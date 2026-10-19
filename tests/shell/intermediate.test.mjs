@@ -201,3 +201,24 @@ describe('round 2: tighter checks', () => {
     assert.match(m.goal + (m.note || ''), /export GREETING/);
   });
 });
+
+describe('round 3: 9.8 across lines (log resets per line, like the UI)', () => {
+  const seq = (...lines) => {
+    const SQ = loadShell();
+    SQ.content.chapters[T9].setup();
+    for (const l of lines) run(SQ, l); // run() resets rt.log per line
+    return SQ.content.chapters[T9].missions[7].check(SQ.ctxFor(lines[lines.length - 1]));
+  };
+  it('accepts a failing command on an earlier line', () => {
+    assert.ok(seq('ls nothing', 'echo $?'));
+    assert.ok(seq('cat nothing', 'echo $?'));
+    assert.ok(seq('cat nothing; echo $?'));
+  });
+  it('rejects code 0 or no real failure', () => {
+    assert.ok(!seq('ls village', 'echo $?'));
+    assert.ok(!seq('echo $?'));
+    assert.ok(!seq('echo 2; echo $?'));
+    assert.ok(!seq('ls nothing', 'echo 2'));
+    assert.ok(!seq('ls nothing', 'ls village', 'echo $?'));
+  });
+});

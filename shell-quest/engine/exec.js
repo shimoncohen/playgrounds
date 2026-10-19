@@ -30,7 +30,9 @@ function runCmd(words,io){
 
 const FOR_RE=/^for\s+([A-Za-z_]\w*)\s+in\s+(.*?)\s*;\s*do\s+(.*?)\s*;?\s*done\s*$/;
 const errOut=e=>({out:[{text:(e.raw?'':'bash: ')+e.message,cls:'err'}],code:2});
-function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const sd=CTX.depth;CTX.depth=o.depth;try{return execLine0(line,o)}finally{CTX.depth=sd}}
+let nest=0;
+/* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
+function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);if(nest===0)SQ.rt.prevLast=S.last;const sd=CTX.depth;CTX.depth=o.depth;nest++;try{return execLine0(line,o)}finally{CTX.depth=sd;nest--}}
 function execLine0(line,o){const res=[];let code=0;
   if(o.depth>6)return {out:[{text:'bash: too many nested scripts',cls:'err'}],code:1};
   const t=line.trim();

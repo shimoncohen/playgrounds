@@ -89,7 +89,7 @@ const CH=[
  {title:'Did it work?',goal:`Every command leaves an exit code. Make one fail, then read it: <code>ls nothing; echo $?</code>`,
   anat:[['ls','cmd'],['nothing','arg'],[';','op'],['echo','cmd'],['$?','var']],answer:'ls nothing; echo $?',
   explain:`<code>$?</code> holds the exit code of the last command. <code>0</code> means success and anything else means failure. Scripts use it to decide what to do next.`,
-  check:c=>/\$\?/.test(c.line)&&c.log.some((e,k)=>k>0&&e.name==='echo'&&c.log[k-1].code!==0&&e.out.trim()===String(c.log[k-1].code))}
+  check:c=>/\$\?/.test(c.line)&&c.log.some((e,k)=>{if(e.name!=='echo')return false;const code=k>0?c.log[k-1].code:SQ.rt.prevLast;return !!code&&e.out.trim()===String(code)})}
  ]}
 ];
 SQ.content.chapters.push(...CH);
