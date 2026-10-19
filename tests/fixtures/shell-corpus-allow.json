@@ -322,18 +322,19 @@
     "code": 0
   },
   "function f { echo hi; }": {
-    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
-    "out": "this practice shell does not support functions yet",
-    "code": 2
+    "reason": "Task 6b: functions run; a definition stores the function and prints nothing (status 0)",
+    "out": "",
+    "code": 0
   },
   "f() { echo hi; }": {
-    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
-    "out": "this practice shell does not support functions yet",
-    "code": 2
+    "reason": "Task 6b: functions run; a definition stores the function and prints nothing (status 0)",
+    "out": "",
+    "code": 0
   },
   "f() { echo hi; }; f": {
-    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
-    "out": "this practice shell does not support functions yet\nbash: f: command not found"
+    "reason": "Task 6b: functions run; defining then calling f prints its body output",
+    "out": "hi",
+    "code": 0
   },
   "[[ -f readme.txt ]] && echo yes": {
     "reason": "Task 6a: [[ ]] now parses; evaluating it arrives in Task 7 (clean \"does not support [[ ]] yet\" until then)",
@@ -424,5 +425,20 @@
   "echo a ;; echo b": {
     "reason": "Task 6a: the whole-text parser (Task 5) names the ;; token like bash: near unexpected token ';;'",
     "out": "bash: syntax error near unexpected token ';;'"
+  },
+  "return": {
+    "reason": "Task 6b: return is a builtin; outside a function it prints bash's message (status 1)",
+    "out": "bash: return: can only 'return' from a function or sourced script",
+    "code": 1
+  },
+  "local x=1": {
+    "reason": "Task 6b: local is a builtin; outside a function it prints bash's message (status 1) and sets nothing",
+    "out": "bash: local: can only be used in a function",
+    "code": 1
+  },
+  "f() { echo hi; }\nf": {
+    "reason": "Task 6b: functions run and persist to the next typed line, so f prints hi",
+    "out": "hi",
+    "code": 0
   }
 }

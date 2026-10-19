@@ -79,7 +79,8 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
       if(box&&box===env.stdin){let got=null; /* shared box: the first read of io.stdin takes the rest of it */
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
-      r=SQ.runCmd(c.words,io)}
+      r=SQ.runCmd(c.words,io);
+      if(r.list&&last&&!out&&!err){if(r.ui)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
       if(cr.ui)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
@@ -110,7 +111,7 @@ function runCompound(c,env){return nested(()=>{
     case 'subshell':return runSubshell(c,env);
     case 'arith':return runArith(c,env);
     case 'cond':return {out:[errL('this practice shell does not support [[ ]] yet')],code:2};
-    case 'func':return {out:[errL('this practice shell does not support functions yet')],code:2};
+    case 'func':return defineFunction(c,env);
   }
   return {out:[errL('bash: internal error: unknown node '+c.type)],code:2}})}
 
@@ -126,7 +127,7 @@ function runIf(c,env){const out=[];let code=0,ui;
   logKw(env,'if',code);return {out,code,ui}}
 
 /* A loop body's ctl: returns 'next' (keep looping), 'stop' (leave the loop) or a ctl to pass outward. outer = loops enclosing this one. */
-function loopCtl(ctl,outer){
+function resolveCtl(ctl,outer){
   if(ctl.type==='break')return ctl.n>1&&outer>0?{type:'break',n:ctl.n-1}:'stop';
   if(ctl.type==='continue')return ctl.n>1&&outer>0?{type:'continue',n:ctl.n-1}:'next';
   return ctl}
@@ -134,10 +135,10 @@ function loopCtl(ctl,outer){
 function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assign({},env,{loops:env.loops+1});
   for(;;){SQ.step();
     const cr=runList(c.cond,inner);out.push(...cr.out);if(cr.ui)ui=cr.ui;
-    if(cr.ctl){pass=loopCtl(cr.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}
+    if(cr.ctl){pass=resolveCtl(cr.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}
     if(c.type==='while'?cr.code!==0:cr.code===0)break;
     const br=runList(c.body,inner);out.push(...br.out);if(br.ui)ui=br.ui;code=br.code;
-    if(br.ctl){pass=loopCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}}
+    if(br.ctl){pass=resolveCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}}
   logKw(env,c.type,code);return {out,code,ui}}
 
 /* for: the list expands once, one 'for' log entry with the items, then one step per pass. The loop variable stays set afterwards. */
@@ -152,7 +153,7 @@ function runFor(c,env){const out=[];let code=0,ui;
   const inner=Object.assign({},env,{loops:env.loops+1});
   for(const it of items){SQ.step();SQ.setVar(c.var,it);
     const br=runList(c.body,inner);out.push(...br.out);if(br.ui)ui=br.ui;code=br.code;
-    if(br.ctl){const pass=loopCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;return {out,code,ctl:pass,ui}}}
+    if(br.ctl){const pass=resolveCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;return {out,code,ctl:pass,ui}}}
   return {out,code,ui}}
 
 function runCase(c,env){const out=[];let code=0,w;
@@ -177,5 +178,55 @@ function runArith(c,env){SQ.step();let v;
   try{v=SQ.arithVal(c.expr)}catch(e){if(e&&e.stop)throw e;const out=[...CTX.pend.splice(0),errL(errOf(e))];logKw(env,'((',1);return {out,code:1}}
   const out=CTX.pend.splice(0),code=v!=='0'?0:1;logKw(env,'((',code);return {out,code}}
 
-Object.assign(SQ,{runProgram,snapshotShell,restoreShell});
+/* ---------- functions ----------
+   S.fns[name] = the source text of the body ({ ... } plus its redirects), parsed lazily on call through a small bounded cache.
+   A call pushes Frame {name,args,kind:'function',locals}; `local` saves the previous value of a name in locals (undefined = was unset)
+   and the pop puts it back, so callees see the caller's locals (dynamic scope) and nothing leaks after the return. */
+const FN_NEST=100,CACHE_MAX=64;
+const parseCache=new Map();let fnDepth=0;
+const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
+const hasFunction=name=>own(S.fns,name);
+function fnsText(skip){let t=0;for(const k of Object.keys(S.fns||{}))if(k!==skip)t+=S.fns[k].length;return t}
+function defineFunction(c,env){const src=c.body.src;
+  if(c.name==='__proto__')return {out:[errL(`bash: \`${c.name}': not a valid identifier`)],code:1};
+  const total=fnsText(c.name)+src.length;
+  if(src.length>SQ.LIM.TEXT||(total>1000&&total+SQ.stateText(S.fs)>SQ.LIM.STATE)){logKw(env,'(fn)',1);return {out:[errL(`bash: ${c.name}: function too large for this practice shell`)],code:1}}
+  (S.fns=S.fns||{})[c.name]=src;
+  logKw(env,'(fn)',0);return {out:[],code:0}}
+function parsedBody(text){let p=parseCache.get(text);
+  if(p){parseCache.delete(text);parseCache.set(text,p);return p}
+  p=SQ.parseProgram(text);parseCache.set(text,p);
+  if(parseCache.size>CACHE_MAX)parseCache.delete(parseCache.keys().next().value);
+  return p}
+function restoreLocals(f){for(const [k,v] of f.locals){if(v===undefined)delete S.vars[k];else S.vars[k]=v}}
+/* runCmd's result shape plus list (the body's Out[] in order, used when the call's output goes straight to the screen) */
+function callFunction(name,args,io){
+  if(fnDepth>=FN_NEST)throw Object.assign(new Error(`bash: ${name}: maximum function nesting level exceeded`),{stop:true});
+  let prog;try{prog=parsedBody(S.fns[name])}catch(e){if(e&&e.stop)throw e;return {out:'',err:[errOf(e)],tips:[],code:e.code||2,list:[errL(errOf(e))]}}
+  const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'function',locals:new Map()};
+  fr.push(f);fnDepth++;let r;
+  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0})}
+  finally{fnDepth--;restoreLocals(f);fr.length=Math.min(fr.length,at)}
+  const ret=r.ctl&&r.ctl.type==='return';
+  const o=asCmd(r);o.code=ret?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
+  if(r.ctl&&!ret)o.ctl=r.ctl;
+  return o}
+/* the frame `local` and `return` act on: the innermost function frame on top of the stack (sourced scripts arrive in Task 7) */
+const fnFrame=()=>{const f=SQ.rt.frames;const t=f[f.length-1];return t&&(t.kind==='function'||t.kind==='source')?t:null};
+function localBuiltin(a){const f=fnFrame();
+  if(!f||f.kind!=='function')return SQ.E('bash: local: can only be used in a function',1);
+  const err=[];let code=0;
+  for(const x of a){const eq=x.indexOf('='),k=eq<0?x:x.slice(0,eq);
+    if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: local: \`${x}': not a valid identifier`);code=1;continue}
+    if(!f.locals.has(k))f.locals.set(k,own(S.vars,k)?S.vars[k]:undefined);
+    if(eq<0)delete S.vars[k];else S.vars[k]=x.slice(eq+1)}
+  return {out:'',err,code}}
+function returnBuiltin(a){
+  if(!fnFrame())return SQ.E("bash: return: can only 'return' from a function or sourced script",1);
+  let n=S.last;
+  if(a.length){if(!/^[-+]?\d+$/.test(a[0]))return Object.assign(SQ.E(`bash: return: ${a[0]}: numeric argument required`,2),{ctl:{type:'return',n:2}});
+    n=((Number(a[0])%256)+256)%256}
+  return {out:'',err:[],code:n,ctl:{type:'return',n}}}
+
+Object.assign(SQ,{runProgram,snapshotShell,restoreShell,callFunction,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
 })(window.SQ=window.SQ||{});

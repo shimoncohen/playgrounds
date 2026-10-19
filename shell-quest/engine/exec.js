@@ -22,8 +22,13 @@ function runCmd(words,io){
   const name=args[0],a=args.slice(1);let r,lname=name;
   if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];S.vars[k]=name.slice(k.length+1);r=ok();lname='(assign)'}
   else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
+  else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
+    if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
+    return r}
   else if(name.includes('/'))r=runPath(name,io,false);
   else if((name==='break'||name==='continue')&&!CMDS[name])r=loopCtl(name,a,io);
+  else if(name==='local'&&!CMDS.local)r=SQ.localBuiltin(a);
+  else if(name==='return'&&!CMDS.return)r=SQ.returnBuiltin(a);
   else if(CMDS[name])r=CMDS[name](a,io);
   else if(FRIENDLY[name])r=E(FRIENDLY[name],127);
   else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
@@ -62,7 +67,7 @@ function capLines(r){let n=0;const out=[];
 /* The whole text is parsed before anything runs: a syntax error prints once and nothing executes. */
 function execLine0(line,o){
   if(o.depth>6)return {out:[{text:'bash: too many nested scripts',cls:'err'}],code:1};
-  let prog;try{prog=SQ.parseProgram(line)}catch(e){if(e&&e.stop)throw e;return errOut(e)}
+  let prog;try{prog=SQ.parseProgram(line)}catch(e){if(e&&e.stop)throw e;const r=errOut(e);S.last=r.code;return r}
   return SQ.runProgram(prog,{depth:o.depth,tty:o.tty,record:o.record,stdin:o.stdin||null})}
 
 function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:SQ.rt.log,

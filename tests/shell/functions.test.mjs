@@ -1,5 +1,5 @@
 // Interpreter core (Task 6a): compound commands, lists, pipelines, here-strings/here-docs, subshells, loop control.
-// Function definitions, frames, local and return arrive in Task 6b.
+// Functions, frames, local and return (Task 6b).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadShell, run } from './harness.mjs';
@@ -148,5 +148,135 @@ describe('caps still hold', () => {
   it('break outside a loop does nothing harmful', () => {
     const SQ = loadShell();
     assert.equal(out('break; echo after', SQ).split('\n').pop(), 'after');
+  });
+});
+
+describe('functions (Task 6b)', () => {
+  it('a function gets its arguments', () => {
+    assert.equal(out('greet() { echo "Hello, $1!"; }; greet Ada'), 'Hello, Ada!');
+    assert.equal(out('count() { echo $#; }; count a b c'), '3');
+  });
+  it('a function persists to the next typed line and in the saved state', () => {
+    const SQ = loadShell();
+    run(SQ, 'greet() { echo "Hello, $1!"; }');
+    assert.equal(out('greet Bo', SQ), 'Hello, Bo!');
+    assert.ok(JSON.parse(JSON.stringify(SQ.S)).fns.greet);
+  });
+  it('the function keyword form works', () => {
+    assert.equal(out('function f { echo hi; }; f'), 'hi');
+    assert.equal(out('function f() { echo hi2; }; f'), 'hi2');
+  });
+  it('local scopes a variable to the call and restores it on return', () => {
+    const SQ = loadShell();
+    assert.equal(out('f() { local x=2; echo $x; }; x=1; f; echo $x', SQ), '2\n1');
+    assert.equal(out('f() { local y=5; }; f; echo "[$y]"', SQ), '[]');
+    assert.equal(out('g() { echo $x; }; h() { local x=in; g; }; x=out; h; echo $x', SQ), 'in\nout');
+    assert.equal(out('k() { local x; x=3; echo $x; }; x=9; k; echo $x', SQ), '3\n9');
+  });
+  it('local outside a function is an error', () => {
+    const r = run(loadShell(), 'local x=1');
+    assert.equal(r.out, 'bash: local: can only be used in a function');
+    assert.equal(r.code, 1);
+  });
+  it('return sets the status; with no number it keeps the last status', () => {
+    assert.equal(out('f() { return 3; }; f; echo $?'), '3');
+    assert.equal(out('f() { echo a; return 4; echo b; }; f; echo $?'), 'a\n4');
+    const SQ = loadShell();
+    const want = out('ls nothing 2>/dev/null; echo $?', SQ);
+    assert.equal(out('f() { ls nothing 2>/dev/null; return; }; f; echo $?', SQ), want);
+    assert.equal(out('f() { for i in 1 2 3; do if echo $i | grep 2 >/dev/null; then return 7; fi; echo $i; done; }; f; echo $?', SQ), '1\n7');
+  });
+  it('return outside a function is an error', () => {
+    const r = run(loadShell(), 'return 3');
+    assert.equal(r.out, "bash: return: can only 'return' from a function or sourced script");
+    assert.equal(r.code, 1);
+  });
+  it('endless recursion stops at the nesting limit and unwinds', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'f() { f; }; f');
+    assert.equal(r.out, 'bash: f: maximum function nesting level exceeded');
+    assert.equal(SQ.rt.frames.length, 0);
+    assert.equal(out('echo ok', SQ), 'ok');
+  });
+  it('recursion inside the limit works; past it stops', () => {
+    const SQ = loadShell();
+    run(SQ, 'down() { if (( $1 > 0 )); then down $(( $1 - 1 )); else echo done; fi; }');
+    assert.equal(out('down 50', SQ), 'done');
+    assert.equal(out('down 150', SQ), 'bash: down: maximum function nesting level exceeded');
+    assert.equal(SQ.rt.frames.length, 0);
+    assert.equal(out('down 3', SQ), 'done');
+  });
+  it('nested for inside if inside a function', () => {
+    assert.equal(out('f() { if echo >/dev/null; then for i in $@; do echo "<$i>"; done; fi; }; f a b'), '<a>\n<b>');
+  });
+  it('for with no list walks the function arguments', () => {
+    assert.equal(out('f() { for i; do echo $i; done; }; f a b'), 'a\nb');
+  });
+  it('a function beats a builtin of the same name', () => {
+    assert.equal(out('pwd() { echo mine; }; pwd'), 'mine');
+  });
+  it('functions read stdin from pipes and redirects', () => {
+    assert.equal(out('f() { cat; }; echo hi | f'), 'hi');
+    assert.equal(out('f() { cat; } <<< hi; f'), 'hi');
+    assert.equal(out('f() { echo a; echo b; }; f | wc -l'), '2');
+    const SQ = loadShell();
+    assert.equal(out('f() { echo saved; }; f > o.txt; cat o.txt', SQ), 'saved');
+  });
+  it('output and errors keep their order', () => {
+    const lines = out('f() { echo a; ls nope; echo b; }; f').split('\n');
+    assert.equal(lines.length, 3);
+    assert.equal(lines[0], 'a');
+    assert.match(lines[1], /nope/);
+    assert.equal(lines[2], 'b');
+  });
+  it('a definition logs (fn); a call logs only its inner commands', () => {
+    const SQ = loadShell();
+    run(SQ, 'f() { echo a; }; f');
+    assert.deepEqual(SQ.rt.log.map((e) => e.name), ['(fn)', 'echo']);
+    const fn = SQ.rt.log[0];
+    assert.deepEqual([...fn.args], []);
+    assert.equal(fn.code, 0);
+  });
+  it('a function defined in $( ) or ( ) does not leak', () => {
+    const SQ = loadShell();
+    assert.equal(out('echo $(g() { echo in; }; g)', SQ), 'in');
+    assert.match(out('g', SQ), /g: command not found/);
+    assert.match(out('( h() { echo in; }; h ); h', SQ), /^in\nbash: h: command not found/);
+  });
+  it('local values come back when the step budget stops a function', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'x=1; f() { local x=2; until ls nothing 2>/dev/null; do echo >/dev/null; done; }; f');
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+    assert.equal(SQ.rt.frames.length, 0);
+    assert.equal(out('echo $x', SQ), '1');
+  });
+  it('the parse cache stays bounded', () => {
+    const SQ = loadShell();
+    for (let i = 0; i < 200; i++) run(SQ, `f${i}() { echo ${i}; }; f${i}`);
+    assert.equal(out('f199', SQ), '199');
+    assert.ok(SQ.fnParseCache.size <= 64, `cache grew to ${SQ.fnParseCache.size}`);
+  });
+  it('function text counts toward the state cap', () => {
+    const SQ = loadShell();
+    const r = run(SQ, `big() { echo "${'A'.repeat(1100000)}"; }`);
+    assert.equal(r.out, 'bash: big: function too large for this practice shell');
+    assert.equal(r.code, 1);
+    assert.ok(!(SQ.S.fns && SQ.S.fns.big));
+    SQ.getNode('/home/explorer/readme.txt').content = 'x'.repeat(1000000);
+    const r2 = run(SQ, `big2() { echo "${'B'.repeat(600000)}"; }`);
+    assert.equal(r2.out, 'bash: big2: function too large for this practice shell');
+    assert.ok(!(SQ.S.fns && SQ.S.fns.big2));
+    assert.equal(out('small() { echo s; }; small', SQ), 's');
+  });
+});
+
+describe('Task 6a review carry-overs', () => {
+  it('<< inside (( )) in $( ) is not a here-document', () => {
+    assert.equal(out('echo "$(x=1; (( x << 2 ))\necho in\n)"'), 'in');
+  });
+  it('a syntax error sets $? to 2', () => {
+    const SQ = loadShell();
+    run(SQ, 'if x');
+    assert.equal(out('echo $?', SQ), '2');
   });
 });

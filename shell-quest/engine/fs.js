@@ -45,10 +45,12 @@ function makeWorld(){
 function fresh(){return {fs:makeWorld(),cwd:HOME,oldpwd:HOME,vars:{},last:0,hist:[],ch:0,mi:0,done:{},xp:0,best:0,badges:{},seen:false}}
 const S=fresh();
 SQ.S=S;
+/* S.fns (function name -> body source text) is lazy like S.exp: absent until the first definition, always read as S.fns||{}. It is saved with S. */
 SQ.fresh=fresh;
 SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];Object.assign(S,next)};
 SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,onSaveFail:null,frames:[]};
-/* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame. */
+/* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame.
+   locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
 SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
 /* Caps that stop runaway commands. TEXT: longest text one command, pipe stage or file may hold. LINES: screen lines per typed line.
@@ -133,5 +135,5 @@ function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const
   if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{LIM,StepLimit,step,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{stateText,LIM,StepLimit,step,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

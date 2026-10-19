@@ -6,22 +6,21 @@ const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
 const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'});
+/* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
-  if(f.locals&&f.locals.has(k)){const v=f.locals.get(k);return v===undefined?'':v}
   if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
   return BUILTIN_VARS()[k]||''}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 function isSet(k){const f=SQ.frame();
   if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
   if(/^\d+$/.test(k))return +k<=f.args.length;
-  if(f.locals&&f.locals.has(k))return f.locals.get(k)!==undefined;
   return own(S.vars,k)||own(BUILTIN_VARS(),k)}
-function setVar(k,v){const f=SQ.frame();
+function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
-  if(f.locals&&f.locals.has(k))f.locals.set(k,v);else S.vars[k]=v}
+  S.vars[k]=v}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
 const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
 const CTX={depth:0,pend:[],sub:0};
@@ -48,6 +47,8 @@ function scanSub(line,i){
   if(line[i+2]==='(')return scanArith(line,i);
   let d=0,j=i+1;const docs=[];
   while(j<line.length){const c=line[j];
+    if(c==='('&&line[j+1]==='('){let e=-1;try{e=scanArith(line,j-1)}catch(x){} /* (( ... )) or $(( ... )): its << is a shift, not a here-document */
+      if(e>0){j=e+1;continue}}
     if(c==='<'&&line[j+1]==='<'&&line[j+2]!=='<'){let k=j+2,strip=false,w='';if(line[k]==='-'){strip=true;k++}
       while(line[k]===' '||line[k]==='\t')k++;
       while(k<line.length&&!/[\s|&;()<>]/.test(line[k])){const q=line[k];
