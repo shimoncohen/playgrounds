@@ -78,6 +78,22 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
+  test(`${name}-quest shows only the selected tab`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1280, height: 800 } });
+    await page.waitForSelector('#mission');
+    const tabs = await page.$$eval('.tabs button[data-tab]', bs => bs.map(b => b.dataset.tab));
+    assert.ok(tabs.length >= 3, 'expected at least 3 tabs');
+    for (const tab of tabs) {
+      await page.click(`.tabs button[data-tab="${tab}"]`);
+      // A panel counts as shown when it takes up space; `hidden` panels must collapse.
+      const shown = await page.$$eval('section[id^="tab-"]', ss =>
+        ss.filter(s => s.getBoundingClientRect().height > 0 && getComputedStyle(s).display !== 'none').map(s => s.id.slice(4)));
+      assert.deepEqual(shown, [tab], `after clicking "${tab}"`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
   test(`${name}-quest progress survives export, wipe and import`, async () => {
     const key = `${name}-quest-v1`;
     const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
