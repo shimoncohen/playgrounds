@@ -211,3 +211,23 @@ describe('diff', () => {
     assert.match(run(SQ, 'diff -z a b').out, /diff: invalid option -- 'z'/);
   });
 });
+
+describe('sed g with empty matches follows sed, not JS', () => {
+  for (const [line, want] of [
+    ["echo baaac | sed 's/a*/X/g'", 'XbXcX'],
+    ["echo a | sed 's/a*/X/g'", 'X'],
+    ['echo "a  b" | sed \'s/ */_/g\'', '_a_b_'],
+    ['echo abc123 | sed \'s/[0-9]*/N/g\'', 'NaNbNcN'],
+    ["echo baaac | sed 's/a*/X/'", 'Xbaaac'],
+  ]) it(line, () => assert.equal(out(line), want));
+});
+
+describe('unsupported real options say so', () => {
+  const U = (l, x) => assert.equal(out(l), `this practice shell does not support ${x} yet`);
+  it('sed -i', () => U("echo a | sed -i 's/a/b/'", 'sed -i'));
+  it('sed negation', () => assert.match(out("echo a | sed '1!d'"), /^this practice shell does not support .*yet$/));
+  it('seq -s', () => U('seq -s, 3', 'seq -s'));
+  it('tr -c', () => U('echo a | tr -cd a', 'tr -c'));
+  it('cut -s', () => U('echo a | cut -s -d, -f1', 'cut -s'));
+  it('nonexistent letter stays invalid option', () => assert.match(out('echo a | sed -j p'), /sed: invalid option -- 'j'/));
+});

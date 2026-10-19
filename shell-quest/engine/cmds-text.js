@@ -1,7 +1,9 @@
 (function (SQ) {
 const {norm,getNode,writeFile,ok,E,lines,readInputs}=SQ;
 const CMDS=SQ.CMDS;
-const badOpt=(cmd,ch)=>E(`${cmd}: invalid option -- '${ch}'`);
+const unsup=x=>E(`this practice shell does not support ${x} yet`);
+const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'v',basename:'asz',dirname:'z'};
+const badOpt=(cmd,ch)=>ch==='-'||(REAL[cmd]||'').includes(ch)?unsup(`${cmd} ${ch==='-'?'--long options':'-'+ch}`):E(`${cmd}: invalid option -- '${ch}'`);
 const isOpt=x=>x.length>1&&x[0]==='-'&&x!=='--';
 const MAX_SEQ=10000,MAX_OUT=200000,MAX_XARGS=1000,MAX_XDEPTH=3;
 const tooBig=(cmd)=>E(`${cmd}: output too large for this practice shell`);
@@ -75,8 +77,10 @@ function sedParse(script){const bad=(n,m)=>({err:`sed: -e expression #1, char ${
   if(A1){cmd.a1=A1;if(script[i]===','){i++;const A2=addr();if(A2&&A2.bad)return A2.bad;if(!A2)return bad(i+1,'unexpected `,\'');if(A1.n===undefined||(A2.n===undefined&&!A2.last))return bad(i,'only N,M and N,$ line ranges are supported here');cmd.a2=A2}}
   while(i<n&&script[i]===' ')i++;
   if(i>=n)return bad(i,'missing command');
+  if(script[i]==='!')return {err:'this practice shell does not support sed negated addresses (!) yet'};
   const c=script[i++];
   if(c==='d'||c==='p'){while(i<n&&script[i]===' ')i++;if(i<n)return bad(i+1,'extra characters after command');cmd.c=c;return {cmd}}
+  if('yaicqnNDPhHgGx=lrwbtTe{'.includes(c))return {err:`this practice shell does not support sed command '${c}' yet`};
   if(c!=='s')return bad(i,`unknown command: \`${c}'`);
   const dl=script[i++];if(dl===undefined||dl==='\n'||dl==='\\')return bad(i,'unterminated `s\' command');
   const part=()=>{let s='';while(i<n&&script[i]!==dl){if(script[i]==='\\'&&i+1<n){if(script[i+1]===dl){s+=RE_SPECIAL.test(dl)&&dl!=='/'?'\\'+dl:dl;i+=2;continue}s+=script[i]+script[i+1];i+=2;continue}s+=script[i++]}
@@ -89,6 +93,12 @@ function mkRe(pat,fl){if(pat.length>200||/\([^()]*[+*][^()]*\)[+*{]/.test(pat))r
 function expandRepl(rp,m){let o='';for(let i=0;i<rp.length;i++){const c=rp[i];
   if(c==='\\'&&i+1<rp.length){const d=rp[++i];if(d==='n')o+='\n';else if(d==='t')o+='\t';else if(/[1-9]/.test(d))o+=m[+d]===undefined?'':m[+d];else o+=d}
   else if(c==='&')o+=m[0];else o+=c}return o}
+function sedSub(line,c){const rx=new RegExp(c.rx.source,'g'+(c.ic?'i':''));let o='',last=0,prevEnd=-1,m;
+  while(last<=line.length&&(m=rx.exec(line))){
+    if(m[0]===''){if(m.index===prevEnd){rx.lastIndex=m.index+1;if(m.index>=line.length)break;continue}}
+    o+=line.slice(last,m.index)+expandRepl(c.rp,m);last=m.index+m[0].length;prevEnd=last;
+    if(!c.g)break;if(m[0]==='')rx.lastIndex=m.index+1}
+  return o+line.slice(last)}
 CMDS.sed=function(a,io){let quiet=false,script=null;const files=[];
   for(let i=0;i<a.length;i++){const x=a[i];
     if(x==='--'){files.push(...a.slice(i+1));break}
@@ -108,7 +118,7 @@ CMDS.sed=function(a,io){let quiet=false,script=null;const files=[];
         if(!hit)continue;
         if(c.c==='d'){del=true;break}
         if(c.c==='p')out.push(line);
-        else{c.rx.lastIndex=0;const next=line.replace(c.rx,(...m)=>{return expandRepl(c.rp,typeof m[m.length-1]==='object'?m.slice(0,-3):m.slice(0,-2))});
+        else{const next=sedSub(line,c);
           const changed=next!==line||false;line=next;if(c.p&&changed)out.push(line)}}
       if(!del&&!quiet)out.push(line)})}
   return {out:out.join('\n'),err,code:err.length?1:0}};
