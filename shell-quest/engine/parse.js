@@ -5,7 +5,7 @@ const M=(c,s)=>'\x01'+c+s+'\x02';
 const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
-const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'});
+const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin',IFS:' \t\n'});
 /* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope).
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
@@ -28,6 +28,23 @@ function setVar(k,v){
   if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
   S.vars[k]=v}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
+/* ---------- word splitting ----------
+   ifsNow(): the current IFS (unset = the default space, tab, newline). ifsScan walks text calling ch(c) for a field character and brk(hard) at a field break:
+   a run of IFS whitespace is one soft break; one other IFS character (with the IFS whitespace around it) is one hard break, which ends a field even when it is empty. */
+const DEF_IFS=' \t\n';
+const ifsNow=()=>isSet('IFS')?getVar('IFS'):DEF_IFS;
+function ifsScan(text,ifs,ch,brk){const n=text.length;
+  const W=c=>(c===' '||c==='\t'||c==='\n')&&ifs.includes(c),D=c=>ifs.includes(c);
+  for(let j=0;j<n;){const c=text[j];
+    if(!D(c)){ch(c);j++;continue}
+    let k=j,hard=false;while(k<n&&W(text[k]))k++;
+    if(k<n&&D(text[k])&&!W(text[k])){hard=true;k++;while(k<n&&W(text[k]))k++}
+    brk(hard);j=k}}
+/* SQ.splitFields(text, ifs) -> the fields of text split on ifs, as an unquoted expansion would be (IFS whitespace collapses and trims, other IFS characters keep empty fields) */
+function splitFields(text,ifs){text=String(text);if(ifs==='')return text===''?[]:[text];
+  const out=[];let cur='',started=false;
+  ifsScan(text,ifs,c=>{cur+=c;started=true},hard=>{if(started||hard)out.push(cur);cur='';started=false});
+  if(started)out.push(cur);return out}
 const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
 const CTX={depth:0,pend:[],sub:0,lastSub:null}; /* lastSub: status of the most recently finished $( ), read by an assignment-only command */
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
@@ -173,11 +190,18 @@ function braceVal(body){let m;
 function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const toks=[],pending=[],P=!!opt.pos;let i=0,cur=null;
   if(P){const tp=toks.push.bind(toks);toks.push=t=>{if(t.t==='op'){t.s=(t.v==='<<'||t.v==='<<-')?i-t.v.length:i;t.e=t.s+t.v.length}return tp(t)}} /* opt.pos (AST parser): tokens carry source offsets s/e */
-  const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
-  /* splice a substitution result into the current word, splitting it on whitespace; e = index of the expansion's last character */
-  const inject=(val,e)=>{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
-    if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
-    else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}};
+  /* a word that is empty and was never quoted came only from expansions: it vanishes (e= ; printf '[%s]' $e a -> [a]); a dry scan keeps it for the AST */
+  const push=()=>{if(cur){if(!(cur.v===''&&(cur.empt||(!dry&&!cur.keep))))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
+  /* splice an unquoted expansion's result into the current word: split on IFS (a field break ends the word so far; a hard break ends it even when empty),
+     and * or ? in the result make the word a glob pattern. opt.nosplit (assignments, redirect targets, case words): appended as is. */
+  const started=()=>cur.v!==''||cur.keep;
+  const splice=val=>{if(opt.nosplit){cur.v+=val;return}
+    const ifs=ifsNow(),add=c=>{cur.v+=c;if(c==='*'||c==='?')cur.glob=true};
+    if(ifs===''){for(const c of val)add(c);return}
+    ifsScan(val,ifs,add,hard=>{if(started()||hard){if(hard){cur.keep=true;delete cur.empt}push()}cur=fresh()})};
+  /* unquoted $@ / $*: each argument is spliced on its own, with a field break between them (an empty argument vanishes) */
+  const spliceList=list=>{if(opt.nosplit){cur.v+=list.join(' ');return}
+    list.forEach((a,k)=>{if(k>0){if(started())push();cur=fresh()}splice(a)})};
   const fresh=()=>({v:'',glob:false,s:i});
   /* opt.pos only: (( ... )) and [[ ... ]] at command position are one raw span token, so << < > inside are never redirects or here-docs; null = not a span (unterminated or ((a); (b)) -> normal tokens) */
   const spanOk=()=>{const l=toks[toks.length-1];
@@ -237,16 +261,15 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
         if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
         if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
           if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
-            if(!d.list.length)atEmpty=true;else{s+=d.list[0];for(let k=1;k<d.list.length;k++){cur.v+=s;push();cur=fresh();s=d.list[k]}}}
-          else s+=d.list?d.list.join(' '):d.val;
+            if(!d.list.length)atEmpty=true;else{s+=d.list[0];for(let k=1;k<d.list.length;k++){cur.v+=s;push();cur=fresh();cur.keep=true;s=d.list[k]}}}
+          else s+=d.list?d.list.join(line[j+1]==='*'||line[j+2]==='*'?ifsJoin():' '):d.val; /* "$*" joins with the first IFS character */
           j=d.end;continue}}s+=line[j];j++}
       if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;if(atEmpty&&s===''&&cur.v==='')cur.empt=true;i=j+1;continue}
     if(c==='$'&&line[i+1]==='('&&line[i+2]!=='('){const e=scanSub(line,i);
-      if(!dry){const val=runSub(line.slice(i+2,e));
-        if(opt.nosplit)cur.v+=val;else inject(val,e)}
+      if(!dry)splice(runSub(line.slice(i+2,e)));
       i=e+1;continue}
     if(c==='$'){const d=evalDollar(line,i,dry,false);if(d){
-      if(d.list&&!opt.nosplit)inject(d.list.join(' '),d.end-1);else cur.v+=d.list?d.list.join(' '):d.val;
+      if(dry)cur.v+=d.val;else if(d.list)spliceList(d.list);else splice(d.val);
       i=d.end;continue}}
     if(c==='\\'&&i+1<line.length){cur.v+=line[i+1];i+=2;continue}
     if(c==='*'||c==='?')cur.glob=true;
@@ -254,9 +277,15 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   push();return toks}
 /* Words from parse() carry their raw source; expand them at run time so earlier commands on the line (X=1; echo $X) and $(...) take effect in order. */
 const ASSIGN=/^[A-Za-z_]\w*=/;
+const ifsJoin=()=>{const f=ifsNow();return f===''?'':f[0]};
 function expandWord(w,nosplit){return tokenize(w.raw,{nosplit}).filter(t=>t.t==='w')}
-function expandWords(words,exporting){const out=[];
-  words.forEach((w,k)=>{const ns=(k===0&&ASSIGN.test(w.raw))||(exporting&&k>0&&ASSIGN.test(w.raw));out.push(...expandWord(w,ns))});return out}
+/* expandWords(words, cmd): cmd = the words of a simple command. Then NAME=value words are not split or globbed when every word is one (an assignment-only
+   command, marked assign) or when the command is a declaration builtin (export, local, readonly, declare), as in bash. A for list (cmd false) splits every word. */
+const DECL=/^(export|local|readonly|declare)$/;
+function expandWords(words,cmd){const out=[];
+  const all=cmd&&words.every(w=>ASSIGN.test(w.raw)),decl=cmd&&DECL.test(words[0].raw);
+  words.forEach((w,k)=>{const ns=all||(decl&&k>0&&ASSIGN.test(w.raw));const ts=expandWord(w,ns);
+    for(const t of ts){if(all){t.assign=true;t.glob=false}out.push(t)}});return out} /* no push(...ts): a split value can give 500,000 fields */
 function expandOne(w){return expandWord(w,true).map(t=>t.v).join(' ')}
 /* Body of a here-document whose delimiter was unquoted: $VAR ${ } $( ) $(( )) expand; \$ \` \\ and backslash-newline are escapes, every other backslash and all quotes stay literal. */
 function expandHeredoc(raw){let o='',j=0;
@@ -296,5 +325,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

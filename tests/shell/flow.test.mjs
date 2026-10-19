@@ -471,3 +471,84 @@ describe('Stage 3 leftovers: type, break in functions, abort on ${X:?}', () => {
     assert.equal(o('v=$(echo ${X:?m}; echo after); echo "[$v]"', SQ), 'bash: X: m\n[]');
   });
 });
+
+// Stage 3, Task 4: prefix assignments and read with IFS.
+describe('prefix assignments (X=1 cmd)', () => {
+  const o = (line, SQ = loadShell()) => run(SQ, line).out;
+  it('the AST keeps leading NAME=word items in assigns', () => {
+    const SQ = loadShell();
+    const c = SQ.parseProgram('X=1 Y="a b" echo hi').items[0].andor.first.cmds[0];
+    assert.deepEqual(Array.from(c.assigns, (a) => [a.name, a.word.raw]), [['X', 'X=1'], ['Y', 'Y="a b"']]);
+    assert.deepEqual(Array.from(c.words, (w) => w.raw), ['echo', 'hi']);
+    const d = SQ.parseProgram('X=1').items[0].andor.first.cmds[0];
+    assert.equal(d.assigns.length, 0);
+    assert.deepEqual(Array.from(d.words, (w) => w.raw), ['X=1']);
+    assert.equal(SQ.parseProgram('echo X=1').items[0].andor.first.cmds[0].assigns.length, 0);
+  });
+  it('expansion happens before the assignment, which is scoped to the command', () => {
+    const SQ = loadShell();
+    assert.equal(o('X=1 echo $X', SQ), '');
+    assert.equal(o('echo "[$X]"', SQ), '[]');
+    assert.equal(o('f() { echo "[$X]"; }; X=7 f; echo "[$X]"', SQ), '[7]\n[]');
+    assert.equal(o('X=old; X=new f; echo "[$X]"', SQ), '[new]\n[old]');
+  });
+  it('a script sees a prefix variable as exported, and the caller gets its own back', () => {
+    const SQ = loadShell();
+    SQ.writeFile('/home/explorer/p.sh', 'echo "[$X]"', false, 'p.sh');
+    assert.equal(o('X=5 bash p.sh; echo "[$X]"', SQ), '[5]\n[]');
+    assert.equal(o('X=1; X=5 bash p.sh; echo "[$X]"', SQ), '[5]\n[1]');
+    assert.equal(o('bash p.sh', SQ), '[]');
+  });
+  it('the status is the command\'s; a prefix on a missing command is restored too', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'X=1 false');
+    assert.equal(r.code, 1);
+    assert.equal(run(SQ, 'X=1 nosuchcmd').code, 127);
+    assert.equal(o('echo "[$X]"', SQ), '[]');
+  });
+  it('several assignments with no command all stay set', () => {
+    assert.equal(o('x=1 y=2; echo $x $y'), '1 2');
+    assert.equal(o('x=$(echo "a  b") y=$x; echo "[$x][$y]"'), '[a  b][a  b]');
+  });
+  it('an assignment with no command left after expansion stays set', () => {
+    assert.equal(o('X=3 $nothing; echo $X'), '3');
+  });
+  it('a bad name is refused', () => {
+    const r = run(loadShell(), '__proto__=1 echo hi');
+    assert.equal(r.code, 1);
+    assert.match(r.out, /not a valid identifier/);
+  });
+});
+
+describe('read and IFS', () => {
+  it('IFS=, read splits on commas and IFS is unchanged afterwards', () => {
+    const SQ = loadShell();
+    assert.equal(out('IFS=, read a b <<< "1,2"; echo $a $b', SQ), '1 2');
+    assert.equal(out('echo "${#IFS}"', SQ), '3');
+    run(SQ, 'IFS=:');
+    assert.equal(out('IFS=, read a b <<< "3,4"; echo "$a $b $IFS"', SQ), '3 4 :');
+  });
+  it('IFS= read -r keeps the whole line', () => {
+    assert.equal(out('IFS= read -r l <<< "  x  y "; echo "[$l]"'), '[  x  y ]');
+    assert.equal(out('IFS= read -r a b <<< " x y "; echo "[$a][$b]"'), '[ x y ][]');
+    assert.equal(out("IFS= read -r l <<< 'a\\b'; echo \"[$l]\""), '[a\\b]');
+    assert.equal(out("IFS= read l <<< 'a\\b'; echo \"[$l]\""), '[ab]');
+  });
+  it('a non-whitespace IFS keeps empty fields and governs the last-name rule', () => {
+    assert.equal(out('IFS=, read a b c <<< ",x"; echo "[$a][$b][$c]"'), '[][x][]');
+    assert.equal(out('IFS=, read a b <<< "1,2,"; echo "[$a][$b]"'), '[1][2]');
+    assert.equal(out('IFS=, read a b <<< "1,2,3,"; echo "[$a][$b]"'), '[1][2,3,]');
+    assert.equal(out('IFS=, read a <<< "1,,"; echo "[$a]"'), '[1,,]');
+    assert.equal(out('IFS=, read a b <<< "1,,"; echo "[$a][$b]"'), '[1][]');
+    assert.equal(out('IFS=", " read a b <<< "1 , 2 , "; echo "[$a][$b]"'), '[1][2]');
+    assert.equal(out('IFS=: read a <<< "  x  "; echo "[$a]"'), '[  x  ]');
+    assert.equal(out('IFS=, read a b <<< "1,a\\,b"; echo "[$a][$b]"'), '[1][a,b]');
+    assert.equal(out('IFS=, read -r a b <<< "1,a\\,b"; echo "[$a][$b]"'), '[1][a\\,b]');
+  });
+  it('IFS set for the whole shell also applies, and a file walk with IFS= read -r keeps spaces', () => {
+    assert.equal(out('IFS=:; read a b <<< "1:2 3"; echo "[$a][$b]"'), '[1][2 3]');
+    const SQ = loadShell();
+    SQ.writeFile('/home/explorer/sp.txt', '  one  \ntwo', false, 'sp.txt');
+    assert.equal(out('while IFS= read -r l; do echo "[$l]"; done < sp.txt', SQ), '[  one  ]\n[two]');
+  });
+});

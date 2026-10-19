@@ -580,5 +580,40 @@
     "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash behaviour); pwd, a later stage, and the shell both stay in the home directory",
     "out": "/home/explorer",
     "cwd": "/home/explorer"
+  },
+  "X=a Y=b": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "",
+    "code": 0,
+    "vars": {
+      "X": "a",
+      "Y": "b"
+    }
+  },
+  "X= 1": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "bash: 1: command not found"
+  },
+  "X=*; echo $X": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini forest journal.txt notes.txt readme.txt scripts secrets.txt village"
+  },
+  "X=$(ls forest); echo $X": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "cave mushroom.txt owl.txt"
+  },
+  "a=b echo hi": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "hi",
+    "code": 0
+  },
+  "X=1 echo $X": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "[setup 0..8]\necho \"Today is $(date)\"\necho \"wolves: $(grep -ic wolf journal.txt)\"\necho '$HOME'\nFILES=$(ls village); echo $FILES": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "logs people.txt sales.csv shop.txt"
   }
 }

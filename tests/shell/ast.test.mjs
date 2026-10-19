@@ -176,7 +176,14 @@ describe('parseProgram: simple commands and redirects', () => {
   it('quoted reserved word at command position is a command', () => {
     assert.equal(first('"if" x').type, 'simple');
   });
-  it('assignment prefix words stay words', () => assert.deepEqual(words(first('X=1 Y=2 cmd')), ['X=1', 'Y=2', 'cmd']));
+  // Stage 3 Task 4: leading NAME=word items before a command name move to assigns; a command of assignments only keeps them as words
+  it('assignment prefix words become assigns', () => {
+    const c = first('X=1 Y=2 cmd');
+    assert.deepEqual(words(c), ['cmd']);
+    assert.deepEqual(Array.from(c.assigns, (a) => a.name + '|' + a.word.raw), ['X|X=1', 'Y|Y=2']);
+    assert.deepEqual(words(first('X=1 Y=2')), ['X=1', 'Y=2']);
+    assert.deepEqual(words(first('cmd X=1')), ['cmd', 'X=1']);
+  });
   it('nothing in a redirect target is a syntax error', () => {
     synErr('echo >', "syntax error near unexpected token 'newline'");
     synErr('echo > ;', "syntax error near unexpected token ';'");

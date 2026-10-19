@@ -4,18 +4,41 @@ const {LIM,HOME,norm,getNode,bname,ok,E,globExpand,CTX,expandWords,CMDS,FRIENDLY
 /* ./FILE and bash FILE: SQ.runScript (interp.js) does the work; args are $1.., stdin comes from a pipe or < */
 function runPath(name,io,force,args){return SQ.runScript(name,{args:args||[],depth:io.depth,tty:io.tty,force,stdinBox:io.stdinBox||null})}
 
-function runCmd(words,io){
+/* assignment words (NAME=value text after expansion): [[name, value]], or an error result for a bad name */
+function assignPairs(texts){const out=[];
+  for(const t of texts){const k=t.slice(0,t.indexOf('='));if(SQ.badName(k))return E(`bash: \`${k}': not a valid identifier`,1);
+    const v=t.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');out.push([k,v])}
+  return out}
+const failExp=e=>{if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.code||2);if(e&&e.abort)er.ctl={type:'exit',n:1,abort:true};return er};
+/* runCmd(words, io, assigns): assigns = the prefix assignments of `X=1 cmd` (AST Simple.assigns). The words expand first (X=1 echo $X prints the old X),
+   then the values; they are set and exported for this one command only (functions and scripts see them, read honours IFS) and put back afterwards.
+   With no command left after expansion (X=1 $empty) they stay set, as an assignment-only command. */
+function runCmd(words,io,assigns){
   if(!words.length)return ok();
   SQ.step();
-  const args=[];let globbed=false;let ew;
+  let ew,pre=null;
   CTX.lastSub=null;
-  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.code||2);if(e&&e.abort)er.ctl={type:'exit',n:1,abort:true};return er}
+  const all=!(assigns&&assigns.length)&&words.every(w=>/^[A-Za-z_]\w*=/.test(w.raw));
+  try{if(all){ew=[]; /* a=1 b=$a: left to right, each value sees the ones before it */
+      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps))break;for(const [k,v] of ps)S.vars[k]=v}}
+    else ew=expandWords(words,true);
+    if(assigns&&assigns.length)pre=assigns.map(x=>SQ.expandOne(x.word))}
+  catch(e){return failExp(e)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
-  if(!ew.length)return Object.assign(ok(),{err:pend});
+  if(pre){pre=assignPairs(pre);if(!Array.isArray(pre))return Object.assign(pre,{err:pend.concat(pre.err)})}
+  if(!ew.length){if(pre){for(const [k,v] of pre)S.vars[k]=v;const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;return r}
+    return Object.assign(ok(),{err:pend})}
+  if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
+    for(const [k,v] of pre){S.vars[k]=v;(S.exp=S.exp||{})[k]=1}
+    try{return runCmd0(ew,io,pend)}
+    finally{for(const [k,v,x] of saved){if(v===undefined)delete S.vars[k];else S.vars[k]=v;if(!x&&S.exp)delete S.exp[k]}}}
+  return runCmd0(ew,io,pend)}
+function runCmd0(ew,io,pend){const args=[];let globbed=false;
   for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
   const name=args[0],a=args.slice(1);let r,lname=name;
-  if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];lname='(assign)';
-    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{const v=name.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');S.vars[k]=v;r=ok();if(CTX.lastSub!==null)r.code=CTX.lastSub}} /* an assignment-only command takes the status of its last $( ) */
+  if(ew.every(w=>w.assign)){lname='(assign)'; /* NAME=value words only: each one is set; the command takes the status of its last $( ) */
+    const ps=assignPairs(ew.map(w=>w.v));
+    if(!Array.isArray(ps))r=ps;else{for(const [k,v] of ps)S.vars[k]=v;r=ok();if(CTX.lastSub!==null)r.code=CTX.lastSub}}
   else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}

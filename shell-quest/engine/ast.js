@@ -5,6 +5,7 @@ const MAX_DEPTH=100;
 const CLOSERS=new Set(['then','elif','else','fi','do','done','esac','}']);
 const REDIR_OPS=new Set(['>','>>','<','2>','2>>','2>&1','>&2','<<','<<-','<<<']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
+const ASSIGN=/^[A-Za-z_][A-Za-z0-9_]*=/;
 const fail=(m,raw)=>Object.assign(new Error(m),{code:2,raw:!!raw});
 const bad=t=>fail("syntax error near unexpected token '"+(t===undefined||t==='\n'?'newline':t)+"'");
 const eofErr=()=>fail('syntax error: unexpected end of file');
@@ -90,13 +91,16 @@ function parseProgram(text){
     return parseSimple()}
 
   function parseSimple(){
-    const s=startOf(),n={type:'simple',words:[],out:null,inp:null,err:null,doc:null,herestr:null};
+    const s=startOf(),n={type:'simple',words:[],assigns:[],out:null,inp:null,err:null,doc:null,herestr:null};
     for(;;){const t=tk();if(!t)break;
       if(t.t==='w'){n.words.push(next());continue}
       if(REDIR_OPS.has(t.v)){redirect(n);continue}
       if(t.v==='('&&n.words.length&&/=$/.test(n.words[n.words.length-1].raw)&&toks[p-1].e===t.s)throw unsup('arrays');
       break}
     if(!n.words.length&&!n.out&&!n.inp&&!n.err&&!n.doc&&!n.herestr){const t=tk();throw t?bad(show(t)):eofErr()}
+    /* leading NAME=word items before a command name are prefix assignments (X=1 cmd); a command of assignments only keeps them as words */
+    let a=0;while(a<n.words.length&&ASSIGN.test(n.words[a].raw))a++;
+    if(a&&a<n.words.length){n.assigns=n.words.slice(0,a).map(w=>({name:w.raw.slice(0,w.raw.indexOf('=')),word:w}));n.words=n.words.slice(a)}
     if(n.doc&&isOp(tk(),'\n'))lastEnd=tk().e; /* the here-document body follows the line break */
     return mk(n,s)}
 

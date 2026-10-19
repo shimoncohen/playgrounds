@@ -225,5 +225,297 @@
   "printf \"echo a\\necho (\\n\" > s.sh\nbash s.sh": {
     "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
     "out": "s.sh: line 2: syntax error near unexpected token '('"
+  },
+  "x=$(false) y=$(true); echo $?": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "0",
+    "vars": {
+      "x": "",
+      "y": ""
+    }
+  },
+  "x=\"a b  c\"; printf \"[%s]\" $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[a][b][c]"
+  },
+  "e=; printf \"[%s]\" $e a": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "[a]"
+  },
+  "n=\"a*\"; touch ab; echo $n": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "ab"
+  },
+  "IFS=,; y=\"1,2,,3\"; printf \"[%s]\" $y": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "[1][2][][3]"
+  },
+  "[ -n $unset ] && echo true || echo false": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "true"
+  },
+  "IFS=, read a b <<< \"1,2\"; echo $a $b": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "1 2",
+    "vars": {
+      "a": "1",
+      "b": "2"
+    }
+  },
+  "f() { echo \"[$X]\"; }; X=7 f; echo \"[$X]\"": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "[7]\n[]"
+  },
+  "X=1 echo $X": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "x=`echo a b`; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
+    "out": "bash: a: command not found"
+  },
+  "[ -n $UNSET ] && echo weird": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "weird",
+    "code": 0
+  },
+  "[ $UNSET = x ] || echo noeq": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: [: =: binary operator expected\nnoeq"
+  },
+  "x=\"a b\"; [ $x = \"a b\" ]; echo $?": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: [: a: binary operator expected\n2"
+  },
+  "x=$(for i in 1 2 3; do echo $i; done); echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "1 2 3"
+  },
+  "set -- a b c; echo $1 $2 $3 $#": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "bash: set: command not found\nDid you mean: sed?\n0"
+  },
+  "echo $0 $1 $2": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "bash"
+  },
+  "x=1 y=2; echo $x $y": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "1 2",
+    "vars": {
+      "x": "1",
+      "y": "2"
+    }
+  },
+  "x=1 echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "x=1 env | grep ^x=": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "x=1",
+    "code": 0
+  },
+  "x=1; x=2 true; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "1"
+  },
+  "FOO=bar printenv FOO": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "bash: printenv: command not found"
+  },
+  "LC_ALL=C sort readme.txt": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "Folders hold other things. Files hold text.\nThis world is made of folders and files.\nType help any time to see the commands you can use.\nWelcome, explorer!",
+    "code": 0
+  },
+  "x=a b": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "bash: b: command not found"
+  },
+  "x=`echo a`; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
+    "out": "bash: a`: command not found"
+  },
+  "x=\"a  b\"; echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "x=\"  a  \"; echo [$x]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[ a ]"
+  },
+  "x=\"a b c\"; for w in $x; do echo $w; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a\nb\nc",
+    "vars": {
+      "x": "a b c",
+      "w": "c"
+    }
+  },
+  "x=\"*\"; echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "x=$(ls); echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "x=\"a b\"; touch $x; ls": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a  b  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/a",
+        0,
+        "da39a3ee"
+      ],
+      [
+        "/home/explorer/b",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "x=\"a b\"; mkdir $x; ls": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a/  b/  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "x=\"\"; echo $x end": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "end"
+  },
+  "IFS=,; x=\"a,b,c\"; for i in $x; do echo $i; done": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "a\nb\nc",
+    "vars": {
+      "IFS": ",",
+      "x": "a,b,c",
+      "i": "c"
+    }
+  },
+  "IFS=:; echo $PATH": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "/usr/local/bin /usr/bin /bin"
+  },
+  "IFS=,; read a b <<< \"1,2\"; echo $a $b": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "1 2",
+    "vars": {
+      "IFS": ",",
+      "a": "1",
+      "b": "2"
+    }
+  },
+  "IFS= read -r l <<< \"  x  \"; echo \"[$l]\"": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "[  x  ]",
+    "vars": {
+      "l": "  x  "
+    }
+  },
+  "OLDIFS=$IFS; IFS=,; IFS=$OLDIFS; echo ok": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "vars": {
+      "OLDIFS": " \t\n",
+      "IFS": " \t\n"
+    }
+  },
+  "v='a b'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": "a b",
+      "w": "b"
+    }
+  },
+  "v='a b'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v='a b'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "v=' a  b '; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "v=' a  b '; echo [$v]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[ a b ]"
+  },
+  "v=' a  b '; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": " a  b ",
+      "w": "b"
+    }
+  },
+  "v=' a  b '; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v=' a  b '; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "v='*'; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "v='*'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<camp>\n<config.ini>\n<docs>\n<drafts>\n<forest>\n<journal.txt>\n<lib>\n<logs>\n<notes.txt>\n<numbers.txt>\n<readme.txt>\n<scripts>\n<secrets.txt>\n<village>",
+    "vars": {
+      "v": "*",
+      "w": "village"
+    }
+  },
+  "v='*'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp|config.ini|docs|drafts|forest|journal.txt|lib|logs|notes.txt|numbers.txt|readme.txt|scripts|secrets.txt|village|"
+  },
+  "v='*'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: too many arguments\nempty"
+  },
+  "v=''; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "",
+    "vars": {
+      "v": ""
+    }
+  },
+  "v=''; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "set"
+  },
+  "v='a\tb'; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "v='a\tb'; echo [$v]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[a b]"
+  },
+  "v='a\tb'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": "a\tb",
+      "w": "b"
+    }
+  },
+  "v='a\tb'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v='a\tb'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
   }
 }

@@ -363,8 +363,8 @@ describe('advanced quick-fire and guide (chapters 12 and 13)', () => {
     const cs = SQ.content.guide.filter((g) => g.ch === 11 || g.ch === 12).map((g) => g.c);
     for (const k of ['[', 'test', '[[', 'if', 'case', 'while', 'until', 'break', 'read', '$(( ))']) assert.ok(cs.includes(k), `guide entry ${k}`);
     const at = SQ.content.guide.find((g) => g.c === '"$@"');
-    assert.match(at.what, /Always quote variables: bash splits an unquoted variable/, 'the "$@" entry warns that this shell does not split $var');
-    assert.match(at.what, /for f in \$files loops once here but once per word in bash/);
+    assert.match(at.what, /Always quote variables: bash splits an unquoted variable/, 'the "$@" entry warns that an unquoted $var is split');
+    assert.match(at.what, /for f in \$files loops once per word/); // Stage 3 Task 4: this shell splits too, so the entry no longer says it does not
   });
   it('every advanced quick-fire answer runs without an error in a set-up world', () => {
     for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced'))

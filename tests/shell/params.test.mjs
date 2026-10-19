@@ -343,3 +343,99 @@ describe('Stage 3 leftovers: parameters and status', () => {
     assert.ok(!/^USER=/m.test(o('env', SQ)));
   });
 });
+
+// Stage 3, Task 4: word splitting on IFS, empty expansions, globbing after splitting.
+describe('word splitting and IFS', () => {
+  const o = (line, SQ = loadShell()) => run(SQ, line).out;
+  it('SQ.splitFields: IFS whitespace collapses and trims, other IFS characters keep empty fields', () => {
+    const SQ = loadShell();
+    assert.deepEqual([...SQ.splitFields('  a b  c ', ' \t\n')], ['a', 'b', 'c']);
+    assert.deepEqual([...SQ.splitFields('1,2,,3', ',')], ['1', '2', '', '3']);
+    assert.deepEqual([...SQ.splitFields(',,', ',')], ['', '']);
+    assert.deepEqual([...SQ.splitFields(' a , b ,, c ', ' ,')], ['a', 'b', '', 'c']);
+    assert.deepEqual([...SQ.splitFields('a b', '')], ['a b']);
+    assert.deepEqual([...SQ.splitFields('', ' ')], []);
+    assert.deepEqual([...SQ.splitFields('   ', ' ')], []);
+  });
+  it('an unquoted $var splits, a quoted one does not', () => {
+    assert.equal(o('x="a b  c"; printf \'[%s]\' $x'), '[a][b][c]');
+    assert.equal(o('x="a b  c"; printf \'[%s]\' "$x"'), '[a b  c]');
+    assert.equal(o('x="a b  c"; printf \'[%s]\' ${x}'), '[a][b][c]');
+    assert.equal(o('x=" a"; printf \'[%s]\' ""$x'), '[][a]');
+    assert.equal(o('x="b c"; printf \'[%s]\' a${x}d'), '[ab][cd]');
+    assert.equal(o('x=\'a"b c\'; printf \'[%s]\' $x'), '[a"b][c]');
+  });
+  it('$( ) and $(( )) results split; literal and quoted text never does', () => {
+    assert.equal(o('for w in $(echo a b); do echo $w; done'), 'a\nb');
+    assert.equal(o('printf \'[%s]\' $(echo "a  b")'), '[a][b]');
+    assert.equal(o('printf \'[%s]\' "$(echo "a  b")"'), '[a  b]');
+    assert.equal(o('printf \'[%s]\' $((1+2))x'), '[3x]');
+    assert.equal(o('IFS=1; printf \'[%s]\' $((101))'), '[][0]');
+    assert.equal(o('printf \'[%s]\' "a b" \'c d\' e\\ f'), '[a b][c d][e f]');
+  });
+  it('an empty unquoted expansion vanishes', () => {
+    assert.equal(o('e=; printf \'[%s]\' $e a'), '[a]');
+    assert.equal(o('e=; printf \'[%s]\' "$e" a'), '[][a]');
+    assert.equal(o('printf \'[%s]\' $nosuch $(true) a'), '[a]');
+    assert.equal(o('x=""; echo $x end'), 'end');
+    assert.equal(o('v=\'\'; for w in $v; do echo "<$w>"; done; echo done'), 'done');
+    assert.equal(o('[ -n $unset ] && echo T || echo F'), 'T');
+    assert.equal(o('[ -n "$unset" ] && echo T || echo F'), 'F');
+  });
+  it('globbing happens after splitting, only for unquoted expansions', () => {
+    const SQ = loadShell();
+    run(SQ, 'touch ab');
+    assert.equal(o('n="a*"; echo $n', SQ), 'ab');
+    assert.equal(o('n="a*"; echo "$n"', SQ), 'a*');
+    assert.equal(o('n="zz a?"; echo $n', SQ), 'zz ab');
+    assert.equal(o('n="q*"; echo $n', SQ), 'q*');
+    assert.equal(o('n="a*"; a=$n; echo "$a"', SQ), 'a*');
+  });
+  it('assignments, here-documents, [[ ]], case words, redirect targets and here-strings never split', () => {
+    const SQ = loadShell();
+    assert.equal(o('x="a  b"; a=$x; echo "[$a]"', SQ), '[a  b]');
+    assert.equal(o('x="a  b"; a=$x b=$(echo "1  2"); echo "[$a][$b]"', SQ), '[a  b][1  2]');
+    SQ.writeFile('/home/explorer/h.sh', 'x="a  b"\ncat <<EOF\n$x|$(echo "c  d")\nEOF', false, 'h.sh');
+    assert.equal(o('bash h.sh', SQ), 'a  b|c  d');
+    assert.equal(o('x="a  b"; [[ $x == "a  b" ]] && echo ok', SQ), 'ok');
+    assert.equal(o('x="a  b"; [[ -n $x && $x = a* ]] && echo ok', SQ), 'ok');
+    assert.equal(o('x="a  b"; case $x in "a  b") echo hit;; *) echo miss;; esac', SQ), 'hit');
+    assert.equal(o('x="o  p"; echo hi > $x; cat "o  p"', SQ), 'hi');
+    assert.equal(o('x="a  b"; cat <<< $x', SQ), 'a  b');
+    assert.equal(o('f() { local y=$1; echo "[$y]"; }; f "a  b"', SQ), '[a  b]');
+    assert.equal(o('x="a  b"; export z=$x; echo "[$z]"', SQ), '[a  b]');
+  });
+  it('a custom IFS', () => {
+    assert.equal(o('IFS=,; y="1,2,,3"; printf \'[%s]\' $y'), '[1][2][][3]');
+    assert.equal(o('x="a b  c"; IFS= ; printf \'[%s]\' $x'), '[a b  c]');
+    assert.equal(o('IFS=,; x="a,b,c"; for i in $x; do echo $i; done'), 'a\nb\nc');
+    assert.equal(o('IFS=:; for d in $PATH; do echo $d; done'), '/usr/local/bin\n/usr/bin\n/bin');
+    assert.equal(o('IFS=", "; x=" a , b ,, c "; printf \'[%s]\' $x'), '[a][b][][c]');
+    assert.equal(o('IFS=,; x=",b"; printf \'[%s]\' a$x'), '[a][b]');
+    assert.equal(o('IFS=,; x="b,"; printf \'[%s]\' a${x}c'), '[ab][c]');
+    assert.equal(o('OLDIFS=$IFS; IFS=,; IFS=$OLDIFS; x="a b"; printf \'[%s]\' $x'), '[a][b]');
+    assert.equal(o('IFS=,; unset IFS; x="a b"; printf \'[%s]\' $x'), '[a][b]');
+    assert.equal(o('echo "[${#IFS}]"'), '[3]');
+    assert.equal(o('unset IFS; echo "${IFS-unset}"; x="a b"; printf \'[%s]\' $x'), 'unset\n[a][b]');
+  });
+  it('a value split into a quarter of a million fields does not overflow', () => {
+    const SQ = loadShell();
+    assert.equal(o('x="a "; for i in $(seq 1 18); do x=$x$x; done; echo $x | wc -w; f() { echo $#; }; f $x', SQ), '262144\n262144');
+    assert.equal(o('echo next', SQ), 'next');
+  });
+  it('"$@", $@, "$*" and $*', () => {
+    const SQ = loadShell();
+    run(SQ, 'f() { printf \'[%s]\' "$@"; echo; printf \'[%s]\' $@; echo; printf \'[%s]\' "$*"; echo; printf \'[%s]\' $*; }');
+    assert.equal(o('f "a b" c', SQ), '[a b][c]\n[a][b][c]\n[a b c]\n[a][b][c]');
+    assert.equal(o('f a "" b', SQ), '[a][][b]\n[a][b]\n[a  b]\n[a][b]');
+    assert.equal(o('g() { IFS=,; echo "$*"; IFS=; echo "$*"; unset IFS; echo "$*"; }; g "a b" c', SQ), 'a b,c\na bc\na b c');
+    assert.equal(o('h() { printf \'[%s]\' x$@y; }; h a "" b', SQ), '[xa][by]');
+    assert.equal(o('k() { IFS=,; printf \'[%s]\' $*; }; k "a b" c,d', SQ), '[a b][c][d]');
+  });
+  it('for f in $(ls) walks the names', () => {
+    const SQ = loadShell();
+    assert.equal(o('n=0; for f in $(ls forest); do n=$((n+1)); done; echo $n', SQ), '3');
+    assert.equal(o('x=$(ls forest); echo $x', SQ), 'cave mushroom.txt owl.txt');
+    assert.equal(o('x=$(ls forest); echo "$x"', SQ), 'cave\nmushroom.txt\nowl.txt');
+  });
+});

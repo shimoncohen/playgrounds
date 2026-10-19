@@ -7,7 +7,7 @@ const errL=text=>({text,cls:'err'});
 const {errOf}=SQ;
 const ce=(m,code=2)=>Object.assign(new Error(m),{raw:true,code});
 const NAME=/^[A-Za-z_]\w*$/;
-const BUILTIN_NAMES=['HOME','USER','SHELL','HOSTNAME','PATH']; /* the variables a fresh shell already has; `unset` hides them through S.unsetB (see getVar in parse.js) */
+const BUILTIN_NAMES=['HOME','USER','SHELL','HOSTNAME','PATH','IFS']; /* the variables a fresh shell already has; `unset` hides them through S.unsetB (see getVar in parse.js) */
 
 /* ---------- test expressions ----------
    Tokens are {raw}: for [ and test the raw text IS the already-expanded value; for [[ it is source text expanded lazily (no word splitting, no globbing) so && and || short-circuit.
@@ -152,12 +152,21 @@ CMDS.read=function(a,io){let raw=false,i=0;
     line+=seg;break}
   const ch=[];
   for(let j=0;j<line.length;j++){if(!raw&&line[j]==='\\'&&j+1<line.length){ch.push({c:line[++j],e:true});continue}if(!raw&&line[j]==='\\')continue;ch.push({c:line[j],e:false})}
-  const text=s=>s.map(x=>x.c).join(''),ws=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n');
+  const text=s=>s.map(x=>x.c).join('');
   if(!names.length){set('REPLY',text(ch));return ok()}
-  let p=0;
-  names.forEach((n,idx)=>{while(p<ch.length&&ws(ch[p]))p++;
-    if(idx===names.length-1){let e=ch.length;while(e>p&&ws(ch[e-1]))e--;set(n,text(ch.slice(p,e)));p=ch.length;return}
-    const s=p;while(p<ch.length&&!ws(ch[p]))p++;set(n,text(ch.slice(s,p)))});
+  /* fields split on IFS like an unquoted expansion (an escaped character never splits); the last name takes the rest of the line without its leading and
+     trailing IFS whitespace, and without one trailing IFS delimiter when only a single field is left (bash: IFS=, read a b <<< "1,2," gives b=2) */
+  const ifs=SQ.ifsNow();
+  if(ifs===''){names.forEach((n,k)=>set(n,k?'':text(ch)));return ok()}
+  const W=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n')&&ifs.includes(x.c),D=x=>!x.e&&ifs.includes(x.c);
+  const delimEnd=(s,q)=>{let k=q;while(k<s.length&&W(s[k]))k++;if(k<s.length&&D(s[k])&&!W(s[k])){k++;while(k<s.length&&W(s[k]))k++}return k};
+  let p=0;while(p<ch.length&&W(ch[p]))p++;
+  names.forEach((n,idx)=>{
+    if(idx===names.length-1){let e=ch.length;while(e>p&&W(ch[e-1]))e--;const rest=ch.slice(p,e);
+      let f=0;while(f<rest.length&&!D(rest[f]))f++;
+      set(n,text(f<rest.length&&delimEnd(rest,f)===rest.length?rest.slice(0,f):rest));p=ch.length;return}
+    const s=p;while(p<ch.length&&!D(ch[p]))p++;set(n,text(ch.slice(s,p)));
+    if(p<ch.length)p=delimEnd(ch,p)});
   return ok()};
 
 /* ---------- shift unset exit source ---------- */

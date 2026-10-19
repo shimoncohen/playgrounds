@@ -91,7 +91,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
       if(box&&box===env.stdin){let got=null; /* shared box: the first read of io.stdin takes the rest of it */
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
-      r=SQ.runCmd(c.words,io);
+      r=SQ.runCmd(c.words,io,c.assigns);
       if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
