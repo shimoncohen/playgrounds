@@ -182,7 +182,7 @@ function editorCmd(name){return a=>{const {rest}=flags(a);if(!rest.length)return
   return {out:'',err:[],code:0,ui:{edit:abs,isNew:!n}}}}
 for(const n of ['nano','edit','vi','vim'])CMDS[n]=editorCmd(n);
 const FRIENDLY={
-  code:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
+  code:'code opens VS Code, which this practice shell does not have. Use its own small editor instead: nano FILE.',
   sudo:'sudo runs a command as the all-powerful admin user. You don\'t need it here, and on a real computer use it only when you know why.',
   exit:'There is nowhere to exit to. Your progress saves automatically.',
   logout:'There is nowhere to exit to. Your progress saves automatically.',

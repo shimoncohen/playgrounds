@@ -552,11 +552,12 @@ describe('editor commands (Task 9)', () => {
     assert.deepEqual(ui(SQ, 'true && nano a.sh').ui, { edit: H + 'a.sh', isNew: true });
     assert.deepEqual(ui(SQ, 'f() { nano b.sh; }; f').ui, { edit: H + 'b.sh', isNew: true });
   });
-  it('emacs-style friendly messages are kept for code; nano/vi/vim are real commands', () => {
+  it('a friendly message is kept for code (pointing to nano); nano/vi/vim are real commands', () => {
     const SQ = loadShell();
     assert.ok(SQ.CMDS.nano && SQ.CMDS.edit && SQ.CMDS.vi && SQ.CMDS.vim);
     assert.ok(!SQ.FRIENDLY.nano && !SQ.FRIENDLY.vi && !SQ.FRIENDLY.vim);
-    assert.match(out(SQ, 'code f'), /no text editor/);
+    assert.match(out(SQ, 'code f'), /nano FILE/);
+    assert.doesNotMatch(out(SQ, 'code f'), /no text editor/); // false since the editor panel exists
   });
 });
 

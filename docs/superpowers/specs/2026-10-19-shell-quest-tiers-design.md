@@ -240,6 +240,37 @@ Stage 1 shipped the file split, `shared/tiers.js`, the Intermediate tier (chapte
 - **Golden.** `tests/shell-golden.mjs` replays the seven Beginner chapters only. Later tiers are covered by solvability, wrong-command and alternative-solution tests in `tests/shell/`.
 - **Parser.** `parse.js` stays line-based; the AST rewrite is part of stage 2.
 
+## Stage 2 as built
+
+Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `challenge` missions and the Advanced tier: chapters 12 to 15 in the UI (indexes 11 to 14), Decisions, Loops & numbers, Functions & arguments and Real scripts, 7 missions each (28, six of them script missions and the 15.7 backup capstone a challenge), 20 XP per mission, "Automator" at 1890 XP. How to write such missions is in `docs/tiers-guideline.md` (sections 3a, 3b and 6). The Beginner golden transcript is byte-identical, and a differential corpus of about 1,100 lines recorded from the Stage 1 engine (`tests/shell/corpus.test.mjs`) proves that everything else a learner could already type behaves the same, apart from entries marked `expectChange` and overridden, with a reason, in `tests/fixtures/shell-corpus-allow.json`.
+
+**Deviations from the plan.**
+
+- The interpreter task was split in two, 6a (parse swap, lists, pipelines, if/while/until/for, groups) and 6b (case, functions and frames, subshells, here-documents), each with its own review.
+- Task 11b was inserted before the last content task: mission 14.7 needed `>&2` and stderr checks, so the engine gained `>&2` / `1>&2` and `scriptPasses` gained `expectErr` / `expectErrMatch`.
+- The tokenizer carried a `legacy` flag (the old line-based behaviour) while the AST parser was built beside it; Task 6a wired the parser in and removed the flag. The tokenizer's `pos` option gives the AST parser source offsets and raw `(( ))` / `[[ ]]` spans.
+- Each stage of a multi-command pipeline runs in a subshell for variables, exports and functions (`echo Ada | read x` leaves `x` unset, as in bash). `cd` and `shift` in a pipeline stage still leak into the shell, because an unmarked corpus entry pins `cd forest | cat`.
+- `local` is a save and restore in `S.vars` through the function's frame (dynamic scope), not a separate scope object.
+- `source` runs the file in the current shell under a `'source'` frame; `return` ends the file.
+- Script and challenge checks run in `SQ.sandbox`, a throwaway copy of the whole state that never writes `localStorage`. A mission can name the world its check judges (`m.world`), and the failure line is computed in that same world (`SQ.missionVerdict`).
+- "Automator" sits at the XP computed from the content, 1890, not the 1875 target above.
+
+**Caps.** `SQ.LIM` (20,000 steps per typed line, 2,000 screen lines, 1,000,000 characters per file or output, 5,000,000 output characters per line, 1,500,000 characters of saved state, 200-character patterns); 20,000 tokens per program; parser nesting 100; interpreter nesting 250 across compounds, `$( )` and scripts (`IMAX`); function and `source` nesting 100; scripts nested 6 deep; `${X#p}` / `%` / `/` patterns of 200 characters on values of at most 5,000; 20 test cases per script mission and 2,000 reported characters per case.
+
+**Still unsupported or different from bash (known limitations).**
+
+- Not there at all (Stage 3 or later): arrays, `&` background jobs, `set` (`-e`, `-x`, `--`), `trap`, `getopts`, `awk`, a process table (`ps`, `kill`, `sleep`, `jobs`), `declare`, `let`, `BASH_REMATCH`.
+- `VAR=x cmd` prefix assignments are not supported (`IFS= read -r line` says `IFS=: command not found`), and `read` does not use `IFS`.
+- An unquoted `$var` is **not** word-split (only `$@`, `$*` and `$( )` split), and an unquoted empty `$var` passes one empty argument where bash passes none. Lessons always quote, and a test enforces it.
+- `type [[` says not found; `local -r` is rejected; function names with `-` or `.` are a syntax error; `${V/#a/_}` (anchored substitution) does nothing.
+- `echo x > f >&2` sends the text to stderr but does not create or truncate `f`.
+- `while read` also hands over a last line with no trailing newline (bash drops it). Files in this world never end in a newline, so this matches the rest of the shell.
+- `cd` and `shift` inside a pipeline stage leak into the shell (see above).
+- `$( )` skips here-documents textually: `<<` inside an arithmetic `(( ))` within a `$( )` is handled, but a function definition with a here-document redirect (`f() {...} <<EOF`) does not keep its body; a `$( )` inside a loop with redirected stdin does not inherit it.
+- A script with a syntax error prints only the parser's message (`bash: syntax error near unexpected token 'then'`) with no file name or line number, and one unsupported construct anywhere in the file stops the whole script before it runs.
+- A typed here-document cannot span lines at the prompt (the terminal takes one line at a time); scripts use them. A typed `exit` prints a friendly message instead of closing anything.
+- `break`/`continue` inside a function do not reach the caller's loop; `$0` inside a function is the function name; `xargs` cannot call a function.
+
 ## Risks and mitigations
 
 | Risk | Mitigation |

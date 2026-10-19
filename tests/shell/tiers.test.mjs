@@ -51,6 +51,22 @@ describe('tiers', () => {
     assert.equal(SQ.tiers.rankFor(695).name, 'Pipe Fitter');
     assert.equal(SQ.tiers.missionXp(7), 15);
   });
+  it('Advanced adds the Automator rank (the top one) at the cumulative XP computed from content', () => {
+    const adv = SQ.content.chapters.filter((c) => c.tier === 'advanced');
+    assert.equal(adv.length, 4);
+    const expected = SQ.tiers.cumulativeXp('intermediate') + adv.reduce((n, c) => n + c.missions.length * 20 + 25, 0);
+    assert.equal(expected, 1890);
+    assert.equal(SQ.tiers.cumulativeXp('advanced'), expected);
+    const r = SQ.tiers.ranks();
+    assert.deepEqual([...r[r.length - 1]], [expected, 'Automator']);
+    assert.equal(SQ.tiers.rankFor(expected).name, 'Automator');
+    assert.equal(SQ.tiers.rankFor(expected - 1).name, 'Script Smith');
+    assert.equal(SQ.tiers.missionXp(11), 20);
+    const S = { done: {}, badges: {} };
+    SQ.content.chapters.forEach((c, i) => { S.badges[i] = 1; c.missions.forEach((m, j) => { S.done[`${i}.${j}`] = 1; }); });
+    const st = SQ.tiers.status(S).filter((x) => x.chapters.length); // Expert has no chapters and is not drawn
+    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.complete]))), [['beginner', true], ['intermediate', true], ['advanced', true]]);
+  });
   it('a tier without chapters adds no rank', () => {
     assert.equal(SQ.tiers.ranks().length, 7); // Expert has no chapters yet
     const t = Tiers.create({

@@ -10,7 +10,7 @@ function disarm(){clearTimeout(armT);closeBtn.textContent='Close'}
 function refresh(){if(!dirty())disarm()}
 function openEditor(path,content,opts){
   if(isOpen()){
-    if(path===abs){text.focus();return true}
+    if(path===abs){if(opts&&opts.fill){text.value=String(content==null?'':content);refresh();try{text.setSelectionRange(text.value.length,text.value.length)}catch(e){}}text.focus();return true} /* fill: Type it for me puts the answer in, unsaved */
     if(dirty()){SQ.ui.addLine(SQ.ui.renderText(`Tip: ${abs.split('/').pop()} has unsaved changes. Save or close ${abs.split('/').pop()} first, then open ${path.split('/').pop()}.`),'tip');SQ.ui.scrollDown();return false}}
   abs=path;title.textContent=path;
   const t=String(content==null?'':content);text.value=t;base=text.value; /* the textarea normalises line breaks itself */

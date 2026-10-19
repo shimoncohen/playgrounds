@@ -87,7 +87,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
-  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs)})}else fill(m.answer)}
+  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.answer)}
   else if(a==='nextch')goChapter(S.ch+1);
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');

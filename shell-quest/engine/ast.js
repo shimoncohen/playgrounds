@@ -1,6 +1,6 @@
 (function (SQ) {
 /* Stage 2 AST parser: SQ.parseProgram(text) -> List. Recursive descent over SQ.tokenize(text,{dry:true,pos:true}); words keep their raw source for run-time expansion.
-   Standalone (not yet wired into the executor). Nodes carry src = exact source slice. Errors: code 2, raw:false (syntax) / raw:true (unsupported). */
+   Wired in by Task 6a: exec.js and interp.js run every typed line, script, function body and sourced file through it. Nodes carry src = exact source slice. Errors: code 2, raw:false (syntax) / raw:true (unsupported). */
 const MAX_DEPTH=100;
 const CLOSERS=new Set(['then','elif','else','fi','do','done','esac','}']);
 const REDIR_OPS=new Set(['>','>>','<','2>','2>>','2>&1','>&2','<<','<<-','<<<']);

@@ -14,7 +14,11 @@ Most folders hold `index.html` (markup), `style.css` and `app.js`; Shell Quest s
 
 ## Tiers
 
-Shell Quest has Beginner and Intermediate tiers (Advanced and Expert are planned). Tiers are open: every chapter is unlocked, and the chapter rail just groups them and shows how far you are in each. `shared/tiers.js` holds the tier model (XP per mission, ranks from cumulative XP) so other playgrounds can reuse it. How to use it, how to keep old saves working and how to write checks that hold up: [docs/tiers-guideline.md](docs/tiers-guideline.md).
+Shell Quest has three tiers, Beginner (7 chapters, 52 missions), Intermediate (4 chapters, 29 missions) and Advanced (4 chapters, 28 missions); Expert is planned. Tiers are open: every chapter is unlocked, and the chapter rail just groups them and shows how far you are in each. `shared/tiers.js` holds the tier model (XP per mission, ranks from cumulative XP) so other playgrounds can reuse it.
+
+Advanced is about real scripts: tests and `if`/`case`, loops and `$(( ))`, functions with arguments and `local`, and scripts that read input, `source` a library, write files with here-documents and report errors on stderr with an exit status. Script missions are written in an editor panel (`nano FILE`, then Save or Save & run) and checked by running them against hidden test cases on a throwaway copy of the world. The practice shell is a documented subset of bash: what it does not do yet (arrays, `&`, `set -e`, `trap`, `getopts`, `awk`, ...) is listed in the design's "Stage 2 as built" section.
+
+How to use the tier model, keep old saves working, write command, outcome and script missions, and write checks that hold up: [docs/tiers-guideline.md](docs/tiers-guideline.md). The design and what each stage actually built: [docs/superpowers/specs/2026-10-19-shell-quest-tiers-design.md](docs/superpowers/specs/2026-10-19-shell-quest-tiers-design.md).
 
 ## Saving progress
 
@@ -50,13 +54,13 @@ npm run test:engine               # just the shell engine and content tests (Nod
 npm run check                     # does every folder still bundle for artifacts?
 ```
 
-`tests/smoke.mjs` serves the repo on a local port and checks that the landing page and every playground load without errors, that progress export, import and the linked save file behave, and that the Shell Quest tiers, field guide, quick-fire and artifact bundle work. `tests/shell-golden.mjs` replays every Beginner mission in the browser and compares the transcript and final save to fixtures in `tests/fixtures/`. `tests/shell/*.test.mjs` run the engine and content in Node without a browser. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
+`tests/smoke.mjs` (48 tests) serves the repo on a local port and checks that the landing page and every playground load without errors, that progress export, import and the linked save file behave, and that the Shell Quest tiers, field guide, quick-fire, editor panel, script missions and artifact bundle work. `tests/shell-golden.mjs` replays every Beginner mission in the browser and compares the transcript and final save to fixtures in `tests/fixtures/` (52 records). `tests/shell/*.test.mjs` (1,721 tests) run the engine and content in Node without a browser, including the solvability of every mission and a differential corpus that compares about 1,100 lines with the output recorded from the Stage 1 engine. Never regenerate the golden or corpus fixtures to make a test pass (see the guideline). Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
 
 Shell Quest is split by job, as plain scripts sharing one `SQ` namespace and loaded in order from `index.html`:
 
-- `shell-quest/engine/`: file system, parser, commands, and `exec.js` (runs a line, builds the mission check context).
-- `shell-quest/content/`: `tiers.js` (tier setup), `tier-beginner.js` and `tier-intermediate.js` (chapters and missions), `guide.js`, `quickfire.js`.
-- `shell-quest/ui.js` and `app.js`: rendering and event wiring.
+- `shell-quest/engine/`: file system (`fs.js`), tokenizer and expansions (`parse.js`), arithmetic (`arith.js`), the AST parser (`ast.js`), the interpreter, functions, scripts and sandbox (`interp.js`), commands (`cmds-*.js`), and `exec.js` (runs a line, runs script test cases, builds the mission check context).
+- `shell-quest/content/`: `tiers.js` (tier setup), `tier-beginner.js`, `tier-intermediate.js` and `tier-advanced.js` (chapters and missions), `guide.js`, `quickfire.js`.
+- `shell-quest/ui.js`, `editor.js` and `app.js`: rendering, the script editor panel, and event wiring.
 
 ## CI and deployment
 

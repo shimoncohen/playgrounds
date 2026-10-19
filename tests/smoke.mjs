@@ -160,13 +160,16 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   await page.waitForSelector('#mission');
   assert.equal(await page.locator('.tierhead').count(), 3);
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
-  let [head, ihead] = await heads();
+  let [head, ihead, ahead] = await heads();
   assert.match(head, /^Beginner/);
   assert.match(head, /0\/7/);
   assert.doesNotMatch(head, /★/);
   assert.match(ihead, /^Intermediate/);
   assert.match(ihead, /0\/4/);
   assert.doesNotMatch(ihead, /★/);
+  assert.match(ahead, /^Advanced/);
+  assert.match(ahead, /0\/4/);
+  assert.doesNotMatch(ahead, /★/);
   const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
   await page.click('.chap[data-ch="7"]');
   await page.waitForFunction(() => /Pick a column/.test(document.querySelector('#mission').textContent));
@@ -175,11 +178,18 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
   await page.waitForSelector('#mission');
-  [head, ihead] = await heads();
+  [head, ihead, ahead] = await heads();
   assert.match(head, /7\/7/);
   assert.match(head, /★/);
   assert.match(ihead, /0\/4/);
   assert.doesNotMatch(ihead, /★/);
+  // a Stage 1 save knows nothing of Advanced: the new tier just starts empty
+  assert.match(ahead, /^Advanced/);
+  assert.match(ahead, /0\/4/);
+  assert.doesNotMatch(ahead, /★/);
+  assert.equal((await page.textContent('#xpText')).trim(), '695 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Pipe Fitter');
+  assert.deepEqual(await page.$$eval('.chap[data-ch="11"] .ct, .chap[data-ch="14"] .ct', es => es.map(e => e.textContent)), ['0/7', '0/7']);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -206,9 +216,45 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   assert.match(heads[1], /^Intermediate/);
   assert.match(heads[1], /4\/4/);
   assert.match(heads[1], /★/);
+  assert.match(heads[2], /^Advanced/);
+  assert.match(heads[2], /0\/4/);
+  assert.doesNotMatch(heads[2], /★/);
+  assert.deepEqual(await page.$$eval('.chap[data-ch="8"] .ct, .chap[data-ch="10"] .ct', es => es.map(e => e.textContent)), ['8/8', '7/7']);
   assert.equal(xp, 1230);
   assert.equal((await page.textContent('#xpText')).trim(), '1230 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Script Smith');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest: a save with chapters 1 to 15 badged shows three complete tiers, a star on each, and the top rank Automator', async () => {
+  // Built from the beginner fixture: every Intermediate (15 XP) and Advanced (20 XP) mission done, every badge earned.
+  const f = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'), 'utf8'));
+  const counts = { 7: [7, 15], 8: [8, 15], 9: [7, 15], 10: [7, 15], 11: [7, 20], 12: [7, 20], 13: [7, 20], 14: [7, 20] };
+  let xp = f.data.xp;
+  for (const [ch, [n, per]] of Object.entries(counts)) {
+    for (let m = 0; m < n; m++) { f.data.done[`${ch}.${m}`] = 1; xp += per; }
+    f.data.badges[ch] = 1; xp += 25;
+  }
+  assert.equal(xp, 1890);
+  f.data.xp = xp; f.data.ch = 14; f.data.mi = 7;
+  const file = path.join(tmp, 'advanced-complete.json');
+  fs.writeFileSync(file, JSON.stringify(f));
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
+  await page.waitForSelector('#mission');
+  const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  assert.equal(heads.length, 3);
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, true, true]);
+  assert.match(heads[0], /^Beginner.*7\/7.*★/);
+  assert.match(heads[1], /^Intermediate.*4\/4.*★/);
+  assert.match(heads[2], /^Advanced.*4\/4.*★/);
+  assert.equal(await page.locator('.chap.earned').count(), 15);
+  assert.equal((await page.textContent('#xpText')).trim(), '1890 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Automator');
+  assert.match(await page.textContent('#mission h2'), /You finished the Advanced tier/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -230,6 +276,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   assert.match(heads[0], /^Beginner/);
   assert.match(heads[1], /^Intermediate/);
+  assert.match(heads[2], /^Advanced/);
   const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
   await page.click('.chap[data-ch="7"]');
   await page.waitForFunction(() => /Pick a column/.test(document.querySelector('#mission').textContent));
@@ -796,8 +843,13 @@ test('shell-quest script mission: Type it for me opens the editor pre-filled; wr
   assert.match(await page.textContent('#screen'), /\$ bash scripts\/hi\.sh Ada\s*Hi Ada/);
   assert.equal(await xp(), '0 XP');
   assert.equal(await lines(/Mission complete/), 0);
+  // Type it for me while the editor is open on the mission file puts the answer in (unsaved), instead of doing nothing
+  await page.click('[data-act="fill"]');
+  assert.equal(await page.inputValue('#edText'), fake.answer);
+  assert.equal(await xp(), '0 XP', 'filling does not save');
+  await page.click('#edClose');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?', 'the filled answer counts as an unsaved change');
   // the right script: Save alone completes it, once
-  await page.fill('#edText', fake.answer);
   await page.click('#edSave');
   await waitScreen(/Mission complete: Greeter\s+\+20 XP/);
   assert.equal(await xp(), '20 XP');
