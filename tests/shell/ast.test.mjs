@@ -404,3 +404,43 @@ describe('parseProgram: limits', () => {
     assert.equal(e.code, 2);
   });
 });
+
+describe('parseProgram: (( )) and [[ ]] are raw spans', () => {
+  it('<< inside (( )) does not swallow following lines', () => {
+    const l = P('(( x<<2 ))\necho hi\necho there');
+    assert.equal(l.items.length, 3);
+    assert.deepEqual([l.items[0].andor.first.cmds[0].type, l.items[0].andor.first.cmds[0].expr], ['arith', 'x<<2']);
+    assert.equal(l.items[2].andor.src, 'echo there');
+  });
+  it('<< inside [[ ]] does not swallow following lines', () => {
+    const l = P('[[ x<<y ]]\necho hi\necho there');
+    assert.equal(l.items.length, 3);
+    assert.equal(l.items[0].andor.first.cmds[0].raw, 'x<<y');
+  });
+  it('>> and < inside spans', () => {
+    assert.equal(first('(( x>>2 ))').expr, 'x>>2');
+    assert.equal(first('[[ a < b ]]').raw, 'a < b');
+  });
+  it('parens and quotes inside [[ ]]', () => {
+    assert.equal(first('[[ $x == "a b" && ( -n y ) ]]').raw, '$x == "a b" && ( -n y )');
+    assert.equal(first('[[ "]]" == x ]]').raw, '"]]" == x');
+  });
+  it('here-doc after a span still works', () => {
+    const l = P('(( 1 )) && cat <<EOF\nhi\nEOF\necho z');
+    assert.equal(l.items.length, 2);
+    assert.equal(l.items[0].andor.rest[0].pipe.cmds[0].doc.raw, 'hi\n');
+  });
+  it('span after then/do/!/&&, but not as an argument', () => {
+    assert.equal(first('if (( x<<1 )); then :; fi').branches[0].cond.items[0].andor.first.cmds[0].type, 'arith');
+    assert.equal(P('echo [[ a ]]').items[0].andor.first.cmds[0].type, 'simple');
+  });
+  it('((a); (b)) is still a subshell; unterminated spans are EOF errors', () => {
+    assert.equal(first('((a); (b))').type, 'subshell');
+    synErr('(( x<<2', 'syntax error: unexpected end of file');
+    synErr('[[ a', 'syntax error: unexpected end of file');
+  });
+  it('! ! x toggles negate', () => {
+    assert.equal(P('! ! x').items[0].andor.first.negate, false);
+    assert.equal(P('! ! ! x').items[0].andor.first.negate, true);
+  });
+});

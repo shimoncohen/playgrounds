@@ -152,6 +152,17 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
     if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
     else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}};
   const fresh=()=>({v:'',glob:false,s:i});
+  /* opt.pos only: (( ... )) and [[ ... ]] at command position are one raw span token, so << < > inside are never redirects or here-docs; null = not a span (unterminated or ((a); (b)) -> normal tokens) */
+  const spanOk=()=>{const l=toks[toks.length-1];
+    return !l||(l.t==='op'?!/^(<|>|>>|2>|2>>|<<|<<-|<<<)$/.test(l.v):l.raw===l.v&&['then','do','else','elif','if','while','until','!','{'].includes(l.v))};
+  const span=ar=>{let j=i+2,d=0;
+    for(;j<line.length;j++){const c=line[j];
+      if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)return null;j=k;continue}
+      if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;j++}if(j>=line.length)return null;continue}
+      if(c==='\\'){j++;continue}
+      if(ar){if(c==='(')d++;else if(c===')'){if(d>0)d--;else if(line[j+1]===')')return {t:'arith',raw:line.slice(i+2,j).trim(),s:i,e:j+2};else return null}}
+      else if(c===']'&&line[j+1]===']'&&/\s/.test(line[j-1])&&(j+2>=line.length||/[\s;&|)<>]/.test(line[j+2])))return {t:'cond',raw:line.slice(i+2,j).trim(),s:i,e:j+2}}
+    return null};
   /* here-doc delimiter word after << / <<-: quotes and backslashes are removed and make the body literal; the word follows the op as a plain word token */
   const heredocWord=(op,strip)=>{while(line[i]===' '||line[i]==='\t')i++;
     const s=i;let d='',q=false;
@@ -172,6 +183,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
     pending.length=0};
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
+    if(P&&!cur&&((c==='('&&line[i+1]==='(')||(c==='['&&line[i+1]==='['&&/\s/.test(line[i+2]||'')))&&spanOk()){const sp=span(c==='(');if(sp){toks.push(sp);i=sp.e;continue}}
     if(!L&&c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();if(P)toks[toks.length-1].e=i;continue}
     if(!L&&(c==='('||c===')')){push();toks.push({t:'op',v:c});i++;continue}
     if(!L&&c==='\\'&&line[i+1]==='\n'){i+=2;continue}

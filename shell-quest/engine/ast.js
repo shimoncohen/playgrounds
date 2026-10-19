@@ -48,7 +48,7 @@ function parseProgram(text){
     return mk({type:'andor',first,rest},s)}
   function parsePipeline(){
     const s=startOf();let negate=false;
-    if(isWord(tk(),'!')){next();negate=true;if(!tk())throw eofErr()}
+    while(isWord(tk(),'!')){next();negate=!negate;if(!tk())throw eofErr()}
     const cmds=[parseCommand()];
     while(isOp(tk(),'|')){next();skipNl();if(!tk())throw eofErr();cmds.push(parseCommand())}
     return mk({type:'pipeline',negate,cmds},s)}
@@ -56,7 +56,7 @@ function parseProgram(text){
   /* one redirect operator at tk(), merged into r (parse() shapes: out/err {path,append,w}, inp token, err {dup}) */
   function redirect(r){const o=next();
     if(o.v==='2>&1'){r.err={dup:true};return}
-    const w=tk();if(!w)throw o.v==='<<'||o.v==='<<-'?bad('newline'):bad('newline');
+    const w=tk();if(!w)throw bad('newline');
     if(w.t!=='w')throw bad(show(w));
     next();
     if(o.v==='<<'||o.v==='<<-')r.doc=o.doc;
@@ -69,6 +69,8 @@ function parseProgram(text){
 
   function parseCommand(){
     const t=tk();if(!t)throw eofErr();
+    if(t.t==='arith'){next();return {type:'arith',expr:t.raw,src:text.slice(t.s,t.e)}}
+    if(t.t==='cond'){next();return {type:'cond',raw:t.raw,src:text.slice(t.s,t.e)}}
     if(t.t==='op'){
       if(t.v==='(')return nest(parseParen);
       if(REDIR_OPS.has(t.v))return parseSimple();
@@ -91,7 +93,6 @@ function parseProgram(text){
     for(;;){const t=tk();if(!t)break;
       if(t.t==='w'){n.words.push(next());continue}
       if(REDIR_OPS.has(t.v)){redirect(n);continue}
-      if(t.v==='('&&n.words.length&&/^[A-Za-z_]\w*\+?=$/.test(n.words[n.words.length-1].raw)&&toks[p-1].e===t.s)throw unsup('arrays');
       if(t.v==='('&&n.words.length&&/=$/.test(n.words[n.words.length-1].raw)&&toks[p-1].e===t.s)throw unsup('arrays');
       break}
     if(!n.words.length&&!n.out&&!n.inp&&!n.err&&!n.doc&&!n.herestr){const t=tk();throw t?bad(show(t)):eofErr()}
