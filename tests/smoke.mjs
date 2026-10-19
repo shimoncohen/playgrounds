@@ -977,3 +977,39 @@ test('shell-quest capstone: with a leftover backup/, a script that never makes i
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('shell-quest editor: a Save is judged on its own, not on the line typed before it (13.1 is not completed by a Save)', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano notes.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  const answer = await page.evaluate(() => window.SQ.content.chapters[12].missions[0].answer);
+  await type(answer); // typed while chapter 1 is the current one: nothing to complete there
+  await page.waitForFunction(() => window.SQ.rt.lastOut === '1\n2\n3');
+  await page.click('.chap[data-ch="12"]');
+  await page.waitForFunction(() => window.SQ.S.ch === 12 && window.SQ.S.mi === 0);
+  await page.fill('#edText', '#!/bin/bash\necho note\n');
+  await page.click('#edSave');
+  await waitScreen(/Saved notes\.sh/);
+  assert.equal(await page.evaluate(() => !!window.SQ.S.done['12.0']), false, 'the Save did not replay the earlier line');
+  await type(answer);
+  await waitScreen(/Mission complete/);
+  assert.equal(await page.evaluate(() => !!window.SQ.S.done['12.0']), true, 'typing it now completes it');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest: Reset world also forgets functions and the last exit status', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('hi() { echo hello-fn; }; X=1; export X');
+  await type('false');
+  assert.equal(await page.evaluate(() => [!!(window.SQ.S.fns && window.SQ.S.fns.hi), window.SQ.S.last]).then(JSON.stringify), JSON.stringify([true, 1]));
+  await page.click('#resetWorld');
+  await page.click('#resetWorld');
+  await waitScreen(/World reset to its starting state/);
+  assert.deepEqual(await page.evaluate(() => [window.SQ.S.fns === undefined, window.SQ.S.last, JSON.stringify(window.SQ.S.vars), window.SQ.S.exp === undefined]), [true, 0, '{}', true]);
+  assert.equal(await page.evaluate(k => JSON.parse(localStorage.getItem(k)).fns, SQ_KEY), undefined, 'the saved game has no functions either');
+  await type('hi');
+  await waitScreen(/bash: hi: command not found/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

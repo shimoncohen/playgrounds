@@ -42,7 +42,9 @@ const shownPath=abs=>{const r=rel(abs);return r==='.'?disp(abs):r};
 SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();
   const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
   if(e){addLine(renderText(e),'err');scrollDown();return false}
-  addLine(renderText('Saved '+shown),'sys');checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
+  addLine(renderText('Saved '+shown),'sys');
+  SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last; /* a Save is judged on its own, never on the line typed before it */
+  checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
   runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true,ranAbs:abs})};
@@ -92,7 +94,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */

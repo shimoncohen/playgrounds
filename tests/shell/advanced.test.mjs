@@ -362,6 +362,9 @@ describe('advanced quick-fire and guide (chapters 12 and 13)', () => {
     for (const ci of [11, 12]) assert.ok(SQ.content.guide.filter((g) => g.ch === ci).length >= 6, `chapter ${ci}`);
     const cs = SQ.content.guide.filter((g) => g.ch === 11 || g.ch === 12).map((g) => g.c);
     for (const k of ['[', 'test', '[[', 'if', 'case', 'while', 'until', 'break', 'read', '$(( ))']) assert.ok(cs.includes(k), `guide entry ${k}`);
+    const at = SQ.content.guide.find((g) => g.c === '"$@"');
+    assert.match(at.what, /Always quote variables: bash splits an unquoted variable/, 'the "$@" entry warns that this shell does not split $var');
+    assert.match(at.what, /for f in \$files loops once here but once per word in bash/);
   });
   it('every advanced quick-fire answer runs without an error in a set-up world', () => {
     for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced'))
@@ -442,7 +445,8 @@ describe('advanced chapters 14 and 15: shape', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(t(ch[F14].missions[6]))), [[['Ada'], null, 'Hello, Ada!', null, null], [[], null, '', 1, 'usage'], [['Ada Lovelace'], null, 'Hello, Ada Lovelace!', null, null]]);
     const r = ch[R15].missions;
     const J = (x) => JSON.parse(JSON.stringify(x));
-    assert.deepEqual(J(r[2].tests.map((x) => [x.args, x.expectCode])), [[['journal.txt'], 0], [['ghost'], 1]]);
+    assert.deepEqual(J(r[2].tests.map((x) => [x.args, x.expectCode])), [[['journal.txt'], 0], [['ghost'], 1], [['village'], 1]]);
+    assert.equal(r[2].tests[2].expectErrMatch, 'village', 'a folder is not a file');
     assert.deepEqual(J(r[3].tests.map((x) => [x.stdin, x.expectOut])), [['Ada\n', 'Hello, Ada!'], ['Grace\n', 'Hello, Grace!']]);
     assert.deepEqual(J(r[4].tests.map((x) => x.expectFiles)), [{ 'app.conf': 'name=quest\nmode=fast' }, { 'app.conf': 'name=quest\nmode=fast' }]);
     assert.deepEqual(J(r[4].tests[1].files), { 'app.conf': 'name=quest\nmode=fast' }, 'the second case starts from a finished first run');
@@ -645,6 +649,12 @@ describe('chapter 15 (Real scripts) checks', () => {
     assert.equal(ok('#!/bin/bash\n[ -f "$1" ] || echo "not a file: $1" >&2\nexit 0\n'), false, 'always exits 0');
     assert.equal(ok('#!/bin/bash\n[ -f "$1" ] && exit 0\nexit 1\n'), false, 'no message');
     assert.equal(why('#!/bin/bash\n[ -f "$1" ] || echo "not a file: $1" >&2\nexit 0\n'), 'Test 2 (a missing file) failed: expected "exit status 1", got "exit status 0 (not a file: ghost)"');
+    // [ -e ] also says yes to a folder: the third case (village) catches it
+    const withE = m.answer.replace('[ -f "$1" ]', '[ -e "$1" ]');
+    assert.notEqual(withE, m.answer);
+    assert.equal(ok(withE), false, '[ -e ] accepts a folder');
+    assert.ok(m.wrong.includes(withE));
+    assert.equal(why(withE), 'Test 3 (a folder, not a file) failed: expected "/village/", got ""');
   });
   it('15.4 Script: ask a question', () => {
     const { m, ok } = scriptJudge(R15, 3);
@@ -669,6 +679,9 @@ describe('chapter 15 (Real scripts) checks', () => {
     const echoes = '#!/bin/bash\n# cat > app.conf <<EOF would be nicer\necho name=quest > app.conf\necho mode=fast >> app.conf\n';
     assert.equal(ok(echoes), false, 'no here-document (a comment does not count)');
     assert.equal(ok('#!/bin/bash\nprintf "name=quest\\nmode=fast\\n" > app.conf\n'), false, 'printf, no here-document');
+    assert.equal(ok("#!/bin/bash\nprintf 'name=quest\\nmode=fast\\n' > app.conf # <<EOF\n"), false, 'a here-document only in a trailing comment');
+    assert.equal(ok('#!/bin/bash\ncat > app.conf <<EOF # the two settings\nname=quest\nmode=fast\nEOF\n'), true, 'a comment after a real here-document');
+    assert.equal(ok("#!/bin/bash\ncat <<'EOF' >app.conf\nname=quest\nmode=fast\nEOF\n"), true, 'quoted delimiter, no space before the file');
     put(SQ, m, echoes);
     const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
     assert.equal(v.good, false);
