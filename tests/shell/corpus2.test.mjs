@@ -67,6 +67,14 @@ describe('differential corpus 2 (Stage 2 engine)', () => {
     for (const word of ['awk', 'sleep', 'trap', 'getopts', 'sed -i', 'find . -name "*.txt" -exec', 'xargs -P', '<(', 'set -e', '%5.2f', 'grep -o']) assert.ok(marked.some((e) => specLines(e).join('\n').includes(word)), `no expectChange entry mentions ${word}`);
   });
 
+  it('marks grep -A/-B/-C/-r/-rn/-l/-L/-q/-h/-m/-s and find -maxdepth lines expectChange', () => {
+    for (const line of ['grep -A1 wolf forest/notes.txt', 'grep -B1 wolf forest/notes.txt', 'grep -C1 wolf forest/notes.txt', 'grep -rn wolf forest', 'grep -rl wolf .', 'grep -r wolf .', 'grep -l wolf forest/notes.txt', 'grep -L wolf forest/notes.txt', 'grep -q wolf forest/notes.txt; echo $?', 'grep -h wolf forest/notes.txt', 'grep -m1 a readme.txt', 'grep -s wolf nosuch.txt; echo $?', 'find . -maxdepth 1']) {
+      const e = corpus.find((x) => x.line === line);
+      assert.ok(e && e.expectChange, `not marked expectChange: ${line}`);
+    }
+    for (const e of corpus.filter((x) => x.setupUpTo === undefined && /^this practice shell does not support (grep|find) /m.test(x.out))) assert.ok(e.expectChange, `Stage 2 'does not support' grep/find output not marked: ${JSON.stringify(specLines(e))}`);
+  });
+
   for (const e of corpus) {
     const key = keyOf(e);
     const label = JSON.stringify(specLines(e).join(' ⏎ ')) + (e.put ? ` (script ${Object.keys(e.put).pop()})` : '') + (e.prefix && e.prefix.length ? ` (after ${e.prefix.length} prefix lines, setup 0..${e.setupUpTo})` : e.setupUpTo !== undefined ? ` (setup 0..${e.setupUpTo})` : '');
