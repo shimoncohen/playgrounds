@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -208,6 +209,36 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   assert.equal((await page.textContent('#xpText')).trim(), '1230 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Script Smith');
   assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inlined page', async () => {
+  execFileSync('python3', ['tools/build.py', 'shell'], { cwd: ROOT, stdio: 'pipe' });
+  const body = fs.readFileSync(path.join(ROOT, 'dist/shell-quest.html'), 'utf8');
+  // The Artifact service wraps the body-only fragment in a document skeleton; mirror that here.
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${body}</body></html>`;
+  const { ctx, page, errors } = await open('about:blank');
+  const consoleErrors = [];
+  page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+  await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  await page.goto('http://bundle.test/shell-quest.html');
+  await page.waitForSelector('#mission');
+  assert.equal(await page.locator('.tierhead').count(), 2);
+  const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  assert.match(heads[0], /^Beginner/);
+  assert.match(heads[1], /^Intermediate/);
+  const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
+  await page.click('.chap[data-ch="7"]');
+  await page.waitForFunction(() => /Pick a column/.test(document.querySelector('#mission').textContent));
+  assert.notEqual((await page.textContent('#mission')).replace(/\s+/g, ' '), before);
+  const xp = async () => parseInt(await page.textContent('#xpText'), 10);
+  const x0 = await xp();
+  await page.fill('#cmd', 'cut -d, -f1 village/sales.csv');
+  await page.press('#cmd', 'Enter');
+  await page.waitForFunction(x => parseInt(document.querySelector('#xpText').textContent, 10) > x, x0);
+  assert.equal(await xp(), x0 + 15);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(consoleErrors, []);
   await ctx.close();
 });
 
