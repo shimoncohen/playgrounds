@@ -92,7 +92,7 @@ function startFire(){const pick=$('#fTier').value;const order=QF.map((q,i)=>i).f
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fSkip">Skip</button><button class="btn ghost" id="fStop">End round</button></div>`;
   showQ();$('#fIn').focus();clearInterval(qT);qT=setInterval(()=>{QS.left=Math.max(0,LEN-(Date.now()-QS.t0)/1000);setStats();if(QS.left<=0)stopFire(true)},100)}
 function showQ(){if(QS.i>=QS.order.length){QS.order=QS.order.sort(()=>Math.random()-.5);QS.i=0}$('#fTask').textContent=QF[QS.order[QS.i]][0];setStats()}
-function answer(v,skip){const q=QF[QS.order[QS.i]];const good=!skip&&q[1].some(x=>normA(x)===normA(v));const fb=$('#fFb');
+function answer(v,skip){const q=QF[QS.order[QS.i]];const nm=q[3]&&q[3].exact?(t=>t.trim().replace(/\s+/g,' ')):normA;const good=!skip&&q[1].some(x=>nm(x)===nm(v));const fb=$('#fFb');
   if(good){QS.score+=10+Math.min(QS.streak,5)*2;QS.streak++;fb.className='fb good';fb.textContent=`Correct${QS.streak>1?` · streak ${QS.streak}`:''}`}
   else{QS.streak=0;QS.misses.push([q[0],q[1][0],v]);fb.className='fb bad';fb.innerHTML=`${skip?'Skipped':'Not quite'}. One answer: <code>${esc(q[1][0])}</code>`}
   QS.i++;showQ();const inp=$('#fIn');inp.value='';inp.focus()}

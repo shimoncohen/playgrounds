@@ -148,3 +148,56 @@ describe('intermediate quick-fire and guide', () => {
     }
   });
 });
+
+describe('round 2: tighter checks', () => {
+  it('8.1 needs the real first column with -d and -f', () => {
+    no(T8, 0, 'cut -f1 village/sales.csv');
+    no(T8, 0, 'cut -d, -f1 journal.txt');
+    yes(T8, 0, 'cut -f 1 -d, village/sales.csv');
+    yes(T8, 0, 'cut -d "," -f1 village/sales.csv');
+  });
+  it('8.6 needs ls piped into tee, saved to any path, even over an existing file', () => {
+    const pre = ['ls | tee listing.txt'];
+    no(T8, 5, 'echo hi | tee listing.txt', pre);
+    no(T8, 5, 'echo x | tee y.txt');
+    no(T8, 5, 'ls | tee -a nothere/x.txt');
+    yes(T8, 5, 'ls | tee listing.txt', pre);
+    yes(T8, 5, 'ls | tee ./listing.txt');
+    yes(T8, 5, 'ls -a | tee village/all.txt');
+  });
+  it('8.7 needs sort -n and the true top row', () => {
+    no(T8, 6, 'grep bread village/sales.csv | head -n 1');
+    no(T8, 6, 'echo 30 | sort');
+    no(T8, 6, 'echo 30 | sort -n');
+    no(T8, 6, 'cut -d, -f2 village/sales.csv | head -n 1');
+    yes(T8, 6, 'sort -t, -k2 -n village/sales.csv | tail -n 1');
+    yes(T8, 6, 'sort -t, -k2 -nr village/sales.csv');
+    yes(T8, 6, 'cut -d, -f2 village/sales.csv | sort -n | tail -n 1');
+  });
+  it('9.4 needs a variable from $( ) and a real listing', () => {
+    no(T9, 3, 'echo shop.txt people.txt');
+    no(T9, 3, 'echo $(ls village)');
+    no(T9, 3, 'FILES="shop.txt people.txt"; echo $FILES');
+    yes(T9, 3, 'F=$(ls village); echo "$F"');
+    yes(T9, 3, 'echo $FILES', ['FILES=$(ls village)']);
+  });
+  it('9.7 needs an exported variable read by a script', () => {
+    const pre = ['export GREETING=hi'];
+    no(T9, 6, "echo 'echo hi' > g.sh; chmod +x g.sh; ./g.sh", pre);
+    no(T9, 6, 'echo "echo $GREETING" > g.sh; chmod +x g.sh; ./g.sh', pre);
+    no(T9, 6, "GREETING=hi; echo 'echo $GREETING' > g.sh; bash g.sh");
+    yes(T9, 6, "echo 'echo $GREETING' > g.sh; bash g.sh", pre);
+    yes(T9, 6, "echo 'echo $GREETING' > hello.sh; chmod +x hello.sh; ./hello.sh", pre);
+  });
+  it('9.8 needs $? to read a real failure code', () => {
+    no(T9, 7, 'echo 2; echo $?');
+    no(T9, 7, 'ls; echo $?');
+    yes(T9, 7, 'cat nothing; echo $?');
+    yes(T9, 7, 'grep zzz journal.txt; echo $?');
+    yes(T9, 7, 'ls nothing; echo "$?"');
+  });
+  it('9.6 text tells you to export first', () => {
+    const m = loadShell().content.chapters[T9].missions[5];
+    assert.match(m.goal + (m.note || ''), /export GREETING/);
+  });
+});

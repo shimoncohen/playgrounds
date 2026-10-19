@@ -240,6 +240,29 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   await ctx.close();
 });
 
+test('shell-quest quick-fire: single-quote question rejects expanding forms, tee accepts ./', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-fire');
+  await page.selectOption('#fTier', 'intermediate');
+  await page.click('#fStart');
+  const tryAnswer = async (task, ans) => {
+    for (let i = 0; i < 40 && (await page.textContent('#fTask')) !== task; i++) await page.click('#fSkip');
+    assert.equal(await page.textContent('#fTask'), task);
+    await page.fill('#fIn', ans);
+    await page.press('#fIn', 'Enter');
+    return (await page.textContent('#fFb')).trim();
+  };
+  const T = 'Print the text $HOME without bash expanding it';
+  assert.match(await tryAnswer(T, 'echo $HOME'), /^Not quite/);
+  assert.match(await tryAnswer(T, 'echo "$HOME"'), /^Not quite/);
+  assert.match(await tryAnswer(T, "echo '$HOME'"), /^Correct/);
+  assert.match(await tryAnswer(T, 'echo \\$HOME'), /^Correct/);
+  assert.match(await tryAnswer('Show the output of ls and also save it in listing.txt', 'ls | tee ./listing.txt'), /^Correct/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('import rejects another playground\'s file and garbage', async () => {
   const { ctx, page } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

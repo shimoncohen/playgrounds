@@ -25,11 +25,11 @@ const QF=[
  ["Turn the text in the pipe into uppercase",["tr a-z A-Z","tr [:lower:] [:upper:]"],'intermediate'],
  ["Replace every o with 0 in notes.txt",["sed s/o/0/g notes.txt","sed 's/o/0/g' notes.txt","sed \"s/o/0/g\" notes.txt"],'intermediate'],
  ["Print only lines 2 to 4 of notes.txt",["sed -n 2,4p notes.txt","sed -n '2,4p' notes.txt","sed -n \"2,4p\" notes.txt"],'intermediate'],
- ["Show the output of ls and also save it in listing.txt",["ls | tee listing.txt"],'intermediate'],
+ ["Show the output of ls and also save it in listing.txt",["ls | tee listing.txt","ls | tee ./listing.txt"],'intermediate'],
  ["Sort the numbers in nums.txt, biggest first",["sort -n -r nums.txt","sort -nr nums.txt","sort -rn nums.txt","sort -r -n nums.txt"],'intermediate'],
  ["Print: Today is, then the output of date, using $( )",["echo \"Today is $(date)\"","echo Today is $(date)"],'intermediate'],
  ["Store the output of ls in a variable called FILES",["FILES=$(ls)","FILES=\"$(ls)\""],'intermediate'],
- ["Print the text $HOME without bash expanding it",["echo '$HOME'"],'intermediate'],
+ ["Print the text $HOME without bash expanding it",["echo '$HOME'","echo \\$HOME"],'intermediate',{exact:true}],
  ["Share the variable NAME=Ada with scripts",["export NAME=Ada","export NAME=\"Ada\"","NAME=Ada; export NAME"],'intermediate'],
  ["List all exported variables as NAME=value",["env"],'intermediate'],
  ["Print the exit code of the last command",["echo $?"],'intermediate']
