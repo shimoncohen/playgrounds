@@ -1,325 +1,8 @@
-
 (()=>{
-const HOME='/home/explorer', KEY='shell-quest-v1';
-const D=(c={})=>({type:'dir',children:c});
-const F=(s='',x=false)=>({type:'file',content:s,exec:x});
+const SQ=window.SQ;
+const S=SQ.S;
+const {HOME,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,disp,join,ensureDir,ensureFile,cmpName,sortedKeys,lines,CMDS,execLine,ctxFor}=SQ;
 
-const README=`Welcome, explorer!
-This world is made of folders and files.
-Folders hold other things. Files hold text.
-Type help any time to see the commands you can use.`;
-const SECRET=`SECRET MAP
-----------
-The forest hides a cave.
-The cave goes deeper than it looks.
-Hidden files start with a dot. ls -a shows them.`;
-const JOURNAL=[
-'Day 1. Packed the bag and left the village at dawn.','The road to the forest was muddy.','Heard a wolf howling far away.','Made a fire and ate bread.',
-'Day 2. Found a strange map in an old tree.','The map shows a cave north of the river.','Crossed the river on a fallen log.','A Wolf watched me from the hill.',
-'I kept walking and did not look back.','Day 3. Rain all morning.','Dried my socks by the fire.','Counted my supplies: 4 apples, 2 bread, 1 rope.',
-'Day 4. Reached the edge of the forest.','Owls everywhere. One seemed to talk.','The map says the treasure is deeper than it looks.','Found the cave entrance behind a waterfall.',
-'Day 5. Went into the cave with a torch.','Bats! Hundreds of them.','Heard the WOLF again, closer this time.','Blocked the entrance with rocks.',
-'Day 6. Followed a tunnel downward.','Marked the path on the map so I can find my way back.','The tunnel split in two. Chose the left.','Found a heavy chest.',
-'Day 7. The chest is locked.','Tried every key on my ring. None fit.','Left a note for the next explorer.','Walked back to the village to rest.',
-'The wolf followed me to the gate, then turned away.','Next time I will bring better tools. Maybe a terminal.'].join('\n');
-const PEOPLE=['Mira','Tomas','Ada','Ben','Mira','Zoe','Ada','Lena','Ben','Mira','Omar','Kai'].join('\n');
-const GOLD=`You found the gold!
-Secret word: PENGUIN
-(Tux the penguin is the mascot of Linux.)`;
-const LOGS={'day1.log':'06:00 gate opened\n09:30 baker lit the oven\n20:00 gate closed','day2.log':'06:00 gate opened\n13:10 wolf seen near the river\n20:00 gate closed','day3.log':'06:00 gate opened\n11:45 explorer returned\n20:00 gate closed'};
-
-function makeWorld(){
-  return D({
-    etc:D({hostname:F('basecamp'),motd:F('Welcome to basecamp. Be careful with rm.')}),
-    home:D({explorer:D({
-      'readme.txt':F(README),'.secret_map':F(SECRET),'journal.txt':F(JOURNAL),
-      forest:D({'mushroom.txt':F('Red cap, white spots.\nDo not eat.'),'owl.txt':F('Hoo! The cave is right here. Try: cd cave'),
-        cave:D({'echo.txt':F('hello... hello... hello...'),'.bats':F('312 bats live here. They hide, like this file.'),
-          deeper:D({chest:D({'gold.txt':F(GOLD)})})})}),
-      village:D({'shop.txt':F('apple 2\nbread 3\nrope 12\ntorch 8\nmap 20'),'people.txt':F(PEOPLE),
-        logs:D({'day1.log':F(LOGS['day1.log']),'day2.log':F(LOGS['day2.log']),'day3.log':F(LOGS['day3.log']),'notes.txt':F('Logs are kept for three days.')})})
-    })}),
-    tmp:D({})
-  });
-}
-
-function fresh(){return {fs:makeWorld(),cwd:HOME,oldpwd:HOME,vars:{},last:0,hist:[],ch:0,mi:0,done:{},xp:0,best:0,badges:{},seen:false}}
-let S=fresh();
-try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw);if(o&&o.fs)S=Object.assign(fresh(),o)}}catch(e){}
-function save(){try{S.hist=S.hist.slice(-200);localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-
-/* ---------- filesystem ---------- */
-function norm(p,base){base=base||S.cwd;if(p==null||p==='')return base;if(p==='~'||p.startsWith('~/'))p=HOME+p.slice(1);
-  const parts=p.startsWith('/')?[]:base.split('/').filter(Boolean);
-  for(const s of p.split('/')){if(!s||s==='.')continue;if(s==='..')parts.pop();else parts.push(s)}
-  return '/'+parts.join('/')}
-function getNode(abs){let n=S.fs;for(const s of abs.split('/').filter(Boolean)){if(!n||n.type!=='dir')return null;n=n.children[s];if(!n)return null}return n||null}
-function parentOf(abs){const parts=abs.split('/').filter(Boolean);const name=parts.pop();const pp='/'+parts.join('/');return [getNode(pp),name,pp]}
-function bname(abs){return abs.split('/').filter(Boolean).pop()||'/'}
-function disp(abs){return abs===HOME?'~':abs.startsWith(HOME+'/')?'~'+abs.slice(HOME.length):abs}
-function join(a,b){return (a==='/'?'':a)+'/'+b}
-const clone=n=>JSON.parse(JSON.stringify(n));
-let changed=new Set();
-function markTree(abs,n){changed.add(abs);if(n.type==='dir')for(const k in n.children)markTree(join(abs,k),n.children[k])}
-function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!n.children[s]){n.children[s]=D();changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
-function ensureDir(p){mkdirp(norm(p,HOME))}
-function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);changed.add(abs)}}
-function writeFile(abs,text,append,shown){const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
-  const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
-  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);changed.add(abs);return null}
-const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
-function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-
-/* ---------- shell engine ---------- */
-const M=(c,s)=>'\x01'+c+s+'\x02';
-const ok=(out='')=>({out,err:[],code:0});
-const E=(m,c=1)=>({out:'',err:[m],code:c});
-const lines=t=>t===''?[]:t.split('\n');
-let LOG=[];
-function getVar(k){if(k==='?')return String(S.last);if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
-  return ({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'})[k]||''}
-const VRX=/^\$(\{(\w+)\}|(\w+|\?))/;
-function tokenize(line){
-  const toks=[];let i=0,cur=null;
-  const push=()=>{if(cur){toks.push({t:'w',v:cur.v,glob:cur.glob});cur=null}};
-  while(i<line.length){const c=line[i];
-    if(c===' '||c==='\t'){push();i++;continue}
-    if(c==='|'){push();if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
-    if(c==='&'&&line[i+1]==='&'){push();toks.push({t:'op',v:'&&'});i+=2;continue}
-    if(c===';'){push();toks.push({t:'op',v:';'});i++;continue}
-    if(c==='>'){push();if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
-    if(c==='<'){push();toks.push({t:'op',v:'<'});i++;continue}
-    if(c==='#'&&!cur)break;
-    if(c==='~'&&!cur&&(i+1>=line.length||/[\s\/|;&<>]/.test(line[i+1]))){cur={v:HOME,glob:false};i++;continue}
-    cur=cur||{v:'',glob:false};
-    if(c==="'"){const j=line.indexOf("'",i+1);if(j<0)throw new Error("unclosed ' quote. Every opening quote needs a closing one.");cur.v+=line.slice(i+1,j);i=j+1;continue}
-    if(c==='"'){let j=i+1,s='';while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){s+=line[j+1];j+=2;continue}
-        if(line[j]==='$'){const m=line.slice(j).match(VRX);if(m){s+=getVar(m[2]||m[3]);j+=m[0].length;continue}}s+=line[j];j++}
-      if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;i=j+1;continue}
-    if(c==='$'){const m=line.slice(i).match(VRX);if(m){cur.v+=getVar(m[2]||m[3]);i+=m[0].length;continue}}
-    if(c==='\\'&&i+1<line.length){cur.v+=line[i+1];i+=2;continue}
-    if(c==='*'||c==='?')cur.glob=true;
-    cur.v+=c;i++}
-  push();return toks}
-function parse(toks){
-  const seq=[];let pipe=[],op=null;const nc=()=>({words:[],out:null,inp:null});let cmd=nc();
-  const bad=v=>{throw new Error(`syntax error near unexpected token '${v}'`)};
-  for(let k=0;k<toks.length;k++){const t=toks[k];
-    if(t.t==='w'){cmd.words.push(t);continue}
-    if(t.v==='>'||t.v==='>>'||t.v==='<'){const nx=toks[k+1];if(!nx||nx.t!=='w')bad(nx?nx.v:'newline');if(t.v==='<')cmd.inp=nx.v;else cmd.out={path:nx.v,append:t.v==='>>'};k++;continue}
-    if(t.v==='|'){if(!cmd.words.length)bad('|');pipe.push(cmd);cmd=nc();continue}
-    if(!cmd.words.length&&!cmd.out)bad(t.v);
-    pipe.push(cmd);seq.push({op,pipe});op=t.v;pipe=[];cmd=nc()}
-  if(cmd.words.length||cmd.out)pipe.push(cmd);else if(pipe.length)bad('newline');
-  if(pipe.length)seq.push({op,pipe});else if(op&&op!==';')bad('newline');
-  return seq}
-function globRe(p,ci){return new RegExp('^'+p.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$',ci?'i':'')}
-function globExpand(pat){const idx=pat.lastIndexOf('/');const dp=idx>=0?pat.slice(0,idx+1):'';const b=pat.slice(idx+1);
-  if(/[*?]/.test(dp)||!b)return [pat];const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
-  const rx=globRe(b);const m=Object.keys(dn.children).filter(k=>(b.startsWith('.')||!k.startsWith('.'))&&rx.test(k)).sort(cmpName).map(k=>dp+k);
-  return m.length?m:[pat]}
-function flags(a){const fl=new Set(),rest=[];let end=false;for(const x of a){if(!end&&x==='--'){end=true;continue}
-  if(!end&&x.startsWith('-')&&x.length>1){if(x.startsWith('--'))fl.add(x);else for(const ch of x.slice(1))fl.add(ch)}else rest.push(x)}return {fl,rest}}
-function readInputs(rest,io,cmd){const src=[],err=[];if(!rest.length){src.push({name:'',text:io.stdin});return {src,err}}
-  for(const t of rest){const n=getNode(norm(t));if(!n)err.push(`${cmd}: ${t}: No such file or directory`);else if(n.type==='dir')err.push(`${cmd}: ${t}: Is a directory`);else src.push({name:t,text:n.content})}
-  return {src,err}}
-function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',name+'/');if(n.exec)return M('x',name);return name}
-function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
-  if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
-  return {n,rest,bad:isNaN(n)}}
-
-const CMDS={
-  pwd:()=>ok(S.cwd),
-  ls(a,io){const {fl,rest}=flags(a);const all=fl.has('a')||fl.has('A'),long=fl.has('l');const targets=rest.length?rest:['.'];const err=[];let code=0;
-    const fmt=(name,n)=>long?`${n.type==='dir'?'drwxr-xr-x':n.exec?'-rwxr-xr-x':'-rw-r--r--'}  explorer  ${String(n.type==='dir'?4096:n.content.length).padStart(5)}  ${paint(name,n,io.tty)}`:paint(name,n,io.tty);
-    const jn=arr=>arr.join(long||!io.tty?'\n':'  ');const files=[],dirs=[],blocks=[];
-    for(const t of targets){const n=getNode(norm(t));if(!n){err.push(`ls: cannot access '${t}': No such file or directory`);code=2;continue}(n.type==='dir'?dirs:files).push([t,n])}
-    if(files.length)blocks.push(jn(files.map(([t,n])=>fmt(t,n))));
-    for(const [t,n] of dirs){let ents=Object.keys(n.children).filter(k=>all||!k.startsWith('.')).sort(cmpName).map(k=>fmt(k,n.children[k]));
-      if(fl.has('a'))ents=[fmt('.',n),fmt('..',D())].concat(ents);
-      let body=jn(ents);if(targets.length>1)body=t+':'+(body?'\n'+body:'');blocks.push(body)}
-    return {out:blocks.filter(b=>b!=='').join(targets.length>1?'\n\n':'\n'),err,code}},
-  cd(a){if(a.length>1)return E('bash: cd: too many arguments');let t=a[0];if(t===undefined)t=HOME;let show='';if(t==='-'){t=S.oldpwd;show=t}
-    const abs=norm(t),n=getNode(abs);if(!n)return E(`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
-    S.oldpwd=S.cwd;S.cwd=abs;return ok(show)},
-  mkdir(a){const {fl,rest}=flags(a);if(!rest.length)return E('mkdir: missing operand');const err=[];
-    for(const t of rest){const abs=norm(t);if(getNode(abs)){if(!fl.has('p'))err.push(`mkdir: cannot create directory '${t}': File exists`);continue}
-      if(fl.has('p')){const bad=mkdirp(abs);if(bad)err.push(`mkdir: cannot create directory '${t}': Not a directory`);continue}
-      const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`mkdir: cannot create directory '${t}': No such file or directory`);continue}
-      par.children[name]=D();changed.add(abs)}
-    const r={out:'',err,code:err.length?1:0};if(err.some(e=>e.endsWith('No such file or directory')))r.tips=['Tip: add -p to create the missing folders along the way.'];return r},
-  touch(a){if(!a.length)return E('touch: missing file operand');const err=[];for(const t of a){const abs=norm(t);if(getNode(abs)){changed.add(abs);continue}
-      const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`touch: cannot touch '${t}': No such file or directory`);continue}par.children[name]=F('');changed.add(abs)}
-    return {out:'',err,code:err.length?1:0}},
-  echo(a){let x=a.slice();while(x[0]==='-n'||x[0]==='-e')x.shift();return ok(x.join(' '))},
-  cat(a,io){const {rest}=flags(a);const {src,err}=readInputs(rest,io,'cat');return {out:src.map(s=>s.text).join('\n'),err,code:err.length?1:0}},
-  rm(a){const {fl,rest}=flags(a);const r=fl.has('r')||fl.has('R'),f=fl.has('f');if(!rest.length)return f?ok():E('rm: missing operand');const err=[];const tips=[];
-    for(const t of rest){const abs=norm(t);
-      if(abs==='/'||abs===HOME||HOME.startsWith(abs+'/')){err.push(`rm: refusing to remove '${t}': that would wipe out your whole world`);continue}
-      if(S.cwd===abs||S.cwd.startsWith(abs+'/')){err.push(`rm: you are standing inside '${t}'. cd out of it first.`);continue}
-      const n=getNode(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
-      if(n.type==='dir'&&!r){err.push(`rm: cannot remove '${t}': Is a directory`);tips.push(`Tip: folders need -r (recursive): rm -r ${t}`);continue}
-      const [par,name,pp]=parentOf(abs);delete par.children[name];changed.add(pp)}
-    return {out:'',err,code:err.length?1:0,tips}},
-  rmdir(a){if(!a.length)return E('rmdir: missing operand');const err=[];for(const t of a){const abs=norm(t),n=getNode(abs);
-      if(!n){err.push(`rmdir: failed to remove '${t}': No such file or directory`);continue}if(n.type!=='dir'){err.push(`rmdir: failed to remove '${t}': Not a directory`);continue}
-      if(Object.keys(n.children).length){err.push(`rmdir: failed to remove '${t}': Directory not empty`);continue}
-      if(S.cwd===abs||S.cwd.startsWith(abs+'/')){err.push(`rmdir: you are standing inside '${t}'. cd out of it first.`);continue}
-      const [par,name,pp]=parentOf(abs);delete par.children[name];changed.add(pp)}return {out:'',err,code:err.length?1:0}},
-  cp(a){return copyMove(a,false)},
-  mv(a){return copyMove(a,true)},
-  head(a,io){return headTail(a,io,'head')},
-  tail(a,io){return headTail(a,io,'tail')},
-  wc(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest,io,'wc');const out=[];
-    const pick=['l','w','c'].filter(x=>fl.has(x)||(x==='c'&&fl.has('m')));
-    for(const s of src){const L=lines(s.text).length,W=s.text.split(/\s+/).filter(Boolean).length,C=s.text.length+(s.text?1:0);
-      const vals={l:L,w:W,c:C};const cols=(pick.length?pick:['l','w','c']).map(k=>pick.length===1?String(vals[k]):String(vals[k]).padStart(4));
-      out.push(cols.join(pick.length===1?'':' ')+(s.name?' '+s.name:''))}
-    return {out:out.join('\n'),err,code:err.length?1:0}},
-  grep(a,io){const {fl,rest}=flags(a);if(!rest.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);const pat=rest.shift();
-    const fg=fl.has('i')?'gi':'g';let re;try{re=new RegExp(pat,fg)}catch(e){re=new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),fg)}
-    const {src,err}=readInputs(rest,io,'grep');const multi=src.length>1;const out=[];let total=0;
-    for(const s of src){let cnt=0;lines(s.text).forEach((ln,i)=>{re.lastIndex=0;const hit=re.test(ln);if(hit!==fl.has('v')){cnt++;
-        if(!fl.has('c')){let txt=ln;if(io.tty&&!fl.has('v')&&pat){re.lastIndex=0;txt=ln.replace(re,m=>M('m',m))}
-          const pre=(multi?(io.tty?M('f',s.name):s.name)+':':'')+(fl.has('n')?(io.tty?M('n',String(i+1)):String(i+1))+':':'');out.push(pre+txt)}}});
-      if(fl.has('c'))out.push((multi?s.name+':':'')+cnt);total+=cnt}
-    return {out:out.join('\n'),err,code:err.length?2:total?0:1}},
-  sort(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest,io,'sort');let L=[].concat(...src.map(s=>lines(s.text)));
-    if(fl.has('n'))L.sort((x,y)=>(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y));else L.sort((x,y)=>x.localeCompare(y));
-    if(fl.has('r'))L.reverse();if(fl.has('u'))L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
-  uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];const g=[];
-    for(const x of L){if(g.length&&g[g.length-1][0]===x)g[g.length-1][1]++;else g.push([x,1])}
-    return {out:g.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
-  find(a){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')){start=a[0];i=1}let rx=null,type=null;
-    for(;i<a.length;i++){const p=a[i];if(p==='-name'||p==='-iname'){const v=a[++i];if(v==null)return E(`find: missing argument to '${p}'`);rx=globRe(v,p==='-iname')}
-      else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d')return E(`find: unknown argument to -type: ${type}`)}
-      else{const r=E(`find: paths must come before the search options: '${p}'`);if(/[*?]/.test(a.join('')))r.tips=['Tip: put quotes around the pattern, like -name "*.txt", so the shell leaves the * for find.'];return r}}
-    const root=getNode(norm(start));if(!root)return E(`find: '${start}': No such file or directory`);const out=[];
-    (function walk(n,path,nm){if((!rx||rx.test(nm))&&(!type||(type==='d')===(n.type==='dir')))out.push(path);
-      if(n.type==='dir')for(const k of Object.keys(n.children).sort(cmpName))walk(n.children[k],path.replace(/\/$/,'')+'/'+k,k)})(root,start,bname(norm(start)));
-    return ok(out.join('\n'))},
-  tree(a,io){const {fl,rest}=flags(a);const t=rest[0]||'.';const n=getNode(norm(t));if(!n)return E(`tree: '${t}': No such file or directory`);if(n.type!=='dir')return ok(t);
-    const out=[io.tty?M('d',t):t];let dc=0,fc=0;
-    (function rec(node,pre){const ks=sortedKeys(node).filter(k=>fl.has('a')||!k.startsWith('.'));ks.forEach((k,i)=>{const last=i===ks.length-1,c=node.children[k];
-      out.push(pre+(last?'└── ':'├── ')+paint(k,c,io.tty));if(c.type==='dir'){dc++;rec(c,pre+(last?'    ':'│   '))}else fc++})})(n,'');
-    out.push('',`${dc} director${dc===1?'y':'ies'}, ${fc} file${fc===1?'':'s'}`);return ok(out.join('\n'))},
-  chmod(a){if(a.length<2)return E("chmod: missing operand. Example: chmod +x pack.sh");const mode=a[0];let x;
-    if(/^[ugoa]*\+[rwx]*x[rwx]*$/.test(mode))x=true;else if(/^[ugoa]*-[rwx]*x[rwx]*$/.test(mode))x=false;else if(/^[0-7]{3}$/.test(mode))x=(parseInt(mode[0],10)&1)===1;
-    else if(/^[ugoa]*[+-][rw]+$/.test(mode))return ok();else return E(`chmod: invalid mode: '${mode}'`);
-    const err=[];for(const t of a.slice(1)){const abs=norm(t),n=getNode(abs);if(!n){err.push(`chmod: cannot access '${t}': No such file or directory`);continue}if(n.type==='file')n.exec=x;changed.add(abs)}
-    return {out:'',err,code:err.length?1:0}},
-  history:()=>ok(S.hist.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n')),
-  clear:()=>Object.assign(ok(),{clear:true}),
-  whoami:()=>ok('explorer'),
-  hostname:()=>ok('basecamp'),
-  date(){const d=new Date(),p=d.toDateString().split(' ');return ok(`${p[0]} ${p[1]} ${p[2]} ${d.toTimeString().slice(0,8)} ${p[3]}`)},
-  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return runPath(a[0],io,true)},
-  sh(a,io){return CMDS.bash(a,io)},
-  help:()=>ok(['Commands in this practice shell:',
-    '  Look around   pwd  ls  cd  tree  cat',
-    '  Create        mkdir  touch  echo',
-    '  Organize      cp  mv  rm  rmdir',
-    '  Read          head  tail  wc  grep  sort  uniq',
-    '  Search        find',
-    '  Scripts       NAME=value  chmod  bash  ./file  for … do … done',
-    '  Other         history  clear  whoami  date  man <command>',
-    'Symbols:  |  >  >>  <  &&  ;  *  ?  ~  .  ..',
-    'Try: man grep'].join('\n')),
-  man(a){if(!a[0])return E('What manual page do you want? For example: man ls');const g=GUIDE.find(x=>x.c===a[0]||x.c.split(' ')[0]===a[0]);
-    if(!g)return E(`No manual entry for ${a[0]}`);
-    return ok([`${g.c.toUpperCase()}`,'',`  ${g.what}`,'','EXAMPLES',...g.ex.map(([c,n])=>`  ${c}${n?'    # '+n:''}`),'',"(Short version. Real man pages are long; on a real computer press q to quit them.)"].join('\n'))}
-};
-function headTail(a,io,cmd){const {n,rest,bad}=parseN(a);if(bad)return E(`${cmd}: invalid number of lines`);const {src,err}=readInputs(rest,io,cmd);const out=[];
-  src.forEach((s,i)=>{const L=lines(s.text);const part=cmd==='head'?L.slice(0,n):(n?L.slice(-n):[]);if(src.length>1)out.push((i?'\n':'')+`==> ${s.name} <==`);out.push(...part)});
-  return {out:out.join('\n'),err,code:err.length?1:0}}
-function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const r=move||fl.has('r')||fl.has('R');
-  if(rest.length<2)return E(rest.length?`${nm}: missing destination file operand after '${rest[0]}'`:`${nm}: missing file operand`);
-  const dest=rest.pop(),dabs=norm(dest),dn=getNode(dabs),into=!!dn&&dn.type==='dir';
-  if(rest.length>1&&!into)return E(`${nm}: target '${dest}' is not a directory`);const err=[],tips=[];
-  for(const s of rest){const sabs=norm(s),sn=getNode(sabs);
-    if(!sn){err.push(`${nm}: cannot stat '${s}': No such file or directory`);continue}
-    if(sn.type==='dir'&&!r){err.push(`cp: -r not specified; omitting directory '${s}'`);tips.push(`Tip: copying a folder needs -r: cp -r ${s} ${dest}`);continue}
-    const tabs=into?join(dabs,bname(sabs)):dabs;
-    if(tabs===sabs){err.push(`${nm}: '${s}' and '${dest}' are the same file`);continue}
-    if(sn.type==='dir'&&(tabs+'/').startsWith(sabs+'/')){err.push(`${nm}: cannot ${move?'move':'copy'} '${s}' into itself`);continue}
-    if(move&&(S.cwd===sabs||S.cwd.startsWith(sabs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
-    const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
-    const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
-    const copy=move?sn:clone(sn);if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];changed.add(spp)}
-    par.children[name]=copy;markTree(tabs,copy)}
-  return {out:'',err,code:err.length?1:0,tips}}
-
-const FRIENDLY={
-  nano:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vim:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vi:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  code:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  sudo:'sudo runs a command as the all-powerful admin user. You don\'t need it here, and on a real computer use it only when you know why.',
-  exit:'There is nowhere to exit to. Your progress saves automatically.',
-  logout:'There is nowhere to exit to. Your progress saves automatically.',
-  cls:'cls is the Windows command. In bash, use clear.',
-  dir:'dir is the Windows command. In bash, use ls.',
-  copy:'copy is the Windows command. In bash, use cp.',
-  move:'move is the Windows command. In bash, use mv.',
-  del:'del is the Windows command. In bash, use rm.',
-  'cd..':'Bash needs a space between cd and the dots: cd ..',
-  less:'less pages through long files. This practice shell doesn\'t have it; use head and tail instead.',
-  more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
-};
-function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
-
-function runPath(name,io,force){const abs=norm(name),n=getNode(abs);
-  if(!n)return E(`bash: ${name}: No such file or directory`,127);
-  if(n.type==='dir')return E(`bash: ${name}: Is a directory`,126);
-  if(!force&&!n.exec)return Object.assign(E(`bash: ${name}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
-  const saveCwd=S.cwd,saveVars=Object.assign({},S.vars);const out=[],err=[];let code=0;
-  for(const ln of n.content.split('\n')){const t=ln.trim();if(!t||t.startsWith('#'))continue;
-    const r=execLine(t,{depth:io.depth+1,tty:io.tty,record:false});for(const o of r.out){if(o.clear)continue;(o.cls==='out'?out:err).push(o.text)}code=r.code}
-  S.cwd=saveCwd;S.vars=saveVars;return {out:out.join('\n'),err,code}}
-
-function runCmd(words,io){
-  if(!words.length)return ok();
-  const args=[];let globbed=false;
-  for(const w of words){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
-  const name=args[0],a=args.slice(1);let r,lname=name;
-  if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];S.vars[k]=name.slice(k.length+1);r=ok();lname='(assign)'}
-  else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
-  else if(name.includes('/'))r=runPath(name,io,false);
-  else if(CMDS[name])r=CMDS[name](a,io);
-  else if(FRIENDLY[name])r=E(FRIENDLY[name],127);
-  else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
-  if(io.record)LOG.push({name:lname,args:a,globbed,piped:io.pipeLen>1,redirect:io.redirect,code:r.code,out:r.out||''});
-  return r}
-
-const FOR_RE=/^for\s+([A-Za-z_]\w*)\s+in\s+(.*?)\s*;\s*do\s+(.*?)\s*;?\s*done\s*$/;
-function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const res=[];let code=0;
-  if(o.depth>6)return {out:[{text:'bash: too many nested scripts',cls:'err'}],code:1};
-  const t=line.trim();
-  if(/^for\b/.test(t)){const fm=t.match(FOR_RE);
-    if(!fm)return {out:[{text:'bash: for loop needs this shape: for x in a b c; do echo $x; done',cls:'err'}],code:2};
-    let toks;try{toks=tokenize(fm[2])}catch(e){return {out:[{text:'bash: '+e.message,cls:'err'}],code:2}}
-    const items=[];let globbed=false;for(const w of toks){if(w.t!=='w')continue;if(w.glob){globbed=true;items.push(...globExpand(w.v))}else items.push(w.v)}
-    if(o.record)LOG.push({name:'for',args:items,globbed,piped:false,redirect:null,code:0,out:''});
-    for(const it of items){S.vars[fm[1]]=it;const r=execLine(fm[3],o);res.push(...r.out);code=r.code}
-    S.last=code;return {out:res,code}}
-  let seq;try{seq=parse(tokenize(line))}catch(e){return {out:[{text:'bash: '+e.message,cls:'err'}],code:2}}
-  for(const item of seq){if(item.op==='&&'&&code!==0)continue;if(item.op==='||'&&code===0)continue;
-    let stdin='';const P=item.pipe;
-    for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1;
-      if(c.inp){const n=getNode(norm(c.inp));if(!n||n.type!=='file'){res.push({text:`bash: ${c.inp}: No such file or directory`,cls:'err'});code=1;break}stdin=n.content}
-      if(c.out&&!c.out.append){const e=writeFile(norm(c.out.path),'',false,c.out.path);if(e){res.push({text:e,cls:'err'});code=1;break}}
-      const r=runCmd(c.words,{stdin,tty:o.tty&&last&&!c.out,depth:o.depth,pipeLen:P.length,record:o.record,redirect:c.out});
-      if(r.clear)res.push({clear:true});
-      r.err.forEach(e=>res.push({text:e,cls:'err'}));(r.tips||[]).forEach(e=>res.push({text:e,cls:'tip'}));
-      code=r.code;
-      if(c.out){const e=writeFile(norm(c.out.path),r.out,c.out.append,c.out.path);if(e){res.push({text:e,cls:'err'});code=1}stdin=''}
-      else if(last){if(r.out!=='')res.push({text:r.out,cls:'out'})}
-      else stdin=r.out}
-    S.last=code}
-  return {out:res,code}}
-
-/* ---------- missions ---------- */
 const CH=[
 {name:'Where am I?',badge:'Pathfinder',intro:'Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
  learned:['pwd','ls','ls -a','cat','cd','cd ..','cd ~'],
@@ -497,7 +180,7 @@ const GUIDE=[
  {c:'man',ch:7,what:'Show the manual for a command. On a real computer, press q to leave it.',syn:[['man','cmd'],['command','arg']],ex:[['man grep','']]},
  {c:'help',ch:7,what:'List every command this practice shell knows.',syn:[['help','cmd']],ex:[['help','']]}
 ];
-
+SQ.GUIDE=GUIDE;
 const QF=[
  ['Show the folder you are in',['pwd']],['List the files here',['ls']],
  ['List files here, including hidden ones',['ls -a','ls -la','ls -al','ls -A']],
@@ -537,11 +220,6 @@ function addLine(html,cls){const d=document.createElement('div');d.className='li
 function scrollDown(){term.scrollTop=term.scrollHeight}
 function totalDone(i){return CH[i].missions.filter((m,j)=>S.done[i+'.'+j]).length}
 
-function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:LOG,
-  ran:(n,p)=>LOG.some(e=>e.name===n&&(!p||p(e))),has:p=>!!nd(p),node:nd,
-  isDir:p=>{const n=nd(p);return !!n&&n.type==='dir'},isFile:p=>{const n=nd(p);return !!n&&n.type==='file'},
-  read:p=>{const n=nd(p);return n&&n.type==='file'?n.content:''},
-  flag:(e,ch)=>e.args.some(x=>/^-[A-Za-z]+$/.test(x)&&x.includes(ch))}}
 
 function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
   try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
@@ -555,7 +233,7 @@ function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return
   pop=true}
 
 function run(line){const before=S.cwd;addLine(promptHTML(before)+esc(line));
-  if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;LOG=[];changed=new Set();
+  if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
   if(line.trim()){const r=execLine(line,{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;checkMission(line)}
   renderAll();save();scrollDown()}
 
@@ -568,7 +246,7 @@ function renderCrumbs(){const parts=S.cwd.split('/').filter(Boolean);let h='<spa
   parts.forEach((s,i)=>{p+='/'+s;h+=`${i?'<span class="sep">/</span>':''}<button data-cd="${esc(p)}">${esc(s)}</button>`});crumbsEl.innerHTML=h}
 function renderMap(){
   const node=(name,n,abs)=>{const isDir=n.type==='dir',here=abs===S.cwd;
-    const cls=['row',isDir?'d':'f',name.startsWith('.')?'hid':'',here?'here':'',changed.has(abs)?'flash':''].filter(Boolean).join(' ');
+    const cls=['row',isDir?'d':'f',name.startsWith('.')?'hid':'',here?'here':'',SQ.rt.changed.has(abs)?'flash':''].filter(Boolean).join(' ');
     let h=`<li><button class="${cls}" data-path="${esc(abs)}" title="${esc(abs)}">${isDir?ICON_DIR:ICON_FILE}<span class="nm">${esc(name)}${isDir&&abs!=='/'?'/':''}</span>${n.exec?'<span class="tag">x</span>':''}${here?'<span class="pin">YOU</span>':''}</button>`;
     if(isDir){const ks=sortedKeys(n);if(ks.length)h+='<ul class="tree">'+ks.map(k=>node(k,n.children[k],join(abs,k))).join('')+'</ul>'}return h+'</li>'};
   mapEl.innerHTML='<ul class="tree root">'+node('/',S.fs,'/')+'</ul>';
@@ -602,7 +280,7 @@ function renderXP(){let i=0;while(i+1<RANKS.length&&S.xp>=RANKS[i+1][0])i++;cons
 function renderAll(){renderPrompt();renderCrumbs();renderMap();renderChapters();renderMission();renderXP()}
 
 function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
-  changed=new Set();CH[i].setup();if(changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
+  SQ.rt.changed=new Set();CH[i].setup();if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
 
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
@@ -639,7 +317,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};changed=new Set();CH[S.ch].setup();changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};SQ.rt.changed=new Set();CH[S.ch].setup();SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
@@ -701,7 +379,7 @@ function renderGuide(){const groups=CH.map(c=>c.name).concat(['Handy extras']);
 let armP=null;
 $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');if(t){showTab('quest');fill(t.dataset.try);return}
   if(e.target.id==='resetProgress'){const b=e.target;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase progress, XP and world';clearTimeout(armP);armP=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},3500);return}
-    clearTimeout(armP);S=fresh();S.seen=true;screen.innerHTML='';welcome();CH[0].setup();changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
+    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();CH[0].setup();SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
 
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');
@@ -709,7 +387,7 @@ function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash s
 
 /* boot */
 if(!S.seen){CH[S.ch].setup();S.seen=true}
-changed=new Set();
+SQ.rt.changed=new Set();
 welcome();if(S.hist.length)addLine(renderText(`Welcome back. You are on chapter ${S.ch+1}: ${CH[S.ch].name}.`),'tip');
 renderAll();renderGuide();fireIdle();save();
 const h=(location.hash||'').slice(1);if(h==='guide'||h==='quickfire'||h==='fire')showTab(h==='guide'?'guide':'fire');
