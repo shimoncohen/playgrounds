@@ -93,8 +93,8 @@ describe('sed', () => {
       ["echo a | sed 's/a/b/q'", /^sed: -e expression #1, char \d+: unknown option to `s'/],
       ["echo a | sed 'k'", /^sed: -e expression #1, char \d+: unknown command: `k'/],
       ["echo a | sed", /^sed: no script given|usage/i],
-      ["echo a | sed 's/(/x/'", /^sed: invalid regular expression/],
-      ["echo aaaa | sed 's/(a+)+$/x/'", /^sed: pattern too complex for this practice shell/],
+      ["echo a | sed 's/\\(/x/'", /^sed: -e expression #1, char 7: Unmatched \( or \\\(/],
+      ["echo aaaa | sed -E 's/(a+)+$/x/'", /^sed: pattern too complex for this practice shell/],
       ["echo a | sed -q p", /sed: invalid option -- 'q'/],
       ["sed p nofile", /sed: .*nofile.*No such file or directory/],
     ]) {
@@ -225,8 +225,8 @@ describe('sed g with empty matches follows sed, not JS', () => {
 
 describe('unsupported real options say so', () => {
   const U = (l, x) => assert.equal(out(l), `this practice shell does not support ${x} yet`);
-  it('sed -i', () => U("echo a | sed -i 's/a/b/'", 'sed -i'));
-  it('sed negation', () => assert.match(out("echo a | sed '1!d'"), /^this practice shell does not support .*yet$/));
+  it('sed -z', () => U("echo a | sed -z 's/a/b/'", 'sed -z'));
+  it('sed hold space', () => U("echo a | sed 'h;G'", "sed command 'h'"));
   it('seq -s', () => U('seq -s, 3', 'seq -s'));
   it('tr -c', () => U('echo a | tr -cd a', 'tr -c'));
   it('cut -s', () => U('echo a | cut -s -d, -f1', 'cut -s'));

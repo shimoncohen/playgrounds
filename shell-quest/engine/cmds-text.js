@@ -2,7 +2,7 @@
 const {norm,getNode,writeFile,ok,E,lines,readInputs,globRe,cmpName,M}=SQ;
 const CMDS=SQ.CMDS;
 const unsup=x=>E(`this practice shell does not support ${x} yet`);
-const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z'};
+const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'zuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z'};
 const badOpt=(cmd,ch)=>ch==='-'||(REAL[cmd]||'').includes(ch)?unsup(`${cmd} ${ch==='-'?'--long options':'-'+ch}`):E(`${cmd}: invalid option -- '${ch}'`);
 const isOpt=x=>x.length>1&&x[0]==='-'&&x!=='--';
 const MAX_SEQ=10000,MAX_OUT=200000,MAX_XARGS=1000,MAX_XDEPTH=3;
@@ -62,66 +62,58 @@ CMDS.tr=function(a,io){let del=false,sq=false,i=0;
     if(sq&&sqSet.has(o)&&prev===o)continue;res+=o;prev=o}
   return ok(res)};
 
-// ---- sed ----
-const RE_SPECIAL=/[\\^$.*+?()[\]{}|\/-]/;
-function sedParse(script){const bad=(n,m)=>({err:`sed: -e expression #1, char ${n}: ${m}`});
-  let i=0;const n=script.length;const cmd={a1:null,a2:null,re:null};
-  const num=()=>{let s='';while(i<n&&/\d/.test(script[i]))s+=script[i++];return s===''?null:+s};
-  const addr=()=>{if(script[i]==='/'){i++;let s='';while(i<n&&script[i]!=='/'){if(script[i]==='\\'&&i+1<n){if(script[i+1]==='/'){s+='/';i+=2;continue}s+=script[i++]}s+=script[i++]}
-      if(i>=n)return {bad:bad(i,'unterminated address regex')};i++;return {re:s}}
-    if(script[i]==='$'){i++;return {last:true}}
-    const v=num();return v===null?null:{n:v}};
-  while(i<n&&script[i]===' ')i++;
-  const A1=addr();if(A1&&A1.bad)return A1.bad;
-  if(A1){cmd.a1=A1;if(script[i]===','){i++;const A2=addr();if(A2&&A2.bad)return A2.bad;if(!A2)return bad(i+1,'unexpected `,\'');if(A1.n===undefined||(A2.n===undefined&&!A2.last))return bad(i,'only N,M and N,$ line ranges are supported here');cmd.a2=A2}}
-  while(i<n&&script[i]===' ')i++;
-  if(i>=n)return bad(i,'missing command');
-  if(script[i]==='!')return {err:'this practice shell does not support sed negated addresses (!) yet'};
-  const c=script[i++];
-  if(c==='d'||c==='p'){while(i<n&&script[i]===' ')i++;if(i<n)return bad(i+1,'extra characters after command');cmd.c=c;return {cmd}}
-  if('yaicqnNDPhHgGx=lrwbtTe{'.includes(c))return {err:`this practice shell does not support sed command '${c}' yet`};
-  if(c!=='s')return bad(i,`unknown command: \`${c}'`);
-  const dl=script[i++];if(dl===undefined||dl==='\n'||dl==='\\')return bad(i,'unterminated `s\' command');
-  const part=()=>{let s='';while(i<n&&script[i]!==dl){if(script[i]==='\\'&&i+1<n){if(script[i+1]===dl){s+=RE_SPECIAL.test(dl)&&dl!=='/'?'\\'+dl:dl;i+=2;continue}s+=script[i]+script[i+1];i+=2;continue}s+=script[i++]}
-    if(i>=n)return null;i++;return s};
-  const re=part();if(re===null)return bad(n,'unterminated `s\' command');
-  const rp=part();if(rp===null)return bad(n,'unterminated `s\' command');
-  let g=false,p=false,ic=false;while(i<n){const f=script[i++];if(f==='g')g=true;else if(f==='p')p=true;else if(f==='i'||f==='I')ic=true;else if(f===' ')continue;else return bad(i,'unknown option to `s\'')}
-  cmd.c='s';cmd.pat=re;cmd.rp=rp;cmd.g=g;cmd.p=p;cmd.ic=ic;return {cmd}}
-/* compile through SQ.safeRegex; returns the RegExp, or a string with the error text for the caller to print */
-function mkRe(pat,fl){try{return SQ.safeRegex(pat,fl)}catch(e){return e.complex?'sed: '+e.message:'sed: invalid regular expression: '+pat}}
-function expandRepl(rp,m){let o='';for(let i=0;i<rp.length;i++){const c=rp[i];
-  if(c==='\\'&&i+1<rp.length){const d=rp[++i];if(d==='n')o+='\n';else if(d==='t')o+='\t';else if(/[1-9]/.test(d))o+=m[+d]===undefined?'':m[+d];else o+=d}
-  else if(c==='&')o+=m[0];else o+=c}return o}
-function sedSub(line,c){const rx=new RegExp(c.rx.source,'g'+(c.ic?'i':''));let o='',last=0,prevEnd=-1,m;
-  while(last<=line.length&&(m=rx.exec(line))){
-    if(m[0]===''){if(m.index===prevEnd){rx.lastIndex=m.index+1;if(m.index>=line.length)break;continue}}
-    o+=line.slice(last,m.index)+expandRepl(c.rp,m);last=m.index+m[0].length;prevEnd=last;
-    if(!c.g)break;if(m[0]==='')rx.lastIndex=m.index+1}
-  return o+line.slice(last)}
-CMDS.sed=function(a,io){let quiet=false,script=null;const files=[];
+// ---- sed ---- (the parser and runner live in sed.js: SQ.sedCompile / SQ.sedExec)
+/* Options: -n -E/-r -s -e SCRIPT (repeatable) -i[SUFFIX] (a * in SUFFIX is the file's name), --quiet --silent --regexp-extended --separate
+   --expression=S --in-place[=SUFFIX]. Without -e the first operand is the script. Files are one stream unless -s or -i; '-' is stdin.
+   GNU messages: can't read X (exit 2), read error on DIR (exit 4, stops), couldn't edit X: not a regular file (exit 4), no input files (exit 4). */
+CMDS.sed=function(a,io){let quiet=false,ere=false,sep=false,inPlace=false,suffix='',end=false;const exprs=[],ops=[];
+  const need=ch=>E(`sed: option requires an argument -- '${ch}'`);
   for(let i=0;i<a.length;i++){const x=a[i];
-    if(x==='--'){files.push(...a.slice(i+1));break}
-    if(x==='-e'){if(i+1>=a.length)return E("sed: option requires an argument -- 'e'");script=script===null?a[++i]:script+'\n'+a[++i];continue}
-    if(isOpt(x)){for(const ch of x.slice(1)){if(ch==='n')quiet=true;else if(ch==='E'||ch==='r'){}else return badOpt('sed',ch)}continue}
-    if(script===null)script=x;else files.push(x)}
-  if(script===null)return E('sed: no script given. Try: sed \'s/old/new/\' file',1);
-  const cmds=[];for(const part of script.split('\n')){if(part.trim()==='')continue;const r=sedParse(part);if(r.err)return E(r.err);cmds.push(r.cmd)}
-  for(const c of cmds){if(c.c==='s'){c.rx=mkRe(c.pat,(c.g?'g':'')+(c.ic?'i':''));if(typeof c.rx==='string')return E(c.rx)}
-    for(const k of ['a1','a2'])if(c[k]&&c[k].re!==undefined){c[k].rx=mkRe(c[k].re,'');if(typeof c[k].rx==='string')return E(c[k].rx)}}
-  const {src,err}=readInputs(files,io,'sed');const out=[];
-  for(const s of src){const L=lines(s.text);
-    L.forEach((ln,idx)=>{const no=idx+1;let line=ln,del=false;
-      const test=(ad)=>ad.n!==undefined?no===ad.n:ad.last?no===L.length:ad.rx.test(line);
-      for(const c of cmds){
-        let hit=true;if(c.a1)hit=c.a2?no>=c.a1.n&&(c.a2.last||no<=c.a2.n):test(c.a1);
-        if(!hit)continue;
-        if(c.c==='d'){del=true;break}
-        if(c.c==='p')out.push(line);
-        else{const next=sedSub(line,c);
-          const changed=next!==line;line=next;if(c.p&&changed)out.push(line)}}
-      if(!del&&!quiet)out.push(line)})}
-  return {out:out.join('\n'),err,code:err.length?1:0}};
+    if(end||x==='-'||x[0]!=='-'){ops.push(x);continue}
+    if(x==='--'){end=true;continue}
+    if(x[1]==='-'){const eq=x.indexOf('='),nm=eq<0?x.slice(2):x.slice(2,eq),v=eq<0?null:x.slice(eq+1);
+      if(nm==='quiet'||nm==='silent')quiet=true;else if(nm==='regexp-extended')ere=true;else if(nm==='separate')sep=true;
+      else if(nm==='in-place'){inPlace=true;suffix=v||''}
+      else if(nm==='expression'){if(v===null){if(i+1>=a.length)return E("sed: option '--expression' requires an argument");exprs.push(a[++i])}else exprs.push(v)}
+      else return unsup('sed --long options');continue}
+    for(let k=1;k<x.length;k++){const ch=x[k];
+      if(ch==='n')quiet=true;else if(ch==='E'||ch==='r')ere=true;else if(ch==='s')sep=true;
+      else if(ch==='e'){let v=x.slice(k+1);if(v===''){if(i+1>=a.length)return need('e');v=a[++i]}exprs.push(v);break}
+      else if(ch==='i'){inPlace=true;suffix=x.slice(k+1);break}
+      else return badOpt('sed',ch)}}
+  if(!exprs.length){if(!ops.length)return E('sed: no script given. Try: sed \'s/old/new/\' file',1);exprs.push(ops.shift())}
+  const comp=SQ.sedCompile(exprs,{E:ere});if(comp.err)return E(comp.err,comp.code||1);
+  const prog=comp.prog,err=[];let code=0;
+  const run=(streams)=>{try{return SQ.sedExec(prog,streams,{n:quiet})}
+    catch(e){if(e&&e.sedRt)return {rt:'sed: '+e.message};throw e}};
+  if(inPlace){
+    if(!ops.length)return E('sed: no input files',4);
+    for(const f of ops){
+      if(f==='-'||SQ.isNull(f)){err.push(`sed: couldn't edit ${f}: not a regular file`);code=4;continue}
+      const abs=norm(f),nd=getNode(abs);
+      if(!nd){err.push(SQ.isLoop(abs)?`sed: can't read ${f}: Too many levels of symbolic links`:`sed: can't read ${f}: No such file or directory`);code=Math.max(code,2);continue}
+      if(nd.type!=='file'){err.push(`sed: couldn't edit ${f}: not a regular file`);code=4;continue}
+      const old=nd.content,r=run([lines(old)]);
+      if(r.rt){err.push(r.rt);code=4;break}
+      if(suffix){const base=SQ.bname(abs),dir=abs.slice(0,abs.length-base.length);
+        const bk=suffix.includes('*')?(suffix.includes('/')?norm(suffix.split('*').join(base)):dir+suffix.split('*').join(base)):abs+suffix;
+        const we=writeFile(bk,old,false,f+suffix);if(we){err.push(we.replace(/^bash: /,'sed: '));code=4;continue}}
+      const we=writeFile(abs,r.outs[0].join('\n'),false,f);if(we){err.push(we.replace(/^bash: /,'sed: '));code=4}
+      if(r.stop){if(r.quit!==null)code=r.quit;break}}
+    return {out:'',err,code}}
+  const srcs=[];let fatal=null;
+  for(const f of (ops.length?ops:['-'])){
+    if(f==='-'){srcs.push(lines(io.stdin));continue}
+    if(SQ.isNull(f)){srcs.push([]);continue}
+    const abs=norm(f),nd=getNode(abs);
+    if(!nd){err.push(SQ.isLoop(abs)?`sed: can't read ${f}: Too many levels of symbolic links`:`sed: can't read ${f}: No such file or directory`);code=Math.max(code,2);continue}
+    if(nd.type==='dir'){fatal=`sed: read error on ${f}: Is a directory`;break}
+    srcs.push(lines(nd.content))}
+  const r=run(sep?srcs:[[].concat(...srcs)]);
+  if(r.rt){err.push(r.rt);return {out:'',err,code:4}}
+  if(fatal&&!r.stop){err.push(fatal);code=4}
+  if(r.stop&&r.quit!==null)code=r.quit;
+  return {out:[].concat(...r.outs).join('\n'),err,code}};
 
 // ---- seq ----
 const NUM=/^[+-]?(\d+\.?\d*|\.\d+)$/;

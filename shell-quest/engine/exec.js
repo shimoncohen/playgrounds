@@ -36,7 +36,7 @@ function runCmd(words,io,assigns){
   return runCmd0(ew,io,pend)}
 function runCmd0(ew,io,pend){const {args,globbed}=SQ.globWords(ew);
   const name=args[0],a=args.slice(1);let r,lname=name;
-  if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
+  if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)&&!own(CMDS,name)&&!SQ.hasFunction(name)){ /* the tip is for `x = 1`, never for a real command such as sed = file */r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
     return r}

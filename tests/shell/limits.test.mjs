@@ -224,7 +224,7 @@ describe('safeRegex', () => {
     const SQ = loadShell();
     run(SQ, `echo ${hang} > h.txt`);
     for (const pat of ['(a|a)*$', '((a+))+$', '(a+)+$', '(a*)*$', '(.*a)+$', '(a|aa)+$']) {
-      const r = fast(SQ, `sed 's/${pat}/x/' h.txt`, 1000);
+      const r = fast(SQ, `sed -E 's/${pat}/x/' h.txt`, 1000); // -E: in a BRE these characters are literals (Task 7)
       assert.equal(r.out, 'sed: pattern too complex for this practice shell', pat);
       assert.notEqual(r.code, 0);
     }

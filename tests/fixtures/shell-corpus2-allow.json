@@ -733,5 +733,95 @@
     "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
     "out": "./journal.txt",
     "code": 0
+  },
+  "sed 's/a/b/2' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: the numeric s flag replaces the 2nd match",
+    "out": "Welcome, explorer!\nThis world is made of folders bnd files.\nFolders hold other things. Files hold text.\nType help any time to see the commbnds you can use.",
+    "code": 0
+  },
+  "sed '/wolf/d' forest/notes.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "sed -n '/wolf/p' forest/notes.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "sed 's/a/b/;s/c/d/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: ; separates commands",
+    "out": "Weldome, explorer!\nThis world is mbde of folders and files.\nFolders hold other things. Files hold text.\nType help bny time to see the dommands you can use.",
+    "code": 0
+  },
+  "sed 'y/abc/xyz/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: the y command transliterates",
+    "out": "Welzome, explorer!\nThis world is mxde of folders xnd files.\nFolders hold other things. Files hold text.\nType help xny time to see the zommxnds you zxn use.",
+    "code": 0
+  },
+  "sed '2q' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: q prints the line and quits",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.",
+    "code": 0
+  },
+  "sed '1!d' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: ! negates an address",
+    "out": "Welcome, explorer!",
+    "code": 0
+  },
+  "sed 's/\\(a\\)/[\\1]/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: BRE \\( \\) groups and \\1 back-references (a plain ( is literal in a BRE)",
+    "out": "Welcome, explorer!\nThis world is m[a]de of folders and files.\nFolders hold other things. Files hold text.\nType help [a]ny time to see the commands you can use."
+  },
+  "sed 'y/abc/xy/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: y with unequal sets is GNU's error",
+    "out": "sed: -e expression #1, char 9: strings for `y' command are different lengths"
+  },
+  "sed -i 's/a/b/' readme.txt; cat readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: -i edits the file in place and prints nothing",
+    "out": "Welcome, explorer!\nThis world is mbde of folders and files.\nFolders hold other things. Files hold text.\nType help bny time to see the commands you can use.",
+    "files": [
+      [
+        "/home/explorer/readme.txt",
+        155,
+        "26e5033d"
+      ]
+    ]
+  },
+  "sed -i.bak 's/a/b/' readme.txt; ls": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: -i.bak edits the file in place and keeps readme.txt.bak",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  readme.txt.bak  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/readme.txt",
+        155,
+        "26e5033d"
+      ],
+      [
+        "/home/explorer/readme.txt.bak",
+        155,
+        "b69cd96c"
+      ]
+    ]
+  },
+  "sed -i 's/a/b/' nosuch.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read nosuch.txt: No such file or directory",
+    "code": 2
+  },
+  "echo abc | sed '1i\\\\top'": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: i inserts text before the line (GNU one-line form; \\t in the text is a tab)",
+    "out": "\top\nabc",
+    "code": 0
+  },
+  "echo abc | sed 'a\\\\bottom'": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a appends text after the line (GNU one-line form; \\b in the text is b)",
+    "out": "abc\nbottom",
+    "code": 0
+  },
+  "printf 'a\\nb\\n' | sed -n '$='": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: = prints the line number, so -n '$=' counts lines",
+    "out": "2",
+    "code": 0
   }
 }
