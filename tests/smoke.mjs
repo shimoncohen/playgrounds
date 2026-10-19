@@ -171,6 +171,28 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   await ctx.close();
 });
 
+test('shell-quest field guide groups by tier and keeps extras explicit', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-guide');
+  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner']);
+  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner']);
+  const extras = await page.$$eval('#guide .gsec[data-extras] h4', hs => hs.map(h => h.textContent));
+  assert.ok(extras.includes('help'), 'help should sit in Handy extras');
+  assert.match(await page.textContent('#guide .gsec[data-extras] h3'), /Handy extras/);
+  assert.ok(await page.isVisible('#guide .gsec[data-extras]'));
+  await page.click('#guide .gfilter button[data-tier="beginner"]');
+  assert.ok(await page.isVisible('#guide h3[data-tier="beginner"]'));
+  assert.ok(await page.isVisible('#guide .gsec[data-tier="beginner"] h4'));
+  assert.ok(!(await page.isVisible('#guide .gsec[data-extras]')), 'extras hidden under a tier filter');
+  await page.click('#guide .gfilter button[data-tier="all"]');
+  assert.ok(await page.isVisible('#guide .gsec[data-extras]'));
+  await page.setViewportSize({ width: 390, height: 800 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('import rejects another playground\'s file and garbage', async () => {
   const { ctx, page } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

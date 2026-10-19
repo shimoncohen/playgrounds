@@ -197,3 +197,8 @@ ul.tree.root{border:0;padding:0;margin:0}
 .bigan{padding:18px;overflow-x:auto}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.gsec[hidden]{display:none}
+.gfilter{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.gfilter .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tierh{font-size:24px;margin-bottom:12px}

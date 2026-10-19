@@ -28,10 +28,10 @@ const GUIDE=[
  {c:'chmod',ch:6,what:'Change permissions. +x makes a file executable, so you can run it.',syn:[['chmod','cmd'],['+x','opt'],['file','arg']],ex:[['chmod +x pack.sh','']]},
  {c:'./script',ch:6,what:'Run a script in this folder. bash script.sh runs it even without +x.',syn:[['./pack.sh','cmd']],ex:[['./pack.sh',''],['bash pack.sh','']]},
  {c:'for',ch:6,what:'Repeat commands once for each item in a list.',syn:[['for','kw'],['x','var'],['in a b c;','arg'],['do … ;','cmd'],['done','kw']],ex:[['for n in 1 2 3; do echo $n; done',''],['for f in *.txt; do wc -l $f; done','count lines in each text file']]},
- {c:'history',ch:7,what:'List the commands you typed. Press ↑ to bring the last ones back.',syn:[['history','cmd']],ex:[['history','']]},
- {c:'clear',ch:7,what:'Clear the screen. Ctrl+L does the same.',syn:[['clear','cmd']],ex:[['clear','']]},
- {c:'man',ch:7,what:'Show the manual for a command. On a real computer, press q to leave it.',syn:[['man','cmd'],['command','arg']],ex:[['man grep','']]},
- {c:'help',ch:7,what:'List every command this practice shell knows.',syn:[['help','cmd']],ex:[['help','']]}
+ {c:'history',ch:'extras',what:'List the commands you typed. Press ↑ to bring the last ones back.',syn:[['history','cmd']],ex:[['history','']]},
+ {c:'clear',ch:'extras',what:'Clear the screen. Ctrl+L does the same.',syn:[['clear','cmd']],ex:[['clear','']]},
+ {c:'man',ch:'extras',what:'Show the manual for a command. On a real computer, press q to leave it.',syn:[['man','cmd'],['command','arg']],ex:[['man grep','']]},
+ {c:'help',ch:'extras',what:'List every command this practice shell knows.',syn:[['help','cmd']],ex:[['help','']]}
 ];
 SQ.content.guide.push(...GUIDE);
 SQ.GUIDE=SQ.content.guide;

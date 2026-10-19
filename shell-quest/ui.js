@@ -55,8 +55,15 @@ function renderXP(){const r=SQ.tiers.rankFor(S.xp),lo=r.lo,hi=r.hi;
 function renderAll(){renderPrompt();renderCrumbs();renderMap();renderChapters();renderMission();renderXP()}
 
 
-function renderGuide(){const groups=CH.map(c=>c.name).concat(['Handy extras']);
+function renderGuide(){
+  const tiers=[];CH.forEach((c,i)=>{const t=SQ.tiers.tierOf(i);if(!tiers.includes(t))tiers.push(t)});
   const ex=g=>`<div class="ex">${g.ex.map(([c,n])=>`<div class="exrow"><code>${esc(c)}</code>${n?`<small>${esc(n)}</small>`:''}<button class="try" data-try="${esc(c)}">Try</button></div>`).join('')}</div>`;
+  const card=g=>`<article class="card panel"><h4>${esc(g.c)}</h4><p>${esc(g.what)}</p>${anatomy(g.syn)}${ex(g)}</article>`;
+  const chapterSec=ci=>{const items=GUIDE.filter(g=>g.ch===ci);return items.length?`<section class="gsec"><h3>Chapter ${ci+1}: ${esc(CH[ci].name)}</h3><div class="cards">${items.map(card).join('')}</div></section>`:''};
+  const tierSec=t=>`<section class="gsec gtier" data-tier="${t.id}"><h3 data-tier="${t.id}" class="tierh">${esc(t.name)}</h3>${CH.map((c,i)=>SQ.tiers.tierOf(i).id===t.id?chapterSec(i):'').join('')}</section>`;
+  const extras=GUIDE.filter(g=>g.ch==='extras');
+  const extrasSec=extras.length?`<section class="gsec" data-extras><h3>Handy extras</h3><div class="cards">${extras.map(card).join('')}</div></section>`:'';
+  const filter=`<div class="gfilter" role="group" aria-label="Filter by tier"><button class="btn ghost" data-tier="all" aria-pressed="true">All</button>${tiers.map(t=>`<button class="btn ghost" data-tier="${t.id}" aria-pressed="false">${esc(t.name)}</button>`).join('')}</div>`;
   $('#guide').innerHTML=`<div><h2>Field guide</h2><p class="lede">Everything from the quest in one place. Press Try on any example to drop it into the practice terminal.</p></div>
   <section class="gsec"><h3>How to read a command</h3><div class="panel bigan">${anatomy([['grep','cmd'],['-i','opt'],['wolf','arg'],['journal.txt','arg'],['|','op'],['wc','cmd'],['-l','opt']])}
    <p class="explain" style="margin-top:12px">The <b>command</b> comes first and says what to do. <b>Options</b> start with a dash and change how it behaves. <b>Arguments</b> are the things it works on, usually files or folders. <b>Operators</b> like <code>|</code>, <code>&gt;</code> and <code>&amp;&amp;</code> connect commands. Spaces separate everything, so put quotes around text that contains spaces.</p></div></section>
@@ -73,13 +80,17 @@ function renderGuide(){const groups=CH.map(c=>c.name).concat(['Handy extras']);
    <li>Don't paste commands from the internet that you don't understand, especially ones with <code>sudo</code> or <code>rm -rf</code>.</li>
    <li><kbd>Ctrl</kbd>+<kbd>C</kbd> stops a command that is running. <kbd>q</kbd> exits man pages and other viewers.</li>
    <li>Lost? <code>pwd</code> tells you where you are and <code>cd ~</code> takes you home.</li></ol></section>
-  ${groups.map((gname,gi)=>{const items=GUIDE.filter(g=>g.ch===gi);return items.length?`<section class="gsec"><h3>${gi<CH.length?`Chapter ${gi+1}: `:''}${esc(gname)}</h3><div class="cards">${items.map(g=>`<article class="card panel"><h4>${esc(g.c)}</h4><p>${esc(g.what)}</p>${anatomy(g.syn)}${ex(g)}</article>`).join('')}</div></section>`:''}).join('')}
-  <section class="gsec"><h3>Open a real terminal</h3><div class="os">
+  ${filter}${tiers.map(tierSec).join('')}${extrasSec}
+  <section class="gsec gfoot"><h3>Open a real terminal</h3><div class="os">
    <article class="card panel"><h4>Mac</h4><p>Press <kbd>Cmd</kbd>+<kbd>Space</kbd>, type Terminal, press Enter. Macs use zsh by default, a close cousin of bash. Every command in this course works the same there.</p></article>
    <article class="card panel"><h4>Windows</h4><p>Install WSL: open PowerShell as administrator, run <code>wsl --install</code>, restart, then open Ubuntu from the Start menu. Git Bash is a lighter alternative.</p></article>
    <article class="card panel"><h4>Linux</h4><p>Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> on most distributions, or find Terminal in your app menu.</p></article>
    <article class="card panel"><h4>First steps there</h4><p>Make a safe playground before experimenting: <code>mkdir ~/playground &amp;&amp; cd ~/playground</code>. Then rerun your favourite missions on real files.</p></article></div></section>
   <section class="gsec"><h3>After this course</h3><div class="panel" style="padding:14px 16px"><p class="explain">Good next topics, roughly in order: editing files with <code>nano</code>, <code>if</code> statements and exit codes, functions in scripts, reading <code>man</code> pages, permissions in depth (<code>ls -l</code> and <code>chmod 755</code>), and then tools that run on top of bash, like <code>git</code> and <code>ssh</code>.</p>
-   <div class="actions" style="margin-top:12px"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`}
+   <div class="actions" style="margin-top:12px"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`;
+  const gd=$('#guide');gd.querySelector('.gfilter').addEventListener('click',e=>{const b=e.target.closest('button[data-tier]');if(!b)return;const t=b.dataset.tier;
+    gd.querySelectorAll('.gfilter button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    gd.querySelectorAll('.gtier').forEach(x=>{x.hidden=t!=='all'&&x.dataset.tier!==t});
+    const xs=gd.querySelector('[data-extras]');if(xs)xs.hidden=t!=='all'})}
 SQ.ui={renderAll,renderPrompt,renderCrumbs,renderMap,renderChapters,renderMission,renderXP,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML,anatomy,setPop(){pop=true}};
 })(window.SQ = window.SQ || {});
