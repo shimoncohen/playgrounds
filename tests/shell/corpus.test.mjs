@@ -19,8 +19,9 @@ const FIELDS = ['out', 'code', 'cwd', 'vars', 'files', 'gone'];
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
 describe('differential corpus', () => {
-  assert.ok(fs.existsSync(FIXTURE), `fixture missing: ${FIXTURE} (generate with UPDATE_CORPUS=1)`);
-  const corpus = readJson(FIXTURE);
+  const have = fs.existsSync(FIXTURE);
+  it('fixture exists', () => assert.ok(have, `fixture missing: ${FIXTURE} (generate with UPDATE_CORPUS=1)`));
+  const corpus = have ? readJson(FIXTURE) : [];
   const allow = fs.existsSync(ALLOW) ? readJson(ALLOW) : {};
 
   it('has at least 250 entries with unique keys', () => {
@@ -29,10 +30,10 @@ describe('differential corpus', () => {
     assert.equal(new Set(keys).size, keys.length, 'duplicate corpus keys');
   });
 
-  it('every allow-list key names a corpus entry and carries a reason', () => {
-    const keys = new Set(corpus.map(keyOf));
+  it('every allow-list key names an expectChange corpus entry and carries a reason', () => {
+    const marked = new Set(corpus.filter((e) => e.expectChange).map(keyOf));
     for (const [k, v] of Object.entries(allow)) {
-      assert.ok(keys.has(k), `allow-list key not in corpus: ${JSON.stringify(k)}`);
+      assert.ok(marked.has(k), `allow-list key is not a corpus entry marked expectChange: ${JSON.stringify(k)}`);
       assert.ok(typeof v.reason === 'string' && v.reason.length > 0, `allow entry needs a reason: ${JSON.stringify(k)}`);
     }
   });
@@ -48,6 +49,12 @@ describe('differential corpus', () => {
         assert.ok(corpus.some((e) => e.setupUpTo === ci && e.line === m.answer && (e.prefix || []).length === mi), `chapter ${ci} mission ${mi}: no entry with its prefix`);
       }));
     assert.ok(n >= 70, `expected the full answer set, saw ${n}`);
+  });
+
+  it('contains every quick-fire answer variant', () => {
+    const SQ = loadShell();
+    const lines = new Set(corpus.filter((e) => e.line !== undefined).map((e) => e.line));
+    for (const q of SQ.content.quickfire) for (const a of q[1]) assert.ok(lines.has(a), `quick-fire answer missing: ${a}`);
   });
 
   for (const e of corpus) {

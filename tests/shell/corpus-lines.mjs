@@ -5,6 +5,11 @@
 // Every entry runs in a world where the setup() of chapters 0..10 has been applied. No dates, no $RANDOM.
 
 export const LINES = [
+  // ---- quick-fire forms (more variants come from SQ.content.quickfire) ----
+  'chmod a=r readme.txt', 'chmod =r readme.txt', 'chmod ugo=r readme.txt', 'chmod 600 readme.txt', 'chmod u=rw,go=r readme.txt', 'chmod go-w readme.txt',
+  'cut -f1 -d, village/shop.txt', 'cut -d" " -f1 village/shop.txt', "echo hello | tr '[:lower:]' '[:upper:]'", 'echo hello | tr [:lower:] [:upper:]', "sed -n '1p' readme.txt", "sed -n '$p' readme.txt",
+  'echo hi | tee f', 'echo hi | tee -a readme.txt', 'sort -nr village/shop.txt', 'ln -s forest/owl.txt o', 'env | sort', 'export V=1; echo $V', 'export -p',
+
   // ---- empty / whitespace / comments ----
   '', ' ', '   ', '\t', '# only a comment', '   # indented comment', 'echo hi # trailing comment',
   'echo a#b', 'echo "a # b"', 'echo   many    spaces   here', '\techo tab-led', 'echo\ttabbed\targs', '  echo lead and trail  ',
@@ -74,7 +79,7 @@ export const LINES = [
   // ---- command substitution ----
   'echo $(echo hi)', 'echo "$(echo hi)"', 'echo "[$(echo a b)]"', 'echo $(echo a b)', 'echo $(pwd)', 'echo "in $(pwd) now"', 'X=$(echo hi); echo $X', 'X=$(pwd); echo $X', 'X=$(ls forest); echo $X',
   'echo $(echo $(echo deep))', 'echo $(echo $(echo $(echo deeper)))', 'echo $(ls nosuch)', 'echo $(ls nosuch); echo $?', 'echo $(cd forest; pwd); pwd', 'echo $(X=1; echo $X); echo [$X]',
-  'echo $(echo', 'echo "$(echo"', 'echo $(', 'echo $()', { line: 'echo $(  )', change: false }, 'echo a$(echo b)c', 'echo $(echo a)$(echo b)', 'echo $(cat readme.txt | head -n 1)', 'echo "$(cat readme.txt | wc -l)"',
+  { line: 'echo $(echo', change: 'unterminated $( message may change' }, 'echo "$(echo"', 'echo $(', 'echo $()', { line: 'echo $(  )', change: false }, 'echo a$(echo b)c', 'echo $(echo a)$(echo b)', 'echo $(cat readme.txt | head -n 1)', 'echo "$(cat readme.txt | wc -l)"',
   'ls $(echo forest)', 'cat $(echo readme.txt)', 'echo $(seq 1 3)', 'echo "$(seq 1 3)"', 'echo $(echo "a   b")', 'echo "$(echo "nested quotes")"', 'echo $(echo ")")', "echo $(echo ')')",
   'echo $(wc -l journal.txt)', 'for i in $(seq 1 3); do echo "$(echo $i)"; done', 'echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo end))))))))))))))))))))))))))',
   'echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo end))))))))))))))))))))',
@@ -168,7 +173,7 @@ export const LINES = [
   'true', 'false', 'true && echo ok', 'false || echo ok', 'false; echo $?', 'exit', 'return', 'local x=1', '(echo hi)', '( echo hi )', '{ echo hi; }', '{ echo hi; } > f', 'echo $(( 1 + 2 ))', 'echo $((2*3))', 'echo $((', 'echo `date_zz`', 'echo `echo hi`',
   'echo a{b,c}', 'echo {1..3}', 'echo hi > f &', 'ls &', 'for i in 1; do echo $i; done &', 'echo hi 1>&2', 'echo hi 2>&1 >f', 'echo ${X:=v}', 'echo ${X:+v}', 'echo ${HOME#/home}', 'echo ${HOME%/explorer}', 'echo ${HOME/home/h}', 'echo ${#}', 'echo $*',
   'declare x=1', 'alias l=ls', 'unset X', 'set -e', 'let x=1', 'eval echo hi', 'trap x EXIT', 'wait', 'jobs', 'fg', 'echo $RANDOM_ZZ', '! true', '! false && echo ok', 'time ls', 'cd forest &', 'select x in a; do echo $x; done',
-  'echo !!', 'echo !$', 'echo a\\', 'echo a \\\n b', 'ls | { cat; }', 'echo hi |& tee f', 'cat <(echo hi)', 'echo hi >(cat)', 'echo hi >| f', 'cat <> f', 'echo [a]', 'echo a=b', 'a=b echo hi', 'X=1 echo $X', 'echo a ;; echo b',
+  'echo !!', 'echo !$', 'echo a\\', { line: 'echo a \\\n b', change: 'backslash-newline continuation' }, 'ls | { cat; }', 'echo hi |& tee f', 'cat <(echo hi)', 'echo hi >(cat)', { line: 'echo hi >| f', change: '>| clobber redirect may become supported' }, { line: 'cat <> f', change: '<> redirect may become supported' }, 'echo [a]', 'echo a=b', { line: 'a=b echo hi', change: 'prefix assignment may become command-scoped' }, { line: 'X=1 echo $X', change: 'prefix assignment may become command-scoped' }, 'echo a ;; echo b',
   ['X=1', 'echo "$X $1 $@ $#"'], ['f() { echo hi; }', 'f'], ['echo "echo \\$1 \\$2" > x.sh', 'bash x.sh a b'], ['echo "echo \\$# args" > x.sh', 'bash x.sh a b c'], ['echo "exit 3" > x.sh', 'bash x.sh', 'echo $?'], ['echo "false" > x.sh', 'bash x.sh', 'echo $?'],
   ['echo "echo hi" > x.sh', 'source x.sh'], ['echo "X=9" > x.sh', 'source x.sh', 'echo $X'], ['echo "read X" > x.sh', 'bash x.sh'], ['echo "echo -e a" > x.sh', 'bash x.sh'], ['echo "echo \\${X:-d}" > x.sh', 'bash x.sh'],
 ];

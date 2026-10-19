@@ -1,6 +1,7 @@
 // Differential corpus: builds the entry specs, replays one in a fresh world, and (UPDATE_CORPUS=1 via
 // corpus.test.mjs) rewrites tests/fixtures/shell-corpus.json from the CURRENT engine.
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadShell, run } from './harness.mjs';
@@ -28,7 +29,7 @@ const RULES = [
   ['unquoted ( ) or { }', /(?:^|[\s;&|])[({]\s|(?:^|\s)[)}]/],
   ['echo -e', /\becho\s+-[a-zA-Z]*e/],
   ['editor becomes a real command', new RegExp(CMD + String.raw`(?:nano|vi|vim|code)\b`)],
-  ['for with pipe/redirect/chain after done', /\bdone\s*(?:[|<>]|;\s*\S|&&|\|\|)/],
+  ['for with pipe/redirect/chain after done', /\bdone\s*(?:[|<>]|;\s*(?!done\b)\S|&&|\|\|)/],
   ['negation !', /(?:^|[;&|]\s*)!\s/],
   ['backticks', /`/],
   ['brace expansion', /\{[^}\s]*(?:,|\.\.)[^}\s]*\}/],
@@ -56,7 +57,7 @@ export function autoChange(lines) {
 export function listFiles(SQ) {
   const out = [];
   const walk = (abs, n) => {
-    if (n.type === 'file') out.push([abs, n.content.length]);
+    if (n.type === 'file') out.push([abs, n.content.length, crypto.createHash('sha1').update(n.content).digest('hex').slice(0, 8)]);
     else if (n.type === 'dir') for (const k of Object.keys(n.children)) walk(SQ.join(abs, k), n.children[k]);
   };
   const home = SQ.getNode(SQ.HOME);
@@ -75,13 +76,14 @@ const stable = (t) => t.replace(/\b[A-Z][a-z]{2} [A-Z][a-z]{2} [ \d]\d \d\d:\d\d
 /* spec: { line | lines, prefix?, setupUpTo? } -> { out, code, cwd, vars, files, gone } */
 export function runSpec(spec) {
   const SQ = freshWorld(spec.setupUpTo ?? 10);
-  const base = new Map(listFiles(SQ));
+  const base = new Map(listFiles(SQ).map(([p, n, h]) => [p, `${n}:${h}`]));
   for (const p of spec.prefix || []) run(SQ, p);
   let r = { out: '', code: 0 };
   for (const l of spec.lines || [spec.line]) r = run(SQ, l);
-  // files: delta against the seeded world (new or resized files as [path,size]); gone: seeded files that no longer exist.
-  const now = new Map(listFiles(SQ));
-  const files = [...now].filter(([p, n]) => base.get(p) !== n);
+  // files: delta against the seeded world (new or changed files as [path,size,sha1-prefix]); gone: seeded files that no longer exist.
+  const all = listFiles(SQ);
+  const now = new Map(all.map(([p, n, h]) => [p, `${n}:${h}`]));
+  const files = all.filter(([p, n, h]) => base.get(p) !== `${n}:${h}`);
   const gone = [...base.keys()].filter((p) => !now.has(p)).sort();
   return { out: stable(r.out), code: r.code, cwd: SQ.S.cwd, vars: { ...SQ.S.vars }, files, gone };
 }
@@ -99,6 +101,12 @@ export function answerSpecs() {
     answers.forEach((a, mi) => specs.push({ line: a, prefix: answers.slice(0, mi), setupUpTo: ci }));
   });
   return specs;
+}
+
+/* every accepted quick-fire answer variant (the UI only string-compares them; here each is also run for its effect) */
+export function quickfireSpecs() {
+  const SQ = loadShell();
+  return SQ.content.quickfire.flatMap((q) => q[1].map((a) => ({ line: a })));
 }
 
 export function handSpecs() {
@@ -119,7 +127,10 @@ export function handSpecs() {
 
 export function buildEntries() {
   const entries = [];
-  for (const spec of [...handSpecs(), ...answerSpecs()]) {
+  const seenKeys = new Set();
+  for (const spec of [...handSpecs(), ...quickfireSpecs(), ...answerSpecs()]) {
+    if (seenKeys.has(keyOf(spec))) continue;
+    seenKeys.add(keyOf(spec));
     const res = runSpec(spec);
     const e = { ...(spec.line !== undefined ? { line: spec.line } : { lines: spec.lines }) };
     if (spec.prefix && spec.prefix.length) e.prefix = spec.prefix;
