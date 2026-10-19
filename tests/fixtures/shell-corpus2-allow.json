@@ -585,5 +585,153 @@
   "printf \"%10.3f|\\n\" 3.14159": {
     "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
     "out": "     3.142|"
+  },
+  "grep -r a / | wc -l": {
+    "reason": "Stage 3 Task 6: -r is built: it now searches every file under / (91 matching lines) instead of printing the unsupported message",
+    "out": "91"
+  },
+  "grep -l wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -l is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -L wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -L is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -h wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -h is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -H wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -H is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -q wolf forest/notes.txt; echo $?": {
+    "reason": "Stage 3 Task 6: grep -q is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory\n2"
+  },
+  "grep -o wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -o is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -o \"[a-z]*\" readme.txt": {
+    "reason": "Stage 3 Task 6: -o is built: every non-empty match prints on its own line",
+    "out": "elcome\nexplorer\nhis\nworld\nis\nmade\nof\nfolders\nand\nfiles\nolders\nhold\nother\nthings\niles\nhold\ntext\nype\nhelp\nany\ntime\nto\nsee\nthe\ncommands\nyou\ncan\nuse",
+    "code": 0
+  },
+  "grep -w wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -w wol forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -x wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -x is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -r wolf .": {
+    "reason": "Stage 3 Task 6: grep -r is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.\n./village/logs/all.log:10.0.0.7 INFO wolf seen\n./village/logs/day2.log:13:10 wolf seen near the river",
+    "code": 0
+  },
+  "grep -r wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -rn wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -rl wolf .": {
+    "reason": "Stage 3 Task 6: -r and -l are built: files with a match are listed in sorted order",
+    "out": "./journal.txt\n./village/logs/all.log\n./village/logs/day2.log",
+    "code": 0
+  },
+  "grep -R wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -A1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -A1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -B1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -B1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -C1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -C1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -m1 a readme.txt": {
+    "reason": "Stage 3 Task 6: -m is built: stops after the first selected line",
+    "out": "This world is made of folders and files.",
+    "code": 0
+  },
+  "grep -e wolf -e owl forest/*": {
+    "reason": "Stage 3 Task 6: -e is built; forest/* includes the directory forest/cave, which grep reports as \"Is a directory\" (status 2)",
+    "out": "grep: forest/cave: Is a directory",
+    "code": 2
+  },
+  "grep -F \"a.b\" readme.txt": {
+    "reason": "Stage 3 Task 6: -F is built: \"a.b\" is matched literally and readme.txt has no such text, so nothing prints (status 1)",
+    "out": ""
+  },
+  "grep -s wolf nosuch.txt; echo $?": {
+    "reason": "Stage 3 Task 6: -s is built: it hides the missing-file message, and the status stays 2",
+    "out": "2"
+  },
+  "grep --color=never wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep --color=never is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep --include=\"*.txt\" -r wolf .": {
+    "reason": "Stage 3 Task 6: grep --include=\"*.txt\" is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.",
+    "code": 0
+  },
+  "echo abc | grep -o b": {
+    "reason": "Stage 3 Task 6: -o is built: each match prints on its own line",
+    "out": "b",
+    "code": 0
+  },
+  "echo abc | grep -e": {
+    "reason": "Stage 3 Task 6: -e is built; a missing pattern argument prints GNU's \"option requires an argument\" lines with the usage hint and exits 2",
+    "out": "grep: option requires an argument -- 'e'\nUsage: grep [OPTION]... PATTERNS [FILE]...\nTry 'grep --help' for more information.",
+    "code": 2
+  },
+  "grep -E \"(\" readme.txt": {
+    "reason": "Stage 3 Task 6: an unclosed ( under -E is a bad regular expression: GNU grep prints \"grep: Unmatched ( or \\(\" and exits 2",
+    "out": "grep: Unmatched ( or \\(",
+    "code": 2
+  },
+  "grep \"[\" readme.txt": {
+    "reason": "Stage 3 Task 6: an unclosed [ is a bad regular expression: GNU grep prints \"grep: Invalid regular expression\" and exits 2 instead of matching a literal [",
+    "out": "grep: Invalid regular expression",
+    "code": 2
+  },
+  "echo ab | grep -E \"a|b\" -o": {
+    "reason": "Stage 3 Task 6: -o is built: each match prints on its own line",
+    "out": "a\nb",
+    "code": 0
+  },
+  "find . -name \"*.txt\" | xargs grep -l wolf": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt",
+    "code": 0
   }
 }

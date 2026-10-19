@@ -1170,7 +1170,7 @@
   {"line":"echo abc | grep -e","out":"this practice shell does not support grep -e yet","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"grep -o/-w/-x/-r/-R/-l/-L/-q/-s/-h/-H/-A/-B/-C/-m/-E/-F/-P/-e"},
   {"line":"grep","out":"usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]","code":2,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"grep -E \"(\" readme.txt","out":"","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"grep -o/-w/-x/-r/-R/-l/-L/-q/-s/-h/-H/-A/-B/-C/-m/-E/-F/-P/-e"},
-  {"line":"grep \"[\" readme.txt","out":"","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
+  {"line":"grep \"[\" readme.txt","out":"","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"Task 6 (Stage 3): grep flags (-o -w -x -r -l -L -q -s -h -H -m -A -B -C -e -F, GNU regex errors)"},
   {"line":"echo a+b | grep -E \"a\\+b\"","out":"a+b","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"grep -o/-w/-x/-r/-R/-l/-L/-q/-s/-h/-H/-A/-B/-C/-m/-E/-F/-P/-e"},
   {"line":"echo aaa | grep -E \"a{2}\"","out":"aaa","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"grep -o/-w/-x/-r/-R/-l/-L/-q/-s/-h/-H/-A/-B/-C/-m/-E/-F/-P/-e"},
   {"line":"echo ab | grep -E \"a|b\" -o","out":"this practice shell does not support grep -o yet","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"grep -o/-w/-x/-r/-R/-l/-L/-q/-s/-h/-H/-A/-B/-C/-m/-E/-F/-P/-e"},

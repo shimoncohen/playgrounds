@@ -1,5 +1,5 @@
 (function (SQ) {
-const {norm,getNode,writeFile,ok,E,lines,readInputs}=SQ;
+const {norm,getNode,writeFile,ok,E,lines,readInputs,globRe,cmpName,M}=SQ;
 const CMDS=SQ.CMDS;
 const unsup=x=>E(`this practice shell does not support ${x} yet`);
 const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z'};
@@ -208,6 +208,113 @@ CMDS.printf=function(a){let i=0,vname=null;
   if(r.err&&r.text===''&&/printf: (width|precision|output) too large|invalid directive/.test(r.err))return {out:'',err,code:1};
   if(vname!==null){if(r.text.length>SQ.LIM.VAR)return E('bash: printf: value too large for this practice shell',1);SQ.S.vars[vname]=r.text;return {out:'',err,code:r.code}}
   return {out:r.text.endsWith('\n')?r.text.slice(0,-1):r.text,err,code:r.code}};
+
+// ---- grep ----
+/* -i -n -c -v -E -F -w -x -o -l -L -q -s -h -H -r -R, -e PAT (repeatable), -m N, -A/-B/-C N and -NUM, --include/--exclude=GLOB, --color=never|auto.
+   Patterns are JS regexes through SQ.safeRegex (BRE and ERE are not told apart); several patterns match leftmost-longest. A pattern that does not
+   compile is a literal, except an unclosed [ or a trailing backslash (and, with -E, an unclosed ( or {2,1}), which print GNU's message and exit 2.
+   -r/-R walk directories in cmpName order and never follow symlinked directories, so a link cycle ends; -r skips symlinks, -R reads links to files.
+   Unsupported: -f -P -z -a -U -T -V -Z -y -I -u -d, other long options and --color=always. */
+const GREP_UNSUP='fPzaUTVZyIud';
+const GREP_USAGE="Usage: grep [OPTION]... PATTERNS [FILE]...\nTry 'grep --help' for more information.";
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\\/-]/g,'\\$&');
+function grepBadRe(p,ere){ /* GNU's message for a pattern JS refuses, or '' to treat it as a literal */
+  let depth=0,i=0,open=false,lastOpen=-1;
+  for(;i<p.length;i++){const c=p[i];
+    if(c==='\\'){if(i===p.length-1)return 'Trailing backslash';i++;continue}
+    if(c==='['){open=true;lastOpen=i;i++;if(p[i]==='^')i++;if(p[i]===']')i++;
+      while(i<p.length&&p[i]!==']'){if(p[i]==='['&&(p[i+1]===':'||p[i+1]==='.'||p[i+1]==='=')){const e=p.indexOf(p[i+1]+']',i+2);if(e<0)break;i=e+1}i++}
+      if(i<p.length)open=false;else break;continue}
+    if(ere){if(c==='(')depth++;else if(c===')'&&depth>0)depth--}}
+  if(open)return lastOpen===p.length-1?'Invalid regular expression':'Unmatched [, [^, [:, [., or [=';
+  if(ere&&depth>0)return 'Unmatched ( or \\(';
+  if(ere){const m=/\{(\d+),(\d+)\}/.exec(p);if(m&&+m[1]>+m[2])return 'Invalid content of \\{\\}'}
+  return ''}
+CMDS.grep=function(a,io){
+  const o={i:0,n:0,c:0,v:0,E:0,F:0,w:0,x:0,o:0,l:0,L:0,q:0,s:0,h:0,H:0,r:0,R:0};
+  const pats=[],files=[],filt=[];let A=-1,B=-1,Cx=-1,mMax=-1,color='auto',end=false,havePat=false;
+  const need=ch=>Object.assign(E(`grep: option requires an argument -- '${ch}'\n${GREP_USAGE}`,2));
+  for(let i=0;i<a.length;i++){const x=a[i];
+    if(end||x.length<2||x[0]!=='-'){files.push(x);continue}
+    if(x==='--'){end=true;continue}
+    if(x[1]==='-'){const eq=x.indexOf('='),name=eq<0?x.slice(2):x.slice(2,eq);
+      if(name==='include'||name==='exclude'){let v;if(eq>=0)v=x.slice(eq+1);else if(i+1<a.length)v=a[++i];else return E(`grep: option '--${name}' requires an argument\n${GREP_USAGE}`,2);filt.push([name,v]);continue}
+      if((name==='color'||name==='colour')&&eq>=0){const v=x.slice(eq+1);if(v==='never'||v==='auto'){color=v;continue}return unsup(`grep ${x}`)}
+      return unsup('grep --long options')}
+    let digits='';
+    for(let j=1;j<x.length;j++){const ch=x[j];
+      if(ch>='0'&&ch<='9'){digits+=ch;continue}
+      if(digits){Cx=parseInt(digits,10);digits=''}
+      if('inclvEFwxoLqshHrR'.includes(ch)){o[ch]=1;continue}
+      if('ABCme'.includes(ch)){let v=x.slice(j+1);if(!v){if(i+1>=a.length)return need(ch);v=a[++i]}
+        if(ch==='e'){pats.push(v);havePat=true}
+        else if(ch==='m'){if(!/^-?\d+$/.test(v))return E('grep: invalid max count',2);mMax=parseInt(v,10);if(mMax<0)mMax=-1}
+        else{if(!/^\d+$/.test(v))return E(`grep: ${v}: invalid context length argument`,2);const n=parseInt(v,10);if(ch==='A')A=n;else if(ch==='B')B=n;else Cx=n}
+        break}
+      if(GREP_UNSUP.includes(ch))return unsup(`grep -${ch}`);
+      return E(`grep: invalid option -- '${ch}'`,2)}
+    if(digits)Cx=parseInt(digits,10)}
+  if(!havePat){if(!files.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);pats.push(files.shift())}
+  const bef=B>=0?B:Cx,aft=A>=0?A:Cx,ctxOn=bef>=0||aft>=0,nB=Math.max(bef,0),nA=Math.max(aft,0);
+  if(mMax===0)return {out:'',err:[],code:1};
+  /* compile */
+  const res=[];let compiled=0;
+  for(const raw of pats)for(const p of raw.split('\n')){
+    if(++compiled%100===0)SQ.step();
+    let src;
+    if(o.F)src=reEsc(p);
+    else{try{SQ.safeRegex(p,'');src=p}catch(e){if(e.complex)return E('grep: '+e.message,2);const m=grepBadRe(p,o.E);if(m)return E('grep: '+m,2);src=reEsc(p)}}
+    if(o.x)src='^(?:'+src+')$';else if(o.w)src='(?<![A-Za-z0-9_])(?:'+src+')(?![A-Za-z0-9_])';
+    try{res.push(new RegExp(src,o.i?'gi':'g'))}catch(e){return E('grep: Invalid regular expression',2)}}
+  let work=0;
+  const hit=ln=>{work+=res.length;if(work>=100){SQ.step();work=0}for(const r of res){r.lastIndex=0;if(r.test(ln))return true}return false};
+  const spans=ln=>{const sp=[];let pos=0;while(pos<=ln.length){let best=null;
+      for(const r of res){r.lastIndex=pos;const m=r.exec(ln);if(m&&(best===null||m.index<best.index||(m.index===best.index&&m[0].length>best[0].length)))best=m}
+      if(!best)break;if(best[0].length===0){pos=best.index+1;continue}sp.push([best.index,best.index+best[0].length]);pos=best.index+best[0].length}
+    return sp};
+  const paintOn=io.tty&&color!=='never';
+  const out=[],err=[];let anyOut=false,matchedAny=false,quit=false,dirSeen=false;
+  const keep=name=>{ /* --include / --exclude: the last matching option wins; none matching keeps the file unless the first option is --include */
+    if(!filt.length)return true;const b=name.slice(name.lastIndexOf('/')+1);let verdict=null;
+    for(const [k,g] of filt)if(globRe(g).test(b)||globRe(g).test(name))verdict=k==='include';
+    return verdict===null?filt[0][0]!=='include':verdict};
+  const scan=(name,text,withName)=>{
+    const L=lines(text),listing=o.l||o.L,quiet=o.q||listing,showName=o.H?true:o.h?false:withName;
+    const nm=s=>paintOn?M('f',s):s;
+    let cnt=0,last=-1,pend=0,stopped=false;
+    const emit=(i,sepc,txt)=>{out.push((showName?nm(name)+sepc:'')+(o.n?(paintOn?M('n',String(i+1)):String(i+1))+sepc:'')+txt)};
+    for(let i=0;i<L.length;i++){const ln=L[i];
+      if(stopped){if(pend>0){pend--;if(!o.o)emit(i,'-',ln);last=i;continue}break}
+      if(hit(ln)!==!!o.v){cnt++;matchedAny=true;
+        if(o.q){quit=true;return}
+        if(listing)break;
+        if(!o.c){
+          if(ctxOn){const from=Math.max(i-nB,last+1);if(anyOut&&(last<0?from>=0:from>last+1))out.push('--');anyOut=true;
+            if(!o.o)for(let k=from;k<i;k++)emit(k,'-',L[k]);last=i;pend=nA}
+          if(o.o){for(const [s,e] of spans(ln))emit(i,':',paintOn?M('m',ln.slice(s,e)):ln.slice(s,e))}
+          else{let txt=ln;if(paintOn&&!o.v&&res.length){const sp=spans(ln);let q='',at=0;for(const [s,e] of sp){q+=ln.slice(at,s)+M('m',ln.slice(s,e));at=e}txt=q+ln.slice(at)}emit(i,':',txt)}}
+        if(mMax>=0&&cnt>=mMax){stopped=true;if(o.c||pend===0)break}}
+      else if(pend>0&&!o.c){pend--;if(!o.o)emit(i,'-',ln);last=i}}
+    if(o.l){if(cnt)out.push(nm(name))}else if(o.L){if(!cnt)out.push(nm(name))}
+    else if(o.c&&!o.q)out.push((showName?name+':':'')+cnt)};
+  const walk=(disp,abs,node)=>{SQ.step();const pre=disp===''?'':disp.endsWith('/')?disp:disp+'/';
+    for(const k of Object.keys(node.children).sort(cmpName)){if(quit)return;const c=node.children[k],ca=abs==='/'?'/'+k:abs+'/'+k;
+      if(c.type==='dir'){walk(pre+k,ca,c);continue}
+      if(c.type==='link'){if(!o.R)continue;const t=SQ.realPath(ca,true);const tn=t&&getNode(t);if(!tn){err.push(`grep: ${pre+k}: No such file or directory`);continue}if(tn.type==='dir')continue;
+        if(keep(k))scan(pre+k,tn.content,true);continue}
+      if(keep(k))scan(pre+k,c.content,true)}};
+  const rec=o.r||o.R;
+  if(!files.length){
+    if(rec){dirSeen=true;walk('',norm('.'),getNode(norm('.')))}
+    else scan('(standard input)',io.stdin,false)}
+  else for(const t of files){if(quit)break;
+    if(SQ.isNull(t)){scan(t,'',files.length>1);continue}
+    const abs=norm(t),n=getNode(abs);
+    if(!n){if(!o.s)err.push(SQ.isLoop(abs)?`grep: ${t}: Too many levels of symbolic links`:`grep: ${t}: No such file or directory`);else err.push(null);continue}
+    if(n.type==='dir'){if(!rec){if(!o.s)err.push(`grep: ${t}: Is a directory`);else err.push(null);continue}dirSeen=true;walk(t,abs,n);continue}
+    if(keep(t))scan(t,n.content,files.length>1)}
+  const errs=err.filter(e=>e!==null);
+  return {out:out.join('\n'),err:errs,code:o.q&&matchedAny?0:err.length?2:matchedAny?0:1}};
 
 // ---- basename / dirname ----
 CMDS.basename=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('basename',a[0][1]);

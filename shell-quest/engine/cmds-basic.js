@@ -52,17 +52,7 @@ const CMDS={
       const vals={l:L,w:W,c:C};const cols=(pick.length?pick:['l','w','c']).map(k=>pick.length===1?String(vals[k]):String(vals[k]).padStart(4));
       out.push(cols.join(pick.length===1?'':' ')+(s.name?' '+s.name:''))}
     return {out:out.join('\n'),err,code:err.length?1:0}},
-  grep(a,io){const {fl,rest}=flags(a);
-    for(const f of fl){if('incvE'.includes(f)&&f.length===1)continue;if(f.startsWith('--'))return E('this practice shell does not support grep --long options yet');
-      return 'FwxrRlLhHoqsABCefmPzaUTVZyIud'.includes(f)?E(`this practice shell does not support grep -${f} yet`):E(`grep: invalid option -- '${f}'`,2)}
-    if(!rest.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);const pat=rest.shift();
-    const fg=fl.has('i')?'gi':'g';let re;try{re=SQ.safeRegex(pat,fg)}catch(e){if(e.complex)return E('grep: '+e.message,2);re=new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),fg)}
-    const {src,err}=readInputs(rest,io,'grep');const multi=src.length>1;const out=[];let total=0;
-    for(const s of src){let cnt=0;lines(s.text).forEach((ln,i)=>{re.lastIndex=0;const hit=re.test(ln);if(hit!==fl.has('v')){cnt++;
-        if(!fl.has('c')){let txt=ln;if(io.tty&&!fl.has('v')&&pat){re.lastIndex=0;txt=ln.replace(re,m=>M('m',m))}
-          const pre=(multi?(io.tty?M('f',s.name):s.name)+':':'')+(fl.has('n')?(io.tty?M('n',String(i+1)):String(i+1))+':':'');out.push(pre+txt)}}});
-      if(fl.has('c'))out.push((multi?s.name+':':'')+cnt);total+=cnt}
-    return {out:out.join('\n'),err,code:err.length?2:total?0:1}},
+  grep:null, /* defined in cmds-text.js; the key stays here so command suggestions keep their order */
   sort(a,io){const o={n:0,r:0,u:0,t:null,keys:[]},rest=[],bad=m=>Object.assign(E(m),{code:2}),uns=x=>bad(`this practice shell does not support sort ${x} yet`);let end=false;
     for(let i=0;i<a.length;i++){const x=a[i];
       if(end||x.length<2||x[0]!=='-'){rest.push(x);continue}

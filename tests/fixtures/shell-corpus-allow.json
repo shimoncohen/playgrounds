@@ -615,5 +615,34 @@
   "[setup 0..8]\necho \"Today is $(date)\"\necho \"wolves: $(grep -ic wolf journal.txt)\"\necho '$HOME'\nFILES=$(ls village); echo $FILES": {
     "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
     "out": "logs people.txt sales.csv shop.txt"
+  },
+  "grep -l wolf *": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "grep: camp: Is a directory\ngrep: forest: Is a directory\ngrep: scripts: Is a directory\ngrep: village: Is a directory\njournal.txt",
+    "code": 2
+  },
+  "grep -r wolf .": {
+    "reason": "Stage 3 Task 6: grep -r is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.\n./village/logs/all.log:10.0.0.7 INFO wolf seen\n./village/logs/day2.log:13:10 wolf seen near the river",
+    "code": 0
+  },
+  "grep -l wolf journal.txt": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "journal.txt",
+    "code": 0
+  },
+  "grep -w wolf journal.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built and now searches instead of printing the unsupported message",
+    "out": "Heard a wolf howling far away.\nThe wolf followed me to the gate, then turned away.",
+    "code": 0
+  },
+  "grep \"[\" journal.txt": {
+    "reason": "Stage 3 Task 6: an unclosed [ is a bad regular expression: GNU grep prints \"grep: Invalid regular expression\" and exits 2 instead of matching a literal [",
+    "out": "grep: Invalid regular expression",
+    "code": 2
+  },
+  "grep -x x journal.txt": {
+    "reason": "Stage 3 Task 6: grep -x is built and now searches instead of printing the unsupported message",
+    "out": ""
   }
 }

@@ -6,7 +6,7 @@ describe('unbuilt grep/find/pipe syntax says so instead of misbehaving', () => {
   const SQ = loadShell();
   const msg = (l) => run(SQ, l);
   it('grep real-but-unbuilt flags', () => {
-    for (const f of ['-h', '-r', '-l', '-w', '-o', '-q']) {
+    for (const f of ['-P', '-z', '-f', '-a']) {
       const r = msg(`grep ${f} wolf journal.txt`);
       assert.equal(r.out, `this practice shell does not support grep ${f} yet`);
       assert.notEqual(r.code, 0);

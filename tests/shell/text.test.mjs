@@ -232,3 +232,146 @@ describe('unsupported real options say so', () => {
   it('cut -s', () => U('echo a | cut -s -d, -f1', 'cut -s'));
   it('nonexistent letter stays invalid option', () => assert.match(out('echo a | sed -j p'), /sed: invalid option -- 'j'/));
 });
+
+describe('grep flags (Stage 3)', () => {
+  /* expected values were taken from GNU grep 3.11 on the same data */
+  const world = () => {
+    const SQ = loadShell();
+    for (const l of [
+      "printf 'a1\\nb\\nc\\na2\\nd\\ne\\nf\\na3\\n' > f",
+      "printf 'x\\na9\\nz\\n' > g",
+      'mkdir -p d/sub',
+      'echo hi > d/a.txt',
+      'echo hi > d/sub/b.c',
+      'echo hi > d/z.md',
+      'ln -s .. d/sub/up',
+      'ln -s a.txt d/lnk',
+    ]) run(SQ, l);
+    return SQ;
+  };
+  const g = (l) => run(world(), l);
+  const eq = (l, out, code) => {
+    const r = g(l);
+    assert.equal(r.out, out, l);
+    if (code !== undefined) assert.equal(r.code, code, l + ' (status)');
+  };
+
+  it('-o prints each match on its own line, with -n, -i and -c', () => {
+    eq("echo 'foo bar foo' | grep -o foo", 'foo\nfoo', 0);
+    eq('grep -on a f', '1:a\n4:a\n8:a');
+    eq("echo 'Foo foo' | grep -oi foo", 'Foo\nfoo');
+    eq('grep -co a f', '3');
+    eq('echo abc | grep -o "x*"', '', 0);
+    eq('grep -ov a f', '', 0);
+    eq('grep -e a -e b -n -o f | head -3', '1:a\n2:b\n4:a');
+  });
+  it('-w matches whole words, -x whole lines, -F is literal, -e repeats', () => {
+    eq("echo 'foo foobar bar' | grep -ow 'foo\\w*'", 'foo\nfoobar');
+    eq("echo 'foo-bar foo_bar' | grep -ow foo", 'foo');
+    eq("echo 'foobar' | grep -w foo", '', 1);
+    eq("grep -x -e a1 -e d f", 'a1\nd');
+    eq("echo 'a.b axb' | grep -oF 'a.b'", 'a.b');
+    eq("echo 'axb' | grep -F 'a.b'", '', 1);
+    eq('grep -e a1 -e a3 f', 'a1\na3');
+  });
+  it('-l -L -q -c -h -H', () => {
+    eq('grep -l a f g', 'f\ng', 0);
+    eq('grep -L zzz f', 'f', 1); /* GNU 3.11: status follows line selection, not the listing */
+    eq('grep -L a f', '', 0);
+    eq('grep -q a f; echo $?', '0');
+    eq('grep -q zzz f; echo $?', '1');
+    eq('grep -q a nofile f; echo $?', 'grep: nofile: No such file or directory\n0');
+    eq('grep -c a f g', 'f:3\ng:1');
+    eq('grep -lc a f g', 'f\ng');
+    eq('grep -h a f g | head -2', 'a1\na2');
+    eq('grep -H a f | head -1', 'f:a1');
+    eq('grep -Hc a f', 'f:3');
+    eq('echo a | grep -H a', '(standard input):a');
+  });
+  it('-s hides file errors but keeps the status', () => {
+    eq('grep a nofile', 'grep: nofile: No such file or directory', 2);
+    eq('grep -s a nofile; echo $?', '2');
+    eq('grep -s a nofile f | head -1', 'f:a1');
+  });
+  it('-m stops after N selected lines', () => {
+    eq('grep -m1 a f', 'a1', 0);
+    eq('grep -c -m2 a f g', 'f:2\ng:1');
+    eq('grep -cv -m2 a f', '2');
+    eq('grep -m0 a f', '', 1);
+    eq('grep -m1 -A3 a f', 'a1\nb\nc\na2');
+    eq('grep -m x a f', 'grep: invalid max count', 2);
+  });
+  it('-A -B -C context groups with -- and -n marks', () => {
+    eq('grep -A0 a f', 'a1\n--\na2\n--\na3');
+    eq('grep -A1 a f', 'a1\nb\n--\na2\nd\n--\na3');
+    eq('grep -B1 a f', 'a1\n--\nc\na2\n--\nf\na3');
+    eq('grep -nC1 a f g', 'f:1:a1\nf-2-b\nf-3-c\nf:4:a2\nf-5-d\n--\nf-7-f\nf:8:a3\n--\ng-1-x\ng:2:a9\ng-3-z');
+    eq('grep -n -A1 a f g', 'f:1:a1\nf-2-b\n--\nf:4:a2\nf-5-d\n--\nf:8:a3\n--\ng:2:a9\ng-3-z');
+    eq('grep -2 d f', 'c\na2\nd\ne\nf');
+    eq('grep -E -v -n -A1 "a|b|c" f', '5:d\n6:e\n7:f\n8-a3');
+    eq('grep -A x a f', 'grep: x: invalid context length argument', 2);
+  });
+  it('-r searches in sorted order, prefixes names, skips links', () => {
+    eq('grep -r hi d', 'd/a.txt:hi\nd/sub/b.c:hi\nd/z.md:hi', 0);
+    eq('grep -r hi d/', 'd/a.txt:hi\nd/sub/b.c:hi\nd/z.md:hi');
+    eq('cd d; grep -r hi', 'a.txt:hi\nsub/b.c:hi\nz.md:hi');
+    eq('cd d; grep -r hi .', './a.txt:hi\n./sub/b.c:hi\n./z.md:hi');
+    eq('cd d; grep -R hi', 'a.txt:hi\nlnk:hi\nsub/b.c:hi\nz.md:hi');
+    eq('grep -r hi d/a.txt', 'hi');
+    eq('grep -rh hi d', 'hi\nhi\nhi');
+    eq('grep -rc hi d', 'd/a.txt:1\nd/sub/b.c:1\nd/z.md:1');
+    eq('grep -rl hi d', 'd/a.txt\nd/sub/b.c\nd/z.md');
+    eq('grep -rn hi d/sub', 'd/sub/b.c:1:hi');
+    eq("grep -r --include='*.c' hi d", 'd/sub/b.c:hi');
+    eq("grep -r --exclude='*.c' hi d", 'd/a.txt:hi\nd/z.md:hi');
+    eq("grep -r --include='*.c' --include='*.md' hi d", 'd/sub/b.c:hi\nd/z.md:hi');
+    eq('grep hi d', 'grep: d: Is a directory', 2);
+  });
+  it('a link cycle ends', () => {
+    const SQ = world();
+    run(SQ, 'ln -s . d/self');
+    run(SQ, 'ln -s /home d/sub/home');
+    assert.equal(run(SQ, 'grep -rc hi d | wc -l').out, '3');
+    assert.equal(run(SQ, 'grep -Rc hi d | wc -l').out, '4');
+  });
+  it('-E kept, -v with context, no match status 1', () => {
+    eq('grep -E "a1|d" f', 'a1\nd');
+    eq('echo ab | grep -E "a|b" -o', 'a\nb');
+    eq('grep zzz f', '', 1);
+  });
+  it('bad patterns use GNU messages and status 2', () => {
+    eq('grep -E "(" f', 'grep: Unmatched ( or \\(', 2);
+    eq('grep "[abc" f', 'grep: Unmatched [, [^, [:, [., or [=', 2);
+    eq("grep 'a\\' f", 'grep: Trailing backslash', 2);
+    eq('grep -E "a{2,1}" f', 'grep: Invalid content of \\{\\}', 2);
+    eq('grep -e', 'grep: option requires an argument -- \'e\'\nUsage: grep [OPTION]... PATTERNS [FILE]...\nTry \'grep --help\' for more information.', 2);
+  });
+  it('still-unsupported options keep the unsupported message', () => {
+    for (const f of ['-P', '-z', '-f', '-a']) eq(`grep ${f} wolf f`, `this practice shell does not support grep ${f} yet`);
+    eq('grep --color=always a f', 'this practice shell does not support grep --color=always yet');
+    eq('grep --bogus a f', 'this practice shell does not support grep --long options yet');
+    eq('grep --color=never a f | head -1', 'a1');
+    eq('grep --color a f', 'this practice shell does not support grep --long options yet');
+  });
+  it('terminal colouring: matches and names are marked, --color=never turns it off', () => {
+    const SQ = world();
+    const raw = (l) => SQ.execLine(l).out.map((o) => o.text).join('\n');
+    assert.match(raw('grep -o a1 f'), /\x01ma1\x02/);
+    assert.match(raw('grep -H a1 f'), /\x01ff\x02:/);
+    assert.equal(raw('grep -H --color=never a1 f'), 'f:a1');
+    assert.equal(raw('grep -v a f | head -1'), 'b');
+  });
+  it('a missing file after a match still reports, -q after a match stops', () => {
+    eq('grep a f nofile', 'grep: nofile: No such file or directory\nf:a1\nf:a2\nf:a3', 2); /* the shell prints a command's errors before its output, as it always has */
+    eq('grep -q a f nofile; echo $?', '0');
+  });
+  it('output and step caps hold on big inputs', () => {
+    const SQ = world();
+    run(SQ, 'for i in $(seq 1 3000); do echo "line $i"; done > big');
+    const r = run(SQ, 'grep -n line big');
+    assert.match(r.out, /output cut off after 2000 lines/);
+    assert.equal(run(SQ, 'grep -c line big').out, '3000');
+    assert.equal(run(SQ, 'grep -o 1 big | wc -l').out, '1900');
+    assert.equal(run(SQ, 'grep -A2 line big | wc -l').out.length > 0, true);
+  });
+});
