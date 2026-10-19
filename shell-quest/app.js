@@ -9,6 +9,7 @@ const screen=$('#screen'),cmdIn=$('#cmd'),promptEl=$('#prompt'),term=$('#term'),
 const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML}=SQ.ui;
 let histIdx=S.hist.length;
 
+/* opts ({feedback}) is consumed by script missions (Task 10) */
 function checkMission(line,opts){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
   try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
@@ -67,9 +68,13 @@ cmdIn.addEventListener('keydown',e=>{
   else if(e.ctrlKey&&(e.key==='l'||e.key==='L')){e.preventDefault();screen.innerHTML=''}
   else if(e.ctrlKey&&(e.key==='c'||e.key==='C')&&!String(window.getSelection())){e.preventDefault();addLine(promptHTML(S.cwd)+esc(cmdIn.value)+'^C');cmdIn.value='';scrollDown()}});
 term.addEventListener('click',()=>{if(!String(window.getSelection()))cmdIn.focus()});
-$('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;cmdIn.focus();
+/* the extra keys type into whichever of the terminal input or the editor's fields was used last */
+let lastField=cmdIn;
+for(const el of [cmdIn,$('#edText'),$('#edArgs'),$('#edStdin')])el.addEventListener('focusin',()=>{lastField=el});
+function typeInto(el,k){el.focus();const p=el.selectionStart??el.value.length,q=el.selectionEnd??p;el.setRangeText(k,p,q,'end');el.dispatchEvent(new Event('input',{bubbles:true}))}
+$('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;const edOpen=!$('#editor').hidden;const f=(lastField===cmdIn||edOpen)?lastField:cmdIn;(['TAB','UP','ENTER'].includes(k)?cmdIn:f).focus();
   if(k==='TAB')complete();else if(k==='UP'){if(histIdx>0){histIdx--;fill(S.hist[histIdx]||'')}}else if(k==='ENTER'){const v=cmdIn.value;cmdIn.value='';run(v)}
-  else{const p=cmdIn.selectionStart??cmdIn.value.length;cmdIn.value=cmdIn.value.slice(0,p)+k+cmdIn.value.slice(p);cmdIn.setSelectionRange(p+k.length,p+k.length)}});
+  else typeInto(f,k)});
 crumbsEl.addEventListener('click',e=>{const b=e.target.closest('[data-cd]');if(b)fill('cd '+b.dataset.cd)});
 mapEl.addEventListener('click',e=>{const b=e.target.closest('[data-path]');if(!b)return;const abs=b.dataset.path,n=getNode(abs);if(!n)return;fill((n.type==='dir'?'cd ':'cat ')+rel(abs))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(b)goChapter(+b.dataset.ch)});

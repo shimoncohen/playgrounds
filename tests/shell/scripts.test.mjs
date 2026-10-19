@@ -540,3 +540,18 @@ describe('editor commands (Task 9)', () => {
     assert.match(out(SQ, 'code f'), /no text editor/);
   });
 });
+
+describe('editor ui request scope (fix round 1)', () => {
+  const U = (SQ, line) => { const r = SQ.execLine(line); return r.ui && JSON.parse(JSON.stringify(r.ui)); };
+  it('nano f | cat does not open the editor; nano as the last stage does', () => {
+    const SQ = loadShell();
+    assert.equal(U(SQ, 'nano f | cat'), undefined);
+    assert.deepEqual(U(SQ, 'echo hi | nano f'), { edit: H + 'f', isNew: true });
+  });
+  it('a script that calls nano does not produce ui', () => {
+    const SQ = loadShell();
+    put(SQ, 's.sh', 'nano inner.txt\necho done');
+    assert.equal(U(SQ, 'bash s.sh'), undefined);
+    assert.equal(U(SQ, 'f() { nano b.sh; }; f | cat'), undefined);
+  });
+});

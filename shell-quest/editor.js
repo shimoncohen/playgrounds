@@ -28,7 +28,7 @@ $('#edSave').addEventListener('click',save);
 $('#edRun').addEventListener('click',run);
 closeBtn.addEventListener('click',()=>closeEditor(false));
 $('#edTab').addEventListener('click',()=>{const a=text.selectionStart,b=text.selectionEnd;text.focus();text.setRangeText('  ',a,b,'end');refresh();text.dispatchEvent(new Event('input',{bubbles:true}))});
-text.addEventListener('input',refresh);
+text.addEventListener('input',()=>{disarm();refresh()}); /* typing cancels a pending discard */
 ed.addEventListener('keydown',e=>{
   const mod=e.ctrlKey||e.metaKey,k=e.key;
   if(mod&&(k==='s'||k==='S')){e.preventDefault();save()}

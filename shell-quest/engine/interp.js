@@ -86,13 +86,14 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
       r=SQ.runCmd(c.words,io);
-      if(r.list&&last&&!out&&!err){if(r.ui)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
+      if(r.list&&last&&!out&&!err){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
-      if(cr.ui)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
+      if(cr.ui&&last)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
       if(last&&!out&&!err){res.push(...cr.out);code=cr.code;continue}
       r=asCmd(cr)}
-    if(r.ui)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;
+    if(r.ui&&last)ui=r.ui; /* only the last stage may open the editor: nano f | cat does not */
+    if(P.length===1&&r.ctl)ctl=r.ctl;
     if(r.clear)res.push({clear:true});
     let errs=r.err.slice(),tips=r.tips||[],text=r.out;
     if(err){if(err.dup){if(errs.length)text=[text,...errs].filter(x=>x!=='').join('\n')}

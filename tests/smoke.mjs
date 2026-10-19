@@ -516,7 +516,14 @@ test('shell-quest editor: CRLF is normalised, 1,000,001 characters are refused, 
   await waitScreen(/Saved run\.sh/);
   const f = await file('run.sh');
   assert.equal(f.content, 'a\nb\nc\n');
-  assert.ok(f.exec || f.mode, 'still runnable');
+  assert.equal(f.exec, true, 'exec bit kept after an editor save');
+  await type('nano fresh.sh');
+  await page.waitForFunction(() => document.querySelector('#edTitle').textContent.endsWith('fresh.sh'));
+  await page.click('#edSave');
+  await waitScreen(/Saved fresh\.sh/);
+  assert.ok(!(await file('fresh.sh')).exec, 'a new file is not runnable');
+  await type('nano run.sh');
+  await page.waitForFunction(() => document.querySelector('#edTitle').textContent.endsWith('run.sh'));
   await page.fill('#edText', 'x'.repeat(1000001));
   await page.click('#edSave');
   await waitScreen(/file too large for this practice shell/);
@@ -659,6 +666,90 @@ test('shell-quest: touch extra keys include the script punctuation; tab completi
   for (const bad of ['[', '.', ':']) assert.ok(!all.includes(bad), `"${bad}" hidden from completion`);
   assert.equal((await listFor('[')).value, '[', 'nothing completes "["');
   assert.equal((await listFor('nan')).value, 'nano ');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: extra keys type into the field that was used last', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await type('nano k.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'ab');
+  await page.evaluate(() => { const t = document.getElementById('edText'); t.focus(); t.setSelectionRange(1, 1); });
+  await page.click('#keys button[data-k="{"]');
+  assert.equal(await page.inputValue('#edText'), 'a{b');
+  assert.equal(await page.inputValue('#cmd'), '');
+  assert.deepEqual(await page.evaluate(() => [document.activeElement.id, document.activeElement.selectionStart]), ['edText', 2]);
+  await page.focus('#edArgs');
+  await page.click('#keys button[data-k="$"]');
+  assert.equal(await page.inputValue('#edArgs'), '$');
+  assert.equal(await page.inputValue('#edText'), 'a{b');
+  await page.click('#edClose'); await page.click('#edClose');
+  await page.waitForSelector('#editor', { state: 'hidden' });
+  await page.click('#keys button[data-k="["]');
+  assert.equal(await page.inputValue('#cmd'), '[', 'closed editor: keys go to the terminal');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: Save & run quotes names with spaces, quotes and $; reopening the open file just refocuses', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type("touch 'a b$c.sh'");
+  await type("nano 'a b$c.sh'");
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo ran-$1\n');
+  await page.fill('#edArgs', 'X');
+  await page.click('#edRun');
+  await waitScreen(/ran-X/);
+  await page.fill('#edText', 'echo changed\n');
+  await page.focus('#edArgs');
+  await type("nano 'a b$c.sh'");
+  await page.waitForFunction(() => document.activeElement.id === 'edText');
+  assert.doesNotMatch(await page.textContent('#screen'), /unsaved changes/);
+  assert.equal(await page.inputValue('#edText'), 'echo changed\n');
+  await type("touch \"it's.sh\"");
+  await page.click('#edSave');
+  await type("nano \"it's.sh\"");
+  await page.waitForFunction(() => document.querySelector('#edTitle').textContent.endsWith("it's.sh"));
+  await page.fill('#edText', 'echo quote-ok\n');
+  await page.click('#edRun');
+  await waitScreen(/quote-ok/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: the discard prompt resets after a timeout and when typing resumes', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await page.clock.install();
+  await type('nano d.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo x\n');
+  await page.click('#edClose');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?');
+  await page.clock.runFor(7000);
+  await page.waitForFunction(() => document.querySelector('#edClose').textContent.trim() === 'Close');
+  await page.click('#edClose');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?');
+  await page.press('#edText', 'a');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Close', 'typing cancels the prompt');
+  assert.equal(await page.isVisible('#editor'), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: a failed save shows the error and leaves the editor open and unsaved', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('mkdir sub');
+  await type('nano sub/f.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo hi\n');
+  await type('rmdir sub');
+  await waitScreen(/\$ rmdir sub/);
+  await page.click('#edSave');
+  await waitScreen(/No such file or directory/);
+  assert.equal(await page.isVisible('#editor'), true);
+  await page.click('#edClose');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?', 'still dirty');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
