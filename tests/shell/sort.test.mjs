@@ -41,3 +41,36 @@ describe('sort -t / -k', () => {
     assert.match(run(SQ, 'sort -q t.csv').out, /invalid option -- 'q'/);
   });
 });
+
+describe('sort -k key modifiers n, r and b', () => {
+  const shop = (args) => run(SQ, `sort ${args} village/shop.txt`).out.split('\n');
+  const BY_PRICE_DESC = ['map 20', 'rope 12', 'torch 8', 'bread 3', 'apple 2'];
+  it('-k2nr, -k2,2n, -k2,2nr and -k 2n are accepted', () => {
+    assert.deepEqual(shop('-k2nr'), BY_PRICE_DESC);
+    assert.deepEqual(shop('-k 2nr'), BY_PRICE_DESC);
+    assert.deepEqual(shop('-k2,2nr'), BY_PRICE_DESC);
+    assert.deepEqual(shop('-k2,2n'), [...BY_PRICE_DESC].reverse());
+    assert.deepEqual(shop('-k 2n'), [...BY_PRICE_DESC].reverse());
+    assert.deepEqual(shop('-k2,2n -r'), [...BY_PRICE_DESC].reverse()); // like GNU: a key with its own order options ignores the global -r
+    assert.deepEqual(shop('-k2b,2bn'), [...BY_PRICE_DESC].reverse());
+  });
+  it('a per-key r reverses only that key', () => {
+    run(SQ, "echo 'x 1\ny 1\nx 2' > pairs.txt");
+    assert.deepEqual(run(SQ, 'sort -k1,1 -k2,2nr pairs.txt').out.split('\n'), ['x 2', 'x 1', 'y 1']);
+    assert.deepEqual(run(SQ, 'sort -k1,1r -k2,2n pairs.txt').out.split('\n'), ['y 1', 'x 1', 'x 2']);
+  });
+  it('other modifiers say so', () => {
+    for (const x of ['f', 'd', 'g', 'h', 'M', 'V', 'i']) {
+      const r = run(SQ, `sort -k2${x} village/shop.txt`);
+      assert.equal(r.out, `this practice shell does not support sort key modifier ${x} yet`, x);
+      assert.notEqual(r.code, 0);
+    }
+    assert.equal(run(SQ, 'sort -k2,2nf village/shop.txt').out, 'this practice shell does not support sort key modifier f yet');
+  });
+  it('bad keys still print the number error, the 8.7 answer still works', () => {
+    assert.match(run(SQ, 'sort -k0n village/shop.txt').out, /invalid number at field start/);
+    assert.match(run(SQ, 'sort -kn village/shop.txt').out, /invalid number at field start/);
+    SQ.content.chapters[7].setup();
+    assert.equal(run(SQ, 'sort -t, -k2 -n -r village/sales.csv | head -n 1').out, 'bread,30,3');
+  });
+});

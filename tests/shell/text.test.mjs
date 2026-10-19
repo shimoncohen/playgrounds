@@ -94,7 +94,7 @@ describe('sed', () => {
       ["echo a | sed 'k'", /^sed: -e expression #1, char \d+: unknown command: `k'/],
       ["echo a | sed", /^sed: no script given|usage/i],
       ["echo a | sed 's/(/x/'", /^sed: invalid regular expression/],
-      ["echo aaaa | sed 's/(a+)+$/x/'", /^sed: invalid regular expression/],
+      ["echo aaaa | sed 's/(a+)+$/x/'", /^sed: pattern too complex for this practice shell/],
       ["echo a | sed -q p", /sed: invalid option -- 'q'/],
       ["sed p nofile", /sed: .*nofile.*No such file or directory/],
     ]) {

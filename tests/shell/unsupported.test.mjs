@@ -6,7 +6,7 @@ describe('unbuilt grep/find/pipe syntax says so instead of misbehaving', () => {
   const SQ = loadShell();
   const msg = (l) => run(SQ, l);
   it('grep real-but-unbuilt flags', () => {
-    for (const f of ['-h', '-E', '-r', '-l', '-w', '-o', '-q']) {
+    for (const f of ['-h', '-r', '-l', '-w', '-o', '-q']) {
       const r = msg(`grep ${f} wolf journal.txt`);
       assert.equal(r.out, `this practice shell does not support grep ${f} yet`);
       assert.notEqual(r.code, 0);
@@ -35,5 +35,18 @@ describe('unbuilt grep/find/pipe syntax says so instead of misbehaving', () => {
     const r = msg('ls |& wc -l');
     assert.equal(r.out, 'this practice shell does not support |& yet');
     assert.equal(msg('ls | wc -l').code, 0);
+  });
+});
+
+describe('grep -E', () => {
+  it('is accepted as a no-op, like sed -E', () => {
+    const SQ = loadShell();
+    const plain = run(SQ, 'grep "wolf|owl" journal.txt');
+    const ere = run(SQ, 'grep -E "wolf|owl" journal.txt');
+    assert.equal(ere.code, 0);
+    assert.ok(ere.out.length > 0);
+    assert.equal(ere.out, plain.out);
+    assert.equal(run(SQ, 'grep -iE "WOLF|owl" journal.txt').out, run(SQ, 'grep -i "WOLF|owl" journal.txt').out);
+    assert.equal(run(SQ, 'grep -cE "wolf|owl" journal.txt').out, run(SQ, 'grep -c "wolf|owl" journal.txt').out);
   });
 });

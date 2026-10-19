@@ -50,10 +50,10 @@ const CMDS={
       out.push(cols.join(pick.length===1?'':' ')+(s.name?' '+s.name:''))}
     return {out:out.join('\n'),err,code:err.length?1:0}},
   grep(a,io){const {fl,rest}=flags(a);
-    for(const f of fl){if('incv'.includes(f)&&f.length===1)continue;if(f.startsWith('--'))return E('this practice shell does not support grep --long options yet');
-      return 'EFwxrRlLhHoqsABCefmPzaUTVZyIud'.includes(f)?E(`this practice shell does not support grep -${f} yet`):E(`grep: invalid option -- '${f}'`,2)}
+    for(const f of fl){if('incvE'.includes(f)&&f.length===1)continue;if(f.startsWith('--'))return E('this practice shell does not support grep --long options yet');
+      return 'FwxrRlLhHoqsABCefmPzaUTVZyIud'.includes(f)?E(`this practice shell does not support grep -${f} yet`):E(`grep: invalid option -- '${f}'`,2)}
     if(!rest.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);const pat=rest.shift();
-    const fg=fl.has('i')?'gi':'g';let re;try{re=new RegExp(pat,fg)}catch(e){re=new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),fg)}
+    const fg=fl.has('i')?'gi':'g';let re;try{re=SQ.safeRegex(pat,fg)}catch(e){if(e.complex)return E('grep: '+e.message,2);re=new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),fg)}
     const {src,err}=readInputs(rest,io,'grep');const multi=src.length>1;const out=[];let total=0;
     for(const s of src){let cnt=0;lines(s.text).forEach((ln,i)=>{re.lastIndex=0;const hit=re.test(ln);if(hit!==fl.has('v')){cnt++;
         if(!fl.has('c')){let txt=ln;if(io.tty&&!fl.has('v')&&pat){re.lastIndex=0;txt=ln.replace(re,m=>M('m',m))}
@@ -69,18 +69,20 @@ const CMDS={
         if(ch==='n'||ch==='r'||ch==='u')o[ch]=1;
         else if(ch==='t'||ch==='k'){let v=x.slice(j+1);if(!v){if(i+1>=a.length)return bad(`sort: option requires an argument -- '${ch}'`);v=a[++i]}
           if(ch==='t'){if(v.length!==1)return bad(`sort: multi-character tab '${v}'`);o.t=v}
-          else{const m=v.match(/^(\d+)(?:,(\d+))?$/);if(!m||+m[1]<1||(m[2]!==undefined&&+m[2]<1))return bad(`sort: invalid number at field start: invalid count at start of '${v}'`);
-            if(m[2]!==undefined&&+m[2]<+m[1])o.keys.push([+m[1],+m[1]]);else o.keys.push([+m[1],m[2]?+m[2]:0])}
+          else{const m=v.match(/^(\d+)([A-Za-z]*)(?:,(\d+)([A-Za-z]*))?$/);if(!m||+m[1]<1||(m[3]!==undefined&&+m[3]<1))return bad(`sort: invalid number at field start: invalid count at start of '${v}'`);
+            const mods={n:0,r:0,any:false};for(const x of m[2]+(m[4]||'')){if(x==='n'||x==='r'){mods[x]=1;mods.any=true}else if(x==='b')mods.any=true;else return uns('key modifier '+x)}
+            const f=+m[1],l=m[3]!==undefined?+m[3]:0;o.keys.push([l&&l<f?f:f,l&&l<f?f:l,mods])}
           break}
         else if('fbhMoscgVdiRSTzm'.includes(ch))return uns('-'+ch);
         else return bad(`sort: invalid option -- '${ch}'`)}}
     const {src,err}=readInputs(rest,io,'sort');let L=[].concat(...src.map(s=>lines(s.text)));
     const fld=ln=>o.t!==null?ln.split(o.t):ln.trim().split(/\s+/);
     const key=(ln,[f,l])=>{const F=fld(ln);return F.slice(f-1,l||undefined).join(o.t!==null?o.t:' ')};
-    const cmp=(x,y)=>{for(const k of o.keys){const kx=key(x,k),ky=key(y,k);const d=o.n?(parseFloat(kx)||0)-(parseFloat(ky)||0):kx.localeCompare(ky);if(d)return d}
-      if(o.keys.length)return x.localeCompare(y);return o.n?(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y):x.localeCompare(y)};
+    const base=(x,y)=>o.n?(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y):x.localeCompare(y);
+    const cmp=(x,y)=>{for(const k of o.keys){const kx=key(x,k),ky=key(y,k);const md=k[2],num=md.any?md.n:o.n,rev=md.any?md.r:o.r,d=num?(parseFloat(kx)||0)-(parseFloat(ky)||0):kx.localeCompare(ky);if(d)return rev?-d:d}
+      if(o.keys.length)return o.r?y.localeCompare(x):x.localeCompare(y);return o.r?-base(x,y):base(x,y)};
     L.sort(cmp);
-    if(o.r)L.reverse();if(o.u)L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
+    if(o.u)L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
   uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];const g=[];
     for(const x of L){if(g.length&&g[g.length-1][0]===x)g[g.length-1][1]++;else g.push([x,1])}
     return {out:g.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},

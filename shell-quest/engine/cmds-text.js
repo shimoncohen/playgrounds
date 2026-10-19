@@ -6,7 +6,6 @@ const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpd
 const badOpt=(cmd,ch)=>ch==='-'||(REAL[cmd]||'').includes(ch)?unsup(`${cmd} ${ch==='-'?'--long options':'-'+ch}`):E(`${cmd}: invalid option -- '${ch}'`);
 const isOpt=x=>x.length>1&&x[0]==='-'&&x!=='--';
 const MAX_SEQ=10000,MAX_OUT=200000,MAX_XARGS=1000,MAX_XDEPTH=3;
-const tooBig=(cmd)=>E(`${cmd}: output too large for this practice shell`);
 
 // ---- tee ----
 CMDS.tee=function(a,io){let app=false,i=0;
@@ -89,7 +88,8 @@ function sedParse(script){const bad=(n,m)=>({err:`sed: -e expression #1, char ${
   const rp=part();if(rp===null)return bad(n,'unterminated `s\' command');
   let g=false,p=false,ic=false;while(i<n){const f=script[i++];if(f==='g')g=true;else if(f==='p')p=true;else if(f==='i'||f==='I')ic=true;else if(f===' ')continue;else return bad(i,'unknown option to `s\'')}
   cmd.c='s';cmd.pat=re;cmd.rp=rp;cmd.g=g;cmd.p=p;cmd.ic=ic;return {cmd}}
-function mkRe(pat,fl){if(pat.length>200||/\([^()]*[+*][^()]*\)[+*{]/.test(pat))return null;try{return new RegExp(pat,fl)}catch(e){return null}}
+/* compile through SQ.safeRegex; returns the RegExp, or a string with the error text for the caller to print */
+function mkRe(pat,fl){try{return SQ.safeRegex(pat,fl)}catch(e){return e.complex?'sed: '+e.message:'sed: invalid regular expression: '+pat}}
 function expandRepl(rp,m){let o='';for(let i=0;i<rp.length;i++){const c=rp[i];
   if(c==='\\'&&i+1<rp.length){const d=rp[++i];if(d==='n')o+='\n';else if(d==='t')o+='\t';else if(/[1-9]/.test(d))o+=m[+d]===undefined?'':m[+d];else o+=d}
   else if(c==='&')o+=m[0];else o+=c}return o}
@@ -107,8 +107,8 @@ CMDS.sed=function(a,io){let quiet=false,script=null;const files=[];
     if(script===null)script=x;else files.push(x)}
   if(script===null)return E('sed: no script given. Try: sed \'s/old/new/\' file',1);
   const cmds=[];for(const part of script.split('\n')){if(part.trim()==='')continue;const r=sedParse(part);if(r.err)return E(r.err);cmds.push(r.cmd)}
-  for(const c of cmds){if(c.c==='s'){c.rx=mkRe(c.pat,(c.g?'g':'')+(c.ic?'i':''));if(!c.rx)return E('sed: invalid regular expression: '+c.pat)}
-    for(const k of ['a1','a2'])if(c[k]&&c[k].re!==undefined){c[k].rx=mkRe(c[k].re,'');if(!c[k].rx)return E('sed: invalid regular expression: '+c[k].re)}}
+  for(const c of cmds){if(c.c==='s'){c.rx=mkRe(c.pat,(c.g?'g':'')+(c.ic?'i':''));if(typeof c.rx==='string')return E(c.rx)}
+    for(const k of ['a1','a2'])if(c[k]&&c[k].re!==undefined){c[k].rx=mkRe(c[k].re,'');if(typeof c[k].rx==='string')return E(c[k].rx)}}
   const {src,err}=readInputs(files,io,'sed');const out=[];
   for(const s of src){const L=lines(s.text);
     L.forEach((ln,idx)=>{const no=idx+1;let line=ln,del=false;
@@ -119,7 +119,7 @@ CMDS.sed=function(a,io){let quiet=false,script=null;const files=[];
         if(c.c==='d'){del=true;break}
         if(c.c==='p')out.push(line);
         else{const next=sedSub(line,c);
-          const changed=next!==line||false;line=next;if(c.p&&changed)out.push(line)}}
+          const changed=next!==line;line=next;if(c.p&&changed)out.push(line)}}
       if(!del&&!quiet)out.push(line)})}
   return {out:out.join('\n'),err,code:err.length?1:0}};
 
@@ -161,7 +161,7 @@ CMDS.xargs=function(a,io){let n=0,repl=null,noRun=false,i=0;
   const out=[],err=[],tips=[];let code=0;xDepth++;
   try{for(const w of calls){
       if(xBudget<=0){err.push('xargs: too many commands for this practice shell');code=1;break}
-      xBudget--;const f=CMDS[w[0]];
+      xBudget--;SQ.step();const f=CMDS[w[0]];
       if(!f){err.push(`xargs: ${w[0]}: No such file or directory`);code=127;continue}
       const r=f(w.slice(1),Object.assign({},io,{stdin:'',tty:false,pipeLen:1}));
       if(r.out!=='')out.push(r.out);err.push(...(r.err||[]));tips.push(...(r.tips||[]));if(r.code!==0&&code===0)code=123}}
