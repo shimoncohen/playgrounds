@@ -348,6 +348,7 @@ test('linked save file: follows saves, restores after wipes', async () => {
     window.showOpenFilePicker = async () => [await h()];
   };
   await ctx.addInitScript(stub);
+  await ctx.addInitScript(() => { try { sessionStorage.setItem('loads', String(Number(sessionStorage.getItem('loads')) + 1)); } catch (e) { /* no storage */ } });
   await page.reload();
   await page.waitForSelector('#cmd');
   const fileText = () => page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle('linked.json')).getFile()).text());
@@ -369,8 +370,17 @@ test('linked save file: follows saves, restores after wipes', async () => {
 
   // localStorage wiped, link kept (IndexedDB): restores on load.
   await page.evaluate(() => localStorage.clear());
+  const loads = () => page.evaluate(() => Number(sessionStorage.getItem('loads')));
+  const before = await loads();
   await page.reload();
-  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k) || '{}').xp > 0, key);
+  // Restoring from the link writes localStorage and then reloads the page (shared/progress.js restore()),
+  // so the restored value is visible one navigation before the page has settled. Count document loads
+  // (the init script bumps a sessionStorage counter) and wait for both the test's reload and the restore's.
+  await until(async () => {
+    try { return (await loads()) === before + 2 && (await local()) === saved; }
+    catch (e) { if (/context was destroyed|navigation/i.test(e.message)) return false; throw e; }
+  });
+  await page.waitForLoadState('load');
   assert.equal(await local(), saved);
 
   // Everything wiped, including the link: "Open existing file" brings it back.
