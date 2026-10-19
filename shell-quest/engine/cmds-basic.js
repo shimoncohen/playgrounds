@@ -81,6 +81,13 @@ const CMDS={
     else if(/^[ugoa]*[+-][rw]+$/.test(mode))return ok();else return E(`chmod: invalid mode: '${mode}'`);
     const err=[];for(const t of a.slice(1)){const abs=norm(t),n=getNode(abs);if(!n){err.push(`chmod: cannot access '${t}': No such file or directory`);continue}if(n.type==='file')n.exec=x;SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
+  export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
+    for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
+      if(m[2]!==undefined)S.vars[k]=m[3];(S.exp=S.exp||{})[k]=1}
+    return {out:'',err,code:err.length?1:0}},
+  env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])L[k]=SQ.getVar(k);
+    for(const k of Object.keys(S.exp||{}))if(k in S.vars)L[k]=S.vars[k];
+    return ok(Object.keys(L).sort().map(k=>k+'='+L[k]).join('\n'))},
   history:()=>ok(S.hist.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n')),
   clear:()=>Object.assign(ok(),{clear:true}),
   whoami:()=>ok('explorer'),

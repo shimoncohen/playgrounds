@@ -66,10 +66,11 @@ function markTree(abs,n){SQ.rt.changed.add(abs);if(n.type==='dir')for(const k in
 function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!n.children[s]){n.children[s]=D();SQ.rt.changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);SQ.rt.changed.add(abs)}}
-function writeFile(abs,text,append,shown){const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
+const isNull=p=>norm(p)==='/dev/null';
+function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys});
+Object.assign(SQ,{HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

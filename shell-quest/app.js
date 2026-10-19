@@ -69,7 +69,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};SQ.rt.changed=new Set();CH[S.ch].setup();SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;SQ.rt.changed=new Set();CH[S.ch].setup();SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
