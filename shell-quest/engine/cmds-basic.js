@@ -24,7 +24,10 @@ const CMDS={
   touch(a){if(!a.length)return E('touch: missing file operand');const err=[];for(const t of a){const abs=norm(t);if(getNode(abs)){SQ.rt.changed.add(abs);continue}
       const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`touch: cannot touch '${t}': No such file or directory`);continue}par.children[name]=F('');SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
-  echo(a){let x=a.slice();while(x[0]==='-n'||x[0]==='-e')x.shift();return ok(x.join(' '))},
+  /* flags -n -e -E (alone or combined) are consumed; -e expands \n \t \\ \0nnn \xHH. -n has no visible effect: output text never carries a trailing newline. Other dashes stay literal. */
+  echo(a){let x=a.slice(),e=false;while(x.length&&/^-[neE]+$/.test(x[0])){for(const f of x[0].slice(1))if(f==='e')e=true;else if(f==='E')e=false;x.shift()}
+    let s=x.join(' ');if(e)s=s.replace(/\\(0[0-7]{0,3}|x[0-9a-fA-F]{1,2}|[nt\\])/g,(m,c)=>c==='n'?'\n':c==='t'?'\t':c==='\\'?'\\':c[0]==='x'?String.fromCharCode(parseInt(c.slice(1),16)):String.fromCharCode(parseInt(c.slice(1)||'0',8)));
+    return ok(s)},
   cat(a,io){const {rest}=flags(a);const {src,err}=readInputs(rest,io,'cat');return {out:src.map(s=>s.text).join('\n'),err,code:err.length?1:0}},
   rm(a){const {fl,rest}=flags(a);const r=fl.has('r')||fl.has('R'),f=fl.has('f');if(!rest.length)return f?ok():E('rm: missing operand');const err=[];const tips=[];
     for(const t of rest){const abs=realPath(norm(t),false)||norm(t),rcwd=realPath(S.cwd,true)||S.cwd;
@@ -188,6 +191,6 @@ const FRIENDLY={
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(FRIENDLY[c])continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

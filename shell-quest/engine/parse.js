@@ -9,6 +9,7 @@ const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'baseca
 /* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(k==='BASH_REMATCH')throw unsup('BASH_REMATCH');
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
   if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
@@ -69,7 +70,7 @@ function scanSub(line,i){
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
   const sv=SQ.snapshotShell();
-  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false})}finally{CTX.sub--;SQ.restoreShell(sv)}
+  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
   return v.join('\n').replace(/\n+$/,'')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
@@ -281,5 +282,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

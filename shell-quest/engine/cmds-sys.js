@@ -1,7 +1,7 @@
 (function (SQ) {
 const {norm,getNode,lstat,isLoop,parentOf,bname,modeOf,modeString,ok,E,flags}=SQ;
 const CMDS=SQ.CMDS;
-const BUILTINS=['cd','export','source'];
+const BUILTINS=['cd','export','source','.','[','test','true','false',':','read','shift','unset','local','return','exit','break','continue'];
 const known=c=>Object.prototype.hasOwnProperty.call(CMDS,c);
 
 // ---- stat ----
@@ -34,6 +34,6 @@ CMDS.which=function(a){const {rest}=flags(a);const out=[];let code=0;
   for(const c of rest){if(known(c))out.push('/usr/bin/'+c);else code=1}
   return {out:out.join('\n'),err:[],code:rest.length?code:1}};
 CMDS.type=function(a){const {rest}=flags(a);const out=[],err=[];
-  for(const c of rest){if(BUILTINS.includes(c))out.push(`${c} is a shell builtin`);else if(known(c))out.push(`${c} is /usr/bin/${c}`);else err.push(`bash: type: ${c}: not found`)}
+  for(const c of rest){if(SQ.hasFunction(c))out.push(`${c} is a function`);else if(BUILTINS.includes(c))out.push(`${c} is a shell builtin`);else if(known(c))out.push(`${c} is /usr/bin/${c}`);else err.push(`bash: type: ${c}: not found`)}
   return {out:out.join('\n'),err,code:err.length?1:0}};
 })(window.SQ = window.SQ || {});

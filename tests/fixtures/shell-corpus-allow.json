@@ -269,8 +269,8 @@
     "code": 2
   },
   "echo \"if true; then echo yes; fi\" > x.sh\nbash x.sh": {
-    "reason": "Task 6a: if runs as a compound inside a script line (true/false builtins arrive in Task 7, so true is still \"command not found\")",
-    "out": "bash: true: command not found\nDid you mean: tree?",
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "yes",
     "code": 0
   },
   "for i in $(seq 1 5000); do echo $i; done | wc -l": {
@@ -302,14 +302,14 @@
     "code": 2
   },
   "if true; then echo y; fi": {
-    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
-    "out": "bash: true: command not found\nDid you mean: tree?",
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "y",
     "code": 0
   },
   "while true; do echo y; done": {
-    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
-    "out": "bash: true: command not found\nDid you mean: tree?",
-    "code": 0
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "this practice shell stopped the command: too many steps",
+    "code": 1
   },
   "until false; do echo y; done": {
     "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
@@ -337,9 +337,9 @@
     "code": 0
   },
   "[[ -f readme.txt ]] && echo yes": {
-    "reason": "Task 6a: [[ ]] now parses; evaluating it arrives in Task 7 (clean \"does not support [[ ]] yet\" until then)",
-    "out": "this practice shell does not support [[ ]] yet",
-    "code": 2
+    "reason": "Task 7: [ [[ and test evaluate conditions",
+    "out": "yes",
+    "code": 0
   },
   "(echo hi)": {
     "reason": "Task 6a: ( ) subshells and { } groups run",
@@ -383,13 +383,13 @@
     "out": "this practice shell does not support & yet"
   },
   "! true": {
-    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
-    "out": "bash: true: command not found\nDid you mean: tree?",
-    "code": 0
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "",
+    "code": 1
   },
   "! false && echo ok": {
-    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
-    "out": "bash: false: command not found\nok",
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "ok",
     "code": 0
   },
   "cd forest &": {
@@ -440,5 +440,105 @@
     "reason": "Task 6b: functions run and persist to the next typed line, so f prints hi",
     "out": "hi",
     "code": 0
+  },
+  "echo -e \"a\\tb\"": {
+    "reason": "Task 7: echo -e expands \\t, \\n and \\\\ (-n/-e/-E flags are consumed)",
+    "out": "a\tb"
+  },
+  "[ -f readme.txt ] && echo yes": {
+    "reason": "Task 7: [ [[ and test evaluate conditions",
+    "out": "yes",
+    "code": 0
+  },
+  "test -f readme.txt && echo yes": {
+    "reason": "Task 7: [ [[ and test evaluate conditions",
+    "out": "yes",
+    "code": 0
+  },
+  "test 1 = 1": {
+    "reason": "Task 7: [ [[ and test evaluate conditions",
+    "out": "",
+    "code": 0
+  },
+  "read X": {
+    "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it)",
+    "out": "read: this practice shell cannot wait for typing. Pipe input in (echo Ada | read name) or use a here-string: read name <<< Ada",
+    "code": 1
+  },
+  "echo hi | read X": {
+    "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it)",
+    "out": "",
+    "code": 0,
+    "vars": {
+      "X": "hi"
+    }
+  },
+  "shift": {
+    "reason": "Task 7: shift is a builtin (nothing to shift at the base shell: status 1)",
+    "out": "",
+    "code": 1
+  },
+  "source x.sh": {
+    "reason": "Task 7: source and . run a file in the current shell (a missing file is a No such file error)",
+    "out": "bash: source: x.sh: No such file or directory",
+    "code": 1
+  },
+  ". x.sh": {
+    "reason": "Task 7: source and . run a file in the current shell (a missing file is a No such file error)",
+    "out": "bash: .: x.sh: No such file or directory",
+    "code": 1
+  },
+  "true": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "",
+    "code": 0
+  },
+  "false": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "",
+    "code": 1
+  },
+  "true && echo ok": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "ok",
+    "code": 0
+  },
+  "false || echo ok": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "ok"
+  },
+  "false; echo $?": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "1"
+  },
+  "unset X": {
+    "reason": "Task 7: unset is a builtin (unsetting an unset name is status 0)",
+    "out": "",
+    "code": 0
+  },
+  "echo \"exit 3\" > x.sh\nbash x.sh\necho $?": {
+    "reason": "Task 7: exit is a builtin; inside a script run with bash it ends the script with its status",
+    "out": "3"
+  },
+  "echo \"false\" > x.sh\nbash x.sh\necho $?": {
+    "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
+    "out": "1"
+  },
+  "echo \"echo hi\" > x.sh\nsource x.sh": {
+    "reason": "Task 7: source and . run a file in the current shell (a missing file is a No such file error)",
+    "out": "hi",
+    "code": 0
+  },
+  "echo \"X=9\" > x.sh\nsource x.sh\necho $X": {
+    "reason": "Task 7: source and . run a file in the current shell (a missing file is a No such file error)",
+    "out": "9",
+    "vars": {
+      "X": "9"
+    }
+  },
+  "echo \"read X\" > x.sh\nbash x.sh": {
+    "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it)",
+    "out": "read: this practice shell cannot wait for typing. Pipe input in (echo Ada | read name) or use a here-string: read name <<< Ada",
+    "code": 1
   }
 }

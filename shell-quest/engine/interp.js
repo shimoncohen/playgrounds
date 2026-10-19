@@ -110,7 +110,7 @@ function runCompound(c,env){return nested(()=>{
     case 'group':return runList(c.body,env);
     case 'subshell':return runSubshell(c,env);
     case 'arith':return runArith(c,env);
-    case 'cond':return {out:[errL('this practice shell does not support [[ ]] yet')],code:2};
+    case 'cond':return runCond(c,env);
     case 'func':return defineFunction(c,env);
   }
   return {out:[errL('bash: internal error: unknown node '+c.type)],code:2}})}
@@ -174,8 +174,13 @@ function runSubshell(c,env){const sv=snapshotShell();let r;
   const code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code;
   return {out:r.out,code,ui:r.ui}}
 
+/* [[ ... ]]: SQ.evalCond (cmds-flow.js) returns the status and leaves stderr lines in CTX.pend */
+function runCond(c,env){const code=SQ.evalCond(c.raw);logKw(env,'[[',code);return {out:CTX.pend.splice(0),code}}
+
 function runArith(c,env){SQ.step();let v;
-  try{v=SQ.arithVal(c.expr)}catch(e){if(e&&e.stop)throw e;const out=[...CTX.pend.splice(0),errL(errOf(e))];logKw(env,'((',1);return {out,code:1}}
+  /* an arithmetic error reads `bash: ((: reason`: the expression prefix of SQ.arith's message becomes ((: */
+  try{v=SQ.arithVal(c.expr)}catch(e){if(e&&e.stop)throw e;const m=errOf(e),pre='bash: '+c.expr+': ';
+    const out=[...CTX.pend.splice(0),errL(m.startsWith(pre)?'bash: ((: '+m.slice(pre.length):m)];logKw(env,'((',1);return {out,code:1}}
   const out=CTX.pend.splice(0),code=v!=='0'?0:1;logKw(env,'((',code);return {out,code}}
 
 /* ---------- functions ----------
@@ -211,10 +216,27 @@ function callFunction(name,args,io){
   const o=asCmd(r);o.code=ret?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
   if(r.ctl&&!ret)o.ctl=r.ctl;
   return o}
-/* the frame `local` and `return` act on: the innermost function frame on top of the stack (sourced scripts arrive in Task 7) */
+/* source FILE: the text runs in the CURRENT shell under a Frame {name:FILE,args,kind:'source'}; `return` ends the file with its status, `exit n` ends that file
+   (the status is n; only a typed line shows the friendly exit message). Parse first: a syntax error prints once and nothing runs. The nesting bound matches functions. */
+let srcDepth=0;
+function runSourced(name,text,args,io){
+  const fail=(m,c)=>({out:'',err:[m],tips:[],code:c,list:[errL(m)]});
+  if(srcDepth>=FN_NEST)return fail('bash: source: maximum source nesting level exceeded',1);
+  let prog;try{prog=parsedBody(text)}catch(e){if(e&&e.stop)throw e;return fail(errOf(e),e.code||2)}
+  const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'source',locals:new Map()};
+  fr.push(f);srcDepth++;let r;
+  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0})}
+  finally{srcDepth--;fr.length=Math.min(fr.length,at)}
+  const end=r.ctl&&(r.ctl.type==='return'||r.ctl.type==='exit');
+  const o=asCmd(r);o.code=end?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
+  if(r.ctl&&!end)o.ctl=r.ctl;
+  return o}
+/* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */
 const fnFrame=()=>{const f=SQ.rt.frames;const t=f[f.length-1];return t&&(t.kind==='function'||t.kind==='source')?t:null};
-function localBuiltin(a){const f=fnFrame();
-  if(!f||f.kind!=='function')return SQ.E('bash: local: can only be used in a function',1);
+/* `local` belongs to the nearest function frame; a sourced file called from a function shares that function's scope */
+function localBuiltin(a){const fr=SQ.rt.frames;let f=null;
+  for(let i=fr.length-1;i>=0;i--){if(fr[i].kind==='function'){f=fr[i];break}if(fr[i].kind!=='source')break}
+  if(!f)return SQ.E('bash: local: can only be used in a function',1);
   const err=[];let code=0;
   for(const x of a){const eq=x.indexOf('='),k=eq<0?x:x.slice(0,eq);
     if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: local: \`${x}': not a valid identifier`);code=1;continue}
@@ -228,5 +250,5 @@ function returnBuiltin(a){
     n=((Number(a[0])%256)+256)%256}
   return {out:'',err:[],code:n,ctl:{type:'return',n}}}
 
-Object.assign(SQ,{runProgram,snapshotShell,restoreShell,callFunction,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
+Object.assign(SQ,{runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
 })(window.SQ=window.SQ||{});

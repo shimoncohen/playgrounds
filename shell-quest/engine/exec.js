@@ -7,7 +7,8 @@ function runPath(name,io,force){const abs=norm(name),n=getNode(abs);
   if(!force&&!n.exec)return Object.assign(E(`bash: ${name}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
   const sv=SQ.snapshotShell(),saveVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(k in saveVars)S.vars[k]=saveVars[k];const out=[],err=[];let code=0;
   try{for(const ln of n.content.split('\n')){const t=ln.trim();if(!t||t.startsWith('#'))continue;
-    const r=execLine(t,{depth:io.depth+1,tty:io.tty,record:false});for(const o of r.out){if(o.clear)continue;(o.cls==='out'?out:err).push(o.text)}code=r.code}}
+    const r=execLine(t,{depth:io.depth+1,tty:io.tty,record:false,script:true});for(const o of r.out){if(o.clear)continue;(o.cls==='out'?out:err).push(o.text)}code=r.code;
+    if(r.ctl&&r.ctl.type==='exit'){code=r.ctl.n;break}}} /* exit ends the script */
   finally{SQ.restoreShell(sv)}
   return {out:out.join('\n'),err,code}}
 
@@ -68,7 +69,13 @@ function capLines(r){let n=0;const out=[];
 function execLine0(line,o){
   if(o.depth>6)return {out:[{text:'bash: too many nested scripts',cls:'err'}],code:1};
   let prog;try{prog=SQ.parseProgram(line)}catch(e){if(e&&e.stop)throw e;const r=errOut(e);S.last=r.code;return r}
-  return SQ.runProgram(prog,{depth:o.depth,tty:o.tty,record:o.record,stdin:o.stdin||null})}
+  const r=SQ.runProgram(prog,{depth:o.depth,tty:o.tty,record:o.record,stdin:o.stdin||null});
+  /* exit: a script or $( ) keeps the signal (the caller ends there); on a typed line there is nowhere to exit to */
+  if(r.ctl&&r.ctl.type==='exit'){
+    if(o.script)return r;
+    if(o.sub){S.last=r.ctl.n;return {out:r.out,code:r.ctl.n}}
+    r.out.push({text:FRIENDLY.exit,cls:'err'});S.last=127;return {out:r.out,code:127}}
+  return r}
 
 function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:SQ.rt.log,
   ran:(n,p)=>SQ.rt.log.some(e=>e.name===n&&(!p||p(e))),has:p=>!!nd(p),node:nd,
