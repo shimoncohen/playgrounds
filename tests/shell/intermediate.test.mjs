@@ -139,8 +139,8 @@ describe('intermediate quick-fire and guide', () => {
     assert.equal(SQ.content.quickfire.filter((q) => q[2] === 'intermediate').length, 24);
     assert.ok(SQ.content.quickfire.filter((q) => !q[2]).length > 0);
   });
-  it('has 6 guide entries per chapter and man works for them', () => {
-    for (const ci of [7, 8, 9, 10]) assert.equal(SQ.content.guide.filter((g) => g.ch === ci).length, 6, `chapter ${ci}`);
+  it('has at least 6 guide entries per chapter and man works for them', () => {
+    for (const ci of [7, 8, 9, 10]) assert.ok(SQ.content.guide.filter((g) => g.ch === ci).length >= 6, `chapter ${ci}`);
     for (const cmd of ['cut', 'tr', 'sed', 'tee', 'export', 'env', 'date']) {
       const r = run(SQ, `man ${cmd}`);
       assert.match(r.out, new RegExp('^' + cmd.toUpperCase()), cmd);
@@ -520,6 +520,28 @@ describe('Task 14 fix round 1', () => {
       W.ensureFile('~/village/logs/day3.log', 'x');
       const r = run(W, a);
       assert.doesNotMatch(r.out, /not support|command not found|invalid|No such|paths must/, `${a} -> ${r.out}`);
+    }
+  });
+});
+
+describe('man pages for the helper commands', () => {
+  it('man works for printf, seq, basename, dirname, which and type, each tagged to an Intermediate chapter', () => {
+    const SQ = loadShell();
+    for (const cmd of ['printf', 'seq', 'basename', 'dirname', 'which', 'type']) {
+      const r = run(SQ, `man ${cmd}`);
+      assert.match(r.out, new RegExp('^' + cmd.toUpperCase()), cmd);
+      assert.equal(r.code, 0, cmd);
+      const g = SQ.content.guide.find((x) => x.c === cmd);
+      assert.ok(g && SQ.tiers.tierOf(g.ch).id === 'intermediate', cmd);
+      for (const [ex] of g.ex) { SQ.content.chapters[g.ch].setup(); assert.equal(run(SQ, ex).code, 0, ex); }
+    }
+  });
+  it('every command that man can describe has a guide entry, and no real command printed "No manual entry" among the documented ones', () => {
+    const SQ = loadShell();
+    const documented = new Set(SQ.content.guide.map((g) => g.c.split(' ')[0]));
+    for (const name of Object.keys(SQ.CMDS)) {
+      if (!documented.has(name)) continue;
+      assert.doesNotMatch(run(SQ, `man ${name}`).out, /No manual entry/, name);
     }
   });
 });

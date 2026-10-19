@@ -1,16 +1,13 @@
 (()=>{
 const SQ=window.SQ;
 const S=SQ.S;
-const {HOME,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,disp,join,ensureDir,ensureFile,cmpName,sortedKeys,lines,CMDS,execLine,ctxFor}=SQ;
+const {HOME,makeWorld,fresh,save,norm,getNode,disp,join,cmpName,CMDS,execLine,ctxFor}=SQ;
 
 const CH=SQ.content.chapters,GUIDE=SQ.content.guide,QF=SQ.content.quickfire;
-/* ---------- UI ---------- */
 const $=s=>document.querySelector(s);
 const screen=$('#screen'),cmdIn=$('#cmd'),promptEl=$('#prompt'),term=$('#term'),mapEl=$('#map'),missionEl=$('#mission'),chaptersEl=$('#chapters'),crumbsEl=$('#crumbs');
 const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML}=SQ.ui;
 let histIdx=S.hist.length;
-
-
 
 function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
   try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
@@ -113,6 +110,9 @@ $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');
   addLine('Your mission is on the left. Type help to list commands, or man ls to learn about one.','sys');addLine('')}
+
+/* a save the browser refused (storage full or blocked) is reported once in the terminal instead of failing silently */
+SQ.rt.onSaveFail=()=>{addLine(renderText('Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'),'err');scrollDown()};
 
 /* boot */
 if(!S.seen){CH[S.ch].setup();S.seen=true}

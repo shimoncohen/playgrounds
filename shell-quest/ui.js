@@ -31,10 +31,10 @@ function renderChapters(){Tiers.renderRail(chaptersEl,{status:SQ.tiers.status(S)
 function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
   const dots=`<div class="dots" aria-label="Missions in this chapter">${ch.missions.map((m,i)=>`<button class="dot${S.done[S.ch+'.'+i]?' done':''}${i===S.mi?' cur':''}" data-mi="${i}" title="${esc(m.title)}" aria-label="Mission ${i+1}: ${esc(m.title)}">${i+1}</button>`).join('')}</div>`;
   let h;
-  if(S.mi>=n){const all=totalDone(S.ch)===n,last=S.ch===CH.length-1;
+  if(S.mi>=n){const all=totalDone(S.ch)===n,last=S.ch===CH.length-1,tier=SQ.tiers.tierOf(S.ch),begin=tier.id==='beginner',tdone=SQ.tiers.status(S).some(x=>x.tier===tier&&x.complete);
     h=`<div class="eyebrow">Chapter ${S.ch+1} complete</div><div class="badge-art${all?'':' dim'}">${all?'★':S.ch+1}</div>
-    <h2>${last?'You finished Shell Quest':all?'Badge earned: '+esc(ch.badge):'Chapter finished'}</h2>
-    <p class="explain">${last?'You can move around a filesystem, build and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':'You can now use these on any real Linux or Mac terminal:'}</p>
+    <h2>${last?(begin?'You finished Shell Quest':(tdone?'You finished the '+esc(tier.name)+' tier':'You reached the last chapter')):all?'Badge earned: '+esc(ch.badge):'Chapter finished'}</h2>
+    <p class="explain">${last?(begin?'You can move around a filesystem, build and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':'That is every chapter there is for now. You can revisit any chapter from the list on the left.'):'You can now use these on any real Linux or Mac terminal:'}</p>
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, then open a real terminal. The field guide shows how on Mac, Windows and Linux.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`}
