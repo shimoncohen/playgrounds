@@ -257,10 +257,10 @@ CMDS.grep=function(a,io){
     if(o.F)src=reEsc(p);
     else{try{SQ.safeRegex(p,'');src=p}catch(e){if(e.complex)return E('grep: '+e.message,2);const m=grepBadRe(p,o.E);if(m)return E('grep: '+m,2);src=reEsc(p)}}
     if(o.x)src='^(?:'+src+')$';else if(o.w)src='(?<![A-Za-z0-9_])(?:'+src+')(?![A-Za-z0-9_])';
-    try{res.push(new RegExp(src,o.i?'gi':'g'))}catch(e){return E('grep: Invalid regular expression',2)}}
+    try{res.push(SQ.watchRegex(new RegExp(src,o.i?'gi':'g')))}catch(e){return E('grep: Invalid regular expression',2)}}
   let work=0;
-  const hit=ln=>{work+=res.length;if(work>=100){SQ.step();work=0}for(const r of res){r.lastIndex=0;if(r.test(ln))return true}return false};
-  const spans=ln=>{const sp=[];let pos=0;while(pos<=ln.length){let best=null;
+  const hit=ln=>{work+=res.length;if(work>=100){SQ.step();work=0}for(const r of res){SQ.reGuard(r,ln);r.lastIndex=0;if(r.test(ln))return true}return false};
+  const spans=ln=>{const sp=[];let pos=0;for(const r of res)SQ.reGuard(r,ln,true);while(pos<=ln.length){let best=null;
       for(const r of res){r.lastIndex=pos;const m=r.exec(ln);if(m&&(best===null||m.index<best.index||(m.index===best.index&&m[0].length>best[0].length)))best=m}
       if(!best)break;if(best[0].length===0){pos=best.index+1;continue}sp.push([best.index,best.index+best[0].length]);pos=best.index+best[0].length}
     return sp};
@@ -296,6 +296,7 @@ CMDS.grep=function(a,io){
         if(keep(k))scan(pre+k,tn.content,true);continue}
       if(keep(k))scan(pre+k,c.content,true)}};
   const rec=o.r||o.R;
+  try{
   if(!files.length){
     if(rec){dirSeen=true;walk('',norm('.'),getNode(norm('.')))}
     else scan('(standard input)',io.stdin,false)}
@@ -305,6 +306,7 @@ CMDS.grep=function(a,io){
     if(!n){if(!o.s)err.push(SQ.isLoop(abs)?`grep: ${t}: Too many levels of symbolic links`:`grep: ${t}: No such file or directory`);else err.push(null);continue}
     if(n.type==='dir'){if(!rec){if(!o.s)err.push(`grep: ${t}: Is a directory`);else err.push(null);continue}dirSeen=true;walk(t,abs,n);continue}
     if(keep(t))scan(t,n.content,files.length>1)}
+  }catch(e){if(e&&e.complex)return {out:out.join('\n'),err:['grep: '+e.message],code:2};throw e}
   const errs=err.filter(e=>e!==null);
   return {out:out.join('\n'),err:errs,code:o.q&&matchedAny?0:err.length?2:matchedAny?0:1}};
 

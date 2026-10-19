@@ -140,7 +140,8 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
     if(cache.size>=CACHE_MAX)cache.clear();
     cache.set(src,re);return re}
   const reOf=(node)=>node.type==='regex'?node.re:compile(toStr(ev(node)));
-  const test=(re,s)=>{re.lastIndex=0;return re.test(s)};
+  const guard=(re,s,all)=>{try{SQ.reGuard(re,s,all)}catch(e){if(e&&e.complex)throw new AwkErr(e.message,-1);throw e}};
+  const test=(re,s)=>{guard(re,s,false);re.lastIndex=0;return re.test(s)};
 
   /* ---- values ---- */
   /* OFMT/CONVFMT: one numeric conversion (and any %%); anything else is unusable and %.6g is used instead */
@@ -186,7 +187,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
     if(s==='')return [];
     if(!isRe&&fs==='')return Array.from(s);
     if(!isRe&&fs.length===1)return s.split(fs);
-    const re=isRe?fs:compile(fs),parts=[];let pos=0,lastEnd=0,work=0;
+    const re=isRe?fs:compile(fs),parts=[];let pos=0,lastEnd=0,work=0;guard(re,s,true);
     while(pos<=s.length){re.lastIndex=pos;const mm=re.exec(s);if(!mm)break;
       if(++work%1000===0)step();
       if(mm[0].length===0){pos=mm.index+1;continue}
@@ -276,7 +277,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
   function subst(e,global){
     const re=reOf(e.args[0]),repl=toStr(ev(e.args[1]));
     const r=e.args.length>2?ref(e.args[2]):{get:()=>rec0,set:v=>setField(0,v)};
-    const s=toStr(r.get());let res='',pos=0,lastEnd=-1,count=0,work=0;
+    const s=toStr(r.get());let res='',pos=0,lastEnd=-1,count=0,work=0;guard(re,s,global);
     const expand=mt=>{let t='';for(let i=0;i<repl.length;i++){const c=repl[i];
         if(c==='\\'&&(repl[i+1]==='&'||repl[i+1]==='\\')){t+=repl[++i];continue}
         t+=c==='&'?mt:c}return t};
@@ -311,7 +312,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
         const arr=getArr(a[1].name);arr.m.clear();parts.forEach((p,i)=>arr.m.set(String(i+1),mkInput(p)));return parts.length}
       case 'sub':return subst(e,false);
       case 'gsub':return subst(e,true);
-      case 'match':{const s=toStr(ev(a[0])),re=reOf(a[1]);re.lastIndex=0;const mm=re.exec(s);
+      case 'match':{const s=toStr(ev(a[0])),re=reOf(a[1]);guard(re,s,false);re.lastIndex=0;const mm=re.exec(s);
         if(mm){G.RSTART=mm.index+1;G.RLENGTH=mm[0].length}else{G.RSTART=0;G.RLENGTH=-1}return G.RSTART}
       case 'sprintf':{const vals=a.map(ev);return format(toStr(vals[0]),vals.slice(1),false)}
       case 'sin':return Math.sin(toNum(ev(a[0])));

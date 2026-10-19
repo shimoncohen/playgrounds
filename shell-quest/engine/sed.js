@@ -187,13 +187,15 @@ function sedCompile(chunks,o){o=o||{};const text=chunks.join('\n'),n=text.length
   return {prog:{cmds,quiet:!!o.quiet}}}
 
 /* ---- runner ---- */
+/* a subject too long for the regex (SQ.reGuard) is a runtime error: 'sed: pattern too complex for this practice shell' */
+const guard=(rx,s,all)=>{try{SQ.reGuard(rx,s,all)}catch(e){if(e&&e.complex)throw Object.assign(new Error(e.message),{sedRt:true});throw e}};
 function caseText(parts,m){let o='',mode='',one='';
   const add=t=>{if(!t)return;if(mode==='U')t=t.toUpperCase();else if(mode==='L')t=t.toLowerCase();
     if(one){t=(one==='u'?t[0].toUpperCase():t[0].toLowerCase())+t.slice(1);one=''}o+=t};
   for(const p of parts){if(p.l!==undefined)add(p.l);else if(p.g!==undefined)add(m[p.g]===undefined?'':m[p.g]);
     else if(p.cs==='U'||p.cs==='L'){mode=p.cs;one=''}else if(p.cs==='E'){mode='';one=''}else one=p.cs}
   return o}
-function subst(s,rx,c){let pos=0,last=0,prevEnd=-1,k=0,did=false,o='';
+function subst(s,rx,c){let pos=0,last=0,prevEnd=-1,k=0,did=false,o='';guard(rx,s,c.g||c.num>1);
   while(pos<=s.length){rx.lastIndex=pos;const m=rx.exec(s);if(!m)break;const st=m.index,en=st+m[0].length;
     if(st===en&&st===prevEnd){pos=st+1;continue}
     k++;if(k===c.num||(c.g&&k>c.num)){o+=s.slice(last,st)+caseText(c.parts,m);last=en;did=true;if(!c.g)break}
@@ -213,7 +215,7 @@ function sedExec(prog,streams,o){const cmds=prog.cmds,quiet=!!(o.n||prog.quiet);
       const test=(a)=>{const no=j+1;
         if(a.t==='n')return no===a.n;if(a.t==='last')return isLast();
         if(a.t==='step')return a.step<=0?no===a.n:no>=a.n&&(no-a.n)%a.step===0;
-        if(a.t==='re'){const rx=a.rx||lastRe;if(!rx)throw Object.assign(new Error('no previous regular expression'),{sedRt:true});lastRe=rx;rx.lastIndex=0;return rx.test(ps)}
+        if(a.t==='re'){const rx=a.rx||lastRe;if(!rx)throw Object.assign(new Error('no previous regular expression'),{sedRt:true});lastRe=rx;guard(rx,ps,false);rx.lastIndex=0;return rx.test(ps)}
         return false};
       const match=(c)=>{if(!c.a1)return true;let hit;
         if(!c.a2)hit=test(c.a1);

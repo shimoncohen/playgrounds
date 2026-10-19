@@ -255,6 +255,137 @@ describe('safeRegex', () => {
   });
 });
 
+describe('regex backtracking guard (Task 9b)', () => {
+  const put = (SQ, name, text) => SQ.writeFile(SQ.norm(name), text);
+  const TOO = 'pattern too complex for this practice shell';
+  const after = (SQ) => assert.equal(run(SQ, 'echo next').out, 'next');
+  it('pinned slow patterns end quickly with the friendly message, and the next command works', () => {
+    const SQ = loadShell();
+    put(SQ, 'l128.txt', 'a'.repeat(128));
+    put(SQ, 'l32k.txt', 'a'.repeat(32000));
+    put(SQ, 'l30k.txt', 'a'.repeat(30000));
+    const cases = [
+      [`grep -E '.*.*.*.*.*c' l128.txt`, 'grep: ' + TOO],
+      [`sed 's/a*a*a*a*a*a*a*a*b/x/' l32k.txt`, 'sed: ' + TOO],
+      [`awk '/a*a*a*a*b/' l32k.txt`, 'awk: ' + TOO],
+      [`grep 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`grep -c 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`grep -o 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`sed 's/a*b/x/g' l30k.txt`, 'sed: ' + TOO],
+      [`sed -n '/a*b/p' l30k.txt`, 'sed: ' + TOO],
+      [`awk '{ gsub(/a*b/, "x"); print }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '{ n = split($0, p, /a*b/); print n }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '{ print match($0, /a*b/) }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '$1 ~ /a*b/' l30k.txt`, 'awk: ' + TOO],
+      [`awk -F 'a*b' '{ print NF }' l30k.txt`, 'awk: ' + TOO],
+      [`x=$(cat l30k.txt); [[ $x =~ a*b ]]`, 'bash: [[: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      const r = fast(SQ, line, 1000);
+      assert.equal(r.out, want, line);
+      assert.notEqual(r.code, 0, line);
+      after(SQ);
+    }
+  });
+  it('awk strings built inside the program are guarded too', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, `awk 'BEGIN { s = "a"; while (length(s) < 30000) s = s s; print (s ~ /a*a*a*b/) }'`, 1000);
+    assert.equal(r.out, 'awk: ' + TOO);
+    after(SQ);
+  });
+  it('glob patterns with many stars stay fast on long names (find -name, grep --include)', () => {
+    const SQ = loadShell();
+    const name = 'a'.repeat(250);
+    run(SQ, `mkdir g; touch g/${name}`);
+    const r = fast(SQ, `find g -name '*a*a*a*a*a*a*a*a*b'`, 1000);
+    assert.equal(r.out, '');
+    assert.equal(fast(SQ, `find g -name '*a*a'`, 1000).out, 'g/' + name);
+    assert.equal(fast(SQ, `ls g/*a*a*a*a*a*a*a*a*b 2>&1 | wc -l`, 1000).out, '1');
+  });
+  it('many lines that each fit cannot add up to a freeze: the work is charged to the step budget', () => {
+    const SQ = loadShell();
+    put(SQ, 'many.txt', ('a'.repeat(200) + '\n').repeat(4900)); // a*a*c is cubic; 200 characters fit, 4,900 such lines would take minutes
+    for (const line of [`grep -c 'a*a*c' many.txt`, `sed -n '/a*a*c/p' many.txt`, `awk '/a*a*c/' many.txt`]) {
+      const r = fast(SQ, line, 2000);
+      assert.equal(r.out, 'this practice shell stopped the command: too many steps', line);
+      after(SQ);
+    }
+    assert.equal(run(SQ, `head -3 many.txt | grep -c 'a*a*c'`).out, '0');
+  });
+  it('everyday patterns keep working on normal lines, and on long lines when they are linear', () => {
+    const SQ = loadShell();
+    put(SQ, 't.txt', ['foo and bar', 'ver 3.14 ok', 'abba', 'the wolf howls', 'an error here', 'root:x:0:0:root:/root:/bin/bash', 'nothing'].join('\n'));
+    const want = [
+      [`grep '^.*foo.*bar$' t.txt`, 'foo and bar'],
+      [`grep -E '[0-9]+\\.[0-9]+' t.txt`, 'ver 3.14 ok'],
+      [`grep -E '^(a|b)+$' t.txt`, 'abba'],
+      [`grep '\\bwolf\\b' t.txt`, 'the wolf howls'],
+      [`grep '.*error.*' t.txt`, 'an error here'],
+      [`grep -c '^[^:]*:[^:]*:' t.txt`, '1'],
+      [`sed -n 's/^\\([^:]*\\):.*/\\1/p' t.txt`, 'root'],
+      [`awk -F: '/^root/ { print $7 }' t.txt`, '/bin/bash'],
+      [`awk '{ gsub(/o+/, "0"); print }' t.txt | head -1`, 'f0 and bar'],
+    ];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+    const long = 'x'.repeat(200000) + ' wolf ' + 'y'.repeat(200000);
+    put(SQ, 'long.txt', long);
+    assert.equal(fast(SQ, `grep -c '\\bwolf\\b' long.txt`, 2000).out, '1');
+    assert.equal(fast(SQ, `grep -c 'wolf' long.txt`, 2000).out, '1');
+    assert.equal(fast(SQ, `sed 's/.*/z/' long.txt`, 2000).out, 'z');
+    assert.equal(fast(SQ, `awk '{ print length($0) }' long.txt`, 2000).out, String(long.length));
+    assert.equal(fast(SQ, `sed 's/o/0/g' long.txt | grep -c w0lf`, 2000).out, '1');
+  });
+  it('regexFits: refuses by subject length, deterministically', () => {
+    const { safeRegex, regexFits, LIM } = loadShell();
+    const ab = safeRegex('a*b', '');
+    assert.equal(regexFits(ab, 200), true);
+    assert.equal(regexFits(ab, 30000), false);
+    assert.equal(regexFits(safeRegex('\\bwolf\\b', ''), LIM.TEXT), true);
+    assert.equal(regexFits(safeRegex('^foo', ''), LIM.TEXT), true);
+    for (const p of ['^.*foo.*bar$', '[0-9]+\\.[0-9]+', '^(a|b)+$', '\\bwolf\\b', '.*error.*', '^[^:]*:[^:]*:'])
+      assert.equal(regexFits(safeRegex(p, 'g'), 1000), true, p);
+    for (const p of ['.*.*.*.*.*c', 'a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'])
+      assert.throws(() => safeRegex(p, ''), (e) => e.complex === true, p);
+  });
+  it('seeded random patterns: each is refused, or runs within 250 ms on worst-case subjects up to the longest length it accepts', () => {
+    const { safeRegex, regexFits, LIM } = loadShell();
+    let seed = 12345;
+    const rnd = (k) => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor((seed / 2147483648) * k); };
+    const atoms = ['a', 'b', '.', '[ab]', '[^b]', '\\w', '(?:ab)', '(a|b)', '(a|bc)', 'ab'];
+    const quants = ['', '', '*', '*', '+', '?', '{2,5}', '{1,}', '*?', '+?'];
+    const subjects = (n) => ['a'.repeat(n), 'a'.repeat(n - 1) + 'c', 'ab'.repeat(n >> 1) + 'c', 'b'.repeat(n - 1) + 'c', 'aab'.repeat(Math.floor(n / 3)) + 'x'];
+    let accepted = 0, refused = 0, worst = 0, worstPat = '';
+    const t0 = Date.now();
+    for (let k = 0; k < 120; k++) {
+      let p = rnd(3) === 0 ? '^' : '';
+      const len = 1 + rnd(6);
+      for (let i = 0; i < len; i++) p += atoms[rnd(atoms.length)] + quants[rnd(quants.length)];
+      if (rnd(3) === 0) p += rnd(2) ? '$' : 'c';
+      let re;
+      try { re = safeRegex(p, 'g'); } catch (e) { assert.equal(e.complex, true, p); refused++; continue; }
+      accepted++;
+      for (const all of [false, true]) {
+        let lo = 0, hi = LIM.TEXT; // longest accepted subject length
+        while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (regexFits(re, mid, all, true)) lo = mid; else hi = mid - 1; } // true: no line breaks
+        if (lo < 4) continue;
+        for (const s of subjects(lo)) {
+          const t = Date.now();
+          re.lastIndex = 0;
+          if (!all) re.test(s);
+          else { // a /g loop as sed s///g and awk gsub run it; after 2,000 matches only linear match-building work is left
+            for (let k = 0, m; k < 2000 && (m = re.exec(s)); k++) if (m[0] === '') re.lastIndex++;
+          }
+          const ms = Date.now() - t;
+          if (ms > worst) { worst = ms; worstPat = `${p} n=${lo} all=${all}`; }
+          assert.ok(ms < 250, `${p} took ${ms} ms on ${s.length} chars (all=${all})`);
+        }
+      }
+    }
+    assert.ok(accepted > 30 && refused > 3, `accepted ${accepted}, refused ${refused}`);
+    assert.ok(Date.now() - t0 < 5000, `took ${Date.now() - t0} ms; worst ${worst} ms ${worstPat}`);
+  });
+});
+
 describe('every mission answer, guide example and quick-fire answer stays inside the caps', () => {
   const SQ0 = loadShell();
   const chapters = SQ0.content.chapters;

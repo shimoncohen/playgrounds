@@ -311,7 +311,17 @@ function parse(toks){
   if(cmd.words.length||cmd.out)pipe.push(cmd);else if(pipe.length)bad('newline');
   if(pipe.length)seq.push({op,pipe});else if(op&&op!==';')bad('newline');
   return seq}
-function globRe(p,ci){return new RegExp('^'+p.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$',ci?'i':'')}
+/* globRe(p, ci) -> {test(name)}: * and ? wildcards (every other character literal; neither wildcard matches a line break), matched with one backtrack
+   point (the last *), so the work is at most name length x pattern length: a JS regex like ^.*a.*a.*b$ would backtrack polynomially (Task 9b). */
+const GLOB_NL=/[\n\r\u2028\u2029]/;
+function globRe(p,ci){if(ci)p=p.toLowerCase();
+  return {test(s){if(ci)s=s.toLowerCase();let i=0,j=0,star=-1,mark=0;
+    while(j<s.length){const c=p[i];
+      if(c==='*'){star=i++;mark=j;continue}
+      if(i<p.length&&(c==='?'?!GLOB_NL.test(s[j]):c===s[j])){i++;j++;continue}
+      if(star<0||GLOB_NL.test(s[mark]))return false;
+      i=star+1;j=++mark}
+    while(p[i]==='*')i++;return i===p.length}}}
 /* every glob is charged to the step budget: one step, plus one per 100 names it looks at */
 function globExpand(pat){const idx=pat.lastIndexOf('/');const dp=idx>=0?pat.slice(0,idx+1):'';const b=pat.slice(idx+1);
   if(/[*?]/.test(dp)||!b)return [pat];SQ.step();const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
