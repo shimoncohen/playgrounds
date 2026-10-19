@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Shell Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/tiers.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">$_</span>Shell Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Rookie</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+
+<main>
+<section id="tab-quest" class="quest" role="tabpanel" aria-labelledby="t-quest">
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite"></article>
+  </aside>
+  <div class="termCol">
+    <div class="crumbs" id="crumbs"></div>
+    <div class="term" id="term">
+      <div id="screen"></div>
+      <div class="inputline"><span id="prompt"></span><input id="cmd" aria-label="Type a bash command" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+    </div>
+    <section id="editor" class="panel editor" aria-label="File editor" hidden>
+      <div class="edhead"><span class="edlabel">Editing</span><code id="edTitle" class="edtitle"></code></div>
+      <textarea id="edText" aria-label="File contents" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="edrun">
+        <label class="edargs">Arguments <input id="edArgs" aria-label="Arguments for Save and run" placeholder="e.g. Ada" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+        <details class="edstdin"><summary>Input for the script (stdin)</summary><textarea id="edStdin" aria-label="Standard input for Save and run" spellcheck="false" wrap="off" rows="3"></textarea></details>
+      </div>
+      <div class="edbar"><button type="button" class="btn" id="edSave">Save</button><button type="button" class="btn" id="edRun">Save &amp; run</button><button type="button" class="btn ghost" id="edTab" aria-label="Insert two spaces">Tab ⇥</button><button type="button" class="btn ghost" id="edClose">Close</button></div>
+      <p class="edhint"><kbd>Ctrl</kbd>+<kbd>S</kbd> saves · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> saves and runs · <kbd>Esc</kbd> closes</p>
+    </section>
+    <div class="keys" id="keys" aria-label="Extra keys">
+      <button data-k="TAB">Tab</button><button data-k="UP">↑</button><button data-k="/">/</button><button data-k="~">~</button><button data-k="-">-</button><button data-k="|">|</button><button data-k=">">&gt;</button><button data-k="*">*</button><button data-k=".">.</button><button data-k="&quot;">"</button><button data-k="$">$</button><button data-k=";">;</button><button data-k="&amp;">&amp;</button><button data-k="(">(</button><button data-k=")">)</button><button data-k="{">{</button><button data-k="}">}</button><button data-k="[">[</button><button data-k="]">]</button><button data-k="=">=</button><button data-k="&lt;">&lt;</button><button data-k="`">`</button><button data-k="\">\</button><button data-k="ENTER">Enter ⏎</button>
+    </div>
+    <div class="termbar"><span><kbd>Tab</kbd> completes names</span><span><kbd>↑</kbd> <kbd>↓</kbd> history</span><span><kbd>Ctrl</kbd>+<kbd>L</kbd> clears</span><span class="sp"></span><button class="linkbtn" id="resetWorld">Reset world</button></div>
+  </div>
+  <aside class="mapCol">
+    <div class="panel">
+      <h3>World map</h3>
+      <p class="mapsub">Updates live as you type. Click a folder to fill in a cd, or a file to fill in a cat.</p>
+      <div class="mapscroll"><div id="map"></div></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--dir)"></span>folder</span>
+        <span><span class="sw" style="background:var(--line)"></span>file</span>
+        <span><span class="pin">YOU</span> you are here</span>
+        <span><span class="tag">x</span> runnable</span>
+        <span style="opacity:.6">.faded = hidden</span>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire">
+    <div><h2>Quick-fire</h2><p class="lede">You get a task. Type the command that does it. 75 seconds on the clock, and every correct answer in a row adds a streak bonus. Wrong answers show you the right one, so every round teaches something.</p></div>
+    <div class="fireCard panel">
+      <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
+      <div class="timer"><i id="fTimer"></i></div>
+      <label class="ftier">Questions from <select id="fTier" aria-label="Question tier"><option value="mixed">Mixed</option></select></label>
+      <div id="fStage"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"></div>
+</section>
+</main>
+</div>
+
+<script>window.PROGRESS={key:"shell-quest-v1",name:"Shell Quest"}</script>
+<script src="../shared/progress.js"></script>
+<script src="../shared/tiers.js"></script>
+<script src="engine/fs.js"></script>
+<script src="engine/arith.js"></script>
+<script src="engine/parse.js"></script>
+<script src="engine/ast.js"></script>
+<script src="engine/interp.js"></script>
+<script src="engine/cmds-basic.js"></script>
+<script src="engine/cmds-text.js"></script>
+<script src="engine/cmds-sys.js"></script>
+<script src="engine/cmds-flow.js"></script>
+<script src="engine/exec.js"></script>
+<script src="content/tiers.js"></script>
+<script src="content/tier-beginner.js"></script>
+<script src="content/tier-intermediate.js"></script>
+<script src="content/tier-advanced.js"></script>
+<script src="content/guide.js"></script>
+<script src="content/quickfire.js"></script>
+<script src="ui.js"></script>
+<script src="editor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
