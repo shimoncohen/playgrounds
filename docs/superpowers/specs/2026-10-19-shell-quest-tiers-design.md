@@ -255,7 +255,7 @@ Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `
 - Script and challenge checks run in `SQ.sandbox`, a throwaway copy of the whole state that never writes `localStorage`. A mission can name the world its check judges (`m.world`), and the failure line is computed in that same world (`SQ.missionVerdict`).
 - "Automator" sits at the XP computed from the content, 1890, not the 1875 target above.
 
-**Caps.** `SQ.LIM` (20,000 steps per typed line, 2,000 screen lines, 1,000,000 characters per file or output, 5,000,000 output characters per line, 1,500,000 characters of saved state, 200-character patterns); 20,000 tokens per program; parser nesting 100; interpreter nesting 250 across compounds, `$( )` and scripts (`IMAX`); function and `source` nesting 100; scripts nested 6 deep; `${X#p}` / `%` / `/` patterns of 200 characters on values of at most 5,000; 20 test cases per script mission and 2,000 reported characters per case.
+**Caps.** `SQ.LIM` (20,000 steps per typed line, 2,000 screen lines, 1,000,000 characters per file or output, 5,000,000 output characters per line, 1,500,000 characters of saved state, 200-character patterns); 20,000 tokens per program; parser nesting 100; interpreter nesting 250 across compounds, `$( )` and scripts (`IMAX`); function and `source` nesting 100; scripts nested 6 deep; `${X#p}` / `%` / `/` patterns of 200 characters on values of at most 5,000; 20 test cases per script mission and 2,000 reported characters per case. Expansion and `[`/`[[` expression nesting stops at 100 levels with `bash: syntax error: nesting too deep` (status 2), and a JS stack overflow that still escapes prints the same line. The saved-state cap is enforced by `writeFile` for writes over 1,000 characters, by `cp` before a big copy, and for everything else (small writes in a loop, `mv`, many `cp`) every 256 steps and once at the end of the typed line (`SQ.checkState`, no rollback).
 
 **Still unsupported or different from bash (known limitations).**
 
@@ -270,6 +270,14 @@ Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `
 - A script with a syntax error prints only the parser's message (`bash: syntax error near unexpected token 'then'`) with no file name or line number, and one unsupported construct anywhere in the file stops the whole script before it runs.
 - A typed here-document cannot span lines at the prompt (the terminal takes one line at a time); scripts use them. A typed `exit` prints a friendly message instead of closing anything.
 - `break`/`continue` inside a function do not reach the caller's loop; `$0` inside a function is the function name; `xargs` cannot call a function.
+- `x=$(false); echo $?` prints 0 (bash: 1): an assignment-only command does not take the status of its `$( )`.
+- `a="1+2"; echo $((a*2))` prints 0: a variable's text is not evaluated as an expression inside `$(( ))` (bash gives 6).
+- `unset HOME` leaves the default home in place.
+- `type if` says not found (bash: `if is a shell keyword`).
+- A failing `${X:?msg}` prints its message but does not end the script or function (bash does).
+- `help` lists only the Beginner commands (an unmarked `help cd` corpus entry pins its text); `man` and `type` cover the rest.
+- File-descriptor duplication other than `2>&1`, `>&2` and `1>&2` (`2>&2`, `2>&-`, `>&-`, `3>&1`) prints "this practice shell does not support >& yet".
+- `__proto__` is refused as a variable or function name ("not a valid identifier"); names such as `constructor` or `toString` behave like any other unset name.
 
 ## Risks and mitigations
 
