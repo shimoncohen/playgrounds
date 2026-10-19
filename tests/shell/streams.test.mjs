@@ -114,3 +114,30 @@ describe('export and env', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(SQ.S.exp)), { A: 1 });
   });
 });
+
+describe('substitution is a subshell', () => {
+  it('does not leak cwd', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'echo $(cd forest; pwd); pwd').out, '/home/explorer/forest\n/home/explorer');
+  });
+  it('does not leak variables', () => {
+    assert.equal(run(loadShell(), 'echo $(X=5); echo $X').out, '');
+  });
+  it('does not leak exports', () => {
+    const SQ = loadShell();
+    run(SQ, 'echo $(export Q=1)');
+    assert.ok(!run(SQ, 'env').out.split('\n').includes('Q=1'));
+  });
+  it('filesystem changes persist', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'echo $(touch f; echo ok)').out, 'ok');
+    assert.equal(run(SQ, 'ls f').out, 'f');
+  });
+  it('for-list substitution errors do not leak into the next command', () => {
+    const SQ = loadShell();
+    let s = 'echo x';
+    for (let i = 0; i < 40; i++) s = `echo $(${s})`;
+    run(SQ, `for a in $(${s}); do echo $a; done`);
+    assert.equal(run(SQ, 'echo clean').out, 'clean');
+  });
+});

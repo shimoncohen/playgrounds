@@ -23,7 +23,9 @@ function scanSub(line,i){
   throw new Error("unexpected EOF while looking for matching ')'")}
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
-  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false})}finally{CTX.sub--}
+  const sv={cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),last:S.last};
+  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false})}finally{CTX.sub--;
+    S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;if(sv.exp)S.exp=sv.exp;else delete S.exp}
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
   return v.join('\n').replace(/\n+$/,'')}
 /* opt.dry: only find structure (no substitution, words keep their raw source); default: expand for real. opt.nosplit: substitution results stay one word. */
