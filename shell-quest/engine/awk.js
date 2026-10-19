@@ -11,7 +11,7 @@
    - Values are numbers, strings, numeric strings (fields, split() pieces, -v and name=value values that look like numbers) or
      uninitialised (both "" and 0). A comparison is numeric when both sides are numbers, numeric strings or uninitialised, else a string
      comparison ("10" < "9" is true for constants, false for fields 10 and 9). A number becomes a string through CONVFMT (OFMT in print);
-     an integral value below 2^63 always prints whole. inf, -inf and nan print as those words (BWK style; mawk/gawk print -nan), never as
+     an integral value in [-2^63, 2^63) prints whole with exact digits; an unusable OFMT/CONVFMT (not one numeric conversion) means %.6g. inf, -inf and nan print as those words (BWK style; mawk/gawk print -nan), never as
      JS text. Strings never parse as nan/inf ("nan"+0 is 0, as in gawk). Array keys are strings; a missing field is "".
    - Records: RS is a newline only (anything else: the practice-shell message); a final newline ends the last record. FS " " splits on
      runs of blanks and trims; another single character is literal; "" splits into characters; longer is an ERE. Assigning a field or NF
@@ -32,8 +32,10 @@
    (negative, or above 1,000 and above NF: $1000001 and $1000000 = 1 are refused), `awk: can't use scalar x as array`, `awk: can't use
    array x in scalar context`, `awk: not enough args in printf(FMT)`, `awk: can't open file F`, followed by ` source line number N`
    for errors inside the program. Output printed before an error is kept.
-   Caps: SQ.step() per record, per loop pass and per function call (an endless loop ends with the step-limit message), function calls
-   nest at most 100 deep, a string longer than LIM.VAR stops the command (`a value grew too large`), output beyond LIM.TEXT stops with
+   Caps: SQ.step() per record, per loop pass and per user function call (an endless loop ends with the step-limit message; a call
+   costs a step by design, so a doubly recursive fib(20), about 22,000 calls, stops at LIM.STEPS while fib(15) runs), function calls
+   nest at most 100 deep, an expression nested so deep that JS runs out of stack (a chain of thousands of + or concatenations) ends
+   with `awk: nesting too deep` (exit 2), a string longer than LIM.VAR stops the command (`a value grew too large`), output beyond LIM.TEXT stops with
    `awk: output too large for this practice shell` (exit 1), the screen shows LIM.LINES lines as for every command. */
 (function (SQ) {
 const MAX_FIELD=1000,MAX_CALLS=100,CACHE_MAX=200;
@@ -50,6 +52,9 @@ const mkInput=s=>NUMRE.test(s)?new SN(s,Number(s.trim())):s;
 const strToNum=s=>{const m=PREFIX.exec(s);return m?Number(m[1]):0};
 const isNumish=v=>v===undefined||typeof v==='number'||v instanceof SN;
 const jsRepr=x=>Number.isNaN(x)?'nan':x===Infinity?'inf':x===-Infinity?'-inf':Object.is(x,-0)?'-0':String(x);
+const intText=n=>Number.isFinite(n)?BigInt(Math.trunc(n)).toString():jsRepr(n);
+const NEST='awk: nesting too deep';
+const USABLE_FMT=/^(?:[^%]|%%)*%[-+#0 ]*\d*(?:\.\d*)?[eEfFgGdiouxX](?:[^%]|%%)*$/;
 const roundHE=x=>Math.abs(x%1)===0.5?2*Math.round(x/2):Math.round(x);
 
 /* awk string escapes, as the lexer does them (for -v, -F and name=value operands) */
@@ -114,9 +119,9 @@ function ereToJs(p){let o='',i=0,atom=-1,quant=false;const open=[],n=p.length;
 /* ---- the interpreter ---- */
 function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
   let prog;
-  try{prog=SQ.awkParse(progText)}catch(e){if(e&&e.awkErr)return {out:'',err:e.message,code:e.code||2};throw e}
+  try{prog=SQ.awkParse(progText)}catch(e){if(e&&e.awkErr)return {out:'',err:e.message,code:e.code||2};if(SQ.isOverflow(e))return {out:'',err:NEST,code:2};throw e}
   const LIM=SQ.LIM,step=SQ.step;
-  const out=[];let outLen=0;const warns=[];
+  const out=[];let outLen=0;
   const G=Object.create(null);let frame=null,depth=0,curLine=0,retVal,exitCode=0;
   let rec0='',flds=[null],nf=0,seed=0,lcg=0;
   const fail=(msg,line)=>new AwkErr(msg,line===undefined?curLine:line);
@@ -138,9 +143,10 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
   const test=(re,s)=>{re.lastIndex=0;return re.test(s)};
 
   /* ---- values ---- */
-  const fmtOf=name=>{const f=G[name];return typeof f==='string'?f:f instanceof SN?f.s:'%.6g'};
+  /* OFMT/CONVFMT: one numeric conversion (and any %%); anything else is unusable and %.6g is used instead */
+  const fmtOf=name=>{const f=G[name],s=typeof f==='string'?f:f instanceof SN?f.s:'';return USABLE_FMT.test(s)?s:'%.6g'};
   function numStr(x,fmtName){
-    if(Number.isInteger(x)&&Math.abs(x)<9223372036854775808)return Math.abs(x)<1e21?String(x):BigInt(x).toString();
+    if(Number.isInteger(x)&&x>=-9223372036854775808&&x<9223372036854775808)return Math.abs(x)<9007199254740992?String(x):BigInt(x).toString();
     if(!Number.isFinite(x))return jsRepr(x);
     return format(fmtOf(fmtName),[x],true)}
   function toStr(v){if(v===undefined)return '';if(typeof v==='string')return v;if(v instanceof SN)return v.s;return numStr(v,'CONVFMT')}
@@ -191,7 +197,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
   function fieldIndex(v){const n=toNum(v);
     if(!Number.isFinite(n))throw fail(`trying to access out of range field ${jsRepr(n)}`);
     const i=Math.trunc(n);
-    if(i<0||(i>MAX_FIELD&&i>nf))throw fail(`trying to access out of range field ${i}`);
+    if(i<0||(i>MAX_FIELD&&i>nf))throw fail(`trying to access out of range field ${intText(i)}`);
     return i}
   const getField=i=>i===0?rec0:i<=nf?flds[i]:'';
   function setField(i,v){
@@ -200,7 +206,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
     flds[i]=v;rebuild()}
   function setNF(v){const n=Math.trunc(toNum(v));
     if(!(n>=0))throw fail('cannot set NF to a negative value');
-    if(n>MAX_FIELD&&n>nf)throw fail(`trying to access out of range field ${n}`);
+    if(n>MAX_FIELD&&n>nf)throw fail(`trying to access out of range field ${intText(n)}`);
     while(nf<n)flds[++nf]='';
     nf=n;flds.length=n+1;rebuild()}
 
@@ -421,6 +427,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
   catch(e){
     if(e===OUT_CAP)return {out:'',err:errs.concat('awk: output too large for this practice shell').join('\n'),code:1};
     if(e===RS_SIG)return {out:out.join(''),err:errs.concat('this practice shell does not support awk RS other than a newline yet').join('\n'),code:2};
+    if(SQ.isOverflow(e))return {out:out.join(''),err:errs.concat(NEST).join('\n'),code:2};
     if(!(e instanceof AwkErr))throw e;
     errs.push('awk: '+e.message+(e.line>0?'\n source line number '+e.line:''));code=2}
   return {out:out.join(''),err:errs.join('\n'),code}}
@@ -431,7 +438,7 @@ const USAGE='usage: awk [-F fs][-v var=value][prog | -f progfile][file ...]';
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
 SQ.CMDS.awk=function(a,io){
   const {E,norm,getNode}=SQ;
-  let FS;const vars={},progFiles=[];let i=0;
+  let FS;const vars=Object.create(null),progFiles=[];let i=0;
   for(;i<a.length;i++){const x=a[i];
     if(x==='--'){i++;break}
     if(x.length<2||x[0]!=='-')break;

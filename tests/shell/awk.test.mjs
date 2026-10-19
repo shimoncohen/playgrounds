@@ -310,6 +310,45 @@ describe('errors and caps', () => {
   });
 });
 
+describe('review fixes', () => {
+  const SQ = loadShell();
+  const ar = (p, o = { vars: {} }) => SQ.awkRun(p, [], o);
+  it('long left-deep chains end with awk: nesting too deep, never a JS error', () => {
+    const chains = [
+      ['+', 9000, '1'], ['concat', 3000, '"a"'], ['&&', 6000, '1'], ['||', 6000, '1'], ['<', 6000, '1'], ['-', 6000, '1'], ['*', 6000, '1'], ['~', 6000, '1'],
+    ];
+    for (const [op, n, term] of chains) {
+      const p = 'BEGIN{print ' + Array(n).fill(term).join(op === 'concat' ? ' ' : op) + '}';
+      assert.ok(p.length <= 20000, op);
+      assert.deepEqual({ ...ar(p) }, { out: '', err: 'awk: nesting too deep', code: 2 }, op);
+    }
+    assert.deepEqual({ ...ar('BEGIN{print ' + '1?1:'.repeat(3000) + '1}') }, { out: '', err: 'awk: nesting too deep', code: 2 });
+    assert.deepEqual({ ...ar('BEGIN{print ' + '$'.repeat(150) + '0}') }, { out: '', err: 'awk: nesting too deep', code: 2 });
+    const res = r(`awk 'BEGIN{print ${Array(9000).fill('1').join('+')}}'`);
+    assert.deepEqual(res, { out: 'awk: nesting too deep', code: 2 });
+  });
+  it('field and NF messages print numbers as awk does', () => {
+    assert.equal(r(`echo a | awk '{print $(1e300)}'`).out.split('\n')[0], 'awk: trying to access out of range field ' + BigInt(1e300).toString());
+    assert.equal(r(`echo a | awk '{NF=-log(0)}'`).out.split('\n')[0], 'awk: trying to access out of range field inf');
+    assert.equal(r(`echo a | awk '{NF=log(-1)}'`).out.split('\n')[0], 'awk: cannot set NF to a negative value');
+  });
+  it('whole numbers up to 2^63 print exact digits (print, concatenation, fields)', () => {
+    assert.equal(out(`awk 'BEGIN{print 2^62, -2^63, 2^53+2, 2^63; x = 2^62 ""; print x}'`), L('4611686018427387904 -9223372036854775808 9007199254740994 9.22337e+18', '4611686018427387904'));
+    assert.equal(out(`echo 4611686018427387904 | awk '{print $1+0}'`), '4611686018427387904');
+  });
+  it('-v __proto__=1 is an ordinary variable', () => {
+    assert.equal(out(`awk -v __proto__=1 'BEGIN{print __proto__ + 1}'`), '2');
+  });
+  it('an unusable OFMT or CONVFMT falls back to %.6g', () => {
+    assert.equal(out(`awk 'BEGIN{OFMT="%d%d"; print 0.5; OFMT="%s"; print 0.25; OFMT="abc"; print 1.5; OFMT="%.2f"; print 3.14159}'`), L('0.5', '0.25', '1.5', '3.14'));
+    assert.equal(out(`awk 'BEGIN{CONVFMT="%s"; x = 0.5 ""; CONVFMT="%x%%"; y = 1.5 ""; CONVFMT="%c"; z = 66.5 ""; print x, y, z}'`), '0.5 1% 66.5');
+  });
+  it('a user function call costs a step: fib(20) stops at LIM.STEPS (by design)', () => {
+    assert.equal(out(`awk 'function fib(n){return n<2?n:fib(n-1)+fib(n-2)} BEGIN{print fib(15)}'`), '610');
+    assert.equal(out(`awk 'function fib(n){return n<2?n:fib(n-1)+fib(n-2)} BEGIN{print fib(20)}'`), 'this practice shell stopped the command: too many steps');
+  });
+});
+
 describe('the awk command', () => {
   it('-f reads the program from a file; a missing one is an error', () => {
     const SQ = world();
