@@ -367,7 +367,8 @@ describe('advanced quick-fire and guide (chapters 12 and 13)', () => {
     for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced'))
       for (const a of q[1]) {
         const S2 = loadShell();
-        for (const ci of [D12, L13]) S2.setupChapter(S2.content.chapters[ci]);
+        // the chapter 14 and 15 answers need their worlds too
+        for (const ci of [D12, L13, 13, 14]) S2.setupChapter(S2.content.chapters[ci]);
         run(S2, 'touch notes.txt; mkdir -p logs');
         const r = run(S2, a);
         assert.doesNotMatch(r.out, /bash:|not support|command not found/, `${a}: ${r.out}`);
@@ -378,6 +379,381 @@ describe('advanced quick-fire and guide (chapters 12 and 13)', () => {
       for (const [e, note] of g.ex) {
         const S2 = loadShell();
         for (const ci of [D12, L13]) S2.setupChapter(S2.content.chapters[ci]);
+        const r = run(S2, e);
+        assert.doesNotMatch(r.out, /bash:|not support|command not found/, `${g.c}: ${e}: ${r.out}`);
+        if (/^prints /.test(note)) assert.equal(r.out.replace(/\n/g, ' '), note.slice(7), `${g.c}: ${e}`);
+      }
+  });
+});
+
+// ---- Task 12: Advanced chapters 14 (Functions & arguments) and 15 (Real scripts), indexes 13 and 14 ----
+const F14 = 13, R15 = 14;
+const ALL_ADV = [D12, L13, F14, R15];
+// a script mission: write text to its file in a world with the chapter set up, then ask the mission's own pass rule
+function scriptJudge(ci, mi) {
+  const SQ = loadShell();
+  const ch = SQ.content.chapters[ci], m = ch.missions[mi];
+  SQ.setupChapter(ch);
+  const pass = () => (m.check ? !!m.check(SQ.ctxFor('')) : SQ.ctxFor('').scriptPasses(m).ok);
+  const ok = (t) => { put(SQ, m, t); return pass(); };
+  const why = (t) => { put(SQ, m, t); return SQ.scriptFailLine(m, SQ.ctxFor('').scriptPasses(m).failed); };
+  return { SQ, ch, m, ok, why, pass };
+}
+
+describe('advanced chapters 14 and 15: shape', () => {
+  const SQ = loadShell();
+  const ch = SQ.content.chapters;
+  it('sit at indexes 13 and 14, tier advanced, 7 missions each, after chapters 12 and 13', () => {
+    assert.equal(ch.length, 15);
+    assert.deepEqual([...ch.slice(11, 15).map((c) => c.tier)], Array(4).fill('advanced'));
+    assert.deepEqual([...ch.slice(13, 15).map((c) => c.name)], ['Functions & arguments', 'Real scripts']);
+    assert.deepEqual([...ch.slice(13, 15).map((c) => c.badge)], ['Function Maker', 'Scripter']);
+    assert.deepEqual([...ch.slice(11, 15).map((c) => c.missions.length)], [7, 7, 7, 7]);
+    assert.equal(SQ.tiers.missionXp(14), 20);
+  });
+  it('all 28 Advanced missions: cumulative XP 1230 + 28*20 + 4*25, Automator there, Intermediate still 1230', () => {
+    const adv = ch.filter((c) => c.tier === 'advanced');
+    assert.equal(adv.reduce((n, c) => n + c.missions.length, 0), 28);
+    assert.equal(SQ.tiers.cumulativeXp('intermediate'), 1230);
+    assert.equal(SQ.tiers.cumulativeXp('advanced'), 1230 + 28 * 20 + 4 * 25);
+    assert.equal(SQ.tiers.cumulativeXp('advanced'), 1890);
+    assert.equal(SQ.tiers.rankFor(1890).name, 'Automator');
+    assert.ok(SQ.tiers.ranks().some((r) => r[1] === 'Automator' && r[0] === 1890));
+  });
+  it('missions have the shared fields, no em dashes, and the script missions sit where the table says', () => {
+    for (const c of ch.slice(13, 15)) c.missions.forEach((m) => {
+      for (const k of ['title', 'goal', 'explain', 'answer']) assert.equal(typeof m[k], 'string', `${m.title}.${k}`);
+      assert.doesNotMatch(m.explain + m.goal + (m.note || '') + (m.hint || ''), /—/, 'no em dashes');
+      if (!m.kind) assert.ok(Array.isArray(m.anat) && m.anat.length && typeof m.check === 'function', m.title);
+    });
+    const kinds = (c) => [...c.missions.map((m) => (m.kind ? `${m.kind}:${m.file}` : 'command'))];
+    assert.deepEqual(kinds(ch[F14]), [...Array(6).fill('command'), 'script:scripts/greet.sh']);
+    assert.deepEqual(kinds(ch[R15]), ['command', 'command', 'script:scripts/check.sh', 'script:scripts/ask.sh', 'script:scripts/mkconf.sh',
+      'script:scripts/loglines.sh', 'challenge:scripts/backup.sh']);
+    for (const c of ch.slice(13, 15)) for (const m of c.missions.filter((x) => x.kind)) {
+      assert.equal(typeof m.starter, 'string', m.title);
+      assert.ok(m.wrong.length >= 2, `${m.title}: at least two wrong scripts`);
+      assert.ok(m.tests.length >= 2 && m.tests.every((t) => t.label), `${m.title}: labelled cases`);
+      assert.equal(typeof m.hint, 'string', m.title);
+    }
+  });
+  it('the case tables', () => {
+    const t = (m) => m.tests.map((x) => [x.args || [], x.stdin, x.expectOut, x.expectCode, x.expectErrMatch]);
+    assert.deepEqual(JSON.parse(JSON.stringify(t(ch[F14].missions[6]))), [[['Ada'], null, 'Hello, Ada!', null, null], [[], null, '', 1, 'usage'], [['Ada Lovelace'], null, 'Hello, Ada Lovelace!', null, null]]);
+    const r = ch[R15].missions;
+    const J = (x) => JSON.parse(JSON.stringify(x));
+    assert.deepEqual(J(r[2].tests.map((x) => [x.args, x.expectCode])), [[['journal.txt'], 0], [['ghost'], 1]]);
+    assert.deepEqual(J(r[3].tests.map((x) => [x.stdin, x.expectOut])), [['Ada\n', 'Hello, Ada!'], ['Grace\n', 'Hello, Grace!']]);
+    assert.deepEqual(J(r[4].tests.map((x) => x.expectFiles)), [{ 'app.conf': 'name=quest\nmode=fast' }, { 'app.conf': 'name=quest\nmode=fast' }]);
+    assert.deepEqual(J(r[4].tests[1].files), { 'app.conf': 'name=quest\nmode=fast' }, 'the second case starts from a finished first run');
+    const bk = r[6].tests;
+    assert.deepEqual(J(bk.map((x) => [x.args, x.expectOut, x.expectCode || 0])), [
+      [['docs'], 'backed up 3 files', 0], [['drafts'], 'backed up 0 files', 0], [['nowhere'], '', 1], [[], '', 1],
+      [['docs'], 'backed up 3 files', 0], [['trip'], 'backed up 2 files', 0]]);
+    assert.equal(bk[2].expectErrMatch, 'usage');
+    assert.ok(Object.keys(bk[5].expectFiles).every((p) => p.includes(' ')), 'names with spaces');
+    assert.ok(Object.keys(bk[4].files).some((p) => p.startsWith('backup/')), 'second run: backup/ already holds an old copy');
+  });
+  it('15.6 cases: the counts are the real line counts of the files, sorted by name', () => {
+    const S2 = loadShell();
+    const m = S2.content.chapters[R15].missions[5];
+    S2.setupChapter(S2.content.chapters[R15]);
+    for (const tc of m.tests) {
+      const files = {};
+      const logs = S2.getNode(S2.norm('~/logs')).children;
+      for (const k of Object.keys(logs)) files['logs/' + k] = logs[k].content;
+      Object.assign(files, tc.files || {});
+      const want = Object.keys(files).filter((p) => p.endsWith('.log')).sort().map((p) => `${p.slice(5)}: ${files[p].split('\n').length}`).join('\n');
+      assert.equal(tc.expectOut, want, tc.label);
+    }
+  });
+  it('no explanation teaches an unquoted variable inside a test, or an unsupported construct', () => {
+    for (const c of ch.slice(13, 15)) for (const m of c.missions) {
+      const text = [m.goal, m.explain, m.note || '', m.hint || '', m.answer, m.starter || ''].join(' ').replace(/<[^>]+>/g, '');
+      assert.doesNotMatch(text, /\[\s+\$\w/, `${m.title}: quote variables in [ ]`);
+      assert.doesNotMatch(text, /IFS=|set --|BASH_REMATCH|local -r/, `${m.title}: unsupported here`);
+    }
+    for (const g of SQ.content.guide.filter((g) => g.ch === 13 || g.ch === 14)) for (const [e] of g.ex) {
+      assert.doesNotMatch(e, /\[\s+\$\w/, `guide ${g.c}: ${e}`);
+      assert.doesNotMatch(e, /IFS=|set --/, `guide ${g.c}: ${e}`);
+    }
+  });
+});
+
+describe('advanced chapters 14 and 15: world seeding', () => {
+  it('chapter 15 seeds lib/strings.sh, logs/, docs/ and an empty drafts/; chapter 14 does not; setup twice changes nothing', () => {
+    const S1 = loadShell();
+    S1.setupChapter(S1.content.chapters[F14]);
+    assert.ok(!S1.ctxFor('').has('~/lib/strings.sh') && !S1.ctxFor('').has('~/docs'));
+    const SQ = loadShell();
+    for (const ci of ALL_ADV) SQ.setupChapter(SQ.content.chapters[ci]);
+    const c = SQ.ctxFor('');
+    assert.match(c.read('~/lib/strings.sh'), /shout\(\) \{ echo "\$1" \| tr a-z A-Z; \}/);
+    const kids = (p) => Object.keys(c.node(p).children).sort();
+    assert.deepEqual(kids('~/docs').filter((k) => k.endsWith('.txt')).length, 3);
+    assert.deepEqual(kids('~/docs').filter((k) => k.endsWith('.md')).length, 1);
+    assert.equal(kids('~/docs').length, 4);
+    assert.ok(kids('~/logs').filter((k) => k.endsWith('.log')).length >= 3);
+    assert.ok(kids('~/logs').some((k) => !k.endsWith('.log')), 'a file that is not a log');
+    assert.deepEqual(kids('~/drafts'), []);
+    assert.ok(!c.has('~/backup'), 'backup/ is the script\'s job');
+    assert.equal(c.read('~/village/people.txt'), SQ.PEOPLE, 'people.txt untouched');
+    const snap = JSON.stringify(SQ.S.fs);
+    for (const ci of ALL_ADV) SQ.setupChapter(SQ.content.chapters[ci]);
+    assert.equal(JSON.stringify(SQ.S.fs), snap, 'second setup changes nothing');
+  });
+  it('never clobbers learner files', () => {
+    const SQ = loadShell();
+    SQ.setupChapter(SQ.content.chapters[R15]);
+    for (const l of ['echo mine > lib/strings.sh', 'echo mine > docs/todo.txt', 'echo mine > logs/app.log', 'echo mine > scripts/backup.sh', 'echo mine > scripts/greet.sh'])
+      run(SQ, l);
+    SQ.setupChapter(SQ.content.chapters[R15]);
+    SQ.setupChapter(SQ.content.chapters[F14]);
+    const c = SQ.ctxFor('');
+    for (const p of ['~/lib/strings.sh', '~/docs/todo.txt', '~/logs/app.log', '~/scripts/backup.sh', '~/scripts/greet.sh']) assert.equal(c.read(p), 'mine', p);
+  });
+  it('jump-in safe: each answer works in a fresh world with only its own chapter set up', () => {
+    for (const ci of [F14, R15]) {
+      const SQ = loadShell();
+      const ch = SQ.content.chapters[ci];
+      SQ.setupChapter(ch);
+      for (const m of ch.missions) assertSolvable(SQ, ch, m);
+    }
+  });
+  it('jump-in safe after the chapter files were deleted: setup puts them back', () => {
+    const SQ = loadShell();
+    SQ.setupChapter(SQ.content.chapters[R15]);
+    run(SQ, 'rm -r journal.txt scripts lib logs docs drafts');
+    const ch = SQ.content.chapters[R15];
+    SQ.setupChapter(ch);
+    for (const m of ch.missions) assertSolvable(SQ, ch, m);
+  });
+});
+
+describe('chapter 14 (Functions & arguments) checks', () => {
+  it('14.1 Define and call', () => {
+    yes(F14, 0, 'greet() { echo "Hello, $1!"; }; greet Ada');
+    yes(F14, 0, 'function greet { echo "Hello, $1!"; }; greet Ada');
+    yes(F14, 0, 'hi() { echo "Hello, $1!"; }; hi "Ada"');
+    yes(F14, 0, 'greet() { echo "Hello, $1!"; }', 'greet Ada');
+    no(F14, 0, 'echo "Hello, Ada!"');
+    no(F14, 0, 'greet() { echo "Hello, $1!"; }');
+    no(F14, 0, 'greet() { echo "Hello, $1!"; }; echo "Hello, Ada!"');
+    no(F14, 0, 'greet() { echo "Hello, Ada!"; }; greet Ada');
+    no(F14, 0, 'greet() { echo "Hello, $1!"; }; greet Bob');
+    no(F14, 0, 'greet() { echo "Hello, $1!"; }; echo greet; greet Ada');
+  });
+  it('14.2 Count the arguments', () => {
+    yes(F14, 1, 'count() { echo $#; }; count a b c');
+    yes(F14, 1, 'count() { echo "$#"; }; count x y z');
+    yes(F14, 1, 'n() { echo "$#"; }; n "a b" c d');
+    no(F14, 1, 'echo 3');
+    no(F14, 1, 'count() { echo 3; }; count a b c');
+    no(F14, 1, 'count() { echo $#; }; count a b');
+    no(F14, 1, 'count() { echo $#; }; echo 3');
+  });
+  it('14.3 All the arguments', () => {
+    yes(F14, 2, 'show() { for a in "$@"; do echo "- $a"; done; }; show x y');
+    yes(F14, 2, 'show() { for a; do echo "- $a"; done; }; show x y');
+    yes(F14, 2, 'list() { for w in "$@"; do echo "- $w"; done; }; list "x" "y"');
+    no(F14, 2, 'echo "- x"; echo "- y"');
+    no(F14, 2, 'for a in x y; do echo "- $a"; done');
+    no(F14, 2, 'show() { echo "- x"; echo "- y"; }; show x y');
+    no(F14, 2, 'show() { for a in "$1"; do echo "- $a"; done; }; show x y');
+  });
+  it('14.4 Return a status', () => {
+    yes(F14, 3, 'is_big() { [ "$1" -gt 10 ]; }; is_big 20 && echo big');
+    yes(F14, 3, 'is_big() { [ $1 -gt 10 ]; }; is_big 20 && echo big');
+    yes(F14, 3, 'big() { if [ "$1" -gt 10 ]; then return 0; else return 1; fi; }; if big 50; then echo big; fi');
+    yes(F14, 3, 'is_big() { (( $1 > 10 )); }; is_big 20 && echo big');
+    no(F14, 3, 'echo big');
+    no(F14, 3, 'is_big() { [ "$1" -gt 10 ]; }; echo big');
+    no(F14, 3, 'is_big() { [ "$1" -gt 10 ]; }; is_big 20; echo big');
+    no(F14, 3, 'is_big() { return 0; }; is_big 20 && echo big');
+    no(F14, 3, 'is_big() { [ "$1" -gt 10 ]; }; is_big 5 || echo big');
+    no(F14, 3, '[ 20 -gt 10 ] && echo big');
+  });
+  it('14.5 Keep it local', () => {
+    yes(F14, 4, 'f() { local x=2; echo $x; }; x=1; f; echo $x');
+    yes(F14, 4, 'f() { local x=2; echo "$x"; }; x=1; f; echo "$x"');
+    yes(F14, 4, 'g() { local n; n=2; echo "$n"; }; n=1; g; echo "$n"');
+    yes(F14, 4, 'x=1', 'f() { local x=2; echo "$x"; }; f; echo "$x"');
+    no(F14, 4, 'echo 2; echo 1');
+    no(F14, 4, 'f() { x=2; echo "$x"; }; x=1; f; echo "$x"');
+    no(F14, 4, 'f() { local x=2; echo "$x"; }; f; echo 1');
+    no(F14, 4, 'f() { local x=2; }; echo 2; x=1; echo "$x"');
+  });
+  it('14.6 Default values', () => {
+    yes(F14, 5, 'echo ${NAME:-stranger}');
+    yes(F14, 5, 'echo "${NAME:-stranger}"');
+    yes(F14, 5, 'NAME=Ada', 'echo "${NAME:-stranger}"');
+    yes(F14, 5, 'echo "${WHO:-friend}"');
+    no(F14, 5, 'echo stranger');
+    no(F14, 5, 'echo ${NAME:-}stranger');
+    no(F14, 5, 'echo ${NAME-stranger} ${X:-y}');
+    no(F14, 5, 'NAME=Ada', 'echo "${NAME:-stranger}"; echo stranger');
+    no(F14, 5, 'echo "${NAME:-stranger}" stranger');
+  });
+  it('14.7 Script: greeter (answer, alternatives, wrong ones, failure lines)', () => {
+    const { m, ok, why } = scriptJudge(F14, 6);
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok('#!/bin/bash\nif [ "$#" -eq 0 ]; then\n  echo "usage: greet.sh NAME" 1>&2\n  exit 1\nfi\necho "Hello, $1!"\n'), true, '$# test, 1>&2');
+    assert.equal(ok('#!/bin/bash\n[ -n "$1" ] || { echo "usage: greet.sh NAME" >&2; exit 1; }\necho "Hello, $1!"\n'), true, 'one-line guard');
+    assert.equal(ok('#!/bin/bash\ngreet() { echo "Hello, $1!"; }\n[ -z "$1" ] && { echo "usage: greet.sh NAME" >&2; exit 1; }\ngreet "$1"\n'), true, 'with a function');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok('#!/bin/bash\nif [ -z "$1" ]; then\n  echo "usage: greet.sh NAME"\n  exit 1\nfi\necho "Hello, $1!"\n'), false, 'usage on stdout');
+    assert.equal(ok('#!/bin/bash\nif [ -z "$1" ]; then\n  echo "usage: greet.sh NAME" >&2\nfi\necho "Hello, $1!"\n'), false, 'always exits 0');
+    assert.equal(ok('#!/bin/bash\n[ -z "$1" ] && { echo "usage: greet.sh NAME" >&2; exit 1; }\nfor w in $@; do echo "Hello, $w!"; done\n'), false, 'ignores the quotes');
+    assert.equal(why('#!/bin/bash\nif [ -z "$1" ]; then\n  echo "usage: greet.sh NAME"\n  exit 1\nfi\necho "Hello, $1!"\n'),
+      'Test 2 (no name) failed: expected "", got "usage: greet.sh NAME"');
+    assert.equal(why('#!/bin/bash\nif [ -z "$1" ]; then\n  echo "usage: greet.sh NAME" >&2\nfi\necho "Hello, $1!"\n'),
+      'Test 2 (no name) failed: expected "", got "Hello, !"');
+  });
+});
+
+describe('chapter 15 (Real scripts) checks', () => {
+  it('15.1 Read from a string', () => {
+    yes(R15, 0, 'read first rest <<< "alpha beta gamma"; echo $rest');
+    yes(R15, 0, 'read first rest <<< "alpha beta gamma"; echo "$rest"');
+    yes(R15, 0, 'read -r a b <<< "alpha beta gamma"; echo "$b"');
+    no(R15, 0, 'echo beta gamma');
+    no(R15, 0, 'read first rest <<< "alpha beta gamma"; echo beta gamma');
+    no(R15, 0, 'read first rest <<< "alpha beta gamma"; echo "$first"');
+    no(R15, 0, 'echo "alpha beta gamma" | cut -d" " -f2-');
+    no(R15, 0, 'read line <<< "beta gamma"; echo "$line"');
+  });
+  it('15.2 Share a library', () => {
+    yes(R15, 1, 'source lib/strings.sh; shout hello');
+    yes(R15, 1, '. lib/strings.sh; shout hello');
+    yes(R15, 1, 'source ~/lib/strings.sh; shout "hello"');
+    yes(R15, 1, 'source lib/strings.sh', 'shout hello');
+    no(R15, 1, 'echo HELLO');
+    no(R15, 1, 'source lib/strings.sh; echo HELLO');
+    no(R15, 1, 'echo hello | tr a-z A-Z');
+    no(R15, 1, 'shout() { echo HELLO; }; shout hello');
+    no(R15, 1, 'source lib/strings.sh; shout bye');
+    no(R15, 1, 'bash lib/strings.sh; shout hello');
+  });
+  it('15.3 Script: exit codes', () => {
+    const { m, ok, why } = scriptJudge(R15, 2);
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok('#!/bin/bash\n[ -f "$1" ] && exit 0\necho "not a file: $1" >&2\nexit 1\n'), true, 'one-line test');
+    assert.equal(ok('#!/bin/bash\nif test -f "$1"; then\n  exit 0\nelse\n  echo "missing: $1" 1>&2\n  exit 1\nfi\n'), true, 'test and else');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok('#!/bin/bash\n[ -f "$1" ] || echo "not a file: $1" >&2\nexit 0\n'), false, 'always exits 0');
+    assert.equal(ok('#!/bin/bash\n[ -f "$1" ] && exit 0\nexit 1\n'), false, 'no message');
+    assert.equal(why('#!/bin/bash\n[ -f "$1" ] || echo "not a file: $1" >&2\nexit 0\n'), 'Test 2 (a missing file) failed: expected "exit status 1", got "exit status 0 (not a file: ghost)"');
+  });
+  it('15.4 Script: ask a question', () => {
+    const { m, ok } = scriptJudge(R15, 3);
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok('#!/bin/bash\nread -r who\necho "Hello, $who!"\n'), true, 'read -r');
+    assert.equal(ok('#!/bin/bash\nread name\nprintf "Hello, %s!\\n" "$name"\n'), true, 'printf');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok('#!/bin/bash\necho "Hello, $1!"\n'), false, 'argument, not stdin');
+    assert.equal(ok('#!/bin/bash\necho "Hello, Ada!"\n'), false, 'hardcoded');
+  });
+  it('15.5 Script: write a config', () => {
+    const { SQ, m, ok, why } = scriptJudge(R15, 4);
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok("#!/bin/bash\ncat <<'END' > app.conf\nname=quest\nmode=fast\nEND\n"), true, 'quoted delimiter, redirect after');
+    assert.equal(ok('#!/bin/bash\ncat > app.conf <<EOF\nname=quest\nmode=fast\nEOF\nexit 0\n'), true);
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok('#!/bin/bash\ncat >> app.conf <<EOF\nname=quest\nmode=fast\nEOF\n'), false, 'appends: the second run doubles the file');
+    assert.ok(why('#!/bin/bash\ncat >> app.conf <<EOF\nname=quest\nmode=fast\nEOF\n')
+      .startsWith('Test 2 (running it a second time) failed: expected "name=quest\\nmode=fast", got "name=quest\\nmode=fast\\nname=quest'));
+    // the real run: the answer writes the file the goal describes, and a second run leaves it the same
+    put(SQ, m, m.answer);
+    run(SQ, 'bash scripts/mkconf.sh');
+    assert.equal(SQ.ctxFor('').read('~/app.conf'), 'name=quest\nmode=fast');
+    run(SQ, 'bash scripts/mkconf.sh');
+    assert.equal(run(SQ, 'cat app.conf').out, 'name=quest\nmode=fast');
+  });
+  it('15.6 Script: count lines', () => {
+    const { SQ, m, ok } = scriptJudge(R15, 5);
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok('#!/bin/bash\nfor f in logs/*.log; do\n  echo "${f##*/}: $(cat "$f" | wc -l)"\ndone\n'), true, '${f##*/} and cat | wc');
+    assert.equal(ok('#!/bin/bash\ncd logs\nfor f in *.log; do\n  n=0\n  while read line; do n=$((n + 1)); done < "$f"\n  echo "$f: $n"\ndone\n'), true, 'cd and a read loop');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok('#!/bin/bash\nwc -l logs/*.log\n'), false, 'wc on its own');
+    assert.equal(ok('#!/bin/bash\nfor f in logs/*; do echo "$(basename "$f"): $(wc -l < "$f")"; done\n'), false, 'counts the .txt too');
+    assert.equal(ok('#!/bin/bash\nfor f in logs/*.log; do echo "$f: $(wc -l < "$f")"; done\n'), false, 'the path, not the name');
+    assert.equal(ok('#!/bin/bash\nfor f in logs/*.log; do echo "$(basename "$f"): $(wc -w < "$f")"; done\n'), false, 'words, not lines');
+    put(SQ, m, m.answer);
+    assert.equal(run(SQ, 'bash scripts/loglines.sh').out, m.tests[0].expectOut, 'the seeded logs, through the terminal');
+  });
+  it('15.7 Capstone: backup script', () => {
+    const { SQ, m, ok, why } = scriptJudge(R15, 6);
+    assert.equal(typeof m.check, 'function');
+    assert.equal(ok(m.answer), true);
+    const alt = '#!/bin/bash\n[ -d "$1" ] || { echo "usage: backup.sh DIR" >&2; exit 1; }\nmkdir -p backup\ncount=0\nfor f in "$1"/*.txt; do\n  if [ -f "$f" ]; then cp "$f" backup/; count=$((count+1)); fi\ndone\necho "backed up $count files"\n';
+    assert.equal(ok(alt), true, 'guard with ||, [ -f ] in the loop');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    const noMkdir = m.answer.replace('mkdir -p backup\n', '');
+    assert.notEqual(noMkdir, m.answer);
+    assert.equal(ok(noMkdir), false, 'does not create backup/');
+    assert.equal(ok(m.answer.replace('"$1"/*.txt', '"$1"/*')), false, 'copies the .md file too');
+    assert.equal(ok(m.answer.replace('exit 1', 'exit 0')), false, 'always exits 0');
+    assert.equal(ok(m.answer.replace('for f in "$1"/*.txt', 'for f in $(ls "$1"/*.txt)')), false, 'looping over $(ls): names with spaces break');
+    assert.equal(ok(m.answer.replace('  [ -e "$f" ] || continue\n', '')), false, 'an empty folder counts 1');
+    assert.equal(ok('#!/bin/bash\nmkdir -p backup\ncp "$1"/*.txt backup/\necho "backed up 3 files"\n'), false, 'hardcoded count');
+    // backup/ left over from an earlier run (Beginner mission 6.7 also makes one) does not hide a script that never creates it
+    run(SQ, 'mkdir -p backup');
+    assert.equal(ok(noMkdir), false, 'leftover backup/ in the world');
+    // nor do learner edits to docs/ and drafts/ break the answer
+    run(SQ, 'echo extra > docs/extra.txt; echo x > drafts/x.txt; rm docs/todo.txt');
+    assert.equal(ok(m.answer), true, 'the check runs on the seeded docs/ and an empty drafts/');
+    assert.equal(why(noMkdir).startsWith('Test '), true);
+    // through the terminal: the answer backs up the seeded docs and keeps their contents
+    const S2 = loadShell();
+    S2.setupChapter(S2.content.chapters[R15]);
+    put(S2, m, m.answer);
+    assert.equal(run(S2, 'bash scripts/backup.sh docs').out, 'backed up 3 files');
+    const c = S2.ctxFor('');
+    for (const k of Object.keys(c.node('~/docs').children).filter((k) => k.endsWith('.txt'))) assert.equal(c.read('~/backup/' + k), c.read('~/docs/' + k));
+    assert.ok(!c.has('~/backup/' + Object.keys(c.node('~/docs').children).find((k) => k.endsWith('.md'))));
+    assert.equal(run(S2, 'bash scripts/backup.sh docs').out, 'backed up 3 files', 'second run');
+    const r = S2.execLine('bash scripts/backup.sh nowhere');
+    assert.deepEqual([...r.out.map((o) => o.cls === 'out')], [false], 'the usage line is on stderr');
+    assert.match(r.out[0].text, /usage/);
+    assert.equal(S2.S.last, 1);
+  });
+});
+
+describe('advanced quick-fire and guide (chapters 14 and 15)', () => {
+  const SQ = loadShell();
+  it('has 6 more quick-fire questions per chapter (24 advanced in all)', () => {
+    assert.equal(SQ.content.quickfire.filter((q) => q[2] === 'advanced').length, 24);
+  });
+  it('has 6 guide entries per chapter, covering the new keywords', () => {
+    for (const ci of [13, 14]) assert.ok(SQ.content.guide.filter((g) => g.ch === ci).length >= 6, `chapter ${ci}`);
+    const g = SQ.content.guide.filter((g) => g.ch === 13 || g.ch === 14);
+    const text = g.map((x) => x.c + ' ' + x.what).join(' ');
+    for (const k of ['function', 'local', 'shift', 'source', 'exit', 'return', 'nano', '<<EOF', '<<<', '>&2']) assert.ok(text.includes(k), `guide covers ${k}`);
+    const cs = g.map((x) => x.c);
+    for (const k of ['local', 'shift', 'source', 'exit', 'return', 'nano']) assert.ok(cs.includes(k), `guide entry ${k}`);
+  });
+  it('every advanced quick-fire answer runs without an error in a world with all four chapters set up', () => {
+    for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced'))
+      for (const a of q[1]) {
+        const S2 = loadShell();
+        for (const ci of ALL_ADV) S2.setupChapter(S2.content.chapters[ci]);
+        run(S2, 'touch notes.txt; mkdir -p logs');
+        const r = run(S2, a);
+        assert.doesNotMatch(r.out, /bash:|not support|command not found/, `${a}: ${r.out}`);
+      }
+  });
+  it('guide examples for chapters 14 and 15 print what they say', () => {
+    for (const g of SQ.content.guide.filter((g) => g.ch === 13 || g.ch === 14))
+      for (const [e, note] of g.ex) {
+        const S2 = loadShell();
+        for (const ci of ALL_ADV) S2.setupChapter(S2.content.chapters[ci]);
         const r = run(S2, e);
         assert.doesNotMatch(r.out, /bash:|not support|command not found/, `${g.c}: ${e}: ${r.out}`);
         if (/^prints /.test(note)) assert.equal(r.out.replace(/\n/g, ' '), note.slice(7), `${g.c}: ${e}`);

@@ -5,6 +5,18 @@ const NUMBERS=['4','8','15','16','23','42'].join('\n');
 /* Chapters 12 and 13 need the journal, the village folder, an empty scripts/ folder and numbers.txt.
    village/people.txt is already in the starting world (names only) and is left alone. lib/strings.sh belongs to chapter 15. */
 const seedAdvanced=()=>{ensureFile('~/journal.txt',JOURNAL);ensureDir('~/village');ensureDir('~/scripts');ensureFile('~/numbers.txt',NUMBERS)};
+/* Chapter 15 adds a function library, a logs/ folder (three .log files and one that is not a log), docs/ (three .txt and one .md)
+   and an empty drafts/ for the backup capstone. Files in this world have no trailing newline, so wc -l counts every line shown. */
+const STRINGS_LIB=`# String helpers. Load them into your shell with: source lib/strings.sh
+shout() { echo "$1" | tr a-z A-Z; }`;
+const LOGS15={'app.log':'08:00 app started\n08:05 ada logged in\n08:20 report saved\n09:00 app stopped','db.log':'08:00 db opened\n09:00 db closed',
+  'web.log':'08:01 GET /\n08:02 GET /map\n08:03 GET /cave'};
+const DOCS={'ideas.txt':'A bridge over the river.','notes.txt':'Meet at the gate at dawn.\nBring the map.','todo.txt':'fix the lamp\nfeed the owl\nsharpen the axe',
+  'readme.md':'# Docs\nPlain notes live in the .txt files.'};
+const under=(dir,o)=>Object.fromEntries(Object.entries(o).map(([k,v])=>[dir+'/'+k,v]));
+const seedDocs=()=>{for(const k in DOCS)ensureFile('~/docs/'+k,DOCS[k]);ensureDir('~/drafts')};
+const seedReal=()=>{seedAdvanced();ensureFile('~/lib/strings.sh',STRINGS_LIB);
+  for(const k in LOGS15)ensureFile('~/logs/'+k,LOGS15[k]);ensureFile('~/logs/readme.txt','One .log file per service.');seedDocs()};
 
 /* A test that ran on this line ([, test or [[) and passed (exit 0) or failed. With op (such as -f) the test must use it on an operand.
    [[ is logged without its words, so for [[ the operator is read from the typed line. */
@@ -18,6 +30,17 @@ const said=c=>c.out().split('\n').map(s=>s.trim()).filter(Boolean).join('\n');
 const guarded=c=>/&&|\bif\b/.test(c.line);
 const looped=c=>c.log.some(e=>e.name==='for'||e.name==='while'||e.name==='until');
 const HOME_NOTE=`Not at home? Run <code>cd ~</code> first.`;
+
+/* Functions (S.fns) that the line calls as a command. The definitions on the line (name, () and body) are cut out first,
+   so a definition alone or `echo greet` never counts as a call. Function calls are not logged, hence the line. */
+const fnsCalled=c=>{const F=SQ.S.fns||{};let rest=c.line;
+  for(const n of Object.keys(F)){const i=rest.indexOf(F[n]);if(i<0)continue;
+    rest=rest.slice(0,i).replace(new RegExp('(function\\s+)?'+reEsc(n)+'\\s*(\\(\\s*\\))?\\s*$'),'')+' ; '+rest.slice(i+F[n].length)}
+  return Object.keys(F).filter(n=>new RegExp('(^|[;&|({]|\\b(then|do|else|if|while|until)\\s)\\s*'+reEsc(n)+'(?=[\\s;&|)]|$)').test(rest))};
+/* call a function on a throwaway copy of the world: what it prints (trimmed lines, like said) and its status */
+const fnRun=(n,args)=>SQ.sandbox(()=>{const r=SQ.execLine(n+' '+args);
+  return {out:r.out.filter(o=>o.cls==='out').map(o=>o.text).join('\n').split('\n').map(s=>s.trim()).filter(Boolean).join('\n'),code:r.code}});
+const callsFn=(c,ok)=>fnsCalled(c).some(n=>ok(n));
 
 const EXISTS_ANSWER=`#!/bin/bash
 # Say whether the path given as $1 is there.
@@ -35,6 +58,88 @@ for n in "$@"; do
 done
 echo "$sum"
 `;
+const GREET_ANSWER=`#!/bin/bash
+# Greet the name given as $1, or explain how to call the script.
+if [ -z "$1" ]; then
+  echo "usage: greet.sh NAME" >&2
+  exit 1
+fi
+echo "Hello, $1!"
+`;
+const CHECK_ANSWER=`#!/bin/bash
+# Succeed (exit 0) when $1 is a file. Otherwise say so on stderr and fail (exit 1).
+if [ -f "$1" ]; then
+  exit 0
+fi
+echo "check.sh: $1 is not a file" >&2
+exit 1
+`;
+const ASK_ANSWER=`#!/bin/bash
+# Read a name from the input (stdin) and greet it.
+read name
+echo "Hello, $name!"
+`;
+const MKCONF_ANSWER=`#!/bin/bash
+# Write app.conf with a here-document: every line up to EOF goes into the file.
+cat > app.conf <<EOF
+name=quest
+mode=fast
+EOF
+`;
+const LOGLINES_ANSWER=`#!/bin/bash
+# Print "NAME: N" for every .log file in logs/, N being its number of lines.
+for f in logs/*.log; do
+  n=$(wc -l < "$f")
+  echo "$(basename "$f"): $n"
+done
+`;
+const BACKUP_ANSWER=`#!/bin/bash
+# Copy every .txt file in the folder given as $1 into backup/, then say how many.
+if [ -z "$1" ] || [ ! -d "$1" ]; then
+  echo "usage: backup.sh DIR" >&2
+  exit 1
+fi
+mkdir -p backup
+n=0
+for f in "$1"/*.txt; do
+  [ -e "$f" ] || continue
+  cp "$f" backup/
+  n=$((n + 1))
+done
+echo "backed up $n files"
+`;
+/* The capstone is judged on a known world: no backup/ yet (Beginner mission 6.7 makes one), the seeded docs/, an empty drafts/,
+   and no trip/ or nowhere/ of the learner's that would change the counts. Like scriptPasses, nothing here touches the saved game. */
+const backupWorld=fn=>SQ.sandbox(()=>{const h=SQ.getNode(SQ.HOME);
+  if(h&&h.type==='dir')for(const k of ['backup','docs','drafts','trip','nowhere'])delete h.children[k];
+  seedDocs();return fn()});
+const LOG_CASE2={'logs/app.log':'started','logs/cache.log':'hit\nmiss\nhit','logs/db.log':'a\nb\nc\nd\ne','logs/web.log':'GET /\nGET /map'};
+const TRIP={'trip/day one.txt':'Left the village at dawn.','trip/day two.txt':'Crossed the river.','trip/route.md':'north, then east'};
+const DOCS_COPIED=Object.assign(under('backup',{'ideas.txt':DOCS['ideas.txt'],'notes.txt':DOCS['notes.txt'],'todo.txt':DOCS['todo.txt']}),
+  {'backup/readme.md':'(missing)'}); /* scriptPasses reports an absent file as (missing): the .md must not be copied */
+const BACKUP={title:'Capstone: backup script',kind:'challenge',file:'scripts/backup.sh',
+  goal:`Write <code>scripts/backup.sh</code>. Given a folder, it creates <code>backup/</code> if it is missing, copies every <code>.txt</code> file of that folder into it and prints <code>backed up N files</code>. With no argument, or one that is not a folder, it prints a usage line on stderr and exits with 1. Try <code>bash scripts/backup.sh docs</code>.`,
+  anat:[['[ -d "$1" ]','cmd'],['>&2','op'],['exit 1','kw'],['mkdir -p backup','cmd'],['for','kw'],['f','var'],['in "$1"/*.txt','arg'],['cp "$f" backup/','cmd'],['n=$((n + 1))','var'],['echo "backed up $n files"','cmd']],
+  answer:BACKUP_ANSWER,
+  starter:`#!/bin/bash
+# Back up the .txt files of the folder given as $1.
+# 1. No argument, or not a folder? Print "usage: backup.sh DIR" on stderr, exit 1.
+# 2. Make backup/ if it is missing.
+# 3. Copy each "$1"/*.txt into backup/ and count it. Quote "$f": names can have spaces.
+# 4. Print: backed up N files
+`,
+  wrong:[BACKUP_ANSWER.replace('"$1"/*.txt','"$1"/*'),BACKUP_ANSWER.replace('mkdir -p backup\n',''),BACKUP_ANSWER.replace('exit 1','exit 0'),
+    BACKUP_ANSWER.replace('for f in "$1"/*.txt','for f in $(ls "$1"/*.txt)')],
+  tests:[
+    {label:'the docs folder',args:['docs'],files:under('docs',DOCS),expectOut:'backed up 3 files',expectFiles:DOCS_COPIED},
+    {label:'an empty folder',args:['drafts'],expectOut:'backed up 0 files'},
+    {label:'a folder that does not exist',args:['nowhere'],expectOut:'',expectErrMatch:'usage',expectCode:1},
+    {label:'no argument',args:[],expectOut:'',expectErrMatch:'usage',expectCode:1},
+    {label:'a second run over an old backup',args:['docs'],files:Object.assign(under('docs',DOCS),{'backup/todo.txt':'an old copy'}),expectOut:'backed up 3 files',expectFiles:{'backup/todo.txt':DOCS['todo.txt']}},
+    {label:'names with spaces',args:['trip'],files:TRIP,expectOut:'backed up 2 files',expectFiles:{'backup/day one.txt':TRIP['trip/day one.txt'],'backup/day two.txt':TRIP['trip/day two.txt']}}],
+  check:c=>backupWorld(()=>c.scriptPasses(BACKUP).ok),
+  hint:`Start from the starter's four steps. Loop with <code>for f in "$1"/*.txt</code>, skip the pattern itself when nothing matched (<code>[ -e "$f" ] || continue</code>), and count with <code>n=$((n + 1))</code>. Save it, then run <code>bash scripts/backup.sh docs</code> and <code>bash scripts/backup.sh drafts</code>.`,
+  explain:`This puts the whole Advanced tier together: a test on <code>$1</code> with a usage line on stderr and <code>exit 1</code>, <code>mkdir -p</code> (no error when the folder is already there), a loop over a wildcard and a running count. When a folder has no <code>.txt</code> files the pattern matches nothing and stays as it is, so the loop sees the text <code>drafts/*.txt</code> once: the <code>[ -e "$f" ]</code> test skips it. The wildcard hands the loop each name whole, spaces and all, while <code>for f in $(ls …)</code> would cut <code>day one.txt</code> in two. Write <code>"$f"</code> with quotes too: real bash splits an unquoted variable at its spaces, even where this practice shell does not. Each time you save, the script is tried on a world with no <code>backup/</code>: on <code>docs</code>, the empty <code>drafts</code>, a missing folder, no argument, a second run over an old copy and names with spaces.`};
 
 const CH=[
 {tier:'advanced',name:'Decisions',badge:'Decider',intro:'Scripts have to choose: do this if a file is there, that if it is not. Every choice starts with a test, a command that answers yes or no through its exit code.',
@@ -142,6 +247,175 @@ echo "$sum"
   tests:[{label:'three numbers',args:['1','2','3'],expectOut:'6'},{label:'two numbers',args:['10','20'],expectOut:'30'},{label:'no arguments',args:[],expectOut:'0'}],
   hint:`Use the running total from mission 3, but loop over <code>"$@"</code>. Save it, then run <code>bash scripts/sum.sh 1 2 3</code>.`,
   explain:`<code>"$@"</code> is every argument, each kept whole, so <code>for n in "$@"</code> visits them in turn. With no arguments the loop body never runs and the total stays 0. Each time you save, the script is tried with <code>1 2 3</code>, <code>10 20</code> and nothing.`}
+ ]},
+{tier:'advanced',name:'Functions & arguments',badge:'Function Maker',intro:'A function gives a few commands one name, so you can run them again with different arguments. Inside it, $1, $# and "$@" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
+ learned:['name() { … }','$1 and $#','"$@"','return status','local','${VAR:-default}'],setup:seedAdvanced,
+ missions:[
+ {title:'Define and call',goal:`Give a group of commands a name, then use it: <code>greet() { echo "Hello, $1!"; }; greet Ada</code>`,
+  anat:[['greet()','kw'],['{','kw'],['echo "Hello, $1!";','cmd'],['}','kw'],[';','op'],['greet','cmd'],['Ada','arg']],answer:'greet() { echo "Hello, $1!"; }; greet Ada',
+  explain:`<code>greet() { …; }</code> defines a <b>function</b>: from now on <code>greet</code> works like a command in this shell. Inside it, <code>$1</code> is the first argument of the call, so <code>greet Ada</code> prints Hello, Ada! and <code>greet Grace</code> prints Hello, Grace!. The spaces inside the braces and the <code>;</code> before <code>}</code> are required. <code>type greet</code> tells you greet is a function.`,
+  check:c=>said(c)==='Hello, Ada!'&&callsFn(c,n=>fnRun(n,'Grace').out==='Hello, Grace!')},
+ {title:'Count the arguments',goal:`<code>$#</code> is how many arguments a call got: <code>count() { echo "$#"; }; count a b c</code>`,
+  anat:[['count()','kw'],['{','kw'],['echo "$#";','cmd'],['}','kw'],[';','op'],['count','cmd'],['a b c','arg']],answer:'count() { echo "$#"; }; count a b c',
+  explain:`Each word after the function name is one argument, so <code>count a b c</code> prints 3. Quotes make one argument out of several words: <code>count "a b" c</code> prints 2. Outside any function, <code>$#</code> counts the arguments of the shell itself, 0 here.`,
+  check:c=>said(c)==='3'&&callsFn(c,n=>fnRun(n,'p q').out==='2')},
+ {title:'All the arguments',goal:`Loop over every argument of a call with <code>"$@"</code>: <code>show() { for a in "$@"; do echo "- $a"; done; }; show x y</code>`,
+  anat:[['show()','kw'],['{','kw'],['for','kw'],['a','var'],['in "$@"','arg'],[';','op'],['do','kw'],['echo "- $a"','cmd'],[';','op'],['done;','kw'],['}','kw'],[';','op'],['show x y','cmd']],
+  answer:'show() { for a in "$@"; do echo "- $a"; done; }; show x y',
+  explain:`<code>"$@"</code> stands for all the arguments, each kept whole, so <code>show "big map" key</code> prints two lines, not three. Without the quotes, <code>$@</code> splits every argument at its spaces again. <code>for a; do</code> is short for <code>for a in "$@"; do</code>.`,
+  check:c=>said(c)==='- x\n- y'&&looped(c)&&callsFn(c,n=>fnRun(n,'one two three').out==='- one\n- two\n- three')},
+ {title:'Return a status',goal:`A function answers yes or no through its exit status: <code>is_big() { [ "$1" -gt 10 ]; }; is_big 20 &amp;&amp; echo big</code>`,
+  anat:[['is_big()','kw'],['{','kw'],['[ "$1" -gt 10 ];','cmd'],['}','kw'],[';','op'],['is_big 20','cmd'],['&&','op'],['echo big','cmd']],answer:'is_big() { [ "$1" -gt 10 ]; }; is_big 20 && echo big',
+  explain:`A function's status is the status of the last command it ran, here the test: 0 when the number is bigger than 10, 1 when it is not. So <code>is_big 20 &amp;&amp; echo big</code> prints big and <code>is_big 5 &amp;&amp; echo big</code> prints nothing. <code>return 1</code> leaves a function early with a status of your choice.`,
+  check:c=>said(c)==='big'&&guarded(c)&&callsFn(c,n=>fnRun(n,'20').code===0&&fnRun(n,'5').code!==0)},
+ {title:'Keep it local',goal:`Give a function its own variable that leaves the caller's alone: <code>f() { local x=2; echo "$x"; }; x=1; f; echo "$x"</code>`,
+  anat:[['f()','kw'],['{','kw'],['local x=2;','cmd'],['echo "$x";','cmd'],['}','kw'],[';','op'],['x=1','var'],[';','op'],['f','cmd'],[';','op'],['echo "$x"','cmd']],answer:'f() { local x=2; echo "$x"; }; x=1; f; echo "$x"',
+  explain:`<code>local x=2</code> makes an x that belongs to this call only. The function prints 2, and when it returns the outer x is back, so the last echo prints 1. Leave out <code>local</code> and the function overwrites the caller's x: both echoes print 2. <code>local</code> works only inside a function.`,
+  check:c=>said(c)==='2\n1'&&c.ran('local')&&c.log.some(e=>e.name==='local'&&e.args.some(a=>SQ.S.vars[a.split('=')[0]]==='1'))&&callsFn(c,n=>fnRun(n,'').out==='2')},
+ {title:'Default values',goal:`Print a variable, with a fallback for when it is unset or empty: <code>echo "\${NAME:-stranger}"</code>`,
+  anat:[['echo','cmd'],['"${NAME:-stranger}"','var']],answer:'echo "${NAME:-stranger}"',
+  explain:`<code>\${NAME:-stranger}</code> gives the value of NAME, or the word after <code>:-</code> when NAME is unset or empty. NAME itself does not change. Set it with <code>NAME=Ada</code> and the same line prints Ada. In a script, <code>\${1:-world}</code> gives the first argument a default.`,
+  check:c=>{const m=/\$\{([A-Za-z_]\w*):-([^}]*)\}/.exec(c.line);if(!m)return false;const v=Object.prototype.hasOwnProperty.call(SQ.S.vars,m[1])?SQ.S.vars[m[1]]:'';const want=v?String(v):m[2].replace(/^["']|["']$/g,'');
+    return !!want&&said(c)===want}},
+ {title:'Script: greeter',kind:'script',file:'scripts/greet.sh',
+  goal:`Write <code>scripts/greet.sh</code>: <code>bash scripts/greet.sh Ada</code> prints <code>Hello, Ada!</code>. Run with no name, it prints <code>usage: greet.sh NAME</code> on stderr (<code>&gt;&amp;2</code>) and exits with 1. Open it with <code>nano scripts/greet.sh</code>.`,
+  anat:[['if','kw'],['[ -z "$1" ]','cmd'],['then','kw'],['echo "usage: greet.sh NAME"','cmd'],['>&2','op'],['exit 1','kw'],['fi','kw'],['echo "Hello, $1!"','cmd']],
+  answer:GREET_ANSWER,
+  starter:`#!/bin/bash
+# Print "Hello, NAME!" for the name given as $1.
+# With no name at all, print "usage: greet.sh NAME" on stderr (>&2)
+# and stop with exit 1.
+`,
+  wrong:[`#!/bin/bash
+if [ -z "$1" ]; then
+  echo "usage: greet.sh NAME"
+  exit 1
+fi
+echo "Hello, $1!"
+`,`#!/bin/bash
+if [ -z "$1" ]; then
+  echo "usage: greet.sh NAME" >&2
+fi
+echo "Hello, $1!"
+`,`#!/bin/bash
+[ -z "$1" ] && { echo "usage: greet.sh NAME" >&2; exit 1; }
+for word in $@; do
+  echo "Hello, $word!"
+done
+`],
+  tests:[{label:'a name',args:['Ada'],expectOut:'Hello, Ada!'},{label:'no name',args:[],expectOut:'',expectErrMatch:'usage',expectCode:1},
+    {label:'a name with a space',args:['Ada Lovelace'],expectOut:'Hello, Ada Lovelace!'}],
+  hint:`Test for a missing name with <code>[ -z "$1" ]</code>, print the usage line with <code>&gt;&amp;2</code> at the end and stop with <code>exit 1</code>. Save it, then try <code>bash scripts/greet.sh Ada</code> and <code>bash scripts/greet.sh; echo $?</code>.`,
+  explain:`<code>&gt;&amp;2</code> sends echo's text to <b>stderr</b>, the error stream: a pipe or <code>&gt; file</code> passes it by and it still reaches the screen. <code>exit 1</code> ends the script with status 1, which tells the caller something went wrong: <code>bash scripts/greet.sh || echo failed</code>. Each time you save, the script is tried with <code>Ada</code>, with nothing, and with <code>"Ada Lovelace"</code>, one argument with a space that must stay whole.`}
+ ]},
+{tier:'advanced',name:'Real scripts',badge:'Scripter',intro:'Real scripts read input, share code through libraries, write files and report success or failure through their exit status. The chapter ends with a capstone: a backup script you could use for real.',
+ learned:['read <<< string','source','exit status','read from stdin','here-documents','wc -l < file','the backup capstone'],setup:seedReal,
+ missions:[
+ {title:'Read from a string',goal:`Split a string into variables with read and a here-string: <code>read first rest &lt;&lt;&lt; "alpha beta gamma"; echo "$rest"</code>`,
+  anat:[['read','cmd'],['first rest','var'],['<<<','op'],['"alpha beta gamma"','arg'],[';','op'],['echo "$rest"','cmd']],answer:'read first rest <<< "alpha beta gamma"; echo "$rest"',
+  explain:`<code>&lt;&lt;&lt;</code>, a <b>here-string</b>, feeds the text to read as its input. read puts one word in each variable and the rest of the line in the last one, so first is alpha and rest is <code>beta gamma</code>. A pipe would not work here: in <code>echo "alpha beta" | read first rest</code> each part of the pipe runs in its own copy of the shell, so the variables are empty afterwards.`,
+  check:c=>{const e=c.log.find(e=>e.name==='read'&&e.code===0&&e.args.filter(a=>!a.startsWith('-')).length>=2);if(!e)return false;
+    const names=e.args.filter(a=>!a.startsWith('-')),last=names[names.length-1];
+    return /<<</.test(c.line)&&said(c)==='beta gamma'&&SQ.S.vars[last]==='beta gamma'&&new RegExp('\\$\\{?'+reEsc(last)+'\\b').test(c.line)}},
+ {title:'Share a library',goal:`<code>lib/strings.sh</code> holds a function. Load it into your shell and use it: <code>source lib/strings.sh; shout hello</code>`,note:HOME_NOTE,
+  anat:[['source','cmd'],['lib/strings.sh','arg'],[';','op'],['shout','cmd'],['hello','arg']],answer:'source lib/strings.sh; shout hello',
+  explain:`<code>source</code>, or its short name <code>.</code>, runs a file in <b>this</b> shell, so the functions it defines stay: <code>shout</code> now works like a command. <code>bash lib/strings.sh</code> would run it in a separate shell, and shout would be gone when that ended. Look inside with <code>cat lib/strings.sh</code>: shout pipes its argument through <code>tr a-z A-Z</code>.`,
+  check:c=>{const F=SQ.S.fns||{},lib=c.read('~/lib/strings.sh');
+    const sourced=c.log.some(e=>(e.name==='source'||e.name==='.')&&e.code===0&&e.args.some(a=>/(^|\/)lib\/strings\.sh$/.test(a)));
+    return said(c)==='HELLO'&&!!F.shout&&lib.includes(F.shout)&&fnsCalled(c).includes('shout')&&(sourced||!c.ran('(fn)'))}},
+ {title:'Script: exit codes',kind:'script',file:'scripts/check.sh',
+  goal:`Write <code>scripts/check.sh</code>: it exits with 0 when its argument is a file. Otherwise it prints a message naming it on stderr and exits with 1. Try <code>bash scripts/check.sh journal.txt; echo $?</code>.`,
+  anat:[['if','kw'],['[ -f "$1" ]','cmd'],['then','kw'],['exit 0','kw'],['fi','kw'],['echo "check.sh: $1 is not a file"','cmd'],['>&2','op'],['exit 1','kw']],
+  answer:CHECK_ANSWER,
+  starter:`#!/bin/bash
+# Exit with 0 when $1 is a file.
+# Otherwise print a message that names $1 on stderr (>&2) and exit with 1.
+`,
+  wrong:[`#!/bin/bash
+[ -f "$1" ] || echo "not a file: $1" >&2
+exit 0
+`,`#!/bin/bash
+[ -f "$1" ] && exit 0
+exit 1
+`,`#!/bin/bash
+if [ -d "$1" ]; then exit 0; fi
+echo "not a folder: $1" >&2
+exit 1
+`],
+  tests:[{label:'a file',args:['journal.txt'],files:{'journal.txt':JOURNAL},expectCode:0},{label:'a missing file',args:['ghost'],expectErrMatch:'ghost',expectCode:1}],
+  hint:`Use <code>[ -f "$1" ]</code> and <code>exit 0</code>, then <code>echo … &gt;&amp;2</code> and <code>exit 1</code>. Save it, then try <code>bash scripts/check.sh ghost; echo $?</code>.`,
+  explain:`Every command ends with an <b>exit status</b>, and a script's status is the number given to <code>exit</code>, or else that of its last command. 0 means success and anything else failure, and that is what <code>if</code>, <code>&amp;&amp;</code> and <code>||</code> read: <code>bash scripts/check.sh ghost || echo no file</code>. Messages for people go to stderr, so a caller that only wants the status can drop them with <code>2&gt;/dev/null</code>.`},
+ {title:'Script: ask a question',kind:'script',file:'scripts/ask.sh',
+  goal:`Write <code>scripts/ask.sh</code>: it reads a name from its input and prints <code>Hello, NAME!</code>. Try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>, or type the name in the editor's input box and use Save &amp; run.`,
+  anat:[['read','cmd'],['name','var'],['echo "Hello, $name!"','cmd']],
+  answer:ASK_ANSWER,
+  starter:`#!/bin/bash
+# Read one line (a name) from the input, then print "Hello, NAME!".
+`,
+  wrong:[`#!/bin/bash
+echo "Hello, $1!"
+`,`#!/bin/bash
+echo "Hello, Ada!"
+`,`#!/bin/bash
+read name
+echo "Hello, name!"
+`],
+  tests:[{label:'Ada on stdin',stdin:'Ada\n',expectOut:'Hello, Ada!'},{label:'Grace on stdin',stdin:'Grace\n',expectOut:'Hello, Grace!'}],
+  hint:`One <code>read name</code>, then an echo with <code>"$name"</code> in it. Save it, then try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>.`,
+  explain:`read takes the next line of the script's input (stdin): whatever is piped or redirected into the script, or what you put in the editor's input box. That is not the same as arguments: <code>$1</code> is typed after the script's name, input arrives on its own. Each time you save, the script is given Ada and then Grace as input.`},
+ {title:'Script: write a config',kind:'script',file:'scripts/mkconf.sh',
+  goal:`Write <code>scripts/mkconf.sh</code>: with a here-document, it writes <code>app.conf</code> holding the two lines <code>name=quest</code> and <code>mode=fast</code>. Running it again must leave the same file.`,
+  anat:[['cat','cmd'],['> app.conf','op'],['<<EOF','op'],['name=quest','arg'],['mode=fast','arg'],['EOF','kw']],
+  answer:MKCONF_ANSWER,
+  starter:`#!/bin/bash
+# Write app.conf with a here-document:
+# cat > app.conf <<EOF
+# ...the two lines...
+# EOF
+`,
+  wrong:[`#!/bin/bash
+cat >> app.conf <<EOF
+name=quest
+mode=fast
+EOF
+`,`#!/bin/bash
+cat > app.conf <<EOF
+name=quest
+mode=slow
+EOF
+`,`#!/bin/bash
+cat <<EOF
+name=quest
+mode=fast
+EOF
+`],
+  tests:[{label:'a first run',expectFiles:{'app.conf':'name=quest\nmode=fast'}},{label:'running it a second time',files:{'app.conf':'name=quest\nmode=fast'},expectFiles:{'app.conf':'name=quest\nmode=fast'}}],
+  hint:`Put <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, run <code>bash scripts/mkconf.sh</code> twice, then <code>cat app.conf</code>.`,
+  explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in scripts: this practice shell runs one typed line at a time.`},
+ {title:'Script: count lines',kind:'script',file:'scripts/loglines.sh',
+  goal:`Write <code>scripts/loglines.sh</code>: for every <code>.log</code> file in <code>logs/</code>, it prints the file's name and its number of lines, like <code>app.log: 4</code>, in name order.`,
+  anat:[['for','kw'],['f','var'],['in logs/*.log','arg'],['n=$(wc -l < "$f")','var'],['echo "$(basename "$f"): $n"','cmd'],['done','kw']],
+  answer:LOGLINES_ANSWER,
+  starter:`#!/bin/bash
+# For every .log file in logs/, print "NAME: N" (N = its number of lines).
+# Loop over logs/*.log, count with wc -l, strip the folder with basename.
+`,
+  wrong:[`#!/bin/bash
+wc -l logs/*.log
+`,`#!/bin/bash
+echo "app.log: 4"
+echo "db.log: 2"
+echo "web.log: 3"
+`,`#!/bin/bash
+for f in logs/*; do
+  echo "$(basename "$f"): $(wc -l < "$f")"
+done
+`],
+  tests:[{label:'the logs here',files:under('logs',LOGS15),expectOut:'app.log: 4\ndb.log: 2\nweb.log: 3'},
+    {label:'other logs',files:LOG_CASE2,expectOut:'app.log: 1\ncache.log: 3\ndb.log: 5\nweb.log: 2'}],
+  hint:`Loop with <code>for f in logs/*.log</code>. Inside, <code>n=$(wc -l &lt; "$f")</code> and <code>echo "$(basename "$f"): $n"</code>. Save it, then run <code>bash scripts/loglines.sh</code>.`,
+  explain:`<code>wc -l &lt; "$f"</code> prints just the number, because wc reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> (or <code>\${f##*/}</code>) drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
+ BACKUP
  ]}
 ];
 SQ.content.chapters.push(...CH);

@@ -56,7 +56,19 @@ const QF=[
  ["Print the remainder of 17 divided by 5",["echo $((17%5))","echo $(( 17 % 5 ))","echo $((17 % 5))"],'advanced'],
  ["Add n to the running total sum",["sum=$((sum+n))","sum=$(( sum + n ))","sum=$((sum + n))","((sum+=n))","(( sum += n ))"],'advanced'],
  ["Put the first line of notes.txt into the variable line",["read line < notes.txt","read -r line < notes.txt"],'advanced'],
- ["Print every line of notes.txt with a while read loop",["while read line; do echo \"$line\"; done < notes.txt","while read -r line; do echo \"$line\"; done < notes.txt"],'advanced']
+ ["Print every line of notes.txt with a while read loop",["while read line; do echo \"$line\"; done < notes.txt","while read -r line; do echo \"$line\"; done < notes.txt"],'advanced'],
+ ["Define a function hi that prints hi",["hi() { echo hi; }","function hi { echo hi; }","function hi() { echo hi; }","hi () { echo hi; }"],'advanced'],
+ ["Inside a function, print how many arguments it got",["echo $#","echo \"$#\""],'advanced'],
+ ["Define f, which sets a local variable x to 5",["f() { local x=5; }","function f { local x=5; }","function f() { local x=5; }"],'advanced'],
+ ["Drop the first argument, so $2 becomes $1",["shift","shift 1"],'advanced'],
+ ["Define a function no that returns status 1",["no() { return 1; }","function no { return 1; }","function no() { return 1; }"],'advanced'],
+ ["Print NAME, or guest when NAME is unset or empty",["echo \"${NAME:-guest}\"","echo ${NAME:-guest}"],'advanced'],
+ ["Load the functions in lib/strings.sh into this shell",["source lib/strings.sh",". lib/strings.sh","source ./lib/strings.sh",". ./lib/strings.sh"],'advanced'],
+ ["Put the two words of \"red green\" into the variables a and b, with a here-string",["read a b <<< \"red green\"","read -r a b <<< \"red green\"","read a b <<< 'red green'","read -r a b <<< 'red green'"],'advanced',{exact:true}],
+ ["Print oops on stderr instead of stdout",["echo oops >&2","echo oops 1>&2","echo \"oops\" >&2"],'advanced'],
+ ["End a script with exit status 1",["exit 1"],'advanced'],
+ ["Open scripts/greet.sh in the editor",["nano scripts/greet.sh","nano ./scripts/greet.sh"],'advanced'],
+ ["Run scripts/greet.sh with the name Ada",["bash scripts/greet.sh Ada","bash ./scripts/greet.sh Ada"],'advanced']
 ];
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});
