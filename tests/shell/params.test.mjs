@@ -245,3 +245,19 @@ describe('pattern operators stay fast and exact', () => {
     assert.equal(run(SQ, "echo ${V#a'*'}").out, 'b');
   });
 });
+
+describe('expandHeredoc', () => {
+  it('expands $VAR, ${ }, $( ) and $(( ))', () => {
+    const SQ = loadShell();
+    run(SQ, 'X=hi');
+    assert.equal(SQ.expandHeredoc('a $X ${X}! $(echo z) $((1+2))\n'), 'a hi hi! z 3\n');
+  });
+  it('honours \\$, \\` and \\\; other backslashes and quotes stay literal', () => {
+    const SQ = loadShell();
+    run(SQ, 'X=hi');
+    assert.equal(SQ.expandHeredoc('\\$X \\` \\\\ \\n "q" \'s\'\n'), '$X ` \\ \\n "q" \'s\'\n');
+  });
+  it('backslash-newline joins lines', () => {
+    assert.equal(loadShell().expandHeredoc('a\\\nb\n'), 'ab\n');
+  });
+});

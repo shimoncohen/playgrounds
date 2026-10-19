@@ -143,29 +143,55 @@ function braceVal(body){let m;
     return {val:len===undefined?val.slice(off):len<0?val.slice(off,n+len):val.slice(off,off+len)}}
   throw perr('${'+body+'}: bad substitution',1)}
 /* opt.dry: only find structure (no substitution, words keep their raw source); default: expand for real. opt.nosplit: substitution results stay one word. */
-function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
-  const toks=[];let i=0,cur=null;
+function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* legacy: pre-Stage-2 lexing for the executor (( ) & newline ;; stay word characters, << and <<< unsupported) until the AST parser replaces it */
+  const toks=[],pending=[];let i=0,cur=null;
   const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push({t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
   /* splice a substitution result into the current word, splitting it on whitespace; e = index of the expansion's last character */
   const inject=(val,e)=>{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
     if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
     else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}};
   const fresh=()=>({v:'',glob:false,s:i});
+  /* here-doc delimiter word after << / <<-: quotes and backslashes are removed and make the body literal; the word follows the op as a plain word token */
+  const heredocWord=(op,strip)=>{while(line[i]===' '||line[i]==='\t')i++;
+    const s=i;let d='',q=false;
+    while(i<line.length&&!/[\s|&;()<>]/.test(line[i])){const c=line[i];
+      if(c==="'"||c==='"'){const k=line.indexOf(c,i+1);if(k<0)throw new Error('unclosed '+c+' quote. Every opening quote needs a closing one.');d+=line.slice(i+1,k);q=true;i=k+1;continue}
+      if(c==='\\'&&i+1<line.length){d+=line[i+1];q=true;i+=2;continue}
+      d+=c;i++}
+    if(!d)throw new Error("syntax error near unexpected token '"+(i<line.length?line[i]:'newline')+"'");
+    toks.push({t:'w',v:d,glob:false,raw:line.slice(s,i)});
+    op.doc={raw:'',quoted:q,strip,delim:d,eof:true};pending.push(op.doc)};
+  /* at the line break after the op(s): read each pending body in order, up to its delimiter line (linear: one indexOf per line) */
+  const readDocs=()=>{for(const doc of pending){let body='';
+      while(i<line.length){const k=line.indexOf('\n',i),text=line.slice(i,k<0?line.length:k),cmp=doc.strip?text.replace(/^\t+/,''):text;
+        i=k<0?line.length:k+1;
+        if(cmp===doc.delim){delete doc.eof;break}
+        body+=cmp+'\n'}
+      doc.raw=body}
+    pending.length=0};
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
+    if(!L&&c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();continue}
+    if(!L&&(c==='('||c===')')){push();toks.push({t:'op',v:c});i++;continue}
+    if(!L&&c==='\\'&&line[i+1]==='\n'){i+=2;continue}
     if(c==='|'){push();if(line[i+1]==='&')throw unsup('|&');if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
     if(c==='&'&&line[i+1]==='&'){push();toks.push({t:'op',v:'&&'});i+=2;continue}
     if(c==='&'&&line[i+1]==='>')throw unsup('&>');
-    if(c===';'){push();toks.push({t:'op',v:';'});i++;continue}
+    if(!L&&c==='&'){push();toks.push({t:'op',v:'&'});i++;continue}
+    if(c===';'){push();if(!L&&line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
     if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
     if(c==='>'){push();if(line[i+1]==='&')throw unsup('>&');if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
-    if(c==='<'){push();if(line[i+1]==='<')throw unsup(line[i+2]==='<'?'<<<':'<<');toks.push({t:'op',v:'<'});i++;continue}
-    if(c==='#'&&!cur)break;
+    if(c==='<'){push();
+      if(line[i+1]==='<'){if(L)throw unsup(line[i+2]==='<'?'<<<':'<<');
+        if(line[i+2]==='<'){toks.push({t:'op',v:'<<<'});i+=3;continue}
+        const strip=line[i+2]==='-',op={t:'op',v:strip?'<<-':'<<'};i+=strip?3:2;toks.push(op);heredocWord(op,strip);continue}
+      toks.push({t:'op',v:'<'});i++;continue}
+    if(c==='#'&&!cur){if(L)break;const k=line.indexOf('\n',i);i=k<0?line.length:k;continue}
     if(c==='~'&&!cur&&(i+1>=line.length||/[\s\/|;&<>]/.test(line[i+1]))){cur={v:HOME,glob:false,s:i};i++;continue}
     cur=cur||fresh();
     if(c==="'"){const j=line.indexOf("'",i+1);if(j<0)throw new Error("unclosed ' quote. Every opening quote needs a closing one.");cur.v+=line.slice(i+1,j);cur.keep=true;i=j+1;continue}
-    if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
+    if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(!L&&line[j+1]==='\n'){j+=2;continue}if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
         if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
         if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
           if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
@@ -186,10 +212,19 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   push();return toks}
 /* Words from parse() carry their raw source; expand them at run time so earlier commands on the line (X=1; echo $X) and $(...) take effect in order. */
 const ASSIGN=/^[A-Za-z_]\w*=/;
-function expandWord(w,nosplit){return tokenize(w.raw,{nosplit}).filter(t=>t.t==='w')}
+function expandWord(w,nosplit){return tokenize(w.raw,{nosplit,legacy:true}).filter(t=>t.t==='w')}
 function expandWords(words,exporting){const out=[];
   words.forEach((w,k)=>{const ns=(k===0&&ASSIGN.test(w.raw))||(exporting&&k>0&&ASSIGN.test(w.raw));out.push(...expandWord(w,ns))});return out}
 function expandOne(w){return expandWord(w,true).map(t=>t.v).join(' ')}
+/* Body of a here-document whose delimiter was unquoted: $VAR ${ } $( ) $(( )) expand; \$ \` \\ and backslash-newline are escapes, every other backslash and all quotes stay literal. */
+function expandHeredoc(raw){let o='',j=0;
+  while(j<raw.length){const c=raw[j];
+    if(c==='\\'&&j+1<raw.length){const n=raw[j+1];if(n==='\n'){j+=2;continue}if(n==='$'||n==='`'||n==='\\'){o+=n;j+=2;continue}o+=c;j++;continue}
+    if(c==='$'){
+      if(raw[j+1]==='('&&raw[j+2]!=='('){const e=scanSub(raw,j);o+=runSub(raw.slice(j+2,e));j=e+1;continue}
+      const d=evalDollar(raw,j,false,true);if(d){o+=d.list?d.list.join(' '):d.val;j=d.end;continue}}
+    o+=c;j++}
+  return o}
 function parse(toks){
   const seq=[];let pipe=[],op=null;const nc=()=>({words:[],out:null,inp:null,err:null});let cmd=nc();
   const bad=v=>{throw new Error(`syntax error near unexpected token '${v}'`)};
@@ -218,5 +253,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{M,ok,E,lines,getVar,VRX,tokenize,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{M,ok,E,lines,getVar,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

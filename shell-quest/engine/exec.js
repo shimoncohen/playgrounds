@@ -56,13 +56,13 @@ function execLine0(line,o){const res=[];let code=0;
   const t=line.trim();
   if(/^for\b/.test(t)){const fm=t.match(FOR_RE);
     if(!fm)return {out:[{text:'bash: for loop needs this shape: for x in a b c; do echo $x; done',cls:'err'}],code:2};
-    let toks;try{toks=expandWords(tokenize(fm[2],{dry:true}).filter(w=>w.t==='w'))}catch(e){if(e&&e.stop)throw e;const r=errOut(e);r.out.unshift(...CTX.pend.splice(0));return r}
+    let toks;try{toks=expandWords(tokenize(fm[2],{dry:true,legacy:true}).filter(w=>w.t==='w'))}catch(e){if(e&&e.stop)throw e;const r=errOut(e);r.out.unshift(...CTX.pend.splice(0));return r}
     res.push(...CTX.pend.splice(0));
     const items=[];let globbed=false;for(const w of toks){if(w.glob){globbed=true;items.push(...globExpand(w.v))}else items.push(w.v)}
     if(o.record)SQ.rt.log.push({name:'for',args:items,globbed,piped:false,redirect:null,code:0,out:''});
     for(const it of items){SQ.step();S.vars[fm[1]]=it;const r=execLine(fm[3],o);res.push(...r.out);code=r.code}
     S.last=code;return {out:res,code}}
-  let seq;try{seq=parse(tokenize(line,{dry:true}))}catch(e){if(e&&e.stop)throw e;return errOut(e)}
+  let seq;try{seq=parse(tokenize(line,{dry:true,legacy:true}))}catch(e){if(e&&e.stop)throw e;return errOut(e)}
   for(const item of seq){if(item.op==='&&'&&code!==0)continue;if(item.op==='||'&&code===0)continue;
     let stdin='';const P=item.pipe;
     for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1;
