@@ -56,7 +56,24 @@ function norm(p,base){base=base||S.cwd;if(p==null||p==='')return base;if(p==='~'
   const parts=p.startsWith('/')?[]:base.split('/').filter(Boolean);
   for(const s of p.split('/')){if(!s||s==='.')continue;if(s==='..')parts.pop();else parts.push(s)}
   return '/'+parts.join('/')}
-function getNode(abs){let n=S.fs;for(const s of abs.split('/').filter(Boolean)){if(!n||n.type!=='dir')return null;n=n.children[s];if(!n)return null}return n||null}
+const MAX_HOPS=20;
+/* walk the tree; links in the path are followed, and the final one only when follow is true. Sets walk.loop when too many hops. */
+function walk(abs,follow){let parts=abs.split('/').filter(Boolean),hops=0;walk.loop=false;
+  let n=S.fs,path='',i=0;
+  while(i<parts.length){if(!n||n.type!=='dir')return null;let c=n.children[parts[i]];if(!c)return null;
+    if(c.type==='link'&&(follow||i<parts.length-1)){if(++hops>MAX_HOPS){walk.loop=true;return null}
+      const t=norm(c.target,path||'/');parts=t.split('/').filter(Boolean).concat(parts.slice(i+1));n=S.fs;path='';i=0;continue}
+    path+='/'+parts[i];n=c;i++}
+  return n||null}
+function getNode(abs){return walk(abs,true)}
+function lstat(abs){return walk(abs,false)}
+function isLoop(abs){walk(abs,true);return walk.loop}
+/* where a write to abs lands: follows a link chain even when it dangles */
+function writeTarget(abs){for(let h=0;h<=MAX_HOPS;h++){const l=lstat(abs);if(!l||l.type!=='link')return abs;abs=norm(l.target,abs.replace(/\/[^/]*$/,'')||'/')}return null}
+const defMode=n=>n.type==='dir'||n.exec?0o755:0o644;
+const modeOf=n=>n.type==='link'?0o777:n.mode!=null?n.mode:defMode(n);
+function modeString(n){const m=modeOf(n);let s=n.type==='dir'?'d':n.type==='link'?'l':'-';
+  for(let i=8;i>=0;i--)s+=(m>>i)&1?'rwx'[(8-i)%3]:'-';return s}
 function parentOf(abs){const parts=abs.split('/').filter(Boolean);const name=parts.pop();const pp='/'+parts.join('/');return [getNode(pp),name,pp]}
 function bname(abs){return abs.split('/').filter(Boolean).pop()||'/'}
 function disp(abs){return abs===HOME?'~':abs.startsWith(HOME+'/')?'~'+abs.slice(HOME.length):abs}
@@ -67,10 +84,10 @@ function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boo
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);SQ.rt.changed.add(abs)}}
 const isNull=p=>norm(p)==='/dev/null';
-function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
+function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const wt=writeTarget(abs);if(wt===null)return `bash: ${shown}: Too many levels of symbolic links`;abs=wt;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

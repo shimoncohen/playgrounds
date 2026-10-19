@@ -2,7 +2,7 @@
 const S=SQ.S;
 const {HOME,norm,getNode,bname,writeFile,ok,E,tokenize,parse,globExpand,CTX,expandWords,expandOne,isNull,CMDS,FRIENDLY,suggest}=SQ;
 function runPath(name,io,force){const abs=norm(name),n=getNode(abs);
-  if(!n)return E(`bash: ${name}: No such file or directory`,127);
+  if(!n)return E(SQ.isLoop(abs)?`bash: ${name}: Too many levels of symbolic links`:`bash: ${name}: No such file or directory`,127);
   if(n.type==='dir')return E(`bash: ${name}: Is a directory`,126);
   if(!force&&!n.exec)return Object.assign(E(`bash: ${name}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
   const saveCwd=S.cwd,saveVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(k in saveVars)S.vars[k]=saveVars[k];const out=[],err=[];let code=0;

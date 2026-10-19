@@ -91,7 +91,7 @@ function globExpand(pat){const idx=pat.lastIndexOf('/');const dp=idx>=0?pat.slic
 function flags(a){const fl=new Set(),rest=[];let end=false;for(const x of a){if(!end&&x==='--'){end=true;continue}
   if(!end&&x.startsWith('-')&&x.length>1){if(x.startsWith('--'))fl.add(x);else for(const ch of x.slice(1))fl.add(ch)}else rest.push(x)}return {fl,rest}}
 function readInputs(rest,io,cmd){const src=[],err=[];if(!rest.length){src.push({name:'',text:io.stdin});return {src,err}}
-  for(const t of rest){if(SQ.isNull(t)){src.push({name:t,text:''});continue}const n=getNode(norm(t));if(!n)err.push(`${cmd}: ${t}: No such file or directory`);else if(n.type==='dir')err.push(`${cmd}: ${t}: Is a directory`);else src.push({name:t,text:n.content})}
+  for(const t of rest){if(SQ.isNull(t)){src.push({name:t,text:''});continue}const n=getNode(norm(t));if(!n)err.push(SQ.isLoop(norm(t))?`${cmd}: ${t}: Too many levels of symbolic links`:`${cmd}: ${t}: No such file or directory`);else if(n.type==='dir')err.push(`${cmd}: ${t}: Is a directory`);else src.push({name:t,text:n.content})}
   return {src,err}}
 function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',name+'/');if(n.exec)return M('x',name);return name}
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];

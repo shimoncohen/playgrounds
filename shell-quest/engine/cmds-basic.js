@@ -1,19 +1,19 @@
 (function (SQ) {
 const S=SQ.S;
-const {HOME,D,F,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,cmpName,sortedKeys,M,ok,E,lines,globRe,flags,readInputs,paint,parseN}=SQ;
+const {HOME,D,F,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,cmpName,sortedKeys,lstat,isLoop,modeOf,defMode,modeString,M,ok,E,lines,globRe,flags,readInputs,paint,parseN}=SQ;
 const CMDS={
   pwd:()=>ok(S.cwd),
   ls(a,io){const {fl,rest}=flags(a);const all=fl.has('a')||fl.has('A'),long=fl.has('l');const targets=rest.length?rest:['.'];const err=[];let code=0;
-    const fmt=(name,n)=>long?`${n.type==='dir'?'drwxr-xr-x':n.exec?'-rwxr-xr-x':'-rw-r--r--'}  explorer  ${String(n.type==='dir'?4096:n.content.length).padStart(5)}  ${paint(name,n,io.tty)}`:paint(name,n,io.tty);
+    const fmt=(name,n)=>long?`${modeString(n)}  explorer  ${String(n.type==='dir'?4096:n.type==='link'?n.target.length:n.content.length).padStart(5)}  ${paint(name,n,io.tty)}${n.type==='link'?' -> '+n.target:''}`:paint(name,n,io.tty);
     const jn=arr=>arr.join(long||!io.tty?'\n':'  ');const files=[],dirs=[],blocks=[];
-    for(const t of targets){const n=getNode(norm(t));if(!n){err.push(`ls: cannot access '${t}': No such file or directory`);code=2;continue}(n.type==='dir'?dirs:files).push([t,n])}
+    for(const t of targets){let n=long?lstat(norm(t)):getNode(norm(t));if(!n){err.push(isLoop(norm(t))?`ls: cannot access '${t}': Too many levels of symbolic links`:`ls: cannot access '${t}': No such file or directory`);code=2;continue}(n.type==='dir'?dirs:files).push([t,n])}
     if(files.length)blocks.push(jn(files.map(([t,n])=>fmt(t,n))));
     for(const [t,n] of dirs){let ents=Object.keys(n.children).filter(k=>all||!k.startsWith('.')).sort(cmpName).map(k=>fmt(k,n.children[k]));
       if(fl.has('a'))ents=[fmt('.',n),fmt('..',D())].concat(ents);
       let body=jn(ents);if(targets.length>1)body=t+':'+(body?'\n'+body:'');blocks.push(body)}
     return {out:blocks.filter(b=>b!=='').join(targets.length>1?'\n\n':'\n'),err,code}},
   cd(a){if(a.length>1)return E('bash: cd: too many arguments');let t=a[0];if(t===undefined)t=HOME;let show='';if(t==='-'){t=S.oldpwd;show=t}
-    const abs=norm(t),n=getNode(abs);if(!n)return E(`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
+    const abs=norm(t),n=getNode(abs);if(!n)return E(isLoop(abs)?`bash: cd: ${a[0]}: Too many levels of symbolic links`:`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
     S.oldpwd=S.cwd;S.cwd=abs;return ok(show)},
   mkdir(a){const {fl,rest}=flags(a);if(!rest.length)return E('mkdir: missing operand');const err=[];
     for(const t of rest){const abs=norm(t);if(getNode(abs)){if(!fl.has('p'))err.push(`mkdir: cannot create directory '${t}': File exists`);continue}
@@ -30,7 +30,7 @@ const CMDS={
     for(const t of rest){const abs=norm(t);
       if(abs==='/'||abs===HOME||HOME.startsWith(abs+'/')){err.push(`rm: refusing to remove '${t}': that would wipe out your whole world`);continue}
       if(S.cwd===abs||S.cwd.startsWith(abs+'/')){err.push(`rm: you are standing inside '${t}'. cd out of it first.`);continue}
-      const n=getNode(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
+      const n=lstat(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
       if(n.type==='dir'&&!r){err.push(`rm: cannot remove '${t}': Is a directory`);tips.push(`Tip: folders need -r (recursive): rm -r ${t}`);continue}
       const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp)}
     return {out:'',err,code:err.length?1:0,tips}},
@@ -65,10 +65,10 @@ const CMDS={
     return {out:g.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
   find(a){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')){start=a[0];i=1}let rx=null,type=null;
     for(;i<a.length;i++){const p=a[i];if(p==='-name'||p==='-iname'){const v=a[++i];if(v==null)return E(`find: missing argument to '${p}'`);rx=globRe(v,p==='-iname')}
-      else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d')return E(`find: unknown argument to -type: ${type}`)}
+      else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d'&&type!=='l')return E(`find: unknown argument to -type: ${type}`)}
       else{const r=E(`find: paths must come before the search options: '${p}'`);if(/[*?]/.test(a.join('')))r.tips=['Tip: put quotes around the pattern, like -name "*.txt", so the shell leaves the * for find.'];return r}}
     const root=getNode(norm(start));if(!root)return E(`find: '${start}': No such file or directory`);const out=[];
-    (function walk(n,path,nm){if((!rx||rx.test(nm))&&(!type||(type==='d')===(n.type==='dir')))out.push(path);
+    (function walk(n,path,nm){if((!rx||rx.test(nm))&&(!type||n.type===({d:'dir',f:'file',l:'link'})[type]))out.push(path);
       if(n.type==='dir')for(const k of Object.keys(n.children).sort(cmpName))walk(n.children[k],path.replace(/\/$/,'')+'/'+k,k)})(root,start,bname(norm(start)));
     return ok(out.join('\n'))},
   tree(a,io){const {fl,rest}=flags(a);const t=rest[0]||'.';const n=getNode(norm(t));if(!n)return E(`tree: '${t}': No such file or directory`);if(n.type!=='dir')return ok(t);
@@ -76,10 +76,13 @@ const CMDS={
     (function rec(node,pre){const ks=sortedKeys(node).filter(k=>fl.has('a')||!k.startsWith('.'));ks.forEach((k,i)=>{const last=i===ks.length-1,c=node.children[k];
       out.push(pre+(last?'└── ':'├── ')+paint(k,c,io.tty));if(c.type==='dir'){dc++;rec(c,pre+(last?'    ':'│   '))}else fc++})})(n,'');
     out.push('',`${dc} director${dc===1?'y':'ies'}, ${fc} file${fc===1?'':'s'}`);return ok(out.join('\n'))},
-  chmod(a){if(a.length<2)return E("chmod: missing operand. Example: chmod +x pack.sh");const mode=a[0];let x;
-    if(/^[ugoa]*\+[rwx]*x[rwx]*$/.test(mode))x=true;else if(/^[ugoa]*-[rwx]*x[rwx]*$/.test(mode))x=false;else if(/^[0-7]{3}$/.test(mode))x=(parseInt(mode[0],10)&1)===1;
-    else if(/^[ugoa]*[+-][rw]+$/.test(mode))return ok();else return E(`chmod: invalid mode: '${mode}'`);
-    const err=[];for(const t of a.slice(1)){const abs=norm(t),n=getNode(abs);if(!n){err.push(`chmod: cannot access '${t}': No such file or directory`);continue}if(n.type==='file')n.exec=x;SQ.rt.changed.add(abs)}
+  chmod(a){if(a.length<2)return E("chmod: missing operand. Example: chmod +x pack.sh");const mode=a[0];const ch=parseMode(mode);
+    if(ch===false)return E(`chmod: invalid mode: '${mode}'`);if(ch&&ch.msg)return E(ch.msg);
+    const err=[];for(const t of a.slice(1)){const abs=norm(t),n=getNode(abs);
+      if(!n){const l=lstat(abs);err.push(isLoop(abs)?`chmod: cannot access '${t}': Too many levels of symbolic links`:l&&l.type==='link'?`chmod: cannot operate on dangling symlink '${t}'`:`chmod: cannot access '${t}': No such file or directory`);continue}
+      const m=ch(modeOf(n));if(n.type==='file')n.exec=!!(m&0o100);
+      if(m===defMode(n))delete n.mode;else n.mode=m;
+      SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
   export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
     for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
@@ -109,6 +112,17 @@ const CMDS={
     if(!g)return E(`No manual entry for ${a[0]}`);
     return ok([`${g.c.toUpperCase()}`,'',`  ${g.what}`,'','EXAMPLES',...g.ex.map(([c,n])=>`  ${c}${n?'    # '+n:''}`),'',"(Short version. Real man pages are long; on a real computer press q to quit them.)"].join('\n'))}
 };
+/* chmod mode parser: returns a function old->new, false when invalid, or {msg} when unsupported */
+function parseMode(str){let m=str.match(/^0?([0-7]{3})$/);
+  if(m){const v=parseInt(m[1],8);return()=>v}
+  if(/^[0-7]{4}$/.test(str))return {msg:'this practice shell does not support setuid/setgid/sticky modes yet'};
+  const UMASK=0o022,ops=[];
+  for(const cl of str.split(',')){const c=cl.match(/^([ugoa]*)((?:[-+=][rwx]*)+)$/);if(!c)return false;
+    let who=0;for(const w of c[1]||'a')who|=w==='u'?0o700:w==='g'?0o070:w==='o'?0o007:0o777;
+    const mask=c[1]?who:0o777&~UMASK;
+    for(const o of c[2].match(/[-+=][rwx]*/g)){let bits=0;for(const p of o.slice(1)){const b=p==='r'?4:p==='w'?2:1;bits|=b*0o111}
+      ops.push([o[0],who?(c[1]?who:mask):mask,bits])}}
+  return old=>{let v=old;for(const [op,w,bits] of ops){const b=bits&w;v=op==='+'?v|b:op==='-'?v&~b:(v&~w)|b}return v}}
 function headTail(a,io,cmd){const {n,rest,bad}=parseN(a);if(bad)return E(`${cmd}: invalid number of lines`);const {src,err}=readInputs(rest,io,cmd);const out=[];
   src.forEach((s,i)=>{const L=lines(s.text);const part=cmd==='head'?L.slice(0,n):(n?L.slice(-n):[]);if(src.length>1)out.push((i?'\n':'')+`==> ${s.name} <==`);out.push(...part)});
   return {out:out.join('\n'),err,code:err.length?1:0}}
@@ -116,8 +130,8 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
   if(rest.length<2)return E(rest.length?`${nm}: missing destination file operand after '${rest[0]}'`:`${nm}: missing file operand`);
   const dest=rest.pop(),dabs=norm(dest),dn=getNode(dabs),into=!!dn&&dn.type==='dir';
   if(rest.length>1&&!into)return E(`${nm}: target '${dest}' is not a directory`);const err=[],tips=[];
-  for(const s of rest){const sabs=norm(s),sn=getNode(sabs);
-    if(!sn){err.push(`${nm}: cannot stat '${s}': No such file or directory`);continue}
+  for(const s of rest){const sabs=norm(s),sn=move?lstat(sabs):getNode(sabs);
+    if(!sn){err.push(isLoop(sabs)?`${nm}: cannot stat '${s}': Too many levels of symbolic links`:`${nm}: cannot stat '${s}': No such file or directory`);continue}
     if(sn.type==='dir'&&!r){err.push(`cp: -r not specified; omitting directory '${s}'`);tips.push(`Tip: copying a folder needs -r: cp -r ${s} ${dest}`);continue}
     const tabs=into?join(dabs,bname(sabs)):dabs;
     if(tabs===sabs){err.push(`${nm}: '${s}' and '${dest}' are the same file`);continue}
