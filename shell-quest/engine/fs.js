@@ -61,7 +61,7 @@ class StepLimit extends Error{constructor(why){super('this practice shell stoppe
 /* The saved-state cap. writeFile checks LIM.STATE itself only for a write that grows the world by more than 1,000 characters (so a small write stays O(1)).
    Small writes, cp and mv set SQ.rt.grew instead; checkState() then walks the world once (stateText) and, when it is over LIM.STATE, stops the command
    with a StepLimit. step() calls it every 256 steps (a loop pass or a command run is a step) and execLine calls it once more when the outermost line ends,
-   so a loop of small writes ends with at most 256 steps' worth of writes past the cap. No rollback: the files written so far stay, as with any stopped command. */
+   so a loop of small writes ends with at most 256 steps' worth of writes past the cap (one command writing many small targets can land more before the check; see the spec's known limitations). No rollback: the files written so far stay, as with any stopped command. */
 const STATE_MSG='the files in this world grew too large (rm some to free space)';
 function checkState(){if(!SQ.rt.grew)return;SQ.rt.grew=false;if(stateText(S.fs)>LIM.STATE)throw new StepLimit(STATE_MSG)}
 function step(){if(++SQ.rt.steps>LIM.STEPS)throw new StepLimit();if((SQ.rt.steps&255)===0)checkState()}
