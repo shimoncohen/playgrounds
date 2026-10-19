@@ -109,5 +109,320 @@
   "echo \"echo \\${X:-d}\" > x.sh\nbash x.sh": {
     "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
     "out": "d"
+  },
+  "for i in a b; do echo $i; done; echo $i": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "a\nb\nb",
+    "code": 0,
+    "vars": {
+      "i": "b"
+    }
+  },
+  "for i in; do echo $i; done": {
+    "reason": "Task 6a: the for-shape message is gone; an empty word list is a valid loop that runs zero times (bash)",
+    "out": "",
+    "code": 0
+  },
+  "for i in 1 2 3; do echo $i; done | wc -l": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "3",
+    "code": 0,
+    "vars": {
+      "i": "3"
+    }
+  },
+  "for i in 1 2; do echo $i; done > loop.txt": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "",
+    "code": 0,
+    "vars": {
+      "i": "2"
+    },
+    "files": [
+      [
+        "/home/explorer/loop.txt",
+        3,
+        "860bfb3b"
+      ]
+    ]
+  },
+  "for i in 1 2; do echo $i; done; echo end": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "1\n2\nend",
+    "code": 0,
+    "vars": {
+      "i": "2"
+    }
+  },
+  "for i in 1 2 3; do echo $i; done && echo ok": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "1\n2\n3\nok",
+    "code": 0,
+    "vars": {
+      "i": "3"
+    }
+  },
+  "for i in a b; do touch $i.txt; done; ls": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "a.txt  b.txt  camp/  config.ini  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/",
+    "code": 0,
+    "vars": {
+      "i": "b"
+    },
+    "files": [
+      [
+        "/home/explorer/a.txt",
+        0,
+        "da39a3ee"
+      ],
+      [
+        "/home/explorer/b.txt",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "for 1 in a; do echo x; done": {
+    "reason": "Task 6a: the for-shape message is gone; a malformed for is now an ordinary syntax error from the whole-text parser",
+    "out": "bash: syntax error near unexpected token '1'"
+  },
+  "for i a b; do echo x; done": {
+    "reason": "Task 6a: the for-shape message is gone; a malformed for is now an ordinary syntax error from the whole-text parser",
+    "out": "bash: syntax error near unexpected token 'a'"
+  },
+  "for i in a b": {
+    "reason": "Task 6a: the for-shape message is gone; a malformed for is now an ordinary syntax error from the whole-text parser",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "for i in a b; do echo $i": {
+    "reason": "Task 6a: the for-shape message is gone; a malformed for is now an ordinary syntax error from the whole-text parser",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "for i in a b; echo $i; done": {
+    "reason": "Task 6a: the for-shape message is gone; a malformed for is now an ordinary syntax error from the whole-text parser",
+    "out": "bash: syntax error near unexpected token 'echo'"
+  },
+  "for i in 1 2 3; do echo $i; done; for j in x y; do echo $j; done": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "1\n2\n3\nx\ny",
+    "code": 0,
+    "vars": {
+      "i": "3",
+      "j": "y"
+    }
+  },
+  "for i in 1 2; do false_zz; done; echo $?": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "bash: false_zz: command not found\nbash: false_zz: command not found\n127",
+    "code": 0,
+    "vars": {
+      "i": "2"
+    }
+  },
+  "for n in 1 2 3; do mkdir dir$n; done; ls": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "camp/  config.ini  dir1/  dir2/  dir3/  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/",
+    "code": 0,
+    "vars": {
+      "n": "3"
+    }
+  },
+  "for i in 1 2 3; do echo $i; done > out.txt; cat out.txt": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "1\n2\n3",
+    "code": 0,
+    "vars": {
+      "i": "3"
+    },
+    "files": [
+      [
+        "/home/explorer/out.txt",
+        5,
+        "9e17c076"
+      ]
+    ]
+  },
+  "cat |": {
+    "reason": "Task 6a: the whole-text parser (Task 5) reports a dangling | && || as \"unexpected end of file\"",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "echo a;; echo b": {
+    "reason": "Task 6a: the whole-text parser (Task 5) names the ;; token like bash: near unexpected token ';;'",
+    "out": "bash: syntax error near unexpected token ';;'"
+  },
+  "echo a &&": {
+    "reason": "Task 6a: the whole-text parser (Task 5) reports a dangling | && || as \"unexpected end of file\"",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "echo a ||": {
+    "reason": "Task 6a: the whole-text parser (Task 5) reports a dangling | && || as \"unexpected end of file\"",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo end))))))))))))))))))))))))))": {
+    "reason": "Task 6a: an unquoted ) is an operator now, so the extra ) in this line is a syntax error (bash) instead of a literal \")\"",
+    "out": "bash: syntax error near unexpected token ')'",
+    "code": 2
+  },
+  "echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo $(echo end))))))))))))))))))))": {
+    "reason": "Task 6a: an unquoted ) is an operator now, so the extra ) in this line is a syntax error (bash) instead of a literal \")\"",
+    "out": "bash: syntax error near unexpected token ')'",
+    "code": 2
+  },
+  "echo \"if true; then echo yes; fi\" > x.sh\nbash x.sh": {
+    "reason": "Task 6a: if runs as a compound inside a script line (true/false builtins arrive in Task 7, so true is still \"command not found\")",
+    "out": "bash: true: command not found\nDid you mean: tree?",
+    "code": 0
+  },
+  "for i in $(seq 1 5000); do echo $i; done | wc -l": {
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "out": "5000",
+    "code": 0,
+    "vars": {
+      "i": "5000"
+    }
+  },
+  "cat << EOF": {
+    "reason": "Task 6a: here-documents run; one cut off by end of input warns like bash and still runs",
+    "out": "bash: warning: here-document delimited by end-of-file (wanted 'EOF')",
+    "code": 0
+  },
+  "cat <<< hi": {
+    "reason": "Task 6a: here-strings feed stdin",
+    "out": "hi",
+    "code": 0
+  },
+  "echo hi &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet",
+    "code": 2
+  },
+  "sleep 1 &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet",
+    "code": 2
+  },
+  "if true; then echo y; fi": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "bash: true: command not found\nDid you mean: tree?",
+    "code": 0
+  },
+  "while true; do echo y; done": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "bash: true: command not found\nDid you mean: tree?",
+    "code": 0
+  },
+  "until false; do echo y; done": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "this practice shell stopped the command: too many steps",
+    "code": 1
+  },
+  "case x in x) echo y;; esac": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "y",
+    "code": 0
+  },
+  "function f { echo hi; }": {
+    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
+    "out": "this practice shell does not support functions yet",
+    "code": 2
+  },
+  "f() { echo hi; }": {
+    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
+    "out": "this practice shell does not support functions yet",
+    "code": 2
+  },
+  "f() { echo hi; }; f": {
+    "reason": "Task 6a: function definitions now parse; executing them arrives in Task 6b (clean \"does not support functions yet\" until then)",
+    "out": "this practice shell does not support functions yet\nbash: f: command not found"
+  },
+  "[[ -f readme.txt ]] && echo yes": {
+    "reason": "Task 6a: [[ ]] now parses; evaluating it arrives in Task 7 (clean \"does not support [[ ]] yet\" until then)",
+    "out": "this practice shell does not support [[ ]] yet",
+    "code": 2
+  },
+  "(echo hi)": {
+    "reason": "Task 6a: ( ) subshells and { } groups run",
+    "out": "hi",
+    "code": 0
+  },
+  "( echo hi )": {
+    "reason": "Task 6a: ( ) subshells and { } groups run",
+    "out": "hi",
+    "code": 0
+  },
+  "{ echo hi; }": {
+    "reason": "Task 6a: ( ) subshells and { } groups run",
+    "out": "hi",
+    "code": 0
+  },
+  "{ echo hi; } > f": {
+    "reason": "Task 6a: ( ) subshells and { } groups run",
+    "out": "",
+    "code": 0,
+    "files": [
+      [
+        "/home/explorer/f",
+        2,
+        "c22b5f91"
+      ]
+    ]
+  },
+  "echo hi > f &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet",
+    "code": 2,
+    "files": []
+  },
+  "ls &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet"
+  },
+  "for i in 1; do echo $i; done &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet"
+  },
+  "! true": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "bash: true: command not found\nDid you mean: tree?",
+    "code": 0
+  },
+  "! false && echo ok": {
+    "reason": "Task 6a: if/while/until/case/! run as compounds (true/false builtins arrive in Task 7, so they are still \"command not found\")",
+    "out": "bash: false: command not found\nok",
+    "code": 0
+  },
+  "cd forest &": {
+    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
+    "out": "this practice shell does not support & yet",
+    "code": 2
+  },
+  "select x in a; do echo $x; done": {
+    "reason": "Task 6a: select is parsed and reported as unsupported",
+    "out": "this practice shell does not support select yet",
+    "code": 2
+  },
+  "echo a \\\n b": {
+    "reason": "Task 6a: backslash-newline joins lines (line continuation)",
+    "out": "a b"
+  },
+  "ls | { cat; }": {
+    "reason": "Task 6a: ( ) subshells and { } groups run",
+    "out": "camp\nconfig.ini\nforest\njournal.txt\nnotes.txt\nreadme.txt\nscripts\nsecrets.txt\nvillage",
+    "code": 0
+  },
+  "cat <(echo hi)": {
+    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
+    "out": "bash: syntax error near unexpected token '('",
+    "code": 2
+  },
+  "echo hi >(cat)": {
+    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
+    "out": "bash: syntax error near unexpected token '('",
+    "code": 2,
+    "files": []
+  },
+  "echo a ;; echo b": {
+    "reason": "Task 6a: the whole-text parser (Task 5) names the ;; token like bash: near unexpected token ';;'",
+    "out": "bash: syntax error near unexpected token ';;'"
   }
 }

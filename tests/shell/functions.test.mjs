@@ -1,0 +1,152 @@
+// Interpreter core (Task 6a): compound commands, lists, pipelines, here-strings/here-docs, subshells, loop control.
+// Function definitions, frames, local and return arrive in Task 6b.
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { loadShell, run } from './harness.mjs';
+
+const out = (line, SQ = loadShell()) => run(SQ, line).out;
+
+describe('compound commands', () => {
+  it('if / else picks a branch by exit status', () => {
+    assert.equal(out('if echo ok >/dev/null; then echo y; else echo n; fi'), 'y');
+    assert.equal(out('if ls nothing 2>/dev/null; then echo y; else echo n; fi'), 'n');
+  });
+  it('elif runs the first true branch; no true branch and no else is status 0', () => {
+    assert.equal(out('if ls nothing 2>/dev/null; then echo a; elif echo >/dev/null; then echo b; else echo c; fi'), 'b');
+    const SQ = loadShell();
+    assert.equal(out('if ls nothing 2>/dev/null; then echo a; fi; echo $?', SQ), '0');
+  });
+  it('until with break', () => {
+    assert.equal(out('until ls nothing 2>/dev/null; do echo a; break; done'), 'a');
+  });
+  it('while with continue and break counts', () => {
+    const SQ = loadShell();
+    assert.equal(out('for i in 1 2 3; do if echo $i | grep 2 >/dev/null; then continue; fi; echo $i; done', SQ), '1\n3');
+    assert.equal(out('for a in 1 2; do for b in x y; do echo $a$b; break 2; done; done', SQ), '1x');
+    assert.equal(out('for a in 1 2; do for b in x y; do continue 2; echo no; done; echo no; done; echo end', SQ), 'end');
+  });
+  it('for loops pipe, chain and redirect', () => {
+    assert.equal(out('for i in 1 2 3; do echo $i; done | wc -l'), '3');
+    assert.equal(out('for x in a b; do echo $x; done && echo end'), 'a\nb\nend');
+    const SQ = loadShell();
+    assert.equal(out('for i in 1 2; do echo $i; done > loop.txt; cat loop.txt', SQ), '1\n2');
+  });
+  it('for logs one entry with the expanded items, and one step per pass', () => {
+    const SQ = loadShell();
+    run(SQ, 'for f in *.txt; do echo $f; done');
+    const e = SQ.rt.log.filter((x) => x.name === 'for');
+    assert.equal(e.length, 1);
+    assert.deepEqual([...e[0].args], ['journal.txt', 'readme.txt']);
+    assert.equal(e[0].globbed, true);
+    assert.equal(SQ.rt.log.filter((x) => x.name === 'echo').length, 2);
+  });
+  it('case matches glob patterns and alternatives', () => {
+    assert.equal(out('case apple in a*) echo A;; b*) echo B;; esac'), 'A');
+    assert.equal(out('case x in a|x) echo m;; esac'), 'm');
+    assert.equal(out('case "a*" in "a*") echo lit;; esac'), 'lit');
+    assert.equal(out('case ab in "a*") echo lit;; *) echo other;; esac'), 'other');
+  });
+  it('keyword entries are logged after the compound completes', () => {
+    const SQ = loadShell();
+    run(SQ, 'if echo a >/dev/null; then echo b; fi; case x in x) echo c;; esac');
+    const names = SQ.rt.log.map((e) => e.name);
+    assert.deepEqual(names, ['echo', 'echo', 'if', 'echo', 'case']);
+    assert.equal(SQ.rt.log[2].code, 0);
+  });
+  it('{ } groups share one output stream', () => {
+    assert.equal(out('{ echo a; echo b; } | wc -l'), '2');
+  });
+  it('( ) subshell keeps cd and variables to itself', () => {
+    const SQ = loadShell();
+    assert.equal(out('( cd forest; pwd ); pwd', SQ), '/home/explorer/forest\n/home/explorer');
+    assert.equal(out('( X=1 ); echo "[$X]"', SQ), '[]');
+  });
+  it('! negates the status', () => {
+    assert.equal(out('! echo a >/dev/null; echo $?'), '1');
+    assert.equal(out('! ls nothing 2>/dev/null && echo yes'), 'yes');
+  });
+  it('(( )) sets the status from the value', () => {
+    assert.equal(out('(( 2 > 1 )) && echo big'), 'big');
+    assert.equal(out('(( 0 )); echo $?'), '1');
+  });
+});
+
+describe('input to compounds and here-strings', () => {
+  it('cat <<< feeds a here-string', () => {
+    assert.equal(out('cat <<< "hi there"'), 'hi there');
+    const SQ = loadShell();
+    assert.equal(out('X=5; cat <<< "x is $X"', SQ), 'x is 5');
+  });
+  it('done < file feeds the loop body', () => {
+    const SQ = loadShell();
+    assert.equal(out('for l in a; do cat; done < journal.txt', SQ), out('cat journal.txt', SQ));
+    assert.equal(out('for l in a b; do cat; done < readme.txt', SQ), out('cat readme.txt', SQ));
+  });
+  it('here-documents expand unless the delimiter is quoted', () => {
+    const SQ = loadShell();
+    assert.equal(out('X=7; cat <<EOF\nx=$X\nEOF', SQ), 'x=7');
+    assert.equal(out("cat <<'EOF'\nx=$X\nEOF", SQ), 'x=$X');
+    assert.equal(out('cat <<-EOF\n\t\tindented\n\tEOF', SQ), 'indented');
+    assert.equal(out('cat <<EOF | wc -l\na\nb\nEOF', SQ), '2');
+  });
+  it('a here-document cut short by the end of input warns and still runs', () => {
+    const r = run(loadShell(), 'cat <<EOF\nline');
+    assert.equal(r.out, "bash: warning: here-document delimited by end-of-file (wanted 'EOF')\nline");
+    assert.equal(r.code, 0);
+  });
+  it('a here-document inside $( ) may contain ) and quotes', () => {
+    assert.equal(out('echo "$(cat <<EOF\na ) b \' c\nEOF\n)"'), "a ) b ' c");
+  });
+});
+
+describe('parsing the whole text first', () => {
+  it('a syntax error prints once and executes nothing', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'touch zz; if x');
+    assert.equal(r.out, 'bash: syntax error: unexpected end of file');
+    assert.equal(r.code, 2);
+    assert.equal(SQ.getNode('/home/explorer/zz'), null);
+  });
+  it('& says it is not supported', () => {
+    assert.equal(out('echo hi &'), 'this practice shell does not support & yet');
+  });
+  it('backslash-newline joins the lines', () => {
+    assert.equal(out('echo a \\\n b'), 'a b');
+    assert.equal(out('echo ab\\\ncd'), 'abcd');
+  });
+  it('the for loop shape message is gone', () => {
+    assert.equal(out('for i in a b; do echo $i; done; echo $i'), 'a\nb\nb');
+  });
+});
+
+describe('caps still hold', () => {
+  it('a for over 5000 items is cut at 2000 lines', () => {
+    const r = run(loadShell(), 'for i in $(seq 1 5000); do echo $i; done');
+    const lines = r.out.split('\n');
+    assert.equal(lines.length, 2001);
+    assert.match(lines[2000], /output cut off after 2000 lines/);
+  });
+  it('an endless until loop stops on the step budget and the shell stays usable', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'cd forest; until ls nothing 2>/dev/null; do echo >/dev/null; done');
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+    assert.equal(r.code, 1);
+    assert.equal(out('pwd', SQ), '/home/explorer/forest');
+    assert.equal(out('echo ok', SQ), 'ok');
+  });
+  it('deeply nested compounds through $( ) stop instead of overflowing the stack', () => {
+    const wrap = (b) => { for (let i = 0; i < 90; i++) b = `if echo >/dev/null; then ${b}; fi`; return b; };
+    let line = 'echo deep';
+    for (let i = 0; i < 15; i++) line = wrap(`echo $(${line})`);
+    const r = run(loadShell(), line);
+    assert.equal(r.out, 'this practice shell stopped the command: nesting too deep');
+    assert.equal(r.code, 1);
+    let ok = 'echo deep';
+    for (let i = 0; i < 19; i++) { for (let k = 0; k < 12; k++) ok = `if echo >/dev/null; then ${ok}; fi`; ok = `echo $(${ok})`; }
+    assert.equal(run(loadShell(), ok).out, 'deep');
+  });
+  it('break outside a loop does nothing harmful', () => {
+    const SQ = loadShell();
+    assert.equal(out('break; echo after', SQ).split('\n').pop(), 'after');
+  });
+});

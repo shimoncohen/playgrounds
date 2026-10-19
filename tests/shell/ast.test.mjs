@@ -81,10 +81,10 @@ describe('tokenizer: here-documents', () => {
   });
 });
 
-describe('executor stays unchanged for the new tokens (until Tasks 5/6)', () => {
-  it('<< and <<< still say unsupported', () => {
-    assert.equal(run(loadShell(), 'cat <<< hi').out, 'this practice shell does not support <<< yet');
-    assert.equal(run(loadShell(), 'cat << EOF').out, 'this practice shell does not support << yet');
+describe('executor runs the new tokens (Task 6a)', () => {
+  it('<< and <<< feed stdin', () => {
+    assert.equal(run(loadShell(), 'cat <<< hi').out, 'hi');
+    assert.equal(run(loadShell(), 'cat << EOF').out, "bash: warning: here-document delimited by end-of-file (wanted 'EOF')");
   });
   it('typed ( ) and & do not crash', () => {
     const r = run(loadShell(), 'echo (a) b &');

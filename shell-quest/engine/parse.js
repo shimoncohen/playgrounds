@@ -43,10 +43,21 @@ function scanBrace(line,i,dq){let d=1,j=i+2;
     if(c==='}'){d--;if(d===0)return j}
     j++}
   throw new Error("unexpected EOF while looking for matching '}'")}
+/* $( ... ): index of the matching ). Honours quotes, nested $( ) and here-documents (a body line is skipped up to its delimiter line, so ) and quotes in it do not count). */
 function scanSub(line,i){
   if(line[i+2]==='(')return scanArith(line,i);
-  let d=0,j=i+1;
+  let d=0,j=i+1;const docs=[];
   while(j<line.length){const c=line[j];
+    if(c==='<'&&line[j+1]==='<'&&line[j+2]!=='<'){let k=j+2,strip=false,w='';if(line[k]==='-'){strip=true;k++}
+      while(line[k]===' '||line[k]==='\t')k++;
+      while(k<line.length&&!/[\s|&;()<>]/.test(line[k])){const q=line[k];
+        if(q==="'"||q==='"'){const e=line.indexOf(q,k+1);if(e<0)break;w+=line.slice(k+1,e);k=e+1;continue}
+        if(q==='\\'){w+=line[k+1]||'';k+=2;continue}
+        w+=q;k++}
+      if(w)docs.push({w,strip});j=k;continue}
+    if(c==='\n'&&docs.length){j++;
+      for(const doc of docs)while(j<line.length){const e=line.indexOf('\n',j),t=line.slice(j,e<0?line.length:e);j=e<0?line.length:e+1;if((doc.strip?t.replace(/^\t+/,''):t)===doc.w)break}
+      docs.length=0;continue}
     if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
     if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;else if(line[j]==='$'&&line[j+1]==='(')j=scanSub(line,j);j++}
       if(j>=line.length)break;j++;continue}
@@ -56,9 +67,8 @@ function scanSub(line,i){
   throw new Error("unexpected EOF while looking for matching ')'")}
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
-  const sv={cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),last:S.last};
-  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false})}finally{CTX.sub--;
-    S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;if(sv.exp)S.exp=sv.exp;else delete S.exp}
+  const sv=SQ.snapshotShell();
+  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false})}finally{CTX.sub--;SQ.restoreShell(sv)}
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
   return v.join('\n').replace(/\n+$/,'')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
@@ -73,6 +83,8 @@ function evalDollar(line,i,dry,dq){
   const m=line.slice(i).match(VRX);if(!m)return null;
   const k=m[1];return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
 /* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
+/* case pattern: str matches the whole of the pattern word (quoted parts literal) */
+function patMatch(str,raw){pguard(str);const L=matchLens(globItems(expandStr(raw,false,true)),str,0);return L.length>0&&L[L.length-1]===str.length}
 function expandStr(s,dq,pat){let o='',j=0;const Q=(x,q)=>pat&&q?x.replace(/[*?[\]\\]/g,'\\$&'):x;
   while(j<s.length){const c=s[j];
     if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=Q(s.slice(j+1,k),true);j=k+1;continue}
@@ -143,7 +155,7 @@ function braceVal(body){let m;
     return {val:len===undefined?val.slice(off):len<0?val.slice(off,n+len):val.slice(off,off+len)}}
   throw perr('${'+body+'}: bad substitution',1)}
 /* opt.dry: only find structure (no substitution, words keep their raw source); default: expand for real. opt.nosplit: substitution results stay one word. */
-function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* legacy: pre-Stage-2 lexing for the executor (( ) & newline ;; stay word characters, << and <<< unsupported) until the AST parser replaces it */
+function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const toks=[],pending=[],P=!!opt.pos;let i=0,cur=null;
   if(P){const tp=toks.push.bind(toks);toks.push=t=>{if(t.t==='op'){t.s=(t.v==='<<'||t.v==='<<-')?i-t.v.length:i;t.e=t.s+t.v.length}return tp(t)}} /* opt.pos (AST parser): tokens carry source offsets s/e */
   const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
@@ -186,27 +198,27 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
     if(P&&!cur&&((c==='('&&line[i+1]==='(')||(c==='['&&line[i+1]==='['&&/\s/.test(line[i+2]||'')))&&spanOk()){const sp=span(c==='(');if(sp){toks.push(sp);i=sp.e;continue}}
-    if(!L&&c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();if(P)toks[toks.length-1].e=i;continue}
-    if(!L&&(c==='('||c===')')){push();toks.push({t:'op',v:c});i++;continue}
-    if(!L&&c==='\\'&&line[i+1]==='\n'){i+=2;continue}
+    if(c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();if(P)toks[toks.length-1].e=i;continue}
+    if(c==='('||c===')'){push();toks.push({t:'op',v:c});i++;continue}
+    if(c==='\\'&&line[i+1]==='\n'){i+=2;continue}
     if(c==='|'){push();if(line[i+1]==='&')throw unsup('|&');if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
     if(c==='&'&&line[i+1]==='&'){push();toks.push({t:'op',v:'&&'});i+=2;continue}
     if(c==='&'&&line[i+1]==='>')throw unsup('&>');
-    if(!L&&c==='&'){push();toks.push({t:'op',v:'&'});i++;continue}
-    if(c===';'){push();if(!L&&line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
+    if(c==='&'){push();toks.push({t:'op',v:'&'});i++;continue}
+    if(c===';'){push();if(line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
     if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
     if(c==='>'){push();if(line[i+1]==='&')throw unsup('>&');if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
     if(c==='<'){push();
-      if(line[i+1]==='<'){if(L)throw unsup(line[i+2]==='<'?'<<<':'<<');
+      if(line[i+1]==='<'){
         if(line[i+2]==='<'){toks.push({t:'op',v:'<<<'});i+=3;continue}
         const strip=line[i+2]==='-',op={t:'op',v:strip?'<<-':'<<'};i+=strip?3:2;toks.push(op);heredocWord(op,strip);continue}
       toks.push({t:'op',v:'<'});i++;continue}
-    if(c==='#'&&!cur){if(L)break;const k=line.indexOf('\n',i);i=k<0?line.length:k;continue}
+    if(c==='#'&&!cur){const k=line.indexOf('\n',i);i=k<0?line.length:k;continue}
     if(c==='~'&&!cur&&(i+1>=line.length||/[\s\/|;&<>]/.test(line[i+1]))){cur={v:HOME,glob:false,s:i};i++;continue}
     cur=cur||fresh();
     if(c==="'"){const j=line.indexOf("'",i+1);if(j<0)throw new Error("unclosed ' quote. Every opening quote needs a closing one.");cur.v+=line.slice(i+1,j);cur.keep=true;i=j+1;continue}
-    if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(!L&&line[j+1]==='\n'){j+=2;continue}if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
+    if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(line[j+1]==='\n'){j+=2;continue}if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
         if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
         if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
           if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
@@ -227,7 +239,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
   push();return toks}
 /* Words from parse() carry their raw source; expand them at run time so earlier commands on the line (X=1; echo $X) and $(...) take effect in order. */
 const ASSIGN=/^[A-Za-z_]\w*=/;
-function expandWord(w,nosplit){return tokenize(w.raw,{nosplit,legacy:true}).filter(t=>t.t==='w')}
+function expandWord(w,nosplit){return tokenize(w.raw,{nosplit}).filter(t=>t.t==='w')}
 function expandWords(words,exporting){const out=[];
   words.forEach((w,k)=>{const ns=(k===0&&ASSIGN.test(w.raw))||(exporting&&k>0&&ASSIGN.test(w.raw));out.push(...expandWord(w,ns))});return out}
 function expandOne(w){return expandWord(w,true).map(t=>t.v).join(' ')}
@@ -268,5 +280,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{M,ok,E,lines,getVar,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

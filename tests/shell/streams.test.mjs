@@ -74,7 +74,10 @@ describe('stderr redirects', () => {
   });
   it('unsupported syntax says so', () => {
     assert.equal(run(loadShell(), 'echo hi &> f').out, 'this practice shell does not support &> yet');
-    assert.equal(run(loadShell(), 'cat <<< hi').out, 'this practice shell does not support <<< yet');
+  });
+  it('here-strings feed stdin (Task 6a)', () => {
+    assert.equal(run(loadShell(), 'cat <<< hi').out, 'hi');
+    assert.equal(run(loadShell(), 'wc -l <<< hi').out, '1');
   });
 });
 
