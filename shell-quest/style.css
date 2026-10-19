@@ -162,6 +162,8 @@ ul.tree.root{border:0;padding:0;margin:0}
 .fire h2,.guide h2{font-size:32px;font-weight:800}
 .lede{margin:6px 0 0;color:var(--muted);max-width:62ch}
 .fireCard{padding:20px;display:flex;flex-direction:column;gap:16px}
+.ftier{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--muted)}
+.ftier select{max-width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line,currentColor);border-radius:8px;padding:6px 10px}
 .fstats{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 .fstats b{font-family:var(--font-display);font-size:22px;color:var(--ink);margin-left:4px}
 .timer{height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden}

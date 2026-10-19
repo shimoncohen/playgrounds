@@ -193,6 +193,33 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   await ctx.close();
 });
 
+test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draws from the chosen pool', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-fire');
+  const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
+  assert.deepEqual(opts.slice(0, 2), [['mixed', 'Mixed'], ['beginner', 'Beginner']]);
+  assert.equal(await page.inputValue('#fTier'), 'mixed');
+  const pool = await page.evaluate(() => SQ.content.quickfire.filter(q => (q[2] || 'beginner') === 'beginner').map(q => q[0]));
+  assert.ok(pool.length > 0);
+  const run = async (tier, allowed) => {
+    await page.selectOption('#fTier', tier);
+    await page.click('#fStart');
+    for (let i = 0; i < 3; i++) {
+      const task = await page.textContent('#fTask');
+      assert.ok(allowed.includes(task), `"${task}" is in the ${tier} pool`);
+      await page.click('#fSkip');
+    }
+    await page.click('#fStop');
+  };
+  await run('beginner', pool);
+  await run('mixed', await page.evaluate(() => SQ.content.quickfire.map(q => q[0])));
+  await page.setViewportSize({ width: 390, height: 800 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('import rejects another playground\'s file and garbage', async () => {
   const { ctx, page } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

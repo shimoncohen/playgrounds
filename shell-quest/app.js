@@ -84,7 +84,10 @@ function setStats(){$('#fScore').textContent=QS?QS.score:0;$('#fStreak').textCon
 function fireIdle(){fStage.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Example task</div>
   <div class="task">Show the folder you are in</div><p class="fb" style="margin-top:4px">Answer: <code>pwd</code></p></div>
   <div class="actions"><button class="btn" id="fStart">Start the clock</button></div>`;setStats()}
-function startFire(){const order=QF.map((q,i)=>i).sort(()=>Math.random()-.5);QS={order,i:0,score:0,streak:0,left:LEN,misses:[],t0:Date.now()};
+const qTier=q=>q[2]||'beginner';
+/* tier picker: one option per tier that has quick-fire questions; the pool is derived lazily at run start */
+(function buildTierPicker(){const sel=$('#fTier');for(const {tier:t} of SQ.tiers.status({})){if(!QF.some(q=>qTier(q)===t.id))continue;const o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o)}})();
+function startFire(){const pick=$('#fTier').value;const order=QF.map((q,i)=>i).filter(i=>pick==='mixed'||qTier(QF[i])===pick).sort(()=>Math.random()-.5);if(!order.length)return;QS={order,i:0,score:0,streak:0,left:LEN,misses:[],t0:Date.now()};
   fStage.innerHTML=`<div class="task" id="fTask"></div><div class="fterm"><span class="p-sym" style="color:var(--term-prompt)">$ </span><input id="fIn" aria-label="Your answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fSkip">Skip</button><button class="btn ghost" id="fStop">End round</button></div>`;
   showQ();$('#fIn').focus();clearInterval(qT);qT=setInterval(()=>{QS.left=Math.max(0,LEN-(Date.now()-QS.t0)/1000);setStats();if(QS.left<=0)stopFire(true)},100)}
