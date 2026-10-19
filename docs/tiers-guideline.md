@@ -23,11 +23,11 @@ SQ.tiers = window.Tiers.create({
 
 Each chapter carries `tier: 'intermediate'`. What you get back:
 
-- `tierOf(ch)` returns the tier of chapter index `ch` (the first tier if the tag is missing or unknown).
+- `tierOf(ch)` returns the tier **object** (`{id, name, blurb, missionXp}`) of chapter index `ch`, or the first tier if the tag is missing or unknown.
 - `missionXp(ch)` is the XP for one mission in that chapter. The app uses it when a mission completes; `chapterBadgeXp` is the 25.
 - `status(S)` gives, per tier, its chapter indexes, `chaptersDone`, `missionsDone`, `missionsTotal` and `complete`. Pass the saved state `S` (`S.done`, `S.badges`).
 - `ranks()` and `rankFor(xp)` give the rank ladder and the rank (name, index, `lo`, `hi`) for an XP total.
-- `Tiers.renderRail(container, { status, chapters, S, onPick })` draws a `.tierhead` per tier that has chapters, then that tier's chapter buttons. Load `shared/tiers.css` next to your own stylesheet; it uses the host page's theme variables.
+- `Tiers.renderRail(container, { status, chapters, S, onPick })` draws a `.tierhead` per tier that has chapters, then that tier's chapter buttons. Load `shared/tiers.css` next to your own stylesheet; it uses the host page's theme variables `--muted`, `--ink`, `--accent-text` and `--line`, so define those (or map them) in your `style.css`.
 
 **Ranks derive from cumulative XP.** `ranks()` is `baseRanks` plus one entry per tier that has chapters and a name in `tierEndRanks`. That entry sits at the XP of finishing everything up to and including that tier: `sum(missions * missionXp + 25)`. Shell Quest: Beginner ends at 695, Intermediate at 1230 ("Script Smith"). Add chapters to a tier and its threshold moves by itself; never type the number.
 
@@ -47,7 +47,7 @@ The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/
 | Helper | Meaning |
 |---|---|
 | `c.line`, `c.cwd` | the line just typed, the working directory |
-| `c.log` | command log for this line only: `{name, args, globbed, piped, redirect, errRedirect, code, out}` per command that ran |
+| `c.log` | command log for this line only: `{name, args, globbed, piped, redirect, errRedirect, code, out}` per command that ran (`errRedirect` is only set when `2>` was used, so treat it as optional) |
 | `c.ran(name, pred?)` | some logged command has that name (and `pred(entry)` is true) |
 | `c.flag(entry, ch)` | the entry has a short option containing `ch` (`-rf` has `r`) |
 | `c.has(p)`, `c.isDir(p)`, `c.isFile(p)` | path exists, is a folder, is a file (`~` and relative paths work) |
@@ -69,8 +69,17 @@ check: c => {
   return !!want && c.ran('cut', e => e.out.trim() === want);
 }
 
-// output-only is not enough on its own: also require the file ended up right
-check: c => c.log.some((e, k) => e.name === 'tee' && k > 0 && c.log[k - 1].name === 'ls' && e.out.trim() === c.log[k - 1].out.trim())
+// outcome style across two log entries and the file system (the real check of Intermediate mission 8.6):
+// tee must follow ls, print the same text, and a file it was given must hold that text
+check: c => c.log.some((e, k) => {
+  if (e.name !== 'tee' || k === 0) return false;
+  const p = c.log[k - 1], want = p.out.trim();
+  if (p.name !== 'ls' || !want || e.out.trim() !== want) return false;
+  return e.args.filter(x => !x.startsWith('-')).some(f => {
+    const n = SQ.getNode(SQ.norm(f));          // relative to the current folder, like the shell
+    return !!n && n.type === 'file' && n.content.trim() === want;
+  });
+})
 ```
 
 ## 4. Keeping saved progress compatible
@@ -79,7 +88,7 @@ Learners already have saves, exports and linked save files. They must keep loadi
 
 1. **Append chapters, never reorder or remove.** Chapters live in one global array; indexes are the identity. New tiers go at the end, in tier order.
 2. **Keys are `'<chapter>.<mission>'`** (`S.done['7.0']`, `S.badges[7]`). Never insert a mission in the middle of a chapter that has shipped; add to the end.
-3. **New state fields need defaults** in `fresh()`. The loader is `Object.assign(fresh(), saved)`, so old saves pick the default up.
+3. **New state fields need a default or a fallback.** The loader is `Object.assign(fresh(), saved)`, so a field with a default in `fresh()` is picked up by old saves. A field that is created lazily must be read with a fallback: `S.exp` (exported variables) is not in `fresh()` and is always read as `S.exp||{}`.
 4. **Never rename the `localStorage` key** (`shell-quest-v1`, set in `window.PROGRESS` in `index.html` and in `engine/fs.js`). Exports and the linked file are matched to it.
 5. **Rank renames only change names.** Thresholds are derived from XP, so a rename never changes anyone's progress. (The 600 XP rank went from "Shell Wizard" to "Pipe Fitter" this way.)
 6. Tier badges are derived, so there is nothing to migrate when a tier is added.
