@@ -22,7 +22,12 @@ const ALLLOG=[
 const seedLogs=()=>{for(const k of Object.keys(LOGS))ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/village/logs/all.log',ALLLOG)};
 const seedPerms=()=>{ensureFile('~/notes.txt',NOTES);ensureFile('~/secrets.txt',SECRETS);ensureDir('~/scripts');seedLogs()};
 const seedStreams=()=>{seedPerms();ensureFile('~/village/scratch/old1.log','old line 1');ensureFile('~/village/scratch/old2.log','old line 2');
-  ensureFile('~/village/scratch/keep.txt','Keep me.')};
+  ensureFile('~/village/scratch/keep.txt','Keep me.');snapLogs()};
+let seeded=[];
+const SEEDED_LOGS=()=>Object.keys(LOGS).concat('all.log').map(k=>'~/village/logs/'+k);
+function logFiles(n,path,out){if(n&&n.type==='dir')for(const k of Object.keys(n.children)){const c=n.children[k],p=join(path,k);if(c.type==='dir')logFiles(c,p,out);else if(c.type==='file'&&k.endsWith('.log'))out.push(p)}return out}
+const KEEP_LOGS=()=>SEEDED_LOGS().map(p=>norm(p,HOME)).concat(seeded);
+const snapLogs=()=>{seeded=logFiles(SQ.S.fs,'',[]).filter(p=>p.startsWith(norm('~/village')+'/')&&!p.startsWith(norm('~/village/scratch')+'/'))};
 const FP=/^file: \S/;
 const baseName=s=>s.split('/').filter(Boolean).pop()||'';
 const homeNode=p=>getNode(norm(p,HOME));
@@ -150,11 +155,11 @@ const CH=[
  {title:'Silence errors',goal:`Run a command that fails and hide its error message: <code>ls missing 2&gt;/dev/null</code>`,
   anat:[['ls','cmd'],['missing','arg'],['2&gt;','op'],['/dev/null','arg']],answer:'ls missing 2>/dev/null',
   explain:`Stream number 2 is the <b>error</b> stream (1 is the normal output). <code>2&gt;</code> sends it somewhere, and <code>/dev/null</code> is the bin that throws everything away. The command still fails, you just do not see the complaint.`,
-  check:c=>c.log.some(e=>e.code!==0&&e.errRedirect&&!e.errRedirect.dup&&e.errRedirect.path&&isNull(e.errRedirect.path))},
+  check:c=>c.log.some(e=>{const r=e.errRedirect;if(e.code===0||!r||e.out.trim()!=='')return false;return r.dup?!!e.redirect&&isNull(e.redirect.path):!!r.path&&isNull(r.path)})},
  {title:'Keep errors',goal:`Save the error message in a file instead: <code>ls missing 2&gt; errors.txt</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['ls','cmd'],['missing','arg'],['2&gt;','op'],['errors.txt','arg']],answer:'ls missing 2> errors.txt',
   explain:`The same <code>2&gt;</code> can point at a real file. Read it back with <code>cat errors.txt</code>. Use <code>2&gt;&gt;</code> to add to the end instead of starting over.`,
-  check:c=>c.log.some(e=>{const r=e.errRedirect;if(e.code===0||!r||r.dup||!r.path||isNull(r.path))return false;const n=getNode(norm(r.path));return !!n&&n.type==='file'&&n.content.trim().length>0})},
+  check:c=>c.log.some(e=>{const r=e.errRedirect;if(e.code===0||!r)return false;const p=r.dup?(e.redirect&&e.redirect.path):r.path;if(!p||isNull(p))return false;const n=getNode(norm(p));return !!n&&n.type==='file'&&n.content.trim().length>0})},
  {title:'Merge streams',goal:`Send the error down the pipe and count it: <code>ls missing 2&gt;&amp;1 | wc -l</code>`,
   anat:[['ls','cmd'],['missing','arg'],['2&gt;&amp;1','op'],['|','op'],['wc -l','cmd']],answer:'ls missing 2>&1 | wc -l',
   explain:`A pipe only carries normal output. <code>2&gt;&amp;1</code> means <b>send errors to wherever the output goes</b>, so the error message travels down the pipe too. Without it <code>wc</code> would count 0 lines.`,
@@ -165,11 +170,11 @@ const CH=[
   check:c=>{const want=logsIn(norm('~/village/logs'),'.log');if(!want.length)return false;
     return c.log.some(e=>{if(e.name!=='xargs'||e.code!==0)return false;const L=e.out.split('\n').filter(Boolean);
       return L.length>=want.length&&L.every(l=>FP.test(l))&&want.every(w=>L.some(l=>baseName(l.slice(6).trim())===w))})}},
- {title:'Delete what you found',goal:`Remove every <code>.log</code> file in the scratch folder: <code>find village/scratch -name "*.log" | xargs rm</code>`,note:`Only the scratch folder, not <code>village/logs</code>. Run the <code>find</code> part alone first to see what it lists.`,
+ {title:'Delete what you found',goal:`Remove every <code>.log</code> file in the scratch folder only: <code>find village/scratch -name "*.log" | xargs rm</code>`,note:`Leave <code>village/logs</code> alone: the next missions need those logs. Run the <code>find</code> part alone first to see what it lists.`,
   anat:[['find','cmd'],['village/scratch','arg'],['-name','opt'],['"*.log"','arg'],['|','op'],['xargs rm','cmd']],answer:'find village/scratch -name "*.log" | xargs rm',
   explain:`<code>find</code> lists the matching paths, and <code>xargs rm</code> hands them all to <code>rm</code>. It is the same as typing <code>rm</code> followed by every name. Always look at the find output alone before you let rm loose on it.`,
   check:c=>{const d=getNode(norm('~/village/scratch'));if(!d||d.type!=='dir')return false;
-    return c.log.some(e=>e.name==='xargs'&&e.args.includes('rm'))&&logsIn(norm('~/village/scratch'),'.log').length===0&&!!d.children['keep.txt']}},
+    return c.log.some(e=>e.name==='xargs'&&e.args.includes('rm'))&&logsIn(norm('~/village/scratch'),'.log').length===0&&!!d.children['keep.txt']&&KEEP_LOGS().every(p=>{const n=getNode(norm(p));return !!n&&n.type==='file'})}},
  {title:'Compare two files',goal:`See what changed between two days: <code>diff village/logs/day1.log village/logs/day2.log</code>`,note:`Needs both logs. If they are gone, click the chapter again.`,
   anat:[['diff','cmd'],['village/logs/day1.log','arg'],['village/logs/day2.log','arg']],answer:'diff village/logs/day1.log village/logs/day2.log',
   explain:`<code>diff</code> prints only the lines that differ. <code>&lt;</code> marks lines from the first file and <code>&gt;</code> from the second, and <code>2c2</code> means line 2 changed. No output at all means the files are identical.`,

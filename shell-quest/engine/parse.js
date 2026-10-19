@@ -35,7 +35,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const fresh=()=>({v:'',glob:false,s:i});
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
-    if(c==='|'){push();if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
+    if(c==='|'){push();if(line[i+1]==='&')throw unsup('|&');if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
     if(c==='&'&&line[i+1]==='&'){push();toks.push({t:'op',v:'&&'});i+=2;continue}
     if(c==='&'&&line[i+1]==='>')throw unsup('&>');
     if(c===';'){push();toks.push({t:'op',v:';'});i++;continue}

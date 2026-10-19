@@ -472,3 +472,54 @@ describe('Task 14 quick-fire and guide', () => {
     }
   });
 });
+
+describe('Task 14 fix round 1', () => {
+  it('11.5 refuses to pass when it destroys the other logs, and accepts scratch-only variants', () => {
+    fail(T11, 4, 'find village -name "*.log" | xargs rm');
+    fail(T11, 4, 'find . -name "*.log" | xargs rm');
+    fail(T11, 4, 'find village/logs -name "*.log" | xargs rm');
+    pass(T11, 4, "find village/scratch -name '*.log' | xargs rm");
+    pass(T11, 4, 'find village/scratch -name "*.log" | xargs rm -f');
+    pass(T11, 4, 'cd village/scratch', 'find . -name "*.log" | xargs rm');
+    pass(T11, 4, 'cd village/scratch; find . -name "*.log" | xargs rm');
+    fail(T11, 4, 'rm village/scratch/*.log');
+    const m = loadShell().content.chapters[T11].missions[4];
+    assert.match(m.goal + m.note, /village\/logs/);
+  });
+  it('11.1 needs empty output and accepts the >/dev/null 2>&1 form', () => {
+    fail(T11, 0, 'ls village missing 2>/dev/null'); // the listing still prints
+    pass(T11, 0, 'ls missing >/dev/null 2>&1');
+    pass(T11, 0, 'ls missing > /dev/null 2>&1');
+    pass(T11, 0, 'ls missing 2>  /dev/null');
+    fail(T11, 0, 'ls village missing 2>&1 >/dev/null'.replace('2>&1 >/dev/null', '2> errors.txt'));
+  });
+  it('11.2 accepts > file 2>&1 and 2>>', () => {
+    pass(T11, 1, 'ls missing > errors.txt 2>&1');
+    pass(T11, 1, 'ls missing >errors.txt 2>&1');
+    pass(T11, 1, 'ls missing 2>> errors.txt');
+    fail(T11, 1, 'ls village > errors.txt 2>&1'); // no error happened
+    fail(T11, 1, 'ls missing > /dev/null 2>&1');
+  });
+  it('quick-fire: find/xargs question is exact and quoted, others take the extra spellings', () => {
+    const q = loadShell().content.quickfire;
+    const f = q.find((x) => /under old/.test(x[0]));
+    assert.ok(f[3] && f[3].exact);
+    assert.deepEqual([...f[1]], ['find old -name "*.log" | xargs rm', "find old -name '*.log' | xargs rm"]);
+    const has = (re, a) => assert.ok(q.find((x) => re.test(x[0]))[1].includes(a), a);
+    has(/only by you/, 'chmod 0600 secrets.txt');
+    has(/owner run tool/, 'chmod u+x ./tool.sh');
+    has(/size and mode/, 'stat ./secrets.txt');
+    has(/count the lines/, 'ls missing 2>&1|wc -l');
+  });
+  it('every quick-fire answer for chapters 10/11 runs in the engine', () => {
+    const SQ = loadShell();
+    for (const q of SQ.content.quickfire.filter((x) => x[2] === 'intermediate').slice(12)) for (const a of q[1]) {
+      const W = loadShell();
+      for (const ci of [T10, T11]) W.content.chapters[ci].setup();
+      W.ensureFile('~/old/a.log', 'x'); W.ensureFile('~/a.txt', 'a'); W.ensureFile('~/b.txt', 'b'); W.ensureFile('~/tool.sh', '');
+      W.ensureFile('~/village/logs/day3.log', 'x');
+      const r = run(W, a);
+      assert.doesNotMatch(r.out, /not support|command not found|invalid|No such|paths must/, `${a} -> ${r.out}`);
+    }
+  });
+});

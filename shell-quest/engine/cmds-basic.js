@@ -49,7 +49,10 @@ const CMDS={
       const vals={l:L,w:W,c:C};const cols=(pick.length?pick:['l','w','c']).map(k=>pick.length===1?String(vals[k]):String(vals[k]).padStart(4));
       out.push(cols.join(pick.length===1?'':' ')+(s.name?' '+s.name:''))}
     return {out:out.join('\n'),err,code:err.length?1:0}},
-  grep(a,io){const {fl,rest}=flags(a);if(!rest.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);const pat=rest.shift();
+  grep(a,io){const {fl,rest}=flags(a);
+    for(const f of fl){if('incv'.includes(f)&&f.length===1)continue;if(f.startsWith('--'))return E('this practice shell does not support grep --long options yet');
+      return 'EFwxrRlLhHoqsABCefmPzaUTVZyIud'.includes(f)?E(`this practice shell does not support grep -${f} yet`):E(`grep: invalid option -- '${f}'`,2)}
+    if(!rest.length)return E('usage: grep [-i] [-n] [-c] [-v] PATTERN [FILE...]',2);const pat=rest.shift();
     const fg=fl.has('i')?'gi':'g';let re;try{re=new RegExp(pat,fg)}catch(e){re=new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),fg)}
     const {src,err}=readInputs(rest,io,'grep');const multi=src.length>1;const out=[];let total=0;
     for(const s of src){let cnt=0;lines(s.text).forEach((ln,i)=>{re.lastIndex=0;const hit=re.test(ln);if(hit!==fl.has('v')){cnt++;
@@ -84,6 +87,7 @@ const CMDS={
   find(a){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')){start=a[0];i=1}let rx=null,type=null;
     for(;i<a.length;i++){const p=a[i];if(p==='-name'||p==='-iname'){const v=a[++i];if(v==null)return E(`find: missing argument to '${p}'`);rx=globRe(v,p==='-iname')}
       else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d'&&type!=='l')return E(`find: unknown argument to -type: ${type}`)}
+      else if(p.startsWith('-')||p==='!'||p==='(')return E(`this practice shell does not support find ${p} yet`);
       else{const r=E(`find: paths must come before the search options: '${p}'`);if(/[*?]/.test(a.join('')))r.tips=['Tip: put quotes around the pattern, like -name "*.txt", so the shell leaves the * for find.'];return r}}
     const root=getNode(norm(start));if(!root)return E(`find: '${start}': No such file or directory`);const out=[];
     (function walk(n,path,nm){if((!rx||rx.test(nm))&&(!type||n.type===({d:'dir',f:'file',l:'link'})[type]))out.push(path);

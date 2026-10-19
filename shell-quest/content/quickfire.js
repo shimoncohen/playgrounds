@@ -34,16 +34,16 @@ const QF=[
  ["List all exported variables as NAME=value",["env"],'intermediate'],
  ["Print the exit code of the last command",["echo $?"],'intermediate'],
  ["Show the permissions of the files here",["ls -l","ls -la","ls -al","ls -l ."],'intermediate'],
- ["Make secrets.txt readable and writable only by you (use the number form)",["chmod 600 secrets.txt"],'intermediate'],
- ["Let the owner run tool.sh (letter form)",["chmod u+x tool.sh"],'intermediate'],
+ ["Make secrets.txt readable and writable only by you (use the number form)",["chmod 600 secrets.txt","chmod 0600 secrets.txt","chmod 600 ./secrets.txt"],'intermediate'],
+ ["Let the owner run tool.sh (letter form)",["chmod u+x tool.sh","chmod u+x ./tool.sh"],'intermediate'],
  ["Make notes.txt read-only for everyone (letter form with =)",["chmod a=r notes.txt","chmod ugo=r notes.txt","chmod =r notes.txt"],'intermediate'],
  ["Make a symbolic link called latest.log that points to day3.log",["ln -s day3.log latest.log"],'intermediate'],
- ["Show the size and mode of secrets.txt in one go",["stat secrets.txt"],'intermediate'],
+ ["Show the size and mode of secrets.txt in one go",["stat secrets.txt","stat ./secrets.txt"],'intermediate'],
  ["Run ls missing but hide the error message",["ls missing 2>/dev/null","ls missing 2> /dev/null"],'intermediate'],
  ["Run ls missing and save its error message in errors.txt",["ls missing 2> errors.txt","ls missing 2>errors.txt"],'intermediate'],
- ["Run ls missing, send the error down the pipe and count the lines",["ls missing 2>&1 | wc -l"],'intermediate'],
+ ["Run ls missing, send the error down the pipe and count the lines",["ls missing 2>&1 | wc -l","ls missing 2>&1|wc -l"],'intermediate'],
  ["Run echo file: once for each name that ls prints",["ls | xargs -n1 echo file:","ls | xargs -n 1 echo file:"],'intermediate'],
- ["Delete every .log file that find lists under old",["find old -name *.log | xargs rm","find old -name \"*.log\" | xargs rm"],'intermediate'],
+ ["Delete every .log file that find lists under old (quote the pattern)",["find old -name \"*.log\" | xargs rm","find old -name '*.log' | xargs rm"],'intermediate',{exact:true}],
  ["Show the differences between a.txt and b.txt",["diff a.txt b.txt"],'intermediate']
 ];
 SQ.content.quickfire.push(...QF);
