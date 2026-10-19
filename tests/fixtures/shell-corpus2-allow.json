@@ -517,5 +517,73 @@
   "v='a\tb'; test -n $v && echo set || echo empty": {
     "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
     "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "printf \"%.0s-\" {1..10}; echo": {
+    "reason": "Task 5: printf honours precision, so %.0s prints nothing for its argument and only the literal dash is left (the brace range is still one literal word until brace expansion exists)",
+    "out": "-"
+  },
+  "printf \"%d\\n\" abc": {
+    "reason": "Task 5: the invalid-number message is bash-style, with the \"bash: \" prefix real bash prints (stdout still shows 0, status still 1)",
+    "out": "bash: printf: abc: invalid number\n0"
+  },
+  "printf \"%x\\n\" 255": {
+    "reason": "Task 5: %x was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "ff",
+    "code": 0
+  },
+  "printf \"%o\\n\" 8": {
+    "reason": "Task 5: %o was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "10",
+    "code": 0
+  },
+  "printf \"%c\\n\" abc": {
+    "reason": "Task 5: %c was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a",
+    "code": 0
+  },
+  "printf \"%.2s\\n\" abcdef": {
+    "reason": "Task 5: printf honours precision, so %.2s truncates the argument to \"ab\" instead of printing the directive text",
+    "out": "ab"
+  },
+  "printf \"%b\\n\" \"a\\tb\"": {
+    "reason": "Task 5: %b was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a\tb",
+    "code": 0
+  },
+  "printf \"%q\\n\" \"a b\"": {
+    "reason": "Task 5: %q was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a\\ b",
+    "code": 0
+  },
+  "printf \"%5.2f\\n\" 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": " 3.14"
+  },
+  "printf '%5.2f\\n' 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": " 3.14"
+  },
+  "printf \"%f\\n\" 1.5": {
+    "reason": "Task 5: %f now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "1.500000",
+    "code": 0
+  },
+  "printf \"%e\\n\" 1.5": {
+    "reason": "Task 5: %e was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "1.500000e+00",
+    "code": 0
+  },
+  "printf \"%.3f\\n\" 2": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "2.000"
+  },
+  "printf \"%u\\n\" 7": {
+    "reason": "Task 5: %u was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "7",
+    "code": 0
+  },
+  "printf \"%10.3f|\\n\" 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "     3.142|"
   }
 }

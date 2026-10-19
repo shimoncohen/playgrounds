@@ -2,7 +2,7 @@
 const {norm,getNode,writeFile,ok,E,lines,readInputs}=SQ;
 const CMDS=SQ.CMDS;
 const unsup=x=>E(`this practice shell does not support ${x} yet`);
-const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'v',basename:'asz',dirname:'z'};
+const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'iszuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z'};
 const badOpt=(cmd,ch)=>ch==='-'||(REAL[cmd]||'').includes(ch)?unsup(`${cmd} ${ch==='-'?'--long options':'-'+ch}`):E(`${cmd}: invalid option -- '${ch}'`);
 const isOpt=x=>x.length>1&&x[0]==='-'&&x!=='--';
 const MAX_SEQ=10000,MAX_OUT=200000,MAX_XARGS=1000,MAX_XDEPTH=3;
@@ -195,26 +195,19 @@ CMDS.diff=function(a,io){let q=false;const ops=[];
     else{out.push(`${rg(h.x0,na)}c${rg(h.y0,nb)}`);h.xs.forEach(l=>out.push('< '+l));out.push('---');h.ys.forEach(l=>out.push('> '+l))}}
   return {out:out.join('\n'),err:[],code:1}};
 
-// ---- printf ----
-function unesc(s){return s.replace(/\\(n|t|r|\\|"|'|a|0)/g,(_,c)=>({n:'\n',t:'\t',r:'\r','\\':'\\','"':'"',"'":"'",a:'\x07','0':'\0'}[c]))}
-CMDS.printf=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('printf',a[0][1]);
+// ---- printf ---- (the formatting lives in printf.js: SQ.fmtPrintf, shared with awk)
+CMDS.printf=function(a){let i=0,vname=null;
+  for(;i<a.length&&isOpt(a[i]);){
+    if(a[i][1]==='v'){if(a[i].length>2){vname=a[i].slice(2);i++}else{if(i+1>=a.length)return E("bash: printf: -v: option requires an argument",2);vname=a[i+1];i+=2}}
+    else return badOpt('printf',a[i][1])}
+  if(a[i]==='--')i++;
   if(i>=a.length)return E('printf: usage: printf format [arguments]');
-  const fmt=a[i],args=a.slice(i+1);const err=[];let ai=0,out='',bad=false,used;
-  const DIR=/%([-0]*)(\d*)([a-zA-Z%])/g;
-  const once=()=>{used=false;let last=0,res='';DIR.lastIndex=0;let m;
-    while((m=DIR.exec(fmt))){res+=unesc(fmt.slice(last,m.index));last=DIR.lastIndex;const [,fl,w,cv]=m;
-      if(cv==='%'){res+='%';continue}
-      if(+w>1000){err.push('printf: width too large for this practice shell');bad=true;return null}
-      let v;
-      if(cv==='s'){used=true;v=ai<args.length?args[ai++]:''}
-      else if(cv==='d'||cv==='i'){used=true;const raw=ai<args.length?args[ai++]:'0';if(!/^[+-]?\d+$/.test(raw)){err.push(`printf: ${raw}: invalid number`);bad=true;v='0'}else v=String(parseInt(raw,10))}
-      else{err.push(`printf: %${cv}: invalid directive`);bad=true;return null}
-      const W=+w;if(v.length<W)v=fl.includes('-')?v.padEnd(W):(fl.includes('0')&&cv!=='s'?v.padStart(W,'0'):v.padStart(W));res+=v}
-    res+=unesc(fmt.slice(last));return res};
-  let guard=0;
-  do{const r=once();if(r===null)break;out+=r;if(out.length>MAX_OUT)return E('printf: output too large for this practice shell');if(++guard>10000)break}while(used&&ai<args.length);
-  if(bad&&out===''&&err.length&&/invalid directive|too large/.test(err[0]))return {out:'',err,code:1};
-  return {out:out.endsWith('\n')?out.slice(0,-1):out,err,code:bad?1:0}};
+  if(vname!==null&&(!/^[A-Za-z_]\w*$/.test(vname)||SQ.badName(vname)))return E(`bash: printf: \`${vname}': not a valid identifier`,2);
+  const r=SQ.fmtPrintf(a[i],a.slice(i+1));
+  const err=r.err?r.err.split('\n'):[];
+  if(r.err&&r.text===''&&/printf: (width|precision|output) too large|invalid directive/.test(r.err))return {out:'',err,code:1};
+  if(vname!==null){if(r.text.length>SQ.LIM.VAR)return E('bash: printf: value too large for this practice shell',1);SQ.S.vars[vname]=r.text;return {out:'',err,code:r.code}}
+  return {out:r.text.endsWith('\n')?r.text.slice(0,-1):r.text,err,code:r.code}};
 
 // ---- basename / dirname ----
 CMDS.basename=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('basename',a[0][1]);

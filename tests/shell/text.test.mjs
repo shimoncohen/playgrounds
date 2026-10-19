@@ -161,7 +161,8 @@ describe('printf', () => {
     assert.match(out('printf'), /printf: usage/);
     assert.match(out('printf "%d" x'), /printf: x: invalid number/);
     assert.match(out('printf "%99999999s" x'), /printf: .*too (large|long)/);
-    assert.match(out('printf "%q" x'), /printf: %q: invalid directive/);
+    assert.match(out('printf "%z" x'), /printf: %z: invalid directive/);
+    assert.equal(out('printf "%q" x'), 'x', '%q is a real conversion now');
   });
 });
 
