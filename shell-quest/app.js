@@ -10,14 +10,12 @@ const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderTex
 let histIdx=S.hist.length;
 
 /* Script and challenge missions are re-checked on every call (a Save, a typed line, Save & run): scriptPasses bails out at once when the file is missing and runs in a sandbox.
-   A custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case,
+   SQ.missionVerdict decides: a custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case,
    but only when the file that ran (opts.ranAbs) is the mission's own file: running some other file says nothing about it. */
 const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
   const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
-  try{const c=ctxFor(line);
-    if(typeof m.check==='function'){good=!!m.check(c);if(!good&&explain&&m.tests)failed=c.scriptPasses(m).failed||null}
-    else if(isScript(m)&&m.file){const r=c.scriptPasses(m);good=!!r.ok;failed=r.failed||null}}catch(e){}
+  try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
   if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');

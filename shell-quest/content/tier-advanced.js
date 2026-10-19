@@ -116,7 +116,7 @@ const backupWorld=fn=>SQ.sandbox(()=>{const h=SQ.getNode(SQ.HOME);
 const LOG_CASE2={'logs/app.log':'started','logs/cache.log':'hit\nmiss\nhit','logs/db.log':'a\nb\nc\nd\ne','logs/web.log':'GET /\nGET /map'};
 const TRIP={'trip/day one.txt':'Left the village at dawn.','trip/day two.txt':'Crossed the river.','trip/route.md':'north, then east'};
 const DOCS_COPIED=Object.assign(under('backup',{'ideas.txt':DOCS['ideas.txt'],'notes.txt':DOCS['notes.txt'],'todo.txt':DOCS['todo.txt']}),
-  {'backup/readme.md':'(missing)'}); /* scriptPasses reports an absent file as (missing): the .md must not be copied */
+  {'backup/readme.md':'(missing)'},under('docs',DOCS)); /* scriptPasses reports an absent file as (missing): the .md must not be copied; the originals must stay (mv fails) */
 const BACKUP={title:'Capstone: backup script',kind:'challenge',file:'scripts/backup.sh',
   goal:`Write <code>scripts/backup.sh</code>. Given a folder, it creates <code>backup/</code> if it is missing, copies every <code>.txt</code> file of that folder into it and prints <code>backed up N files</code>. With no argument, or one that is not a folder, it prints a usage line on stderr and exits with 1. Try <code>bash scripts/backup.sh docs</code>.`,
   anat:[['[ -d "$1" ]','cmd'],['>&2','op'],['exit 1','kw'],['mkdir -p backup','cmd'],['for','kw'],['f','var'],['in "$1"/*.txt','arg'],['cp "$f" backup/','cmd'],['n=$((n + 1))','var'],['echo "backed up $n files"','cmd']],
@@ -129,18 +129,22 @@ const BACKUP={title:'Capstone: backup script',kind:'challenge',file:'scripts/bac
 # 4. Print: backed up N files
 `,
   wrong:[BACKUP_ANSWER.replace('"$1"/*.txt','"$1"/*'),BACKUP_ANSWER.replace('mkdir -p backup\n',''),BACKUP_ANSWER.replace('exit 1','exit 0'),
-    BACKUP_ANSWER.replace('for f in "$1"/*.txt','for f in $(ls "$1"/*.txt)')],
+    BACKUP_ANSWER.replace('for f in "$1"/*.txt','for f in $(ls "$1"/*.txt)'),BACKUP_ANSWER.replace('cp "$f" backup/','mv "$f" backup/')],
   tests:[
-    {label:'the docs folder',args:['docs'],files:under('docs',DOCS),expectOut:'backed up 3 files',expectFiles:DOCS_COPIED},
+    {label:'docs, in a world with no backup/ yet',args:['docs'],files:under('docs',DOCS),expectOut:'backed up 3 files',expectFiles:DOCS_COPIED},
     {label:'an empty folder',args:['drafts'],expectOut:'backed up 0 files'},
     {label:'a folder that does not exist',args:['nowhere'],expectOut:'',expectErrMatch:'usage',expectCode:1},
     {label:'no argument',args:[],expectOut:'',expectErrMatch:'usage',expectCode:1},
     {label:'a second run over an old backup',args:['docs'],files:Object.assign(under('docs',DOCS),{'backup/todo.txt':'an old copy'}),expectOut:'backed up 3 files',expectFiles:{'backup/todo.txt':DOCS['todo.txt']}},
     {label:'names with spaces',args:['trip'],files:TRIP,expectOut:'backed up 2 files',expectFiles:{'backup/day one.txt':TRIP['trip/day one.txt'],'backup/day two.txt':TRIP['trip/day two.txt']}}],
+  world:backupWorld, /* the check and the Save & run failure line (SQ.missionVerdict) both judge this world */
   check:c=>backupWorld(()=>c.scriptPasses(BACKUP).ok),
   hint:`Start from the starter's four steps. Loop with <code>for f in "$1"/*.txt</code>, skip the pattern itself when nothing matched (<code>[ -e "$f" ] || continue</code>), and count with <code>n=$((n + 1))</code>. Save it, then run <code>bash scripts/backup.sh docs</code> and <code>bash scripts/backup.sh drafts</code>.`,
-  explain:`This puts the whole Advanced tier together: a test on <code>$1</code> with a usage line on stderr and <code>exit 1</code>, <code>mkdir -p</code> (no error when the folder is already there), a loop over a wildcard and a running count. When a folder has no <code>.txt</code> files the pattern matches nothing and stays as it is, so the loop sees the text <code>drafts/*.txt</code> once: the <code>[ -e "$f" ]</code> test skips it. The wildcard hands the loop each name whole, spaces and all, while <code>for f in $(ls …)</code> would cut <code>day one.txt</code> in two. Write <code>"$f"</code> with quotes too: real bash splits an unquoted variable at its spaces, even where this practice shell does not. Each time you save, the script is tried on a world with no <code>backup/</code>: on <code>docs</code>, the empty <code>drafts</code>, a missing folder, no argument, a second run over an old copy and names with spaces.`};
+  explain:`This puts the whole Advanced tier together: a test on <code>$1</code> with a usage line on stderr and <code>exit 1</code>, <code>mkdir -p</code> (no error when the folder is already there), a loop over a wildcard and a running count. When a folder has no <code>.txt</code> files the pattern matches nothing and stays as it is, so the loop sees the text <code>drafts/*.txt</code> once: the <code>[ -e "$f" ]</code> test skips it. The wildcard hands the loop each name whole, spaces and all, while <code>for f in $(ls …)</code> would cut <code>day one.txt</code> in two. Always write <code>"$f"</code> with quotes: bash splits an unquoted variable at its spaces (this practice shell is more forgiving, but real bash is not). Each time you save, the script is tried on a world with no <code>backup/</code>: on <code>docs</code>, the empty <code>drafts</code>, a missing folder, no argument, a second run over an old copy and names with spaces. The originals must stay in <code>docs</code>: copy with <code>cp</code>, do not move them.`};
 
+/* a here-document (<<WORD, <<-WORD, <<'WORD') outside comment lines; <<< is a here-string, not a here-document */
+const usesHereDoc=text=>text.split('\n').some(l=>!/^\s*#/.test(l)&&/(^|[^<])<<-?\s*['"]?[A-Za-z_]\w*/.test(l));
+let MKCONF;
 const CH=[
 {tier:'advanced',name:'Decisions',badge:'Decider',intro:'Scripts have to choose: do this if a file is there, that if it is not. Every choice starts with a test, a command that answers yes or no through its exit code.',
  learned:['[ -f file ]','test','if … then … else … fi','-gt -lt -eq','case … esac','[[ == pattern ]]'],setup:seedAdvanced,
@@ -363,7 +367,7 @@ echo "Hello, name!"
   tests:[{label:'Ada on stdin',stdin:'Ada\n',expectOut:'Hello, Ada!'},{label:'Grace on stdin',stdin:'Grace\n',expectOut:'Hello, Grace!'}],
   hint:`One <code>read name</code>, then an echo with <code>"$name"</code> in it. Save it, then try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>.`,
   explain:`read takes the next line of the script's input (stdin): whatever is piped or redirected into the script, or what you put in the editor's input box. That is not the same as arguments: <code>$1</code> is typed after the script's name, input arrives on its own. Each time you save, the script is given Ada and then Grace as input.`},
- {title:'Script: write a config',kind:'script',file:'scripts/mkconf.sh',
+ MKCONF={title:'Script: write a config',kind:'script',file:'scripts/mkconf.sh',
   goal:`Write <code>scripts/mkconf.sh</code>: with a here-document, it writes <code>app.conf</code> holding the two lines <code>name=quest</code> and <code>mode=fast</code>. Running it again must leave the same file.`,
   anat:[['cat','cmd'],['> app.conf','op'],['<<EOF','op'],['name=quest','arg'],['mode=fast','arg'],['EOF','kw']],
   answer:MKCONF_ANSWER,
@@ -389,6 +393,8 @@ name=quest
 mode=fast
 EOF
 `],
+  check:c=>usesHereDoc(c.read('~/scripts/mkconf.sh'))&&c.scriptPasses(MKCONF).ok,
+  checkFail:'The file is right, but write it with a here-document: cat > app.conf <<EOF, the two lines, then EOF.',
   tests:[{label:'a first run',expectFiles:{'app.conf':'name=quest\nmode=fast'}},{label:'running it a second time',files:{'app.conf':'name=quest\nmode=fast'},expectFiles:{'app.conf':'name=quest\nmode=fast'}}],
   hint:`Put <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, run <code>bash scripts/mkconf.sh</code> twice, then <code>cat app.conf</code>.`,
   explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in scripts: this practice shell runs one typed line at a time.`},

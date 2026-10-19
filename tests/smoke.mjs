@@ -895,3 +895,33 @@ test('shell-quest script mission: Save & run on some other file prints no failur
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('shell-quest capstone: with a leftover backup/, a script that never makes it is refused and Save & run says why; 15.5 asks for a here-document', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  const xp = () => page.evaluate(() => window.SQ.S.xp);
+  await page.click('.chap[data-ch="14"]');
+  await page.waitForFunction(() => window.SQ.S.ch === 14);
+  await page.click('#mission button[data-mi="6"]');
+  await type('mkdir -p backup');
+  const m = await page.evaluate(() => { const m = window.SQ.content.chapters[14].missions[6]; return { file: m.file, wrong: m.wrong, answer: m.answer }; });
+  await type(`nano ${m.file}`);
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', m.wrong[1]);
+  await page.fill('#edArgs', 'docs');
+  await page.click('#edRun');
+  await waitScreen(/Test 1 \(docs, in a world with no backup\/ yet\) failed/);
+  assert.equal(await xp(), 0);
+  await page.fill('#edText', m.answer);
+  await page.click('#edRun');
+  await waitScreen(/Mission complete: Capstone: backup script/);
+  await page.click('#edClose');
+  await page.click('#mission button[data-mi="4"]');
+  await type('nano scripts/mkconf.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', '#!/bin/bash\necho name=quest > app.conf\necho mode=fast >> app.conf\n');
+  await page.click('#edRun');
+  await waitScreen(/write it with a here-document/);
+  assert.equal(await page.evaluate(() => !!window.SQ.S.done['14.4']), false);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

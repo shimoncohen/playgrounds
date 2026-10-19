@@ -664,6 +664,15 @@ describe('chapter 15 (Real scripts) checks', () => {
     assert.equal(ok(m.starter), false);
     for (const w of m.wrong) assert.equal(ok(w), false, w);
     assert.equal(ok('#!/bin/bash\ncat >> app.conf <<EOF\nname=quest\nmode=fast\nEOF\n'), false, 'appends: the second run doubles the file');
+    assert.equal(ok('#!/bin/bash\ncat > app.conf <<-EOF\n\tname=quest\n\tmode=fast\n\tEOF\n'), true, '<<- with tabs');
+    assert.equal(ok('#!/bin/bash\ncat > app.conf << "END"\nname=quest\nmode=fast\nEND\n'), true, 'quoted delimiter after a space');
+    const echoes = '#!/bin/bash\n# cat > app.conf <<EOF would be nicer\necho name=quest > app.conf\necho mode=fast >> app.conf\n';
+    assert.equal(ok(echoes), false, 'no here-document (a comment does not count)');
+    assert.equal(ok('#!/bin/bash\nprintf "name=quest\\nmode=fast\\n" > app.conf\n'), false, 'printf, no here-document');
+    put(SQ, m, echoes);
+    const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
+    assert.equal(v.good, false);
+    assert.match(SQ.scriptFailLine(m, v.failed), /here-document: cat > app\.conf <<EOF/);
     assert.ok(why('#!/bin/bash\ncat >> app.conf <<EOF\nname=quest\nmode=fast\nEOF\n')
       .startsWith('Test 2 (running it a second time) failed: expected "name=quest\\nmode=fast", got "name=quest\\nmode=fast\\nname=quest'));
     // the real run: the answer writes the file the goal describes, and a second run leaves it the same
@@ -702,6 +711,10 @@ describe('chapter 15 (Real scripts) checks', () => {
     assert.equal(ok(m.answer.replace('exit 1', 'exit 0')), false, 'always exits 0');
     assert.equal(ok(m.answer.replace('for f in "$1"/*.txt', 'for f in $(ls "$1"/*.txt)')), false, 'looping over $(ls): names with spaces break');
     assert.equal(ok(m.answer.replace('  [ -e "$f" ] || continue\n', '')), false, 'an empty folder counts 1');
+    assert.equal(ok(m.answer.replace('cp "$f" backup/', 'mv "$f" backup/')), false, 'mv empties docs/');
+    assert.equal(ok(m.answer.replace('cp "$f" backup/', 'cp -- "$f" backup/')), true, 'cp --');
+    assert.equal(ok(m.answer.replace('cp "$f" backup/', 'cp "$f" "backup/$(basename "$f")"')), true, 'cp to a full name');
+    assert.equal(ok('#!/bin/bash\nif [ ! -d "$1" ]; then\n  echo "usage: backup.sh DIR" 1>&2\n  exit 1\nfi\n[ -d backup ] || mkdir backup\nn=0\nfor f in "$1"/*.txt; do\n  [ -f "$f" ] && cp "$f" backup/ && n=$((n+1))\ndone\necho "backed up $n files"\n'), true, 'mkdir without -p, && chain');
     assert.equal(ok('#!/bin/bash\nmkdir -p backup\ncp "$1"/*.txt backup/\necho "backed up 3 files"\n'), false, 'hardcoded count');
     // backup/ left over from an earlier run (Beginner mission 6.7 also makes one) does not hide a script that never creates it
     run(SQ, 'mkdir -p backup');
@@ -709,7 +722,14 @@ describe('chapter 15 (Real scripts) checks', () => {
     // nor do learner edits to docs/ and drafts/ break the answer
     run(SQ, 'echo extra > docs/extra.txt; echo x > drafts/x.txt; rm docs/todo.txt');
     assert.equal(ok(m.answer), true, 'the check runs on the seeded docs/ and an empty drafts/');
-    assert.equal(why(noMkdir).startsWith('Test '), true);
+    // the Save & run explanation judges the same clean world as the check, so it names the failing case
+    put(SQ, m, noMkdir);
+    const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
+    assert.equal(v.good, false);
+    assert.ok(v.failed, 'a failure line, not silence');
+    assert.equal(SQ.scriptFailLine(m, v.failed), 'Test 1 (docs, in a world with no backup/ yet) failed: expected "A bridge over the river.", got "(missing)"');
+    put(SQ, m, m.answer);
+    assert.deepEqual(JSON.parse(JSON.stringify(SQ.missionVerdict(m, SQ.ctxFor(''), true))), { good: true, failed: null });
     // through the terminal: the answer backs up the seeded docs and keeps their contents
     const S2 = loadShell();
     S2.setupChapter(S2.content.chapters[R15]);

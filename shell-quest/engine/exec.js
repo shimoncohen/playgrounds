@@ -112,9 +112,18 @@ function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,l
   out:()=>SQ.rt.lastOut||'',exists:p=>!!nd(p),runScript:(p,a,i)=>sandboxRun(p,a,i),scriptPasses}}
 /* A chapter's setup(), plus the `starter` text of its script/challenge missions: written only where the file is absent, so revisiting a chapter never clobbers saved work. */
 function setupChapter(ch){ch.setup();for(const m of ch.missions)if(m.file&&typeof m.starter==='string'&&(m.kind==='script'||m.kind==='challenge'))SQ.ensureFile(m.file,m.starter)}
+/* missionVerdict(m, c, why): {good, failed} for any mission. A custom m.check wins; script/challenge missions without one use scriptPasses.
+   With why, a failed script/challenge mission also says why: the first failing case, judged inside the same world the check uses
+   (m.world: fn => result, e.g. a sandbox with no leftover backup/), or m.checkFail when every case passes but the check still says no. */
+function missionVerdict(m,c,why){const isScript=m.kind==='script'||m.kind==='challenge',world=typeof m.world==='function'?m.world:(fn=>fn());
+  if(typeof m.check==='function'){const good=!!m.check(c);let failed=null;
+    if(!good&&why&&isScript&&m.tests){failed=world(()=>c.scriptPasses(m)).failed||null;if(!failed&&m.checkFail)failed={index:-2,label:'check',text:m.checkFail}}
+    return {good,failed}}
+  if(isScript&&m.file){const r=world(()=>c.scriptPasses(m));return {good:!!r.ok,failed:r.failed||null}}
+  return {good:false,failed:null}}
 /* the one err line explaining a failed test case (scriptPasses().failed), at most 120 characters */
 const oneLine=(t,n)=>{t=t.replace(/\n/g,'\\n');return t.length>n?t.slice(0,n-3)+'...':t};
-function scriptFailLine(m,f){if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
+function scriptFailLine(m,f){if(f.index===-2)return oneLine(f.text,120);if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
   return oneLine(`Test ${f.index+1} (${f.label}) failed: expected "${f.expected}", got "${f.got}"`,120)}
-Object.assign(SQ,{runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine});
+Object.assign(SQ,{runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict});
 })(window.SQ = window.SQ || {});
