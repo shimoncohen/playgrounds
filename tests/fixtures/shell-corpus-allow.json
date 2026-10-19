@@ -1,1 +1,113 @@
-{}
+{
+  "echo $$": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "1234"
+  },
+  "echo $0": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "bash"
+  },
+  "echo \"$@\"": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": ""
+  },
+  "echo $#": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "0"
+  },
+  "echo ${X:-default}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "default"
+  },
+  "echo ${#HOME}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "14"
+  },
+  "echo $((1+2))": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )))",
+    "out": "3",
+    "code": 0
+  },
+  "echo $(( 3 * 4 ))": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )); unquoted ( ) or { })",
+    "out": "12",
+    "code": 0
+  },
+  "X=3; echo $((X+1))": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )))",
+    "out": "4",
+    "code": 0,
+    "vars": {
+      "X": "3"
+    }
+  },
+  "X=abc; echo ${#X}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "3"
+  },
+  "echo ${UNSET:-fallback}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "fallback"
+  },
+  "echo ${HOME:-no}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "/home/explorer"
+  },
+  "echo $(( 1 + 2 ))": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )); unquoted ( ) or { })",
+    "out": "3",
+    "code": 0
+  },
+  "echo $((2*3))": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )))",
+    "out": "6",
+    "code": 0
+  },
+  "echo $((": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (arithmetic $(( )))",
+    "out": "bash: unexpected EOF while looking for matching '))'"
+  },
+  "echo ${X:=v}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "v",
+    "vars": {
+      "X": "v"
+    }
+  },
+  "echo ${X:+v}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": ""
+  },
+  "echo ${HOME#/home}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "/explorer"
+  },
+  "echo ${HOME%/explorer}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "/home"
+  },
+  "echo ${HOME/home/h}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "/h/explorer"
+  },
+  "echo ${#}": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "0"
+  },
+  "echo $*": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": ""
+  },
+  "X=1\necho \"$X $1 $@ $#\"": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "1   0"
+  },
+  "echo \"echo \\$# args\" > x.sh\nbash x.sh a b c": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "0 args"
+  },
+  "echo \"echo \\${X:-d}\" > x.sh\nbash x.sh": {
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
+    "out": "d"
+  }
+}

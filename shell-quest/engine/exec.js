@@ -15,7 +15,7 @@ function runCmd(words,io){
   if(!words.length)return ok();
   SQ.step();
   const args=[];let globbed=false;let ew;
-  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;return E((e.raw?'':'bash: ')+e.message,2)}
+  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;return E((e.raw?'':'bash: ')+e.message,e.code||2)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
   if(!ew.length)return Object.assign(ok(),{err:pend});
   for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
@@ -33,7 +33,7 @@ function runCmd(words,io){
   return r}
 
 const FOR_RE=/^for\s+([A-Za-z_]\w*)\s+in\s+(.*?)\s*;\s*do\s+(.*?)\s*;?\s*done\s*$/;
-const errOut=e=>({out:[{text:(e.raw?'':'bash: ')+e.message,cls:'err'}],code:2});
+const errOut=e=>({out:[{text:(e.raw?'':'bash: ')+e.message,cls:'err'}],code:e.code||2});
 let nest=0;
 /* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
@@ -68,7 +68,7 @@ function execLine0(line,o){const res=[];let code=0;
     for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1;
       let out=null,inp=null,err=null;
       try{if(c.out)out={path:expandOne(c.out.w),append:c.out.append};if(c.inp)inp=expandOne(c.inp);if(c.err)err=c.err.dup?c.err:{path:expandOne(c.err.w),append:c.err.append}}
-      catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:(e.raw?'':'bash: ')+e.message,cls:'err'});code=2;break}
+      catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:(e.raw?'':'bash: ')+e.message,cls:'err'});code=e.code||2;break}
       res.push(...CTX.pend.splice(0));
       if(inp!==null){if(isNull(inp))stdin='';else{const n=getNode(norm(inp));if(!n||n.type!=='file'){res.push({text:`bash: ${inp}: No such file or directory`,cls:'err'});code=1;break}stdin=n.content}}
       let bad=false;

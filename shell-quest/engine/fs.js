@@ -47,7 +47,10 @@ const S=fresh();
 SQ.S=S;
 SQ.fresh=fresh;
 SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];Object.assign(S,next)};
-SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,onSaveFail:null};
+SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,onSaveFail:null,frames:[]};
+/* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame. */
+const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
+SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
 /* Caps that stop runaway commands. TEXT: longest text one command, pipe stage or file may hold. LINES: screen lines per typed line.
    STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. STATE: most file text the whole world may hold (keeps the save well inside localStorage). */
 const LIM={TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000};

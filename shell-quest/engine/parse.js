@@ -5,13 +5,46 @@ const M=(c,s)=>'\x01'+c+s+'\x02';
 const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
-function getVar(k){if(k==='?')return String(S.last);if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
-  return ({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'})[k]||''}
-const VRX=/^\$(\{(\w+)\}|(\w+|\?))/;
+const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'});
+function getVar(k){const f=SQ.frame();
+  if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
+  if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
+  if(f.locals&&f.locals.has(k)){const v=f.locals.get(k);return v===undefined?'':v}
+  if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
+  return BUILTIN_VARS()[k]||''}
+const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+function isSet(k){const f=SQ.frame();
+  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
+  if(/^\d+$/.test(k))return +k<=f.args.length;
+  if(f.locals&&f.locals.has(k))return f.locals.get(k)!==undefined;
+  return own(S.vars,k)||own(BUILTIN_VARS(),k)}
+function setVar(k,v){const f=SQ.frame();
+  if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
+  if(f.locals&&f.locals.has(k))f.locals.set(k,v);else S.vars[k]=v}
+const perr=(m,code)=>Object.assign(new Error(m),{code});
+const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
 const CTX={depth:0,pend:[],sub:0};
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
+/* $(( ... )): index of the final ) of the closing )) (nested parentheses balanced). */
+function scanArith(line,i){let d=0;
+  for(let j=i+3;j<line.length;j++){const c=line[j];
+    if(c==='(')d++;else if(c===')'){if(d>0)d--;else if(line[j+1]===')')return j+1;else break}}
+  throw new Error("unexpected EOF while looking for matching '))'")}
+/* ${ ... }: index of the matching }. Honours quotes, nested ${ } and $( ). */
+function scanBrace(line,i,dq){let d=1,j=i+2;
+  while(j<line.length){const c=line[j];
+    if(c==="'"&&!dq){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
+    if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;else if(line[j]==='$'&&line[j+1]==='(')j=scanSub(line,j);j++}
+      if(j>=line.length)break;j++;continue}
+    if(c==='\\'){j+=2;continue}
+    if(c==='$'&&line[j+1]==='{'){d++;j+=2;continue}
+    if(c==='$'&&line[j+1]==='('){j=scanSub(line,j)+1;continue}
+    if(c==='}'){d--;if(d===0)return j}
+    j++}
+  throw new Error("unexpected EOF while looking for matching '}'")}
 function scanSub(line,i){
-  if(line[i+2]==='(')throw unsup('$(( )) arithmetic');
+  if(line[i+2]==='(')return scanArith(line,i);
   let d=0,j=i+1;
   while(j<line.length){const c=line[j];
     if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
@@ -28,10 +61,70 @@ function runSub(cmd){
     S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;if(sv.exp)S.exp=sv.exp;else delete S.exp}
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
   return v.join('\n').replace(/\n+$/,'')}
+/* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
+   list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */
+const arithEnv={get:k=>getVar(k),set:(k,v)=>setVar(k,v)};
+function arithVal(expr){
+  try{return SQ.arith(expandStr(expr),arithEnv)}catch(e){if(e&&e.stop)throw e;if(e&&e.code===undefined)e.code=1;throw e}}
+function evalDollar(line,i,dry,dq){
+  if(line[i+1]==='('&&line[i+2]==='('){const e=scanArith(line,i);return {end:e+1,val:dry?'':arithVal(line.slice(i+3,e-1))}}
+  if(line[i+1]==='{'){const e=scanBrace(line,i,dq);if(dry)return {end:e+1,val:''};
+    const r=braceVal(line.slice(i+2,e));r.end=e+1;return r}
+  const m=line.slice(i).match(VRX);if(!m)return null;
+  const k=m[1];return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
+/* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
+function expandStr(s,dq){let o='',j=0;
+  while(j<s.length){const c=s[j];
+    if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=s.slice(j+1,k);j=k+1;continue}
+    if(c==='"'&&!dq){let k=j+1;while(k<s.length&&s[k]!=='"'){if(s[k]==='\\')k++;k++}
+      if(k>=s.length){o+=c;j++;continue}o+=expandStr(s.slice(j+1,k),true);j=k+1;continue}
+    if(c==='\\'&&j+1<s.length){if(dq&&!'$`"\\'.includes(s[j+1]))o+='\\';o+=s[j+1];j+=2;continue}
+    if(c==='$'){
+      if(s[j+1]==='('&&s[j+2]!=='('){const e=scanSub(s,j);o+=runSub(s.slice(j+2,e));j=e+1;continue}
+      const d=evalDollar(s,j,false,dq);if(d){o+=d.list?d.list.join(' '):d.val;j=d.end;continue}}
+    o+=c;j++}
+  return o}
+const pguard=v=>{if(v.length>5000)throw perr('value too long for this practice shell',1)};
+const dotall=p=>new RegExp(globRe(p).source,'s');
+function braceVal(body){let m;
+  if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body)))return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)};
+  m=/^(\w+|[?@*#$!])/.exec(body);if(!m)throw perr('${'+body+'}: bad substitution',1);
+  const k=m[1],rest=body.slice(k.length);
+  if(rest==='')return (k==='@'||k==='*')?{val:getVar(k),list:SQ.frame().args.slice()}:{val:getVar(k)};
+  const val=getVar(k),set=isSet(k),n=val.length;
+  if((m=/^(:?)([-=+?])([\s\S]*)$/.exec(rest))){const nul=m[1]===':',op=m[2],w=m[3],empty=!set||(nul&&val==='');
+    if(op==='-')return {val:empty?expandStr(w):val};
+    if(op==='=')return {val:empty?(()=>{const d=expandStr(w);setVar(k,d);return d})():val};
+    if(op==='+')return {val:empty?'':expandStr(w)};
+    if(empty)throw perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1);
+    return {val}}
+  if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const re=dotall(expandStr(m[2])),op=m[1];
+    if(op==='#'){for(let j=0;j<=n;j++)if(re.test(val.slice(0,j)))return {val:val.slice(j)}}
+    else if(op==='##'){for(let j=n;j>=0;j--)if(re.test(val.slice(0,j)))return {val:val.slice(j)}}
+    else if(op==='%'){for(let j=n;j>=0;j--)if(re.test(val.slice(j)))return {val:val.slice(0,j)}}
+    else{for(let j=0;j<=n;j++)if(re.test(val.slice(j)))return {val:val.slice(0,j)}}
+    return {val}}
+  if((m=/^(\/\/?)([\s\S]*)$/.exec(rest))){pguard(val);const all=m[1]==='//',t=m[2];
+    let cut=-1;for(let j=0;j<t.length;j++){if(t[j]==='\\')j++;else if(t[j]==='/'){cut=j;break}}
+    const pat=expandStr(cut<0?t:t.slice(0,cut)),rep=cut<0?'':expandStr(t.slice(cut+1));
+    if(!pat)return {val};const re=dotall(pat);let out='',p=0;
+    while(p<n){SQ.step();let e=n;while(e>p&&!re.test(val.slice(p,e)))e--;
+      if(e>p){out+=rep;p=e;if(!all)return {val:out+val.slice(p)}}else out+=val[p++]}
+    return {val:out}}
+  if(rest[0]===':'){const a=rest.slice(1),c=a.indexOf(':');
+    const num=x=>{const r=Number(arithVal(x));return r};
+    let off=num(c<0?a:a.slice(0,c));const len=c<0?undefined:num(a.slice(c+1));
+    if(off<0)off=Math.max(0,n+off);
+    return {val:len===undefined?val.slice(off):len<0?val.slice(off,n+len):val.slice(off,off+len)}}
+  throw perr('${'+body+'}: bad substitution',1)}
 /* opt.dry: only find structure (no substitution, words keep their raw source); default: expand for real. opt.nosplit: substitution results stay one word. */
 function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const toks=[];let i=0,cur=null;
-  const push=()=>{if(cur){toks.push({t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
+  const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push({t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
+  /* splice a substitution result into the current word, splitting it on whitespace; e = index of the expansion's last character */
+  const inject=(val,e)=>{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
+    if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
+    else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}};
   const fresh=()=>({v:'',glob:false,s:i});
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
@@ -47,18 +140,21 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     if(c==='~'&&!cur&&(i+1>=line.length||/[\s\/|;&<>]/.test(line[i+1]))){cur={v:HOME,glob:false,s:i};i++;continue}
     cur=cur||fresh();
     if(c==="'"){const j=line.indexOf("'",i+1);if(j<0)throw new Error("unclosed ' quote. Every opening quote needs a closing one.");cur.v+=line.slice(i+1,j);cur.keep=true;i=j+1;continue}
-    if(c==='"'){let j=i+1,s='';cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
-        if(line[j]==='$'&&line[j+1]==='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
-        if(line[j]==='$'){const m=line.slice(j).match(VRX);if(m){s+=getVar(m[2]||m[3]);j+=m[0].length;continue}}s+=line[j];j++}
-      if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;i=j+1;continue}
-    if(c==='$'&&line[i+1]==='('){const e=scanSub(line,i);
+    if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
+        if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
+        if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
+          if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
+            if(!d.list.length)atEmpty=true;else{s+=d.list[0];for(let k=1;k<d.list.length;k++){cur.v+=s;push();cur=fresh();s=d.list[k]}}}
+          else s+=d.list?d.list.join(' '):d.val;
+          j=d.end;continue}}s+=line[j];j++}
+      if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;if(atEmpty&&s===''&&cur.v==='')cur.empt=true;i=j+1;continue}
+    if(c==='$'&&line[i+1]==='('&&line[i+2]!=='('){const e=scanSub(line,i);
       if(!dry){const val=runSub(line.slice(i+2,e));
-        if(opt.nosplit)cur.v+=val;
-        else{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
-          if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
-          else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}}}
+        if(opt.nosplit)cur.v+=val;else inject(val,e)}
       i=e+1;continue}
-    if(c==='$'){const m=line.slice(i).match(VRX);if(m){cur.v+=getVar(m[2]||m[3]);i+=m[0].length;continue}}
+    if(c==='$'){const d=evalDollar(line,i,dry,false);if(d){
+      if(d.list&&!opt.nosplit)inject(d.list.join(' '),d.end-1);else cur.v+=d.list?d.list.join(' '):d.val;
+      i=d.end;continue}}
     if(c==='\\'&&i+1<line.length){cur.v+=line[i+1];i+=2;continue}
     if(c==='*'||c==='?')cur.glob=true;
     cur.v+=c;i++}
