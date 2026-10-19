@@ -43,4 +43,4 @@ jobs:
 
       # The engine tests already ran above; `npm test` would run them a second time.
       - name: Browser smoke and golden tests
-        run: node tests/smoke.mjs && node tests/shell-golden.mjs
+        run: npm run test:browser

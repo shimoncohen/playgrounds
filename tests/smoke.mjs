@@ -343,9 +343,12 @@ test('shell-quest quick-fire: single-quote question rejects expanding forms, tee
   await page.click('#t-fire');
   await page.selectOption('#fTier', 'intermediate');
   await page.click('#fStart');
+  const poolSize = await page.evaluate(() => SQ.content.quickfire.filter(q => q[2] === 'intermediate').length);
   const tryAnswer = async (task, ans) => {
-    for (let i = 0; i < 40 && (await page.textContent('#fTask')) !== task; i++) await page.click('#fSkip');
-    assert.equal(await page.textContent('#fTask'), task);
+    // Every answer (right or wrong) moves on, and the queue reshuffles when it runs out, so the target comes
+    // round again within two passes of the pool; allow three before failing.
+    for (let i = 0; i < poolSize * 3 && (await page.textContent('#fTask')) !== task; i++) await page.click('#fSkip');
+    assert.equal(await page.textContent('#fTask'), task, `question never came up within ${poolSize * 3} skips`);
     await page.fill('#fIn', ans);
     await page.press('#fIn', 'Enter');
     return (await page.textContent('#fFb')).trim();
