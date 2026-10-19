@@ -172,7 +172,7 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     const copy=move?sn:clone(sn);
     if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
     if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
-    par.children[name]=copy;markTree(tabs,copy)}
+    par.children[name]=copy;markTree(tabs,copy,!move);SQ.grewCheck()}
   return {out:'',err,code:err.length?1:0,tips}}
 
 /* nano/edit/vi/vim FILE: no file is made here; the page opens its editor on the absolute path and Save writes it */

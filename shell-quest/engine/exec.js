@@ -14,7 +14,7 @@ function runCmd(words,io){
   for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
   const name=args[0],a=args.slice(1);let r,lname=name;
   if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];lname='(assign)';
-    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{S.vars[k]=name.slice(k.length+1);r=ok()}}
+    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{const v=name.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');S.vars[k]=v;r=ok()}}
   else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
@@ -44,7 +44,7 @@ const errOut=e=>({out:[{text:errOf(e),cls:'err'}],code:e.code||2});
 let nest=0;
 /* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
-  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.outChars=0}
+  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.outChars=0;SQ.rt.grewBy=0}
   const sd=CTX.depth;CTX.depth=o.depth;nest++;
   try{const r=execLine0(line,o);if(!outer)return r;
     SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */

@@ -43,7 +43,7 @@ SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const 
   const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
   if(e){addLine(renderText(e),'err');scrollDown();return false}
   addLine(renderText('Saved '+shown),'sys');
-  SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last; /* a Save is judged on its own, never on the line typed before it */
+  SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last; /* a Save is judged on its own, never on the line typed before it */
   checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;

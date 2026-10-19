@@ -23,6 +23,7 @@ function isSet(k){const f=SQ.frame();
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
   if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
+  if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
   S.vars[k]=v}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
 const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;

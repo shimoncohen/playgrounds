@@ -1,6 +1,8 @@
 (function (SQ) {
 const HOME='/home/explorer', KEY='shell-quest-v1';
-const D=(c={})=>({type:'dir',children:c});
+/* children maps have no prototype, so a file named constructor, toString or __proto__ is an ordinary key (a JSON round trip gives plain objects back: fixTree rebuilds them) */
+const D=(c={})=>({type:'dir',children:Object.assign(Object.create(null),c)});
+function fixTree(n){if(n&&n.type==='dir'&&n.children){const c=Object.create(null);for(const k of Object.keys(n.children)){c[k]=n.children[k];fixTree(c[k])}n.children=c}return n}
 const F=(s='',x=false)=>({type:'file',content:s,exec:x});
 
 const README=`Welcome, explorer!
@@ -47,32 +49,35 @@ const S=fresh();
 SQ.S=S;
 /* S.fns (function name -> body source text) is lazy like S.exp: absent until the first definition, always read as S.fns||{}. It is saved with S. */
 SQ.fresh=fresh;
-SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];Object.assign(S,next)};
-SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[]};
+SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];fixTree(next&&next.fs);Object.assign(S,next)};
+SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[]};
 /* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame.
    locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
 SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
 /* Caps that stop runaway commands. TEXT: longest text one command, pipe stage or file may hold. LINES: screen lines per typed line.
-   STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. STATE: most file text the whole world may hold (keeps the save well inside localStorage). */
-const LIM={TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000};
+   STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. VAR: longest text one variable may hold. STATE: most file text the whole world may hold (keeps the save well inside localStorage). */
+const LIM={VAR:1000000,TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000};
 /* Thrown to unwind a runaway line; execLine catches it at the outermost call. e.stop marks it so inner catch blocks rethrow it. */
 class StepLimit extends Error{constructor(why){super('this practice shell stopped the command: '+(why||'too many steps'));this.stop=true}}
 /* The saved-state cap. writeFile checks LIM.STATE itself only for a write that grows the world by more than 1,000 characters (so a small write stays O(1)).
-   Small writes, cp and mv set SQ.rt.grew instead; checkState() then walks the world once (stateText) and, when it is over LIM.STATE, stops the command
-   with a StepLimit. step() calls it every 256 steps (a loop pass or a command run is a step) and execLine calls it once more when the outermost line ends,
-   so a loop of small writes ends with at most 256 steps' worth of writes past the cap (one command writing many small targets can land more before the check; see the spec's known limitations). No rollback: the files written so far stay, as with any stopped command. */
-const STATE_MSG='the files in this world grew too large (rm some to free space)';
-function checkState(){if(!SQ.rt.grew)return;SQ.rt.grew=false;if(stateText(S.fs)>LIM.STATE)throw new StepLimit(STATE_MSG)}
-function step(){if(++SQ.rt.steps>LIM.STEPS)throw new StepLimit();if((SQ.rt.steps&255)===0)checkState()}
+   Every other growth adds its characters to SQ.rt.grewBy (writeFile, markTree for cp); once that passes GROW_CHECK (50,000) writeFile, cp and step()
+   call checkState(), which walks the world once (stateText) and, when it is over LIM.STATE, stops the command with a StepLimit. execLine resets grewBy at the start of
+   each typed line and calls checkState once more at its end, so a world can pass the cap by about GROW_CHECK plus one write. No rollback: the files written so far stay, as with any stopped command. */
+const STATE_MSG='the files in this world grew too large (rm some to free space)',GROW_CHECK=50000;
+function checkState(){if(!SQ.rt.grewBy)return;SQ.rt.grewBy=0;if(stateText(S.fs)>LIM.STATE)throw new StepLimit(STATE_MSG)}
+const grewCheck=()=>{if(SQ.rt.grewBy>GROW_CHECK)checkState()};
+function step(){if(++SQ.rt.steps>LIM.STEPS)throw new StepLimit();grewCheck()}
 /* shared helpers: own(o,k) is a safe own-property test (S.vars, S.fns and the command tables are plain objects, so `constructor` or `__proto__` must not
    resolve through the prototype); errOf(e) is the one error line for a caught Error (a JS stack overflow reads like the parser's nesting error, never raw JS text);
    fatalText(e) is the line for an error that escaped to the outermost catch. */
 const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
 const NEST_DEEP='syntax error: nesting too deep';
-const isOverflow=e=>!!e&&e.name==='RangeError'&&/call stack/i.test(String(e.message));
-const errOf=e=>isOverflow(e)?'bash: '+NEST_DEEP:(e&&e.raw?'':'bash: ')+(e&&typeof e==='object'?e.message:String(e));
-const fatalText=e=>e&&e.stop?e.message:isOverflow(e)?'bash: '+NEST_DEEP:'bash: internal error: '+(e&&e.message||e);
+const isOverflow=e=>!!e&&((e.name==='RangeError'&&/call stack/i.test(String(e.message)))||/too much recursion/i.test(String(e.message))); /* Chrome/Node, Firefox */
+const TOO_BIG='this practice shell stopped the command: a value grew too large';
+const isRange=e=>!!e&&e.name==='RangeError'&&!isOverflow(e); /* Invalid string/array length and the like */
+const errOf=e=>isOverflow(e)?'bash: '+NEST_DEEP:isRange(e)?TOO_BIG:(e&&e.raw?'':'bash: ')+(e&&typeof e==='object'?e.message:String(e));
+const fatalText=e=>e&&e.stop?e.message:isOverflow(e)?'bash: '+NEST_DEEP:isRange(e)?TOO_BIG:'bash: internal error: '+(e&&e.message||e);
 /* safeRegex: compile a user regex, or throw an Error with .complex=true when it could hang the browser (catastrophic backtracking).
    Rule: a group that is repeated (* + {n,} {n,m}) must not contain a quantifier (* + ? {..}) at any depth, and must not contain an alternation,
    with one exception: a flat group of plain literal alternatives whose first characters all differ, like (a|b)+ or (cat|dog)*, is safe
@@ -117,7 +122,7 @@ const MAX_HOPS=20;
 /* walk the tree; links in the path are followed, and the final one only when follow is true. Sets walk.loop when too many hops. */
 function walk(abs,follow){let parts=abs.split('/').filter(Boolean),hops=0;walk.loop=false;
   let n=S.fs,path='',i=0;
-  while(i<parts.length){if(!n||n.type!=='dir')return null;let c=n.children[parts[i]];if(!c)return null;
+  while(i<parts.length){if(!n||n.type!=='dir')return null;let c=own(n.children,parts[i])?n.children[parts[i]]:null;if(!c)return null;
     if(c.type==='link'&&(follow||i<parts.length-1)){if(++hops>MAX_HOPS){walk.loop=true;return null}
       const t=norm(c.target,path||'/');parts=t.split('/').filter(Boolean).concat(parts.slice(i+1));n=S.fs;path='';i=0;continue}
     path+='/'+parts[i];n=c;i++}
@@ -136,9 +141,10 @@ function parentOf(abs){const parts=abs.split('/').filter(Boolean);const name=par
 function bname(abs){return abs.split('/').filter(Boolean).pop()||'/'}
 function disp(abs){return abs===HOME?'~':abs.startsWith(HOME+'/')?'~'+abs.slice(HOME.length):abs}
 function join(a,b){return (a==='/'?'':a)+'/'+b}
-const clone=n=>JSON.parse(JSON.stringify(n));
-function markTree(abs,n){SQ.rt.changed.add(abs);SQ.rt.grew=true;if(n.type==='dir')for(const k in n.children)markTree(join(abs,k),n.children[k])}
-function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!n.children[s]){n.children[s]=D();SQ.rt.changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
+const clone=n=>fixTree(JSON.parse(JSON.stringify(n)));
+/* grow=true (cp) also counts the file text it copied towards grewBy; a move (grow false) only marks the paths changed */
+function markTree(abs,n,grow){SQ.rt.changed.add(abs);if(grow&&n.type==='file')SQ.rt.grewBy+=n.content.length;if(n.type==='dir')for(const k in n.children)markTree(join(abs,k),n.children[k],grow)}
+function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!own(n.children,s)){n.children[s]=D();SQ.rt.changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);SQ.rt.changed.add(abs)}}
 const isNull=p=>norm(p)==='/dev/null';
@@ -146,8 +152,8 @@ function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   const old=n&&n.type==='file'?n.content:'',newLen=append&&old?old.length+1+text.length:text.length,delta=newLen-old.length;
   if(newLen>LIM.TEXT||(delta>1000&&stateText(S.fs)+delta>LIM.STATE))return `bash: ${shown}: file too large for this practice shell`;
-  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);if(delta>0)SQ.rt.grew=true;return null}
+  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);if(delta>0){SQ.rt.grewBy+=delta;grewCheck()}return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

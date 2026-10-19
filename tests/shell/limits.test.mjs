@@ -280,3 +280,83 @@ describe('every mission answer, guide example and quick-fire answer stays inside
     }
   });
 });
+
+describe('Stage 2 hardening (Task 2)', () => {
+  const overCap = (SQ) => { // a world whose files hold more than LIM.STATE, built directly so no check fires
+    const big = 'x'.repeat(SQ.LIM.TEXT);
+    for (let i = 0; i < 3; i++) SQ.S.fs.children.tmp.children['big' + i] = SQ.F(big);
+    assert.ok(SQ.stateText(SQ.S.fs) > SQ.LIM.STATE);
+  };
+  it('file names that match Object.prototype members behave like any other name', () => {
+    const SQ = loadShell();
+    assert.match(run(SQ, 'mkdir constructor; ls').out, /constructor\//);
+    assert.equal(run(SQ, 'touch toString; echo hi > valueOf; cat valueOf').out, 'hi');
+    assert.match(run(SQ, 'cd __proto__').out, /No such file or directory/);
+    run(SQ, 'echo x > __proto__');
+    assert.match(run(SQ, 'cat content').out, /No such file or directory/);
+    assert.equal(({}).content, undefined);
+    assert.equal(Object.prototype.content, undefined);
+  });
+  it('names with prototype members survive the JSON round trip, and old saves still load', () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir constructor; echo a > constructor/__proto__; touch toString');
+    const saved = JSON.stringify(SQ.S);
+    const SQ2 = loadShell();
+    SQ2.resetState(Object.assign(SQ2.fresh(), JSON.parse(saved)));
+    assert.equal(run(SQ2, 'cat constructor/__proto__').out, 'a');
+    assert.match(run(SQ2, 'ls').out, /constructor\//);
+    assert.equal(run(SQ2, 'cat constructor/hasOwnProperty').code !== 0, true);
+    // a save written by the old code (plain objects, no __proto__ keys) still loads
+    const old = JSON.stringify(loadShell().S);
+    const SQ3 = loadShell();
+    SQ3.resetState(Object.assign(SQ3.fresh(), JSON.parse(old)));
+    assert.equal(run(SQ3, 'cat ~/readme.txt').code, 0);
+    run(SQ3, 'cp readme.txt constructor; echo y > hasOwnProperty'); // clone() and fresh writes keep working
+    assert.equal(run(SQ3, 'cat constructor').out.startsWith('Welcome'), true);
+  });
+  it('cat s | tee $(seq 1 3000) cannot overshoot the state cap by more than 60,000', () => {
+    const SQ = loadShell();
+    run(SQ, "printf '%0999d' 0 > s");
+    const r = fast(SQ, 'cat s | tee $(seq 1 3000) >/dev/null', 8000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000, 'state ' + SQ.stateText(SQ.S.fs));
+    assert.match(r.out, /grew too large/);
+  });
+  it('LIM.VAR: a doubling loop stops with a friendly line and the shell stays usable', () => {
+    const SQ = loadShell();
+    assert.equal(SQ.LIM.VAR, 1000000);
+    const r = fast(SQ, 'x=a; for i in $(seq 30); do x=$x$x; done');
+    assert.equal(r.out, 'this practice shell stopped the command: a value grew too large');
+    assert.equal(run(SQ, 'echo ${#x}').out, String(2 ** 19));
+  });
+  it('any RangeError maps to the friendly line; Firefox "too much recursion" maps to the nesting message', () => {
+    const SQ = loadShell();
+    assert.equal(SQ.fatalText(new RangeError('Invalid string length')), 'this practice shell stopped the command: a value grew too large');
+    assert.equal(SQ.errOf(new RangeError('Invalid array length')), 'this practice shell stopped the command: a value grew too large');
+    assert.equal(SQ.fatalText(new RangeError('Maximum call stack size exceeded')), 'bash: ' + SQ.NEST_DEEP);
+    const ff = Object.assign(new Error('too much recursion'), { name: 'InternalError' });
+    assert.equal(SQ.fatalText(ff), 'bash: ' + SQ.NEST_DEEP);
+    assert.equal(SQ.errOf(ff), 'bash: ' + SQ.NEST_DEEP);
+    assert.equal(SQ.isOverflow(ff), true);
+  });
+  it('a stale write flag does not charge the next line in an over-cap world', () => {
+    const SQ = loadShell();
+    overCap(SQ);
+    SQ.writeFile('/home/explorer/saved.txt', 'hello', false, 'saved.txt'); // what an editor Save does
+    assert.ok(SQ.rt.grewBy > 0);
+    assert.equal(run(SQ, 'echo hi').out, 'hi');
+  });
+  it('mv in an over-cap world does not print the cap message', () => {
+    const SQ = loadShell();
+    run(SQ, 'echo a > a');
+    overCap(SQ);
+    const r = run(SQ, 'mv a b; echo done');
+    assert.equal(r.out, 'done');
+  });
+  it('small writes in a loop still hit the cap through grewBy', () => {
+    const SQ = loadShell();
+    run(SQ, "printf '%0999d' 0 > s");
+    const r = fast(SQ, 'for i in $(seq 3000); do cp s f$i; done', 8000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000);
+    assert.match(r.out, /too large/);
+  });
+});

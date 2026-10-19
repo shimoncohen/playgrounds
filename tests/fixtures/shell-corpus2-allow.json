@@ -1,1 +1,81 @@
-{}
+{
+  "mkdir constructor; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): mkdir constructor creates it and ls lists it",
+    "out": "camp/  config.ini  constructor/  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "touch toString; echo hi > valueOf; cat valueOf": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): touch/echo/cat of toString and valueOf create and read real files",
+    "files": [
+      [
+        "/home/explorer/toString",
+        0,
+        "da39a3ee"
+      ],
+      [
+        "/home/explorer/valueOf",
+        2,
+        "c22b5f91"
+      ]
+    ]
+  },
+  "cd __proto__": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): __proto__ is just a missing name, so cd says No such file or directory",
+    "out": "bash: cd: __proto__: No such file or directory"
+  },
+  "echo x > __proto__; cat content": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): the write creates a file named __proto__ and no longer pollutes Object.prototype, so cat content fails",
+    "out": "cat: content: No such file or directory",
+    "code": 1,
+    "files": [
+      [
+        "/home/explorer/__proto__",
+        1,
+        "11f6ad8e"
+      ]
+    ]
+  },
+  "touch hasOwnProperty; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): hasOwnProperty is created and listed",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  hasOwnProperty  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/hasOwnProperty",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "mkdir __proto__; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): __proto__ is created and listed",
+    "out": "__proto__/  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "cat constructor": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): constructor is a missing file, so cat reports it",
+    "out": "cat: constructor: No such file or directory",
+    "code": 1
+  },
+  "x=a; for i in $(seq 1 22); do x=$x$x; done; echo ${#x}; unset x": {
+    "reason": "Task 2 (LIM.VAR): the doubling stops at the 1,000,000-character variable cap with the friendly line instead of reaching 4 MB",
+    "out": "this practice shell stopped the command: a value grew too large",
+    "code": 1,
+    "vars": {
+      "x": {
+        "$repeat": "a",
+        "times": 524288
+      },
+      "i": "20"
+    }
+  },
+  "x=aaaaaaaaaa; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do x=$x$x; done; echo ${#x}; unset x": {
+    "reason": "Task 2 (LIM.VAR): the doubling stops at the 1,000,000-character variable cap with the friendly line instead of reaching 10 MB",
+    "out": "this practice shell stopped the command: a value grew too large",
+    "code": 1,
+    "vars": {
+      "x": {
+        "$repeat": "a",
+        "times": 655360
+      },
+      "i": "17"
+    }
+  }
+}

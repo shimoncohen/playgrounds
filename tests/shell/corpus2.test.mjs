@@ -17,6 +17,8 @@ if (process.env.UPDATE_CORPUS2) {
 }
 
 const FIELDS = ['out', 'code', 'cwd', 'vars', 'files', 'gone'];
+// an override value may abbreviate a long run of one character as { "$repeat": "a", "times": N } (used for the LIM.VAR variable-cap entries)
+const expand = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? (v.$repeat !== undefined ? v.$repeat.repeat(v.times) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, expand(x)]))) : v);
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 
 describe('differential corpus 2 (Stage 2 engine)', () => {
@@ -82,7 +84,7 @@ describe('differential corpus 2 (Stage 2 engine)', () => {
       const got = runSpec(e);
       const ov = Object.prototype.hasOwnProperty.call(allow, key) ? allow[key] : null;
       for (const f of FIELDS) {
-        const want = ov && f in ov ? ov[f] : e[f];
+        const want = ov && f in ov ? expand(ov[f]) : e[f];
         assert.deepEqual(got[f], want, `${f} differs for ${JSON.stringify(specLines(e))}${ov ? ' (allow-listed override: ' + ov.reason + ')' : e.expectChange ? ' (expectChange: ' + e.changeNote + ')' : ''}`);
       }
     });
