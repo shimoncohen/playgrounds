@@ -1,6 +1,6 @@
 (function (SQ) {
 const S=SQ.S;
-const {HOME,D,F,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,cmpName,sortedKeys,lstat,isLoop,modeOf,defMode,modeString,M,ok,E,lines,globRe,flags,readInputs,paint,parseN}=SQ;
+const {HOME,D,F,norm,getNode,parentOf,bname,disp,join,clone,markTree,mkdirp,cmpName,sortedKeys,realPath,lstat,isLoop,modeOf,defMode,modeString,M,ok,E,lines,globRe,flags,readInputs,paint,parseN}=SQ;
 const CMDS={
   pwd:()=>ok(S.cwd),
   ls(a,io){const {fl,rest}=flags(a);const all=fl.has('a')||fl.has('A'),long=fl.has('l');const targets=rest.length?rest:['.'];const err=[];let code=0;
@@ -27,9 +27,9 @@ const CMDS={
   echo(a){let x=a.slice();while(x[0]==='-n'||x[0]==='-e')x.shift();return ok(x.join(' '))},
   cat(a,io){const {rest}=flags(a);const {src,err}=readInputs(rest,io,'cat');return {out:src.map(s=>s.text).join('\n'),err,code:err.length?1:0}},
   rm(a){const {fl,rest}=flags(a);const r=fl.has('r')||fl.has('R'),f=fl.has('f');if(!rest.length)return f?ok():E('rm: missing operand');const err=[];const tips=[];
-    for(const t of rest){const abs=norm(t);
+    for(const t of rest){const abs=realPath(norm(t),false)||norm(t),rcwd=realPath(S.cwd,true)||S.cwd;
       if(abs==='/'||abs===HOME||HOME.startsWith(abs+'/')){err.push(`rm: refusing to remove '${t}': that would wipe out your whole world`);continue}
-      if(S.cwd===abs||S.cwd.startsWith(abs+'/')){err.push(`rm: you are standing inside '${t}'. cd out of it first.`);continue}
+      if(rcwd===abs||rcwd.startsWith(abs+'/')){err.push(`rm: you are standing inside '${t}'. cd out of it first.`);continue}
       const n=lstat(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
       if(n.type==='dir'&&!r){err.push(`rm: cannot remove '${t}': Is a directory`);tips.push(`Tip: folders need -r (recursive): rm -r ${t}`);continue}
       const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp)}
@@ -76,7 +76,7 @@ const CMDS={
     (function rec(node,pre){const ks=sortedKeys(node).filter(k=>fl.has('a')||!k.startsWith('.'));ks.forEach((k,i)=>{const last=i===ks.length-1,c=node.children[k];
       out.push(pre+(last?'└── ':'├── ')+paint(k,c,io.tty));if(c.type==='dir'){dc++;rec(c,pre+(last?'    ':'│   '))}else fc++})})(n,'');
     out.push('',`${dc} director${dc===1?'y':'ies'}, ${fc} file${fc===1?'':'s'}`);return ok(out.join('\n'))},
-  chmod(a){if(a.length<2)return E("chmod: missing operand. Example: chmod +x pack.sh");const mode=a[0];const ch=parseMode(mode);
+  chmod(a){if(a.length<2)return E("chmod: missing operand. Example: chmod +x pack.sh");const mode=a[0];if(/^-[RvcfHh]+$|^--/.test(mode))return E(`this practice shell does not support chmod ${mode.startsWith('--')?'--long options':mode.slice(0,2)} yet`);const ch=parseMode(mode);
     if(ch===false)return E(`chmod: invalid mode: '${mode}'`);if(ch&&ch.msg)return E(ch.msg);
     const err=[];for(const t of a.slice(1)){const abs=norm(t),n=getNode(abs);
       if(!n){const l=lstat(abs);err.push(isLoop(abs)?`chmod: cannot access '${t}': Too many levels of symbolic links`:l&&l.type==='link'?`chmod: cannot operate on dangling symlink '${t}'`:`chmod: cannot access '${t}': No such file or directory`);continue}
@@ -121,8 +121,8 @@ function parseMode(str){let m=str.match(/^0?([0-7]{3})$/);
     let who=0;for(const w of c[1]||'a')who|=w==='u'?0o700:w==='g'?0o070:w==='o'?0o007:0o777;
     const mask=c[1]?who:0o777&~UMASK;
     for(const o of c[2].match(/[-+=][rwx]*/g)){let bits=0;for(const p of o.slice(1)){const b=p==='r'?4:p==='w'?2:1;bits|=b*0o111}
-      ops.push([o[0],who?(c[1]?who:mask):mask,bits])}}
-  return old=>{let v=old;for(const [op,w,bits] of ops){const b=bits&w;v=op==='+'?v|b:op==='-'?v&~b:(v&~w)|b}return v}}
+      ops.push([o[0],who?(c[1]?who:mask):mask,bits,c[1]?who:0o777])}}
+  return old=>{let v=old;for(const [op,w,bits,cw] of ops){const b=bits&w;v=op==='+'?v|b:op==='-'?v&~b:(v&~cw)|b}return v}}
 function headTail(a,io,cmd){const {n,rest,bad}=parseN(a);if(bad)return E(`${cmd}: invalid number of lines`);const {src,err}=readInputs(rest,io,cmd);const out=[];
   src.forEach((s,i)=>{const L=lines(s.text);const part=cmd==='head'?L.slice(0,n):(n?L.slice(-n):[]);if(src.length>1)out.push((i?'\n':'')+`==> ${s.name} <==`);out.push(...part)});
   return {out:out.join('\n'),err,code:err.length?1:0}}
@@ -136,7 +136,9 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     const tabs=into?join(dabs,bname(sabs)):dabs;
     if(tabs===sabs){err.push(`${nm}: '${s}' and '${dest}' are the same file`);continue}
     if(sn.type==='dir'&&(tabs+'/').startsWith(sabs+'/')){err.push(`${nm}: cannot ${move?'move':'copy'} '${s}' into itself`);continue}
-    if(move&&(S.cwd===sabs||S.cwd.startsWith(sabs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
+    const rs=realPath(sabs,!move)||sabs,rcwd=realPath(S.cwd,true)||S.cwd;
+    if(sn.type==='dir'){const dp=realPath(parentOf(tabs)[2],true);if(dp&&(dp===rs||dp.startsWith(rs==='/'?'/':rs+'/'))){err.push(move?`mv: cannot move '${s}' to a subdirectory of itself, '${dest}${into?'/'+bname(sabs):''}'`:`cp: cannot copy a directory, '${s}', into itself, '${dest}${into?'/'+bname(sabs):''}'`);continue}}
+    if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
     const copy=move?sn:clone(sn);if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}

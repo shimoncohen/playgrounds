@@ -182,3 +182,34 @@ describe('stat / which / type', () => {
     assert.equal(r.code, 1);
   });
 });
+
+describe('review fixes', () => {
+  const fresh2 = () => { const SQ = loadShell(); run(SQ, 'cd ~'); return SQ; };
+  it('mv/cp dir into itself via link', () => {
+    const SQ = fresh2();
+    run(SQ, 'ln -s forest fl');
+    assert.equal(run(SQ, 'mv forest fl/inner').out, "mv: cannot move 'forest' to a subdirectory of itself, 'fl/inner'");
+    assert.equal(run(SQ, 'ls forest').out.includes('cave'), true);
+    assert.equal(run(SQ, 'ls').out.includes('forest'), true);
+    assert.match(run(SQ, 'cp -r forest fl/inner').out, /cp: cannot copy a directory, 'forest', into itself/);
+    assert.match(run(SQ, 'mv forest fl').out, /subdirectory of itself/);
+  });
+  it('rm guards see through links', () => {
+    const SQ = fresh2();
+    run(SQ, 'ln -s / root');
+    assert.match(run(SQ, 'rm -r root/home').out, /refusing to remove 'root\/home': that would wipe out your whole world/);
+    run(SQ, 'cd forest/cave/deeper; ln -s .. up');
+    assert.match(run(SQ, 'rm -r up/deeper').out, /rm: you are standing inside 'up\/deeper'/);
+    assert.match(run(SQ, 'mv up/deeper /tmp/x').out, /mv: you are standing inside 'up\/deeper'/);
+    run(SQ, 'cd ~; ln -s .. up2');
+    assert.match(run(SQ, 'rm -r up2/explorer').out, /refusing to remove/);
+    assert.equal(run(SQ, 'ls').out.includes('forest'), true);
+  });
+  it('chmod = clears all, and -R unsupported', () => {
+    const SQ = fresh2();
+    run(SQ, 'touch f; chmod 666 f; chmod =r f');
+    assert.match(run(SQ, 'ls -l f').out, /^-r--r--r--/);
+    assert.equal(run(SQ, 'chmod -R 755 forest').out, 'this practice shell does not support chmod -R yet');
+    assert.equal(run(SQ, 'chmod -v 755 f').out, 'this practice shell does not support chmod -v yet');
+  });
+});
