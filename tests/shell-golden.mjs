@@ -41,7 +41,9 @@ try {
   await page.goto(`${base}/shell-quest/`);
   await page.waitForSelector('#cmd');
 
-  const chapterCount = await page.$$eval('.chap[data-ch]', els => els.length);
+  // Beginner regression guard only: later tiers are covered by solvability/negative tests in tests/shell/.
+  const BEGINNER_CHAPTERS = 7;
+  const chapterCount = BEGINNER_CHAPTERS;
   const records = [];
   for (let ch = 0; ch < chapterCount; ch++) {
     await page.click(`.chap[data-ch="${ch}"]`);

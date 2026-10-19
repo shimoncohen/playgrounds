@@ -15,7 +15,7 @@ const seedVillage=()=>{ensureFile('~/village/shop.txt',SHOP);ensureFile('~/journ
 const argLine=e=>e.args.join(' ');
 const CH=[
 {tier:'intermediate',name:'Text tools',badge:'Textsmith',intro:'Files are mostly text, and a few small tools can cut, swap and reshape it. Learn them and you can answer almost any question about a file.',
- learned:['cut','tr','sed s///','sed -n','tee','sort -n -r'],setup:seedVillage,
+ learned:['cut','tr','sed s///','sed -n','tee','sort -t -k'],setup:seedVillage,
  missions:[
  {title:'Pick a column',goal:`The file <code>village/sales.csv</code> has columns split by commas. Print only the first column: <code>cut -d, -f1 village/sales.csv</code>`,
   anat:[['cut','cmd'],['-d,','opt'],['-f1','opt'],['village/sales.csv','arg']],answer:'cut -d, -f1 village/sales.csv',
@@ -41,9 +41,9 @@ const CH=[
   anat:[['ls','cmd'],['|','op'],['tee','cmd'],['listing.txt','arg']],answer:'ls | tee listing.txt',
   explain:`tee is a T-junction for pipes: the text goes to the screen <b>and</b> into the file. Plain <code>&gt;</code> saves it but shows nothing. <code>tee -a</code> adds to the end instead of replacing.`,
   check:c=>c.ran('tee')&&c.read('~/listing.txt').trim().length>0},
- {title:'Biggest first',goal:`Which item sold the most? Cut out the quantity column, sort it biggest first, and keep one line: <code>cut -d, -f2 village/sales.csv | sort -n -r | head -n 1</code>`,
-  anat:[['cut','cmd'],['-d,','opt'],['-f2','opt'],['village/sales.csv','arg'],['|','op'],['sort','cmd'],['-n','opt'],['-r','opt'],['|','op'],['head -n 1','cmd']],answer:'cut -d, -f2 village/sales.csv | sort -n -r | head -n 1',
-  explain:`Three small tools in a row. cut keeps field 2, the quantities. <code>sort -n</code> compares them as <b>numbers</b>, so 30 beats 4, and <code>-r</code> reverses the order. head keeps only the top line.`,
+ {title:'Biggest first',goal:`Which item sold the most? Sort the sales by the quantity column, biggest first, and keep one line: <code>sort -t, -k2 -n -r village/sales.csv | head -n 1</code>`,
+  anat:[['sort','cmd'],['-t,','opt'],['-k2','opt'],['-n','opt'],['-r','opt'],['village/sales.csv','arg'],['|','op'],['head -n 1','cmd']],answer:'sort -t, -k2 -n -r village/sales.csv | head -n 1',
+  explain:`<code>-t,</code> sets the separator, <code>-k2</code> sorts by field 2, <code>-n</code> compares as numbers so 30 beats 4, and <code>-r</code> reverses the order. Then head keeps only the top row.`,
   check:c=>{const rows=c.read('~/village/sales.csv').split('\n').filter(Boolean).map(l=>l.split(','));
     if(!rows.length)return false;const top=rows.reduce((a,b)=>+b[1]>+a[1]?b:a);
     return c.log.some(e=>(e.name==='head'||e.name==='sort')&&[top[1],top.join(',')].includes(e.out.trim()))}}

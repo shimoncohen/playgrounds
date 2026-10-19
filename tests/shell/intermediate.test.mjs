@@ -80,7 +80,11 @@ describe('chapter 8 checks', () => {
   it('Biggest first', () => {
     yes(T8, 6, 'cut -d, -f2 village/sales.csv | sort -n -r | head -n 1');
     yes(T8, 6, 'cut -d, -f2 village/sales.csv | sort -nr | head -1');
+    yes(T8, 6, 'sort -t, -k2 -n -r village/sales.csv | head -n 1');
+    yes(T8, 6, 'sort -t , -k 2,2 -rn village/sales.csv | head -1');
     no(T8, 6, 'cut -d, -f2 village/sales.csv | sort | head -n 1');
+    no(T8, 6, 'sort -t, -k2 -n village/sales.csv | head -n 1');
+    no(T8, 6, 'sort -t, -k2 -r village/sales.csv | head -n 1');
     no(T8, 6, 'head -n 1 village/sales.csv');
   });
 });

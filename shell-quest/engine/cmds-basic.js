@@ -57,9 +57,27 @@ const CMDS={
           const pre=(multi?(io.tty?M('f',s.name):s.name)+':':'')+(fl.has('n')?(io.tty?M('n',String(i+1)):String(i+1))+':':'');out.push(pre+txt)}}});
       if(fl.has('c'))out.push((multi?s.name+':':'')+cnt);total+=cnt}
     return {out:out.join('\n'),err,code:err.length?2:total?0:1}},
-  sort(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest,io,'sort');let L=[].concat(...src.map(s=>lines(s.text)));
-    if(fl.has('n'))L.sort((x,y)=>(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y));else L.sort((x,y)=>x.localeCompare(y));
-    if(fl.has('r'))L.reverse();if(fl.has('u'))L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
+  sort(a,io){const o={n:0,r:0,u:0,t:null,keys:[]},rest=[],bad=m=>Object.assign(E(m),{code:2}),uns=x=>bad(`this practice shell does not support sort ${x} yet`);let end=false;
+    for(let i=0;i<a.length;i++){const x=a[i];
+      if(end||x.length<2||x[0]!=='-'){rest.push(x);continue}
+      if(x==='--'){end=true;continue}
+      if(x[0]==='-'&&x[1]==='-')return uns(x.split('=')[0]);
+      for(let j=1;j<x.length;j++){const ch=x[j];
+        if(ch==='n'||ch==='r'||ch==='u')o[ch]=1;
+        else if(ch==='t'||ch==='k'){let v=x.slice(j+1);if(!v){if(i+1>=a.length)return bad(`sort: option requires an argument -- '${ch}'`);v=a[++i]}
+          if(ch==='t'){if(v.length!==1)return bad(`sort: multi-character tab '${v}'`);o.t=v}
+          else{const m=v.match(/^(\d+)(?:,(\d+))?$/);if(!m||+m[1]<1||(m[2]!==undefined&&+m[2]<1))return bad(`sort: invalid number at field start: invalid count at start of '${v}'`);
+            if(m[2]!==undefined&&+m[2]<+m[1])o.keys.push([+m[1],+m[1]]);else o.keys.push([+m[1],m[2]?+m[2]:0])}
+          break}
+        else if('fbhMoscgVdiRSTzm'.includes(ch))return uns('-'+ch);
+        else return bad(`sort: invalid option -- '${ch}'`)}}
+    const {src,err}=readInputs(rest,io,'sort');let L=[].concat(...src.map(s=>lines(s.text)));
+    const fld=ln=>o.t!==null?ln.split(o.t):ln.trim().split(/\s+/);
+    const key=(ln,[f,l])=>{const F=fld(ln);return F.slice(f-1,l||undefined).join(o.t!==null?o.t:' ')};
+    const cmp=(x,y)=>{for(const k of o.keys){const kx=key(x,k),ky=key(y,k);const d=o.n?(parseFloat(kx)||0)-(parseFloat(ky)||0):kx.localeCompare(ky);if(d)return d}
+      if(o.keys.length)return x.localeCompare(y);return o.n?(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y):x.localeCompare(y)};
+    L.sort(cmp);
+    if(o.r)L.reverse();if(o.u)L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
   uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];const g=[];
     for(const x of L){if(g.length&&g[g.length-1][0]===x)g[g.length-1][1]++;else g.push([x,1])}
     return {out:g.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
