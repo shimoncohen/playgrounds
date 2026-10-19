@@ -261,3 +261,34 @@ describe('expandHeredoc', () => {
     assert.equal(loadShell().expandHeredoc('a\\\nb\n'), 'ab\n');
   });
 });
+
+describe('JS object names are ordinary shell names', () => {
+  it('an unset variable named like an Object property is empty', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'echo $constructor'), { out: '', code: 0 });
+    assert.deepEqual(run(SQ, 'echo "[$toString][$hasOwnProperty][${valueOf}]"'), { out: '[][][]', code: 0 });
+    assert.deepEqual(run(SQ, 'echo ${constructor:-unset} ${#toString}'), { out: 'unset 0', code: 0 });
+    assert.deepEqual(run(SQ, 'echo $((constructor + 1))'), { out: '1', code: 0 });
+    assert.deepEqual(run(SQ, 'constructor=5; echo $constructor'), { out: '5', code: 0 });
+  });
+  it('constructor and toString as commands are not found', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'constructor'), { out: 'bash: constructor: command not found', code: 127 });
+    assert.deepEqual(run(SQ, 'toString'), { out: 'bash: toString: command not found', code: 127 });
+    assert.deepEqual(run(SQ, 'seq 1 2 | xargs constructor'), { out: 'xargs: constructor: No such file or directory', code: 127 });
+    assert.deepEqual(run(SQ, 'type valueOf'), { out: 'bash: type: valueOf: not found', code: 1 });
+  });
+  it('__proto__ is refused as a variable name and never reads as [object Object]', () => {
+    const SQ = loadShell();
+    const bad = "bash: read: `__proto__': not a valid identifier";
+    assert.deepEqual(run(SQ, 'read __proto__ <<< hi; echo "[$__proto__]"'), { out: bad + '\n[]', code: 0 });
+    assert.deepEqual(run(SQ, '__proto__=5; echo "[$__proto__]"'), { out: "bash: `__proto__': not a valid identifier\n[]", code: 0 });
+    assert.equal(run(SQ, 'for __proto__ in a; do echo x; done').out, "bash: `__proto__': not a valid identifier");
+    assert.equal(run(SQ, 'export __proto__=1').code, 1);
+    assert.equal(run(SQ, 'f(){ local __proto__=1; }; f').code, 1);
+    assert.equal(run(SQ, '__proto__() { echo x; }').code, 1);
+    assert.equal(Object.keys(SQ.S.vars).includes('__proto__'), false);
+    assert.equal(typeof SQ.S.vars.hasOwnProperty, 'function', 'the variable table keeps its prototype');
+    assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
+  });
+});

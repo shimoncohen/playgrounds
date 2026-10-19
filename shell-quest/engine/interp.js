@@ -5,7 +5,7 @@
 const S=SQ.S;
 const {CTX,expandWords,expandOne,globExpand}=SQ;
 const errL=text=>({text,cls:'err'});
-const errOf=e=>(e.raw?'':'bash: ')+e.message;
+const {errOf,own}=SQ;
 
 /* Shell state a subshell, $( ) or script must not leak. FS changes are not part of it. */
 function snapshotShell(){
@@ -70,7 +70,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     let toErr=null;
     try{if(R.out){if(R.out.toErr)toErr=R.out;else out={path:expandOne(R.out.w),append:R.out.append}}if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
       if(R.herestr||R.doc)here=hereText(R,res)}
-    catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:(e.raw?'':'bash: ')+e.message,cls:'err'});code=e.code||2;break}
+    catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:errOf(e),cls:'err'});code=e.code||2;break}
     res.push(...CTX.pend.splice(0));
     let box=null;
     if(inp!==null){if(isNull(inp))box={text:'',pos:0};else{const n=getNode(norm(inp));if(!n||n.type!=='file'){res.push({text:`bash: ${inp}: No such file or directory`,cls:'err'});code=1;break}box={text:n.content,pos:0}}}
@@ -157,6 +157,7 @@ function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assi
 
 /* for: the list expands once, one 'for' log entry with the items, then one step per pass. The loop variable stays set afterwards. */
 function runFor(c,env){const out=[];let code=0,ui;
+  if(SQ.badName(c.var))return {out:[errL(`bash: \`${c.var}': not a valid identifier`)],code:1};
   let items=[],globbed=false;
   if(c.words===null)items=SQ.frame().args.slice();
   else{let toks;
@@ -203,7 +204,6 @@ function runArith(c,env){SQ.step();let v;
    and the pop puts it back, so callees see the caller's locals (dynamic scope) and nothing leaks after the return. */
 const FN_NEST=100,CACHE_MAX=64;
 const parseCache=new Map();let fnDepth=0;
-const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
 const hasFunction=name=>own(S.fns,name);
 function fnsText(skip){let t=0;for(const k of Object.keys(S.fns||{}))if(k!==skip)t+=S.fns[k].length;return t}
 function defineFunction(c,env){const src=c.body.src;
@@ -270,13 +270,13 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
 /* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...) and the per-line runtime state come back
    afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
 function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
-  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,outChars:rt.outChars,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
-  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.outChars=0;rt.sandboxed=true;
+  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,outChars:rt.outChars,grew:rt.grew,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
+  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.outChars=0;rt.grew=false;rt.sandboxed=true;
   try{return fn()}
   finally{const back=JSON.parse(snap);
     for(const k of Object.keys(S))if(!(k in back))delete S[k];
     for(const k of Object.keys(back))S[k]=back[k];
-    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,outChars:keep.outChars,sandboxed:!!keep.sandboxed});
+    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,outChars:keep.outChars,grew:!!keep.grew,sandboxed:!!keep.sandboxed});
     CTX.pend.length=0;CTX.pend.push(...keep.pend);CTX.depth=keep.depth}}
 
 /* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */
@@ -287,7 +287,7 @@ function localBuiltin(a){const fr=SQ.rt.frames;let f=null;
   if(!f)return SQ.E('bash: local: can only be used in a function',1);
   const err=[];let code=0;
   for(const x of a){const eq=x.indexOf('='),k=eq<0?x:x.slice(0,eq);
-    if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: local: \`${x}': not a valid identifier`);code=1;continue}
+    if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: local: \`${x}': not a valid identifier`);code=1;continue}
     if(!f.locals.has(k))f.locals.set(k,own(S.vars,k)?S.vars[k]:undefined);
     if(eq<0)delete S.vars[k];else S.vars[k]=x.slice(eq+1)}
   return {out:'',err,code}}

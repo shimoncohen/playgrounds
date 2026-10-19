@@ -1,6 +1,6 @@
 (function (SQ) {
 const S=SQ.S;
-const {LIM,HOME,norm,getNode,bname,ok,E,globExpand,CTX,expandWords,CMDS,FRIENDLY,suggest}=SQ;
+const {LIM,HOME,norm,getNode,bname,ok,E,globExpand,CTX,expandWords,CMDS,FRIENDLY,suggest,own,errOf,fatalText}=SQ;
 /* ./FILE and bash FILE: SQ.runScript (interp.js) does the work; args are $1.., stdin comes from a pipe or < */
 function runPath(name,io,force,args){return SQ.runScript(name,{args:args||[],depth:io.depth,tty:io.tty,force,stdinBox:io.stdinBox||null})}
 
@@ -8,22 +8,23 @@ function runCmd(words,io){
   if(!words.length)return ok();
   SQ.step();
   const args=[];let globbed=false;let ew;
-  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;return E((e.raw?'':'bash: ')+e.message,e.code||2)}
+  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;return E(errOf(e),e.code||2)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
   if(!ew.length)return Object.assign(ok(),{err:pend});
   for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
   const name=args[0],a=args.slice(1);let r,lname=name;
-  if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];S.vars[k]=name.slice(k.length+1);r=ok();lname='(assign)'}
+  if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];lname='(assign)';
+    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{S.vars[k]=name.slice(k.length+1);r=ok()}}
   else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
     return r}
   else if(name.includes('/'))r=runPath(name,io,false,a);
-  else if((name==='break'||name==='continue')&&!CMDS[name])r=loopCtl(name,a,io);
-  else if(name==='local'&&!CMDS.local)r=SQ.localBuiltin(a);
-  else if(name==='return'&&!CMDS.return)r=SQ.returnBuiltin(a);
-  else if(CMDS[name])r=CMDS[name](a,io);
-  else if(FRIENDLY[name])r=E(FRIENDLY[name],127);
+  else if((name==='break'||name==='continue')&&!own(CMDS,name))r=loopCtl(name,a,io);
+  else if(name==='local'&&!own(CMDS,'local'))r=SQ.localBuiltin(a);
+  else if(name==='return'&&!own(CMDS,'return'))r=SQ.returnBuiltin(a);
+  else if(own(CMDS,name))r=CMDS[name](a,io);
+  else if(own(FRIENDLY,name))r=E(FRIENDLY[name],127);
   else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
   if(pend.length)r.err=pend.concat(r.err||[]);
   if(r.out&&r.out.length>LIM.TEXT){r.out='';r.err=(r.err||[]).concat(`${lname}: output too large for this practice shell`);r.code=1}
@@ -31,7 +32,7 @@ function runCmd(words,io){
   if(io.record)SQ.rt.log.push({name:lname,args:a,globbed,piped:io.pipeLen>1,redirect:io.redirect,errRedirect:io.errRedirect,code:r.code,out:r.out||''});
   return r}
 
-/* break/continue [N] inside a loop: a ctl signal the interpreter unwinds (the full builtins with their messages arrive in Task 7) */
+/* break/continue [N] inside a loop: a ctl signal the interpreter unwinds (loops catch it in interp.js resolveCtl); outside a loop it only prints bash's notice */
 function loopCtl(name,a,io){
   if(!io.loops)return E(`bash: ${name}: only meaningful in a \`for', \`while', or \`until' loop`,0);
   const n=a.length?Number(a[0]):1;
@@ -39,16 +40,18 @@ function loopCtl(name,a,io){
   if(!/^\d+$/.test(a[0]===undefined?'1':a[0]))return Object.assign(E(`bash: ${name}: ${a[0]}: numeric argument required`,1),{ctl:{type:'break',n:Infinity}});
   if(n<1)return Object.assign(E(`bash: ${name}: ${a[0]}: loop count out of range`,1),{ctl:{type:'break',n:Infinity}});
   return Object.assign(ok(),{ctl:{type:name,n}})}
-const errOut=e=>({out:[{text:(e.raw?'':'bash: ')+e.message,cls:'err'}],code:e.code||2});
+const errOut=e=>({out:[{text:errOf(e),cls:'err'}],code:e.code||2});
 let nest=0;
 /* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
   if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.outChars=0}
   const sd=CTX.depth;CTX.depth=o.depth;nest++;
   try{const r=execLine0(line,o);if(!outer)return r;
+    SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */
     SQ.rt.lastOut=r.out.filter(x=>x.cls==='out').map(x=>x.text).join('\n');return capLines(r)}
   catch(e){if(!outer)throw e; /* outermost call: any runaway or unexpected failure becomes one error line, state stays usable */
-    SQ.rt.lastOut='';CTX.pend.length=0;S.last=1;return {out:[{text:e&&e.stop?e.message:'bash: internal error: '+(e&&e.message||e),cls:'err'}],code:1}}
+    const code=SQ.isOverflow(e)?2:1; /* a JS stack overflow reads like the parser's nesting error, status 2 */
+    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code;return {out:[{text:fatalText(e),cls:'err'}],code}}
   finally{CTX.depth=sd;nest--}}
 /* On-screen output per typed line is capped at LIM.LINES; the rest is replaced by one notice. */
 function capLines(r){let n=0;const out=[];
@@ -76,7 +79,7 @@ const cap=t=>t.length>REPORT_MAX?t.slice(0,REPORT_MAX)+'...':t;
 /* ctx.runScript / scriptPasses run on a throwaway copy of the world, from the home directory, with no terminal; a runaway script is a result, never an exception */
 function sandboxRun(path,args,stdin){return SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;
   try{const r=SQ.runScript(path,{args:args||[],stdin,depth:1,tty:false,force:true,record:false});return {out:r.out,err:r.err,code:r.code}}
-  catch(e){return {out:'',err:[e&&e.stop?e.message:'bash: internal error: '+(e&&e.message||e)],code:1,thrown:true}}})}
+  catch(e){return {out:'',err:[fatalText(e)],code:1,thrown:true}}})}
 function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
   if(!fn||fn.type!=='file')return {ok:false,failed:{index:-1,label:'file',expected:m.file,got:'missing'}};
   const cases=(m.tests||[]).slice(0,SCRIPT_CASES);
@@ -85,7 +88,7 @@ function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
     const res=SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;
       for(const [p,c] of Object.entries(tc.files||{})){const abs=norm(p,HOME),[,,pp]=SQ.parentOf(abs);SQ.mkdirp(pp);SQ.writeFile(abs,String(c),false,p)}
       let r;try{r=SQ.runScript(m.file,{args:(tc.args||[]).map(String),stdin:tc.stdin,depth:1,tty:false,force:true,record:false})}
-      catch(e){return {thrown:e&&e.stop?e.message:'bash: internal error: '+(e&&e.message||e)}}
+      catch(e){return {thrown:fatalText(e)}}
       const files={};for(const p of Object.keys(tc.expectFiles||{})){const n=nd(p);files[p]=n&&n.type==='file'?n.content:'(missing)'}
       return {r,files}});
     if(res.thrown!==undefined)return fail(tc.expectOut!==undefined?tc.expectOut:'the script to finish',res.thrown);

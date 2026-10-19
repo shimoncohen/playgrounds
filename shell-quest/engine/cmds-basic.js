@@ -113,11 +113,11 @@ const CMDS={
       SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
   export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
-    for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
+    for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
       if(m[2]!==undefined)S.vars[k]=m[3];(S.exp=S.exp||{})[k]=1}
     return {out:'',err,code:err.length?1:0}},
   env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])L[k]=SQ.getVar(k);
-    for(const k of Object.keys(S.exp||{}))if(k in S.vars)L[k]=S.vars[k];
+    for(const k of Object.keys(S.exp||{}))if(SQ.own(S.vars,k))L[k]=S.vars[k];
     return ok(Object.keys(L).sort().map(k=>k+'='+L[k]).join('\n'))},
   history:()=>ok(S.hist.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n')),
   clear:()=>Object.assign(ok(),{clear:true}),
@@ -169,7 +169,9 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
-    const copy=move?sn:clone(sn);if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
+    const copy=move?sn:clone(sn);
+    if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
+    if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
     par.children[name]=copy;markTree(tabs,copy)}
   return {out:'',err,code:err.length?1:0,tips}}
 
@@ -196,6 +198,6 @@ const FRIENDLY={
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(FRIENDLY[c]||c==='edit')continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit')continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

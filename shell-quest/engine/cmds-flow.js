@@ -4,25 +4,28 @@
 const S=SQ.S;
 const {CMDS,E,ok,norm,getNode,lstat,isLoop,modeOf,CTX,expandStr}=SQ;
 const errL=text=>({text,cls:'err'});
-const errOf=e=>(e.raw?'':'bash: ')+e.message;
+const {errOf}=SQ;
 const ce=(m,code=2)=>Object.assign(new Error(m),{raw:true,code});
 const NAME=/^[A-Za-z_]\w*$/;
 
 /* ---------- test expressions ----------
    Tokens are {raw}: for [ and test the raw text IS the already-expanded value; for [[ it is source text expanded lazily (no word splitting, no globbing) so && and || short-circuit.
-   or := and (OR and)*   and := not (AND not)*   not := ! not | primary   primary := ( or ) | UNARY word | word BINARY word | word      (OR/AND: -o -a for [, || && for [[) */
+   or := and (OR and)*   and := not (AND not)*   not := ! not | primary   primary := ( or ) | UNARY word | word BINARY word | word      (OR/AND: -o -a for [, || && for [[)
+   or/and nodes hold a flat list of operands (a long chain is not a deep tree), and ! and ( ) nest at most NEST deep, so evaluation never overflows the JS stack. */
+const NEST=100;
 const UN=new Set(['-e','-f','-d','-r','-w','-x','-s','-L','-h','-z','-n']);
 const BIN=new Set(['=','==','!=','<','>','-eq','-ne','-lt','-le','-gt','-ge']);
 function parseTest(T,d,name){
-  let p=0;const OR=d?'||':'-o',AND=d?'&&':'-a',stop=new Set([')',OR,AND]);
+  let p=0,dep=0;const OR=d?'||':'-o',AND=d?'&&':'-a',stop=new Set([')',OR,AND]);
+  const deeper=f=>{if(dep>=NEST)throw ce('bash: '+SQ.NEST_DEEP);dep++;try{return f()}finally{dep--}};
   const bad=why=>{throw ce(d?'bash: syntax error in conditional expression':`bash: ${name}: ${why}`)};
   const at=i=>T[i]&&T[i].raw;
-  const orE=()=>{let l=andE();while(at(p)===OR){p++;l={k:'or',l,r:andE()}}return l};
-  const andE=()=>{let l=notE();while(at(p)===AND){p++;l={k:'and',l,r:notE()}}return l};
-  const notE=()=>{if(at(p)==='!'&&p+1<T.length){p++;return {k:'not',e:notE()}}return prim()};
+  const orE=()=>{const xs=[andE()];while(at(p)===OR){p++;xs.push(andE())}return xs.length>1?{k:'or',xs}:xs[0]};
+  const andE=()=>{const xs=[notE()];while(at(p)===AND){p++;xs.push(notE())}return xs.length>1?{k:'and',xs}:xs[0]};
+  const notE=()=>{if(at(p)==='!'&&p+1<T.length){p++;return {k:'not',e:deeper(notE)}}return prim()};
   function prim(){
     const a=T[p];if(!a)return bad('argument expected');
-    if(a.raw==='('&&(d||p+1<T.length)){p++;const e=orE();if(at(p)!==')')return bad("')' expected");p++;return e}
+    if(a.raw==='('&&(d||p+1<T.length)){p++;const e=deeper(orE);if(at(p)!==')')return bad("')' expected");p++;return e}
     const b=T[p+1],c=T[p+2];
     if(b&&c&&(BIN.has(b.raw)||(d&&b.raw==='=~'))&&!(d&&stop.has(c.raw))){p+=3;return {k:'bin',op:b.raw,a,b:c}}
     if(UN.has(a.raw)&&b&&!stop.has(b.raw)){p+=2;return {k:'un',op:a.raw,a:b}}
@@ -90,8 +93,8 @@ function evalTree(tree,d,name){
   const num=t=>{if(d)return BigInt(SQ.arithVal(t.raw));
     if(!INT.test(t.raw))throw ce(`bash: ${name}: ${t.raw}: integer expression expected`);return BigInt(t.raw.trim())};
   const ev=n=>{switch(n.k){
-    case 'or':return ev(n.l)||ev(n.r);
-    case 'and':return ev(n.l)&&ev(n.r);
+    case 'or':return n.xs.some(ev);
+    case 'and':return n.xs.every(ev);
     case 'not':return !ev(n.e);
     case 'str':return val(n.a)!=='';
     case 'un':{const v=val(n.a);
@@ -138,7 +141,7 @@ CMDS.read=function(a,io){let raw=false,i=0;
       else if('snNtdaeui'.includes(ch))return E(`this practice shell does not support read -${ch} yet`,2);
       else return E(`bash: read: -${ch}: invalid option`,2)}}
   const names=a.slice(i);
-  for(const n of names)if(!NAME.test(n))return E(`bash: read: \`${n}': not a valid identifier`,1);
+  for(const n of names)if(!NAME.test(n)||SQ.badName(n))return E(`bash: read: \`${n}': not a valid identifier`,1);
   const box=io.stdinBox;if(!box)return E(NOT_TYPING,1);
   const set=(n,v)=>{S.vars[n]=v};
   if(box.pos>=box.text.length){for(const n of names.length?names:['REPLY'])set(n,'');return {out:'',err:[],code:1}}

@@ -58,7 +58,21 @@ SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
 const LIM={TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000};
 /* Thrown to unwind a runaway line; execLine catches it at the outermost call. e.stop marks it so inner catch blocks rethrow it. */
 class StepLimit extends Error{constructor(why){super('this practice shell stopped the command: '+(why||'too many steps'));this.stop=true}}
-function step(){if(++SQ.rt.steps>LIM.STEPS)throw new StepLimit()}
+/* The saved-state cap. writeFile checks LIM.STATE itself only for a write that grows the world by more than 1,000 characters (so a small write stays O(1)).
+   Small writes, cp and mv set SQ.rt.grew instead; checkState() then walks the world once (stateText) and, when it is over LIM.STATE, stops the command
+   with a StepLimit. step() calls it every 256 steps (a loop pass or a command run is a step) and execLine calls it once more when the outermost line ends,
+   so a loop of small writes ends with at most 256 steps' worth of writes past the cap. No rollback: the files written so far stay, as with any stopped command. */
+const STATE_MSG='the files in this world grew too large (rm some to free space)';
+function checkState(){if(!SQ.rt.grew)return;SQ.rt.grew=false;if(stateText(S.fs)>LIM.STATE)throw new StepLimit(STATE_MSG)}
+function step(){if(++SQ.rt.steps>LIM.STEPS)throw new StepLimit();if((SQ.rt.steps&255)===0)checkState()}
+/* shared helpers: own(o,k) is a safe own-property test (S.vars, S.fns and the command tables are plain objects, so `constructor` or `__proto__` must not
+   resolve through the prototype); errOf(e) is the one error line for a caught Error (a JS stack overflow reads like the parser's nesting error, never raw JS text);
+   fatalText(e) is the line for an error that escaped to the outermost catch. */
+const own=(o,k)=>!!o&&Object.prototype.hasOwnProperty.call(o,k);
+const NEST_DEEP='syntax error: nesting too deep';
+const isOverflow=e=>!!e&&e.name==='RangeError'&&/call stack/i.test(String(e.message));
+const errOf=e=>isOverflow(e)?'bash: '+NEST_DEEP:(e&&e.raw?'':'bash: ')+(e&&typeof e==='object'?e.message:String(e));
+const fatalText=e=>e&&e.stop?e.message:isOverflow(e)?'bash: '+NEST_DEEP:'bash: internal error: '+(e&&e.message||e);
 /* safeRegex: compile a user regex, or throw an Error with .complex=true when it could hang the browser (catastrophic backtracking).
    Rule: a group that is repeated (* + {n,} {n,m}) must not contain a quantifier (* + ? {..}) at any depth, and must not contain an alternation,
    with one exception: a flat group of plain literal alternatives whose first characters all differ, like (a|b)+ or (cat|dog)*, is safe
@@ -123,7 +137,7 @@ function bname(abs){return abs.split('/').filter(Boolean).pop()||'/'}
 function disp(abs){return abs===HOME?'~':abs.startsWith(HOME+'/')?'~'+abs.slice(HOME.length):abs}
 function join(a,b){return (a==='/'?'':a)+'/'+b}
 const clone=n=>JSON.parse(JSON.stringify(n));
-function markTree(abs,n){SQ.rt.changed.add(abs);if(n.type==='dir')for(const k in n.children)markTree(join(abs,k),n.children[k])}
+function markTree(abs,n){SQ.rt.changed.add(abs);SQ.rt.grew=true;if(n.type==='dir')for(const k in n.children)markTree(join(abs,k),n.children[k])}
 function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!n.children[s]){n.children[s]=D();SQ.rt.changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);SQ.rt.changed.add(abs)}}
@@ -132,8 +146,8 @@ function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   const old=n&&n.type==='file'?n.content:'',newLen=append&&old?old.length+1+text.length:text.length,delta=newLen-old.length;
   if(newLen>LIM.TEXT||(delta>1000&&stateText(S.fs)+delta>LIM.STATE))return `bash: ${shown}: file too large for this practice shell`;
-  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);return null}
+  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);if(delta>0)SQ.rt.grew=true;return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{stateText,LIM,StepLimit,step,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,safeRegex,regexRisky,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

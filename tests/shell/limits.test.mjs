@@ -105,6 +105,102 @@ describe('unexpected failures become error lines', () => {
   });
 });
 
+describe('deep nesting never shows raw JS text', () => {
+  const NEST = 'bash: syntax error: nesting too deep';
+  const r = (n, x) => x.repeat(n);
+  it('[ ! ! ... x ] 5000 deep', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, '[ ' + r(5000, '! ') + 'x ]'), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'test ' + r(5000, '! ') + 'x'), { out: NEST, code: 2 });
+    assert.equal(run(SQ, 'echo $?').out, '2');
+  });
+  it('[[ ( ... x ... ) ]] 5000 deep, and [[ ! ! ... ]]', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, '[[ ' + r(5000, '( ') + 'x' + r(5000, ' )') + ' ]]'), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, '[[ ' + r(5000, '! ') + 'x ]]'), { out: NEST, code: 2 });
+  });
+  it('echo ${X:-${X:-...}} 3000 deep, also inside quotes, a function, a here-string and $(( ))', () => {
+    const SQ = loadShell();
+    const deep = r(3000, '${X:-') + 'd' + r(3000, '}');
+    assert.deepEqual(run(SQ, 'echo ' + deep), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'echo "' + deep + '"'), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'f(){ echo ' + deep + '; }; f'), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'cat <<< ' + deep), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'X=1; echo ${X:' + r(3000, '$((') + '1' + r(3000, '))') + '}'), { out: NEST, code: 2 });
+    assert.deepEqual(run(SQ, 'echo "' + r(3000, '$("') + 'x' + r(3000, '")') + '"'), { out: NEST, code: 2 });
+    assert.equal(run(SQ, 'echo still works').out, 'still works');
+  });
+  it('ordinary nesting and long chains still work', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'echo ' + r(40, '${X:-') + 'd' + r(40, '}')).out, 'd');
+    assert.equal(run(SQ, '[ ' + r(40, '! ') + 'x ]; echo $?').out, '0');
+    assert.equal(run(SQ, '[[ ' + r(40, '( ') + 'x' + r(40, ' )') + ' ]] && echo y').out, 'y');
+    assert.equal(run(SQ, '[ ' + r(5000, 'x -o ') + 'x ]; echo $?').out, '0', 'a long -o chain is a flat list');
+    assert.equal(run(SQ, '[[ ' + r(5000, 'x && ') + ' "" ]]; echo $?').out, '1');
+    assert.equal(run(SQ, '[[ -n a && ( x == y || 1 -lt 2 ) ]] && echo ok').out, 'ok');
+    assert.equal(run(SQ, '[ a = b -o c = c -a ! -z d ]; echo $?').out, '0');
+  });
+  it('generic: a JS stack overflow anywhere in a command reads as the nesting error, never as RangeError text', () => {
+    const SQ = loadShell();
+    SQ.CMDS.blowup = () => { const f = (n) => f(n + 1) + 1; return f(0); };
+    assert.deepEqual(run(SQ, 'blowup'), { out: NEST, code: 2 });
+    assert.equal(run(SQ, 'echo $?').out, '2');
+    SQ.CMDS.blowup2 = () => { throw new RangeError('Maximum call stack size exceeded'); };
+    const out = run(SQ, 'for i in 1; do blowup2; done; echo after');
+    assert.equal(out.out, NEST);
+    assert.doesNotMatch(out.out, /Maximum call stack|RangeError/);
+    assert.equal(SQ.errOf(new RangeError('Maximum call stack size exceeded')), NEST);
+    assert.equal(SQ.fatalText(new RangeError('Maximum call stack size exceeded')), NEST);
+  });
+});
+
+describe('the saved-state cap holds for many small writes', () => {
+  it('a loop of small writes stops with the cap message; the world stays near LIM.STATE; the shell still works', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, "i=0; while (( i < 9000 )); do printf '%0999d' 0 > f$i; ((i++)); done", 10000);
+    assert.equal(r.out, 'this practice shell stopped the command: the files in this world grew too large (rm some to free space)');
+    assert.equal(r.code, 1);
+    const size = SQ.stateText(SQ.S.fs);
+    assert.ok(size > SQ.LIM.STATE && size < SQ.LIM.STATE + 256 * 1000, 'state text is ' + size);
+    assert.ok(stateSize(SQ) < 2000000, 'saved state is ' + stateSize(SQ));
+    assert.equal(run(SQ, 'echo still works').out, 'still works');
+    assert.match(run(SQ, 'echo x > one-more').out, /grew too large/, 'over the cap, a further write stops');
+    run(SQ, 'rm f*');
+    assert.equal(run(SQ, 'echo x > small; cat small').out, 'x', 'after rm, writes work again');
+  });
+  it('appending small lines in a loop is caught too', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, "for i in $(seq 9000); do printf '%0999d' 0 >> big$((i % 3)); done", 10000);
+    assert.match(r.out, /grew too large|file too large/);
+    assert.ok(SQ.stateText(SQ.S.fs) < SQ.LIM.STATE + 256 * 1000);
+  });
+  it('cp: a copy that would pass the cap is refused; many small cp end at the cap', () => {
+    const SQ = loadShell();
+    run(SQ, "mkdir big; cd big; printf '%0999d' 0 > s; seq 1 900 | xargs -I{} cp s f{}; cd ..");
+    const r = run(SQ, 'cp -r big b1; echo next');
+    assert.equal(r.out, 'cp: b1: file too large for this practice shell\nnext');
+    assert.equal(SQ.getNode(SQ.norm('~/b1')), null);
+    const r2 = fast(SQ, 'for i in $(seq 900); do cp big/s c$i; done', 10000);
+    assert.match(r2.out, /grew too large/);
+    assert.ok(SQ.stateText(SQ.S.fs) < SQ.LIM.STATE + 256 * 1000);
+  });
+  it('the end of the typed line checks once more (a short line that ends over the cap)', () => {
+    const SQ = loadShell();
+    run(SQ, "mkdir big; cd big; printf '%0999d' 0 > s; seq 1 740 | xargs -I{} cp s f{}; cd ..");
+    run(SQ, 'cp -r big b1');
+    const r = run(SQ, 'cp -r big b2 2>/dev/null; seq 1 20 | xargs -I{} cp big/s x{}');
+    assert.equal(r.out, 'this practice shell stopped the command: the files in this world grew too large (rm some to free space)');
+  });
+  it('the sandbox and scriptPasses are unaffected: the throwaway world is put back', () => {
+    const SQ = loadShell();
+    const before = SQ.stateText(SQ.S.fs);
+    const res = SQ.sandbox(() => run(SQ, "i=0; while (( i < 9000 )); do printf '%0999d' 0 > f$i; ((i++)); done"));
+    assert.match(res.out, /grew too large/);
+    assert.equal(SQ.stateText(SQ.S.fs), before);
+    assert.equal(run(SQ, 'echo x > ok.txt; cat ok.txt').out, 'x');
+  });
+});
+
 describe('failed saves are reported', () => {
   it('sets saveFailed and calls onSaveFail once per failure episode', () => {
     const ctx = loadContext();

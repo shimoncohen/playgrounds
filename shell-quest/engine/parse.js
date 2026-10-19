@@ -1,38 +1,45 @@
 (function (SQ) {
 const S=SQ.S;
-const {HOME,norm,getNode,cmpName}=SQ;
+const {HOME,norm,getNode,cmpName,own}=SQ;
 const M=(c,s)=>'\x01'+c+s+'\x02';
 const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
 const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'});
-/* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope). */
+/* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope).
+   S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
   if(k==='BASH_REMATCH')throw unsup('BASH_REMATCH');
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
-  if(k==='PWD')return S.cwd;if(k in S.vars)return S.vars[k];
-  return BUILTIN_VARS()[k]||''}
-const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  if(k==='PWD')return S.cwd;if(own(S.vars,k))return S.vars[k];
+  const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+const badName=k=>k==='__proto__';
 function isSet(k){const f=SQ.frame();
   if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
   if(/^\d+$/.test(k))return +k<=f.args.length;
   return own(S.vars,k)||own(BUILTIN_VARS(),k)}
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
+  if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
   S.vars[k]=v}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
 const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
 const CTX={depth:0,pend:[],sub:0};
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
+/* Nesting guard for the recursive scanners and expanders below (scanSub/scanBrace through quotes, expandStr through ${X:-...} and $(( ))): past
+   EXP_NEST levels they stop with the parser's nesting error (status 2) instead of overflowing the JS stack. */
+const EXP_NEST=100;let expDepth=0;
+function guarded(f){if(expDepth>=EXP_NEST)throw perr(SQ.NEST_DEEP,2);expDepth++;try{return f()}finally{expDepth--}}
 /* $(( ... )): index of the final ) of the closing )) (nested parentheses balanced). */
 function scanArith(line,i){let d=0;
   for(let j=i+3;j<line.length;j++){const c=line[j];
     if(c==='(')d++;else if(c===')'){if(d>0)d--;else if(line[j+1]===')')return j+1;else break}}
   throw new Error("unexpected EOF while looking for matching '))'")}
 /* ${ ... }: index of the matching }. Honours quotes, nested ${ } and $( ). */
-function scanBrace(line,i,dq){let d=1,j=i+2;
+function scanBrace(line,i,dq){return guarded(()=>scanBrace0(line,i,dq))}
+function scanBrace0(line,i,dq){let d=1,j=i+2;
   while(j<line.length){const c=line[j];
     if(c==="'"&&!dq){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
     if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;else if(line[j]==='$'&&line[j+1]==='(')j=scanSub(line,j);j++}
@@ -44,7 +51,8 @@ function scanBrace(line,i,dq){let d=1,j=i+2;
     j++}
   throw new Error("unexpected EOF while looking for matching '}'")}
 /* $( ... ): index of the matching ). Honours quotes, nested $( ) and here-documents (a body line is skipped up to its delimiter line, so ) and quotes in it do not count). */
-function scanSub(line,i){
+function scanSub(line,i){return guarded(()=>scanSub0(line,i))}
+function scanSub0(line,i){
   if(line[i+2]==='(')return scanArith(line,i);
   let d=0,j=i+1;const docs=[];
   while(j<line.length){const c=line[j];
@@ -87,7 +95,8 @@ function evalDollar(line,i,dry,dq){
 /* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
 /* case pattern: str matches the whole of the pattern word (quoted parts literal) */
 function patMatch(str,raw){pguard(str);const L=matchLens(globItems(expandStr(raw,false,true)),str,0);return L.length>0&&L[L.length-1]===str.length}
-function expandStr(s,dq,pat){let o='',j=0;const Q=(x,q)=>pat&&q?x.replace(/[*?[\]\\]/g,'\\$&'):x;
+function expandStr(s,dq,pat){return guarded(()=>expandStr0(s,dq,pat))}
+function expandStr0(s,dq,pat){let o='',j=0;const Q=(x,q)=>pat&&q?x.replace(/[*?[\]\\]/g,'\\$&'):x;
   while(j<s.length){const c=s[j];
     if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=Q(s.slice(j+1,k),true);j=k+1;continue}
     if(c==='"'&&!dq){let k=j+1;while(k<s.length&&s[k]!=='"'){if(s[k]==='\\')k++;k++}
@@ -208,7 +217,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     if(c==='&'&&line[i+1]==='>')throw unsup('&>');
     if(c==='&'){push();toks.push({t:'op',v:'&'});i++;continue}
     if(c===';'){push();if(line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
-    if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
+    if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='&')throw unsup('>&');else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
     if(c==='>'){push();if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
     if(c==='<'){push();
@@ -283,5 +292,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

@@ -50,3 +50,16 @@ describe('grep -E', () => {
     assert.equal(run(SQ, 'grep -cE "wolf|owl" journal.txt').out, run(SQ, 'grep -c "wolf|owl" journal.txt').out);
   });
 });
+
+describe('fd duplication other than 2>&1 and >&2 is reported as unsupported', () => {
+  const SQ = loadShell();
+  const UNSUP = { out: 'this practice shell does not support >& yet', code: 2 };
+  it('N>&M and N>&- / >&- print the >& message (not a syntax error)', () => {
+    for (const l of ['echo a 2>&2', 'echo a 2>&-', 'echo a >&-', 'echo a 1>&-', 'echo a >&1', 'echo a 3>&1', 'ls nope 2>&3']) assert.deepEqual(run(SQ, l), UNSUP, l);
+  });
+  it('>&2, 1>&2 and 2>&1 keep working', () => {
+    assert.deepEqual(run(SQ, 'echo a >&2'), { out: 'a', code: 0 });
+    assert.deepEqual(run(SQ, 'echo a 1>&2'), { out: 'a', code: 0 });
+    assert.deepEqual(run(SQ, 'ls nope 2>&1 | wc -l'), { out: '1', code: 0 });
+  });
+});
