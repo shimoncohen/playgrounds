@@ -366,6 +366,8 @@ test('import rejects another playground\'s file and garbage', async () => {
   await page.click('.pg-trigger');
   const send = async body => {
     const f = path.join(tmp, 'x.json'); fs.writeFileSync(f, body);
+    // Clear the previous message first, or the wait below returns at once on the stale one (flaky under load).
+    await page.evaluate(() => { document.querySelector('.pg-msg').textContent = ''; });
     await page.setInputFiles('.pg-file', f);
     await page.waitForFunction(() => document.querySelector('.pg-msg').textContent.length > 0);
     return page.textContent('.pg-msg');
