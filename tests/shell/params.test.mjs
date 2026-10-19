@@ -198,3 +198,50 @@ describe('quoting keeps it literal', () => {
     assert.equal(SQ.S.vars.Y, 'set');
   });
 });
+
+describe('pattern operators stay fast and exact', () => {
+  const timed = (SQ, line) => { const t = Date.now(); const r = run(SQ, line); return { ...r, ms: Date.now() - t }; };
+  it('pathological patterns finish quickly', () => {
+    const SQ = loadShell();
+    run(SQ, 'V=' + 'a'.repeat(60));
+    let r = timed(SQ, 'echo ${V##*a*a*a*a*a*b}');
+    assert.equal(r.out, 'a'.repeat(60));
+    assert.ok(r.ms < 1000, `60: ${r.ms}ms`);
+    run(SQ, 'V=' + 'a'.repeat(120));
+    r = timed(SQ, 'echo ${V##*a*a*a*a*a*a*a*b}');
+    assert.equal(r.out, 'a'.repeat(120));
+    assert.ok(r.ms < 1000, `120: ${r.ms}ms`);
+  });
+  it('5000-char values', () => {
+    const SQ = loadShell();
+    run(SQ, 'V=' + 'a'.repeat(4999) + 'b');
+    let r = timed(SQ, 'echo ${V//*a/x}');
+    assert.equal(r.out, 'xb');
+    assert.ok(r.ms < 1500, `${r.ms}ms`);
+    r = timed(SQ, 'echo ${V%%*b*c}');
+    assert.equal(r.out.length, 5000);
+    assert.ok(r.ms < 1500, `${r.ms}ms`);
+  });
+  it('limits pattern length', () => {
+    const SQ = loadShell();
+    run(SQ, 'V=abc');
+    assert.equal(run(SQ, 'echo ${V#' + 'a'.repeat(300) + '}').code, 1);
+  });
+  it('sets, ranges, negation, ?', () => {
+    const SQ = loadShell();
+    run(SQ, 'V=abc123');
+    assert.equal(run(SQ, 'echo ${V#[a-c]}').out, 'bc123');
+    assert.equal(run(SQ, 'echo ${V##[a-c]*[a-c]}').out, '123');
+    assert.equal(run(SQ, 'echo ${V%[!a-z]}').out, 'abc12');
+    assert.equal(run(SQ, 'echo ${V%%[0-9]*}').out, 'abc');
+    assert.equal(run(SQ, 'echo ${V#??}').out, 'c123');
+    assert.equal(run(SQ, 'echo ${V//[0-9]/#}').out, 'abc###');
+  });
+  it('quoted and escaped glob characters are literal', () => {
+    const SQ = loadShell();
+    run(SQ, "V='a*b'");
+    assert.equal(run(SQ, 'echo ${V//\\*/-}').out, 'a-b');
+    assert.equal(run(SQ, 'echo ${V#"*"}').out, 'a*b');
+    assert.equal(run(SQ, "echo ${V#a'*'}").out, 'b');
+  });
+});

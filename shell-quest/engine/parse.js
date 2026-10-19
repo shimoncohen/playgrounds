@@ -73,19 +73,46 @@ function evalDollar(line,i,dry,dq){
   const m=line.slice(i).match(VRX);if(!m)return null;
   const k=m[1];return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
 /* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
-function expandStr(s,dq){let o='',j=0;
+function expandStr(s,dq,pat){let o='',j=0;const Q=(x,q)=>pat&&q?x.replace(/[*?[\]\\]/g,'\\$&'):x;
   while(j<s.length){const c=s[j];
-    if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=s.slice(j+1,k);j=k+1;continue}
+    if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=Q(s.slice(j+1,k),true);j=k+1;continue}
     if(c==='"'&&!dq){let k=j+1;while(k<s.length&&s[k]!=='"'){if(s[k]==='\\')k++;k++}
-      if(k>=s.length){o+=c;j++;continue}o+=expandStr(s.slice(j+1,k),true);j=k+1;continue}
-    if(c==='\\'&&j+1<s.length){if(dq&&!'$`"\\'.includes(s[j+1]))o+='\\';o+=s[j+1];j+=2;continue}
+      if(k>=s.length){o+=c;j++;continue}o+=expandStr(s.slice(j+1,k),true,pat);j=k+1;continue}
+    if(c==='\\'&&j+1<s.length){if(dq&&!'$`"\\'.includes(s[j+1]))o+=Q('\\',dq);o+=Q(s[j+1],true);j+=2;continue}
     if(c==='$'){
-      if(s[j+1]==='('&&s[j+2]!=='('){const e=scanSub(s,j);o+=runSub(s.slice(j+2,e));j=e+1;continue}
-      const d=evalDollar(s,j,false,dq);if(d){o+=d.list?d.list.join(' '):d.val;j=d.end;continue}}
-    o+=c;j++}
+      if(s[j+1]==='('&&s[j+2]!=='('){const e=scanSub(s,j);o+=Q(runSub(s.slice(j+2,e)),dq);j=e+1;continue}
+      const d=evalDollar(s,j,false,dq);if(d){o+=Q(d.list?d.list.join(' '):d.val,dq);j=d.end;continue}}
+    o+=Q(c,dq);j++}
   return o}
+/* Shell glob matching for ${X#p} ${X%p} ${X/p/r}: the pattern compiles to items (* ? [set] literal) and an NFA over pattern positions is run along the string,
+   so every matching length is found in O(len*pattern) with no backtracking. Work is charged to the step budget. */
+function globItems(p){if(p.length>SQ.LIM.PATTERN)throw perr('pattern too long for this practice shell',1);
+  const it=[];
+  for(let j=0;j<p.length;j++){const c=p[j];
+    if(c==='\\'&&j+1<p.length){it.push({t:'c',c:p[++j]});continue}
+    if(c==='*'){if(!it.length||it[it.length-1].t!=='*')it.push({t:'*'});continue}
+    if(c==='?'){it.push({t:'?'});continue}
+    if(c==='['){let k=j+1,neg=false;if(p[k]==='!'||p[k]==='^'){neg=true;k++}
+      const rs=[];let first=true,closed=false;
+      while(k<p.length){let ch=p[k];if(ch===']'&&!first){closed=true;break}first=false;
+        if(ch==='\\'&&k+1<p.length)ch=p[++k];
+        if(p[k+1]==='-'&&k+2<p.length&&p[k+2]!==']'){rs.push([ch,p[k+2]]);k+=3}else{rs.push([ch,ch]);k++}}
+      if(closed){it.push({t:'set',neg,rs});j=k;continue}}
+    it.push({t:'c',c})}
+  return it}
+function itemHit(x,ch){if(x.t==='?')return true;if(x.t==='c')return x.c===ch;
+  let h=false;for(const r of x.rs)if(ch>=r[0]&&ch<=r[1]){h=true;break}return h!==x.neg}
+/* lengths L (ascending) such that str.slice(from,from+L) matches the whole pattern */
+function matchLens(it,str,from){const m=it.length,out=[];let cur=new Uint8Array(m+1),nx=new Uint8Array(m+1),work=0;
+  const close=a=>{for(let i=0;i<m;i++)if(a[i]&&it[i].t==='*')a[i+1]=1};
+  cur[0]=1;close(cur);if(cur[m])out.push(0);
+  for(let j=from;j<str.length;j++){nx.fill(0);let any=false;const ch=str[j];
+    for(let i=0;i<m;i++)if(cur[i]){if(it[i].t==='*'){nx[i]=1;any=true}else if(itemHit(it[i],ch)){nx[i+1]=1;any=true}}
+    work+=m+1;if(work>=2000){work=0;SQ.step()}
+    if(!any)break;close(nx);if(nx[m])out.push(j+1-from);const t=cur;cur=nx;nx=t}
+  return out}
+const rev=a=>a.slice().reverse();
 const pguard=v=>{if(v.length>5000)throw perr('value too long for this practice shell',1)};
-const dotall=p=>new RegExp(globRe(p).source,'s');
 function braceVal(body){let m;
   if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body)))return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)};
   m=/^(\w+|[?@*#$!])/.exec(body);if(!m)throw perr('${'+body+'}: bad substitution',1);
@@ -98,18 +125,16 @@ function braceVal(body){let m;
     if(op==='+')return {val:empty?'':expandStr(w)};
     if(empty)throw perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1);
     return {val}}
-  if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const re=dotall(expandStr(m[2])),op=m[1];
-    if(op==='#'){for(let j=0;j<=n;j++)if(re.test(val.slice(0,j)))return {val:val.slice(j)}}
-    else if(op==='##'){for(let j=n;j>=0;j--)if(re.test(val.slice(0,j)))return {val:val.slice(j)}}
-    else if(op==='%'){for(let j=n;j>=0;j--)if(re.test(val.slice(j)))return {val:val.slice(0,j)}}
-    else{for(let j=0;j<=n;j++)if(re.test(val.slice(j)))return {val:val.slice(0,j)}}
+  if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const it=globItems(expandStr(m[2],false,true)),op=m[1];
+    if(op[0]==='#'){const L=matchLens(it,val,0);if(L.length)return {val:val.slice(op==='#'?L[0]:L[L.length-1])}}
+    else{const L=matchLens(rev(it),val.split('').reverse().join(''),0);if(L.length)return {val:val.slice(0,n-(op==='%'?L[0]:L[L.length-1]))}}
     return {val}}
   if((m=/^(\/\/?)([\s\S]*)$/.exec(rest))){pguard(val);const all=m[1]==='//',t=m[2];
     let cut=-1;for(let j=0;j<t.length;j++){if(t[j]==='\\')j++;else if(t[j]==='/'){cut=j;break}}
-    const pat=expandStr(cut<0?t:t.slice(0,cut)),rep=cut<0?'':expandStr(t.slice(cut+1));
-    if(!pat)return {val};const re=dotall(pat);let out='',p=0;
-    while(p<n){SQ.step();let e=n;while(e>p&&!re.test(val.slice(p,e)))e--;
-      if(e>p){out+=rep;p=e;if(!all)return {val:out+val.slice(p)}}else out+=val[p++]}
+    const pe=expandStr(cut<0?t:t.slice(0,cut),false,true),rep=cut<0?'':expandStr(t.slice(cut+1));
+    if(!pe)return {val};const it=globItems(pe);let out='',p=0;
+    while(p<n){SQ.step();const L=matchLens(it,val,p).filter(x=>x>0);
+      if(L.length){out+=rep;p+=L[L.length-1];if(!all)return {val:out+val.slice(p)}}else out+=val[p++]}
     return {val:out}}
   if(rest[0]===':'){const a=rest.slice(1),c=a.indexOf(':');
     const num=x=>{const r=Number(arithVal(x));return r};
