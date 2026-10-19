@@ -2,10 +2,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadShell, run } from './harness.mjs';
 
-// Known content gap (reported, engine/content untouched): the answer for this mission is only the
-// `find` step, but its check needs a follow-up `cat` of the found file, so a single-line answer
-// cannot satisfy it. Remove from this set once the content provides a solving answer.
-const KNOWN_UNSOLVABLE = new Set(['Treasure hunt']);
+// Documented two-step override: the answer for this mission is only the `find` step; the UI/golden
+// flow then types `cat <printed path>` (the check needs the secret word in a cat output).
+const TWO_STEP = {
+  'Treasure hunt': (SQ, m) => {
+    const found = run(SQ, m.answer).out.split('\n').find((l) => l.trim());
+    assert.ok(found, 'find printed no path');
+    return `cat ${found.trim()}`;
+  },
+};
 
 const chapters = loadShell().content.chapters;
 
@@ -15,9 +20,10 @@ describe('beginner solvability', () => {
       const SQ = loadShell();
       SQ.content.chapters[i].setup();
       for (const m of SQ.content.chapters[i].missions) {
-        run(SQ, m.answer);
-        if (KNOWN_UNSOLVABLE.has(m.title)) continue;
-        assert.ok(m.check(SQ.ctxFor(m.answer)), `mission "${m.title}" not solved by: ${m.answer}`);
+        let last = m.answer;
+        if (TWO_STEP[m.title]) last = TWO_STEP[m.title](SQ, m);
+        run(SQ, last);
+        assert.ok(m.check(SQ.ctxFor(last)), `mission "${m.title}" not solved by: ${last}`);
       }
     });
   });
