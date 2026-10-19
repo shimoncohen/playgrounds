@@ -87,6 +87,7 @@ const CMDS={
   find(a){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')){start=a[0];i=1}let rx=null,type=null;
     for(;i<a.length;i++){const p=a[i];if(p==='-name'||p==='-iname'){const v=a[++i];if(v==null)return E(`find: missing argument to '${p}'`);rx=globRe(v,p==='-iname')}
       else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d'&&type!=='l')return E(`find: unknown argument to -type: ${type}`)}
+      else if(p==='-print'){}
       else if(p.startsWith('-')||p==='!'||p==='(')return E(`this practice shell does not support find ${p} yet`);
       else{const r=E(`find: paths must come before the search options: '${p}'`);if(/[*?]/.test(a.join('')))r.tips=['Tip: put quotes around the pattern, like -name "*.txt", so the shell leaves the * for find.'];return r}}
     const root=getNode(norm(start));if(!root)return E(`find: '${start}': No such file or directory`);const out=[];
