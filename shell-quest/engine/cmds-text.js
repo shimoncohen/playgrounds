@@ -150,7 +150,7 @@ CMDS.xargs=function(a,io){let n=0,repl=null,noRun=false,i=0;
   if(a[i]==='--')i++;
   const cmd=a.slice(i);if(!cmd.length)cmd.push('echo');
   if(xDepth>=MAX_XDEPTH)return E('xargs: too many nested xargs for this practice shell');
-  const fn=CMDS[cmd[0]];if(!fn)return E(`xargs: ${cmd[0]}: No such file or directory`,127);
+  const fn=SQ.own(CMDS,cmd[0])&&CMDS[cmd[0]];if(!fn)return E(`xargs: ${cmd[0]}: No such file or directory`,127);
   const items=repl!==null?lines(io.stdin).filter(l=>l.trim()!==''):io.stdin.split(/\s+/).filter(Boolean);
   let calls;
   if(repl!==null)calls=items.map(it=>cmd.map(w=>w.split(repl).join(it)));
@@ -161,7 +161,7 @@ CMDS.xargs=function(a,io){let n=0,repl=null,noRun=false,i=0;
   const out=[],err=[],tips=[];let code=0;xDepth++;
   try{for(const w of calls){
       if(xBudget<=0){err.push('xargs: too many commands for this practice shell');code=1;break}
-      xBudget--;SQ.step();const f=CMDS[w[0]];
+      xBudget--;SQ.step();const f=SQ.own(CMDS,w[0])&&CMDS[w[0]];
       if(!f){err.push(`xargs: ${w[0]}: No such file or directory`);code=127;continue}
       const r=f(w.slice(1),Object.assign({},io,{stdin:'',tty:false,pipeLen:1}));
       if(r.out!=='')out.push(r.out);err.push(...(r.err||[]));tips.push(...(r.tips||[]));if(r.code!==0&&code===0)code=123}}
