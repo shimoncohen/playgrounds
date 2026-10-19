@@ -61,5 +61,26 @@
     return { tierOf, missionXp, chapterBadgeXp: BADGE_XP, status, ranks, rankFor, cumulativeXp };
   }
 
-  root.Tiers = { create };
+  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* DOM helper: draws a header per tier that has chapters, then that tier's chapter buttons.
+     Chapter button markup is the original flat-list markup (golden test depends on it). */
+  function renderRail(container, o) {
+    const { status, chapters, S, onPick } = o;
+    const doneIn = (i) => {
+      let n = 0;
+      for (let j = 0; j < chapters[i].missions.length; j++) if (S.done[i + '.' + j]) n++;
+      return n;
+    };
+    const btn = (c, i) => `<button class="chap${S.badges[i] ? ' earned' : ''}" data-ch="${i}" aria-current="${i === S.ch}"><span class="num">${S.badges[i] ? '★' : i + 1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${doneIn(i)}/${c.missions.length}</span></button>`;
+    container.innerHTML = status.filter((st) => st.chapters.length).map((st) =>
+      `<div class="tierhead${st.complete ? ' complete' : ''}" data-tier="${esc(st.tier.id)}"><span class="tn">${esc(st.tier.name)}</span><span class="tc">${st.chaptersDone}/${st.chapters.length}</span>${st.complete ? '<span class="tb" aria-label="Tier complete">★</span>' : ''}</div>`
+      + st.chapters.map((i) => btn(chapters[i], i)).join('')).join('');
+    if (onPick) container.onclick = (e) => {
+      const b = e.target.closest && e.target.closest('[data-ch]');
+      if (b) onPick(+b.dataset.ch);
+    };
+  }
+
+  root.Tiers = { create, renderRail };
 })(typeof window !== 'undefined' ? window : globalThis);

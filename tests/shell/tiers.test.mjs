@@ -50,3 +50,26 @@ describe('tiers', () => {
     assert.equal(t.cumulativeXp('a'), 45);
   });
 });
+
+describe('Tiers.renderRail', () => {
+  it('renders one header per status entry, in order, with chapter buttons', () => {
+    const el = { innerHTML: '' };
+    const mk = (id, name, chapters, done, complete) => ({ tier: { id, name }, chapters, chaptersDone: done, complete });
+    const chapters = ['A', 'B', 'C'].map((name) => ({ name, missions: [{}] }));
+    const S = { badges: {}, ch: 0, done: {} };
+    Tiers.renderRail(el, {
+      status: [mk('beginner', 'Beginner', [0, 1], 2, true), mk('intermediate', 'Intermediate', [2], 0, false)],
+      chapters, S,
+    });
+    const heads = [...el.innerHTML.matchAll(/<div class="tierhead[^"]*"[^>]*data-tier="(\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(heads, ['beginner', 'intermediate']);
+    assert.equal((el.innerHTML.match(/data-ch="/g) || []).length, 3);
+    assert.match(el.innerHTML, /2\/2/);
+    assert.match(el.innerHTML, /★/);
+  });
+  it('skips tiers with no chapters', () => {
+    const el = { innerHTML: '' };
+    Tiers.renderRail(el, { status: [{ tier: { id: 'x', name: 'X' }, chapters: [], chaptersDone: 0, complete: false }], chapters: [], S: { badges: {}, done: {}, ch: 0 } });
+    assert.equal(el.innerHTML, '');
+  });
+});

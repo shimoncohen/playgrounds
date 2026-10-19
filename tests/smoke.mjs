@@ -153,6 +153,24 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
   await ctx.close();
 });
 
+test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  assert.equal(await page.locator('.tierhead').count(), 1);
+  let head = (await page.textContent('.tierhead')).replace(/\s+/g, ' ');
+  assert.match(head, /Beginner/);
+  assert.match(head, /0\/7/);
+  assert.doesNotMatch(head, /★/);
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
+  await page.waitForSelector('#mission');
+  head = (await page.textContent('.tierhead')).replace(/\s+/g, ' ');
+  assert.match(head, /7\/7/);
+  assert.match(head, /★/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('import rejects another playground\'s file and garbage', async () => {
   const { ctx, page } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

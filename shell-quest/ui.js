@@ -27,7 +27,7 @@ function renderMap(){
     if(isDir){const ks=sortedKeys(n);if(ks.length)h+='<ul class="tree">'+ks.map(k=>node(k,n.children[k],join(abs,k))).join('')+'</ul>'}return h+'</li>'};
   mapEl.innerHTML='<ul class="tree root">'+node('/',S.fs,'/')+'</ul>';
   const here=mapEl.querySelector('.row.here');if(here){const sc=mapEl.closest('.mapscroll');if(sc&&sc.scrollWidth>sc.clientWidth)sc.scrollLeft=Math.max(0,here.offsetLeft-40)}}
-function renderChapters(){chaptersEl.innerHTML=CH.map((c,i)=>`<button class="chap${S.badges[i]?' earned':''}" data-ch="${i}" aria-current="${i===S.ch}"><span class="num">${S.badges[i]?'★':i+1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`).join('')}
+function renderChapters(){Tiers.renderRail(chaptersEl,{status:SQ.tiers.status(S),chapters:CH,S})}
 function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
   const dots=`<div class="dots" aria-label="Missions in this chapter">${ch.missions.map((m,i)=>`<button class="dot${S.done[S.ch+'.'+i]?' done':''}${i===S.mi?' cur':''}" data-mi="${i}" title="${esc(m.title)}" aria-label="Mission ${i+1}: ${esc(m.title)}">${i+1}</button>`).join('')}</div>`;
   let h;
