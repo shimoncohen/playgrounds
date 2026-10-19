@@ -24,7 +24,10 @@ const CMDS={
   touch(a){if(!a.length)return E('touch: missing file operand');const err=[];for(const t of a){const abs=norm(t);if(getNode(abs)){SQ.rt.changed.add(abs);continue}
       const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`touch: cannot touch '${t}': No such file or directory`);continue}par.children[name]=F('');SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
-  echo(a){let x=a.slice();while(x[0]==='-n'||x[0]==='-e')x.shift();return ok(x.join(' '))},
+  /* flags -n -e -E (alone or combined) are consumed; -e expands \n \t \\ \0nnn \xHH. -n has no visible effect: output text never carries a trailing newline. Other dashes stay literal. */
+  echo(a){let x=a.slice(),e=false;while(x.length&&/^-[neE]+$/.test(x[0])){for(const f of x[0].slice(1))if(f==='e')e=true;else if(f==='E')e=false;x.shift()}
+    let s=x.join(' ');if(e)s=s.replace(/\\(0[0-7]{0,3}|x[0-9a-fA-F]{1,2}|[nt\\])/g,(m,c)=>c==='n'?'\n':c==='t'?'\t':c==='\\'?'\\':c[0]==='x'?String.fromCharCode(parseInt(c.slice(1),16)):String.fromCharCode(parseInt(c.slice(1)||'0',8)));
+    return ok(s)},
   cat(a,io){const {rest}=flags(a);const {src,err}=readInputs(rest,io,'cat');return {out:src.map(s=>s.text).join('\n'),err,code:err.length?1:0}},
   rm(a){const {fl,rest}=flags(a);const r=fl.has('r')||fl.has('R'),f=fl.has('f');if(!rest.length)return f?ok():E('rm: missing operand');const err=[];const tips=[];
     for(const t of rest){const abs=realPath(norm(t),false)||norm(t),rcwd=realPath(S.cwd,true)||S.cwd;
@@ -110,18 +113,18 @@ const CMDS={
       SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
   export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
-    for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
+    for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
       if(m[2]!==undefined)S.vars[k]=m[3];(S.exp=S.exp||{})[k]=1}
     return {out:'',err,code:err.length?1:0}},
   env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])L[k]=SQ.getVar(k);
-    for(const k of Object.keys(S.exp||{}))if(k in S.vars)L[k]=S.vars[k];
+    for(const k of Object.keys(S.exp||{}))if(SQ.own(S.vars,k))L[k]=S.vars[k];
     return ok(Object.keys(L).sort().map(k=>k+'='+L[k]).join('\n'))},
   history:()=>ok(S.hist.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n')),
   clear:()=>Object.assign(ok(),{clear:true}),
   whoami:()=>ok('explorer'),
   hostname:()=>ok('basecamp'),
   date(){const d=new Date(),p=d.toDateString().split(' ');return ok(`${p[0]} ${p[1]} ${p[2]} ${d.toTimeString().slice(0,8)} ${p[3]}`)},
-  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return SQ.runPath(a[0],io,true)},
+  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return SQ.runPath(a[0],io,true,a.slice(1))},
   sh(a,io){return CMDS.bash(a,io)},
   help:()=>ok(['Commands in this practice shell:',
     '  Look around   pwd  ls  cd  tree  cat',
@@ -166,15 +169,22 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
-    const copy=move?sn:clone(sn);if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
+    const copy=move?sn:clone(sn);
+    if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
+    if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
     par.children[name]=copy;markTree(tabs,copy)}
   return {out:'',err,code:err.length?1:0,tips}}
 
+/* nano/edit/vi/vim FILE: no file is made here; the page opens its editor on the absolute path and Save writes it */
+function editorCmd(name){return a=>{const {rest}=flags(a);if(!rest.length)return E(`${name}: missing file operand`,1);const t=rest[0];
+  if(t.length>4096||t.split('/').some(x=>x.length>255))return E(`${name}: ${t.length>80?t.slice(0,80)+'...':t}: File name too long`,1);
+  const abs=norm(t),n=getNode(abs);
+  if(n&&n.type==='dir')return E(`${name}: ${t}: Is a directory`,1);
+  if(!n){const [par]=parentOf(abs);if(!par||par.type!=='dir')return E(`${name}: cannot create '${t}': No such file or directory`,1)}
+  return {out:'',err:[],code:0,ui:{edit:abs,isNew:!n}}}}
+for(const n of ['nano','edit','vi','vim'])CMDS[n]=editorCmd(n);
 const FRIENDLY={
-  nano:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vim:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vi:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  code:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
+  code:'code opens VS Code, which this practice shell does not have. Use its own small editor instead: nano FILE.',
   sudo:'sudo runs a command as the all-powerful admin user. You don\'t need it here, and on a real computer use it only when you know why.',
   exit:'There is nowhere to exit to. Your progress saves automatically.',
   logout:'There is nowhere to exit to. Your progress saves automatically.',
@@ -188,6 +198,6 @@ const FRIENDLY={
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit')continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

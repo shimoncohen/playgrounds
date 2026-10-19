@@ -9,8 +9,14 @@ const screen=$('#screen'),cmdIn=$('#cmd'),promptEl=$('#prompt'),term=$('#term'),
 const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML}=SQ.ui;
 let histIdx=S.hist.length;
 
-function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
-  try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
+/* Script and challenge missions are re-checked on every call (a Save, a typed line, Save & run): scriptPasses bails out at once when the file is missing and runs in a sandbox.
+   SQ.missionVerdict decides: a custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case,
+   but only when the file that ran (opts.ranAbs) is the mission's own file: running some other file says nothing about it. */
+const isScript=m=>m.kind==='script'||m.kind==='challenge';
+function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
+  const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
+  try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
+  if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
@@ -20,21 +26,39 @@ function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return
     else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
   SQ.ui.setPop()}
 
-function run(line){const before=S.cwd;addLine(promptHTML(before)+esc(line));
+/* One typed or generated line: echo it (unless echo:false), run it (optional stdin text), show the output, check the mission.
+   opts.feedback is for script missions (a failed test case is explained); the typed prompt never sets it. */
+function runLine(line,opts){opts=opts||{};const before=S.cwd;let edit=null;
+  if(opts.echo!==false)addLine(promptHTML(before)+esc(line));
   if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
-  if(line.trim()){const r=execLine(line,{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;checkMission(line)}
-  renderAll();save();scrollDown()}
+  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
+  renderAll();save();scrollDown();
+  if(edit)openFor(edit.edit,edit.isNew)}
+const run=line=>runLine(line,{echo:true});
+
+/* the editor panel: nano/edit/vi/vim ask for it, Save writes through the same writeFile the shell uses */
+function openFor(abs,isNew){const n=getNode(abs);SQ.ui.openEditor(abs,n&&n.type==='file'?n.content:'#!/bin/bash\n',{isNew:!n})}
+const shownPath=abs=>{const r=rel(abs);return r==='.'?disp(abs):r};
+SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();
+  const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
+  if(e){addLine(renderText(e),'err');scrollDown();return false}
+  addLine(renderText('Saved '+shown),'sys');
+  SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last; /* a Save is judged on its own, never on the line typed before it */
+  checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
+const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
+SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
+  runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true,ranAbs:abs})};
 
 function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').filter(Boolean),b=cw.split('/').filter(Boolean);let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}
 
 function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
-  SQ.rt.changed=new Set();CH[i].setup();if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
+  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
 
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
   const first=/^\s*\S*$/.test(before);let cands=[];
-  if(first&&!word.includes('/'))cands=Object.keys(CMDS).filter(c=>c.startsWith(word)).map(c=>c+' ');
+  if(first&&!word.includes('/'))cands=Object.keys(CMDS).filter(c=>/^[A-Za-z]/.test(c)&&c.startsWith(word)).map(c=>c+' ');
   else{const idx=word.lastIndexOf('/'),dp=idx>=0?word.slice(0,idx+1):'',b=word.slice(idx+1);const dn=getNode(norm(dp||'.'));
     if(dn&&dn.type==='dir')cands=Object.keys(dn.children).filter(k=>k.startsWith(b)&&(b.startsWith('.')||!k.startsWith('.'))).sort(cmpName).map(k=>dp+k+(dn.children[k].type==='dir'?'/':' '))}
   if(!cands.length)return;
@@ -51,9 +75,13 @@ cmdIn.addEventListener('keydown',e=>{
   else if(e.ctrlKey&&(e.key==='l'||e.key==='L')){e.preventDefault();screen.innerHTML=''}
   else if(e.ctrlKey&&(e.key==='c'||e.key==='C')&&!String(window.getSelection())){e.preventDefault();addLine(promptHTML(S.cwd)+esc(cmdIn.value)+'^C');cmdIn.value='';scrollDown()}});
 term.addEventListener('click',()=>{if(!String(window.getSelection()))cmdIn.focus()});
-$('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;cmdIn.focus();
+/* the extra keys type into whichever of the terminal input or the editor's fields was used last */
+let lastField=cmdIn;
+for(const el of [cmdIn,$('#edText'),$('#edArgs'),$('#edStdin')])el.addEventListener('focusin',()=>{lastField=el});
+function typeInto(el,k){el.focus();const p=el.selectionStart??el.value.length,q=el.selectionEnd??p;el.setRangeText(k,p,q,'end');el.dispatchEvent(new Event('input',{bubbles:true}))}
+$('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;const edOpen=!$('#editor').hidden;const f=(lastField===cmdIn||edOpen)?lastField:cmdIn;(['TAB','UP','ENTER'].includes(k)?cmdIn:f).focus();
   if(k==='TAB')complete();else if(k==='UP'){if(histIdx>0){histIdx--;fill(S.hist[histIdx]||'')}}else if(k==='ENTER'){const v=cmdIn.value;cmdIn.value='';run(v)}
-  else{const p=cmdIn.selectionStart??cmdIn.value.length;cmdIn.value=cmdIn.value.slice(0,p)+k+cmdIn.value.slice(p);cmdIn.setSelectionRange(p+k.length,p+k.length)}});
+  else typeInto(f,k)});
 crumbsEl.addEventListener('click',e=>{const b=e.target.closest('[data-cd]');if(b)fill('cd '+b.dataset.cd)});
 mapEl.addEventListener('click',e=>{const b=e.target.closest('[data-path]');if(!b)return;const abs=b.dataset.path,n=getNode(abs);if(!n)return;fill((n.type==='dir'?'cd ':'cat ')+rel(abs))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(b)goChapter(+b.dataset.ch)});
@@ -61,12 +89,12 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
-  else if(a==='fill'&&m)fill(m.answer);
+  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.answer)}
   else if(a==='nextch')goChapter(S.ch+1);
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;SQ.rt.changed=new Set();CH[S.ch].setup();SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
@@ -105,7 +133,7 @@ fStage.addEventListener('keydown',e=>{if(e.target.id==='fIn'&&e.key==='Enter'&&Q
 let armP=null;
 $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');if(t){showTab('quest');fill(t.dataset.try);return}
   if(e.target.id==='resetProgress'){const b=e.target;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase progress, XP and world';clearTimeout(armP);armP=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},3500);return}
-    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();CH[0].setup();SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
+    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
 
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');
@@ -115,7 +143,7 @@ function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash s
 SQ.rt.onSaveFail=()=>{addLine(renderText('Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'),'err');scrollDown()};
 
 /* boot */
-if(!S.seen){CH[S.ch].setup();S.seen=true}
+if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}
 SQ.rt.changed=new Set();
 welcome();if(S.hist.length)addLine(renderText(`Welcome back. You are on chapter ${S.ch+1}: ${CH[S.ch].name}.`),'tip');
 renderAll();renderGuide();fireIdle();save();

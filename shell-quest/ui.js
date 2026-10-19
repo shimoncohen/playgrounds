@@ -34,14 +34,15 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
   if(S.mi>=n){const all=totalDone(S.ch)===n,last=S.ch===CH.length-1,tier=SQ.tiers.tierOf(S.ch),begin=tier.id==='beginner',tdone=SQ.tiers.status(S).some(x=>x.tier===tier&&x.complete);
     h=`<div class="eyebrow">Chapter ${S.ch+1} complete</div><div class="badge-art${all?'':' dim'}">${all?'★':S.ch+1}</div>
     <h2>${last?(begin?'You finished Shell Quest':(tdone?'You finished the '+esc(tier.name)+' tier':'You reached the last chapter')):all?'Badge earned: '+esc(ch.badge):'Chapter finished'}</h2>
-    <p class="explain">${last?(begin?'You can move around a filesystem, build and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':'That is every chapter there is for now. You can revisit any chapter from the list on the left.'):'You can now use these on any real Linux or Mac terminal:'}</p>
+    <p class="explain">${last?(begin?'You can move around a filesystem, build and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':(tier.id==='advanced'&&tdone?'You can write real bash scripts now: tests and if, loops and arithmetic, functions with arguments and local variables, here-documents, stderr and exit codes. ':'')+'That is every chapter there is for now. You can revisit any chapter from the list on the left.'):'You can now use these on any real Linux or Mac terminal:'}</p>
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, then open a real terminal. The field guide shows how on Mac, Windows and Linux.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`}
-  else{const m=ch.missions[S.mi];const hint=m.hint||`Type exactly this, then press Enter: <code>${esc(m.answer)}</code>`;
+  else{const m=ch.missions[S.mi];const sc=(m.kind==='script'||m.kind==='challenge')&&m.file;const hint=m.hint||(sc?`Use nano ${esc(m.file)} to write it, then run it with bash ${esc(m.file)}.`:`Type exactly this, then press Enter: <code>${esc(m.answer)}</code>`);
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done before':''}</div>
     ${S.mi===0?`<p class="intro">${esc(ch.intro)}</p>`:''}
-    <h2>${esc(m.title)}</h2>
+    <h2>${esc(m.title)}${m.kind==='challenge'?' <span class="mtag">Challenge</span>':''}</h2>
+    ${sc?`<div class="where">Your file: <code>${esc(m.file)}</code></div>`:''}
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
     <p class="explain">${m.explain}</p>
@@ -86,7 +87,7 @@ function renderGuide(){
    <article class="card panel"><h4>Windows</h4><p>Install WSL: open PowerShell as administrator, run <code>wsl --install</code>, restart, then open Ubuntu from the Start menu. Git Bash is a lighter alternative.</p></article>
    <article class="card panel"><h4>Linux</h4><p>Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> on most distributions, or find Terminal in your app menu.</p></article>
    <article class="card panel"><h4>First steps there</h4><p>Make a safe playground before experimenting: <code>mkdir ~/playground &amp;&amp; cd ~/playground</code>. Then rerun your favourite missions on real files.</p></article></div></section>
-  <section class="gsec"><h3>After this course</h3><div class="panel" style="padding:14px 16px"><p class="explain">Good next topics, roughly in order: editing files with <code>nano</code>, <code>if</code> statements and exit codes, functions in scripts, reading <code>man</code> pages, permissions in depth (<code>ls -l</code> and <code>chmod 755</code>), and then tools that run on top of bash, like <code>git</code> and <code>ssh</code>.</p>
+  <section class="gsec"><h3>After this course</h3><div class="panel" style="padding:14px 16px"><p class="explain">Good next topics, roughly in order: reading real <code>man</code> pages, permissions in depth (<code>ls -l</code> and <code>chmod 755</code>), the bash features this practice shell leaves out (arrays, <code>set -euo pipefail</code>, <code>trap</code>, <code>getopts</code>, background jobs with <code>&amp;</code>), <code>awk</code> for columns of text, and then tools that run on top of bash, like <code>git</code> and <code>ssh</code>. If you have not yet, play the Intermediate and Advanced chapters first: they cover text tools, quoting, exit codes, <code>if</code>, loops, functions and real scripts written in <code>nano</code>.</p>
    <div class="actions" style="margin-top:12px"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`;
   const gd=$('#guide');gd.querySelector('.gfilter').addEventListener('click',e=>{const b=e.target.closest('button[data-tier]');if(!b)return;const t=b.dataset.tier;
     gd.querySelectorAll('.gfilter button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));

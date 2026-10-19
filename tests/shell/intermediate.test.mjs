@@ -17,12 +17,12 @@ const no = (ch, m, line, pre) => assert.ok(!judge(ch, m, line, pre), `should rej
 describe('intermediate content shape', () => {
   const ch = loadShell().content.chapters;
   it('adds chapters 8 to 11 after the seven beginner chapters', () => {
-    assert.equal(ch.length, 11);
+    assert.equal(ch.filter((c) => c.tier === 'beginner' || c.tier === 'intermediate').length, 11);
     assert.deepEqual([...ch.slice(0, 7).map((c) => c.missions.length)], [8, 7, 7, 7, 7, 7, 9]);
     assert.deepEqual([...ch.slice(0, 7).map((c) => c.tier)], Array(7).fill('beginner'));
-    assert.deepEqual([...ch.slice(7).map((c) => c.missions.length)], [7, 8, 7, 7]);
-    assert.deepEqual([...ch.slice(7).map((c) => c.tier)], Array(4).fill('intermediate'));
-    assert.deepEqual([...ch.slice(7).map((c) => c.badge)], ['Textsmith', 'Quoter', 'Gatekeeper', 'Streamer']);
+    assert.deepEqual([...ch.slice(7, 11).map((c) => c.missions.length)], [7, 8, 7, 7]);
+    assert.deepEqual([...ch.slice(7, 11).map((c) => c.tier)], Array(4).fill('intermediate'));
+    assert.deepEqual([...ch.slice(7, 11).map((c) => c.badge)], ['Textsmith', 'Quoter', 'Gatekeeper', 'Streamer']);
   });
   it('setup seeds the data files without overwriting learner work', () => {
     const SQ = loadShell();
@@ -34,7 +34,7 @@ describe('intermediate content shape', () => {
     assert.equal(SQ.ctxFor('').read('~/config.ini').trim(), 'mine');
   });
   it('every mission has the beginner-shaped fields', () => {
-    for (const c of ch.slice(7)) for (const m of c.missions) {
+    for (const c of ch.slice(7, 11)) for (const m of c.missions) {
       for (const k of ['title', 'goal', 'explain', 'answer']) assert.equal(typeof m[k], 'string', `${m.title}.${k}`);
       assert.ok(Array.isArray(m.anat) && m.anat.length && typeof m.check === 'function');
       assert.doesNotMatch(m.explain + m.goal, /—/, 'no em dashes');
