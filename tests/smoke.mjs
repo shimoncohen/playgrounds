@@ -163,7 +163,7 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   assert.match(head, /0\/7/);
   assert.doesNotMatch(head, /★/);
   assert.match(ihead, /^Intermediate/);
-  assert.match(ihead, /0\/2/);
+  assert.match(ihead, /0\/4/);
   assert.doesNotMatch(ihead, /★/);
   const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
   await page.click('.chap[data-ch="7"]');
@@ -176,8 +176,37 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   [head, ihead] = await heads();
   assert.match(head, /7\/7/);
   assert.match(head, /★/);
-  assert.match(ihead, /0\/2/);
+  assert.match(ihead, /0\/4/);
   assert.doesNotMatch(ihead, /★/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4/4, star, Script Smith)', async () => {
+  // Built from the beginner fixture: add the four Intermediate badges, their done keys and the XP.
+  const f = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'), 'utf8'));
+  const counts = { 7: 7, 8: 8, 9: 7, 10: 7 };
+  let xp = f.data.xp;
+  for (const [ch, n] of Object.entries(counts)) {
+    for (let m = 0; m < n; m++) { f.data.done[`${ch}.${m}`] = 1; xp += 15; }
+    f.data.badges[ch] = 1; xp += 25;
+  }
+  f.data.xp = xp; f.data.ch = 10; f.data.mi = counts[10];
+  const file = path.join(tmp, 'intermediate-complete.json');
+  fs.writeFileSync(file, JSON.stringify(f));
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
+  await page.waitForSelector('#mission');
+  const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  assert.match(heads[0], /7\/7/);
+  assert.match(heads[1], /^Intermediate/);
+  assert.match(heads[1], /4\/4/);
+  assert.match(heads[1], /★/);
+  assert.equal(xp, 1230);
+  assert.equal((await page.textContent('#xpText')).trim(), '1230 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Script Smith');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

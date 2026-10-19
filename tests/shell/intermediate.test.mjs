@@ -16,13 +16,13 @@ const no = (ch, m, line, pre) => assert.ok(!judge(ch, m, line, pre), `should rej
 
 describe('intermediate content shape', () => {
   const ch = loadShell().content.chapters;
-  it('adds chapters 8 and 9 after the seven beginner chapters', () => {
-    assert.equal(ch.length, 9);
+  it('adds chapters 8 to 11 after the seven beginner chapters', () => {
+    assert.equal(ch.length, 11);
     assert.deepEqual([...ch.slice(0, 7).map((c) => c.missions.length)], [8, 7, 7, 7, 7, 7, 9]);
     assert.deepEqual([...ch.slice(0, 7).map((c) => c.tier)], Array(7).fill('beginner'));
-    assert.deepEqual([...ch.slice(7).map((c) => c.missions.length)], [7, 8]);
-    assert.deepEqual([...ch.slice(7).map((c) => c.tier)], ['intermediate', 'intermediate']);
-    assert.deepEqual([...ch.slice(7).map((c) => c.badge)], ['Textsmith', 'Quoter']);
+    assert.deepEqual([...ch.slice(7).map((c) => c.missions.length)], [7, 8, 7, 7]);
+    assert.deepEqual([...ch.slice(7).map((c) => c.tier)], Array(4).fill('intermediate'));
+    assert.deepEqual([...ch.slice(7).map((c) => c.badge)], ['Textsmith', 'Quoter', 'Gatekeeper', 'Streamer']);
   });
   it('setup seeds the data files without overwriting learner work', () => {
     const SQ = loadShell();
@@ -136,11 +136,11 @@ describe('chapter 9 checks', () => {
 describe('intermediate quick-fire and guide', () => {
   const SQ = loadShell();
   it('has 6 quick-fire questions per chapter, tagged intermediate', () => {
-    assert.equal(SQ.content.quickfire.filter((q) => q[2] === 'intermediate').length, 12);
+    assert.equal(SQ.content.quickfire.filter((q) => q[2] === 'intermediate').length, 24);
     assert.ok(SQ.content.quickfire.filter((q) => !q[2]).length > 0);
   });
   it('has 6 guide entries per chapter and man works for them', () => {
-    for (const ci of [7, 8]) assert.equal(SQ.content.guide.filter((g) => g.ch === ci).length, 6, `chapter ${ci}`);
+    for (const ci of [7, 8, 9, 10]) assert.equal(SQ.content.guide.filter((g) => g.ch === ci).length, 6, `chapter ${ci}`);
     for (const cmd of ['cut', 'tr', 'sed', 'tee', 'export', 'env', 'date']) {
       const r = run(SQ, `man ${cmd}`);
       assert.match(r.out, new RegExp('^' + cmd.toUpperCase()), cmd);
@@ -220,5 +220,255 @@ describe('round 3: 9.8 across lines (log resets per line, like the UI)', () => {
     assert.ok(!seq('echo 2; echo $?'));
     assert.ok(!seq('ls nothing', 'echo 2'));
     assert.ok(!seq('ls nothing', 'ls village', 'echo $?'));
+  });
+});
+
+// ---- Task 14: chapters 10 (Permissions & links) and 11 (Streams & xargs) ----
+const T10 = 9, T11 = 10;
+// UI-style: fresh world, chapter setup, every line on its own log, judge the last line.
+function ui(ch, m, ...lines) {
+  const SQ = loadShell();
+  SQ.content.chapters[ch].setup();
+  for (const l of lines) run(SQ, l);
+  return SQ.content.chapters[ch].missions[m].check(SQ.ctxFor(lines[lines.length - 1]));
+}
+const pass = (ch, m, ...lines) => assert.ok(ui(ch, m, ...lines), `should accept: ${lines.join(' / ')}`);
+const fail = (ch, m, ...lines) => assert.ok(!ui(ch, m, ...lines), `should reject: ${lines.join(' / ')}`);
+
+describe('chapters 10 and 11 shape and seeding', () => {
+  it('seeds secrets.txt at 0644, scripts/, logs and scratch, never clobbering, idempotent', () => {
+    const SQ = loadShell();
+    for (const ci of [T10, T11]) SQ.content.chapters[ci].setup();
+    const c = SQ.ctxFor('');
+    assert.equal(SQ.modeOf(c.node('~/secrets.txt')), 0o644);
+    assert.ok(c.isDir('~/scripts') && Object.keys(c.node('~/scripts').children).length === 0);
+    for (const f of ['day1.log', 'day2.log', 'day3.log', 'all.log']) assert.ok(c.isFile('~/village/logs/' + f), f);
+    assert.ok(c.isFile('~/village/scratch/old1.log') && c.isFile('~/village/scratch/keep.txt'));
+    const snap = JSON.stringify(SQ.S.fs);
+    for (const ci of [T10, T11]) SQ.content.chapters[ci].setup();
+    assert.equal(JSON.stringify(SQ.S.fs), snap, 'second setup changes nothing');
+    run(SQ, 'echo mine > secrets.txt');
+    run(SQ, 'chmod 600 secrets.txt');
+    SQ.content.chapters[T10].setup();
+    assert.equal(c.read('~/secrets.txt').trim(), 'mine');
+    assert.equal(SQ.modeOf(c.node('~/secrets.txt')), 0o600);
+  });
+  it('the Intermediate tier ends at the computed cumulative XP', () => {
+    const SQ = loadShell();
+    assert.equal(SQ.tiers.cumulativeXp('intermediate'), 695 + 29 * 15 + 4 * 25);
+  });
+});
+
+describe('chapter 10 checks', () => {
+  it('10.1 Read the permissions', () => {
+    pass(T10, 0, 'ls -l');
+    pass(T10, 0, 'ls -la');
+    pass(T10, 0, 'ls -l village');
+    fail(T10, 0, 'ls');
+    fail(T10, 0, 'ls -a');
+    fail(T10, 0, 'ls -l nowhere');
+  });
+  it('10.2 Lock it down is judged by the mode, not the output', () => {
+    pass(T10, 1, 'chmod 600 secrets.txt');
+    pass(T10, 1, 'chmod u=rw,go= secrets.txt');
+    pass(T10, 1, 'chmod go-r secrets.txt');
+    pass(T10, 1, 'chmod 644 secrets.txt', 'chmod 600 ./secrets.txt', 'ls -l'); // multi-line
+    fail(T10, 1, 'echo 600');
+    fail(T10, 1, 'chmod 660 secrets.txt');
+    fail(T10, 1, 'chmod 700 secrets.txt');
+    fail(T10, 1, 'chmod 600 notes.txt');
+    fail(T10, 1, 'ls -l');
+  });
+  it('10.3 Add a permission needs the owner x bit', () => {
+    pass(T10, 2, 'chmod u+x notes.txt');
+    pass(T10, 2, 'chmod +x notes.txt');
+    pass(T10, 2, 'chmod 755 notes.txt');
+    pass(T10, 2, 'chmod u+x notes.txt', 'ls -l notes.txt');
+    fail(T10, 2, 'chmod g+x notes.txt');
+    fail(T10, 2, 'chmod 600 notes.txt');
+    fail(T10, 2, 'chmod u+x secrets.txt');
+    fail(T10, 2, 'echo u+x');
+  });
+  it('10.4 Read-only for all is exactly 0444', () => {
+    pass(T10, 3, 'chmod a=r notes.txt');
+    pass(T10, 3, 'chmod 444 notes.txt');
+    pass(T10, 3, 'chmod ugo=r ./notes.txt');
+    pass(T10, 3, 'chmod =r notes.txt');
+    fail(T10, 3, 'chmod a+r notes.txt'); // stays 0644
+    fail(T10, 3, 'chmod 400 notes.txt');
+    fail(T10, 3, 'chmod 644 notes.txt');
+    fail(T10, 3, 'echo 444');
+  });
+  it('10.5 Make a shortcut needs a real link that resolves to day1.log', () => {
+    pass(T10, 4, 'ln -s village/logs/day1.log today.log');
+    pass(T10, 4, 'ln -s ~/village/logs/day1.log today.log');
+    pass(T10, 4, 'ln -s ./village/logs/day1.log today.log');
+    pass(T10, 4, 'ln -s /home/explorer/village/logs/day1.log shortcut');
+    pass(T10, 4, 'cd village', 'ln -s logs/day1.log first.log');
+    fail(T10, 4, 'cp village/logs/day1.log today.log');
+    fail(T10, 4, 'ln -s day1.log today.log'); // dangling from home
+    fail(T10, 4, 'ln -s village/logs/day2.log today.log');
+    fail(T10, 4, 'touch today.log');
+    fail(T10, 4, 'ls -l');
+  });
+  it('10.6 Follow the shortcut reads day1.log through a link', () => {
+    const mk = 'ln -s village/logs/day1.log today.log';
+    pass(T10, 5, mk, 'cat today.log');
+    pass(T10, 5, mk, 'cat ./today.log');
+    pass(T10, 5, 'ln -s ~/village/logs/day1.log first.log', 'cat first.log');
+    fail(T10, 5, mk, 'cat village/logs/day1.log'); // not through the link
+    fail(T10, 5, mk, 'cat village/logs/day2.log');
+    fail(T10, 5, 'cat today.log'); // no link yet
+    fail(T10, 5, 'ln -s village/logs/day2.log today.log', 'cat today.log');
+  });
+  it('10.7 Inspect a file', () => {
+    pass(T10, 6, 'stat secrets.txt');
+    pass(T10, 6, 'stat notes.txt');
+    pass(T10, 6, 'stat village');
+    fail(T10, 6, 'stat nothing');
+    fail(T10, 6, 'ls -l secrets.txt');
+    fail(T10, 6, 'echo Mode:');
+  });
+});
+
+describe('chapter 11 checks', () => {
+  it('11.1 Silence errors needs a failing command with 2> /dev/null', () => {
+    pass(T11, 0, 'ls missing 2>/dev/null');
+    pass(T11, 0, 'ls missing 2> /dev/null');
+    pass(T11, 0, 'cat nothing 2>/dev/null');
+    fail(T11, 0, 'ls missing');
+    fail(T11, 0, 'ls missing > /dev/null'); // error still shows
+    fail(T11, 0, 'ls village 2>/dev/null'); // nothing to silence
+    fail(T11, 0, 'ls missing 2> errors.txt');
+    fail(T11, 0, 'echo 2>/dev/null');
+  });
+  it('11.2 Keep errors needs a non-empty file of the real error', () => {
+    pass(T11, 1, 'ls missing 2> errors.txt');
+    pass(T11, 1, 'ls missing 2>errors.txt');
+    pass(T11, 1, 'cat nothing 2> oops.log');
+    pass(T11, 1, 'ls missing 2>> errors.txt');
+    pass(T11, 1, 'ls missing 2> village/err.txt');
+    fail(T11, 1, 'ls missing > errors.txt'); // stdout, file empty
+    fail(T11, 1, 'echo hi > errors.txt');
+    fail(T11, 1, 'ls village 2> errors.txt'); // no error, empty file
+    fail(T11, 1, 'ls missing 2> /dev/null');
+    fail(T11, 1, 'ls missing');
+  });
+  it('11.3 Merge streams needs 2>&1 and a count of 1', () => {
+    pass(T11, 2, 'ls missing 2>&1 | wc -l');
+    pass(T11, 2, 'cat nothing 2>&1 | wc -l');
+    pass(T11, 2, 'ls missing 2>&1 | grep -c missing');
+    fail(T11, 2, 'ls missing | wc -l');
+    fail(T11, 2, 'ls missing 2>/dev/null | wc -l');
+    fail(T11, 2, 'echo 1');
+    fail(T11, 2, 'ls village 2>&1 | wc -l');
+    fail(T11, 2, 'ls missing 2>&1');
+  });
+  it('11.4 Pipe into arguments needs one file: line per log', () => {
+    pass(T11, 3, 'ls village/logs | xargs -n1 echo file:');
+    pass(T11, 3, 'ls village/logs | xargs -n 1 echo file:');
+    pass(T11, 3, 'ls village/logs | xargs -I{} echo file: {}');
+    pass(T11, 3, 'ls village/logs | xargs -n1 echo "file:"');
+    pass(T11, 3, 'find village/logs -name "*.log" | xargs -n1 echo file:');
+    fail(T11, 3, 'ls village/logs | xargs echo file:'); // one long line
+    fail(T11, 3, 'ls village/logs');
+    fail(T11, 3, 'ls village | xargs -n1 echo file:'); // wrong folder
+    fail(T11, 3, 'ls village/logs | xargs -n1 echo name:');
+    fail(T11, 3, 'echo file:');
+  });
+  it('11.5 Delete what you found: only the scratch .log files go', () => {
+    pass(T11, 4, 'find village/scratch -name "*.log" | xargs rm');
+    pass(T11, 4, 'find village/scratch -name *.log | xargs rm -f');
+    pass(T11, 4, 'find ./village/scratch -name "*.log" | xargs -n1 rm');
+    fail(T11, 4, 'find village/scratch -name "*.log" | xargs rm', 'ls village/scratch'); // pipeline is one line: the xargs line is what is judged
+    fail(T11, 4, 'find village/scratch -name "*.log"');
+    fail(T11, 4, 'rm village/scratch/*.log'); // no xargs
+    fail(T11, 4, 'find village/scratch | xargs rm'); // takes keep.txt too, folder refuses
+    fail(T11, 4, 'find village/scratch -name "*.txt" | xargs rm');
+    fail(T11, 4, 'ls village/scratch | xargs echo');
+  });
+  it('11.6 Compare two files', () => {
+    pass(T11, 5, 'diff village/logs/day1.log village/logs/day2.log');
+    pass(T11, 5, 'diff -q village/logs/day2.log village/logs/day3.log');
+    fail(T11, 5, 'diff village/logs/day1.log');
+    fail(T11, 5, 'diff village/logs/day1.log nothing.log');
+    fail(T11, 5, 'cat village/logs/day1.log');
+  });
+  const CAP = `grep ERROR village/logs/all.log 2>/dev/null | cut -d' ' -f1 | sort | uniq -c > report.txt`;
+  it('11.7 capstone: report.txt must hold the real counts from the seeded all.log', () => {
+    pass(T11, 6, CAP);
+    pass(T11, 6, `grep ERROR village/logs/all.log | cut -d ' ' -f 1 | sort | uniq -c > report.txt`);
+    pass(T11, 6, `grep ERROR village/logs/all.log | cut -f1 -d' ' | sort | uniq -c | sort -rn > report.txt`);
+    pass(T11, 6, `grep ERROR village/logs/all.log > e.txt`, `cut -d' ' -f1 e.txt | sort > k.txt`, `uniq -c k.txt > report.txt`); // multi-line
+    fail(T11, 6, `grep ERROR village/logs/all.log | cut -d' ' -f1 | sort | uniq > report.txt`); // no counts
+    fail(T11, 6, `grep ERROR village/logs/all.log | cut -d' ' -f1 | uniq -c > report.txt`); // forgot sort
+    fail(T11, 6, `grep -v ERROR village/logs/all.log | cut -d' ' -f1 | sort | uniq -c > report.txt`);
+    fail(T11, 6, `cut -d' ' -f1 village/logs/all.log | sort | uniq -c > report.txt`); // all lines, not ERROR
+    fail(T11, 6, `grep ERROR village/logs/all.log | cut -d' ' -f1 | sort | uniq -c`); // not saved
+    fail(T11, 6, 'echo 3 10.0.0.5 > report.txt');
+    fail(T11, 6, 'ls');
+  });
+  it('11.7 derives the expectation from the file, not from a hardcoded string', () => {
+    const SQ = loadShell();
+    SQ.content.chapters[T11].setup();
+    run(SQ, `echo "10.1.1.1 ERROR a" > village/logs/all.log`);
+    run(SQ, `echo "10.1.1.1 ERROR b" >> village/logs/all.log`);
+    run(SQ, `echo "10.2.2.2 INFO c" >> village/logs/all.log`);
+    const m = SQ.content.chapters[T11].missions[6];
+    run(SQ, CAP);
+    assert.ok(m.check(SQ.ctxFor(CAP)), 'new content, new counts');
+    run(SQ, 'echo "3 10.0.0.5" > report.txt');
+    assert.ok(!m.check(SQ.ctxFor('x')), 'the old seeded numbers no longer match');
+  });
+  it('11.7 reports the expected seeded numbers', () => {
+    const SQ = loadShell();
+    SQ.content.chapters[T11].setup();
+    run(SQ, CAP);
+    assert.equal(SQ.ctxFor('').read('~/report.txt').trim().split('\n').map((l) => l.trim()).join('|'), '1 10.0.0.12|3 10.0.0.5|3 10.0.0.7|1 10.0.0.9');
+    assert.equal(run(SQ, 'cat report.txt').out.split('\n')[0], '      1 10.0.0.12');
+  });
+});
+
+describe('jumping in and re-running', () => {
+  it('every Task 14 mission answer passes its own check from a fresh world', () => {
+    for (const ci of [T10, T11]) {
+      const SQ = loadShell();
+      SQ.content.chapters[ci].setup();
+      SQ.content.chapters[ci].missions.forEach((m, mi) => {
+        const pre = ci === T10 && mi === 5 ? ['ln -s village/logs/day1.log today.log'] : [];
+        for (const p of pre) run(SQ, p);
+        const r = run(SQ, m.answer);
+        assert.ok(m.check(SQ.ctxFor(m.answer)), `${ci}.${mi} ${m.answer} -> ${r.out}`);
+      });
+    }
+  });
+  it('a learner can finish chapter 11 in order without breaking the later missions', () => {
+    const SQ = loadShell();
+    SQ.content.chapters[T11].setup();
+    const ms = SQ.content.chapters[T11].missions;
+    ms.forEach((m) => { run(SQ, m.answer); assert.ok(m.check(SQ.ctxFor(m.answer)), m.title); });
+  });
+  it('explanations and goals contain no em dashes', () => {
+    for (const c of loadShell().content.chapters.slice(9)) for (const m of c.missions) assert.doesNotMatch(m.explain + m.goal + (m.note || ''), /—/);
+  });
+});
+
+describe('Task 14 quick-fire and guide', () => {
+  it('every guide example for chapters 10 and 11 runs without a shell error', () => {
+    const SQ = loadShell();
+    for (const ci of [T10, T11]) SQ.content.chapters[ci].setup();
+    for (const g of SQ.content.guide.filter((g) => g.ch === 9 || g.ch === 10)) for (const [cmd] of g.ex) {
+      if (cmd === 'ls missing 2>&1 | wc -l') continue;
+      const r = run(SQ, cmd);
+      if (!/missing|nothing/.test(cmd)) assert.ok(r.code === 0 || /diff/.test(cmd), `${cmd} -> ${r.out}`);
+    }
+  });
+  it('man works for the new guide commands', () => {
+    const SQ = loadShell();
+    for (const cmd of ['stat', 'ln', 'xargs', 'diff', 'chmod']) {
+      const r = run(SQ, `man ${cmd}`);
+      assert.equal(r.code, 0, cmd);
+      assert.match(r.out, new RegExp('^' + cmd.toUpperCase()));
+    }
   });
 });
