@@ -20,7 +20,19 @@ const QF=[
  ['Sort the lines of names.txt',['sort names.txt','cat names.txt | sort']],['Clear the screen',['clear']],
  ['List only the .log files here',['ls *.log']],['Set a variable CITY to Paris',['CITY=Paris']],
  ['Print the value of the variable CITY',['echo $CITY','echo ${CITY}']],
- ['Count the repeats in names.txt (sort first)',['sort names.txt | uniq -c','cat names.txt | sort | uniq -c']]
+ ['Count the repeats in names.txt (sort first)',['sort names.txt | uniq -c','cat names.txt | sort | uniq -c']],
+ ["Print the first column of data.csv (comma separated)",["cut -d, -f1 data.csv","cut -f1 -d, data.csv","cut -d , -f 1 data.csv"],'intermediate'],
+ ["Turn the text in the pipe into uppercase",["tr a-z A-Z","tr [:lower:] [:upper:]"],'intermediate'],
+ ["Replace every o with 0 in notes.txt",["sed s/o/0/g notes.txt","sed 's/o/0/g' notes.txt","sed \"s/o/0/g\" notes.txt"],'intermediate'],
+ ["Print only lines 2 to 4 of notes.txt",["sed -n 2,4p notes.txt","sed -n '2,4p' notes.txt","sed -n \"2,4p\" notes.txt"],'intermediate'],
+ ["Show the output of ls and also save it in listing.txt",["ls | tee listing.txt"],'intermediate'],
+ ["Sort the numbers in nums.txt, biggest first",["sort -n -r nums.txt","sort -nr nums.txt","sort -rn nums.txt","sort -r -n nums.txt"],'intermediate'],
+ ["Print: Today is, then the output of date, using $( )",["echo \"Today is $(date)\"","echo Today is $(date)"],'intermediate'],
+ ["Store the output of ls in a variable called FILES",["FILES=$(ls)","FILES=\"$(ls)\""],'intermediate'],
+ ["Print the text $HOME without bash expanding it",["echo '$HOME'"],'intermediate'],
+ ["Share the variable NAME=Ada with scripts",["export NAME=Ada","export NAME=\"Ada\"","NAME=Ada; export NAME"],'intermediate'],
+ ["List all exported variables as NAME=value",["env"],'intermediate'],
+ ["Print the exit code of the last command",["echo $?"],'intermediate']
 ];
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});

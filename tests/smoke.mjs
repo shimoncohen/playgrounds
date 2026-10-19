@@ -156,17 +156,28 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
-  assert.equal(await page.locator('.tierhead').count(), 1);
-  let head = (await page.textContent('.tierhead')).replace(/\s+/g, ' ');
-  assert.match(head, /Beginner/);
+  assert.equal(await page.locator('.tierhead').count(), 2);
+  const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  let [head, ihead] = await heads();
+  assert.match(head, /^Beginner/);
   assert.match(head, /0\/7/);
   assert.doesNotMatch(head, /★/);
+  assert.match(ihead, /^Intermediate/);
+  assert.match(ihead, /0\/2/);
+  assert.doesNotMatch(ihead, /★/);
+  const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
+  await page.click('.chap[data-ch="7"]');
+  await page.waitForFunction(() => /Pick a column/.test(document.querySelector('#mission').textContent));
+  assert.notEqual((await page.textContent('#mission')).replace(/\s+/g, ' '), before);
+  assert.equal(await page.getAttribute('.chap[data-ch="7"]', 'aria-current'), 'true');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
   await page.waitForSelector('#mission');
-  head = (await page.textContent('.tierhead')).replace(/\s+/g, ' ');
+  [head, ihead] = await heads();
   assert.match(head, /7\/7/);
   assert.match(head, /★/);
+  assert.match(ihead, /0\/2/);
+  assert.doesNotMatch(ihead, /★/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -175,8 +186,8 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-guide');
-  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner']);
-  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner']);
+  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate']);
+  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner', 'Intermediate']);
   const extras = await page.$$eval('#guide .gsec[data-extras] h4', hs => hs.map(h => h.textContent));
   assert.ok(extras.includes('help'), 'help should sit in Handy extras');
   assert.match(await page.textContent('#guide .gsec[data-extras] h3'), /Handy extras/);
@@ -185,8 +196,14 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   assert.ok(await page.isVisible('#guide h3[data-tier="beginner"]'));
   assert.ok(await page.isVisible('#guide .gsec[data-tier="beginner"] h4'));
   assert.ok(!(await page.isVisible('#guide .gsec[data-extras]')), 'extras hidden under a tier filter');
+  assert.ok(!(await page.isVisible('#guide .gsec[data-tier="intermediate"]')), 'Intermediate hidden under the Beginner filter');
+  await page.click('#guide .gfilter button[data-tier="intermediate"]');
+  assert.ok(await page.isVisible('#guide .gsec[data-tier="intermediate"] h4'));
+  assert.ok(!(await page.isVisible('#guide .gsec[data-tier="beginner"]')), 'Beginner hidden under the Intermediate filter');
+  assert.ok(!(await page.isVisible('#guide .gsec[data-extras]')));
   await page.click('#guide .gfilter button[data-tier="all"]');
   assert.ok(await page.isVisible('#guide .gsec[data-extras]'));
+  assert.ok(await page.isVisible('#guide .gsec[data-tier="beginner"]') && await page.isVisible('#guide .gsec[data-tier="intermediate"]'));
   await page.setViewportSize({ width: 390, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
   assert.deepEqual(errors, []);
@@ -198,7 +215,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   await page.waitForSelector('#mission');
   await page.click('#t-fire');
   const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
-  assert.deepEqual(opts.slice(0, 2), [['mixed', 'Mixed'], ['beginner', 'Beginner']]);
+  assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate']]);
   assert.equal(await page.inputValue('#fTier'), 'mixed');
   const pool = await page.evaluate(() => SQ.content.quickfire.filter(q => (q[2] || 'beginner') === 'beginner').map(q => q[0]));
   assert.ok(pool.length > 0);
@@ -212,7 +229,10 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
     }
     await page.click('#fStop');
   };
+  const ipool = await page.evaluate(() => SQ.content.quickfire.filter(q => q[2] === 'intermediate').map(q => q[0]));
+  assert.ok(ipool.length > 0 && ipool.every(t => !pool.includes(t)));
   await run('beginner', pool);
+  await run('intermediate', ipool);
   await run('mixed', await page.evaluate(() => SQ.content.quickfire.map(q => q[0])));
   await page.setViewportSize({ width: 390, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');

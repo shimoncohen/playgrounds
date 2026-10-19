@@ -28,15 +28,31 @@ describe('tiers', () => {
     assert.equal(b.missionsDone, 2);
     assert.equal(b.chaptersDone, 0);
     assert.equal(b.complete, false);
-    assert.equal(b.chapters.length, chapters.length);
-    assert.equal(b.missionsTotal, chapters.reduce((n, c) => n + c.missions.length, 0));
-    S.badges = Object.fromEntries(chapters.map((_, i) => [i, 1]));
+    const mine = chapters.filter((c) => c.tier === 'beginner');
+    assert.equal(b.chapters.length, mine.length);
+    assert.equal(b.missionsTotal, mine.reduce((n, c) => n + c.missions.length, 0));
+    S.badges = Object.fromEntries(chapters.map((c, i) => [i, 1]).filter(([i]) => chapters[i].tier === 'beginner'));
     b = SQ.tiers.status(S).find((s) => s.tier.id === 'beginner');
-    assert.equal(b.chaptersDone, chapters.length);
+    assert.equal(b.chaptersDone, mine.length);
     assert.equal(b.complete, true);
+    const im = SQ.tiers.status(S).find((s) => s.tier.id === 'intermediate');
+    assert.equal(im.complete, false, 'beginner badges do not complete Intermediate');
+    assert.equal(im.missionsDone, 0);
+  });
+  it('Intermediate adds the Script Smith rank at the cumulative XP computed from content', () => {
+    const inter = SQ.content.chapters.filter((c) => c.tier === 'intermediate');
+    assert.ok(inter.length >= 2);
+    const expected = 695 + inter.reduce((n, c) => n + c.missions.length * 15 + 25, 0);
+    assert.equal(SQ.tiers.cumulativeXp('intermediate'), expected);
+    const r = SQ.tiers.ranks();
+    assert.equal(r.length, 6);
+    assert.deepEqual([...r[5]], [expected, 'Script Smith']);
+    assert.equal(SQ.tiers.rankFor(expected).name, 'Script Smith');
+    assert.equal(SQ.tiers.rankFor(695).name, 'Pipe Fitter');
+    assert.equal(SQ.tiers.missionXp(7), 15);
   });
   it('a tier without chapters adds no rank', () => {
-    assert.equal(SQ.tiers.ranks().length, 5);
+    assert.equal(SQ.tiers.ranks().length, 6); // Advanced and Expert have no chapters yet
     const t = Tiers.create({
       tiers: [
         { id: 'a', name: 'A', blurb: '', missionXp: 10 },
