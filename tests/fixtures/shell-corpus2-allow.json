@@ -823,5 +823,175 @@
     "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: = prints the line number, so -n '$=' counts lines",
     "out": "2",
     "code": 0
+  },
+  "awk '{print $1}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; prints the first blank-separated field of each line (matches mawk 1.3.4 on the same file)",
+    "out": "apple\nbread\nrope\ntorch\nmap",
+    "code": 0
+  },
+  "awk '{print}' readme.txt": {
+    "reason": "Task 9: awk is a real command; a bare print prints $0, so the file is copied (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "awk -F, '{print $2}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; -F, splits on commas and these lines have none, so $2 is empty on all five lines (matches mawk 1.3.4 on the same file)",
+    "out": "\n\n\n",
+    "code": 0
+  },
+  "awk 'BEGIN{print 1+2}'": {
+    "reason": "Task 9: awk is a real command; BEGIN runs without reading input (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'END{print NR}' readme.txt": {
+    "reason": "Task 9: awk is a real command; NR in END is the record count, 4 lines (matches mawk 1.3.4 on the same file)",
+    "out": "4",
+    "code": 0
+  },
+  "awk 'NR==1' readme.txt": {
+    "reason": "Task 9: awk is a real command; a pattern without an action prints the matching record (line 1) (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!",
+    "code": 0
+  },
+  "awk '/wolf/' forest/notes.txt": {
+    "reason": "Task 9: awk is a real command; the file is missing in this world; awk reports it in BWK wording (`awk: can't open file F`, exit 2; mawk says cannot open \"F\" (No such file or directory), also exit 2)",
+    "out": "awk: can't open file forest/notes.txt",
+    "code": 2
+  },
+  "awk '{s+=$1} END{print s}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; $1 is a word on every line, so the numeric sum is 0 (matches mawk 1.3.4 on the same file)",
+    "out": "0",
+    "code": 0
+  },
+  "echo 'a b c' | awk '{print $2}'": {
+    "reason": "Task 9: awk is a real command; reads stdin from the pipe and prints field 2 (matches mawk 1.3.4 on the same file)",
+    "out": "b",
+    "code": 0
+  },
+  "echo 'a b c' | awk '{print NF}'": {
+    "reason": "Task 9: awk is a real command; NF is the field count, 3 (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "echo 'a:b' | awk -F: '{print $1}'": {
+    "reason": "Task 9: awk is a real command; -F: splits on colons (matches mawk 1.3.4 on the same file)",
+    "out": "a",
+    "code": 0
+  },
+  "echo 'a b' | awk '{print $2, $1}'": {
+    "reason": "Task 9: awk is a real command; the comma in print inserts OFS (a space) (matches mawk 1.3.4 on the same file)",
+    "out": "b a",
+    "code": 0
+  },
+  "echo 3 | awk '{print $1*2}'": {
+    "reason": "Task 9: awk is a real command; a numeric-looking field does arithmetic (matches mawk 1.3.4 on the same file)",
+    "out": "6",
+    "code": 0
+  },
+  "echo x | awk '{printf \"%s!\\n\", $1}'": {
+    "reason": "Task 9: awk is a real command; printf formats through SQ.fmtPrintf (matches mawk 1.3.4 on the same file)",
+    "out": "x!",
+    "code": 0
+  },
+  "echo abc | awk '{print length($0)}'": {
+    "reason": "Task 9: awk is a real command; length of the record (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "echo abc | awk '{print toupper($0)}'": {
+    "reason": "Task 9: awk is a real command; toupper (matches mawk 1.3.4 on the same file)",
+    "out": "ABC",
+    "code": 0
+  },
+  "echo 'a b' | awk '{$1=\"z\"; print}'": {
+    "reason": "Task 9: awk is a real command; assigning a field rebuilds $0 with OFS (matches mawk 1.3.4 on the same file)",
+    "out": "z b",
+    "code": 0
+  },
+  "awk 'BEGIN{for(i=0;i<3;i++)print i}'": {
+    "reason": "Task 9: awk is a real command; a C-style for loop in BEGIN (matches mawk 1.3.4 on the same file)",
+    "out": "0\n1\n2",
+    "code": 0
+  },
+  "awk 'BEGIN{x[1]=2; print x[1]}'": {
+    "reason": "Task 9: awk is a real command; arrays (matches mawk 1.3.4 on the same file)",
+    "out": "2",
+    "code": 0
+  },
+  "awk '{a[$1]++} END{for(k in a)print k,a[k]}' readme.txt": {
+    "reason": "Task 9: awk is a real command; counts first words; real awk's for-in order is unspecified (mawk prints Folders, This, Type, Welcome,) and this shell uses insertion order (documented in awk.js); the same four lines each with count 1",
+    "out": "Welcome, 1\nThis 1\nFolders 1\nType 1",
+    "code": 0
+  },
+  "awk": {
+    "reason": "Task 9: awk is a real command; no program prints the usage line (BWK wording) with exit 2 (mawk prints a long help text instead)",
+    "out": "usage: awk [-F fs][-v var=value][prog | -f progfile][file ...]",
+    "code": 2
+  },
+  "awk -f prog.awk readme.txt": {
+    "reason": "Task 9: awk is a real command; -f of a missing program file is an error in BWK wording, exit 2 (mawk: cannot open \"prog.awk\", also exit 2)",
+    "out": "awk: can't open file prog.awk",
+    "code": 2
+  },
+  "awk '{'": {
+    "reason": "Task 9: awk is a real command; the unclosed brace is a syntax error before anything runs (Task 8 parser, BWK shape), exit 2 (mawk: missing } near end of file, exit 2)",
+    "out": "awk: syntax error at source line 1\n context is { >>>  <<<",
+    "code": 2
+  },
+  "awk 'BEGIN{print 1/0}'": {
+    "reason": "Task 9: awk is a real command; division by zero is an error, `awk: division by zero` with exit 2, as the plan requires (BWK and gawk stop the same way; mawk alone prints inf)",
+    "out": "awk: division by zero\n source line number 1",
+    "code": 2
+  },
+  "awk 'BEGIN{system(\"ls\")}'": {
+    "reason": "Task 9: awk is a real command; system() is refused with the practice-shell message, exit 2 (Review Focus 2)",
+    "out": "this practice shell does not support awk system() yet",
+    "code": 2
+  },
+  "awk 'BEGIN{getline; print}'": {
+    "reason": "Task 9: awk is a real command; getline is refused with the practice-shell message, exit 2 (Review Focus 2)",
+    "out": "this practice shell does not support awk getline yet",
+    "code": 2
+  },
+  "echo 10 9 | awk '{print ($1<$2)}'": {
+    "reason": "Task 9: awk is a real command; fields that look numeric compare as numbers, 10 < 9 is false (matches mawk 1.3.4 on the same file)",
+    "out": "0",
+    "code": 0
+  },
+  "awk 'BEGIN{print substr(\"hello\",2,3)}'": {
+    "reason": "Task 9: awk is a real command; substr (matches mawk 1.3.4 on the same file)",
+    "out": "ell",
+    "code": 0
+  },
+  "awk 'BEGIN{print index(\"abc\",\"c\")}'": {
+    "reason": "Task 9: awk is a real command; index is 1-based (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'BEGIN{print split(\"a b c\",arr)}'": {
+    "reason": "Task 9: awk is a real command; split returns the piece count (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'BEGIN{printf \"%5.2f\\n\", 3.14159}'": {
+    "reason": "Task 9: awk is a real command; printf %5.2f (matches mawk 1.3.4 on the same file)",
+    "out": " 3.14",
+    "code": 0
+  },
+  "awk '$1>2' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; $1 is a word, so $1>2 is a string comparison and every word sorts after \"2\": all lines print (matches mawk 1.3.4 on the same file)",
+    "out": "apple 2\nbread 3\nrope 12\ntorch 8\nmap 20",
+    "code": 0
+  },
+  "awk 'NF' readme.txt": {
+    "reason": "Task 9: awk is a real command; NF as a pattern selects non-empty lines (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "awk '!seen[$0]++' readme.txt": {
+    "reason": "Task 9: awk is a real command; the dedupe idiom; readme.txt has no repeated lines (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
   }
 }
