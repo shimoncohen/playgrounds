@@ -1,0 +1,422 @@
+[
+  {
+    "chapter": 0,
+    "mission": 0,
+    "title": "Ask where you are",
+    "typed": "pwd",
+    "output": "explorer@basecamp:~$ pwd\n/home/explorer\n✓ Mission complete: Ask where you are   +10 XP",
+    "xpText": "10 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 1,
+    "title": "Look around",
+    "typed": "ls",
+    "output": "explorer@basecamp:~$ ls\nforest/  journal.txt  readme.txt  village/\n✓ Mission complete: Look around   +10 XP",
+    "xpText": "20 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 2,
+    "title": "Reveal hidden files",
+    "typed": "ls -a",
+    "output": "explorer@basecamp:~$ ls -a\n./  ../  forest/  journal.txt  readme.txt  .secret_map  village/\n✓ Mission complete: Reveal hidden files   +10 XP",
+    "xpText": "30 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 3,
+    "title": "Read the secret map",
+    "typed": "cat .secret_map",
+    "output": "explorer@basecamp:~$ cat .secret_map\nSECRET MAP\n----------\nThe forest hides a cave.\nThe cave goes deeper than it looks.\nHidden files start with a dot. ls -a shows them.\n✓ Mission complete: Read the secret map   +10 XP",
+    "xpText": "40 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 4,
+    "title": "Walk into the forest",
+    "typed": "cd forest",
+    "output": "explorer@basecamp:~$ cd forest\n✓ Mission complete: Walk into the forest   +10 XP",
+    "xpText": "50 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 5,
+    "title": "Step back out",
+    "typed": "cd ..",
+    "output": "explorer@basecamp:~/forest$ cd ..\n✓ Mission complete: Step back out   +10 XP",
+    "xpText": "60 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 6,
+    "title": "Go deep in one jump",
+    "typed": "cd forest/cave",
+    "output": "explorer@basecamp:~$ cd forest/cave\n✓ Mission complete: Go deep in one jump   +10 XP",
+    "xpText": "70 XP"
+  },
+  {
+    "chapter": 0,
+    "mission": 7,
+    "title": "Teleport home",
+    "typed": "cd ~",
+    "output": "explorer@basecamp:~/forest/cave$ cd ~\n✓ Mission complete: Teleport home   +10 XP\n★ Chapter complete! Badge earned: Pathfinder   +25 XP",
+    "xpText": "105 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 0,
+    "title": "Build a camp",
+    "typed": "mkdir camp",
+    "output": "explorer@basecamp:~$ mkdir camp\n✓ Mission complete: Build a camp   +10 XP",
+    "xpText": "115 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 1,
+    "title": "Pitch a tent",
+    "typed": "touch camp/tent.txt",
+    "output": "explorer@basecamp:~$ touch camp/tent.txt\n✓ Mission complete: Pitch a tent   +10 XP",
+    "xpText": "125 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 2,
+    "title": "Say something",
+    "typed": "echo \"Hello, world\"",
+    "output": "explorer@basecamp:~$ echo \"Hello, world\"\nHello, world\n✓ Mission complete: Say something   +10 XP",
+    "xpText": "135 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 3,
+    "title": "Start a diary",
+    "typed": "echo \"Day 1: made camp\" > camp/diary.txt",
+    "output": "explorer@basecamp:~$ echo \"Day 1: made camp\" > camp/diary.txt\n✓ Mission complete: Start a diary   +10 XP",
+    "xpText": "145 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 4,
+    "title": "Add a second entry",
+    "typed": "echo \"Day 2: found berries\" >> camp/diary.txt",
+    "output": "explorer@basecamp:~$ echo \"Day 2: found berries\" >> camp/diary.txt\n✓ Mission complete: Add a second entry   +10 XP",
+    "xpText": "155 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 5,
+    "title": "Read your diary",
+    "typed": "cat camp/diary.txt",
+    "output": "explorer@basecamp:~$ cat camp/diary.txt\nDay 1: made camp\nDay 2: found berries\n✓ Mission complete: Read your diary   +10 XP",
+    "xpText": "165 XP"
+  },
+  {
+    "chapter": 1,
+    "mission": 6,
+    "title": "Stack folders",
+    "typed": "mkdir -p camp/supplies/food",
+    "output": "explorer@basecamp:~$ mkdir -p camp/supplies/food\n✓ Mission complete: Stack folders   +10 XP\n★ Chapter complete! Badge earned: Builder   +25 XP",
+    "xpText": "200 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 0,
+    "title": "Make a copy",
+    "typed": "cp readme.txt camp/readme_copy.txt",
+    "output": "explorer@basecamp:~$ cp readme.txt camp/readme_copy.txt\n✓ Mission complete: Make a copy   +10 XP",
+    "xpText": "210 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 1,
+    "title": "Rename the tent",
+    "typed": "mv camp/tent.txt camp/big_tent.txt",
+    "output": "explorer@basecamp:~$ mv camp/tent.txt camp/big_tent.txt\n✓ Mission complete: Rename the tent   +10 XP",
+    "xpText": "220 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 2,
+    "title": "Move it to the village",
+    "typed": "mv camp/big_tent.txt village/",
+    "output": "explorer@basecamp:~$ mv camp/big_tent.txt village/\n✓ Mission complete: Move it to the village   +10 XP",
+    "xpText": "230 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 3,
+    "title": "Delete the copy",
+    "typed": "rm camp/readme_copy.txt",
+    "output": "explorer@basecamp:~$ rm camp/readme_copy.txt\n✓ Mission complete: Delete the copy   +10 XP",
+    "xpText": "240 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 4,
+    "title": "Back up the forest",
+    "typed": "cp -r forest forest_backup",
+    "output": "explorer@basecamp:~$ cp -r forest forest_backup\n✓ Mission complete: Back up the forest   +10 XP",
+    "xpText": "250 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 5,
+    "title": "Remove the backup",
+    "typed": "rm -r forest_backup",
+    "output": "explorer@basecamp:~$ rm -r forest_backup\n✓ Mission complete: Remove the backup   +10 XP",
+    "xpText": "260 XP"
+  },
+  {
+    "chapter": 2,
+    "mission": 6,
+    "title": "Remove an empty folder",
+    "typed": "rmdir camp/supplies/food",
+    "output": "explorer@basecamp:~$ rmdir camp/supplies/food\n✓ Mission complete: Remove an empty folder   +10 XP\n★ Chapter complete! Badge earned: Mover   +25 XP",
+    "xpText": "295 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 0,
+    "title": "Open the journal",
+    "typed": "cat journal.txt",
+    "output": "explorer@basecamp:~$ cat journal.txt\nDay 1. Packed the bag and left the village at dawn.\nThe road to the forest was muddy.\nHeard a wolf howling far away.\nMade a fire and ate bread.\nDay 2. Found a strange map in an old tree.\nThe map shows a cave north of the river.\nCrossed the river on a fallen log.\nA Wolf watched me from the hill.\nI kept walking and did not look back.\nDay 3. Rain all morning.\nDried my socks by the fire.\nCounted my supplies: 4 apples, 2 bread, 1 rope.\nDay 4. Reached the edge of the forest.\nOwls everywhere. One seemed to talk.\nThe map says the treasure is deeper than it looks.\nFound the cave entrance behind a waterfall.\nDay 5. Went into the cave with a torch.\nBats! Hundreds of them.\nHeard the WOLF again, closer this time.\nBlocked the entrance with rocks.\nDay 6. Followed a tunnel downward.\nMarked the path on the map so I can find my way back.\nThe tunnel split in two. Chose the left.\nFound a heavy chest.\nDay 7. The chest is locked.\nTried every key on my ring. None fit.\nLeft a note for the next explorer.\nWalked back to the village to rest.\nThe wolf followed me to the gate, then turned away.\nNext time I will bring better tools. Maybe a terminal.\n✓ Mission complete: Open the journal   +10 XP",
+    "xpText": "305 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 1,
+    "title": "Read the beginning",
+    "typed": "head journal.txt",
+    "output": "explorer@basecamp:~$ head journal.txt\nDay 1. Packed the bag and left the village at dawn.\nThe road to the forest was muddy.\nHeard a wolf howling far away.\nMade a fire and ate bread.\nDay 2. Found a strange map in an old tree.\nThe map shows a cave north of the river.\nCrossed the river on a fallen log.\nA Wolf watched me from the hill.\nI kept walking and did not look back.\nDay 3. Rain all morning.\n✓ Mission complete: Read the beginning   +10 XP",
+    "xpText": "315 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 2,
+    "title": "Read the ending",
+    "typed": "tail -n 3 journal.txt",
+    "output": "explorer@basecamp:~$ tail -n 3 journal.txt\nWalked back to the village to rest.\nThe wolf followed me to the gate, then turned away.\nNext time I will bring better tools. Maybe a terminal.\n✓ Mission complete: Read the ending   +10 XP",
+    "xpText": "325 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 3,
+    "title": "Count the lines",
+    "typed": "wc -l journal.txt",
+    "output": "explorer@basecamp:~$ wc -l journal.txt\n30 journal.txt\n✓ Mission complete: Count the lines   +10 XP",
+    "xpText": "335 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 4,
+    "title": "Search for wolves",
+    "typed": "grep wolf journal.txt",
+    "output": "explorer@basecamp:~$ grep wolf journal.txt\nHeard a wolf howling far away.\nThe wolf followed me to the gate, then turned away.\n✓ Mission complete: Search for wolves   +10 XP",
+    "xpText": "345 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 5,
+    "title": "Ignore upper and lower case",
+    "typed": "grep -i wolf journal.txt",
+    "output": "explorer@basecamp:~$ grep -i wolf journal.txt\nHeard a wolf howling far away.\nA Wolf watched me from the hill.\nHeard the WOLF again, closer this time.\nThe wolf followed me to the gate, then turned away.\n✓ Mission complete: Ignore upper and lower case   +10 XP",
+    "xpText": "355 XP"
+  },
+  {
+    "chapter": 3,
+    "mission": 6,
+    "title": "Find the line numbers",
+    "typed": "grep -n map journal.txt",
+    "output": "explorer@basecamp:~$ grep -n map journal.txt\n5:Day 2. Found a strange map in an old tree.\n6:The map shows a cave north of the river.\n15:The map says the treasure is deeper than it looks.\n22:Marked the path on the map so I can find my way back.\n✓ Mission complete: Find the line numbers   +10 XP\n★ Chapter complete! Badge earned: Reader   +25 XP",
+    "xpText": "390 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 0,
+    "title": "Meet the villagers",
+    "typed": "cat village/people.txt",
+    "output": "explorer@basecamp:~$ cat village/people.txt\nMira\nTomas\nAda\nBen\nMira\nZoe\nAda\nLena\nBen\nMira\nOmar\nKai\n✓ Mission complete: Meet the villagers   +10 XP",
+    "xpText": "400 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 1,
+    "title": "Your first pipe",
+    "typed": "cat village/people.txt | sort",
+    "output": "explorer@basecamp:~$ cat village/people.txt | sort\nAda\nAda\nBen\nBen\nKai\nLena\nMira\nMira\nMira\nOmar\nTomas\nZoe\n✓ Mission complete: Your first pipe   +10 XP",
+    "xpText": "410 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 2,
+    "title": "Remove duplicates",
+    "typed": "sort village/people.txt | uniq",
+    "output": "explorer@basecamp:~$ sort village/people.txt | uniq\nAda\nBen\nKai\nLena\nMira\nOmar\nTomas\nZoe\n✓ Mission complete: Remove duplicates   +10 XP",
+    "xpText": "420 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 3,
+    "title": "Count each name",
+    "typed": "sort village/people.txt | uniq -c",
+    "output": "explorer@basecamp:~$ sort village/people.txt | uniq -c\n      2 Ada\n      2 Ben\n      1 Kai\n      1 Lena\n      3 Mira\n      1 Omar\n      1 Tomas\n      1 Zoe\n✓ Mission complete: Count each name   +10 XP",
+    "xpText": "430 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 4,
+    "title": "Count the wolves",
+    "typed": "grep -i wolf journal.txt | wc -l",
+    "output": "explorer@basecamp:~$ grep -i wolf journal.txt | wc -l\n4\n✓ Mission complete: Count the wolves   +10 XP",
+    "xpText": "440 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 5,
+    "title": "Save any output",
+    "typed": "ls > listing.txt",
+    "output": "explorer@basecamp:~$ ls > listing.txt\n✓ Mission complete: Save any output   +10 XP",
+    "xpText": "450 XP"
+  },
+  {
+    "chapter": 4,
+    "mission": 6,
+    "title": "Save a search",
+    "typed": "grep -i wolf journal.txt > wolves.txt",
+    "output": "explorer@basecamp:~$ grep -i wolf journal.txt > wolves.txt\n✓ Mission complete: Save a search   +10 XP\n★ Chapter complete! Badge earned: Plumber   +25 XP",
+    "xpText": "485 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 0,
+    "title": "Match with a star",
+    "typed": "ls village/logs/*.log",
+    "output": "explorer@basecamp:~$ ls village/logs/*.log\nvillage/logs/day1.log  village/logs/day2.log  village/logs/day3.log\n✓ Mission complete: Match with a star   +10 XP",
+    "xpText": "495 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 1,
+    "title": "See what the star becomes",
+    "typed": "echo village/logs/*.log",
+    "output": "explorer@basecamp:~$ echo village/logs/*.log\nvillage/logs/day1.log village/logs/day2.log village/logs/day3.log\n✓ Mission complete: See what the star becomes   +10 XP",
+    "xpText": "505 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 2,
+    "title": "Find every text file",
+    "typed": "find . -name \"*.txt\"",
+    "output": "explorer@basecamp:~$ find . -name \"*.txt\"\n./camp/diary.txt\n./forest/cave/deeper/chest/gold.txt\n./forest/cave/echo.txt\n./forest/mushroom.txt\n./forest/owl.txt\n./journal.txt\n./listing.txt\n./readme.txt\n./village/big_tent.txt\n./village/logs/notes.txt\n./village/people.txt\n./village/shop.txt\n./wolves.txt\n✓ Mission complete: Find every text file   +10 XP",
+    "xpText": "515 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 3,
+    "title": "Find only folders",
+    "typed": "find . -type d",
+    "output": "explorer@basecamp:~$ find . -type d\n.\n./camp\n./camp/supplies\n./forest\n./forest/cave\n./forest/cave/deeper\n./forest/cave/deeper/chest\n./village\n./village/logs\n✓ Mission complete: Find only folders   +10 XP",
+    "xpText": "525 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 4,
+    "title": "Treasure hunt",
+    "typed": "find . -name gold.txt",
+    "output": "explorer@basecamp:~$ find . -name gold.txt\n./forest/cave/deeper/chest/gold.txt",
+    "xpText": "535 XP",
+    "then": {
+      "typed": "cat ./forest/cave/deeper/chest/gold.txt",
+      "output": "explorer@basecamp:~$ cat ./forest/cave/deeper/chest/gold.txt\nYou found the gold!\nSecret word: PENGUIN\n(Tux the penguin is the mascot of Linux.)\n✓ Mission complete: Treasure hunt   +10 XP"
+    }
+  },
+  {
+    "chapter": 5,
+    "mission": 5,
+    "title": "Clear old logs",
+    "typed": "rm village/logs/*.log",
+    "output": "explorer@basecamp:~$ rm village/logs/*.log\n✓ Mission complete: Clear old logs   +10 XP",
+    "xpText": "545 XP"
+  },
+  {
+    "chapter": 5,
+    "mission": 6,
+    "title": "Chain with &&",
+    "typed": "mkdir -p backup && cp *.txt backup/",
+    "output": "explorer@basecamp:~$ mkdir -p backup && cp *.txt backup/\n✓ Mission complete: Chain with &&   +10 XP\n★ Chapter complete! Badge earned: Tracker   +25 XP",
+    "xpText": "580 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 0,
+    "title": "Store a value",
+    "typed": "NAME=\"Ada\"",
+    "output": "explorer@basecamp:~$ NAME=\"Ada\"\n✓ Mission complete: Store a value   +10 XP",
+    "xpText": "590 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 1,
+    "title": "Use the value",
+    "typed": "echo \"Hello, $NAME\"",
+    "output": "explorer@basecamp:~$ echo \"Hello, $NAME\"\nHello, Ada\n✓ Mission complete: Use the value   +10 XP",
+    "xpText": "600 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 2,
+    "title": "Write a script",
+    "typed": "echo 'echo \"Packing for the trip...\"' > pack.sh",
+    "output": "explorer@basecamp:~$ echo 'echo \"Packing for the trip...\"' > pack.sh\n✓ Mission complete: Write a script   +10 XP",
+    "xpText": "610 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 3,
+    "title": "Add a second command",
+    "typed": "echo 'ls camp' >> pack.sh",
+    "output": "explorer@basecamp:~$ echo 'ls camp' >> pack.sh\n✓ Mission complete: Add a second command   +10 XP",
+    "xpText": "620 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 4,
+    "title": "Try to run it",
+    "typed": "./pack.sh",
+    "output": "explorer@basecamp:~$ ./pack.sh\nbash: ./pack.sh: Permission denied\nTip: mark it as runnable with chmod +x pack.sh\n✓ Mission complete: Try to run it   +10 XP",
+    "xpText": "630 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 5,
+    "title": "Make it runnable",
+    "typed": "chmod +x pack.sh",
+    "output": "explorer@basecamp:~$ chmod +x pack.sh\n✓ Mission complete: Make it runnable   +10 XP",
+    "xpText": "640 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 6,
+    "title": "Run your script",
+    "typed": "./pack.sh",
+    "output": "explorer@basecamp:~$ ./pack.sh\nPacking for the trip...\ndiary.txt  supplies/\n✓ Mission complete: Run your script   +10 XP",
+    "xpText": "650 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 7,
+    "title": "Repeat with a loop",
+    "typed": "for c in red green blue; do echo \"color: $c\"; done",
+    "output": "explorer@basecamp:~$ for c in red green blue; do echo \"color: $c\"; done\ncolor: red\ncolor: green\ncolor: blue\n✓ Mission complete: Repeat with a loop   +10 XP",
+    "xpText": "660 XP"
+  },
+  {
+    "chapter": 6,
+    "mission": 8,
+    "title": "Loop over files",
+    "typed": "for f in *.txt; do echo \"Found $f\"; done",
+    "output": "explorer@basecamp:~$ for f in *.txt; do echo \"Found $f\"; done\nFound journal.txt\nFound listing.txt\nFound readme.txt\nFound wolves.txt\n✓ Mission complete: Loop over files   +10 XP\n★ Chapter complete! Badge earned: Scripter   +25 XP",
+    "xpText": "695 XP"
+  }
+]

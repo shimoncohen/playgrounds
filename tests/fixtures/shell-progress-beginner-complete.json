@@ -1,0 +1,316 @@
+{
+  "format": "playgrounds-progress",
+  "app": "shell-quest",
+  "version": 1,
+  "data": {
+    "fs": {
+      "type": "dir",
+      "children": {
+        "etc": {
+          "type": "dir",
+          "children": {
+            "hostname": {
+              "type": "file",
+              "content": "basecamp",
+              "exec": false
+            },
+            "motd": {
+              "type": "file",
+              "content": "Welcome to basecamp. Be careful with rm.",
+              "exec": false
+            }
+          }
+        },
+        "home": {
+          "type": "dir",
+          "children": {
+            "explorer": {
+              "type": "dir",
+              "children": {
+                "readme.txt": {
+                  "type": "file",
+                  "content": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+                  "exec": false
+                },
+                ".secret_map": {
+                  "type": "file",
+                  "content": "SECRET MAP\n----------\nThe forest hides a cave.\nThe cave goes deeper than it looks.\nHidden files start with a dot. ls -a shows them.",
+                  "exec": false
+                },
+                "journal.txt": {
+                  "type": "file",
+                  "content": "Day 1. Packed the bag and left the village at dawn.\nThe road to the forest was muddy.\nHeard a wolf howling far away.\nMade a fire and ate bread.\nDay 2. Found a strange map in an old tree.\nThe map shows a cave north of the river.\nCrossed the river on a fallen log.\nA Wolf watched me from the hill.\nI kept walking and did not look back.\nDay 3. Rain all morning.\nDried my socks by the fire.\nCounted my supplies: 4 apples, 2 bread, 1 rope.\nDay 4. Reached the edge of the forest.\nOwls everywhere. One seemed to talk.\nThe map says the treasure is deeper than it looks.\nFound the cave entrance behind a waterfall.\nDay 5. Went into the cave with a torch.\nBats! Hundreds of them.\nHeard the WOLF again, closer this time.\nBlocked the entrance with rocks.\nDay 6. Followed a tunnel downward.\nMarked the path on the map so I can find my way back.\nThe tunnel split in two. Chose the left.\nFound a heavy chest.\nDay 7. The chest is locked.\nTried every key on my ring. None fit.\nLeft a note for the next explorer.\nWalked back to the village to rest.\nThe wolf followed me to the gate, then turned away.\nNext time I will bring better tools. Maybe a terminal.",
+                  "exec": false
+                },
+                "forest": {
+                  "type": "dir",
+                  "children": {
+                    "mushroom.txt": {
+                      "type": "file",
+                      "content": "Red cap, white spots.\nDo not eat.",
+                      "exec": false
+                    },
+                    "owl.txt": {
+                      "type": "file",
+                      "content": "Hoo! The cave is right here. Try: cd cave",
+                      "exec": false
+                    },
+                    "cave": {
+                      "type": "dir",
+                      "children": {
+                        "echo.txt": {
+                          "type": "file",
+                          "content": "hello... hello... hello...",
+                          "exec": false
+                        },
+                        ".bats": {
+                          "type": "file",
+                          "content": "312 bats live here. They hide, like this file.",
+                          "exec": false
+                        },
+                        "deeper": {
+                          "type": "dir",
+                          "children": {
+                            "chest": {
+                              "type": "dir",
+                              "children": {
+                                "gold.txt": {
+                                  "type": "file",
+                                  "content": "You found the gold!\nSecret word: PENGUIN\n(Tux the penguin is the mascot of Linux.)",
+                                  "exec": false
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "village": {
+                  "type": "dir",
+                  "children": {
+                    "shop.txt": {
+                      "type": "file",
+                      "content": "apple 2\nbread 3\nrope 12\ntorch 8\nmap 20",
+                      "exec": false
+                    },
+                    "people.txt": {
+                      "type": "file",
+                      "content": "Mira\nTomas\nAda\nBen\nMira\nZoe\nAda\nLena\nBen\nMira\nOmar\nKai",
+                      "exec": false
+                    },
+                    "logs": {
+                      "type": "dir",
+                      "children": {
+                        "notes.txt": {
+                          "type": "file",
+                          "content": "Logs are kept for three days.",
+                          "exec": false
+                        }
+                      }
+                    },
+                    "big_tent.txt": {
+                      "type": "file",
+                      "content": "",
+                      "exec": false
+                    }
+                  }
+                },
+                "camp": {
+                  "type": "dir",
+                  "children": {
+                    "diary.txt": {
+                      "type": "file",
+                      "content": "Day 1: made camp\nDay 2: found berries",
+                      "exec": false
+                    },
+                    "supplies": {
+                      "type": "dir",
+                      "children": {}
+                    }
+                  }
+                },
+                "listing.txt": {
+                  "type": "file",
+                  "content": "camp\nforest\njournal.txt\nlisting.txt\nreadme.txt\nvillage",
+                  "exec": false
+                },
+                "wolves.txt": {
+                  "type": "file",
+                  "content": "Heard a wolf howling far away.\nA Wolf watched me from the hill.\nHeard the WOLF again, closer this time.\nThe wolf followed me to the gate, then turned away.",
+                  "exec": false
+                },
+                "backup": {
+                  "type": "dir",
+                  "children": {
+                    "journal.txt": {
+                      "type": "file",
+                      "content": "Day 1. Packed the bag and left the village at dawn.\nThe road to the forest was muddy.\nHeard a wolf howling far away.\nMade a fire and ate bread.\nDay 2. Found a strange map in an old tree.\nThe map shows a cave north of the river.\nCrossed the river on a fallen log.\nA Wolf watched me from the hill.\nI kept walking and did not look back.\nDay 3. Rain all morning.\nDried my socks by the fire.\nCounted my supplies: 4 apples, 2 bread, 1 rope.\nDay 4. Reached the edge of the forest.\nOwls everywhere. One seemed to talk.\nThe map says the treasure is deeper than it looks.\nFound the cave entrance behind a waterfall.\nDay 5. Went into the cave with a torch.\nBats! Hundreds of them.\nHeard the WOLF again, closer this time.\nBlocked the entrance with rocks.\nDay 6. Followed a tunnel downward.\nMarked the path on the map so I can find my way back.\nThe tunnel split in two. Chose the left.\nFound a heavy chest.\nDay 7. The chest is locked.\nTried every key on my ring. None fit.\nLeft a note for the next explorer.\nWalked back to the village to rest.\nThe wolf followed me to the gate, then turned away.\nNext time I will bring better tools. Maybe a terminal.",
+                      "exec": false
+                    },
+                    "listing.txt": {
+                      "type": "file",
+                      "content": "camp\nforest\njournal.txt\nlisting.txt\nreadme.txt\nvillage",
+                      "exec": false
+                    },
+                    "readme.txt": {
+                      "type": "file",
+                      "content": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+                      "exec": false
+                    },
+                    "wolves.txt": {
+                      "type": "file",
+                      "content": "Heard a wolf howling far away.\nA Wolf watched me from the hill.\nHeard the WOLF again, closer this time.\nThe wolf followed me to the gate, then turned away.",
+                      "exec": false
+                    }
+                  }
+                },
+                "pack.sh": {
+                  "type": "file",
+                  "content": "echo \"Packing for the trip...\"\nls camp",
+                  "exec": true
+                }
+              }
+            }
+          }
+        },
+        "tmp": {
+          "type": "dir",
+          "children": {}
+        }
+      }
+    },
+    "cwd": "/home/explorer",
+    "oldpwd": "/home/explorer/forest/cave",
+    "vars": {
+      "NAME": "Ada",
+      "c": "blue",
+      "f": "wolves.txt"
+    },
+    "last": 0,
+    "hist": [
+      "pwd",
+      "ls",
+      "ls -a",
+      "cat .secret_map",
+      "cd forest",
+      "cd ..",
+      "cd forest/cave",
+      "cd ~",
+      "mkdir camp",
+      "touch camp/tent.txt",
+      "echo \"Hello, world\"",
+      "echo \"Day 1: made camp\" > camp/diary.txt",
+      "echo \"Day 2: found berries\" >> camp/diary.txt",
+      "cat camp/diary.txt",
+      "mkdir -p camp/supplies/food",
+      "cp readme.txt camp/readme_copy.txt",
+      "mv camp/tent.txt camp/big_tent.txt",
+      "mv camp/big_tent.txt village/",
+      "rm camp/readme_copy.txt",
+      "cp -r forest forest_backup",
+      "rm -r forest_backup",
+      "rmdir camp/supplies/food",
+      "cat journal.txt",
+      "head journal.txt",
+      "tail -n 3 journal.txt",
+      "wc -l journal.txt",
+      "grep wolf journal.txt",
+      "grep -i wolf journal.txt",
+      "grep -n map journal.txt",
+      "cat village/people.txt",
+      "cat village/people.txt | sort",
+      "sort village/people.txt | uniq",
+      "sort village/people.txt | uniq -c",
+      "grep -i wolf journal.txt | wc -l",
+      "ls > listing.txt",
+      "grep -i wolf journal.txt > wolves.txt",
+      "ls village/logs/*.log",
+      "echo village/logs/*.log",
+      "find . -name \"*.txt\"",
+      "find . -type d",
+      "find . -name gold.txt",
+      "cat ./forest/cave/deeper/chest/gold.txt",
+      "rm village/logs/*.log",
+      "mkdir -p backup && cp *.txt backup/",
+      "NAME=\"Ada\"",
+      "echo \"Hello, $NAME\"",
+      "echo 'echo \"Packing for the trip...\"' > pack.sh",
+      "echo 'ls camp' >> pack.sh",
+      "./pack.sh",
+      "chmod +x pack.sh",
+      "./pack.sh",
+      "for c in red green blue; do echo \"color: $c\"; done",
+      "for f in *.txt; do echo \"Found $f\"; done"
+    ],
+    "ch": 6,
+    "mi": 9,
+    "done": {
+      "0.0": 1,
+      "0.1": 1,
+      "0.2": 1,
+      "0.3": 1,
+      "0.4": 1,
+      "0.5": 1,
+      "0.6": 1,
+      "0.7": 1,
+      "1.0": 1,
+      "1.1": 1,
+      "1.2": 1,
+      "1.3": 1,
+      "1.4": 1,
+      "1.5": 1,
+      "1.6": 1,
+      "2.0": 1,
+      "2.1": 1,
+      "2.2": 1,
+      "2.3": 1,
+      "2.4": 1,
+      "2.5": 1,
+      "2.6": 1,
+      "3.0": 1,
+      "3.1": 1,
+      "3.2": 1,
+      "3.3": 1,
+      "3.4": 1,
+      "3.5": 1,
+      "3.6": 1,
+      "4.0": 1,
+      "4.1": 1,
+      "4.2": 1,
+      "4.3": 1,
+      "4.4": 1,
+      "4.5": 1,
+      "4.6": 1,
+      "5.0": 1,
+      "5.1": 1,
+      "5.2": 1,
+      "5.3": 1,
+      "5.4": 1,
+      "5.5": 1,
+      "5.6": 1,
+      "6.0": 1,
+      "6.1": 1,
+      "6.2": 1,
+      "6.3": 1,
+      "6.4": 1,
+      "6.5": 1,
+      "6.6": 1,
+      "6.7": 1,
+      "6.8": 1
+    },
+    "xp": 695,
+    "best": 0,
+    "badges": {
+      "0": 1,
+      "1": 1,
+      "2": 1,
+      "3": 1,
+      "4": 1,
+      "5": 1,
+      "6": 1
+    },
+    "seen": true
+  }
+}

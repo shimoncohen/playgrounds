@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/tiers.css">
 
 <div class="wrap">
 <header class="top">
@@ -63,6 +64,7 @@
     <div class="fireCard panel">
       <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
       <div class="timer"><i id="fTimer"></i></div>
+      <label class="ftier">Questions from <select id="fTier" aria-label="Question tier"><option value="mixed">Mixed</option></select></label>
       <div id="fStage"></div>
     </div>
   </div>
@@ -76,6 +78,19 @@
 
 <script>window.PROGRESS={key:"shell-quest-v1",name:"Shell Quest"}</script>
 <script src="../shared/progress.js"></script>
+<script src="../shared/tiers.js"></script>
+<script src="engine/fs.js"></script>
+<script src="engine/parse.js"></script>
+<script src="engine/cmds-basic.js"></script>
+<script src="engine/cmds-text.js"></script>
+<script src="engine/cmds-sys.js"></script>
+<script src="engine/exec.js"></script>
+<script src="content/tiers.js"></script>
+<script src="content/tier-beginner.js"></script>
+<script src="content/tier-intermediate.js"></script>
+<script src="content/guide.js"></script>
+<script src="content/quickfire.js"></script>
+<script src="ui.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

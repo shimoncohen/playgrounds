@@ -79,20 +79,20 @@ docs/tiers-guideline.md
 shell-quest/
   index.html, style.css
   engine/                 no DOM, runs in Node
-    fs.js                 virtual filesystem and path helpers
-    parse.js              tokenizer and parser (AST from stage 2)
-    exec.js               executor, jobs, caps
-    cmds-basic.js         today's commands
-    cmds-text.js          cut, tr, sed, awk, tee, xargs, diff, ...
-    cmds-sys.js           permissions, links, processes, env
+    fs.js                 virtual filesystem, path helpers, save, run caps (LIM) and safeRegex
+    parse.js              tokenizer and parser; line-based by design (AST arrives in stage 2)
+    exec.js               executor (one line at a time), caps, ctxFor; no jobs yet
+    cmds-basic.js         the original commands plus sort -t/-k, find, grep flags
+    cmds-text.js          cut, tr, sed, tee, xargs, diff, seq, printf, basename, dirname
+    cmds-sys.js           permissions, links, env, which/type; no processes yet
   content/
+    tiers.js              Tiers.create(...): tier list, base ranks, end-of-tier ranks
     tier-beginner.js      today's chapters, moved unchanged
-    tier-intermediate.js
-    tier-advanced.js
-    tier-expert.js
+    tier-intermediate.js  (stage 1)
+    tier-advanced.js, tier-expert.js   (later stages)
     guide.js
     quickfire.js
-  ui.js                   rendering, terminal, editor panel, map
+  ui.js                   rendering, terminal, map (no editor panel yet; stage 2)
   app.js                  wiring and boot
 ```
 
@@ -228,6 +228,17 @@ declare tiers and tag chapters; the mission kinds and the check context; how to
 keep saved progress compatible (append, never reorder); how ranks derive from
 XP; the solvability test pattern; and a checklist for adopting tiers in another
 playground.
+
+## Stage 1 as built
+
+Stage 1 shipped the file split, `shared/tiers.js`, the Intermediate tier (chapters 8 to 11 in the UI, indexes 7 to 10, 29 missions, "Script Smith" at 1230 XP), the tier-aware guide and quick-fire, and the engine commands it needs. What differs from the plan above:
+
+- **Mission kinds.** Only `command` and outcome-style checks exist. `c.out()`, `c.exists()` and `c.runScript()` do not exist yet; checks use the real helpers listed in `docs/tiers-guideline.md` (`ran`, `flag`, `has`, `isDir`, `isFile`, `node`, `read`, `log`). `script` and `challenge` missions are stage 2.
+- **Ranks.** The tier-end rank sits at the derived cumulative XP (695 for Beginner, which keeps the 600 XP "Pipe Fitter" rank from the base list; 1230 for Intermediate).
+- **Run-time expansion.** Variable and `$(...)` expansion happens while a line runs, so a mission check sees the log of the current line only; `SQ.rt.prevLast` carries the earlier exit code for `$?` missions.
+- **Caps.** Step, output, file-size and regex-complexity caps are in (`SQ.LIM`, `SQ.safeRegex`); there is no job control or process model.
+- **Golden.** `tests/shell-golden.mjs` replays the seven Beginner chapters only. Later tiers are covered by solvability, wrong-command and alternative-solution tests in `tests/shell/`.
+- **Parser.** `parse.js` stays line-based; the AST rewrite is part of stage 2.
 
 ## Risks and mitigations
 

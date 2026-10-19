@@ -29,14 +29,18 @@ jobs:
 
       - name: JavaScript syntax
         run: |
-          for f in */app.js shared/*.js tests/*.mjs; do
+          for f in */app.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs; do
             node --check "$f" || exit 1
           done
 
       - run: npm ci
 
+      - name: Shell Quest engine tests
+        run: npm run test:engine
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Browser smoke tests
-        run: npm test
+      # The engine tests already ran above; `npm test` would run them a second time.
+      - name: Browser smoke and golden tests
+        run: npm run test:browser

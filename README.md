@@ -10,7 +10,11 @@ Interactive playgrounds for learning programming and tooling. Each one is a stat
 | Python Quest | `python-quest/` |
 | Shell Quest (bash) | `shell-quest/` |
 
-Each folder holds `index.html` (markup), `style.css` and `app.js`. Shared code lives in `shared/`. Fonts and the `acorn` / `typescript` libraries load from CDNs. Nothing needs a server or database, so the repo can be served as-is by GitHub Pages.
+Most folders hold `index.html` (markup), `style.css` and `app.js`; Shell Quest splits its code further (see Development). Shared code lives in `shared/`. Fonts and the `acorn` / `typescript` libraries load from CDNs. Nothing needs a server or database, so the repo can be served as-is by GitHub Pages.
+
+## Tiers
+
+Shell Quest has Beginner and Intermediate tiers (Advanced and Expert are planned). Tiers are open: every chapter is unlocked, and the chapter rail just groups them and shows how far you are in each. `shared/tiers.js` holds the tier model (XP per mission, ranks from cumulative XP) so other playgrounds can reuse it. How to use it, how to keep old saves working and how to write checks that hold up: [docs/tiers-guideline.md](docs/tiers-guideline.md).
 
 ## Saving progress
 
@@ -41,15 +45,22 @@ Then, in a Claude session with the Artifact tool, ask Claude to publish `dist/<n
 ```
 npm ci
 npx playwright install chromium   # once
-npm test                          # browser smoke tests
+npm test                          # engine tests, browser smoke tests, golden transcript
+npm run test:engine               # just the shell engine and content tests (Node only, no browser)
 npm run check                     # does every folder still bundle for artifacts?
 ```
 
-`tests/smoke.mjs` serves the repo on a local port and checks that the landing page and every playground load without errors, and that progress export, import and the linked save file behave. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
+`tests/smoke.mjs` serves the repo on a local port and checks that the landing page and every playground load without errors, that progress export, import and the linked save file behave, and that the Shell Quest tiers, field guide, quick-fire and artifact bundle work. `tests/shell-golden.mjs` replays every Beginner mission in the browser and compares the transcript and final save to fixtures in `tests/fixtures/`. `tests/shell/*.test.mjs` run the engine and content in Node without a browser. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
+
+Shell Quest is split by job, as plain scripts sharing one `SQ` namespace and loaded in order from `index.html`:
+
+- `shell-quest/engine/`: file system, parser, commands, and `exec.js` (runs a line, builds the mission check context).
+- `shell-quest/content/`: `tiers.js` (tier setup), `tier-beginner.js` and `tier-intermediate.js` (chapters and missions), `guide.js`, `quickfire.js`.
+- `shell-quest/ui.js` and `app.js`: rendering and event wiring.
 
 ## CI and deployment
 
-- `.github/workflows/ci.yml` runs on pull requests: the bundle check, `node --check` on every script, and the smoke tests.
+- `.github/workflows/ci.yml` runs on pull requests: the bundle check, `node --check` on every script, the engine tests, and the browser tests.
 - `.github/workflows/pages.yml` runs on every push to `main`: it calls the CI workflow, and only if that passes publishes the site (`index.html`, `shared/` and the `*-quest/` folders) to the root of the `gh-pages` branch.
 - `.github/workflows/pr-preview.yml` runs on pull requests from this repo that touch the landing page, `shared/` or a playground. It publishes a copy to `pr-preview/pr-<number>/` on `gh-pages`, comments the link on the PR, and removes the copy when the PR is closed. Forks and Dependabot are skipped.
 
