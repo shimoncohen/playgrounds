@@ -16,16 +16,17 @@ const failExp=e=>{if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.c
 function runCmd(words,io,assigns){
   if(!words.length)return ok();
   SQ.step();
-  let ew,pre=null;
+  let ew,pre=null,bad=null;
   CTX.lastSub=null;
   const all=!(assigns&&assigns.length)&&words.every(w=>/^[A-Za-z_]\w*=/.test(w.raw));
   try{if(all){ew=[]; /* a=1 b=$a: left to right, each value sees the ones before it */
-      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps))break;for(const [k,v] of ps)S.vars[k]=v}}
+      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps)S.vars[k]=v}}
     else ew=expandWords(words,true);
     if(assigns&&assigns.length)pre=assigns.map(x=>SQ.expandOne(x.word))}
   catch(e){return failExp(e)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
   if(pre){pre=assignPairs(pre);if(!Array.isArray(pre))return Object.assign(pre,{err:pend.concat(pre.err)})}
+  if(all){const r=bad||ok();if(!bad&&CTX.lastSub!==null)r.code=CTX.lastSub;return finishCmd(r,'(assign)',ew.slice(1).map(w=>w.v),false,io,pend)} /* each one was set above, left to right */
   if(!ew.length){if(pre){for(const [k,v] of pre)S.vars[k]=v;const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;return r}
     return Object.assign(ok(),{err:pend})}
   if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
@@ -33,13 +34,9 @@ function runCmd(words,io,assigns){
     try{return runCmd0(ew,io,pend)}
     finally{for(const [k,v,x] of saved){if(v===undefined)delete S.vars[k];else S.vars[k]=v;if(!x&&S.exp)delete S.exp[k]}}}
   return runCmd0(ew,io,pend)}
-function runCmd0(ew,io,pend){const args=[];let globbed=false;
-  for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
+function runCmd0(ew,io,pend){const {args,globbed}=SQ.globWords(ew);
   const name=args[0],a=args.slice(1);let r,lname=name;
-  if(ew.every(w=>w.assign)){lname='(assign)'; /* NAME=value words only: each one is set; the command takes the status of its last $( ) */
-    const ps=assignPairs(ew.map(w=>w.v));
-    if(!Array.isArray(ps))r=ps;else{for(const [k,v] of ps)S.vars[k]=v;r=ok();if(CTX.lastSub!==null)r.code=CTX.lastSub}}
-  else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
+  if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
     return r}
@@ -50,6 +47,9 @@ function runCmd0(ew,io,pend){const args=[];let globbed=false;
   else if(own(CMDS,name))r=CMDS[name](a,io);
   else if(own(FRIENDLY,name))r=E(FRIENDLY[name],127);
   else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
+  return finishCmd(r,lname,a,globbed,io,pend)}
+/* the common tail of a command: stderr from its $( ) first, the output caps, the log entry */
+function finishCmd(r,lname,a,globbed,io,pend){
   if(pend.length)r.err=pend.concat(r.err||[]);
   if(r.out&&r.out.length>LIM.TEXT){r.out='';r.err=(r.err||[]).concat(`${lname}: output too large for this practice shell`);r.code=1}
   SQ.rt.outChars+=(r.out||'').length;if(SQ.rt.outChars>LIM.TOTAL)throw new SQ.StepLimit('output too large');

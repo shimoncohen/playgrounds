@@ -552,3 +552,23 @@ describe('read and IFS', () => {
     assert.equal(out('while IFS= read -r l; do echo "[$l]"; done < sp.txt', SQ), '[  one  ]\n[two]');
   });
 });
+
+describe('prefix assignments are restored when the command is stopped', () => {
+  it('after a step-limit loop in a function', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'f() { while :; do :; done; }; X=1 f');
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+    assert.equal(out('echo "[$X]"; env | grep -c ^X=', SQ), '[]\n0');
+    run(SQ, 'X=old');
+    run(SQ, 'X=new f');
+    assert.equal(out('echo "[$X]"', SQ), '[old]');
+  });
+  it('after a ${Q:?} abort in a function', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'f() { echo ${Q:?no q}; }; X=1 f; echo after');
+    assert.equal(r.out, 'bash: Q: no q');
+    assert.equal(out('echo "[$X]"', SQ), '[]');
+    SQ.writeFile('/home/explorer/q.sh', 'echo "[$X]"; echo ${Q:?}', false, 'q.sh');
+    assert.equal(out('X=2 bash q.sh; echo "[$X]"', SQ), 'bash: Q: parameter null or not set\n[2]\n[]'); // a script's stderr prints before its stdout here
+  });
+});

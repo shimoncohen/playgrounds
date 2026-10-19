@@ -360,3 +360,35 @@ describe('Stage 2 hardening (Task 2)', () => {
     assert.match(r.out, /too large/);
   });
 });
+
+// Stage 3 Task 4 review: an unquoted expansion that splits into many glob patterns is charged to the step budget and capped.
+describe('globbing of split fields', () => {
+  const setup = () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir d; cd d; for i in $(seq 1000); do touch f$i; done');
+    assert.equal(run(SQ, 'ls | wc -l').out, '1000');
+    return SQ;
+  };
+  it('echo $z with 65,536 * fields in a 1,000-file folder stops with the friendly line, quickly', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; echo $z');
+    assert.match(r.out, /^this practice shell stopped the command: /);
+    assert.equal(r.code, 1);
+    assert.equal(run(SQ, 'echo ok').out, 'ok');
+  });
+  it('the same expansion in a for list stops too', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; for f in $z; do :; done');
+    assert.match(r.out, /^this practice shell stopped the command: /);
+    assert.equal(run(SQ, 'echo ok').out, 'ok');
+  });
+  it('many globs that match nothing are charged to the step budget', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="q* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; echo $z | wc -c');
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+  });
+  it('a few globs over the folder still work', () => {
+    const SQ = setup();
+    assert.equal(run(SQ, 'z="f1* f2*"; echo $z | wc -w').out, '223');
+  });
+});

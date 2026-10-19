@@ -167,7 +167,7 @@ function runFor(c,env){const out=[];let code=0,ui;
   if(c.words===null)items=SQ.frame().args.slice();
   else{let toks;
     try{toks=expandWords(c.words)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||2,ctl:abortOf(e)}}
-    for(const w of toks){if(w.glob){globbed=true;items.push(...globExpand(w.v))}else items.push(w.v)}}
+    ({args:items,globbed}=SQ.globWords(toks))}
   out.push(...CTX.pend.splice(0));
   if(env.record)SQ.rt.log.push({name:'for',args:items,globbed,piped:false,redirect:null,code:0,out:''});
   const inner=Object.assign({},env,{loops:env.loops+1});

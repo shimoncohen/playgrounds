@@ -158,7 +158,7 @@ CMDS.read=function(a,io){let raw=false,i=0;
      trailing IFS whitespace, and without one trailing IFS delimiter when only a single field is left (bash: IFS=, read a b <<< "1,2," gives b=2) */
   const ifs=SQ.ifsNow();
   if(ifs===''){names.forEach((n,k)=>set(n,k?'':text(ch)));return ok()}
-  const W=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n')&&ifs.includes(x.c),D=x=>!x.e&&ifs.includes(x.c);
+  const ifsSet=new Set(ifs),W=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n')&&ifsSet.has(x.c),D=x=>!x.e&&ifsSet.has(x.c);
   const delimEnd=(s,q)=>{let k=q;while(k<s.length&&W(s[k]))k++;if(k<s.length&&D(s[k])&&!W(s[k])){k++;while(k<s.length&&W(s[k]))k++}return k};
   let p=0;while(p<ch.length&&W(ch[p]))p++;
   names.forEach((n,idx)=>{

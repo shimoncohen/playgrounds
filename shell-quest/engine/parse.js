@@ -33,8 +33,8 @@ const perr=(m,code)=>Object.assign(new Error(m),{code});
    a run of IFS whitespace is one soft break; one other IFS character (with the IFS whitespace around it) is one hard break, which ends a field even when it is empty. */
 const DEF_IFS=' \t\n';
 const ifsNow=()=>isSet('IFS')?getVar('IFS'):DEF_IFS;
-function ifsScan(text,ifs,ch,brk){const n=text.length;
-  const W=c=>(c===' '||c==='\t'||c==='\n')&&ifs.includes(c),D=c=>ifs.includes(c);
+function ifsScan(text,ifs,ch,brk){const n=text.length,set=new Set(ifs);
+  const W=c=>(c===' '||c==='\t'||c==='\n')&&set.has(c),D=c=>set.has(c);
   for(let j=0;j<n;){const c=text[j];
     if(!D(c)){ch(c);j++;continue}
     let k=j,hard=false;while(k<n&&W(text[k]))k++;
@@ -312,10 +312,19 @@ function parse(toks){
   if(pipe.length)seq.push({op,pipe});else if(op&&op!==';')bad('newline');
   return seq}
 function globRe(p,ci){return new RegExp('^'+p.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$',ci?'i':'')}
+/* every glob is charged to the step budget: one step, plus one per 100 names it looks at */
 function globExpand(pat){const idx=pat.lastIndexOf('/');const dp=idx>=0?pat.slice(0,idx+1):'';const b=pat.slice(idx+1);
-  if(/[*?]/.test(dp)||!b)return [pat];const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
-  const rx=globRe(b);const m=Object.keys(dn.children).filter(k=>(b.startsWith('.')||!k.startsWith('.'))&&rx.test(k)).sort(cmpName).map(k=>dp+k);
+  if(/[*?]/.test(dp)||!b)return [pat];SQ.step();const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
+  const names=Object.keys(dn.children);for(let k=100;k<=names.length;k+=100)SQ.step();
+  const rx=globRe(b);const m=names.filter(k=>(b.startsWith('.')||!k.startsWith('.'))&&rx.test(k)).sort(cmpName).map(k=>dp+k);
   return m.length?m:[pat]}
+/* globWords(tokens) -> {args, globbed}: the expanded words with their glob patterns expanded. Split fields can make many patterns, so the words are capped
+   at ARGS_MAX and their text at twice LIM.TEXT (a StepLimit, the friendly 'stopped the command' line). */
+const ARGS_MAX=500000;
+function globWords(ws){const args=[];let globbed=false,chars=0;
+  const add=v=>{args.push(v);chars+=v.length;if(args.length>ARGS_MAX||chars>2*SQ.LIM.TEXT)throw new SQ.StepLimit('the expanded words grew too large')};
+  for(const w of ws){if(w.glob){globbed=true;for(const v of globExpand(w.v))add(v)}else add(w.v)}
+  return {args,globbed}}
 function flags(a){const fl=new Set(),rest=[];let end=false;for(const x of a){if(!end&&x==='--'){end=true;continue}
   if(!end&&x.startsWith('-')&&x.length>1){if(x.startsWith('--'))fl.add(x);else for(const ch of x.slice(1))fl.add(ch)}else rest.push(x)}return {fl,rest}}
 function readInputs(rest,io,cmd){const src=[],err=[];if(!rest.length){src.push({name:'',text:io.stdin});return {src,err}}
@@ -325,5 +334,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});
