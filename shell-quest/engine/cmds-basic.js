@@ -173,10 +173,15 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     par.children[name]=copy;markTree(tabs,copy)}
   return {out:'',err,code:err.length?1:0,tips}}
 
+/* nano/edit/vi/vim FILE: no file is made here; the page opens its editor on the absolute path and Save writes it */
+function editorCmd(name){return a=>{const {rest}=flags(a);if(!rest.length)return E(`${name}: missing file operand`,1);const t=rest[0];
+  if(t.length>4096||t.split('/').some(x=>x.length>255))return E(`${name}: ${t.length>80?t.slice(0,80)+'...':t}: File name too long`,1);
+  const abs=norm(t),n=getNode(abs);
+  if(n&&n.type==='dir')return E(`${name}: ${t}: Is a directory`,1);
+  if(!n){const [par]=parentOf(abs);if(!par||par.type!=='dir')return E(`${name}: cannot create '${t}': No such file or directory`,1)}
+  return {out:'',err:[],code:0,ui:{edit:abs,isNew:!n}}}}
+for(const n of ['nano','edit','vi','vim'])CMDS[n]=editorCmd(n);
 const FRIENDLY={
-  nano:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vim:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
-  vi:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
   code:'This practice shell has no text editor. Write files with echo and > (replace) or >> (add a line).',
   sudo:'sudo runs a command as the all-powerful admin user. You don\'t need it here, and on a real computer use it only when you know why.',
   exit:'There is nowhere to exit to. Your progress saves automatically.',
@@ -191,6 +196,6 @@ const FRIENDLY={
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(FRIENDLY[c])continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+function suggest(n){let best=null,bd=3;for(const c of Object.keys(CMDS)){if(FRIENDLY[c]||c==='edit')continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

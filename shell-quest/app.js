@@ -9,7 +9,7 @@ const screen=$('#screen'),cmdIn=$('#cmd'),promptEl=$('#prompt'),term=$('#term'),
 const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML}=SQ.ui;
 let histIdx=S.hist.length;
 
-function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
+function checkMission(line,opts){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
   try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
@@ -20,10 +20,26 @@ function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return
     else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
   SQ.ui.setPop()}
 
-function run(line){const before=S.cwd;addLine(promptHTML(before)+esc(line));
+/* One typed or generated line: echo it (unless echo:false), run it (optional stdin text), show the output, check the mission.
+   opts.feedback is for script missions (a failed test case is explained); the typed prompt never sets it. */
+function runLine(line,opts){opts=opts||{};const before=S.cwd;let edit=null;
+  if(opts.echo!==false)addLine(promptHTML(before)+esc(line));
   if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
-  if(line.trim()){const r=execLine(line,{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;checkMission(line)}
-  renderAll();save();scrollDown()}
+  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback})}
+  renderAll();save();scrollDown();
+  if(edit)openFor(edit.edit,edit.isNew)}
+const run=line=>runLine(line,{echo:true});
+
+/* the editor panel: nano/edit/vi/vim ask for it, Save writes through the same writeFile the shell uses */
+function openFor(abs,isNew){const n=getNode(abs);SQ.ui.openEditor(abs,n&&n.type==='file'?n.content:'#!/bin/bash\n',{isNew:!n})}
+const shownPath=abs=>{const r=rel(abs);return r==='.'?disp(abs):r};
+SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();
+  const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
+  if(e){addLine(renderText(e),'err');scrollDown();return false}
+  addLine(renderText('Saved '+shown),'sys');checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
+const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
+SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
+  runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true})};
 
 function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').filter(Boolean),b=cw.split('/').filter(Boolean);let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}
@@ -34,7 +50,7 @@ function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
   const first=/^\s*\S*$/.test(before);let cands=[];
-  if(first&&!word.includes('/'))cands=Object.keys(CMDS).filter(c=>c.startsWith(word)).map(c=>c+' ');
+  if(first&&!word.includes('/'))cands=Object.keys(CMDS).filter(c=>/^[A-Za-z]/.test(c)&&c.startsWith(word)).map(c=>c+' ');
   else{const idx=word.lastIndexOf('/'),dp=idx>=0?word.slice(0,idx+1):'',b=word.slice(idx+1);const dn=getNode(norm(dp||'.'));
     if(dn&&dn.type==='dir')cands=Object.keys(dn.children).filter(k=>k.startsWith(b)&&(b.startsWith('.')||!k.startsWith('.'))).sort(cmpName).map(k=>dp+k+(dn.children[k].type==='dir'?'/':' '))}
   if(!cands.length)return;

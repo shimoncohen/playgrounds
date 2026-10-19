@@ -441,3 +441,224 @@ test('linked save file: follows saves, restores after wipes', async () => {
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+// ---- Task 9: editor panel ----
+const SQ_KEY = 'shell-quest-v1';
+async function shellPage(opts = {}) {
+  const o = await open(`${base}/shell-quest/`, opts);
+  await o.page.waitForSelector('#cmd');
+  o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
+  o.screen = () => o.page.textContent('#screen');
+  o.waitScreen = (re, ms) => o.page.waitForFunction(r => new RegExp(r).test(document.querySelector('#screen').textContent), re.source, { timeout: ms || 8000 });
+  o.file = async name => o.page.evaluate(([k, n]) => { const f = JSON.parse(localStorage.getItem(k)).fs.children.home.children.explorer.children[n]; return f ? f : null; }, [SQ_KEY, name]);
+  o.visible = sel => o.page.evaluate(s => { const e = document.querySelector(s); return !!e && !e.hidden && e.getBoundingClientRect().height > 0; }, sel);
+  return o;
+}
+
+test('shell-quest editor: nano opens a panel with the shebang, Save writes the file, bash runs it', async () => {
+  const { ctx, page, errors, type, waitScreen, file, visible } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  assert.equal(await visible('#editor'), false, 'hidden by default');
+  await type('nano hello.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  assert.equal(await page.inputValue('#edText'), '#!/bin/bash\n');
+  assert.equal((await page.textContent('#edTitle')).trim(), '/home/explorer/hello.sh');
+  assert.equal(await page.evaluate(() => document.activeElement && document.activeElement.id), 'edText');
+  assert.equal(await file('hello.sh'), null, 'no file before Save');
+  assert.equal(await visible('#tab-quest'), true);
+  assert.equal(await visible('#tab-fire'), false);
+  assert.equal(await page.getAttribute('#edText', 'wrap'), 'off');
+  assert.equal(await page.getAttribute('#edText', 'spellcheck'), 'false');
+  assert.ok(await page.getAttribute('#edText', 'aria-label'), 'textarea is labelled');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('#editor button')].every(b => b.type === 'button')), true);
+  await page.fill('#edText', '#!/bin/bash\necho "hello $1"\n');
+  await page.click('#edSave');
+  await waitScreen(/Saved hello\.sh/);
+  assert.equal((await file('hello.sh')).content, '#!/bin/bash\necho "hello $1"\n');
+  await type('bash hello.sh Zed');
+  await waitScreen(/hello Zed/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: Save & run passes arguments and stdin; shortcuts work', async () => {
+  const { ctx, page, errors, waitScreen, type } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano greet.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'read name\necho "hi $1 and $name"\n');
+  await page.fill('#edArgs', 'Ada');
+  await page.click('#editor details summary');
+  await page.fill('#edStdin', 'Bob');
+  await page.click('#edRun');
+  await waitScreen(/hi Ada and Bob/);
+  assert.match(await page.textContent('#screen'), /\$ bash greet\.sh Ada/);
+  // Ctrl+Enter saves and runs
+  await page.fill('#edText', 'echo second $1\n');
+  await page.focus('#edText');
+  await page.keyboard.press('Control+Enter');
+  await waitScreen(/second Ada/);
+  // Ctrl+S saves only, and the browser's own save dialog is suppressed
+  await page.fill('#edText', 'echo third\n');
+  await page.focus('#edText');
+  await page.keyboard.press('Control+s');
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k)).fs.children.home.children.explorer.children['greet.sh'].content === 'echo third\n', SQ_KEY);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: CRLF is normalised, 1,000,001 characters are refused, the exec bit survives', async () => {
+  const { ctx, page, errors, waitScreen, type, file } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('touch run.sh');
+  await type('chmod +x run.sh');
+  await type('nano run.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  // a textarea normalises line breaks itself, so the CRLF text goes straight to the save hook
+  await page.evaluate(() => window.SQ.editorSave('/home/explorer/run.sh', 'a\r\nb\rc\r\n'));
+  await waitScreen(/Saved run\.sh/);
+  const f = await file('run.sh');
+  assert.equal(f.content, 'a\nb\nc\n');
+  assert.ok(f.exec || f.mode, 'still runnable');
+  await page.fill('#edText', 'x'.repeat(1000001));
+  await page.click('#edSave');
+  await waitScreen(/file too large for this practice shell/);
+  assert.equal((await file('run.sh')).content, 'a\nb\nc\n', 'unchanged');
+  assert.equal(await page.isVisible('#editor'), true, 'still open');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: file names are shown as text (no markup, no dialog)', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  let dialogs = 0;
+  page.removeAllListeners('dialog');
+  page.on('dialog', d => { dialogs++; d.dismiss(); });
+  const name = '<img src=x onerror=alert(1)>';
+  await type(`touch '${name}'`);
+  await type(`nano '${name}'`);
+  await page.waitForSelector('#editor:not([hidden])');
+  assert.equal(await page.textContent('#edTitle'), '/home/explorer/' + name);
+  assert.equal(await page.locator('#edTitle img, #editor img').count(), 0);
+  await page.fill('#edText', 'echo x\n');
+  await page.click('#edSave');
+  await waitScreen(/Saved /);
+  assert.equal(await page.locator('#screen img').count(), 0);
+  assert.match(await page.textContent('#screen'), /Saved .*<img src=x onerror=alert\(1\)>/);
+  assert.equal(dialogs, 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: closing needs two clicks with unsaved changes; Escape follows the same rule; focus returns', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano a.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.click('#edClose'); // unchanged: closes at once
+  await page.waitForSelector('#editor', { state: 'hidden' });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'cmd');
+  await type('nano a.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo changed\n');
+  await page.click('#edClose');
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?');
+  assert.equal(await page.isVisible('#editor'), true);
+  await page.click('#edClose');
+  await page.waitForSelector('#editor', { state: 'hidden' });
+  assert.equal((await page.textContent('#edClose')).trim(), 'Close');
+  // Escape: same rule; Save clears the dirty state
+  await type('nano a.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo kept\n');
+  await page.press('#edText', 'Escape');
+  assert.equal(await page.isVisible('#editor'), true);
+  assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?');
+  await page.click('#edSave');
+  await waitScreen(/Saved a\.sh/);
+  assert.equal((await page.textContent('#edClose')).trim(), 'Close', 'Save resets the discard prompt');
+  await page.press('#edText', 'Escape');
+  await page.waitForSelector('#editor', { state: 'hidden' });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'cmd');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: a second file is refused while the first has unsaved changes', async () => {
+  const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano one.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'echo one\n');
+  await type('nano two.sh');
+  await waitScreen(/Save or close one\.sh first/);
+  assert.equal((await page.textContent('#edTitle')).trim(), '/home/explorer/one.sh');
+  assert.equal(await page.inputValue('#edText'), 'echo one\n');
+  await page.click('#edSave');
+  await type('nano two.sh');
+  await page.waitForFunction(() => document.querySelector('#edTitle').textContent.endsWith('two.sh'));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: nano on a missing parent or a directory prints the error and opens nothing', async () => {
+  const { ctx, page, errors, type, waitScreen, visible } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano nodir/x.sh');
+  await waitScreen(/nano: cannot create 'nodir\/x\.sh': No such file or directory/);
+  assert.equal(await visible('#editor'), false);
+  await type('nano forest');
+  await waitScreen(/nano: forest: Is a directory/);
+  assert.equal(await visible('#editor'), false);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest editor: at 390px wide there is no horizontal overflow and every control is usable (touch)', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await type('nano m.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.evaluate(() => document.querySelector('#editor details').open = true);
+  const r = await page.evaluate(() => {
+    const ids = ['edSave', 'edRun', 'edTab', 'edClose', 'edArgs'].map(id => {
+      const b = document.getElementById(id).getBoundingClientRect();
+      return { id, w: b.width, h: b.height, right: b.right, left: b.left };
+    });
+    return { ids, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth };
+  });
+  assert.ok(r.sw <= r.cw, `page overflows horizontally: ${r.sw} > ${r.cw}`);
+  for (const b of r.ids) {
+    assert.ok(b.w > 20 && b.left >= 0 && b.right <= r.cw, `${b.id} is on screen`);
+    assert.ok(b.h >= 40, `${b.id} is at least 40px tall (${b.h})`);
+  }
+  await ctx.close();
+  assert.deepEqual(errors, []);
+});
+
+test('shell-quest editor: the Tab button inserts two spaces at the caret', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await type('nano t.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', 'ab');
+  await page.evaluate(() => { const t = document.getElementById('edText'); t.setSelectionRange(1, 1); });
+  await page.click('#edTab');
+  assert.equal(await page.inputValue('#edText'), 'a  b');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest: touch extra keys include the script punctuation; tab completion hides [ . and :', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const keys = await page.$$eval('#keys button', bs => bs.filter(b => b.offsetParent).map(b => b.dataset.k));
+  for (const k of ['$', ';', '&', '(', ')', '{', '}', '[', ']', '=', '<', '`', '\\']) assert.ok(keys.includes(k), `key ${k}`);
+  await page.click('#keys button[data-k="{"]');
+  assert.equal(await page.inputValue('#cmd'), '{');
+  await page.fill('#cmd', '');
+  // completion: the symbol builtins ([ . :) are never offered; letter prefixes still complete (nano, edit, vi, vim stay)
+  const listFor = prefix => page.evaluate(p => {
+    const c = document.querySelector('#cmd'); c.value = p; c.setSelectionRange(p.length, p.length);
+    document.querySelector('#keys [data-k="TAB"]').click();
+    return { value: c.value, last: document.querySelector('#screen').lastElementChild.textContent };
+  }, prefix);
+  const all = (await listFor('')).last.replace(/^\S+@\S+:\S*\$\s*/, '').split(/\s+/).filter(Boolean);
+  assert.ok(all.length > 20 && all.includes('nano') && all.includes('edit') && all.includes('vi') && all.includes('vim'), 'full list shown: ' + all.length);
+  for (const bad of ['[', '.', ':']) assert.ok(!all.includes(bad), `"${bad}" hidden from completion`);
+  assert.equal((await listFor('[')).value, '[', 'nothing completes "["');
+  assert.equal((await listFor('nan')).value, 'nano ');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

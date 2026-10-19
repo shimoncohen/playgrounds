@@ -482,3 +482,61 @@ describe('scriptPasses', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(r)), { ok: true });
   });
 });
+
+describe('editor commands (Task 9)', () => {
+  const ui = (SQ, line) => { SQ.rt.log = []; SQ.rt.changed = new Set(); const r = SQ.execLine(line); return { ui: r.ui && JSON.parse(JSON.stringify(r.ui)), r }; };
+  const text = (r) => r.out.map((o) => o.text).join('\n');
+  for (const cmd of ['nano', 'edit', 'vi', 'vim']) {
+    it(`${cmd} of a new name asks the page to open it, creating nothing`, () => {
+      const SQ = loadShell();
+      const { ui: u, r } = ui(SQ, `${cmd} hello.sh`);
+      assert.deepEqual(u, { edit: H + 'hello.sh', isNew: true });
+      assert.equal(r.code, 0);
+      assert.equal(text(r), '');
+      assert.equal(SQ.getNode(H + 'hello.sh'), null);
+    });
+  }
+  it('an existing file reports isNew:false', () => {
+    const SQ = loadShell();
+    assert.deepEqual(ui(SQ, 'nano readme.txt').ui, { edit: H + 'readme.txt', isNew: false });
+  });
+  it('relative paths and ~ resolve to an absolute path', () => {
+    const SQ = loadShell();
+    run(SQ, 'cd forest');
+    assert.deepEqual(ui(SQ, 'nano ../x.sh').ui, { edit: H + 'x.sh', isNew: true });
+    assert.deepEqual(ui(SQ, 'nano ~/y.sh').ui, { edit: H + 'y.sh', isNew: true });
+  });
+  it('a directory is refused', () => {
+    const SQ = loadShell();
+    const { ui: u, r } = ui(SQ, 'nano forest');
+    assert.equal(u, undefined);
+    assert.equal(text(r), 'nano: forest: Is a directory');
+    assert.notEqual(r.code, 0);
+  });
+  it('a missing parent is refused', () => {
+    const SQ = loadShell();
+    const { ui: u, r } = ui(SQ, 'nano nodir/x.sh');
+    assert.equal(u, undefined);
+    assert.equal(text(r), "nano: cannot create 'nodir/x.sh': No such file or directory");
+    assert.notEqual(r.code, 0);
+  });
+  it('a missing operand and over-long names are refused', () => {
+    const SQ = loadShell();
+    assert.match(text(ui(SQ, 'nano').r), /missing file operand/);
+    const long = 'a'.repeat(300);
+    const { ui: u, r } = ui(SQ, `nano ${long}`);
+    assert.equal(u, undefined);
+    assert.match(text(r), /File name too long/);
+  });
+  it('the ui request survives && and ; and a function call', () => {
+    const SQ = loadShell();
+    assert.deepEqual(ui(SQ, 'true && nano a.sh').ui, { edit: H + 'a.sh', isNew: true });
+    assert.deepEqual(ui(SQ, 'f() { nano b.sh; }; f').ui, { edit: H + 'b.sh', isNew: true });
+  });
+  it('emacs-style friendly messages are kept for code; nano/vi/vim are real commands', () => {
+    const SQ = loadShell();
+    assert.ok(SQ.CMDS.nano && SQ.CMDS.edit && SQ.CMDS.vi && SQ.CMDS.vim);
+    assert.ok(!SQ.FRIENDLY.nano && !SQ.FRIENDLY.vi && !SQ.FRIENDLY.vim);
+    assert.match(out(SQ, 'code f'), /no text editor/);
+  });
+});

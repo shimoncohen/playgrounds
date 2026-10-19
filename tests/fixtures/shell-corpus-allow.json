@@ -542,5 +542,20 @@
   "echo \"echo \\$1 \\$2\" > x.sh\nbash x.sh a b": {
     "reason": "Task 8: bash FILE ARGS passes $1.. to the script (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
     "out": "a b"
+  },
+  "vi f": {
+    "reason": "Task 9: nano/vi/vim are real commands that open the page editor (no file is created until Save); the engine returns no text and exit code 0",
+    "out": "",
+    "code": 0
+  },
+  "nano f": {
+    "reason": "Task 9: nano/vi/vim are real commands that open the page editor (no file is created until Save); the engine returns no text and exit code 0",
+    "out": "",
+    "code": 0
+  },
+  "vim f": {
+    "reason": "Task 9: nano/vi/vim are real commands that open the page editor (no file is created until Save); the engine returns no text and exit code 0",
+    "out": "",
+    "code": 0
   }
 }

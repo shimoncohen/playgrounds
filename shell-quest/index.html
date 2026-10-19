@@ -37,8 +37,18 @@
       <div id="screen"></div>
       <div class="inputline"><span id="prompt"></span><input id="cmd" aria-label="Type a bash command" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
     </div>
+    <section id="editor" class="panel editor" aria-label="File editor" hidden>
+      <div class="edhead"><span class="edlabel">Editing</span><code id="edTitle" class="edtitle"></code></div>
+      <textarea id="edText" aria-label="File contents" spellcheck="false" wrap="off" autocomplete="off" autocapitalize="off" autocorrect="off"></textarea>
+      <div class="edrun">
+        <label class="edargs">Arguments <input id="edArgs" aria-label="Arguments for Save and run" placeholder="e.g. Ada" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+        <details class="edstdin"><summary>Input for the script (stdin)</summary><textarea id="edStdin" aria-label="Standard input for Save and run" spellcheck="false" wrap="off" rows="3"></textarea></details>
+      </div>
+      <div class="edbar"><button type="button" class="btn" id="edSave">Save</button><button type="button" class="btn" id="edRun">Save &amp; run</button><button type="button" class="btn ghost" id="edTab" aria-label="Insert two spaces">Tab ⇥</button><button type="button" class="btn ghost" id="edClose">Close</button></div>
+      <p class="edhint"><kbd>Ctrl</kbd>+<kbd>S</kbd> saves · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> saves and runs · <kbd>Esc</kbd> closes</p>
+    </section>
     <div class="keys" id="keys" aria-label="Extra keys">
-      <button data-k="TAB">Tab</button><button data-k="UP">↑</button><button data-k="/">/</button><button data-k="~">~</button><button data-k="-">-</button><button data-k="|">|</button><button data-k=">">&gt;</button><button data-k="*">*</button><button data-k=".">.</button><button data-k="&quot;">"</button><button data-k="ENTER">Enter ⏎</button>
+      <button data-k="TAB">Tab</button><button data-k="UP">↑</button><button data-k="/">/</button><button data-k="~">~</button><button data-k="-">-</button><button data-k="|">|</button><button data-k=">">&gt;</button><button data-k="*">*</button><button data-k=".">.</button><button data-k="&quot;">"</button><button data-k="$">$</button><button data-k=";">;</button><button data-k="&amp;">&amp;</button><button data-k="(">(</button><button data-k=")">)</button><button data-k="{">{</button><button data-k="}">}</button><button data-k="[">[</button><button data-k="]">]</button><button data-k="=">=</button><button data-k="&lt;">&lt;</button><button data-k="`">`</button><button data-k="\">\</button><button data-k="ENTER">Enter ⏎</button>
     </div>
     <div class="termbar"><span><kbd>Tab</kbd> completes names</span><span><kbd>↑</kbd> <kbd>↓</kbd> history</span><span><kbd>Ctrl</kbd>+<kbd>L</kbd> clears</span><span class="sp"></span><button class="linkbtn" id="resetWorld">Reset world</button></div>
   </div>
@@ -95,6 +105,7 @@
 <script src="content/guide.js"></script>
 <script src="content/quickfire.js"></script>
 <script src="ui.js"></script>
+<script src="editor.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
