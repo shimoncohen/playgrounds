@@ -220,6 +220,8 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   const { ctx, page, errors } = await open('about:blank');
   const consoleErrors = [];
   page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+  // The bundle keeps the Google Fonts link, which cannot load offline: answer those requests with empty files.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.goto('http://bundle.test/shell-quest.html');
   await page.waitForSelector('#mission');
@@ -239,6 +241,41 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   assert.equal(await xp(), x0 + 15);
   assert.deepEqual(errors, []);
   assert.deepEqual(consoleErrors, []);
+  await ctx.close();
+});
+
+test('shell-quest: runaway output is capped, so progress still saves and survives a reload', async () => {
+  const key = 'shell-quest-v1';
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#cmd');
+  const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
+  // The file-doubling repro, scaled down: the caps must stop it before the saved state outgrows localStorage.
+  await type('seq 10000 > f');
+  await type('seq 300 | xargs -I{} cat f > g');
+  await page.waitForFunction(() => /too large for this practice shell/.test(document.querySelector('#screen').textContent));
+  await type('pwd');
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k) || '{}').xp > 0, key);
+  assert.ok((await read(page, key)).length < 2500000, 'saved state stays small');
+  const xp = JSON.parse(await read(page, key)).xp;
+  await page.reload();
+  await page.waitForSelector('#cmd');
+  assert.equal((await page.textContent('#xpText')).trim(), `${xp} XP`);
+  assert.equal(JSON.parse(await read(page, key)).xp, xp);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#cmd');
+  await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
+  const warnings = () => page.$$eval('#screen .line.err', ls => ls.filter(l => /would not store your progress/.test(l.textContent)).length);
+  await page.fill('#cmd', 'pwd'); await page.press('#cmd', 'Enter');
+  await page.waitForFunction(() => /would not store your progress/.test(document.querySelector('#screen').textContent));
+  await page.fill('#cmd', 'ls'); await page.press('#cmd', 'Enter');
+  await page.fill('#cmd', 'pwd'); await page.press('#cmd', 'Enter');
+  assert.equal(await warnings(), 1);
+  assert.deepEqual(errors, []);
   await ctx.close();
 });
 
