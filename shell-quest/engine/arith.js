@@ -5,7 +5,9 @@ const W=v=>BigInt.asIntN(64,v);
 const OPS=['<<','>>','<=','>=','==','!=','&&','||','**','++','--','+=','-=','*=','/=','%='];
 const ASSIGN=new Set(['=','+=','-=','*=','/=','%=']);
 function pow(b,e){let r=1n;b=BigInt.asUintN(64,b);while(e>0n){if(e&1n)r=BigInt.asUintN(64,r*b);b=BigInt.asUintN(64,b*b);e>>=1n}return W(r)}
-function arith(expr,env){
+/* A variable's text is itself an expression (a="1+2"; $((a*2)) is 6). depth counts those nested evaluations: past 10 (a cycle such as a=b b=a) it stops. */
+const MAX_DEPTH=10;
+function arith(expr,env,depth){depth=depth||0;
   const fail=why=>{const e=new Error('bash: '+expr+': '+why);e.raw=true;return e};
   if(expr.length>200)throw fail('expression too long');
   if(!expr.trim())return '0';
@@ -32,7 +34,9 @@ function arith(expr,env){
   const syn=()=>fail('syntax error in expression');
   const peek=()=>toks[p]&&toks[p].t==='op'?toks[p].v:null;
   const eat=o=>{if(peek()===o){p++;return true}return false};
-  const rd=n=>{const s=String(env.get(n)==null?'':env.get(n)).trim();return /^[+-]?\d+$/.test(s)?W(BigInt(s)):0n};
+  const rd=n=>{const s=String(env.get(n)==null?'':env.get(n)).trim();if(/^[+-]?\d+$/.test(s))return W(BigInt(s));if(s==='')return 0n;
+    if(depth>=MAX_DEPTH){const e=new Error('bash: expression recursion level exceeded');e.raw=true;throw e}
+    return W(BigInt(arith(s,skip?{get:env.get,set:()=>{}}:env,depth+1)))};
   const wr=(n,v)=>{if(!skip)env.set(n,String(v))};
   const V=v=>({v});
   function assign(){

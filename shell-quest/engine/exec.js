@@ -8,13 +8,14 @@ function runCmd(words,io){
   if(!words.length)return ok();
   SQ.step();
   const args=[];let globbed=false;let ew;
-  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;return E(errOf(e),e.code||2)}
+  CTX.lastSub=null;
+  try{ew=expandWords(words,words[0].raw==='export')}catch(e){if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.code||2);if(e&&e.abort)er.ctl={type:'exit',n:1,abort:true};return er}
   const pend=CTX.pend.splice(0).map(o=>o.text);
   if(!ew.length)return Object.assign(ok(),{err:pend});
   for(const w of ew){if(w.glob){globbed=true;args.push(...globExpand(w.v))}else args.push(w.v)}
   const name=args[0],a=args.slice(1);let r,lname=name;
   if(/^[A-Za-z_]\w*=/.test(name)&&args.length===1){const k=name.split('=')[0];lname='(assign)';
-    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{const v=name.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');S.vars[k]=v;r=ok()}}
+    if(SQ.badName(k))r=E(`bash: \`${k}': not a valid identifier`,1);else{const v=name.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');S.vars[k]=v;r=ok();if(CTX.lastSub!==null)r.code=CTX.lastSub}} /* an assignment-only command takes the status of its last $( ) */
   else if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)){r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
@@ -69,7 +70,7 @@ function execLine0(line,o){
   /* exit: a script or $( ) keeps the signal (the caller ends there); on a typed line there is nowhere to exit to */
   if(r.ctl&&r.ctl.type==='exit'){
     if(o.script)return r;
-    if(o.sub){S.last=r.ctl.n;return {out:r.out,code:r.ctl.n}}
+    if(o.sub||r.ctl.abort){S.last=r.ctl.n;return {out:r.out,code:r.ctl.n}}
     r.out.push({text:FRIENDLY.exit,cls:'err'});S.last=127;return {out:r.out,code:127}}
   return r}
 

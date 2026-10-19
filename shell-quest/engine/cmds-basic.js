@@ -12,7 +12,7 @@ const CMDS={
       if(fl.has('a'))ents=[fmt('.',n),fmt('..',D())].concat(ents);
       let body=jn(ents);if(targets.length>1)body=t+':'+(body?'\n'+body:'');blocks.push(body)}
     return {out:blocks.filter(b=>b!=='').join(targets.length>1?'\n\n':'\n'),err,code}},
-  cd(a){if(a.length>1)return E('bash: cd: too many arguments');let t=a[0];if(t===undefined)t=HOME;let show='';if(t==='-'){t=S.oldpwd;show=t}
+  cd(a){if(a.length>1)return E('bash: cd: too many arguments');let t=a[0];if(t===undefined){if(!SQ.isSet('HOME'))return E('bash: cd: HOME not set');t=SQ.getVar('HOME')}let show='';if(t==='-'){t=S.oldpwd;show=t}
     const abs=norm(t),n=getNode(abs);if(!n)return E(isLoop(abs)?`bash: cd: ${a[0]}: Too many levels of symbolic links`:`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
     S.oldpwd=S.cwd;S.cwd=abs;return ok(show)},
   mkdir(a){const {fl,rest}=flags(a);if(!rest.length)return E('mkdir: missing operand');const err=[];
@@ -116,7 +116,7 @@ const CMDS={
     for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
       if(m[2]!==undefined)S.vars[k]=m[3];(S.exp=S.exp||{})[k]=1}
     return {out:'',err,code:err.length?1:0}},
-  env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])L[k]=SQ.getVar(k);
+  env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])if(SQ.isSet(k))L[k]=SQ.getVar(k);
     for(const k of Object.keys(S.exp||{}))if(SQ.own(S.vars,k))L[k]=S.vars[k];
     return ok(Object.keys(L).sort().map(k=>k+'='+L[k]).join('\n'))},
   history:()=>ok(S.hist.map((h,i)=>String(i+1).padStart(4)+'  '+h).join('\n')),

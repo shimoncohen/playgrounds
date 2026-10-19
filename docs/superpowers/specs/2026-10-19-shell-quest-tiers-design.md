@@ -249,7 +249,7 @@ Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `
 - The interpreter task was split in two, 6a (parse swap, lists, pipelines, if/while/until/for, groups) and 6b (case, functions and frames, subshells, here-documents), each with its own review.
 - Task 11b was inserted before the last content task: mission 14.7 needed `>&2` and stderr checks, so the engine gained `>&2` / `1>&2` and `scriptPasses` gained `expectErr` / `expectErrMatch`.
 - The tokenizer carried a `legacy` flag (the old line-based behaviour) while the AST parser was built beside it; Task 6a wired the parser in and removed the flag. The tokenizer's `pos` option gives the AST parser source offsets and raw `(( ))` / `[[ ]]` spans.
-- Each stage of a multi-command pipeline runs in a subshell for variables, exports and functions (`echo Ada | read x` leaves `x` unset, as in bash). `cd` and `shift` in a pipeline stage still leak into the shell, because an unmarked corpus entry pins `cd forest | cat`.
+- Each stage of a multi-command pipeline runs in a subshell (`echo Ada | read x` leaves `x` unset, as in bash). Stage 2 left `cd` and `shift` leaking into the shell, because an unmarked corpus entry pinned `cd forest | cat`; Stage 3 Task 3 closed that (the entry is now marked `expectChange` with an allow-list reason): a stage restores the directory, variables, exports, functions and positional parameters, while files stay shared.
 - `local` is a save and restore in `S.vars` through the function's frame (dynamic scope), not a separate scope object.
 - `source` runs the file in the current shell under a `'source'` frame; `return` ends the file.
 - Script and challenge checks run in `SQ.sandbox`, a throwaway copy of the whole state that never writes `localStorage`. A mission can name the world its check judges (`m.world`), and the failure line is computed in that same world (`SQ.missionVerdict`).
@@ -265,19 +265,12 @@ Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `
 - Not there at all (Stage 3 or later): arrays, `&` background jobs, `set` (`-e`, `-x`, `--`), `trap`, `getopts`, `awk`, a process table (`ps`, `kill`, `sleep`, `jobs`), `declare`, `let`, `BASH_REMATCH`.
 - `VAR=x cmd` prefix assignments are not supported (`IFS= read -r line` says `IFS=: command not found`), and `read` does not use `IFS`.
 - An unquoted `$var` is **not** word-split (only `$@`, `$*` and `$( )` split), and an unquoted empty `$var` passes one empty argument where bash passes none. Lessons always quote, and a test enforces it.
-- `type [[` says not found; `local -r` is rejected; function names with `-` or `.` are a syntax error; `${V/#a/_}` (anchored substitution) does nothing.
-- `echo x > f >&2` sends the text to stderr but does not create or truncate `f`.
+- `local -r` is rejected; function names with `-` or `.` are a syntax error; `${V/#a/_}` (anchored substitution) does nothing.
 - `while read` also hands over a last line with no trailing newline (bash drops it). Files in this world never end in a newline, so this matches the rest of the shell.
-- `cd` and `shift` inside a pipeline stage leak into the shell (see above).
 - `$( )` skips here-documents textually: `<<` inside an arithmetic `(( ))` within a `$( )` is handled, but a function definition with a here-document redirect (`f() {...} <<EOF`) does not keep its body; a `$( )` inside a loop with redirected stdin does not inherit it.
-- A script with a syntax error prints only the parser's message (`bash: syntax error near unexpected token 'then'`) with no file name or line number, and one unsupported construct anywhere in the file stops the whole script before it runs.
+- One unsupported construct anywhere in a script stops the whole file before it runs. (Since Stage 3 Task 3 a script syntax error reads `s.sh: line 3: syntax error near unexpected token 'fi'`, with the path as typed and the line of the offending token; an unexpected end of file names the last line of the text, and `source` still prints the plain `bash:` form.)
 - A typed here-document cannot span lines at the prompt (the terminal takes one line at a time); scripts use them. A typed `exit` prints a friendly message instead of closing anything.
-- `break`/`continue` inside a function do not reach the caller's loop; `$0` inside a function is the function name; `xargs` cannot call a function.
-- `x=$(false); echo $?` prints 0 (bash: 1): an assignment-only command does not take the status of its `$( )`.
-- `a="1+2"; echo $((a*2))` prints 0: a variable's text is not evaluated as an expression inside `$(( ))` (bash gives 6).
-- `unset HOME` leaves the default home in place.
-- `type if` says not found (bash: `if is a shell keyword`).
-- A failing `${X:?msg}` prints its message but does not end the script or function (bash does).
+- `$0` inside a function is the function name; `xargs` cannot call a function.
 - `help` lists only the Beginner commands (an unmarked `help cd` corpus entry pins its text); `man` and `type` cover the rest.
 - File-descriptor duplication other than `2>&1`, `>&2` and `1>&2` (`2>&2`, `2>&-`, `>&-`, `3>&1`) prints "this practice shell does not support >& yet".
 - `__proto__` is refused as a variable or function name ("not a valid identifier"); names such as `constructor` or `toString` behave like any other unset name.

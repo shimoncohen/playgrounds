@@ -428,3 +428,46 @@ describe('break and continue errors (Task 8 review minors)', () => {
     assert.equal(out('continue'), "bash: continue: only meaningful in a `for', `while', or `until' loop");
   });
 });
+
+describe('Stage 3 leftovers: type, break in functions, abort on ${X:?}', () => {
+  const o = (line, SQ = loadShell()) => run(SQ, line).out;
+  it('type names shell keywords', () => {
+    assert.equal(o('type if'), 'if is a shell keyword');
+    assert.equal(o('type for while do done'), 'for is a shell keyword\nwhile is a shell keyword\ndo is a shell keyword\ndone is a shell keyword');
+    assert.equal(o('type [['), '[[ is a shell keyword');
+    assert.equal(o('type cd'), 'cd is a shell builtin');
+    assert.equal(o('type nosuchthing'), 'bash: type: nosuchthing: not found');
+  });
+  it('break and continue inside a function reach the loop that called it', () => {
+    const SQ = loadShell();
+    assert.equal(o('stop() { break; }; for i in 1 2 3; do echo $i; stop; echo no; done; echo end', SQ), '1\nend');
+    assert.equal(o('skip() { continue; }; for i in 1 2 3; do skip; echo no; echo $i; done; echo end', SQ), 'end');
+    assert.equal(o('two() { break 2; }; for a in 1 2; do for b in x y; do echo $a$b; two; done; done; echo end', SQ), '1x\nend');
+    assert.equal(o('n=0; f() { n=$((n+1)); [ $n -ge 3 ] && break; }; while true; do f; done; echo $n', SQ), '3');
+  });
+  it('break in a function called with no active loop only warns', () => {
+    const r = run(loadShell(), 'f() { break; }; f; echo after');
+    assert.equal(r.out, "bash: break: only meaningful in a `for', `while', or `until' loop\nafter");
+  });
+  it('break in a function does not leak through a subshell, a pipe or $( )', () => {
+    const SQ = loadShell();
+    assert.equal(o('f() { break; }; for i in 1 2; do (f); echo $i; done', SQ), "bash: break: only meaningful in a `for', `while', or `until' loop\n1\nbash: break: only meaningful in a `for', `while', or `until' loop\n2");
+  });
+  it('a failing ${X:?msg} ends the function, the script and the typed line', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'f() { echo ${X:?msg}; echo after; }; f; echo more');
+    assert.equal(r.out, 'bash: X: msg');
+    assert.equal(r.code, 1);
+    assert.equal(o('echo $?', SQ), '1');
+    SQ.writeFile('/home/explorer/s.sh', 'echo one\necho ${Y:?need y}\necho two', false, 's.sh');
+    const s = run(SQ, 'bash s.sh; echo status=$?');
+    assert.equal(s.out, 'bash: Y: need y\none\nstatus=1');
+    SQ.writeFile('/home/explorer/t.sh', 'f() { echo ${Z:?}; echo after; }\nf\necho no', false, 't.sh');
+    assert.equal(o('bash t.sh; echo status=$?', SQ), 'bash: Z: parameter null or not set\nstatus=1');
+  });
+  it('${X:?msg} in a subshell or $( ) only ends that one', () => {
+    const SQ = loadShell();
+    assert.equal(o('(echo ${X:?m}; echo after); echo next', SQ), 'bash: X: m\nnext');
+    assert.equal(o('v=$(echo ${X:?m}; echo after); echo "[$v]"', SQ), 'bash: X: m\n[]');
+  });
+});

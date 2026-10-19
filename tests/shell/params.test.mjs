@@ -292,3 +292,54 @@ describe('JS object names are ordinary shell names', () => {
     assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
   });
 });
+
+// Stage 3, Task 3: shell semantics left over from Stage 2.
+describe('Stage 3 leftovers: parameters and status', () => {
+  const o = (line, SQ = loadShell()) => run(SQ, line).out;
+  it('an assignment-only line takes the status of its last $( )', () => {
+    assert.equal(o('x=$(false); echo $?'), '1');
+    assert.equal(o('x=$(true); echo $?'), '0');
+    assert.equal(o('x=plain; echo $?'), '0');
+    assert.equal(o('x=$(exit 3); echo $?'), '3');
+    assert.equal(o('false; x=1; echo $?'), '0');
+    assert.equal(o('x=$(false) && echo yes || echo no'), 'no');
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'x=$(echo hi; false)').code, 1);
+    assert.equal(o('echo $x', SQ), 'hi');
+  });
+  it('a variable text is evaluated as an expression inside $(( ))', () => {
+    assert.equal(o('a="1+2"; echo $((a*2))'), '6');
+    assert.equal(o('a=b; b=4; echo $((a+1))'), '5');
+    assert.equal(o('a=5; echo $((a*2))'), '10');
+    assert.equal(o('echo $((nosuch+1))'), '1');
+    assert.equal(o('a="b=7"; echo $((a)) $b'), '7 7');
+  });
+  it('a cycle or a chain deeper than 10 stops with the recursion error', () => {
+    assert.equal(o('a=b; b=a; echo $((a))'), 'bash: expression recursion level exceeded');
+    assert.equal(o('a=a; echo $((a+1))'), 'bash: expression recursion level exceeded');
+    const SQ = loadShell();
+    run(SQ, 'v0=1; v1=v0; v2=v1; v3=v2; v4=v3; v5=v4; v6=v5; v7=v6; v8=v7; v9=v8');
+    assert.equal(o('echo $((v9))', SQ), '1');
+    run(SQ, 'v10=v9; v11=v10; v12=v11');
+    assert.equal(o('echo $((v12))', SQ), 'bash: expression recursion level exceeded');
+  });
+  it('unset HOME makes $HOME empty and cd without an argument complain', () => {
+    const SQ = loadShell();
+    run(SQ, 'unset HOME');
+    assert.equal(o('echo "[$HOME]"', SQ), '[]');
+    const r = run(SQ, 'cd forest; cd');
+    assert.equal(r.out, 'bash: cd: HOME not set');
+    assert.equal(r.code, 1);
+    assert.equal(o('pwd', SQ), '/home/explorer/forest');
+    assert.equal(o('echo ${HOME:-none}', SQ), 'none');
+    run(SQ, 'HOME=/home/explorer');
+    assert.equal(o('echo $HOME', SQ), '/home/explorer');
+    assert.equal(o('cd; pwd', SQ), '/home/explorer');
+  });
+  it('unset HOME stays inside a subshell and does not show in env', () => {
+    const SQ = loadShell();
+    assert.equal(o('(unset HOME; echo "[$HOME]"); echo "[$HOME]"', SQ), '[]\n[/home/explorer]');
+    run(SQ, 'unset USER');
+    assert.ok(!/^USER=/m.test(o('env', SQ)));
+  });
+});

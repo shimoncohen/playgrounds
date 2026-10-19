@@ -7,6 +7,7 @@ const errL=text=>({text,cls:'err'});
 const {errOf}=SQ;
 const ce=(m,code=2)=>Object.assign(new Error(m),{raw:true,code});
 const NAME=/^[A-Za-z_]\w*$/;
+const BUILTIN_NAMES=['HOME','USER','SHELL','HOSTNAME','PATH']; /* the variables a fresh shell already has; `unset` hides them through S.unsetB (see getVar in parse.js) */
 
 /* ---------- test expressions ----------
    Tokens are {raw}: for [ and test the raw text IS the already-expanded value; for [[ it is source text expanded lazily (no word splitting, no globbing) so && and || short-circuit.
@@ -174,7 +175,7 @@ CMDS.unset=function(a){let fn=false,i=0;
   const err=[];
   for(const n of a.slice(i)){
     if(!NAME.test(n)){err.push(`bash: unset: \`${n}': not a valid identifier`);continue}
-    if(fn){if(S.fns)delete S.fns[n]}else{delete S.vars[n];if(S.exp)delete S.exp[n]}}
+    if(fn){if(S.fns)delete S.fns[n]}else{delete S.vars[n];if(S.exp)delete S.exp[n];if(BUILTIN_NAMES.includes(n))(S.unsetB=S.unsetB||{})[n]=1}}
   return {out:'',err,code:err.length?1:0}};
 
 CMDS.exit=function(a){let n=S.last;

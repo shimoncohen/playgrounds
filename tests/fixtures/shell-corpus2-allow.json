@@ -77,5 +77,153 @@
       },
       "i": "17"
     }
+  },
+  "x=$(false); echo $?": {
+    "reason": "Stage 3 Task 3: an assignment-only line takes the status of its last $( ) (bash: x=$(false); echo $? prints 1)",
+    "out": "1"
+  },
+  "x=$(exit 3); echo $?": {
+    "reason": "Stage 3 Task 3: an assignment-only line takes the status of its last $( ) (bash: x=$(false); echo $? prints 1)",
+    "out": "3"
+  },
+  "f() { echo ${X:?msg}; echo after; }; f": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: msg",
+    "code": 1
+  },
+  "echo ${X:?msg}; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: msg",
+    "code": 1
+  },
+  "echo \"${X:?}\"; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: parameter null or not set",
+    "code": 1
+  },
+  "a=\"1+2\"; echo $((a*2))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "6"
+  },
+  "a=b; b=3; echo $((a+1))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "4"
+  },
+  "a=a; echo $((a+1))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "bash: expression recursion level exceeded",
+    "code": 1
+  },
+  "a=\"2*3\"; echo $((a))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "6"
+  },
+  "unset HOME; echo \"[$HOME]\"": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "[]"
+  },
+  "unset HOME; cd": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "bash: cd: HOME not set",
+    "code": 1
+  },
+  "unset USER; echo \"[$USER]\"": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "[]"
+  },
+  "type if": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "if is a shell keyword",
+    "code": 0
+  },
+  "type for": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "for is a shell keyword",
+    "code": 0
+  },
+  "type [[": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "[[ is a shell keyword",
+    "code": 0
+  },
+  "echo a > f >&2; ls f": {
+    "reason": "Stage 3 Task 3: \"> f >&2\" creates (truncates) f before the output goes to stderr (bash)",
+    "out": "a\nf",
+    "code": 0,
+    "files": [
+      [
+        "/home/explorer/f",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "echo a > f >&2; cat f": {
+    "reason": "Stage 3 Task 3: \"> f >&2\" creates (truncates) f before the output goes to stderr (bash)",
+    "out": "a",
+    "code": 0,
+    "files": [
+      [
+        "/home/explorer/f",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "cd forest | cat; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat; echo $PWD": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "echo hi | cd forest; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat; cd ..; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home",
+    "cwd": "/home"
+  },
+  "f() { break; }; for i in 1 2 3; do echo $i; f; done": {
+    "reason": "Stage 3 Task 3: break/continue in a function reach the loop that called it, without the warning (bash)",
+    "out": "1",
+    "vars": {
+      "i": "1"
+    }
+  },
+  "f() { continue; }; for i in 1 2; do f; echo $i; done": {
+    "reason": "Stage 3 Task 3: break/continue in a function reach the loop that called it, without the warning (bash)",
+    "out": ""
+  },
+  "echo ${NOSUCH:?boom}; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: NOSUCH: boom",
+    "code": 1
+  },
+  "printf \"echo a\\nif\\necho b\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 3: syntax error: unexpected end of file"
+  },
+  "printf \"echo a\\nfi\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error near unexpected token 'fi'"
+  },
+  "printf \"x=1\\nwhile true\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error: unexpected end of file"
+  },
+  "printf \"echo a\\necho (\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error near unexpected token '('"
   }
 }

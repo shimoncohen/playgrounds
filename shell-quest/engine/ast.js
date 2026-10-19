@@ -56,7 +56,7 @@ function parseProgram(text){
   /* one redirect operator at tk(), merged into r (parse() shapes: out/err {path,append,w}, inp token, err {dup}) */
   function redirect(r){const o=next();
     if(o.v==='2>&1'){r.err={dup:true};return}
-    if(o.v==='>&2'){r.out={toErr:true,after:!!r.err};return}
+    if(o.v==='>&2'){r.out={toErr:true,after:!!r.err,pre:r.out&&r.out.path!==undefined?r.out:null};return} /* pre: `> f >&2` still creates f */
     const w=tk();if(!w)throw bad('newline');
     if(w.t!=='w')throw bad(show(w));
     next();
@@ -190,8 +190,13 @@ function parseProgram(text){
     const body=parseGroup();
     return mk({type:'func',name,body},s)}
 
-  const list=parseList(new Set(),true);
-  if(p<toks.length)throw bad(show(tk()));
-  return list}
+  /* a syntax error carries `at`, the source offset of the token it was found at (the end of the text for an unexpected end), so a script can name the line */
+  try{
+    const list=parseList(new Set(),true);
+    if(p<toks.length)throw bad(show(tk()));
+    return list}
+  catch(e){if(e&&e.code===2&&!e.raw&&e.at===undefined&&/^syntax error/.test(e.message))e.at=tk()?tk().s:text.length;throw e}}
+/* the 1-based line of offset `at` in text; an offset at or past the end (unexpected end of file) reports the last line of text */
+SQ.lineOf=(text,at)=>{text=String(text);const end=text.replace(/\n+$/,'').length;at=Math.min(at,Math.max(end-1,0));let n=1;for(let i=text.indexOf('\n');i>=0&&i<at;i=text.indexOf('\n',i+1))n++;return n};
 SQ.parseProgram=parseProgram;
 })(window.SQ=window.SQ||{});

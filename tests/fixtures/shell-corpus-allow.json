@@ -571,5 +571,14 @@
   "code f": {
     "reason": "Task 13: the old message said the shell has no text editor, which is false since Task 9; it now points to nano",
     "out": "code opens VS Code, which this practice shell does not have. Use its own small editor instead: nano FILE."
+  },
+  "cd forest | cat": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash behaviour); the shell stays in the home directory",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash behaviour); pwd, a later stage, and the shell both stay in the home directory",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
   }
 }

@@ -9,17 +9,22 @@ const {errOf,own}=SQ;
 
 /* Shell state a subshell, $( ) or script must not leak. FS changes are not part of it. */
 function snapshotShell(){
-  return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),last:S.last,frames:SQ.rt.frames.length}}
+  const f=SQ.frame();
+  return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,frames:SQ.rt.frames.length,frame:f,args:f.args}}
 function restoreShell(sv){
   S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;
   if(sv.exp)S.exp=sv.exp;else delete S.exp;
   if(sv.fns)S.fns=sv.fns;else delete S.fns;
+  if(sv.unsetB)S.unsetB=sv.unsetB;else delete S.unsetB;
+  sv.frame.args=sv.args; /* shift inside a subshell, $( ) or pipeline stage does not reach the shell */
   SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames)}
 
 /* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows. */
 const IMAX=250;let idepth=0;
 function nested(f){if(idepth>=IMAX)throw new SQ.StepLimit('nesting too deep');idepth++;try{return f()}finally{idepth--}}
 
+/* an expansion error marked abort (${X:?msg}) ends the function, script or typed line: the same unwinding signal as `exit 1`, flagged so a typed line prints no friendly message */
+const abortOf=e=>e&&e.abort?{type:'exit',n:1,abort:true}:undefined;
 function logKw(env,name,code){if(env.record)SQ.rt.log.push({name,args:[],globbed:false,piped:false,redirect:null,errRedirect:null,code,out:''})}
 
 function runProgram(node,env){
@@ -58,19 +63,19 @@ function hereText(R,res){
 function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
   const P=Pn.cmds,{norm,getNode,writeFile,isNull}=SQ;
   let stdin='';
-  /* every stage of a multi-command pipeline is a subshell for variables, exports and functions (echo Ada | read x leaves x unset, like bash). The directory is NOT
-     restored: the corpus pins `cd forest | cat` leaving the shell in forest (an unmarked entry), so that bash difference stays. Files and $? come out of a stage as before. */
+  /* every stage of a multi-command pipeline is a full subshell: directory, variables, exports, functions and positional parameters go back to what they were
+     (echo Ada | read x leaves x unset, cd forest | cat stays put, echo a | shift keeps $#). Files and $? come out of a stage as before. */
   const sv0=P.length>1?snapshotShell():null;
-  const back=()=>{const l=S.last;restoreShell({cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),last:l,frames:sv0.frames})};
+  const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
   try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
     if(sv0&&i>0)back();
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
-    let toErr=null;
-    try{if(R.out){if(R.out.toErr)toErr=R.out;else out={path:expandOne(R.out.w),append:R.out.append}}if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
+    let toErr=null,pre=null;
+    try{if(R.out){if(R.out.toErr){toErr=R.out;if(toErr.pre)pre={path:expandOne(toErr.pre.w),append:toErr.pre.append}}else out={path:expandOne(R.out.w),append:R.out.append}}if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
       if(R.herestr||R.doc)here=hereText(R,res)}
-    catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:errOf(e),cls:'err'});code=e.code||2;break}
+    catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:errOf(e),cls:'err'});code=e.code||2;if(P.length===1)ctl=abortOf(e);break}
     res.push(...CTX.pend.splice(0));
     let box=null;
     if(inp!==null){if(isNull(inp))box={text:'',pos:0};else{const n=getNode(norm(inp));if(!n||n.type!=='file'){res.push({text:`bash: ${inp}: No such file or directory`,cls:'err'});code=1;break}box={text:n.content,pos:0}}}
@@ -78,7 +83,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     else if(i>0)box={text:stdin,pos:0};
     else if(env.stdin)box=env.stdin;
     let bad=false;
-    for(const t of [out,err&&err.path?err:null]){if(t&&!t.append){const e=writeFile(norm(t.path),'',false,t.path);if(e){res.push({text:e,cls:'err'});code=1;bad=true;break}}}
+    for(const t of [out,pre,err&&err.path?err:null]){if(t&&(!t.append||(t===pre&&!getNode(norm(t.path))))){const e=writeFile(norm(t.path),'',false,t.path);if(e){res.push({text:e,cls:'err'});code=1;bad=true;break}}}
     if(bad)break;
     const tty=env.tty&&last&&!out;let r;
     if(simple){
@@ -161,7 +166,7 @@ function runFor(c,env){const out=[];let code=0,ui;
   let items=[],globbed=false;
   if(c.words===null)items=SQ.frame().args.slice();
   else{let toks;
-    try{toks=expandWords(c.words)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||2}}
+    try{toks=expandWords(c.words)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||2,ctl:abortOf(e)}}
     for(const w of toks){if(w.glob){globbed=true;items.push(...globExpand(w.v))}else items.push(w.v)}}
   out.push(...CTX.pend.splice(0));
   if(env.record)SQ.rt.log.push({name:'for',args:items,globbed,piped:false,redirect:null,code:0,out:''});
@@ -172,7 +177,7 @@ function runFor(c,env){const out=[];let code=0,ui;
   return {out,code,ui}}
 
 function runCase(c,env){const out=[];let code=0,w;
-  try{w=expandOne(c.word)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||1}}
+  try{w=expandOne(c.word)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||1,ctl:abortOf(e)}}
   out.push(...CTX.pend.splice(0));
   for(const arm of c.arms){let hit=false;
     for(const p of arm.patterns){let m;
@@ -224,7 +229,7 @@ function callFunction(name,args,io){
   let prog;try{prog=parsedBody(S.fns[name])}catch(e){if(e&&e.stop)throw e;return {out:'',err:[errOf(e)],tips:[],code:e.code||2,list:[errL(errOf(e))]}}
   const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'function',locals:new Map()};
   fr.push(f);fnDepth++;let r;
-  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0})}
+  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:io.loops||0})} /* break/continue in the body reach the caller's loop */
   finally{fnDepth--;restoreLocals(f);fr.length=Math.min(fr.length,at)}
   const ret=r.ctl&&r.ctl.type==='return';
   const o=asCmd(r);o.code=ret?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
@@ -241,7 +246,7 @@ function runSourced(name,text,args,io){
   fr.push(f);srcDepth++;let r;
   try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0})}
   finally{srcDepth--;fr.length=Math.min(fr.length,at)}
-  const end=r.ctl&&(r.ctl.type==='return'||r.ctl.type==='exit');
+  const end=r.ctl&&(r.ctl.type==='return'||(r.ctl.type==='exit'&&!r.ctl.abort));
   const o=asCmd(r);o.code=end?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
   if(r.ctl&&!end)o.ctl=r.ctl;
   return o}
@@ -255,7 +260,10 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
   if(n.type==='dir')return E(`bash: ${path}: Is a directory`,126);
   if(!o.force&&!n.exec)return Object.assign(E(`bash: ${path}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
   if(o.depth+1>6)return E('bash: too many nested scripts',1);
-  let prog;try{prog=parsedBody(n.content)}catch(e){if(e&&e.stop)throw e;return E(errOf(e),e.code||2)}
+  let prog;try{prog=parsedBody(n.content)}catch(e){if(e&&e.stop)throw e;
+    /* a script reports `NAME: line N: syntax error ...` (the path as typed, the line of the offending token) instead of `bash: syntax error ...` */
+    if(e&&e.at!==undefined)return E(`${path}: line ${SQ.lineOf(n.content,e.at)}: ${e.message}`,e.code||2);
+    return E(errOf(e),e.code||2)}
   const box=o.stdinBox||(o.stdin!=null?{text:String(o.stdin),pos:0}:null);
   const sv=snapshotShell(),callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
   delete S.fns;

@@ -14,12 +14,14 @@ function getVar(k){const f=SQ.frame();
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
   if(k==='PWD')return S.cwd;if(own(S.vars,k))return S.vars[k];
-  const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+  if(unsetB(k))return '';const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+/* `unset HOME` (or USER, SHELL, ...) hides the built-in value: S.unsetB lists those names. Assigning the name again puts it back. */
+const unsetB=k=>!!S.unsetB&&own(S.unsetB,k)
 const badName=k=>k==='__proto__';
 function isSet(k){const f=SQ.frame();
   if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
   if(/^\d+$/.test(k))return +k<=f.args.length;
-  return own(S.vars,k)||own(BUILTIN_VARS(),k)}
+  return own(S.vars,k)||(own(BUILTIN_VARS(),k)&&!unsetB(k))}
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
   if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
@@ -27,7 +29,7 @@ function setVar(k,v){
   S.vars[k]=v}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
 const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
-const CTX={depth:0,pend:[],sub:0};
+const CTX={depth:0,pend:[],sub:0,lastSub:null}; /* lastSub: status of the most recently finished $( ), read by an assignment-only command */
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
 /* Nesting guard for the recursive scanners and expanders below (scanSub/scanBrace through quotes, expandStr through ${X:-...} and $(( ))): past
    EXP_NEST levels they stop with the parser's nesting error (status 2) instead of overflowing the JS stack. */
@@ -80,6 +82,7 @@ function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
   const sv=SQ.snapshotShell();
   CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
+  CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
   return v.join('\n').replace(/\n+$/,'')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
@@ -147,7 +150,7 @@ function braceVal(body){let m;
     if(op==='-')return {val:empty?expandStr(w):val};
     if(op==='=')return {val:empty?(()=>{const d=expandStr(w);setVar(k,d);return d})():val};
     if(op==='+')return {val:empty?'':expandStr(w)};
-    if(empty)throw perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1);
+    if(empty)throw Object.assign(perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1),{abort:true}); /* ends the function, script or typed line (see abortCtl) */
     return {val}}
   if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const it=globItems(expandStr(m[2],false,true)),op=m[1];
     if(op[0]==='#'){const L=matchLens(it,val,0);if(L.length)return {val:val.slice(op==='#'?L[0]:L[L.length-1])}}
@@ -293,5 +296,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

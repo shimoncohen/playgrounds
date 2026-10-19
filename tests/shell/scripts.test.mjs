@@ -175,8 +175,7 @@ describe('whole-file parsing', () => {
     const SQ = loadShell();
     put(SQ, 's.sh', 'touch first.txt\necho a\necho b\necho c\necho d\necho e\necho f\necho g\nif then fi\necho z');
     const r = run(SQ, 'bash s.sh');
-    assert.match(r.out, /^bash: .*syntax error/);
-    assert.equal(r.out.split('\n').length, 1);
+    assert.equal(r.out, "s.sh: line 9: syntax error near unexpected token 'then'");
     assert.equal(r.code, 2);
     assert.equal(out(SQ, 'ls first.txt'), "ls: cannot access 'first.txt': No such file or directory");
   });
@@ -573,5 +572,42 @@ describe('editor ui request scope (fix round 1)', () => {
     put(SQ, 's.sh', 'nano inner.txt\necho done');
     assert.equal(U(SQ, 'bash s.sh'), undefined);
     assert.equal(U(SQ, 'f() { nano b.sh; }; f | cat'), undefined);
+  });
+});
+
+describe('Stage 3 leftovers: script syntax errors and redirects', () => {
+  const H2 = '/home/explorer/';
+  it('a script syntax error names the script as typed and the line of the offending token', () => {
+    const SQ = loadShell();
+    SQ.writeFile(H2 + 's.sh', 'echo a\necho b\nfi\necho c', false, 's.sh');
+    const r = run(SQ, 'bash s.sh');
+    assert.equal(r.out, "s.sh: line 3: syntax error near unexpected token 'fi'");
+    assert.equal(r.code, 2);
+    run(SQ, 'chmod +x s.sh');
+    assert.equal(run(SQ, './s.sh').out, "./s.sh: line 3: syntax error near unexpected token 'fi'");
+    assert.equal(run(SQ, 'bash ./s.sh').out, "./s.sh: line 3: syntax error near unexpected token 'fi'");
+  });
+  it('the first line and an unexpected end of file', () => {
+    const SQ = loadShell();
+    SQ.writeFile(H2 + 'a.sh', 'then\necho x', false, 'a.sh');
+    assert.equal(run(SQ, 'bash a.sh').out, "a.sh: line 1: syntax error near unexpected token 'then'");
+    SQ.writeFile(H2 + 'b.sh', 'if true; then\n  echo x\n', false, 'b.sh');
+    assert.match(run(SQ, 'bash b.sh').out, /^b\.sh: line \d+: syntax error: unexpected end of file$/);
+  });
+  it('a typed syntax error keeps the bash: form', () => {
+    assert.equal(run(loadShell(), 'echo a; fi').out, "bash: syntax error near unexpected token 'fi'");
+  });
+  it('echo a > f >&2 creates f empty and sends the text to stderr', () => {
+    const SQ = loadShell();
+    const r = run(SQ, 'echo a > f >&2; echo "[$(cat f)]"; wc -c < f');
+    assert.equal(r.out, 'a\n[]\n0');
+    run(SQ, 'echo old > g; echo b > g >&2');
+    assert.equal(run(SQ, 'cat g; echo end').out, 'end');
+    run(SQ, 'echo keep > h; echo c >> h >&2');
+    assert.equal(run(SQ, 'cat h').out, 'keep');
+  });
+  it('echo a >&2 > f still writes to f', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'echo a >&2 > f; cat f').out, 'a');
   });
 });
