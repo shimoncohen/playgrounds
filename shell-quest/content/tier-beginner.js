@@ -2,7 +2,7 @@
 SQ.content=SQ.content||{chapters:[],guide:[],quickfire:[]};
 const {HOME,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,disp,join,ensureDir,ensureFile,cmpName,sortedKeys,lines,CMDS,execLine,ctxFor}=SQ;
 const CH=[
-{name:'Where am I?',badge:'Pathfinder',intro:'Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
+{tier:'beginner',name:'Where am I?',badge:'Pathfinder',intro:'Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
  learned:['pwd','ls','ls -a','cat','cd','cd ..','cd ~'],
  setup(){ensureDir('~/forest/cave/deeper/chest');ensureFile('~/.secret_map',SECRET);ensureFile('~/readme.txt',README)},
  missions:[
@@ -26,7 +26,7 @@ const CH=[
   explain:`<code>~</code> (tilde) is a shortcut for your home folder, <code>/home/explorer</code>. Plain <code>cd</code> with nothing after it also goes home. A path that starts with <code>/</code> is an <b>absolute path</b>: it works no matter where you are.`,
   check:c=>c.cwd===HOME&&c.ran('cd')}
  ]},
-{name:'Make things',badge:'Builder',intro:'Folders and files don\'t have to exist already. You can create them and write text into them.',
+{tier:'beginner',name:'Make things',badge:'Builder',intro:'Folders and files don\'t have to exist already. You can create them and write text into them.',
  learned:['mkdir','touch','echo','>','>>','mkdir -p'],setup(){},
  missions:[
  {title:'Build a camp',goal:`From home, create a folder: <code>mkdir camp</code>`,anat:[['mkdir','cmd'],['camp','arg']],answer:'mkdir camp',note:`Not at home? Run <code>cd ~</code> first.`,
@@ -44,7 +44,7 @@ const CH=[
  {title:'Stack folders',goal:`Create three nested folders in one go: <code>mkdir -p camp/supplies/food</code>`,anat:[['mkdir','cmd'],['-p','opt'],['camp/supplies/food','arg']],answer:'mkdir -p camp/supplies/food',
   explain:`Without <code>-p</code>, mkdir refuses because <code>supplies</code> doesn't exist yet. <code>-p</code> (parents) creates every missing folder along the path. Try it without <code>-p</code> first to see the error.`,check:c=>c.isDir('~/camp/supplies/food')}
  ]},
-{name:'Copy, move, delete',badge:'Mover',intro:'Rearrange your world. These commands do most everyday file work.',
+{tier:'beginner',name:'Copy, move, delete',badge:'Mover',intro:'Rearrange your world. These commands do most everyday file work.',
  learned:['cp','mv','rm','cp -r','rm -r','rmdir'],
  setup(){ensureDir('~/camp/supplies/food');ensureFile('~/camp/tent.txt','');ensureFile('~/readme.txt',README);ensureDir('~/village');ensureDir('~/forest/cave')},
  missions:[
@@ -63,7 +63,7 @@ const CH=[
  {title:'Remove an empty folder',goal:`<code>rmdir camp/supplies/food</code>`,anat:[['rmdir','cmd'],['camp/supplies/food','arg']],answer:'rmdir camp/supplies/food',
   explain:`rmdir only removes <b>empty</b> folders. If anything is inside, it refuses. That makes it the safe way to tidy up.`,check:c=>!c.has('~/camp/supplies/food')}
  ]},
-{name:'Read files',badge:'Reader',intro:'Real files can be thousands of lines long. These commands show just the part you need.',
+{tier:'beginner',name:'Read files',badge:'Reader',intro:'Real files can be thousands of lines long. These commands show just the part you need.',
  learned:['head','tail -n','wc -l','grep','grep -i','grep -n'],setup(){ensureFile('~/journal.txt',JOURNAL)},
  missions:[
  {title:'Open the journal',goal:`From home: <code>cat journal.txt</code>`,anat:[['cat','cmd'],['journal.txt','arg']],answer:'cat journal.txt',
@@ -81,7 +81,7 @@ const CH=[
  {title:'Find the line numbers',goal:`<code>grep -n map journal.txt</code>`,anat:[['grep','cmd'],['-n','opt'],['map','arg'],['journal.txt','arg']],answer:'grep -n map journal.txt',
   explain:`<code>-n</code> puts the line number in front of each match. Options combine: <code>grep -in map journal.txt</code> does both at once.`,check:c=>c.ran('grep',e=>c.flag(e,'n'))}
  ]},
-{name:'Pipes',badge:'Plumber',intro:'The real power of bash: connect small commands so the output of one becomes the input of the next.',
+{tier:'beginner',name:'Pipes',badge:'Plumber',intro:'The real power of bash: connect small commands so the output of one becomes the input of the next.',
  learned:['|','sort','uniq','uniq -c','> with any command'],setup(){ensureFile('~/journal.txt',JOURNAL);ensureFile('~/village/people.txt',PEOPLE)},
  missions:[
  {title:'Meet the villagers',goal:`<code>cat village/people.txt</code>`,anat:[['cat','cmd'],['village/people.txt','arg']],answer:'cat village/people.txt',
@@ -99,7 +99,7 @@ const CH=[
  {title:'Save a search',goal:`<code>grep -i wolf journal.txt &gt; wolves.txt</code>`,anat:[['grep','cmd'],['-i','opt'],['wolf','arg'],['journal.txt','arg'],['>','op'],['wolves.txt','arg']],answer:'grep -i wolf journal.txt > wolves.txt',
   explain:`Now you have a file of only the wolf sightings. Check it with <code>cat wolves.txt</code>.`,check:c=>/wolf/i.test(c.read('~/wolves.txt'))}
  ]},
-{name:'Wildcards & search',badge:'Tracker',intro:'Work with many files at once, and find anything, anywhere.',
+{tier:'beginner',name:'Wildcards & search',badge:'Tracker',intro:'Work with many files at once, and find anything, anywhere.',
  learned:['*','?','find -name','find -type','&&'],
  setup(){for(const k in LOGS)ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/forest/cave/deeper/chest/gold.txt',GOLD);ensureFile('~/readme.txt',README);ensureFile('~/journal.txt',JOURNAL)},
  missions:[
@@ -121,7 +121,7 @@ const CH=[
   explain:`<code>&amp;&amp;</code> runs the second command only if the first one worked. Here: make the folder, and only then copy every .txt file from home into it.`,
   check:c=>{const n=c.node('~/backup');return !!n&&n.type==='dir'&&Object.keys(n.children).filter(k=>k.endsWith('.txt')).length>=2}}
  ]},
-{name:'Your first script',badge:'Scripter',intro:'A script is a file full of commands that bash runs for you, top to bottom. This is where bash turns into programming.',
+{tier:'beginner',name:'Your first script',badge:'Scripter',intro:'A script is a file full of commands that bash runs for you, top to bottom. This is where bash turns into programming.',
  learned:['NAME=value','$NAME','chmod +x','./script.sh','for loops'],setup(){ensureDir('~/camp')},
  missions:[
  {title:'Store a value',goal:`<code>NAME="Ada"</code>`,anat:[['NAME','var'],['=','op'],['"Ada"','arg']],answer:'NAME="Ada"',

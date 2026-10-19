@@ -141,6 +141,18 @@ for (const name of NAMES) {
   });
 }
 
+test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#xpText')).trim(), '695 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Pipe Fitter');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('import rejects another playground\'s file and garbage', async () => {
   const { ctx, page } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

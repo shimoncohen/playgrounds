@@ -14,13 +14,13 @@ let histIdx=S.hist.length;
 
 function checkMission(line){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
   try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
-  const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;if(isNew)S.xp+=10;
-  addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +10 XP':''}`),'win');
+  const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
+  addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
   if(next>=0)S.mi=next;
   else{const firstOpen=ch.missions.findIndex((x,j)=>!S.done[S.ch+'.'+j]);
     if(firstOpen>=0)S.mi=firstOpen;
-    else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=25;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +25 XP`),'win big')}}}
+    else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
   SQ.ui.setPop()}
 
 function run(line){const before=S.cwd;addLine(promptHTML(before)+esc(line));

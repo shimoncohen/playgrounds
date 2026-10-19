@@ -50,9 +50,8 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
     <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button><button class="btn" data-act="fill">Type it for me</button></div>
     <p class="hint" id="hintBox" hidden>${hint}</p>${dots}`}
   missionEl.innerHTML=h;if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop');pop=false}}
-const RANKS=[[0,'Rookie'],[100,'Apprentice'],[250,'Navigator'],[420,'Operator'],[600,'Shell Wizard']];
-function renderXP(){let i=0;while(i+1<RANKS.length&&S.xp>=RANKS[i+1][0])i++;const lo=RANKS[i][0],hi=i+1<RANKS.length?RANKS[i+1][0]:lo;
-  $('#rank').textContent=RANKS[i][1];$('#xpText').textContent=S.xp+' XP';$('#xpFill').style.width=(hi>lo?Math.min(100,(S.xp-lo)/(hi-lo)*100):100)+'%'}
+function renderXP(){const r=SQ.tiers.rankFor(S.xp),lo=r.lo,hi=r.hi;
+  $('#rank').textContent=r.name;$('#xpText').textContent=S.xp+' XP';$('#xpFill').style.width=(hi>lo?Math.min(100,(S.xp-lo)/(hi-lo)*100):100)+'%'}
 function renderAll(){renderPrompt();renderCrumbs();renderMap();renderChapters();renderMission();renderXP()}
 
 

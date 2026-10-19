@@ -12,7 +12,7 @@ function scriptList() {
   return srcs.filter((s) => /^(engine\/|content\/|\.\.\/shared\/tiers\.js$)/.test(s));
 }
 
-export function loadShell() {
+export function loadContext() {
   const store = new Map();
   const localStorage = {
     getItem: (k) => (store.has(k) ? store.get(k) : null),
@@ -26,7 +26,11 @@ export function loadShell() {
     if (!fs.existsSync(file)) continue; // e.g. shared/tiers.js before it exists
     vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: file });
   }
-  return ctx.SQ;
+  return ctx;
+}
+
+export function loadShell() {
+  return loadContext().SQ;
 }
 
 export function run(SQ, line) {
