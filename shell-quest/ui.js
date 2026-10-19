@@ -38,10 +38,11 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, then open a real terminal. The field guide shows how on Mac, Windows and Linux.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`}
-  else{const m=ch.missions[S.mi];const hint=m.hint||`Type exactly this, then press Enter: <code>${esc(m.answer)}</code>`;
+  else{const m=ch.missions[S.mi];const sc=(m.kind==='script'||m.kind==='challenge')&&m.file;const hint=m.hint||(sc?`Use nano ${esc(m.file)} to write it, then run it with bash ${esc(m.file)}.`:`Type exactly this, then press Enter: <code>${esc(m.answer)}</code>`);
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done before':''}</div>
     ${S.mi===0?`<p class="intro">${esc(ch.intro)}</p>`:''}
-    <h2>${esc(m.title)}</h2>
+    <h2>${esc(m.title)}${m.kind==='challenge'?' <span class="mtag">Challenge</span>':''}</h2>
+    ${sc?`<div class="where">Your file: <code>${esc(m.file)}</code></div>`:''}
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
     <p class="explain">${m.explain}</p>

@@ -32,8 +32,9 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
 
-async function open(url, opts = {}) {
+async function open(url, opts = {}, prep) {
   const ctx = await browser.newContext({ acceptDownloads: true, ...opts });
+  if (prep) await prep(ctx);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -444,8 +445,8 @@ test('linked save file: follows saves, restores after wipes', async () => {
 
 // ---- Task 9: editor panel ----
 const SQ_KEY = 'shell-quest-v1';
-async function shellPage(opts = {}) {
-  const o = await open(`${base}/shell-quest/`, opts);
+async function shellPage(opts = {}, prep) {
+  const o = await open(`${base}/shell-quest/`, opts, prep);
   await o.page.waitForSelector('#cmd');
   o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
   o.screen = () => o.page.textContent('#screen');
@@ -750,6 +751,125 @@ test('shell-quest editor: a failed save shows the error and leaves the editor op
   assert.equal(await page.isVisible('#editor'), true);
   await page.click('#edClose');
   assert.equal((await page.textContent('#edClose')).trim(), 'Discard changes?', 'still dirty');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+// ---- Task 10: mission kinds (script, challenge) ----
+// The test-only chapter in tests/fixtures/fake-advanced.js is appended to content/quickfire.js in transit (before ui.js and app.js run).
+const FAKE_JS = fs.readFileSync(path.join(ROOT, 'tests/fixtures/fake-advanced.js'), 'utf8');
+async function fakeChapterPage() {
+  const o = await shellPage({ viewport: { width: 1280, height: 900 } }, async ctx => {
+    await ctx.route('**/shell-quest/content/quickfire.js', async route => {
+      const r = await route.fetch();
+      await route.fulfill({ response: r, body: (await r.text()) + '\n' + FAKE_JS });
+    });
+  });
+  const idx = await o.page.evaluate(() => window.SQ.content.chapters.length - 1);
+  await o.page.click(`[data-ch="${idx}"]`);
+  await o.page.waitForFunction(() => /Greeter/.test(document.querySelector('#mission').textContent));
+  o.xp = async () => (await o.page.textContent('#xpText')).trim();
+  o.lines = re => o.page.evaluate(r => [...document.querySelectorAll('#screen .line')].filter(l => new RegExp(r).test(l.textContent)).length, re.source);
+  return o;
+}
+
+test('shell-quest script mission: Type it for me opens the editor pre-filled; wrong then right; 20 XP once; replay awards nothing', async () => {
+  const { ctx, page, errors, waitScreen, xp, lines } = await fakeChapterPage();
+  const card = () => page.textContent('#mission');
+  assert.match(await card(), /scripts\/hi\.sh/, 'file path shown on the card');
+  assert.doesNotMatch(await card(), /Challenge/, 'a script mission is not tagged Challenge');
+  await page.click('[data-act="hint"]');
+  assert.match(await page.textContent('#hintBox'), /Use nano scripts\/hi\.sh to write it, then run it with bash scripts\/hi\.sh\./);
+  assert.equal(await xp(), '0 XP');
+  // Type it for me: the editor opens on the mission file, pre-filled with the answer, nothing saved yet
+  await page.click('[data-act="fill"]');
+  await page.waitForSelector('#editor:not([hidden])');
+  assert.equal((await page.textContent('#edTitle')).trim(), '/home/explorer/scripts/hi.sh');
+  const fake = await page.evaluate(() => window.SQ.content.chapters.at(-1).missions[0]);
+  assert.equal(await page.inputValue('#edText'), fake.answer);
+  assert.equal(await page.inputValue('#cmd'), '', 'the terminal input is untouched');
+  // a wrong script, Save & run with an argument: output shows, the failing case is explained, no XP
+  await page.fill('#edText', fake.wrong[0]);
+  await page.fill('#edArgs', 'Ada');
+  await page.click('#edRun');
+  await waitScreen(/Test 2 \(no name\) failed: expected "Hi nobody", got "Hi "/);
+  assert.match(await page.textContent('#screen'), /\$ bash scripts\/hi\.sh Ada\s*Hi Ada/);
+  assert.equal(await xp(), '0 XP');
+  assert.equal(await lines(/Mission complete/), 0);
+  // the right script: Save alone completes it, once
+  await page.fill('#edText', fake.answer);
+  await page.click('#edSave');
+  await waitScreen(/Mission complete: Greeter\s+\+20 XP/);
+  assert.equal(await xp(), '20 XP');
+  assert.equal(await lines(/Test 1 .* failed/), 0, 'no failure line for a correct script');
+  assert.equal(await lines(/Test 2 .* failed/), 1, 'the earlier failure line is the only one');
+  await page.click('#edRun');
+  await waitScreen(/\$ bash scripts\/hi\.sh Ada\s*Hi Ada\s*(\S[\s\S]*)?$/);
+  assert.equal(await lines(/Mission complete: Greeter/), 1, 'running a passing script does not re-announce it');
+  // the next mission is the challenge, with its tag and file path
+  await page.waitForFunction(() => /Counter/.test(document.querySelector('#mission').textContent));
+  assert.match(await card(), /Challenge/);
+  assert.match(await card(), /scripts\/count\.sh/);
+  // replay mission 1: it completes again with no new XP
+  await page.click('[data-mi="0"]');
+  await page.waitForFunction(() => /done before/.test(document.querySelector('#mission').textContent));
+  await page.click('#edSave');
+  await page.waitForFunction(() => document.querySelectorAll('#screen .line.win').length >= 2);
+  assert.equal(await lines(/Mission complete: Greeter\s+\+20 XP/), 1, 'XP is announced once');
+  assert.equal(await xp(), '20 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest challenge mission: custom check wins; Save & run feeds stdin; wrong script explained', async () => {
+  const { ctx, page, errors, waitScreen, xp, lines } = await fakeChapterPage();
+  const fake = await page.evaluate(() => window.SQ.content.chapters.at(-1).missions);
+  await page.click('[data-mi="1"]');
+  await page.waitForFunction(() => /Counter/.test(document.querySelector('#mission').textContent));
+  assert.match(await page.textContent('#mission'), /Challenge/);
+  await page.click('[data-act="fill"]');
+  await page.waitForSelector('#editor:not([hidden])');
+  assert.equal(await page.inputValue('#edText'), fake[1].answer);
+  // echo 2 passes the test case but not the custom check: Save & run gives no completion
+  await page.fill('#edText', '#!/bin/bash\necho 2\n');
+  await page.click('#editor details summary');
+  await page.fill('#edStdin', 'a\nb\n');
+  await page.click('#edRun');
+  await waitScreen(/\$ bash scripts\/count\.sh\s*\n?\s*2/);
+  assert.equal(await lines(/Mission complete/), 0);
+  assert.equal(await xp(), '0 XP');
+  // a genuinely wrong one explains the failing case
+  await page.fill('#edText', fake[1].wrong[1]);
+  await page.click('#edRun');
+  await waitScreen(/Test 1 \(two lines\) failed: expected "2", got "3"/);
+  await page.fill('#edText', fake[1].answer);
+  await page.click('#edRun');
+  await waitScreen(/Mission complete: Counter\s+\+20 XP/);
+  assert.equal(await xp(), '20 XP', 'mission 1 is still open, so no badge yet');
+  assert.equal(await lines(/Badge earned/), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest script mission: starter is written once; revisiting the chapter keeps saved work; a deleted file reopens as new', async () => {
+  const { ctx, page, errors, type, waitScreen } = await fakeChapterPage();
+  const fake = await page.evaluate(() => window.SQ.content.chapters.at(-1).missions[0]);
+  const scripts = async () => page.evaluate(k => JSON.parse(localStorage.getItem(k)).fs.children.home.children.explorer.children.scripts.children['hi.sh'], SQ_KEY);
+  assert.equal((await scripts()).content, fake.starter);
+  await type('echo mine > scripts/hi.sh');
+  await waitScreen(/\$ echo mine > scripts\/hi\.sh/);
+  const idx = await page.evaluate(() => window.SQ.content.chapters.length - 1);
+  await page.click(`[data-ch="${idx}"]`);
+  await page.waitForFunction(() => /Greeter/.test(document.querySelector('#mission').textContent));
+  assert.equal((await scripts()).content, 'mine');
+  await type('rm scripts/hi.sh');
+  await page.click('[data-act="fill"]');
+  await page.waitForSelector('#editor:not([hidden])');
+  assert.equal(await page.getAttribute('#editor', 'data-is-new'), 'true');
+  await page.fill('#edText', fake.wrong[1]);
+  await page.fill('#edArgs', 'Ada');
+  await page.click('#edRun');
+  await waitScreen(/Test 1 \(with a name\) failed: expected "Hi Ada", got "Hello Ada"/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

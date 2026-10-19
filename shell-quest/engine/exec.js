@@ -105,5 +105,11 @@ function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,l
   read:p=>{const n=nd(p);return n&&n.type==='file'?n.content:''},
   flag:(e,ch)=>e.args.some(x=>/^-[A-Za-z]+$/.test(x)&&x.includes(ch)),
   out:()=>SQ.rt.lastOut||'',exists:p=>!!nd(p),runScript:(p,a,i)=>sandboxRun(p,a,i),scriptPasses}}
-Object.assign(SQ,{runPath,runCmd,execLine,ctxFor});
+/* A chapter's setup(), plus the `starter` text of its script/challenge missions: written only where the file is absent, so revisiting a chapter never clobbers saved work. */
+function setupChapter(ch){ch.setup();for(const m of ch.missions)if(m.file&&typeof m.starter==='string'&&(m.kind==='script'||m.kind==='challenge'))SQ.ensureFile(m.file,m.starter)}
+/* the one err line explaining a failed test case (scriptPasses().failed), at most 120 characters */
+const oneLine=(t,n)=>{t=t.replace(/\n/g,'\\n');return t.length>n?t.slice(0,n-3)+'...':t};
+function scriptFailLine(m,f){if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
+  return oneLine(`Test ${f.index+1} (${f.label}) failed: expected "${f.expected}", got "${f.got}"`,120)}
+Object.assign(SQ,{runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine});
 })(window.SQ = window.SQ || {});

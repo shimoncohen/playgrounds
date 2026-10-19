@@ -9,9 +9,14 @@ const screen=$('#screen'),cmdIn=$('#cmd'),promptEl=$('#prompt'),term=$('#term'),
 const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderText,promptHTML}=SQ.ui;
 let histIdx=S.hist.length;
 
-/* opts ({feedback}) is consumed by script missions (Task 10) */
-function checkMission(line,opts){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;
-  try{good=!!m.check(ctxFor(line))}catch(e){}if(!good)return;
+/* Script and challenge missions are re-checked on every call (a Save, a typed line, Save & run): scriptPasses bails out at once when the file is missing and runs in a sandbox.
+   A custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case. */
+const isScript=m=>m.kind==='script'||m.kind==='challenge';
+function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
+  try{const c=ctxFor(line);
+    if(typeof m.check==='function'){good=!!m.check(c);if(!good&&opts.feedback&&isScript(m)&&m.file&&m.tests)failed=c.scriptPasses(m).failed||null}
+    else if(isScript(m)&&m.file){const r=c.scriptPasses(m);good=!!r.ok;failed=r.failed||null}}catch(e){}
+  if(!good){if(failed&&opts.feedback)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
@@ -46,7 +51,7 @@ function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').f
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}
 
 function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
-  SQ.rt.changed=new Set();CH[i].setup();if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
+  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
 
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
@@ -82,12 +87,12 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
-  else if(a==='fill'&&m)fill(m.answer);
+  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs)})}else fill(m.answer)}
   else if(a==='nextch')goChapter(S.ch+1);
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;SQ.rt.changed=new Set();CH[S.ch].setup();SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
@@ -126,7 +131,7 @@ fStage.addEventListener('keydown',e=>{if(e.target.id==='fIn'&&e.key==='Enter'&&Q
 let armP=null;
 $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');if(t){showTab('quest');fill(t.dataset.try);return}
   if(e.target.id==='resetProgress'){const b=e.target;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase progress, XP and world';clearTimeout(armP);armP=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},3500);return}
-    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();CH[0].setup();SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
+    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
 
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');
@@ -136,7 +141,7 @@ function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash s
 SQ.rt.onSaveFail=()=>{addLine(renderText('Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'),'err');scrollDown()};
 
 /* boot */
-if(!S.seen){CH[S.ch].setup();S.seen=true}
+if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}
 SQ.rt.changed=new Set();
 welcome();if(S.hist.length)addLine(renderText(`Welcome back. You are on chapter ${S.ch+1}: ${CH[S.ch].name}.`),'tip');
 renderAll();renderGuide();fireIdle();save();

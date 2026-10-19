@@ -149,6 +149,7 @@ ul.tree.root{border:0;padding:0;margin:0}
 .row.hid{opacity:.55}
 .row.here{background:color-mix(in srgb,var(--accent) 22%,transparent)}
 .tag{font-size:10px;font-weight:700;background:var(--ok);color:var(--surface);border-radius:4px;padding:0 4px}
+.mtag{display:inline-block;vertical-align:middle;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--ok);color:var(--surface);border-radius:4px;padding:1px 6px;margin-left:6px}
 .pin{font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:.06em;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:1px 7px;margin-left:2px}
 .row.flash{animation:flash 1.6s ease}
 @keyframes flash{0%,30%{background:color-mix(in srgb,var(--ok) 40%,transparent)}100%{background:transparent}}
