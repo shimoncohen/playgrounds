@@ -144,8 +144,9 @@ function braceVal(body){let m;
   throw perr('${'+body+'}: bad substitution',1)}
 /* opt.dry: only find structure (no substitution, words keep their raw source); default: expand for real. opt.nosplit: substitution results stay one word. */
 function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* legacy: pre-Stage-2 lexing for the executor (( ) & newline ;; stay word characters, << and <<< unsupported) until the AST parser replaces it */
-  const toks=[],pending=[];let i=0,cur=null;
-  const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push({t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
+  const toks=[],pending=[],P=!!opt.pos;let i=0,cur=null;
+  if(P){const tp=toks.push.bind(toks);toks.push=t=>{if(t.t==='op'){t.s=(t.v==='<<'||t.v==='<<-')?i-t.v.length:i;t.e=t.s+t.v.length}return tp(t)}} /* opt.pos (AST parser): tokens carry source offsets s/e */
+  const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
   /* splice a substitution result into the current word, splitting it on whitespace; e = index of the expansion's last character */
   const inject=(val,e)=>{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
     if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
@@ -159,7 +160,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
       if(c==='\\'&&i+1<line.length){d+=line[i+1];q=true;i+=2;continue}
       d+=c;i++}
     if(!d)throw new Error("syntax error near unexpected token '"+(i<line.length?line[i]:'newline')+"'");
-    toks.push({t:'w',v:d,glob:false,raw:line.slice(s,i)});
+    toks.push(P?{t:'w',v:d,glob:false,raw:line.slice(s,i),s,e:i}:{t:'w',v:d,glob:false,raw:line.slice(s,i)});
     op.doc={raw:'',quoted:q,strip,delim:d,eof:true};pending.push(op.doc)};
   /* at the line break after the op(s): read each pending body in order, up to its delimiter line (linear: one indexOf per line) */
   const readDocs=()=>{for(const doc of pending){let body='';
@@ -171,7 +172,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
     pending.length=0};
   while(i<line.length){const c=line[i];
     if(c===' '||c==='\t'){push();i++;continue}
-    if(!L&&c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();continue}
+    if(!L&&c==='\n'){push();toks.push({t:'op',v:'\n'});i++;readDocs();if(P)toks[toks.length-1].e=i;continue}
     if(!L&&(c==='('||c===')')){push();toks.push({t:'op',v:c});i++;continue}
     if(!L&&c==='\\'&&line[i+1]==='\n'){i+=2;continue}
     if(c==='|'){push();if(line[i+1]==='&')throw unsup('|&');if(line[i+1]==='|'){toks.push({t:'op',v:'||'});i+=2}else{toks.push({t:'op',v:'|'});i++}continue}
