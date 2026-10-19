@@ -168,7 +168,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const fresh=()=>({v:'',glob:false,s:i});
   /* opt.pos only: (( ... )) and [[ ... ]] at command position are one raw span token, so << < > inside are never redirects or here-docs; null = not a span (unterminated or ((a); (b)) -> normal tokens) */
   const spanOk=()=>{const l=toks[toks.length-1];
-    return !l||(l.t==='op'?!/^(<|>|>>|2>|2>>|<<|<<-|<<<)$/.test(l.v):l.raw===l.v&&['then','do','else','elif','if','while','until','!','{'].includes(l.v))};
+    return !l||(l.t==='op'?!/^(<|>|>>|>&2|2>|2>>|<<|<<-|<<<)$/.test(l.v):l.raw===l.v&&['then','do','else','elif','if','while','until','!','{'].includes(l.v))};
   /* A scan that runs to EOF without closing is remembered per kind so repeated unterminated openers stay linear. Sound enough: an unterminated (( or [[ already makes the program an EOF syntax error, so later openers only affect token shape inside an erroneous program. */
   let noAr=false,noCo=false;
   const span=ar=>{let j=i+2,d=0;if(ar?noAr:noCo)return null;const eof=()=>{if(ar)noAr=true;else noCo=true;return null};
@@ -210,7 +210,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     if(c===';'){push();if(line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
     if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
-    if(c==='>'){push();if(line[i+1]==='&')throw unsup('>&');if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
+    if(c==='>'){push();if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
     if(c==='<'){push();
       if(line[i+1]==='<'){
         if(line[i+2]==='<'){toks.push({t:'op',v:'<<<'});i+=3;continue}
@@ -260,6 +260,7 @@ function parse(toks){
   for(let k=0;k<toks.length;k++){const t=toks[k];
     if(t.t==='w'){cmd.words.push(t);continue}
     if(t.v==='2>&1'){cmd.err={dup:true};continue}
+    if(t.v==='>&2'){cmd.out={toErr:true,after:!!cmd.err};continue} /* after: stderr was already redirected, so this stdout follows it (bash is left to right) */
     if(t.v==='>'||t.v==='>>'||t.v==='<'||t.v==='2>'||t.v==='2>>'){const nx=toks[k+1];if(!nx||nx.t!=='w')bad(nx?nx.v:'newline');
       if(t.v==='<')cmd.inp=nx;else if(t.v[0]==='2')cmd.err={path:nx.v,append:t.v==='2>>',w:nx};else cmd.out={path:nx.v,append:t.v==='>>',w:nx};k++;continue}
     if(t.v==='|'){if(!cmd.words.length)bad('|');pipe.push(cmd);cmd=nc();continue}

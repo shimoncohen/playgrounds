@@ -94,6 +94,11 @@ function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
     if(tc.expectMatch!==undefined){let re;
       try{re=SQ.safeRegex(String(tc.expectMatch),'')}catch(e){return fail(tc.expectMatch,'(unusable pattern: '+(e&&e.message)+')')}
       if(!re.test(out))return fail('/'+tc.expectMatch+'/',out)}
+    const errT=res.r.err.join('\n').replace(/\n$/,'');
+    if(tc.expectErr!==undefined&&errT!==tc.expectErr)return fail(tc.expectErr,errT);
+    if(tc.expectErrMatch!==undefined){let re;
+      try{re=SQ.safeRegex(String(tc.expectErrMatch),'')}catch(e){return fail(tc.expectErrMatch,'(unusable pattern: '+(e&&e.message)+')')}
+      if(!re.test(errT))return fail('/'+tc.expectErrMatch+'/',errT)}
     const want=tc.expectCode===undefined?0:tc.expectCode;
     if(res.r.code!==want)return fail('exit status '+want,'exit status '+res.r.code+(res.r.err.length?' ('+res.r.err.join('; ')+')':''));
     for(const [p,c] of Object.entries(tc.expectFiles||{}))if(res.files[p]!==String(c))return fail(c,res.files[p])}

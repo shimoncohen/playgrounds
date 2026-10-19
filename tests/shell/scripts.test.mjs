@@ -412,6 +412,25 @@ describe('scriptPasses', () => {
     const risky = c.scriptPasses({ file: 'greet.sh', tests: [{ stdin: 'q', expectMatch: '(a+)+$' }] });
     assert.equal(risky.ok, false);
   });
+  it('expectErr / expectErrMatch check the stderr lines (Task 11b)', () => {
+    const SQ = loadShell();
+    put(SQ, 'u.sh', 'echo "usage: u.sh NAME" >&2\necho fine\nexit 1');
+    const c = SQ.ctxFor('x');
+    const t = (o) => c.scriptPasses({ file: 'u.sh', tests: [Object.assign({ expectCode: 1 }, o)] });
+    assert.equal(t({ expectOut: 'fine', expectErr: 'usage: u.sh NAME' }).ok, true);
+    assert.equal(t({ expectErrMatch: '^usage' }).ok, true);
+    const bad = t({ expectErr: 'nope' });
+    assert.equal(bad.ok, false);
+    assert.deepEqual([bad.failed.expected, bad.failed.got], ['nope', 'usage: u.sh NAME']);
+    const bm = t({ expectErrMatch: '^nope' });
+    assert.equal(bm.ok, false);
+    assert.deepEqual([bm.failed.expected, bm.failed.got], ['/^nope/', 'usage: u.sh NAME']);
+    assert.equal(t({ expectErrMatch: '(a+)+$' }).ok, false);
+    put(SQ, 'q.sh', 'echo hi');
+    const q = SQ.ctxFor('x').scriptPasses({ file: 'q.sh', tests: [{ expectErr: '' }] });
+    assert.equal(q.ok, true);
+    assert.equal(SQ.ctxFor('x').scriptPasses({ file: 'q.sh', tests: [{ expectErrMatch: 'usage' }] }).ok, false);
+  });
   it('expectCode defaults to 0', () => {
     const SQ = loadShell();
     put(SQ, 's.sh', 'echo hi\nexit 3');

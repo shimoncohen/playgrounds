@@ -3,7 +3,7 @@
    Standalone (not yet wired into the executor). Nodes carry src = exact source slice. Errors: code 2, raw:false (syntax) / raw:true (unsupported). */
 const MAX_DEPTH=100;
 const CLOSERS=new Set(['then','elif','else','fi','do','done','esac','}']);
-const REDIR_OPS=new Set(['>','>>','<','2>','2>>','2>&1','<<','<<-','<<<']);
+const REDIR_OPS=new Set(['>','>>','<','2>','2>>','2>&1','>&2','<<','<<-','<<<']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
 const fail=(m,raw)=>Object.assign(new Error(m),{code:2,raw:!!raw});
 const bad=t=>fail("syntax error near unexpected token '"+(t===undefined||t==='\n'?'newline':t)+"'");
@@ -56,6 +56,7 @@ function parseProgram(text){
   /* one redirect operator at tk(), merged into r (parse() shapes: out/err {path,append,w}, inp token, err {dup}) */
   function redirect(r){const o=next();
     if(o.v==='2>&1'){r.err={dup:true};return}
+    if(o.v==='>&2'){r.out={toErr:true,after:!!r.err};return}
     const w=tk();if(!w)throw bad('newline');
     if(w.t!=='w')throw bad(show(w));
     next();

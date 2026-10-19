@@ -144,3 +144,76 @@ describe('substitution is a subshell', () => {
     assert.equal(run(SQ, 'echo clean').out, 'clean');
   });
 });
+
+// Task 11b: >&2 and 1>&2 send a command's stdout to the stderr stream
+describe('>&2 redirect', () => {
+  // [stdout lines, stderr lines, code] from the raw result (the harness run() merges both)
+  const split = (SQ, line) => {
+    SQ.rt.log = [];
+    SQ.rt.changed = new Set();
+    const r = SQ.execLine(line);
+    const f = (cls) => r.out.filter((o) => o.cls === cls).map((o) => o.text).join('\n');
+    return { out: f('out'), err: f('err'), code: r.code };
+  };
+  it('echo hi >&2 prints on stderr, status 0', () => {
+    assert.deepEqual(split(loadShell(), 'echo hi >&2'), { out: '', err: 'hi', code: 0 });
+  });
+  it('1>&2 is the same', () => {
+    assert.deepEqual(split(loadShell(), 'echo hi 1>&2'), { out: '', err: 'hi', code: 0 });
+    assert.deepEqual(split(loadShell(), 'echo hi >&2;echo ok'), { out: 'ok', err: 'hi', code: 0 });
+  });
+  it('in a pipeline the text goes to the screen and the next stage gets nothing', () => {
+    assert.deepEqual(split(loadShell(), 'echo hi >&2 | cat'), { out: '', err: 'hi', code: 0 });
+    assert.equal(split(loadShell(), 'echo hi >&2 | wc -c').out.trim(), '0');
+  });
+  it('2>/dev/null hides it (group and simple)', () => {
+    const SQ = loadShell();
+    assert.deepEqual(split(SQ, '{ echo a; echo b >&2; } 2>/dev/null'), { out: 'a', err: '', code: 0 });
+    assert.deepEqual(split(SQ, 'echo hi >&2 2>/dev/null'), { out: '', err: 'hi', code: 0 });
+  });
+  it('2> file after >&2 leaves stdout on the screen; 2> file BEFORE it sends stdout to the file too', () => {
+    const SQ = loadShell();
+    assert.deepEqual(split(SQ, 'echo hi >&2 2>f'), { out: '', err: 'hi', code: 0 });
+    assert.equal(run(SQ, 'cat f').out, '');
+    assert.deepEqual(split(SQ, 'echo hi 2>g >&2'), { out: '', err: '', code: 0 });
+    assert.equal(run(SQ, 'cat g').out, 'hi');
+  });
+  it('compound commands take >&2', () => {
+    const SQ = loadShell();
+    assert.deepEqual(split(SQ, '{ echo a; echo b; } >&2'), { out: '', err: 'a\nb', code: 0 });
+    assert.deepEqual(split(SQ, 'if true; then echo y; fi >&2'), { out: '', err: 'y', code: 0 });
+    assert.deepEqual(split(SQ, 'for i in 1 2; do echo $i; done >&2'), { out: '', err: '1\n2', code: 0 });
+    assert.deepEqual(split(SQ, '{ echo a; echo b >&2; } >&2 | cat'), { out: '', err: 'a\nb', code: 0 });
+  });
+  it('the last stdout redirect wins', () => {
+    const SQ = loadShell();
+    assert.deepEqual(split(SQ, 'echo hi >&2 > f'), { out: '', err: '', code: 0 });
+    assert.equal(run(SQ, 'cat f').out, 'hi');
+    assert.deepEqual(split(SQ, 'echo yo > h >&2'), { out: '', err: 'yo', code: 0 });
+  });
+  it('2>&1 combinations follow bash left to right', () => {
+    const SQ = loadShell();
+    // both streams end up on the screen
+    assert.deepEqual(split(SQ, 'ls nothing >&2 2>&1'), { out: '', err: "ls: cannot access 'nothing': No such file or directory", code: 2 });
+    // 2>&1 >&2 swaps the two: the error goes down the pipe, stdout to the screen
+    assert.deepEqual(split(SQ, 'ls nothing 2>&1 >&2 | wc -l'), { out: '1', err: '', code: 0 });
+    assert.deepEqual(split(SQ, 'echo hi 2>&1 >&2 | wc -l'), { out: '0', err: 'hi', code: 0 });
+    assert.deepEqual(split(SQ, 'echo hi >&2 2>&1 | wc -l'), { out: '0', err: 'hi', code: 0 });
+  });
+  it('the unsupported forms still say so', () => {
+    const SQ = loadShell();
+    for (const l of ['echo hi &> f', 'echo hi >&-', 'echo hi 3>&1', 'echo hi >&1', 'echo hi >&3', 'echo hi |& cat'])
+      assert.equal(run(SQ, l).out.startsWith('this practice shell does not support'), true, l);
+    assert.equal(run(SQ, 'echo hi >&1').out, 'this practice shell does not support >& yet');
+    assert.equal(run(SQ, 'echo hi >&1').code, 2);
+  });
+  it('a script writing to stderr: err lines, exit code kept', () => {
+    const SQ = loadShell();
+    run(SQ, 'echo \'echo "usage: s.sh NAME" >&2; echo out; exit 1\' > s.sh');
+    const r = SQ.runScript('s.sh', { force: true, tty: false });
+    assert.deepEqual({ out: r.out, err: Array.from(r.err), code: r.code }, { out: 'out', err: ['usage: s.sh NAME'], code: 1 });
+    const b = split(SQ, 'bash s.sh');
+    assert.equal(b.code, 1);
+    assert.equal(b.err, 'usage: s.sh NAME');
+  });
+});

@@ -557,5 +557,15 @@
     "reason": "Task 9: nano/vi/vim are real commands that open the page editor (no file is created until Save); the engine returns no text and exit code 0",
     "out": "",
     "code": 0
+  },
+  "echo hi >&2": {
+    "reason": "Task 11b: >&2 / 1>&2 send a command's stdout to the stderr stream; the line now prints hi (on stderr) with status 0",
+    "out": "hi",
+    "code": 0
+  },
+  "echo hi 1>&2": {
+    "reason": "Task 11b: >&2 / 1>&2 send a command's stdout to the stderr stream; the line now prints hi (on stderr) with status 0",
+    "out": "hi",
+    "code": 0
   }
 }

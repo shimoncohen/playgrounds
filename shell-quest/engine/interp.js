@@ -67,7 +67,8 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     if(sv0&&i>0)back();
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
-    try{if(R.out)out={path:expandOne(R.out.w),append:R.out.append};if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
+    let toErr=null;
+    try{if(R.out){if(R.out.toErr)toErr=R.out;else out={path:expandOne(R.out.w),append:R.out.append}}if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
       if(R.herestr||R.doc)here=hereText(R,res)}
     catch(e){if(e&&e.stop)throw e;res.push(...CTX.pend.splice(0),{text:(e.raw?'':'bash: ')+e.message,cls:'err'});code=e.code||2;break}
     res.push(...CTX.pend.splice(0));
@@ -86,19 +87,24 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
       r=SQ.runCmd(c.words,io);
-      if(r.list&&last&&!out&&!err){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
+      if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
       if(cr.ui&&last)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
-      if(last&&!out&&!err){res.push(...cr.out);code=cr.code;continue}
+      if(last&&!out&&!err&&!toErr){res.push(...cr.out);code=cr.code;continue}
       r=asCmd(cr)}
     if(r.ui&&last)ui=r.ui; /* only the last stage may open the editor: nano f | cat does not */
     if(P.length===1&&r.ctl)ctl=r.ctl;
     if(r.clear)res.push({clear:true});
-    let errs=r.err.slice(),tips=r.tips||[],text=r.out;
-    if(err){if(err.dup){if(errs.length)text=[text,...errs].filter(x=>x!=='').join('\n')}
-      else if(errs.length){const e=writeFile(norm(err.path),errs.join('\n'),err.append,err.path);if(e)res.push({text:e,cls:'err'})}
-      errs=[];if(!err.dup)tips=[]}
+    let errs=r.err.slice(),tips=r.tips||[],text=r.out,errR=err;
+    if(toErr){ /* >&2: this command's stdout joins the stderr stream. `2>&1 >&2` (after) swaps the two; `2>f >&2` sends both to f; `>&2 2>&1` leaves both on the screen. */
+      const extra=text!==''?[text]:[];text='';
+      if(errR&&errR.dup&&toErr.after){text=errs.join('\n');errs=[];res.push(...extra.map(t=>({text:t,cls:'err'})));errR=null}
+      else if(errR&&errR.path&&toErr.after){errs=extra.concat(errs)}
+      else{if(errR&&errR.dup)errR=null;res.push(...extra.map(t=>({text:t,cls:'err'})))}}
+    if(errR){if(errR.dup){if(errs.length)text=[text,...errs].filter(x=>x!=='').join('\n')}
+      else if(errs.length){const e=writeFile(norm(errR.path),errs.join('\n'),errR.append,errR.path);if(e)res.push({text:e,cls:'err'})}
+      errs=[];if(!errR.dup)tips=[]}
     errs.forEach(e=>res.push({text:e,cls:'err'}));tips.forEach(e=>res.push({text:e,cls:'tip'}));
     code=r.code;
     if(out){const e=writeFile(norm(out.path),text,out.append,out.path);if(e){res.push({text:e,cls:'err'});code=1}stdin=''}
