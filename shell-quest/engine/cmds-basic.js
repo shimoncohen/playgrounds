@@ -124,7 +124,7 @@ const CMDS={
   whoami:()=>ok('explorer'),
   hostname:()=>ok('basecamp'),
   date(){const d=new Date(),p=d.toDateString().split(' ');return ok(`${p[0]} ${p[1]} ${p[2]} ${d.toTimeString().slice(0,8)} ${p[3]}`)},
-  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return SQ.runPath(a[0],io,true)},
+  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return SQ.runPath(a[0],io,true,a.slice(1))},
   sh(a,io){return CMDS.bash(a,io)},
   help:()=>ok(['Commands in this practice shell:',
     '  Look around   pwd  ls  cd  tree  cat',

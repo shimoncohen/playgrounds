@@ -48,7 +48,7 @@ SQ.S=S;
 /* S.fns (function name -> body source text) is lazy like S.exp: absent until the first definition, always read as S.fns||{}. It is saved with S. */
 SQ.fresh=fresh;
 SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];Object.assign(S,next)};
-SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,onSaveFail:null,frames:[]};
+SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[]};
 /* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame.
    locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
@@ -90,7 +90,7 @@ function safeRegex(src,flags){if(regexRisky(src)){const e=new Error('pattern too
 
 try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw);if(o&&o.fs)SQ.resetState(Object.assign(fresh(),o))}}catch(e){}
 /* A failed save (quota, blocked storage) is no longer silent: SQ.rt.saveFailed is set and the UI is told once through SQ.rt.onSaveFail. */
-function save(){try{S.hist=S.hist.slice(-200);localStorage.setItem(KEY,JSON.stringify(S));SQ.rt.saveFailed=false}
+function save(){if(SQ.rt.sandboxed)return;try{S.hist=S.hist.slice(-200);localStorage.setItem(KEY,JSON.stringify(S));SQ.rt.saveFailed=false}
   catch(e){if(!SQ.rt.saveFailed){SQ.rt.saveFailed=true;if(SQ.rt.onSaveFail)SQ.rt.onSaveFail(e)}}}
 function stateText(n){if(!n)return 0;if(n.type==='file')return n.content.length;let t=0;if(n.type==='dir')for(const k of Object.keys(n.children))t+=stateText(n.children[k]);return t}
 

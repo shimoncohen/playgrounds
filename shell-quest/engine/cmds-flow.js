@@ -53,7 +53,7 @@ function condTokens(raw){
       if(rxNext){if(ch==='(')depth++;else if(ch===')'){if(depth===0)break;depth--}else if(/\s/.test(ch)&&depth===0)break}
       else if(/[\s()<>&|]/.test(ch))break;
       j++}}
-    catch(e){if(e.cond||e.raw)throw e;throw syn()}
+    catch(e){if(e.raw)throw e;throw syn()}
     if(j>n)j=n;
     const w=raw.slice(i,j);T.push({raw:w});i=j;rxNext=!rxNext&&w==='=~'?true:false}
   return T}

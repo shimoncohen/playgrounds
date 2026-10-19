@@ -103,8 +103,8 @@
     "out": "1   0"
   },
   "echo \"echo \\$# args\" > x.sh\nbash x.sh a b c": {
-    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
-    "out": "0 args"
+    "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (positional/special parameter ($1 $2 $@ $# $0 $* $$)); Task 8: bash FILE ARGS passes the arguments",
+    "out": "3 args"
   },
   "echo \"echo \\${X:-d}\" > x.sh\nbash x.sh": {
     "reason": "Task 3: parameter expansion, special parameters and $(( )) now work (parameter expansion ${X:-d} ${#X} ${X%..})",
@@ -124,12 +124,10 @@
     "code": 0
   },
   "for i in 1 2 3; do echo $i; done | wc -l": {
-    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone); Task 8: a pipeline stage is a subshell for variables, so the loop variable does not stay set",
     "out": "3",
     "code": 0,
-    "vars": {
-      "i": "3"
-    }
+    "vars": {}
   },
   "for i in 1 2; do echo $i; done > loop.txt": {
     "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
@@ -274,12 +272,10 @@
     "code": 0
   },
   "for i in $(seq 1 5000); do echo $i; done | wc -l": {
-    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone)",
+    "reason": "Task 6a: for is a real compound now: pipes, redirects and chains after done work (the for-shape message is gone); Task 8: a pipeline stage is a subshell for variables, so the loop variable does not stay set",
     "out": "5000",
     "code": 0,
-    "vars": {
-      "i": "5000"
-    }
+    "vars": {}
   },
   "cat << EOF": {
     "reason": "Task 6a: here-documents run; one cut off by end of input warns like bash and still runs",
@@ -466,12 +462,10 @@
     "code": 1
   },
   "echo hi | read X": {
-    "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it)",
+    "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it); Task 8: a pipeline stage is a subshell for variables (as in bash), so X stays unset",
     "out": "",
     "code": 0,
-    "vars": {
-      "X": "hi"
-    }
+    "vars": {}
   },
   "shift": {
     "reason": "Task 7: shift is a builtin (nothing to shift at the base shell: status 1)",
@@ -540,5 +534,13 @@
     "reason": "Task 7: read is a builtin (no stdin on a typed line prints the cannot-wait-for-typing message, status 1; a pipe or here-string feeds it)",
     "out": "read: this practice shell cannot wait for typing. Pipe input in (echo Ada | read name) or use a here-string: read name <<< Ada",
     "code": 1
+  },
+  "echo \"echo \\$1\" > x.sh\nbash x.sh arg": {
+    "reason": "Task 8: bash FILE ARGS passes $1.. to the script (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "arg"
+  },
+  "echo \"echo \\$1 \\$2\" > x.sh\nbash x.sh a b": {
+    "reason": "Task 8: bash FILE ARGS passes $1.. to the script (positional/special parameter ($1 $2 $@ $# $0 $* $$))",
+    "out": "a b"
   }
 }

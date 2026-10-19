@@ -58,7 +58,13 @@ function hereText(R,res){
 function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
   const P=Pn.cmds,{norm,getNode,writeFile,isNull}=SQ;
   let stdin='';
+  /* every stage of a multi-command pipeline is a subshell for variables, exports and functions (echo Ada | read x leaves x unset, like bash). The directory is NOT
+     restored: the corpus pins `cd forest | cat` leaving the shell in forest (an unmarked entry), so that bash difference stays. Files and $? come out of a stage as before. */
+  const sv0=P.length>1?snapshotShell():null;
+  const back=()=>{const l=S.last;restoreShell({cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),last:l,frames:sv0.frames})};
+  try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
+    if(sv0&&i>0)back();
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
     try{if(R.out)out={path:expandOne(R.out.w),append:R.out.append};if(R.inp)inp=expandOne(R.inp);if(R.err)err=R.err.dup?R.err:{path:expandOne(R.err.w),append:R.err.append};
@@ -97,6 +103,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     if(out){const e=writeFile(norm(out.path),text,out.append,out.path);if(e){res.push({text:e,cls:'err'});code=1}stdin=''}
     else if(last){if(text!=='')res.push({text,cls:'out'})}
     else stdin=text}
+  }finally{if(sv0)back()}
   if(Pn.negate)code=code===0?1:0;
   S.last=code;
   const o={out:res,code};if(ctl)o.ctl=ctl;if(ui)o.ui=ui;return o}
@@ -231,6 +238,40 @@ function runSourced(name,text,args,io){
   const o=asCmd(r);o.code=end?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
   if(r.ctl&&!end)o.ctl=r.ctl;
   return o}
+/* ---------- scripts ----------
+   runScript(path, {args,stdin,stdinBox,depth,tty,force,record}) -> {out,err,code}: `bash FILE ARGS` and ./FILE. A child process: it sees only the exported variables
+   (no functions), has its own $0 (the path as typed), $1.., and the caller's cwd/vars/exports/functions/status come back when it ends. The whole file is parsed first:
+   a syntax error prints once and nothing runs. `exit n` ends it with status n. Files it writes stay. depth = the caller's depth. */
+function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false,record:false},o);
+  const {norm,getNode,bname,E}=SQ,abs=norm(path),n=getNode(abs);
+  if(!n)return E(SQ.isLoop(abs)?`bash: ${path}: Too many levels of symbolic links`:`bash: ${path}: No such file or directory`,127);
+  if(n.type==='dir')return E(`bash: ${path}: Is a directory`,126);
+  if(!o.force&&!n.exec)return Object.assign(E(`bash: ${path}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
+  if(o.depth+1>6)return E('bash: too many nested scripts',1);
+  let prog;try{prog=parsedBody(n.content)}catch(e){if(e&&e.stop)throw e;return E(errOf(e),e.code||2)}
+  const box=o.stdinBox||(o.stdin!=null?{text:String(o.stdin),pos:0}:null);
+  const sv=snapshotShell(),callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
+  delete S.fns;
+  const fr=SQ.rt.frames,at=fr.length;fr.push({name:path,args:o.args.slice(),kind:'script',locals:new Map()});
+  const out=[],err=[];let code=0;
+  try{const r=runProgram(prog,{depth:o.depth+1,tty:o.tty,record:o.record,stdin:box,loops:0});
+    for(const x of r.out){if(x.clear)continue;(x.cls==='out'?out:err).push(x.text)}
+    code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code}
+  finally{fr.length=Math.min(fr.length,at);restoreShell(sv)}
+  return {out:out.join('\n'),err,code}}
+
+/* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...) and the per-line runtime state come back
+   afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
+function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
+  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,outChars:rt.outChars,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
+  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.outChars=0;rt.sandboxed=true;
+  try{return fn()}
+  finally{const back=JSON.parse(snap);
+    for(const k of Object.keys(S))if(!(k in back))delete S[k];
+    for(const k of Object.keys(back))S[k]=back[k];
+    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,outChars:keep.outChars,sandboxed:!!keep.sandboxed});
+    CTX.pend.length=0;CTX.pend.push(...keep.pend);CTX.depth=keep.depth}}
+
 /* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */
 const fnFrame=()=>{const f=SQ.rt.frames;const t=f[f.length-1];return t&&(t.kind==='function'||t.kind==='source')?t:null};
 /* `local` belongs to the nearest function frame; a sourced file called from a function shares that function's scope */
@@ -250,5 +291,5 @@ function returnBuiltin(a){
     n=((Number(a[0])%256)+256)%256}
   return {out:'',err:[],code:n,ctl:{type:'return',n}}}
 
-Object.assign(SQ,{runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
+Object.assign(SQ,{runScript,sandbox,runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
 })(window.SQ=window.SQ||{});

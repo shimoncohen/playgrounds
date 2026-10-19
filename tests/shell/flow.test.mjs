@@ -413,3 +413,18 @@ describe('builtin list: type, which, suggest', () => {
     assert.match(out('hed'), /Did you mean: head\?/);
   });
 });
+
+describe('break and continue errors (Task 8 review minors)', () => {
+  it('break 0 and break abc inside a loop', () => {
+    assert.equal(out('for i in 1 2; do break 0; done'), 'bash: break: 0: loop count out of range');
+    assert.equal(code('for i in 1 2; do break 0; done'), 1);
+    assert.equal(out('for i in 1 2; do break abc; done'), 'bash: break: abc: numeric argument required');
+    assert.equal(code('for i in 1 2; do break abc; done'), 1);
+    assert.equal(out('for i in 1 2; do continue 0; done'), 'bash: continue: 0: loop count out of range');
+  });
+  it('break and continue outside a loop', () => {
+    assert.equal(out('break'), "bash: break: only meaningful in a `for', `while', or `until' loop");
+    assert.equal(code('break'), 0);
+    assert.equal(out('continue'), "bash: continue: only meaningful in a `for', `while', or `until' loop");
+  });
+});
