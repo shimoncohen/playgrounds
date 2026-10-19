@@ -1,0 +1,193 @@
+// Browser smoke tests: every page loads without errors, and the progress backup
+// (export, import, linked save file) behaves. Run with `npm test`.
+// Set PW_CHROMIUM to use a specific Chromium binary instead of Playwright's own.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor'];
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
+
+let server, base, browser, tmp;
+
+before(async () => {
+  server = http.createServer((req, res) => {
+    let p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+    if (!p.startsWith(ROOT)) { res.writeHead(403).end(); return; }
+    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
+    if (!fs.existsSync(p)) { res.writeHead(404).end('not found'); return; }
+    res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }).end(fs.readFileSync(p));
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  base = `http://localhost:${server.address().port}`;
+  browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-'));
+});
+after(async () => { await browser?.close(); server?.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
+
+async function open(url, opts = {}) {
+  const ctx = await browser.newContext({ acceptDownloads: true, ...opts });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('dialog', d => d.accept());
+  await page.goto(url);
+  return { ctx, page, errors };
+}
+// Poll an async condition (waitForFunction doesn't reliably await async predicates).
+async function until(fn, ms = 8000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (await fn()) return; await new Promise(r => setTimeout(r, 100)); }
+  throw new Error('condition not met within ' + ms + 'ms');
+}
+const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
+
+test('landing page links to every playground', async () => {
+  const { ctx, page, errors } = await open(base + '/');
+  const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
+  assert.deepEqual(hrefs.sort(), NAMES.map(n => `${n}-quest/`).sort());
+  for (const h of hrefs) {
+    const r = await page.request.get(`${base}/${h}`);
+    assert.equal(r.status(), 200, h);
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('landing page shows saved XP', async () => {
+  const { ctx, page } = await open(base + '/');
+  await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
+  await page.reload();
+  assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
+  await ctx.close();
+});
+
+for (const name of NAMES) {
+  test(`${name}-quest loads cleanly`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+    await page.waitForSelector('#mission');
+    assert.ok((await page.textContent('#mission')).trim().length > 20, 'mission card is empty');
+    assert.ok(await page.$('.pg-trigger'), 'Progress button missing');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
+  test(`${name}-quest progress survives export, wipe and import`, async () => {
+    const key = `${name}-quest-v1`;
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+    await page.waitForSelector('#mission');
+    // Get a real saved state first (some apps only save after an action).
+    if (await read(page, key) === null && !(await page.$('#cmd'))) {
+      await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ xp: 0, done: {} })), key);
+    }
+    if (await read(page, key) === null) {
+      await page.fill('#cmd', name === 'harbor' ? 'docker ps' : 'pwd');
+      await page.press('#cmd', 'Enter');
+      await page.waitForFunction(k => localStorage.getItem(k) !== null, key);
+    }
+    const state = JSON.parse(await read(page, key));
+    state.xp = 77; state.done = { '0-0': true, '0-1': true };
+    // The app keeps its own copy of the state and saves it (some after a short delay), which would
+    // overwrite a seed written behind its back. Write the seed, block any later writes from this
+    // page, then reload so the app starts from the seeded state.
+    await page.evaluate(([k, v]) => {
+      Storage.prototype.setItem.call(localStorage, k, v);
+      Storage.prototype.setItem = () => {};
+    }, [key, JSON.stringify(state)]);
+    await page.reload();
+    await page.waitForSelector('#mission');
+    assert.equal(JSON.parse(await read(page, key)).xp, 77, 'seed did not stick');
+
+    await page.click('.pg-trigger');
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
+    const file = path.join(tmp, `${name}.json`);
+    await dl.saveAs(file);
+    assert.equal(dl.suggestedFilename(), `${name}-quest-progress.json`);
+    const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(exported.app, `${name}-quest`);
+    assert.equal(exported.data.xp, 77);
+
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
+    await page.click('.pg-trigger');
+    await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
+    await page.waitForSelector('#mission');
+    assert.equal(JSON.parse(await read(page, key)).xp, 77);
+    assert.match(await page.textContent('#xpText'), /77/);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('import rejects another playground\'s file and garbage', async () => {
+  const { ctx, page } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  const send = async body => {
+    const f = path.join(tmp, 'x.json'); fs.writeFileSync(f, body);
+    await page.setInputFiles('.pg-file', f);
+    await page.waitForFunction(() => document.querySelector('.pg-msg').textContent.length > 0);
+    return page.textContent('.pg-msg');
+  };
+  assert.match(await send(JSON.stringify({ format: 'playgrounds-progress', app: 'python-quest', data: { xp: 1 } })), /belongs to/);
+  assert.match(await send('not json'), /valid JSON/);
+  await ctx.close();
+});
+
+test('linked save file: follows saves, restores after wipes', async () => {
+  const key = 'shell-quest-v1';
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  // Stand-in for the OS file picker: a file in the browser's private storage (supports the same writable API).
+  const stub = () => {
+    const h = async () => (await navigator.storage.getDirectory()).getFileHandle('linked.json', { create: true });
+    window.showSaveFilePicker = h;
+    window.showOpenFilePicker = async () => [await h()];
+  };
+  await ctx.addInitScript(stub);
+  await page.reload();
+  await page.waitForSelector('#cmd');
+  const fileText = () => page.evaluate(async () => (await (await (await navigator.storage.getDirectory()).getFileHandle('linked.json')).getFile()).text());
+
+  await page.fill('#cmd', 'pwd'); await page.press('#cmd', 'Enter');
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k) || '{}').xp > 0, key);
+  await page.click('.pg-trigger'); await page.click('text=Create save file');
+  await page.waitForSelector('.pg-state.pg-ok');
+  assert.equal(JSON.parse(await fileText()).app, 'shell-quest');
+
+  await page.click('.pg-trigger'); // close the panel
+  await page.fill('#cmd', 'ls'); await page.press('#cmd', 'Enter');
+  const local = () => read(page, key);
+  await until(async () => {
+    const mine = JSON.parse(await local());
+    return mine.hist.includes('ls') && JSON.stringify(JSON.parse(await fileText()).data) === JSON.stringify(mine);
+  });
+  const saved = await local();
+
+  // localStorage wiped, link kept (IndexedDB): restores on load.
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k) || '{}').xp > 0, key);
+  assert.equal(await local(), saved);
+
+  // Everything wiped, including the link: "Open existing file" brings it back.
+  await page.evaluate(async () => {
+    localStorage.clear();
+    await new Promise(r => { const q = indexedDB.deleteDatabase('playgrounds-progress'); q.onsuccess = q.onerror = q.onblocked = r; });
+  });
+  await page.reload();
+  await page.waitForSelector('#cmd');
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.click('text=Open existing file')]);
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem(k) || '{}').xp > 0, key);
+  assert.equal(await local(), saved);
+  await page.click('.pg-trigger');
+  await page.waitForSelector('.pg-state.pg-ok');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

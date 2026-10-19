@@ -1,0 +1,29 @@
+name: Publish site
+
+# Publishes the site root to the gh-pages branch, which GitHub Pages serves.
+# Pull request previews live under pr-preview/ on the same branch (see pr-preview.yml)
+# and are left alone here.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Publish the site root
+        run: tools/publish_site.sh main
