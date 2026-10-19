@@ -444,3 +444,17 @@ describe('parseProgram: (( )) and [[ ]] are raw spans', () => {
     assert.equal(P('! ! ! x').items[0].andor.first.negate, true);
   });
 });
+
+describe('parseProgram: unterminated spans stay linear', () => {
+  const timed = (s) => { const t0 = Date.now(); const e = err(s); assert.ok(Date.now() - t0 < 500, 'slow: ' + (Date.now() - t0) + 'ms'); return e; };
+  it("'(( ' x 40000", () => assert.match(timed('(( '.repeat(40000)).message, /unexpected end of file|nesting too deep|program too large/));
+  it('(( a newline x 5000', () => assert.equal(timed('(( a\n'.repeat(5000)).message, 'syntax error: unexpected end of file'));
+  it("'[[ ' x 40000 and unterminated quotes", () => {
+    timed('[[ '.repeat(40000));
+    timed('(( "a\n'.repeat(5000));
+  });
+  it('tokenizer alone is linear too', () => {
+    const t0 = Date.now(); SQ.tokenize('(( '.repeat(40000), { dry: true, pos: true });
+    assert.ok(Date.now() - t0 < 500);
+  });
+});

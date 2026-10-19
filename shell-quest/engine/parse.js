@@ -155,14 +155,16 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry,L=!!opt.legacy; /* l
   /* opt.pos only: (( ... )) and [[ ... ]] at command position are one raw span token, so << < > inside are never redirects or here-docs; null = not a span (unterminated or ((a); (b)) -> normal tokens) */
   const spanOk=()=>{const l=toks[toks.length-1];
     return !l||(l.t==='op'?!/^(<|>|>>|2>|2>>|<<|<<-|<<<)$/.test(l.v):l.raw===l.v&&['then','do','else','elif','if','while','until','!','{'].includes(l.v))};
-  const span=ar=>{let j=i+2,d=0;
+  /* A scan that runs to EOF without closing is remembered per kind so repeated unterminated openers stay linear. Sound enough: an unterminated (( or [[ already makes the program an EOF syntax error, so later openers only affect token shape inside an erroneous program. */
+  let noAr=false,noCo=false;
+  const span=ar=>{let j=i+2,d=0;if(ar?noAr:noCo)return null;const eof=()=>{if(ar)noAr=true;else noCo=true;return null};
     for(;j<line.length;j++){const c=line[j];
-      if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)return null;j=k;continue}
-      if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;j++}if(j>=line.length)return null;continue}
+      if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)return eof();j=k;continue}
+      if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;j++}if(j>=line.length)return eof();continue}
       if(c==='\\'){j++;continue}
       if(ar){if(c==='(')d++;else if(c===')'){if(d>0)d--;else if(line[j+1]===')')return {t:'arith',raw:line.slice(i+2,j).trim(),s:i,e:j+2};else return null}}
       else if(c===']'&&line[j+1]===']'&&/\s/.test(line[j-1])&&(j+2>=line.length||/[\s;&|)<>]/.test(line[j+2])))return {t:'cond',raw:line.slice(i+2,j).trim(),s:i,e:j+2}}
-    return null};
+    return eof()};
   /* here-doc delimiter word after << / <<-: quotes and backslashes are removed and make the body literal; the word follows the op as a plain word token */
   const heredocWord=(op,strip)=>{while(line[i]===' '||line[i]==='\t')i++;
     const s=i;let d='',q=false;
