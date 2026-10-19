@@ -50,7 +50,7 @@ const QF=[
  ["Print bigger if 7 is greater than 2",["[ 7 -gt 2 ] && echo bigger","test 7 -gt 2 && echo bigger","[[ 7 -gt 2 ]] && echo bigger"],'advanced'],
  ["Print empty if the variable NAME is empty (quote it)",["[ -z \"$NAME\" ] && echo empty","test -z \"$NAME\" && echo empty","[[ -z \"$NAME\" ]] && echo empty"],'advanced',{exact:true}],
  ["Print hi when $USER is explorer, using case",["case \"$USER\" in explorer) echo hi;; esac","case $USER in explorer) echo hi;; esac"],'advanced'],
- ["Print yes if $USER starts with ex, using [[ and a pattern",["[[ \"$USER\" == ex* ]] && echo yes","[[ \"$USER\" = ex* ]] && echo yes"],'advanced',{exact:true}],
+ ["Print yes if $USER starts with ex, using [[ and a pattern",["[[ \"$USER\" == ex* ]] && echo yes","[[ \"$USER\" = ex* ]] && echo yes","[[ $USER == ex* ]] && echo yes","[[ $USER = ex* ]] && echo yes"],'advanced',{exact:true}],
  ["Print 6 times 7 using $(( ))",["echo $((6*7))","echo $(( 6 * 7 ))","echo $((6 * 7))","echo \"$((6*7))\""],'advanced'],
  ["Add 1 to the variable i using $(( ))",["i=$((i+1))","i=$(( i + 1 ))","i=$((i + 1))","i=$(($i+1))"],'advanced'],
  ["Print the remainder of 17 divided by 5",["echo $((17%5))","echo $(( 17 % 5 ))","echo $((17 % 5))"],'advanced'],
