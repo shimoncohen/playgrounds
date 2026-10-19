@@ -157,7 +157,7 @@ describe('advanced chapters 12 and 13: shape', () => {
     }
     for (const g of SQ.content.guide.filter((g) => g.ch === 11 || g.ch === 12))
       for (const [e] of g.ex) assert.doesNotMatch(e, /\[\s+\$\w/, `guide ${g.c}: ${e}`);
-    for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced')) for (const a of q[1]) assert.doesNotMatch(a, /\[\s+\$\w/, a);
+    for (const q of SQ.content.quickfire.filter((q) => q[2] === 'advanced')) for (const a of q[1]) assert.doesNotMatch(a, /(^|[^[])\[\s+\$\w/, a); // unquoted is safe inside [[ ]], so only single [ is forbidden
   });
 });
 
