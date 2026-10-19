@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { FIXTURE, ALLOW, runSpec, keyOf, specLines, writeFixture } from './corpus-generate.mjs';
+import { FIXTURE, ALLOW, runSpec, keyOf, specLines, writeFixture, PINNED_QF } from './corpus-generate.mjs';
 import { loadShell } from './harness.mjs';
 
 if (process.env.UPDATE_CORPUS) {
@@ -51,10 +51,10 @@ describe('differential corpus', () => {
     assert.ok(n >= 70, `expected the full answer set, saw ${n}`);
   });
 
-  it('contains every quick-fire answer variant', () => {
+  it('contains every Beginner and Intermediate quick-fire answer variant', () => {
     const SQ = loadShell();
     const lines = new Set(corpus.filter((e) => e.line !== undefined).map((e) => e.line));
-    for (const q of SQ.content.quickfire) for (const a of q[1]) assert.ok(lines.has(a), `quick-fire answer missing: ${a}`);
+    for (const q of SQ.content.quickfire.filter(PINNED_QF)) for (const a of q[1]) assert.ok(lines.has(a), `quick-fire answer missing: ${a}`);
   });
 
   for (const e of corpus) {

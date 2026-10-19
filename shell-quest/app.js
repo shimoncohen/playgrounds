@@ -10,13 +10,15 @@ const {renderAll,renderMission,renderGuide,addLine,scrollDown,fill,esc,renderTex
 let histIdx=S.hist.length;
 
 /* Script and challenge missions are re-checked on every call (a Save, a typed line, Save & run): scriptPasses bails out at once when the file is missing and runs in a sandbox.
-   A custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case. */
+   A custom m.check wins over the test cases. opts.feedback (Save & run only) also explains the first failing test case,
+   but only when the file that ran (opts.ranAbs) is the mission's own file: running some other file says nothing about it. */
 const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
+  const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
   try{const c=ctxFor(line);
-    if(typeof m.check==='function'){good=!!m.check(c);if(!good&&opts.feedback&&isScript(m)&&m.file&&m.tests)failed=c.scriptPasses(m).failed||null}
+    if(typeof m.check==='function'){good=!!m.check(c);if(!good&&explain&&m.tests)failed=c.scriptPasses(m).failed||null}
     else if(isScript(m)&&m.file){const r=c.scriptPasses(m);good=!!r.ok;failed=r.failed||null}}catch(e){}
-  if(!good){if(failed&&opts.feedback)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
+  if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
@@ -31,7 +33,7 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
 function runLine(line,opts){opts=opts||{};const before=S.cwd;let edit=null;
   if(opts.echo!==false)addLine(promptHTML(before)+esc(line));
   if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
-  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback})}
+  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
   renderAll();save();scrollDown();
   if(edit)openFor(edit.edit,edit.isNew)}
 const run=line=>runLine(line,{echo:true});
@@ -45,7 +47,7 @@ SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const 
   addLine(renderText('Saved '+shown),'sys');checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
-  runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true})};
+  runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true,ranAbs:abs})};
 
 function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').filter(Boolean),b=cw.split('/').filter(Boolean);let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}

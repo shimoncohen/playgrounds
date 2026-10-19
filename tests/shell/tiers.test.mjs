@@ -45,14 +45,14 @@ describe('tiers', () => {
     const expected = 695 + inter.reduce((n, c) => n + c.missions.length * 15 + 25, 0);
     assert.equal(SQ.tiers.cumulativeXp('intermediate'), expected);
     const r = SQ.tiers.ranks();
-    assert.equal(r.length, 6);
+    assert.equal(r.length, 7); // + Automator, now that Advanced has chapters
     assert.deepEqual([...r[5]], [expected, 'Script Smith']);
     assert.equal(SQ.tiers.rankFor(expected).name, 'Script Smith');
     assert.equal(SQ.tiers.rankFor(695).name, 'Pipe Fitter');
     assert.equal(SQ.tiers.missionXp(7), 15);
   });
   it('a tier without chapters adds no rank', () => {
-    assert.equal(SQ.tiers.ranks().length, 6); // Advanced and Expert have no chapters yet
+    assert.equal(SQ.tiers.ranks().length, 7); // Expert has no chapters yet
     const t = Tiers.create({
       tiers: [
         { id: 'a', name: 'A', blurb: '', missionXp: 10 },

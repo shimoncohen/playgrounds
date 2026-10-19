@@ -44,7 +44,19 @@ const QF=[
  ["Run ls missing, send the error down the pipe and count the lines",["ls missing 2>&1 | wc -l","ls missing 2>&1|wc -l"],'intermediate'],
  ["Run echo file: once for each name that ls prints",["ls | xargs -n1 echo file:","ls | xargs -n 1 echo file:"],'intermediate'],
  ["Delete every .log file that find lists under old (quote the pattern)",["find old -name \"*.log\" | xargs rm","find old -name '*.log' | xargs rm"],'intermediate',{exact:true}],
- ["Show the differences between a.txt and b.txt",["diff a.txt b.txt"],'intermediate']
+ ["Show the differences between a.txt and b.txt",["diff a.txt b.txt"],'intermediate'],
+ ["Print yes if notes.txt is a file, using [ and &&",["[ -f notes.txt ] && echo yes","test -f notes.txt && echo yes","[[ -f notes.txt ]] && echo yes"],'advanced'],
+ ["Print found if logs is a folder, using if",["if [ -d logs ]; then echo found; fi","if test -d logs; then echo found; fi","if [[ -d logs ]]; then echo found; fi"],'advanced'],
+ ["Print bigger if 7 is greater than 2",["[ 7 -gt 2 ] && echo bigger","test 7 -gt 2 && echo bigger","[[ 7 -gt 2 ]] && echo bigger"],'advanced'],
+ ["Print empty if the variable NAME is empty (quote it)",["[ -z \"$NAME\" ] && echo empty","test -z \"$NAME\" && echo empty","[[ -z \"$NAME\" ]] && echo empty"],'advanced',{exact:true}],
+ ["Print hi when $USER is explorer, using case",["case \"$USER\" in explorer) echo hi;; esac","case $USER in explorer) echo hi;; esac"],'advanced'],
+ ["Print yes if $USER starts with ex, using [[ and a pattern",["[[ \"$USER\" == ex* ]] && echo yes","[[ \"$USER\" = ex* ]] && echo yes"],'advanced',{exact:true}],
+ ["Print 6 times 7 using $(( ))",["echo $((6*7))","echo $(( 6 * 7 ))","echo $((6 * 7))","echo \"$((6*7))\""],'advanced'],
+ ["Add 1 to the variable i using $(( ))",["i=$((i+1))","i=$(( i + 1 ))","i=$((i + 1))","i=$(($i+1))"],'advanced'],
+ ["Print the remainder of 17 divided by 5",["echo $((17%5))","echo $(( 17 % 5 ))","echo $((17 % 5))"],'advanced'],
+ ["Add n to the running total sum",["sum=$((sum+n))","sum=$(( sum + n ))","sum=$((sum + n))","((sum+=n))","(( sum += n ))"],'advanced'],
+ ["Put the first line of notes.txt into the variable line",["read line < notes.txt","read -r line < notes.txt"],'advanced'],
+ ["Print every line of notes.txt with a while read loop",["while read line; do echo \"$line\"; done < notes.txt","while read -r line; do echo \"$line\"; done < notes.txt"],'advanced']
 ];
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});

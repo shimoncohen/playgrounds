@@ -158,7 +158,7 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
-  assert.equal(await page.locator('.tierhead').count(), 2);
+  assert.equal(await page.locator('.tierhead').count(), 3);
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   let [head, ihead] = await heads();
   assert.match(head, /^Beginner/);
@@ -226,7 +226,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.goto('http://bundle.test/shell-quest.html');
   await page.waitForSelector('#mission');
-  assert.equal(await page.locator('.tierhead').count(), 2);
+  assert.equal(await page.locator('.tierhead').count(), 3);
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   assert.match(heads[0], /^Beginner/);
   assert.match(heads[1], /^Intermediate/);
@@ -284,8 +284,8 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-guide');
-  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate']);
-  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner', 'Intermediate']);
+  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate', 'advanced']);
+  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner', 'Intermediate', 'Advanced']);
   const extras = await page.$$eval('#guide .gsec[data-extras] h4', hs => hs.map(h => h.textContent));
   assert.ok(extras.includes('help'), 'help should sit in Handy extras');
   assert.match(await page.textContent('#guide .gsec[data-extras] h3'), /Handy extras/);
@@ -313,7 +313,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   await page.waitForSelector('#mission');
   await page.click('#t-fire');
   const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
-  assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate']]);
+  assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced']]);
   assert.equal(await page.inputValue('#fTier'), 'mixed');
   const pool = await page.evaluate(() => SQ.content.quickfire.filter(q => (q[2] || 'beginner') === 'beginner').map(q => q[0]));
   assert.ok(pool.length > 0);
@@ -870,6 +870,28 @@ test('shell-quest script mission: starter is written once; revisiting the chapte
   await page.fill('#edArgs', 'Ada');
   await page.click('#edRun');
   await waitScreen(/Test 1 \(with a name\) failed: expected "Hi Ada", got "Hello Ada"/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest script mission: Save & run on some other file prints no failure line about the mission file', async () => {
+  const { ctx, page, errors, type, waitScreen, xp, lines } = await fakeChapterPage();
+  await type('nano other.sh');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.fill('#edText', '#!/bin/bash\necho other\n');
+  await page.click('#edRun');
+  await waitScreen(/\$ bash other\.sh\s*other/);
+  assert.equal(await lines(/Test \d+ .* failed/), 0, 'no failure line for an unrelated file');
+  assert.equal(await lines(/Save your script as/), 0);
+  await page.click('#edClose');
+  // the mission's own file still explains its failing case
+  await page.click('[data-act="fill"]');
+  await page.waitForSelector('#editor:not([hidden])');
+  const fake = await page.evaluate(() => window.SQ.content.chapters.at(-1).missions[0]);
+  await page.fill('#edText', fake.wrong[0]);
+  await page.click('#edRun');
+  await waitScreen(/Test 2 \(no name\) failed/);
+  assert.equal(await xp(), '0 XP');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

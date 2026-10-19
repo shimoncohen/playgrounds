@@ -104,9 +104,11 @@ export function answerSpecs() {
 }
 
 /* every accepted quick-fire answer variant (the UI only string-compares them; here each is also run for its effect) */
+/* pinned like the chapters (0..10): only the Beginner (no tag) and Intermediate pools; Advanced answers are covered by tests/shell/advanced.test.mjs */
+export const PINNED_QF = (q) => !q[2] || q[2] === 'beginner' || q[2] === 'intermediate';
 export function quickfireSpecs() {
   const SQ = loadShell();
-  return SQ.content.quickfire.flatMap((q) => q[1].map((a) => ({ line: a })));
+  return SQ.content.quickfire.filter(PINNED_QF).flatMap((q) => q[1].map((a) => ({ line: a })));
 }
 
 export function handSpecs() {
