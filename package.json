@@ -9,7 +9,8 @@
   "scripts": {
     "build": "python3 tools/build.py",
     "check": "python3 tools/build.py --check",
-    "test": "node tests/smoke.mjs && node tests/shell-golden.mjs"
+    "test:engine": "node --test \"tests/shell/*.test.mjs\"",
+    "test": "npm run test:engine && node tests/smoke.mjs && node tests/shell-golden.mjs"
   },
   "devDependencies": {
     "playwright": "1.64.1"
