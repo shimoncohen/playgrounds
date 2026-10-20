@@ -13,16 +13,18 @@ const CMDS={
       let body=jn(ents);if(targets.length>1)body=t+':'+(body?'\n'+body:'');blocks.push(body)}
     return {out:blocks.filter(b=>b!=='').join(targets.length>1?'\n\n':'\n'),err,code}},
   cd(a){if(a.length>1)return E('bash: cd: too many arguments');let t=a[0];if(t===undefined){if(!SQ.isSet('HOME'))return E('bash: cd: HOME not set');t=SQ.getVar('HOME')}let show='';if(t==='-'){t=S.oldpwd;show=t}
-    const abs=norm(t),n=getNode(abs);if(!n)return E(isLoop(abs)?`bash: cd: ${a[0]}: Too many levels of symbolic links`:`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
+    const abs=norm(t),n=getNode(abs);if(!n&&SQ.tooLong(abs))return E(`bash: cd: ${a[0]}: ${SQ.TOO_LONG}`);if(!n)return E(isLoop(abs)?`bash: cd: ${a[0]}: Too many levels of symbolic links`:`bash: cd: ${a[0]}: No such file or directory`);if(n.type!=='dir')return E(`bash: cd: ${a[0]}: Not a directory`);
+    if(SQ.tooLong(abs))return E(`bash: cd: ${a[0]}: ${SQ.TOO_LONG}`); /* a path through a link loop (ln -s . l; cd l/l/l...) grows the name, not the tree */
     S.oldpwd=S.cwd;S.cwd=abs;return ok(show)},
   mkdir(a){const {fl,rest}=flags(a);if(!rest.length)return E('mkdir: missing operand');const err=[];
     for(const t of rest){const abs=norm(t);if(getNode(abs)){if(!fl.has('p'))err.push(`mkdir: cannot create directory '${t}': File exists`);continue}
+      if(SQ.tooLong(abs)){err.push(`mkdir: cannot create directory '${t}': ${SQ.TOO_LONG}`);continue}
       if(fl.has('p')){const bad=mkdirp(abs);if(bad)err.push(`mkdir: cannot create directory '${t}': Not a directory`);continue}
       const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`mkdir: cannot create directory '${t}': No such file or directory`);continue}
       par.children[name]=D();SQ.rt.changed.add(abs)}
     const r={out:'',err,code:err.length?1:0};if(err.some(e=>e.endsWith('No such file or directory')))r.tips=['Tip: add -p to create the missing folders along the way.'];return r},
   touch(a){if(!a.length)return E('touch: missing file operand');const err=[];for(const t of a){const abs=norm(t);if(getNode(abs)){SQ.rt.changed.add(abs);continue}
-      const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`touch: cannot touch '${t}': No such file or directory`);continue}par.children[name]=F('');SQ.rt.changed.add(abs)}
+      const [par,name]=parentOf(abs);if(!par||par.type!=='dir'){err.push(`touch: cannot touch '${t}': No such file or directory`);continue}if(SQ.tooLong(abs)){err.push(`touch: cannot touch '${t}': ${SQ.TOO_LONG}`);continue}par.children[name]=F('');SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
   /* flags -n -e -E (alone or combined) are consumed; -e expands \n \t \\ \0nnn \xHH. -n has no visible effect: output text never carries a trailing newline. Other dashes stay literal. */
   echo(a){let x=a.slice(),e=false;while(x.length&&/^-[neE]+$/.test(x[0])){for(const f of x[0].slice(1))if(f==='e')e=true;else if(f==='E')e=false;x.shift()}
@@ -36,13 +38,13 @@ const CMDS={
       const n=lstat(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
       if(n.type==='dir'&&!r){err.push(`rm: cannot remove '${t}': Is a directory`);tips.push(`Tip: folders need -r (recursive): rm -r ${t}`);continue}
       if(SQ.rt.fdTab&&SQ.fdNode(abs)){err.push(`rm: cannot remove '${t}': Permission denied`);continue} /* a <( ) file (fs.js fdTable) is read-only */
-      const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp)}
+      const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.stateDrop();SQ.rt.changed.add(pp)}
     return {out:'',err,code:err.length?1:0,tips}},
   rmdir(a){if(!a.length)return E('rmdir: missing operand');const err=[];for(const t of a){const abs=norm(t),n=getNode(abs);
       if(!n){err.push(`rmdir: failed to remove '${t}': No such file or directory`);continue}if(n.type!=='dir'){err.push(`rmdir: failed to remove '${t}': Not a directory`);continue}
       if(Object.keys(n.children).length){err.push(`rmdir: failed to remove '${t}': Directory not empty`);continue}
       if(S.cwd===abs||S.cwd.startsWith(abs+'/')){err.push(`rmdir: you are standing inside '${t}'. cd out of it first.`);continue}
-      const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp)}return {out:'',err,code:err.length?1:0}},
+      const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.stateDrop();SQ.rt.changed.add(pp)}return {out:'',err,code:err.length?1:0}},
   cp(a){return copyMove(a,false)},
   mv(a){return copyMove(a,true)},
   head(a,io){return headTail(a,io,'head')},
@@ -75,9 +77,9 @@ const CMDS={
     const base=(x,y)=>o.n?(parseFloat(x)||0)-(parseFloat(y)||0)||x.localeCompare(y):x.localeCompare(y);
     const cmp=(x,y)=>{for(const k of o.keys){const kx=key(x,k),ky=key(y,k);const md=k[2],num=md.any?md.n:o.n,rev=md.any?md.r:o.r,d=num?(parseFloat(kx)||0)-(parseFloat(ky)||0):kx.localeCompare(ky);if(d)return rev?-d:d}
       if(o.keys.length)return o.r?y.localeCompare(x):x.localeCompare(y);return o.r?-base(x,y):base(x,y)};
-    L.sort(cmp);
-    if(o.u)L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
-  uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];const g=[];
+    SQ.charge(Math.ceil(L.length*Math.log2(L.length+1)/4));L.sort(cmp);
+    if(o.u){const seen=new Set();L=L.filter(x=>!seen.has(x)&&!!seen.add(x))} /* the first of each exact duplicate, in one pass */return {out:L.join('\n'),err,code:err.length?2:0}},
+  uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];SQ.charge(L.length);const g=[];
     for(const x of L){if(g.length&&g[g.length-1][0]===x)g[g.length-1][1]++;else g.push([x,1])}
     const shown=g.filter(([,n])=>fl.has('d')?(fl.has('u')?false:n>1):fl.has('u')?n===1:true); /* -d: only repeated lines, -u: only lines that are not repeated, both: none */
     return {out:shown.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
@@ -190,12 +192,14 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
+    if(SQ.tooLong(tabs,sn)){err.push(move?`mv: cannot move '${s}' to '${dest}${into?'/'+bname(sabs):''}': ${SQ.TOO_LONG}`:`cp: cannot create ${sn.type==='dir'?'directory':'regular file'} '${dest}${into?'/'+bname(sabs):''}': ${SQ.TOO_LONG}`);continue}
     const fds=!!SQ.rt.fdTab&&!!SQ.fdNode(sabs),fdm=move&&fds; /* a <( ) file (fs.js fdTable): mv copies it and the original cannot go, as in bash */
     const copy=move&&!fdm?sn:clone(sn);if(fds)delete copy.mode; /* the copy is an ordinary file (0644), not read-only like the source */
-    if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
+    let sz=0;if(!move){sz=SQ.stateText(copy);if(sz>1000&&SQ.stateOver(sz)){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
     if(fdm)err.push(`mv: cannot remove '${s}': Permission denied`);
     else if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
-    par.children[name]=copy;markTree(tabs,copy,!move||fdm);SQ.grewCheck()}
+    if(ex)SQ.stateDrop(); /* an overwritten file's text is gone */
+    par.children[name]=copy;if(!move)SQ.stateGrew(sz);markTree(tabs,copy,!move||fdm);SQ.grewCheck()}
   return {out:'',err,code:err.length?1:0,tips}}
 
 /* nano/edit/vi/vim FILE: no file is made here; the page opens its editor on the absolute path and Save writes it */
@@ -220,7 +224,17 @@ const FRIENDLY={
   less:'less pages through long files. This practice shell doesn\'t have it; use head and tail instead.',
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
-function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){if(n.length>64)return null; /* Levenshtein is length x length: a huge word gets no suggestion */let best=null,bd=3;for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit'||c==='set')continue; /* never set: its neighbours (let, sed, get) are other commands */const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+/* lev(a, b, cap): Levenshtein distance; with cap, any distance >= cap comes back as cap, and the scan stops once a whole row reaches it */
+function lev(a,b,cap){const m=b.length,d=new Array(m+1);for(let j=0;j<=m;j++)d[j]=j;
+  for(let i=1;i<=a.length;i++){let p=d[0],lo=i;d[0]=i;const ai=a[i-1];
+    for(let j=1;j<=m;j++){const t=d[j];let v=p+(ai===b[j-1]?0:1);if(t+1<v)v=t+1;if(d[j-1]+1<v)v=d[j-1]+1;d[j]=v;if(v<lo)lo=v;p=t}
+    if(cap!==undefined&&lo>=cap)return cap}
+  return cap!==undefined&&d[m]>cap?cap:d[m]}
+/* suggest(n): the closest command name, memoized by name (a loop of misses or a DEBUG trap full of them pays the Levenshtein scan once per distinct
+   name); the cache is dropped when it passes 512 names or the command table changes size */
+const SUG=new Map();let sugKeys=0;
+function suggest(n){const k=Object.keys(CMDS).length;if(k!==sugKeys||SUG.size>512){SUG.clear();sugKeys=k}
+  if(SUG.has(n))return SUG.get(n);const r=suggest0(n);SUG.set(n,r);return r}
+function suggest0(n){if(n.length>64)return null; /* Levenshtein is length x length: a huge word gets no suggestion */let best=null,bd=3;const low=n.toLowerCase();for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit'||c==='set')continue; /* never set: its neighbours (let, sed, get) are other commands */if(Math.abs(c.length-n.length)>=bd)continue; /* the distance is at least the length difference */const d=lev(low,c,bd);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

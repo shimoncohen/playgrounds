@@ -358,6 +358,7 @@ function runHandler(text,key,status,o){o=o||{};const rt=SQ.rt,node=rt.scopeNode,
 /* the current process's EXIT trap, run once (it is removed first): null when none, else {out, code} (code: the handler's exit n, else status) */
 function exitTrap(status,o){const n=SQ.rt.scopeNode,t=n.traps;if(!t||!t.has('EXIT'))return null;
   const h=t.get('EXIT');t.delete('EXIT');if(h==='')return null;
+  const rt=SQ.rt;(rt.exitFired=rt.exitFired||[]).push(h); /* the handlers that ran this typed line (a mission check asks whether one really fired); execLine empties it */
   const r=runHandler(h,'EXIT',status,Object.assign({keep:true},o));
   return {out:r.out,code:r.ctl?r.ctl.n:status}}
 /* error e (a cap, a timeout, ...) is ending the current process: for a timeout its signal's handler first (TERM by default; KILL runs nothing), then

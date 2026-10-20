@@ -644,3 +644,117 @@ describe('globbing of split fields', () => {
     assert.equal(run(SQ, 'z="f1* f2*"; echo $z | wc -w').out, '223');
   });
 });
+
+describe('path caps: File name too long (Stage 3 final review)', () => {
+  const deep = (n) => Array(n).fill('d').join('/');
+  it('mkdir -p of a 2,500-deep path is refused at once and creates nothing', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, `mkdir -p /tmp/x/${deep(2500)}; echo $?`, 2000);
+    assert.match(r.out, /^mkdir: cannot create directory '\/tmp\/x\/d\/d.*': File name too long\n1$/);
+    assert.equal(run(SQ, 'ls /tmp').out, '');
+    assert.doesNotThrow(() => JSON.stringify(SQ.S));
+  });
+  it('the mkdir + cd loop stops at the depth cap quickly, and the world still saves and checks', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 9000); do mkdir d; cd d; done', 3000);
+    assert.match(r.out, /too many steps$/);
+    assert.equal(run(SQ, 'mkdir d').out, "mkdir: cannot create directory 'd': File name too long");
+    assert.ok(SQ.S.cwd.split('/').filter(Boolean).length <= SQ.DEPTH_MAX);
+    assert.doesNotThrow(() => JSON.stringify(SQ.S));
+    assert.doesNotThrow(() => SQ.stateText(SQ.S.fs));
+    assert.doesNotThrow(() => SQ.sandbox(() => run(SQ, 'echo hi')));
+    assert.equal(run(SQ, 'cd ~; tree d | tail -1').out, `${SQ.DEPTH_MAX - 3} directories, 0 files`);
+  });
+  it('touch, redirections, ln -s and mktemp refuse a long name or a too-deep path', () => {
+    const SQ = loadShell();
+    const long = 'x'.repeat(256);
+    assert.equal(run(SQ, `touch ${long}`).out, `touch: cannot touch '${long}': File name too long`);
+    assert.equal(run(SQ, `echo hi > ${long}`).out, `bash: ${long}: File name too long`);
+    assert.equal(run(SQ, `ln -s . ${long}`).out, `ln: failed to create symbolic link '${long}': File name too long`);
+    assert.equal(run(SQ, `mkdir ${'y'.repeat(255)}; echo $?`).out, '0', '255 characters is still fine');
+    run(SQ, `mkdir -p ${deep(126)}`); // ~/d/.../d: 128 components, the most there may be
+    assert.match(run(SQ, `mkdir -p ${deep(127)}`).out, /File name too long$/);
+    assert.match(run(SQ, `mktemp -p ${deep(126)}`).out, /^mktemp: failed to create file via template '.*': File name too long$/);
+    assert.match(run(SQ, `touch ${deep(126)}/f; echo $?`).out, /File name too long\n1$/);
+  });
+  it('cp -r and mv count the subtree they bring along', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p a/${deep(100)} b/${deep(100)}`);
+    const into = `b/${deep(100)}`;
+    assert.match(run(SQ, `mv a ${into}`).out, /^mv: cannot move 'a' to '.*\/a': File name too long$/);
+    assert.match(run(SQ, `cp -r a ${into}`).out, /^cp: cannot create directory '.*\/a': File name too long$/);
+    assert.match(run(SQ, 'ls').out, /(^|\s)a\//, 'a stays where it was');
+  });
+});
+
+describe('big inputs are charged to the step budget (Stage 3 final review)', () => {
+  it('sort -u of 100,000 distinct lines is fast and keeps the first of each duplicate', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 10000 > a; for p in a b c d e f g h i j; do sed "s/^/$p/" a; done > b');
+    assert.equal(fast(SQ, 'sort -u b | wc -l', 2000).out, '100000');
+    assert.equal(run(SQ, 'printf "b\\na\\nb\\nc\\na\\n" | sort -u').out, 'a\nb\nc');
+    assert.equal(run(SQ, 'printf "2\\n10\\n2\\n1\\n" | sort -nu').out, '1\n2\n10');
+  });
+  it('a loop of big diffs stops with the step message instead of running for an hour', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 1500 > a; seq 2 1501 > b');
+    assert.equal(run(SQ, 'diff a b').out, '1d0\n< 1\n1500a1500\n> 1501');
+    const r = fast(SQ, 'for i in $(seq 1 6000); do diff a b; done > /dev/null', 3000);
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+  });
+  it('one big diff, sort or uniq is charged steps', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 1500 > a; seq 2 1501 > b');
+    run(SQ, 'diff a b > /dev/null');
+    assert.ok(SQ.rt.steps > 1000, 'diff charged ' + SQ.rt.steps);
+    run(SQ, 'seq 1 10000 > c; cat c c > c2');
+    run(SQ, 'sort c2 > /dev/null');
+    assert.ok(SQ.rt.steps > 100, 'sort charged ' + SQ.rt.steps);
+  });
+});
+
+describe('background jobs share the line\'s caps (Stage 3 final review)', () => {
+  it('16 jobs printing 4,000-character lines end quickly with one bounded output', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 16); do (while :; do echo $(seq 1 1000); done) & done; sleep 1; echo ok', 2000);
+    assert.ok(r.out.length < SQ.LIM.TOTAL + 100000, 'printed ' + r.out.length);
+    assert.match(r.out, /stopped the (job|command): output too large/);
+    assert.equal(run(SQ, 'echo next').out, 'next');
+  });
+  it('16 jobs appending to files end quickly', () => {
+    const SQ = loadShell();
+    fast(SQ, 'for i in $(seq 1 16); do (while :; do echo $(seq 1 1000) >> /tmp/g$i; done) & done; sleep 1; echo ok', 2000);
+    fast(SQ, 'seq 1 300 > /tmp/s; for i in $(seq 1 16); do (while :; do cat /tmp/s >> /tmp/h$i; done) & done; sleep 1; echo ok', 2000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000);
+  });
+  it('the saved-state cap still refuses a big write near the cap, and frees up after rm', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 10000 > a; cat a a a a a a a a a a > f'); // 488,950 characters
+    let refused = '';
+    for (let i = 0; i < 8 && !refused; i++) { const o = run(SQ, `cat f > g${i}`).out; if (/too large/.test(o)) refused = o; }
+    assert.match(refused, /file too large for this practice shell|grew too large/);
+    // one line: refused, then rm frees space, and the same line's next big write is let through (the estimate is re-walked after a removal)
+    const r = run(SQ, 'cat f > z; rm g*; cat f > h; echo $?');
+    assert.match(r.out, /^bash: z: file too large for this practice shell\n0$/);
+    assert.equal(run(SQ, 'wc -l < h').out, '100000');
+  });
+});
+
+describe('command not found stays cheap (Stage 3 final review)', () => {
+  it('10,000 different unknown names take well under the old ~5 s', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 10000); do foo$i; done', 2500);
+    assert.match(r.out, /too many steps$/);
+    assert.equal(SQ.suggest('grpe'), 'grep');
+    assert.equal(SQ.suggest('ehco'), 'echo');
+    assert.equal(SQ.suggest('x'), null);
+  });
+  it('a DEBUG trap full of unknown commands does not make later lines slow', () => {
+    const SQ = loadShell();
+    run(SQ, 'trap "$(seq 1 1000)" DEBUG');
+    fast(SQ, 'echo a', 1000);
+    fast(SQ, 'echo b; echo c', 1000);
+    run(SQ, 'trap - DEBUG');
+    assert.equal(run(SQ, 'echo d').out, 'd');
+  });
+});

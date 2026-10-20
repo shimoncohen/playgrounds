@@ -56,7 +56,7 @@ CMDS.find=function(a,io){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')&&a[0]!
     const cur=lstat(abs);if(!cur)return true;
     if(SQ.rt.fdTab&&SQ.fdNode(abs)){err.push(`find: cannot delete '${path}': Permission denied`);code=1;return false} /* a <( ) file is read-only */
     if(cur.type==='dir'&&Object.keys(cur.children).length){err.push(`find: cannot delete '${path}': Directory not empty`);code=1;return false}
-    const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp);return true};
+    const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.stateDrop();SQ.rt.changed.add(pp);return true};
   const test=(n,path,name)=>{ /* the expression for one entry: tests until one fails, actions in order */
     for(const e of ex){
       if(e.t==='name'){if(!e.rx.test(name))return}
@@ -103,6 +103,7 @@ CMDS.ln=function(a){const {fl,rest}=flags(a);
   if(ex){if(!fl.has('f'))return E(`ln: failed to create symbolic link '${link}': File exists`);if(ex.type==='dir')return E(`ln: failed to create symbolic link '${link}': File exists`)}
   const [par,name]=parentOf(abs);
   if(!par||par.type!=='dir')return E(`ln: failed to create symbolic link '${link}': No such file or directory`);
+  if(SQ.tooLong(abs))return E(`ln: failed to create symbolic link '${link}': ${SQ.TOO_LONG}`);
   par.children[name]={type:'link',target};SQ.rt.changed.add(abs);return ok()};
 
 // ---- which / type ----

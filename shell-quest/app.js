@@ -31,7 +31,9 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
 function runLine(line,opts){opts=opts||{};const before=S.cwd;let edit=null;
   if(opts.echo!==false)addLine(promptHTML(before)+esc(line));
   if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
-  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
+  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}
+    /* the process cap (procs.js MAX_PROCS) lasts until a chapter switch or Reset world: say so once per line (a page tip, so the engine's bash text stays as recorded) */
+    if(r.out.some(o=>o.text===SQ.FORK_MSG))addLine(renderText('Tip: this practice shell has used up its processes. Click your chapter in the list (your files stay) or Reset world to start fresh.'),'tip');S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
   renderAll();save();scrollDown();
   if(edit)openFor(edit.edit,edit.isNew)}
 const run=line=>runLine(line,{echo:true});
@@ -141,7 +143,9 @@ function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash s
   addLine('Your mission is on the left. Type help to list commands, or man ls to learn about one.','sys');addLine('')}
 
 /* a save the browser refused (storage full or blocked) is reported once in the terminal instead of failing silently */
-SQ.rt.onSaveFail=()=>{addLine(renderText('Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'),'err');scrollDown()};
+SQ.rt.onSaveFail=e=>{const storage=!!e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.name==='SecurityError'||e.code===22||e.code===1014);
+  addLine(renderText(storage?'Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'
+    :`Warning: your progress could not be saved (${e&&e.name||'Error'}). Use Progress, then Export to file, to keep a copy. Reset world clears the files if they are the cause.`),'err');scrollDown()};
 
 /* boot */
 if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}

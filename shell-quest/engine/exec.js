@@ -95,7 +95,7 @@ const errText=out=>out.filter(x=>typeof x.text==='string'&&(x.cls==='err'||x.cls
    A $( ) run at the top of a sandboxed script (o.sub) is not a typed line and costs nothing. SQ.advance's Out[] (Task 12a: output of jobs
    that came due) is appended to the line's output, then the job notices (Task 12b, SQ.flushNotices); lastOut keeps only the line's own output. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
-  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.fdTab=null;SQ.rt.fdOwn=false;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[];if(!o.sub)SQ.rt.lineT0=SQ.rt.clock}
+  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.fdTab=null;SQ.rt.fdOwn=false;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[];SQ.rt.exitFired=[];if(!o.sub)SQ.rt.lineT0=SQ.rt.clock}
   let charged=!(outer&&!o.sub);
   /* Task 17: SQ.rt.lineTook = the virtual seconds the line itself took (sleep, wait, ...), measured before its 1-second cost (ctx.elapsed) */
   const lineCost=r=>{if(charged)return r;charged=true;SQ.rt.lineTook=Math.round((SQ.rt.clock-(SQ.rt.lineT0||0))*1000)/1000;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};

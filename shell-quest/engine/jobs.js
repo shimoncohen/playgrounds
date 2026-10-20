@@ -256,13 +256,13 @@ function inSlice(J,fn){const rt=SQ.rt,B=SQ.BASE_FRAME;
 const LIM=SQ.LIM,JOB_WORK=3*LIM.STEPS;
 function allowance(J){const rt=SQ.rt;if(J.lineNo!==rt.lineNo){J.lineNo=rt.lineNo;J.lineSteps=0}
   return Math.min(LIM.STEPS-J.lineSteps,JOB_WORK-(rt.jobWork||0))}
-function slice(J){const rt=SQ.rt,fgSteps=rt.steps,chars=rt.outChars,allow=allowance(J),start=LIM.STEPS-allow;let res,err=null;
+function slice(J){const rt=SQ.rt,fgSteps=rt.steps,allow=allowance(J),start=LIM.STEPS-allow;let res,err=null;
   rt.steps=start; /* never the foreground's budget */
   try{res=inSlice(J,()=>J.gen.next())}catch(e){err=e}
   finally{const used=Math.min(allow,Math.max(0,rt.steps-start));J.lineSteps+=used;rt.jobWork=(rt.jobWork||0)+used;rt.steps=fgSteps}
   if(err||res.done)J.gen=null; /* finished: nothing left to unwind */
   if(err&&err.jobSig){const s=err.jobSig;endJob(J,'Terminated',128+s.num,s.desc,s.num===9)} /* it signalled itself (kill): no message, like bash */
-  else if(err){J.out.push(errL(stopText(err)),...(err.after||[]));rt.outChars=chars;endJob(J,'Terminated',143)} /* the message, then any EXIT handlers */
+  else if(err){J.out.push(errL(stopText(err)),...(err.after||[]));endJob(J,'Terminated',143)} /* the message, then any EXIT handlers. The output it made stays charged to the line (rt.outChars, LIM.TOTAL): no refund, so many jobs share one cap */
   else if(res.done)endJob(J,'Done',res.value);
   else if(res.value.wait){J.waitReq=res.value.wait;J.wake=Infinity} /* blocked in wait: tick resumes it once its jobs have ended */
   else J.wake=res.value.wake;

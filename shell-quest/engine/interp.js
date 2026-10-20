@@ -405,7 +405,7 @@ function runChild(prog,name,o){
    afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
 function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
   const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,jobWork:rt.jobWork,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth,
-    lastErr:rt.lastErr,lineNo:rt.lineNo,lineT0:rt.lineT0,lineTook:rt.lineTook}; /* Task 17: what ctx.err/jobs/elapsed read (a $( ) at the top of a sandboxed script is an outermost execLine) */
+    lastErr:rt.lastErr,lineNo:rt.lineNo,lineT0:rt.lineT0,lineTook:rt.lineTook,exitFired:rt.exitFired}; /* Task 17: what ctx.err/jobs/elapsed read (a $( ) at the top of a sandboxed script is an outermost execLine) */
   rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.jobWork=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
   const procs=SQ.procsSave(); /* a clean clock, pid counter and process table inside (procs.js) */
   try{return fn()}
@@ -413,7 +413,7 @@ function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
     for(const k of Object.keys(S))if(!(k in back))delete S[k];
     for(const k of Object.keys(back))S[k]=back[k];
     Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,jobWork:keep.jobWork,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed,
-      lastErr:keep.lastErr,lineNo:keep.lineNo,lineT0:keep.lineT0,lineTook:keep.lineTook});
+      lastErr:keep.lastErr,lineNo:keep.lineNo,lineT0:keep.lineT0,lineTook:keep.lineTook,exitFired:keep.exitFired});
     CTX.pend.length=0;CTX.pend.push(...keep.pend);CTX.depth=keep.depth}}
 
 /* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */

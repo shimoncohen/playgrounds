@@ -235,12 +235,13 @@ CMDS.diff=function(a,io){let q=false;const ops=[];
     if(!nd)err.push(`diff: ${t}: No such file or directory`);else if(nd.type==='dir')err.push(`diff: ${t}: Is a directory`);else rd.push(lines(nd.content))}
   if(err.length)return {out:'',err,code:2};
   const [A,B]=rd;if(A.length>1500||B.length>1500)return E('diff: files too large for this practice shell',2);
-  const n=A.length,m=B.length,T=Array.from({length:n+1},()=>new Uint16Array(m+1));
-  for(let x=n-1;x>=0;x--)for(let y=m-1;y>=0;y--)T[x][y]=A[x]===B[y]?T[x+1][y+1]+1:Math.max(T[x+1][y],T[x][y+1]);
+  SQ.charge(Math.ceil(A.length*B.length/8)); /* the table below is n x m cells, about 15 ns each: one unit per 8 */
+  const n=A.length,m=B.length,W=m+1,T=new Uint16Array((n+1)*W),at=(x,y)=>T[x*W+y]; /* one flat table: T[x*W+y] is the LCS length of A[x..] and B[y..] */
+  for(let x=n-1;x>=0;x--){const r=x*W,r1=r+W,ax=A[x];for(let y=m-1;y>=0;y--){const d=T[r1+y],b=T[r+y+1];T[r+y]=ax===B[y]?T[r1+y+1]+1:(d>b?d:b)}}
   const hunks=[];let x=0,y=0,cur=null;
   while(x<n||y<m){if(x<n&&y<m&&A[x]===B[y]){cur=null;x++;y++;continue}
     if(!cur){cur={x0:x,y0:y,xs:[],ys:[]};hunks.push(cur)}
-    if(y>=m||(x<n&&T[x+1][y]>=T[x][y+1])){cur.xs.push(A[x]);x++}else{cur.ys.push(B[y]);y++}}
+    if(y>=m||(x<n&&at(x+1,y)>=at(x,y+1))){cur.xs.push(A[x]);x++}else{cur.ys.push(B[y]);y++}}
   if(!hunks.length)return ok('');
   if(q)return {out:`Files ${ops[0]} and ${ops[1]} differ`,err:[],code:1};
   const rg=(s,c)=>c===1?String(s+1):`${s+1},${s+c}`;const out=[];

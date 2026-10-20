@@ -25,7 +25,9 @@ function renderMap(){
     const cls=['row',isDir?'d':'f',name.startsWith('.')?'hid':'',here?'here':'',SQ.rt.changed.has(abs)?'flash':''].filter(Boolean).join(' ');
     let h=`<li><button class="${cls}" data-path="${esc(abs)}" title="${esc(abs)}">${isDir?ICON_DIR:ICON_FILE}<span class="nm">${esc(name)}${isDir&&abs!=='/'?'/':''}</span>${n.exec?'<span class="tag">x</span>':''}${here?'<span class="pin">YOU</span>':''}</button>`;
     if(isDir){const ks=sortedKeys(n);if(ks.length)h+='<ul class="tree">'+ks.map(k=>node(k,n.children[k],join(abs,k))).join('')+'</ul>'}return h+'</li>'};
-  mapEl.innerHTML='<ul class="tree root">'+node('/',S.fs,'/')+'</ul>';
+  /* the engine caps path depth (fs.js DEPTH_MAX), so this recursion stays shallow; the catch only keeps one bad tree from stopping the rest of the page (and the save) */
+  let html;try{html='<ul class="tree root">'+node('/',S.fs,'/')+'</ul>'}catch(e){html='<p class="note">This world is too big to draw. Remove a deep folder with rm -r to bring the map back.</p>'}
+  mapEl.innerHTML=html;
   const here=mapEl.querySelector('.row.here');if(here){const sc=mapEl.closest('.mapscroll');if(sc&&sc.scrollWidth>sc.clientWidth)sc.scrollLeft=Math.max(0,here.offsetLeft-40)}}
 function renderChapters(){Tiers.renderRail(chaptersEl,{status:SQ.tiers.status(S),chapters:CH,S})}
 function renderMission(){const ch=CH[S.ch],n=ch.missions.length;

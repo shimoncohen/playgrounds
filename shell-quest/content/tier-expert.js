@@ -416,7 +416,7 @@ const CH=[
 {tier:'expert',name:'Safe, debuggable scripts',badge:'Toolsmith',intro:'A script that carries on after an error can do real damage. set -e, set -u and set -o pipefail make it stop instead, set -x shows every step, trap cleans up on the way out, and getopts reads options the way real tools do.',
  learned:['bash -c','set -e','set -u','set -o pipefail','set -x','trap … EXIT','getopts','mktemp'],setup:seedExpert,
  missions:[
- {title:'Stop on error',goal:`Make a small script stop at the first command that fails. Run it with <code>bash -c</code>, then print its exit status: <code>bash -c 'set -e; false; echo after'; echo $?</code>`,
+ {title:'Stop on error',note:`Typed <code>set -e</code> at the prompt? It stays on: a command that fails stops the rest of every line you type until you run <code>set +e</code> (here a chapter switch or Reset world turns it off too; a real terminal would close).`,goal:`Make a small script stop at the first command that fails. Run it with <code>bash -c</code>, then print its exit status: <code>bash -c 'set -e; false; echo after'; echo $?</code>`,
   anat:[['bash -c','cmd'],["'set -e;",'arg'],['false;','arg'],["echo after'",'arg'],[';','op'],['echo $?','cmd']],answer:"bash -c 'set -e; false; echo after'; echo $?",
   explain:`<code>bash -c '…'</code> runs the text as a small script in a new bash. <code>set -e</code> (errexit) makes that script stop at the first command that fails, so <code>echo after</code> never runs, and its exit status is the failing command's: <code>false</code> returns 1. Leave out <code>set -e</code> and it carries on: <code>bash -c 'false; echo after'; echo $?</code> prints <code>after</code> and 0. A command that is tested does not stop it: <code>bash -c 'set -e; false || echo saved; echo after'</code> prints both lines.`,
   check:c=>{const L=rows(c.out());
@@ -445,7 +445,8 @@ const CH=[
  {title:'Clean up after yourself',goal:`Have a small script run a command when it ends, however it ends: <code>bash -c "trap 'echo bye' EXIT; echo hi"</code>`,
   anat:[['bash -c','cmd'],['"trap','arg'],["'echo bye'",'arg'],['EXIT;','arg'],['echo hi"','arg']],answer:`bash -c "trap 'echo bye' EXIT; echo hi"`,
   explain:`<code>trap 'command' EXIT</code> sets a command to run when the shell exits: at the end of the script, after an <code>exit</code>, or when <code>set -e</code> stops it. <code>bash -c "trap 'echo bye' EXIT; exit 3"; echo $?</code> prints <code>bye</code>, then 3. The double quotes outside hold the single quotes inside. Scripts use it to clean up: <code>tmp=$(mktemp)</code> makes a new empty file such as <code>/tmp/tmp.A00001</code> (the letters are random on a real computer), and <code>trap 'rm -f "$tmp"' EXIT</code> removes it on every way out.`,
-  check:c=>{const m=/\btrap\s+(\S.*?)\s+(?:EXIT|0)(?=[\s;'"\\)]|$)/i.exec(c.line);return !!m&&/bye/.test(m[1])&&said(c)==='hi\nbye'}},
+  check:c=>{const m=/\btrap\s+(\S.*?)\s+(?:EXIT|0)(?=[\s;'"\\)]|$)/i.exec(c.line);
+    return !!m&&/bye/.test(m[1])&&said(c)==='hi\nbye'&&(SQ.rt.exitFired||[]).length>0}}, /* an EXIT handler really ran: the prompt's own trap never fires, so typing the output does not count */
  OPTS,
  LOGTOOL
  ]}

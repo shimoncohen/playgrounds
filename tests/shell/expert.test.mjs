@@ -884,6 +884,8 @@ describe('chapter 19 (Safe, debuggable scripts) checks', () => {
     no(SS19, 4, 'echo hi; echo bye');
     no(SS19, 4, "bash -c \"trap '' EXIT; echo hi; echo bye\"");
     no(SS19, 4, "trap 'echo bye' EXIT; echo hi"); // the prompt's shell does not exit: only hi
+    no(SS19, 4, "trap 'echo bye' EXIT; echo hi; echo bye"); // the right text, but typed: no EXIT handler ran (final review)
+    no(SS19, 4, "bash -c \"trap 'echo bye' EXIT; trap - EXIT; echo hi; echo bye\""); // the handler was removed before the script ended
     no(SS19, 4, "bash -c 'echo hi; echo bye'");
     no(SS19, 4, "bash -c \"trap 'echo bye' EXIT; echo hi\"; echo extra");
     no(SS19, 4, "bash -c \"trap 'echo hi' EXIT; echo bye\"");

@@ -200,6 +200,7 @@ CMDS.mktemp=function(a){let dir=false,dry=false,tflag=false,pdir=null,end=false;
     if(L>=26)return fail('File exists');
     const name=shown.slice(0,xs)+String.fromCharCode(65+L)+String(c%cap).padStart(w,'0')+shown.slice(xe),abs=SQ.norm(name);
     if(SQ.lstat(abs))continue;
+    if(SQ.tooLong(abs))return fail(SQ.TOO_LONG);
     if(!dry){const node=dir?SQ.D():SQ.F('');node.mode=dir?0o700:0o600;par.children[abs.slice(abs.lastIndexOf('/')+1)]=node;rt.changed.add(abs)}
     return ok(name)}
   return fail('File exists')};
