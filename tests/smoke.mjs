@@ -128,9 +128,10 @@ for (const name of NAMES) {
     for (const [w, h] of [[1440, 800], [1000, 700]]) {
       const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: w, height: h } });
       await page.waitForSelector('#mission');
-      const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, h: c.getBoundingClientRect().height }; });
+      await page.waitForTimeout(300);
+      const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, bottom: c.getBoundingClientRect().bottom }; });
       assert.equal(r.pos, 'sticky', `${w}x${h}`);
-      assert.ok(r.h <= h, `column is ${r.h}px in ${h}px`);
+      assert.ok(r.bottom <= h, `column ends at ${r.bottom}px in a ${h}px window`);
       assert.deepEqual(errors, []);
       await ctx.close();
     }
