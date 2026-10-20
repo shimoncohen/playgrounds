@@ -85,10 +85,12 @@ const run=(net,dev,line)=>{
     const s=suggest(name);
     return fail(127,'bash: '+name+': command not found',...(s?["Did you mean '"+s+"'?"]:[]));
   }
-  const r=NQ.CMDS[name](net,dev,first.slice(1),{});
+  let r;
+  try{r=NQ.CMDS[name](net,dev,first.slice(1),{});}catch(e){r=null;}
+  if(!r||!Array.isArray(r.out))return fail(1,'bash: '+name+': internal error'); // a broken command never throws at the caller
   let out=r.out,code=r.code;
   for(const f of filters){const o=f(out);out=o.out;code=o.code;}
-  return res(cap(out),cap(r.err),code);
+  return res(cap(out),cap(Array.isArray(r.err)?r.err:[]),code);
 };
 NQ.exec=(net,line,devId)=>{
   const id=devId||net.me,dev=net.devices[id];

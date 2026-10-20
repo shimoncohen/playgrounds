@@ -341,6 +341,23 @@ const traceroute=(net,from,dstIp,maxHops)=>{
   }
   return {hops,entries};
 };
+/* arping: ARP-ask for dstIp out of the first up interface whose connected subnet holds it, even if the sender already
+   has a neighbour entry. The normal ARP rules apply: the reply updates the requester's cache (unless the entry is
+   permanent), and the target learns the requester. Returns {mac, ifaceName, entries}; mac is null if nobody answered,
+   and ifaceName null (no entries) when no up interface is on that subnet. */
+const arping=(net,from,dstIp)=>{
+  const dev=net.devices[from];
+  if(!dev)throw new Error('unknown device: '+from);
+  const n=NQ.ip.parse(dstIp);
+  if(n===null)throw new Error('bad IPv4 address: '+dstIp);
+  const ifaceName=Object.keys(dev.ifaces).find(k=>{const i=dev.ifaces[k],c=i.up&&i.ip&&NQ.ip.cidr(i.ip);return c&&NQ.ip.inSubnet(n,c);});
+  if(!ifaceName)return {mac:null,ifaceName:null,entries:[]};
+  const ctx=session(net,from,0,0);
+  arpRequest(ctx,dev,ifaceName,dstIp);
+  settle(ctx);
+  const e=ctx.entries.find(x=>x.dev===from&&x.dir==='rx'&&x.packet.layers.some(l=>l.name==='ARP'&&l.fields.op==='reply'&&l.fields.spa===dstIp));
+  return {mac:e?e.packet.layers.find(l=>l.name==='ARP').fields.sha:null,ifaceName,entries:ctx.entries};
+};
 /* low-level helper: one frame arrives on devId.ifaceName as if off the wire, and the queue runs until nothing is left
    (same step limit). There is no ping session, so nothing counts as a reply. Returns this call's log entries. */
 const inject=(net,devId,ifaceName,packet)=>{
@@ -352,5 +369,5 @@ const inject=(net,devId,ifaceName,packet)=>{
   settle(ctx);
   return {entries:ctx.entries};
 };
-NQ.sim={ping,traceroute,inject,route,nextHop,REASONS,STEP_LIMIT};
+NQ.sim={ping,traceroute,arping,inject,route,nextHop,REASONS,STEP_LIMIT};
 })();
