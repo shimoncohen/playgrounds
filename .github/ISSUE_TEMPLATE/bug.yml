@@ -1,0 +1,29 @@
+name: Bug
+description: Something is broken, wrong or confusing
+labels: [bug]
+body:
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which playground?
+      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Landing page, Progress saving, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: For a mission, give the chapter and mission title and the exact thing you typed.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Firefox 130 on Android
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Want to fix it?
+      options:
+        - label: I would like to open a PR for this (or have my agent do it)

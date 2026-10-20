@@ -1,0 +1,30 @@
+name: New playground proposal
+description: Propose a whole new quest (a language, tool or your team's stack)
+labels: [new playground]
+body:
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      placeholder: SQL, Git, regex, Rust, our internal CLI...
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: Who is it for, and what can they do at the end?
+    validations:
+      required: true
+  - type: textarea
+    id: runtime
+    attributes:
+      label: How would it run in the browser with no install?
+      description: A real in-browser runtime, or a small simulator like Shell Quest's practice shell? Name any new CDN library.
+    validations:
+      required: true
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Want to build it?
+      options:
+        - label: I would like to build this (see the `new-playground` skill in `.claude/skills/`)

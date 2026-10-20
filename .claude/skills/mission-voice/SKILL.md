@@ -1,0 +1,17 @@
+---
+name: mission-voice
+description: Use when writing or editing learner-facing text (mission goals, hints, explanations, quick-fire, guide entries, win messages, README copy) so it is friendly, concrete, factual and a little playful.
+---
+
+# Mission voice
+
+The reader is a curious beginner, possibly on day one at a new job.
+
+- **Speak to one person.** "You", short sentences, active verbs. One idea per goal.
+- **Concrete over abstract.** Use the quest's world (the village, the harbor, the journal) and real values, not "foo/bar".
+- **Playful, not silly.** A light joke or vivid image is welcome; never at the learner's expense, and never in place of the explanation.
+- **Never condescending.** No "simply", "just", "obviously", "easy". Mistakes are normal: errors are clues, say what the clue means.
+- **Don't assume.** Introduce a term before using it; link a new command to one the learner already knows.
+- **Factual.** Every claim is true in this quest's engine. Test it. Variables quoted in examples.
+- **Praise specifically**: say what the learner's line did ("`>` replaced the file; `>>` would have added to it"), not "Great job!".
+- **Accessible.** Plain words, no idioms that translate badly, nothing that depends on colour or emoji alone.
