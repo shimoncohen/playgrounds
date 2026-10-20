@@ -14,6 +14,7 @@ let histIdx=S.hist.length;
    but only when the file that ran (opts.ranAbs) is the mission's own file: running some other file says nothing about it. */
 const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
+  if(S.done[S.ch+'.'+S.mi])return; /* revisiting a finished mission (clicked in the list) never celebrates it again */
   const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
   try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
   if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}

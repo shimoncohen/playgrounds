@@ -390,6 +390,52 @@ test('shell-quest: runaway output is capped, so progress still saves and survive
   await ctx.close();
 });
 
+test('shell-quest: a finished mission is not celebrated again, and a typo never completes one', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#cmd');
+  const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
+  const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
+  const xp = async () => (await page.textContent('#xpText')).trim();
+  // chapter 5 (Pipes): "Count each name" is mission 4
+  await page.click('.chap[data-ch="4"]');
+  await page.click('#mission .dot[data-mi="3"]');
+  const title = (await page.textContent('#mission h2')).trim();
+  assert.equal(title, 'Count each name');
+  // the reported screenshot: a capital S is "command not found", and must not complete the mission
+  await type('Sort village/people.txt | uniq -c');
+  assert.deepEqual(await wins(), []);
+  assert.equal((await page.$$eval('#mission .dot.done', els => els.length)), 0);
+  await type('sort village/people.txt | uniq -c');
+  assert.equal((await wins()).length, 1);
+  const xpDone = await xp();
+  // go back to the finished mission and repeat it, with the right command and with the typo
+  await page.click('#mission .dot[data-mi="3"]');
+  await type('sort village/people.txt | uniq -c');
+  await type('Sort village/people.txt | uniq -c');
+  assert.equal((await wins()).length, 1, 'no second "Mission complete" line');
+  assert.equal(await xp(), xpDone);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('harbor-quest: a finished mission is not celebrated again when it is revisited', async () => {
+  const { ctx, page, errors } = await open(`${base}/harbor-quest/`);
+  await page.waitForSelector('#cmd');
+  const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
+  const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
+  const ans = await page.evaluate(() => { const b = document.querySelector('#mission [data-act="show"]'); return b ? true : false; });
+  assert.ok(ans, 'the first mission offers its answer');
+  await page.click('#mission [data-act="show"]');
+  const line = await page.inputValue('#cmd');
+  await type(line);
+  assert.equal((await wins()).length, 1);
+  await page.click('#mission .dot[data-mi="0"]');
+  await type(line);
+  assert.equal((await wins()).length, 1, 'no second "Mission complete" line');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#cmd');
@@ -966,11 +1012,12 @@ test('shell-quest script mission: Type it for me opens the editor pre-filled; wr
   await page.waitForFunction(() => /Counter/.test(document.querySelector('#mission').textContent));
   assert.match(await card(), /Challenge/);
   assert.match(await card(), /scripts\/count\.sh/);
-  // replay mission 1: it completes again with no new XP
+  // replay mission 1: a finished mission is not celebrated again (no second message, no XP)
   await page.click('[data-mi="0"]');
   await page.waitForFunction(() => /done before/.test(document.querySelector('#mission').textContent));
   await page.click('#edSave');
-  await page.waitForFunction(() => document.querySelectorAll('#screen .line.win').length >= 2);
+  await page.waitForFunction(() => /Saved /.test(document.querySelector('#screen').textContent));
+  assert.equal(await page.$$eval('#screen .line.win', els => els.length), 1, 'a replay shows no second win line');
   assert.equal(await lines(/Mission complete: Greeter\s+\+20 XP/), 1, 'XP is announced once');
   assert.equal(await xp(), '20 XP');
   assert.deepEqual(errors, []);
@@ -1187,7 +1234,7 @@ test('shell-quest Expert tier: a mission awards 25 XP once; a chapter switch and
   assert.equal(await xp(), x0 + 25);
   await page.click('#mission .dot[data-mi="0"]');
   await type(m.answer);
-  await page.waitForFunction(() => document.querySelectorAll('#screen .line.win').length >= 2);
+  assert.equal(await page.$$eval('#screen .line.win', els => els.length), 1, 'a replay shows no second win line');
   assert.equal(await xp(), x0 + 25, 'a replay awards nothing');
   await type('sleep 30 &');
   await type('sleep 2');
