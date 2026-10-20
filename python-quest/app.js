@@ -1114,6 +1114,7 @@ function renderMission(){
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
+    ${HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button><button class="btn ghost" data-act="fill">Type it for me</button></div>
