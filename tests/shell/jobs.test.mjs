@@ -653,4 +653,9 @@ describe('more of jobs/wait/kill (Task 12b)', () => {
     const SQ = loadShell();
     assert.equal(runN(SQ, 'sleep 30 & while :; do :; done').out, '[1] 1235\nthis practice shell stopped the command: too many steps');
   });
+  it('a negated function call in a job is exempt from set -e (as in the foreground)', () => {
+    const SQ = loadShell();
+    SQ.writeFile(SQ.norm('s.sh'), 'set -e\nf(){ false; }\n{ ! f; echo in; } &\nwait $!\necho st=$?\n');
+    assert.equal(runN(SQ, 'bash s.sh').out, 'in\nst=0');
+  });
 });

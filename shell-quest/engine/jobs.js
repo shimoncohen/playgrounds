@@ -126,7 +126,7 @@ function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
   if(Pn.cmds.length===1&&own(G,c.type)&&plain(c.redirs)){SQ.nestIn();try{r=yield* G[c.type](c,Pn.negate?SQ.quiet(env):env)}finally{SQ.nestOut()}} /* set -e is ignored under ! */
   else{const p=SQ.runPipeline(Pn,Object.assign({},env,{defer:true}));emit(env,p.out);
     if(!p.defer){yield* pay(env);return {code:p.code,ctl:p.ctl}}
-    r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,env)}
+    r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,Pn.negate?SQ.quiet(env):env)}
   if(Pn.negate)r={code:r.code===0?1:0,ctl:r.ctl};
   S.last=r.code;return r}
 /* `wait` in a job (cmds-proc.js): yield until the jobs it waits for have ended; tick resumes this job once SQ.waitReady says so */
