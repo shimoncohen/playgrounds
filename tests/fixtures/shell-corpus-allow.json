@@ -644,5 +644,18 @@
   "grep -x x journal.txt": {
     "reason": "Stage 3 Task 6: grep -x is built and now searches instead of printing the unsupported message",
     "out": ""
+  },
+  "sort village/people.txt | uniq -d": {
+    "reason": "Task 10: uniq -d prints only the lines that repeat (before, the flag was ignored and every distinct line printed)",
+    "out": "Ada\nBen\nMira"
+  },
+  "sort village/people.txt | uniq -u": {
+    "reason": "Task 10: uniq -u prints only the lines that are not repeated (before, the flag was ignored and every distinct line printed)",
+    "out": "Kai\nLena\nOmar\nTomas\nZoe"
+  },
+  "find . -maxdepth 1": {
+    "reason": "Task 10: find -maxdepth is built: it lists the start point and its direct children",
+    "out": ".\n./camp\n./config.ini\n./forest\n./journal.txt\n./notes.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
   }
 }

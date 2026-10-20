@@ -993,5 +993,104 @@
     "reason": "Task 9: awk is a real command; the dedupe idiom; readme.txt has no repeated lines (matches mawk 1.3.4 on the same file)",
     "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
     "code": 0
+  },
+  "cat /dev/zero | head -c 10": {
+    "reason": "Task 10: head -c N is built (the first N bytes), where it used to treat -c and N as file names",
+    "out": "cat: /dev/zero: No such file or directory",
+    "code": 0
+  },
+  "head -c 5 /dev/null": {
+    "reason": "Task 10: head -c N is built (the first N bytes), where it used to treat -c and N as file names",
+    "out": "",
+    "code": 0
+  },
+  "find . -maxdepth 1": {
+    "reason": "Task 10: find -maxdepth is built: it lists the start point and its direct children",
+    "out": ".\n./camp\n./config.ini\n./docs\n./drafts\n./forest\n./journal.txt\n./lib\n./logs\n./notes.txt\n./numbers.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "find . -mindepth 1 -maxdepth 1": {
+    "reason": "Task 10: find -mindepth and -maxdepth are built: the direct children of the start point, without the start point",
+    "out": "./camp\n./config.ini\n./docs\n./drafts\n./forest\n./journal.txt\n./lib\n./logs\n./notes.txt\n./numbers.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "find . -empty": {
+    "reason": "Task 10: find -empty is built: it lists empty files and empty folders",
+    "out": "./camp/supplies/food\n./camp/tent.txt\n./drafts\n./scripts",
+    "code": 0
+  },
+  "find . -name \"*.txt\" -exec echo {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "find . -name \"*.txt\" -exec cat {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "find . -name \"*.txt\" -exec grep -l wolf {} +": {
+    "reason": "Task 10: find -exec ... {} + is built: one grep -l run with every .txt file; only journal.txt mentions wolf",
+    "out": "./journal.txt",
+    "code": 0
+  },
+  "find . -name \"*.txt\" -print0 | xargs -0 echo": {
+    "reason": "Task 10: find -print0 and xargs -0 are built: the NUL-separated names reach echo as arguments",
+    "out": "./camp/tent.txt ./docs/ideas.txt ./docs/notes.txt ./docs/todo.txt ./forest/cave/deeper/chest/gold.txt ./forest/cave/echo.txt ./forest/mushroom.txt ./forest/owl.txt ./journal.txt ./logs/readme.txt ./notes.txt ./numbers.txt ./readme.txt ./secrets.txt ./village/logs/notes.txt ./village/people.txt ./village/scratch/keep.txt ./village/shop.txt",
+    "code": 0
+  },
+  "find . -name \"*.log\" -delete": {
+    "reason": "Task 10: find -delete is built: it removes the matching files (10 .log files) and prints nothing",
+    "out": "",
+    "code": 0,
+    "gone": [
+      "/home/explorer/logs/app.log",
+      "/home/explorer/logs/db.log",
+      "/home/explorer/logs/web.log",
+      "/home/explorer/village/logs/access.log",
+      "/home/explorer/village/logs/all.log",
+      "/home/explorer/village/logs/day1.log",
+      "/home/explorer/village/logs/day2.log",
+      "/home/explorer/village/logs/day3.log",
+      "/home/explorer/village/scratch/old1.log",
+      "/home/explorer/village/scratch/old2.log"
+    ]
+  },
+  "find . -type f -exec wc -l {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "echo a b c | xargs -P 2 echo": {
+    "reason": "Task 10: xargs -P is accepted (batches run one after another in input order); without -n all items go to one echo",
+    "out": "a b c",
+    "code": 0
+  },
+  "echo a b c | xargs -P 2 -n 1 echo": {
+    "reason": "Task 10: xargs -P is accepted (batches run one after another in input order); -n 1 gives one echo per item",
+    "out": "a\nb\nc",
+    "code": 0
+  },
+  "printf \"a\\0b\\0\" | xargs -0 echo": {
+    "reason": "Task 10: xargs -0 is built: the NUL-separated items a and b reach echo",
+    "out": "a b",
+    "code": 0
+  },
+  "echo a b | xargs -t echo": {
+    "reason": "Task 10: xargs -t is built: it prints each command line to stderr before running it",
+    "out": "echo a b\na b",
+    "code": 0
+  },
+  "tac readme.txt": {
+    "reason": "Task 10: tac is built: it prints the lines last to first, where the name used to be unknown",
+    "out": "Type help any time to see the commands you can use.\nFolders hold other things. Files hold text.\nThis world is made of folders and files.\nWelcome, explorer!",
+    "code": 0
+  },
+  "nl readme.txt": {
+    "reason": "Task 10: nl is built: it numbers the lines (-b t by default, six-wide number, tab), where the name used to be unknown",
+    "out": "     1\tWelcome, explorer!\n     2\tThis world is made of folders and files.\n     3\tFolders hold other things. Files hold text.\n     4\tType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "comm readme.txt readme.txt": {
+    "reason": "Task 10: comm is built: a file against itself puts every line in column 3 (two tabs), where the name used to be unknown",
+    "out": "\t\tWelcome, explorer!\n\t\tThis world is made of folders and files.\n\t\tFolders hold other things. Files hold text.\n\t\tType help any time to see the commands you can use.",
+    "code": 0
   }
 }

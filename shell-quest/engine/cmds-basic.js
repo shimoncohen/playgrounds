@@ -78,17 +78,9 @@ const CMDS={
     if(o.u)L=L.filter((x,i)=>L.indexOf(x)===i);return {out:L.join('\n'),err,code:err.length?2:0}},
   uniq(a,io){const {fl,rest}=flags(a);const {src,err}=readInputs(rest.slice(0,1),io,'uniq');const L=src.length?lines(src[0].text):[];const g=[];
     for(const x of L){if(g.length&&g[g.length-1][0]===x)g[g.length-1][1]++;else g.push([x,1])}
-    return {out:g.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
-  find(a){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')){start=a[0];i=1}let rx=null,type=null;
-    for(;i<a.length;i++){const p=a[i];if(p==='-name'||p==='-iname'){const v=a[++i];if(v==null)return E(`find: missing argument to '${p}'`);rx=globRe(v,p==='-iname')}
-      else if(p==='-type'){type=a[++i];if(type!=='f'&&type!=='d'&&type!=='l')return E(`find: unknown argument to -type: ${type}`)}
-      else if(p==='-print'){}
-      else if(p.startsWith('-')||p==='!'||p==='(')return E(`this practice shell does not support find ${p} yet`);
-      else{const r=E(`find: paths must come before the search options: '${p}'`);if(/[*?]/.test(a.join('')))r.tips=['Tip: put quotes around the pattern, like -name "*.txt", so the shell leaves the * for find.'];return r}}
-    const root=getNode(norm(start));if(!root)return E(`find: '${start}': No such file or directory`);const out=[];
-    (function walk(n,path,nm){if((!rx||rx.test(nm))&&(!type||n.type===({d:'dir',f:'file',l:'link'})[type]))out.push(path);
-      if(n.type==='dir')for(const k of Object.keys(n.children).sort(cmpName))walk(n.children[k],path.replace(/\/$/,'')+'/'+k,k)})(root,start,bname(norm(start)));
-    return ok(out.join('\n'))},
+    const shown=g.filter(([,n])=>fl.has('d')?(fl.has('u')?false:n>1):fl.has('u')?n===1:true); /* -d: only repeated lines, -u: only lines that are not repeated, both: none */
+    return {out:shown.map(([x,n])=>fl.has('c')?String(n).padStart(7)+' '+x:x).join('\n'),err,code:err.length?1:0}},
+  find:null, /* defined in cmds-sys.js; the key stays here so command suggestions keep their order */
   tree(a,io){const {fl,rest}=flags(a);const t=rest[0]||'.';const n=getNode(norm(t));if(!n)return E(`tree: '${t}': No such file or directory`);if(n.type!=='dir')return ok(t);
     const out=[io.tty?M('d',t):t];let dc=0,fc=0;
     (function rec(node,pre){const ks=sortedKeys(node).filter(k=>fl.has('a')||!k.startsWith('.'));ks.forEach((k,i)=>{const last=i===ks.length-1,c=node.children[k];
@@ -141,7 +133,27 @@ function parseMode(str){let m=str.match(/^0?([0-7]{3})$/);
     for(const o of c[2].match(/[-+=][rwx]*/g)){let bits=0;for(const p of o.slice(1)){const b=p==='r'?4:p==='w'?2:1;bits|=b*0o111}
       ops.push([o[0],who?(c[1]?who:mask):mask,bits,c[1]?who:0o777])}}
   return old=>{let v=old;for(const [op,w,bits,cw] of ops){const b=bits&w;v=op==='+'?v|b:op==='-'?v&~b:(v&~cw)|b}return v}}
-function headTail(a,io,cmd){const {n,rest,bad}=parseN(a);if(bad)return E(`${cmd}: invalid number of lines`);const {src,err}=readInputs(rest,io,cmd);const out=[];
+/* head/tail: -n N (also -nN, -N; tail -n +N), and -c N bytes (head -c -N: all but the last N; tail -c +N: from byte N). The last of -n and -c wins.
+   Bytes are the characters of this practice shell's text, counting the newline that ends each line (also the last); a K/M/G suffix is not supported. */
+function headTail(a,io,cmd){let mode='n',cv=null;const na=[];
+  for(let i=0;i<a.length;i++){const x=a[i];
+    if(x==='-c'||/^-c./.test(x)){
+      let v=x==='-c'?a[++i]:x.slice(2);
+      if(v===undefined)return E(`${cmd}: option requires an argument -- 'c'`);
+      if(/^[+-]?\d+[bkKmMgGtTPEZYR]/.test(v))return E(`this practice shell does not support ${cmd} -c with a size suffix yet`);
+      if(!(cmd==='tail'?/^[+-]?\d+$/:/^-?\d+$/).test(v))return E(`${cmd}: invalid number of bytes: '${v}'`);
+      mode='c';cv=v;continue}
+    if(x==='-n'){na.push(x,a[++i]);mode='n';continue}
+    if(/^-n\d+$/.test(x)||/^-\d+$/.test(x))mode='n';
+    na.push(x)}
+  const {n,rest,bad}=parseN(na);if(bad)return E(`${cmd}: invalid number of lines`);const {src,err}=readInputs(rest,io,cmd);
+  if(mode==='c'){const sec=src.map(s=>{const t=s.text===''?'':s.text+'\n',len=t.length;let part; /* a file's last line ends in a newline, a byte like any other */
+      if(cmd==='head'){const k=parseInt(cv,10);part=k<0?t.slice(0,Math.max(0,len+k)):t.slice(0,k)}
+      else if(cv[0]==='+'){const k=parseInt(cv,10);part=t.slice(Math.max(0,k-1))}
+      else{const k=Math.abs(parseInt(cv,10));part=k?t.slice(Math.max(0,len-k)):''}
+      return (src.length>1?`==> ${s.name} <==\n`:'')+part});
+    return {out:sec.join('\n').replace(/\n$/,''),err,code:err.length?1:0}}
+  const out=[];
   src.forEach((s,i)=>{const L=lines(s.text);const part=cmd==='head'?L.slice(0,n):(n?L.slice(-n):[]);if(src.length>1)out.push((i?'\n':'')+`==> ${s.name} <==`);out.push(...part)});
   return {out:out.join('\n'),err,code:err.length?1:0}}
 function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const r=move||fl.has('r')||fl.has('R');

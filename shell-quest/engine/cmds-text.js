@@ -2,7 +2,7 @@
 const {norm,getNode,writeFile,ok,E,lines,readInputs,globRe,cmpName,M}=SQ;
 const CMDS=SQ.CMDS;
 const unsup=x=>E(`this practice shell does not support ${x} yet`);
-const REAL={tee:'ip',cut:'bsnz',tr:'cCt',sed:'zuNlbf',seq:'swf',xargs:'0PLstpdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z'};
+const REAL={tee:'ip',cut:'bnz',tr:'cCt',sed:'zuNlbf',seq:'swf',xargs:'LspdEaoeix',diff:'ucrywbBNaeisxUdlpT',printf:'',basename:'asz',dirname:'z',tac:'sbr',nl:'hfdlp',paste:'z',comm:'z'};
 const badOpt=(cmd,ch)=>ch==='-'||(REAL[cmd]||'').includes(ch)?unsup(`${cmd} ${ch==='-'?'--long options':'-'+ch}`):E(`${cmd}: invalid option -- '${ch}'`);
 const isOpt=x=>x.length>1&&x[0]==='-'&&x!=='--';
 const MAX_SEQ=10000,MAX_OUT=200000,MAX_XARGS=1000,MAX_XDEPTH=3;
@@ -18,19 +18,23 @@ CMDS.tee=function(a,io){let app=false,i=0;
 function parseList(s){if(!s)return null;const rs=[];for(const p of s.split(',')){const m=p.match(/^(\d*)(-?)(\d*)$/);if(!p||!m||(!m[1]&&!m[3]))return null;
     const lo=m[1]?+m[1]:1,hi=m[2]?(m[3]?+m[3]:Infinity):lo;if(lo<1||hi<lo&&m[3])return null;rs.push([lo,hi])}
   return n=>rs.some(([lo,hi])=>n>=lo&&n<=hi)}
-CMDS.cut=function(a,io){let d='\t',f=null,c=null,i=0;const files=[];
-  for(;i<a.length;i++){const x=a[i];if(x==='--'){files.push(...a.slice(i+1));break}
+CMDS.cut=function(a,io){let d='\t',f=null,c=null,sup=false;const files=[];
+  for(let i=0;i<a.length;i++){const x=a[i];if(x==='--'){files.push(...a.slice(i+1));break}
     if(!isOpt(x)){files.push(x);continue}
-    const k=x[1];if(k!=='d'&&k!=='f'&&k!=='c')return badOpt('cut',k);
-    let v=x.slice(2);if(v===''){if(i+1>=a.length)return E(`cut: option requires an argument -- '${k}'`);v=a[++i]}
-    if(k==='d'){if([...v].length!==1)return E('cut: the delimiter must be a single character');d=v}else if(k==='f')f=v;else c=v}
+    for(let j=1;j<x.length;j++){const k=x[j];
+      if(k==='s'){sup=true;continue}
+      if(k!=='d'&&k!=='f'&&k!=='c')return badOpt('cut',k);
+      let v=x.slice(j+1);if(v===''){if(i+1>=a.length)return E(`cut: option requires an argument -- '${k}'`);v=a[++i]}
+      if(k==='d'){if([...v].length!==1)return E('cut: the delimiter must be a single character');d=v}else if(k==='f')f=v;else c=v;
+      break}}
   if(f===null&&c===null)return E('cut: you must specify a list of bytes, characters, or fields');
   if(f!==null&&c!==null)return E('cut: only one type of list may be specified');
+  if(sup&&f===null)return E("cut: suppressing non-delimited lines makes sense\n\tonly when operating on fields\nTry 'cut --help' for more information.");
   const pick=parseList(f!==null?f:c);if(!pick)return E('cut: invalid byte, character or field list');
   const {src,err}=readInputs(files,io,'cut');const out=[];
   for(const s of src)for(const ln of lines(s.text)){
     if(c!==null)out.push([...ln].filter((_,j)=>pick(j+1)).join(''));
-    else if(!ln.includes(d))out.push(ln);
+    else if(!ln.includes(d)){if(!sup)out.push(ln)}
     else out.push(ln.split(d).filter((_,j)=>pick(j+1)).join(d))}
   return {out:out.join('\n'),err,code:err.length?1:0}};
 
@@ -131,33 +135,87 @@ CMDS.seq=function(a){const nums=[];
   const out=[];for(let k=0,x=first;inc>0?x<=last+1e-9:x>=last-1e-9;k++,x=first+k*inc)out.push(x.toFixed(dec));
   return ok(out.join('\n'))};
 
+// ---- running a command from inside another (xargs, find -exec) ----
+/* runArgv(argv, io): one command word list run the way the prompt would: a function first, then a path (./script), then a command.
+   Returns {out,err,tips,code}, or null when there is no such command. Its stdin is empty; its output stays text (no terminal colours). */
+function runArgv(argv,io){
+  const name=argv[0],a=argv.slice(1);
+  const child={tty:false,depth:io.depth,pipeLen:1,record:io.record,loops:0,stdin:'',stdinBox:null};
+  if(SQ.hasFunction(name))return SQ.callFunction(name,a,child);
+  if(name.includes('/'))return SQ.runPath(name,child,false,a);
+  const f=SQ.own(CMDS,name)&&CMDS[name];
+  return typeof f==='function'?f(a,child):null}
+/* a word as xargs -t shows it: bare when plain, else quoted so it could be pasted back */
+function shq(w){if(/^[A-Za-z0-9_@%+=:,.\/-]+$/.test(w))return w;
+  if(w==='')return "''";
+  if(!w.includes("'"))return "'"+w+"'";
+  if(!/["$`\\!]/.test(w))return '"'+w+'"';
+  return "'"+w.split("'").join("'\\''")+"'"}
+Object.assign(SQ,{runArgv,shellQuote:shq});
+
 // ---- xargs ----
+/* xargs [-0] [-r] [-t] [-n N] [-P N] [-I STR] [COMMAND [ARG...]]  (default command: echo)
+   Input is split on blanks and newlines with '...' "..." and \ quoting (-0: on NUL, nothing special; -I: one item per line, leading blanks dropped).
+   -n N runs the command once per N items, -I STR once per item with STR replaced in the arguments after the command name, -r skips a run on empty
+   input, -t prints each command to stderr first. -P N is accepted and runs the batches one after another in input order (a practice shell has one
+   process). COMMAND may be a command, a function or ./script. Exit status as GNU: 123 when a run failed, 124 when one exited 255 (xargs stops),
+   127 when the command is missing (xargs stops). Each run costs a step and a typed line runs at most MAX_XARGS of them. */
+const TRY="\nTry 'xargs --help' for more information.";
+function xargsItems(text,mode){ /* mode: 'nul' | 'line' | 'blank' -> {items, err} (err: the quoting error that ended the input) */
+  if(mode==='nul'){const p=text.split('\0');if(p.length&&p[p.length-1]==='')p.pop();return {items:p,err:null}}
+  const items=[];let cur='',has=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(c==='\n'){if(has)items.push(cur);cur='';has=false;continue}
+    if(c===' '||c==='\t'){if(mode==='blank'){if(has)items.push(cur);cur='';has=false}else if(has)cur+=c;continue}
+    if(c==='\\'){if(i+1<text.length&&text[i+1]!=='\n'){cur+=text[++i];has=true}continue}
+    if(c==='"'||c==="'"){const j=text.indexOf(c,i+1),nl=text.indexOf('\n',i+1);
+      if(j<0||(nl>=0&&nl<j))return {items,err:`xargs: unmatched ${c==='"'?'double':'single'} quote; by default quotes are special to xargs unless you use the -0 option`};
+      cur+=text.slice(i+1,j);has=true;i=j;continue}
+    cur+=c;has=true}
+  if(has)items.push(cur);
+  return {items,err:null}}
 let xDepth=0,xBudget=MAX_XARGS;
-CMDS.xargs=function(a,io){let n=0,repl=null,noRun=false,i=0;
+CMDS.xargs=function(a,io){let n=0,repl=null,noRun=false,trace=false,nul=false,i=0,warn=null;
+  const need=ch=>E(`xargs: option requires an argument -- '${ch}'${TRY}`);
   for(;i<a.length&&isOpt(a[i]);i++){const x=a[i];
-    if(x==='-r')noRun=true;
-    else if(x[1]==='n'){let v=x.slice(2);if(v==='')v=a[++i];if(!/^\d+$/.test(v||'')||+v<1)return E(`xargs: invalid number for -n option`);n=+v}
-    else if(x[1]==='I'){let v=x.slice(2);if(v==='')v=a[++i];if(!v)return E("xargs: option requires an argument -- 'I'");repl=v}
-    else return badOpt('xargs',x[1])}
+    if(x==='--')break;
+    for(let j=1;j<x.length;j++){const ch=x[j];
+      if(ch==='r'){noRun=true;continue}
+      if(ch==='t'){trace=true;continue}
+      if(ch==='0'){nul=true;continue}
+      if(ch==='n'||ch==='I'||ch==='P'){let v=x.slice(j+1);if(v===''){if(i+1>=a.length)return need(ch);v=a[++i]}
+        if(ch==='I'){if(v==='')return E('xargs: replace-str must be non-empty');repl=v;if(n)warn='xargs: warning: options --max-args and --replace/-I/-i are mutually exclusive, ignoring previous --max-args value';n=0}
+        else{if(!/^\d+$/.test(v))return E(`xargs: invalid number "${v}" for -${ch} option${TRY}`);
+          if(ch==='n'){if(+v<1)return E(`xargs: value ${v} for -n option should be >= 1${TRY}`);if(repl===null)n=+v}}
+        break}
+      return badOpt('xargs',ch)}}
   if(a[i]==='--')i++;
   const cmd=a.slice(i);if(!cmd.length)cmd.push('echo');
   if(xDepth>=MAX_XDEPTH)return E('xargs: too many nested xargs for this practice shell');
-  const fn=SQ.own(CMDS,cmd[0])&&CMDS[cmd[0]];if(!fn)return E(`xargs: ${cmd[0]}: No such file or directory`,127);
-  const items=repl!==null?lines(io.stdin).filter(l=>l.trim()!==''):io.stdin.split(/\s+/).filter(Boolean);
+  const {items,err:qerr}=xargsItems(io.stdin,nul?'nul':repl!==null?'line':'blank');
   let calls;
-  if(repl!==null)calls=items.map(it=>cmd.map(w=>w.split(repl).join(it)));
-  else if(!items.length)calls=noRun?[]:[cmd.slice()];
+  if(repl!==null){calls=[];
+    for(const it of items){let size=0;
+      const words=cmd.map((w,k)=>{if(k===0)return w;const parts=w.split(repl);size+=w.length+(parts.length-1)*(it.length-repl.length);return parts});
+      if(size>2*SQ.LIM.TEXT)throw new SQ.StepLimit('the expanded words grew too large');
+      calls.push(words.map((w,k)=>k===0?w:w.join(it)))}}
+  else if(!items.length)calls=noRun||qerr?[]:[cmd.slice()];
   else if(n){calls=[];for(let k=0;k<items.length;k+=n)calls.push(cmd.concat(items.slice(k,k+n)))}
   else calls=[cmd.concat(items)];
   const top=xDepth===0;if(top)xBudget=MAX_XARGS;
-  const out=[],err=[],tips=[];let code=0;xDepth++;
+  const out=[],err=warn?[warn]:[],tips=[];let code=0,total=0;xDepth++;
   try{for(const w of calls){
       if(xBudget<=0){err.push('xargs: too many commands for this practice shell');code=1;break}
-      xBudget--;SQ.step();const f=SQ.own(CMDS,w[0])&&CMDS[w[0]];
-      if(!f){err.push(`xargs: ${w[0]}: No such file or directory`);code=127;continue}
-      const r=f(w.slice(1),Object.assign({},io,{stdin:'',tty:false,pipeLen:1}));
-      if(r.out!=='')out.push(r.out);err.push(...(r.err||[]));tips.push(...(r.tips||[]));if(r.code!==0&&code===0)code=123}}
+      xBudget--;SQ.step();
+      if(trace)err.push(w.map(shq).join(' '));
+      const r=runArgv(w,io);
+      if(!r){err.push(`xargs: ${w[0]}: No such file or directory`);code=127;break}
+      if(r.out!==''){out.push(r.out);total+=r.out.length}err.push(...(r.err||[]));tips.push(...(r.tips||[]));
+      if(r.code===255){err.push(`xargs: ${w[0]}: exited with status 255; aborting`);code=124;break}
+      if(r.code!==0&&code===0)code=123;
+      if(total>SQ.LIM.TEXT)break}} /* the line's output is over the cap: the caller prints its 'output too large' notice */
   finally{xDepth--}
+  if(qerr){err.push(qerr);if(code===0)code=1}
   return {out:out.join('\n'),err,code,tips}};
 
 // ---- diff ----
@@ -309,6 +367,107 @@ CMDS.grep=function(a,io){
   }catch(e){if(e&&e.complex)return {out:out.join('\n'),err:['grep: '+e.message],code:2};throw e}
   const errs=err.filter(e=>e!==null);
   return {out:out.join('\n'),err:errs,code:o.q&&matchedAny?0:err.length?2:matchedAny?0:1}};
+
+// ---- tac / nl / paste / comm ----
+/* One input operand (a file name, '-' or none = stdin) as text, or null after pushing the error. stdin can be taken once. */
+function takeInput(cmd,name,io,err,box,fmt){
+  if(name==='-'){if(box.used)return '';box.used=true;return io.stdin}
+  if(SQ.isNull(name))return '';
+  const abs=norm(name),n=getNode(abs);
+  if(!n){err.push(fmt==='open'?`${cmd}: failed to open '${name}' for reading: ${SQ.isLoop(abs)?'Too many levels of symbolic links':'No such file or directory'}`:`${cmd}: ${name}: ${SQ.isLoop(abs)?'Too many levels of symbolic links':'No such file or directory'}`);return null}
+  if(n.type==='dir'){err.push(fmt==='open'?`${cmd}: ${name}: read error: Is a directory`:`${cmd}: ${name}: Is a directory`);return null}
+  return n.content}
+/* plain operands of a command with no options of its own: [files], and the first error for a bad option */
+function operandsOnly(cmd,a){const files=[];let end=false;
+  for(const x of a){if(!end&&x==='--'){end=true;continue}
+    if(!end&&isOpt(x))return {bad:badOpt(cmd,x[1])};files.push(x)}
+  return {files}}
+
+/* tac [FILE...]: each file's lines last to first, files in the order given. */
+CMDS.tac=function(a,io){const o=operandsOnly('tac',a);if(o.bad)return o.bad;
+  const err=[],box={used:false},out=[];
+  for(const f of (o.files.length?o.files:['-'])){const t=takeInput('tac',f,io,err,box,'open');if(t===null)continue;out.push(...lines(t).reverse())}
+  return {out:out.join('\n'),err,code:err.length?1:0}};
+
+/* nl [-b a|t|n] [-n ln|rn|rz] [-w N] [-s STR] [-v N] [-i N] [FILE...]: number lines (default -b t: only non-empty lines; -b a numbers every line;
+   width 6, right-justified, a tab after the number). Numbering runs on across files. Unsupported: -h -f -d -l -p and -b pREGEX. */
+CMDS.nl=function(a,io){let style='t',fmt='rn',w=6,sep='\t',start=1,inc=1;const files=[];
+  const num=(v,what)=>/^[+-]?\d+$/.test(v)?parseInt(v,10):null;
+  for(let i=0;i<a.length;i++){const x=a[i];
+    if(x==='--'){files.push(...a.slice(i+1));break}
+    if(!isOpt(x)){files.push(x);continue}
+    for(let j=1;j<x.length;j++){const ch=x[j];
+      if(!'bnwsvi'.includes(ch))return badOpt('nl',ch);
+      let v=x.slice(j+1);if(v===''){if(i+1>=a.length)return E(`nl: option requires an argument -- '${ch}'`);v=a[++i]}
+      if(ch==='b'){if(v[0]==='p')return unsup('nl -b pREGEX');if(!['a','t','n'].includes(v))return E(`nl: invalid body numbering style: '${v}'\nTry 'nl --help' for more information.`);style=v}
+      else if(ch==='n'){if(!['ln','rn','rz'].includes(v))return E(`nl: invalid line numbering format: '${v}'\nTry 'nl --help' for more information.`);fmt=v}
+      else if(ch==='w'){if(!/^\d+$/.test(v)||+v<1)return E(`nl: invalid line number field width: '${v}'\nTry 'nl --help' for more information.`);w=+v}
+      else if(ch==='s')sep=v;
+      else if(ch==='v'){const k=num(v);if(k===null)return E(`nl: invalid starting line number: '${v}'`);start=k}
+      else{const k=num(v);if(k===null)return E(`nl: invalid line number increment: '${v}'`);inc=k}
+      break}}
+  const err=[],box={used:false},out=[];let k=start;
+  for(const f of (files.length?files:['-'])){const t=takeInput('nl',f,io,err,box,'plain');if(t===null)continue;
+    for(const ln of lines(t)){
+      if(style==='a'||(style==='t'&&ln!=='')){const s=String(k);k+=inc;
+        out.push((fmt==='ln'?s.padEnd(w):fmt==='rn'?s.padStart(w):(s[0]==='-'?'-'+s.slice(1).padStart(w-1,'0'):s.padStart(w,'0')))+sep+ln)}
+      else out.push(' '.repeat(w+sep.length)+ln)}}
+  return {out:out.join('\n'),err,code:err.length?1:0}};
+
+/* paste [-s] [-d LIST] [FILE...]: lines of the files side by side with the delimiters in LIST used in turn (default tab); -s pastes each file's lines
+   into one row. '-' is stdin (several '-' take turns). A missing file is the only output. */
+CMDS.paste=function(a,io){let ser=false,dl=['\t'];const files=[];
+  for(let i=0;i<a.length;i++){const x=a[i];
+    if(x==='--'){files.push(...a.slice(i+1));break}
+    if(!isOpt(x)){files.push(x);continue}
+    for(let j=1;j<x.length;j++){const ch=x[j];
+      if(ch==='s'){ser=true;continue}
+      if(ch!=='d')return badOpt('paste',ch);
+      let v=x.slice(j+1);if(v===''){if(i+1>=a.length)return E("paste: option requires an argument -- 'd'");v=a[++i]}
+      const L=[];for(let k=0;k<v.length;k++){const c=v[k];
+        if(c==='\\'){const e=v[++k];if(e===undefined)return E(`paste: delimiter list ends with an unescaped backslash: ${v}`);L.push(e==='n'?'\n':e==='t'?'\t':e==='0'?'':e==='\\'?'\\':e)}
+        else L.push(c)}
+      dl=L.length?L:[''];break}}
+  const err=[],box={used:false},streams=[];let shared=null;
+  for(const f of (files.length?files:['-'])){
+    if(f==='-'){if(!shared)shared={L:lines(box.used?'':(box.used=true,io.stdin)),pos:0};streams.push(shared);continue}
+    const t=takeInput('paste',f,io,err,box,'plain');if(t===null)return {out:'',err,code:1};streams.push({L:lines(t),pos:0})}
+  const out=[];
+  if(ser){for(const s of streams){let row='';s.L.forEach((ln,k)=>{row+=(k?dl[(k-1)%dl.length]:'')+ln});out.push(row)}}
+  else for(;;){
+    if(streams.every(s=>s.pos>=s.L.length))break;
+    SQ.step();
+    let row='';streams.forEach((s,k)=>{const ln=s.pos<s.L.length?s.L[s.pos++]:'';row+=(k?dl[(k-1)%dl.length]:'')+ln});
+    out.push(row)}
+  return {out:out.join('\n'),err,code:err.length?1:0}};
+
+/* comm [-1] [-2] [-3] FILE1 FILE2: two sorted files in three columns (only in 1, only in 2, in both); -N hides column N. Sorted input is assumed;
+   when a line comes before the one above it, "comm: file N is not in sorted order" is printed once per file (only after a line without a partner,
+   as GNU does), the run goes on, and the status is 1 with a closing "comm: input is not in sorted order". */
+const collate=(x,y)=>x===y?0:(x.localeCompare(y)||(x<y?-1:1));
+CMDS.comm=function(a,io){const hide=[false,false,false],ops=[];let end=false;
+  for(const x of a){
+    if(end||!isOpt(x)){ops.push(x);continue}
+    if(x==='--'){end=true;continue}
+    for(const ch of x.slice(1)){if(ch==='1'||ch==='2'||ch==='3')hide[+ch-1]=true;else return badOpt('comm',ch)}}
+  if(ops.length<2)return E(ops.length?`comm: missing operand after '${ops[0]}'\nTry 'comm --help' for more information.`:`comm: missing operand\nTry 'comm --help' for more information.`);
+  if(ops.length>2)return E(`comm: extra operand '${ops[2]}'\nTry 'comm --help' for more information.`);
+  const err=[],box={used:false},L=[];
+  for(const f of ops){const t=takeInput('comm',f,io,err,box,'plain');if(t===null)return {out:'',err,code:1};L.push(lines(t))}
+  const p2=hide[0]?'':'\t',p3=(hide[0]?'':'\t')+(hide[1]?'':'\t');
+  const out=[],warned=[false,false];let i=0,j=0,unpaired=false,work=0;
+  const adv=(k)=>{const arr=L[k],at=k?j:i;
+    if(at+1<arr.length&&unpaired&&!warned[k]&&collate(arr[at],arr[at+1])>0){warned[k]=true;err.push(`comm: file ${k+1} is not in sorted order`)}
+    if(k)j++;else i++};
+  while(i<L[0].length||j<L[1].length){
+    if(++work%200===0)SQ.step();
+    const c=i>=L[0].length?1:j>=L[1].length?-1:collate(L[0][i],L[1][j]);
+    if(c<0){if(!hide[0])out.push(L[0][i]);unpaired=true;adv(0)}
+    else if(c>0){if(!hide[1])out.push(p2+L[1][j]);unpaired=true;adv(1)}
+    else{if(!hide[2])out.push(p3+L[0][i]);adv(0);adv(1)}}
+  if(warned[0]||warned[1])err.push('comm: input is not in sorted order');
+  return {out:out.join('\n'),err,code:warned[0]||warned[1]?1:0}};
+
 
 // ---- basename / dirname ----
 CMDS.basename=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('basename',a[0][1]);

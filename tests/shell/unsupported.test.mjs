@@ -26,8 +26,8 @@ describe('unbuilt grep/find/pipe syntax says so instead of misbehaving', () => {
     assert.equal(msg('find . -type d -print').out, msg('find . -type d').out);
     assert.equal(msg('find -print').out, msg('find').out);
   });
-  it('find -delete, -exec and friends', () => {
-    for (const f of ['-delete', '-exec', '-maxdepth']) assert.equal(msg(`find . ${f} x`).out, `this practice shell does not support find ${f} yet`);
+  it('find -newer, -o and friends', () => {
+    for (const f of ['-newer', '-o', '-path']) assert.equal(msg(`find . ${f} x`).out, `this practice shell does not support find ${f} yet`);
     assert.equal(msg('find . -name gold.txt').out, './forest/cave/deeper/chest/gold.txt');
     assert.match(msg('find . stray').out, /paths must come before/);
   });

@@ -229,7 +229,7 @@ describe('unsupported real options say so', () => {
   it('sed hold space', () => U("echo a | sed 'h;G'", "sed command 'h'"));
   it('seq -s', () => U('seq -s, 3', 'seq -s'));
   it('tr -c', () => U('echo a | tr -cd a', 'tr -c'));
-  it('cut -s', () => U('echo a | cut -s -d, -f1', 'cut -s'));
+  it('cut -z', () => U('echo a | cut -z -d, -f1', 'cut -z'));
   it('nonexistent letter stays invalid option', () => assert.match(out('echo a | sed -j p'), /sed: invalid option -- 'j'/));
 });
 
@@ -373,5 +373,369 @@ describe('grep flags (Stage 3)', () => {
     assert.equal(run(SQ, 'grep -c line big').out, '3000');
     assert.equal(run(SQ, 'grep -o 1 big | wc -l').out, '1900');
     assert.equal(run(SQ, 'grep -A2 line big | wc -l').out.length > 0, true);
+  });
+});
+
+// ---- Task 10: find -exec / -delete / depth options, xargs options, tac nl paste comm, cut -s, head/tail -c, uniq -d -u ----
+// Expected values were taken from GNU findutils 4.9 / coreutils on the same data (names in this practice shell come out sorted, GNU's in directory order).
+describe('find actions and depth options (Task 10)', () => {
+  const world = () => {
+    const SQ = loadShell();
+    for (const l of ['mkdir -p t/d/e t/d/empty t/sp', 'cd t', 'echo hi > a.txt', "printf 'x\\ny\\n' > b.log", 'touch e0 d/e/z.txt', 'echo x > d/b.txt', "echo q > 'sp/f g.txt'", 'ln -s d ld', 'ln -s a.txt lf']) run(SQ, l);
+    return SQ;
+  };
+  const eq = (l, out, code = 0, SQ = world()) => assert.deepEqual(run(SQ, l), { out, code }, l);
+
+  it('-exec CMD {} \\; runs once per match, in find order, with {} replaced inside words', () => {
+    eq("find . -name '*.txt' -exec wc -l {} \\;", '1 ./a.txt\n1 ./d/b.txt\n0 ./d/e/z.txt\n1 ./sp/f g.txt');
+    eq("find d -name '*.txt' -exec echo a{}b {} \\;", 'ad/b.txtb d/b.txt\nad/e/z.txtb d/e/z.txt');
+    eq('find d -type f -exec cat {} \\;', 'x');
+    eq('find d -name b.txt -exec echo one {} \\; -exec echo two {} \\;', 'one d/b.txt\ntwo d/b.txt');
+  });
+  it('-exec ... {} + runs once with every match, and not at all without one', () => {
+    eq("find d -name '*.txt' -exec echo hi {} +", 'hi d/b.txt d/e/z.txt');
+    eq("find d -name '*.txt' -exec echo {} +", 'd/b.txt d/e/z.txt');
+    eq('find d -name zzz -exec echo hi {} +', '');
+  });
+  it('the status of \\; is only a test, a failing + run makes find fail, a missing command is reported', () => {
+    eq("find d -name '*.txt' -exec false {} \\;", '');
+    eq('find d -type f -exec false {} \\; -print', '');
+    eq('find d -type f -exec true {} \\; -print', 'd/b.txt\nd/e/z.txt');
+    eq("find d -name '*.txt' -exec false {} +", '', 1);
+    eq('find d -name b.txt -exec nosuch {} \\;', "find: 'nosuch': No such file or directory");
+    eq('find d -name b.txt -exec nosuch {} +', "find: 'nosuch': No such file or directory", 1);
+  });
+  it('-exec argument errors', () => {
+    eq('find d -exec', "find: missing argument to '-exec'", 1);
+    eq('find d -exec echo {}', "find: missing argument to '-exec'", 1);
+    eq('find d -exec echo {} x +', "find: missing argument to '-exec'", 1);
+    eq('find d -exec echo a{} +', "find: In '-exec ... {} +' the '{}' must appear by itself, but you specified 'a{}'", 1);
+    eq('find d -exec echo {} {} +', 'find: Only one instance of {} is supported with -exec ... +', 1);
+    eq('find d -type f -exec echo + \\;', '+\n+');
+  });
+  it('-exec can run a function and a script', () => {
+    const SQ = world();
+    run(SQ, 'shout() { echo "<$1>"; }');
+    assert.deepEqual(run(SQ, "find d -name '*.txt' -exec shout {} \\;"), { out: '<d/b.txt>\n<d/e/z.txt>', code: 0 });
+    run(SQ, "printf 'echo script $1\\n' > s.sh");
+    assert.deepEqual(run(SQ, 'find d -name b.txt -exec bash s.sh {} \\;'), { out: 'script d/b.txt', code: 0 });
+  });
+  it('-print0 ends each name with NUL; xargs -0 reads it back', () => {
+    assert.equal(run(world(), 'find d -type f -print0').out, 'd/b.txt\0d/e/z.txt\0');
+    eq('find d -type f -print0 | xargs -0 -n1 echo', 'd/b.txt\nd/e/z.txt');
+    eq('find . -name "*.txt" -print0 | xargs -0 echo', './a.txt ./d/b.txt ./d/e/z.txt ./sp/f g.txt');
+  });
+  it('-mindepth / -maxdepth', () => {
+    eq('find . -maxdepth 1', '.\n./a.txt\n./b.log\n./d\n./e0\n./ld\n./lf\n./sp');
+    eq('find . -maxdepth 0', '.');
+    eq('find . -mindepth 1 -maxdepth 1 -type d', './d\n./sp');
+    eq('find . -mindepth 2', './d/b.txt\n./d/e\n./d/e/z.txt\n./d/empty\n./sp/f g.txt');
+    eq("find . -name '*.txt' -maxdepth 1", './a.txt');
+    eq('find . -maxdepth x', "find: Expected a positive decimal integer argument to -maxdepth, but got 'x'", 1);
+    eq('find . -maxdepth -1', "find: Expected a positive decimal integer argument to -maxdepth, but got '-1'", 1);
+    eq('find . -maxdepth', "find: missing argument to '-maxdepth'", 1);
+    eq('find . -mindepth', "find: missing argument to '-mindepth'", 1);
+  });
+  it('-empty matches empty files and empty folders, not links', () => {
+    eq('find . -empty', './d/e/z.txt\n./d/empty\n./e0');
+    eq('find . -empty -type d', './d/empty');
+    eq('find . -empty -type f', './d/e/z.txt\n./e0');
+  });
+  it('a start point that is a link is listed as itself; with a trailing / it is followed', () => {
+    eq('find ld', 'ld');
+    eq('find ld/ -maxdepth 1', 'ld/\nld/b.txt\nld/e\nld/empty');
+    eq('find lf', 'lf');
+  });
+  it('-name sees the start point under the name you typed', () => {
+    eq('find . -name .', '.');
+    eq('find d/ -name d', 'd/');
+  });
+  it('-newer and the boolean operators stay unsupported', () => {
+    for (const x of ['-newer', '-o', '-not', '-path', '-prune', '-size', '-mtime', '-perm', '-execdir', '-a', '-depth']) eq(`find . ${x} x`, `this practice shell does not support find ${x} yet`, 1);
+    eq('find . ! -name x', 'this practice shell does not support find ! yet', 1);
+  });
+  it('-delete removes files, links and empty folders, children first, and never .', () => {
+    const SQ = world();
+    assert.deepEqual(run(SQ, "find . -name '*.txt' -delete -print"), { out: './a.txt\n./d/b.txt\n./d/e/z.txt\n./sp/f g.txt', code: 0 });
+    assert.equal(run(SQ, 'find .').out, '.\n./b.log\n./d\n./d/e\n./d/empty\n./e0\n./ld\n./lf\n./sp');
+    assert.deepEqual(run(SQ, 'find . -empty -delete'), { out: '', code: 0 });
+    assert.equal(run(SQ, 'find .').out, '.\n./b.log\n./ld\n./lf'); /* d emptied out while it was visited, so it went too */
+  });
+  it('-delete prints the children before their folder and keeps a folder that is not empty', () => {
+    const SQ = world();
+    assert.deepEqual(run(SQ, 'find d -delete -print'), { out: 'd/b.txt\nd/e/z.txt\nd/e\nd/empty\nd', code: 0 });
+    const S2 = world();
+    assert.deepEqual(run(S2, 'find . -type d -name d -delete'), { out: "find: cannot delete './d': Directory not empty", code: 1 });
+    assert.equal(run(S2, 'ls d').out, 'b.txt  e/  empty/');
+    assert.deepEqual(run(S2, 'find . -delete'), { out: '', code: 0 });
+    assert.equal(run(S2, 'ls -a').out, './  ../');
+  });
+  it("-delete and -exec rm keep rm's safety rules", () => {
+    const SQ = loadShell();
+    assert.match(run(SQ, 'find / -maxdepth 0 -delete').out, /find: cannot delete '\/': that would wipe out your whole world/);
+    assert.match(run(SQ, 'find ~ -maxdepth 0 -delete').out, /find: cannot delete '\/home\/explorer': that would wipe out your whole world/);
+    assert.match(run(SQ, 'find /home -maxdepth 0 -delete').out, /find: cannot delete '\/home': that would wipe out your whole world/);
+    assert.ok(run(SQ, 'ls').out.includes('journal.txt'));
+    run(SQ, 'mkdir -p w/in');
+    run(SQ, 'cd w/in');
+    assert.match(run(SQ, 'find /home/explorer/w -delete').out, /find: cannot delete '\/home\/explorer\/w\/in': you are standing inside it/);
+    assert.match(run(SQ, 'find ~ -maxdepth 1 -name w -exec rm -r {} \\;').out, /rm: you are standing inside/);
+    assert.equal(run(SQ, 'pwd').out, '/home/explorer/w/in');
+  });
+  it('a folder that -exec just removed is not entered', () => {
+    const SQ = world();
+    const r = run(SQ, "find . -name d -exec rm -r {} \\; -print");
+    assert.deepEqual(r, { out: "find: './d': No such file or directory\n./d", code: 1 }); /* as GNU: -print still sees ./d, then find fails to enter it */
+    assert.equal(run(SQ, 'ls').out, 'a.txt  b.log  e0  ld  lf  sp/');
+  });
+  it('-exec rm {} + and -exec rmdir remove what matched', () => {
+    const SQ = world();
+    assert.deepEqual(run(SQ, "find . -name 'b.*' -exec rm {} +"), { out: '', code: 0 });
+    assert.equal(run(SQ, 'find . -name "b.*"').out, '');
+    assert.deepEqual(run(SQ, 'find . -type d -empty -exec rmdir {} \\;'), { out: "find: './d/empty': No such file or directory", code: 1 }); /* as GNU: it then tries to enter the folder it removed */
+    assert.equal(run(SQ, 'ls d').out, 'e/');
+  });
+  it('a runaway -exec stops with the friendly step message and the shell stays usable', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 5000 | xargs -n 1000 touch');
+    const r = run(SQ, 'find / -exec true {} \\; -exec true {} \\; -exec true {} \\; -exec true {} \\;');
+    assert.match(r.out, /this practice shell stopped the command: too many steps/);
+    assert.deepEqual(run(SQ, 'echo still here'), { out: 'still here', code: 0 });
+    assert.match(run(SQ, 'find . -exec echo {} \\; | wc -l').out, /too many steps|^\d+$/);
+    assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
+  });
+});
+
+describe('xargs options (Task 10)', () => {
+  const eq = (l, out, code = 0, SQ = loadShell()) => assert.deepEqual(run(SQ, l), { out, code }, l);
+  const TRY = "\nTry 'xargs --help' for more information.";
+  it('-0 splits on NUL only', () => {
+    eq("printf 'a\\0b c\\0' | xargs -0 echo", 'a b c');
+    eq("printf 'a\\0b c\\0' | xargs -0 -n1 echo", 'a\nb c');
+    eq("printf 'a\\0b' | xargs -0 -n1 echo", 'a\nb');
+    eq("printf 'a b\\0c\\0' | xargs -0 -I{} echo '<{}>'", '<a b>\n<c>');
+  });
+  it('-n N groups items', () => {
+    eq("printf 'a b c d e' | xargs -n 2 echo", 'a b\nc d\ne');
+    eq("printf 'a b c' | xargs -n 1 -n 2 echo", 'a b\nc');
+    eq("printf 'a b c' | xargs -n0 echo", 'xargs: value 0 for -n option should be >= 1' + TRY, 1);
+    eq("printf 'a b c' | xargs -n x echo", 'xargs: invalid number "x" for -n option' + TRY, 1);
+    eq("printf 'a b c' | xargs -n", "xargs: option requires an argument -- 'n'" + TRY, 1);
+  });
+  it('-I replaces every {} (or any string) in the arguments after the command, one run per line', () => {
+    eq("printf 'a b\\nc\\n' | xargs -I{} echo '[{}]' {}", '[a b] a b\n[c] c');
+    eq("printf 'a b\\nc\\n' | xargs -I % echo '%'", 'a b\nc');
+    eq("printf 'a b c\\n' | xargs -I{} echo {}{}{}", 'a b ca b ca b c');
+    eq("printf '  a b \\n\\nc\\n' | xargs -I{} echo '[{}]'", '[a b ]\n[c]');
+    eq("printf 'a b\\nc\\n' | xargs -I{} -n1 echo '[{}]'", '[a b]\n[c]');
+    eq("printf 'a' | xargs -I{} {} x", 'xargs: {}: No such file or directory', 127);
+    eq("printf 'a b c' | xargs -I", "xargs: option requires an argument -- 'I'" + TRY, 1);
+  });
+  it('quotes and backslashes group words (not with -0)', () => {
+    eq("printf '\"a b\" c' | xargs -n1 echo", 'a b\nc');
+    eq("printf \"'a b' c\" | xargs -n1 echo", 'a b\nc');
+    eq("printf 'a\\\\ b c' | xargs -n1 echo", 'a b\nc');
+    eq("printf 'a\"b c' | xargs -n1 echo", 'xargs: unmatched double quote; by default quotes are special to xargs unless you use the -0 option', 1);
+    eq("printf \"a'b c\" | xargs echo", 'xargs: unmatched single quote; by default quotes are special to xargs unless you use the -0 option', 1);
+  });
+  it('-P N is accepted and runs the batches one after another, in order', () => {
+    eq("printf 'a b c' | xargs -P 2 -n1 echo", 'a\nb\nc');
+    eq("printf 'a b c' | xargs -P 0 -n1 echo", 'a\nb\nc');
+    eq("printf 'a b c' | xargs -P x -n1 echo", 'xargs: invalid number "x" for -P option' + TRY, 1);
+  });
+  it('-t prints each command to stderr, quoted', () => {
+    eq("printf 'a b' | xargs -t echo", 'echo a b\na b');
+    eq("printf 'a b c' | xargs -t -n2 echo", 'echo a b\necho c\na b\nc'); // stderr (the trace) first: this shell keeps the two streams apart
+    eq("printf 'a b c' | xargs -t -I{} echo '{}'", "echo 'a b c'\na b c");
+    eq("printf 'a' | xargs -t echo 'x y' \"it's\" '$HOME' ''", "echo 'x y' \"it's\" '$HOME' '' a\nx y it's $HOME  a");
+    assert.equal(run(loadShell(), "printf 'a b' | xargs -t echo 2>/dev/null").out, 'a b');
+  });
+  it('-r skips the run on empty input; combined flags work', () => {
+    eq("printf '' | xargs -r echo hi", '');
+    eq("printf '\\n\\n' | xargs echo hi", 'hi');
+    eq("printf 'a b c' | xargs -rn2 echo", 'a b\nc');
+    eq("printf 'a b c' | xargs -n2r echo", 'xargs: invalid number "2r" for -n option' + TRY, 1);
+  });
+  it('-- ends the options', () => {
+    eq("printf 'a b c' | xargs -n1 -- echo", 'a\nb\nc');
+    eq("printf 'a b c' | xargs -- -n1 echo", 'xargs: -n1: No such file or directory', 127);
+  });
+  it('exit status: 123 when a run fails, 127 for a missing command (and it stops)', () => {
+    eq("printf 'a b' | xargs -n1 false", '', 123);
+    eq("printf 'a b' | xargs nosuch", 'xargs: nosuch: No such file or directory', 127);
+    const SQ = loadShell();
+    run(SQ, 'echo hi > a.txt');
+    eq("printf 'a.txt\\nnope' | xargs -n1 cat", 'cat: nope: No such file or directory\nhi', 123, SQ); // stderr first: the two streams are kept apart
+  });
+  it('can call a function and a script', () => {
+    const SQ = loadShell();
+    run(SQ, 'shout() { echo "<$*>"; }');
+    assert.deepEqual(run(SQ, "printf 'a b c' | xargs -n2 shout"), { out: '<a b>\n<c>', code: 0 });
+    run(SQ, "printf 'echo got $1 $2\\n' > s.sh");
+    assert.deepEqual(run(SQ, "printf 'a b c' | xargs -n2 bash s.sh"), { out: 'got a b\ngot c', code: 0 });
+    assert.deepEqual(run(SQ, "printf 'a b' | xargs -n1 ./nosuch.sh"), { out: 'bash: ./nosuch.sh: No such file or directory\nbash: ./nosuch.sh: No such file or directory', code: 123 });
+  });
+  it('the other real options still say so', () => {
+    for (const o of ['-L', '-d', '-s', '-E', '-a', '-p', '-x', '-i', '-e']) assert.equal(out(`echo a | xargs ${o} 1 echo`), `this practice shell does not support xargs ${o} yet`, o);
+  });
+  it('caps: runs per line, huge replacement lists, nesting', () => {
+    const SQ = loadShell();
+    assert.match(run(SQ, 'seq 5000 | xargs -n1 echo').out, /xargs: too many commands for this practice shell/);
+    assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
+    run(SQ, "printf '%0999d' 0 > s");
+    // a 999-character item copied into 900 words, again and again, is far beyond the text cap
+    const r = run(SQ, `seq 1 3000 | xargs -I{} echo ${'{} '.repeat(900)}`);
+    assert.match(r.out, /too large|stopped the command/);
+    assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
+    assert.match(run(SQ, 'echo a | xargs xargs xargs xargs xargs xargs echo').out, /xargs: too many nested xargs/);
+  });
+});
+
+describe('tac, nl, paste, comm (Task 10)', () => {
+  const world = () => {
+    const SQ = loadShell();
+    for (const l of ["printf '1\\n2\\n3\\n' > n1", "printf 'one\\ntwo\\n' > t1", "printf 'b\\na\\nc\\n' > u1", "printf 'a\\nb\\nd\\n' > s1", "printf 'a\\nc\\nd\\ne\\n' > s2", "printf 'x\\n\\ny\\n \\nz\\n' > bl", 'touch e0']) run(SQ, l);
+    return SQ;
+  };
+  const eq = (l, out, code = 0) => assert.deepEqual(run(world(), l), { out, code }, l);
+  it('they are real commands: type, which and tab completion see them', () => {
+    const SQ = loadShell();
+    for (const c of ['tac', 'nl', 'paste', 'comm']) {
+      assert.equal(run(SQ, `type ${c}`).out, `${c} is /usr/bin/${c}`);
+      assert.equal(run(SQ, `which ${c}`).out, `/usr/bin/${c}`);
+      assert.ok(Object.keys(SQ.CMDS).includes(c));
+    }
+  });
+  it('a typo for them gets "Did you mean", and they do not steal other suggestions', () => {
+    const SQ = loadShell();
+    assert.match(run(SQ, 'pastee a').out, /Did you mean: paste\?/);
+    assert.match(run(SQ, 'tca a').out, /command not found/);
+    assert.match(run(SQ, 'lss').out, /Did you mean: ls\?/);
+    assert.match(run(SQ, 'cmm').out, /Did you mean: comm\?/);
+  });
+  it('tac prints lines last to first, file by file', () => {
+    eq('tac n1', '3\n2\n1');
+    eq('tac n1 t1', '3\n2\n1\ntwo\none');
+    eq('cat n1 | tac', '3\n2\n1');
+    eq('tac - < n1', '3\n2\n1');
+    eq('tac e0', '');
+    eq('tac nope', "tac: failed to open 'nope' for reading: No such file or directory", 1);
+    eq('tac nope n1', "tac: failed to open 'nope' for reading: No such file or directory\n3\n2\n1", 1);
+    eq('tac -s, n1', 'this practice shell does not support tac -s yet', 1);
+    eq('tac -j n1', "tac: invalid option -- 'j'", 1);
+  });
+  it('nl numbers non-empty lines by default; -ba numbers all', () => {
+    eq('nl bl', '     1\tx\n       \n     2\ty\n     3\t \n     4\tz');
+    eq('nl -ba bl', '     1\tx\n     2\t\n     3\ty\n     4\t \n     5\tz');
+    eq('nl -b a bl', '     1\tx\n     2\t\n     3\ty\n     4\t \n     5\tz');
+    eq('nl -bt bl', '     1\tx\n       \n     2\ty\n     3\t \n     4\tz');
+    eq('nl -bn bl', '       x\n       \n       y\n        \n       z');
+    eq('nl -b q bl', "nl: invalid body numbering style: 'q'\nTry 'nl --help' for more information.", 1);
+    eq('nl n1 t1', '     1\t1\n     2\t2\n     3\t3\n     4\tone\n     5\ttwo');
+    eq('cat n1 | nl', '     1\t1\n     2\t2\n     3\t3');
+    eq('nl -n rz n1', '000001\t1\n000002\t2\n000003\t3');
+    eq('nl -n ln n1', '1     \t1\n2     \t2\n3     \t3');
+    eq('nl -v 5 n1', '     5\t1\n     6\t2\n     7\t3');
+    eq('nl -i 2 n1', '     1\t1\n     3\t2\n     5\t3');
+    eq('nl -w3 -s: n1', '  1:1\n  2:2\n  3:3');
+    eq('nl nope', 'nl: nope: No such file or directory', 1);
+    eq('nl -v x n1', "nl: invalid starting line number: 'x'", 1);
+    eq('nl -p n1', 'this practice shell does not support nl -p yet', 1);
+  });
+  it('paste joins lines side by side', () => {
+    eq('paste n1 t1', '1\tone\n2\ttwo\n3\t');
+    eq('paste -d, n1 t1', '1,one\n2,two\n3,');
+    eq("paste -d'|-' n1 t1 n1", '1|one-1\n2|two-2\n3|-3');
+    eq("paste -d '' n1 t1", '1one\n2two\n3');
+    eq("paste -d '\\n' n1 t1", '1\none\n2\ntwo\n3');
+    eq('paste n1 n1 n1', '1\t1\t1\n2\t2\t2\n3\t3\t3');
+    eq('paste -s n1', '1\t2\t3');
+    eq('paste -sd, n1', '1,2,3');
+    eq('paste -d, -s n1 t1', '1,2,3\none,two');
+    eq('paste - - < n1', '1\t2\n3\t');
+    eq('paste -s - < n1', '1\t2\t3');
+    eq('paste n1 - < t1', '1\tone\n2\ttwo\n3\t');
+    eq("cat n1 | paste -s -d '+'", '1+2+3');
+    eq('paste n1 nope', 'paste: nope: No such file or directory', 1);
+    eq('paste -z n1', 'this practice shell does not support paste -z yet', 1);
+    eq('paste -d', "paste: option requires an argument -- 'd'", 1);
+  });
+  it('comm compares two sorted files in three columns', () => {
+    eq('comm s1 s2', '\t\ta\nb\n\tc\n\t\td\n\te');
+    eq('comm -1 s1 s2', '\ta\nc\n\td\ne');
+    eq('comm -2 s1 s2', '\ta\nb\n\td');
+    eq('comm -3 s1 s2', 'b\n\tc\n\te');
+    eq('comm -12 s1 s2', 'a\nd');
+    eq('comm -23 s1 s2', 'b');
+    eq('comm -123 s1 s2', '');
+    eq('comm -1 -3 s1 s2', 'c\ne');
+    eq('comm - s2 < s1', '\t\ta\nb\n\tc\n\t\td\n\te');
+    eq('sort u1 | comm - s1', '\t\ta\n\t\tb\nc\n\td');
+    eq('comm s1 nope', 'comm: nope: No such file or directory', 1);
+    eq('comm s1', "comm: missing operand after 's1'\nTry 'comm --help' for more information.", 1);
+    eq('comm s1 s2 s1', "comm: extra operand 's1'\nTry 'comm --help' for more information.", 1);
+    eq('comm e0 s1', '\ta\n\tb\n\td');
+  });
+  it('comm warns once per file when a line comes before the one above it, and exits 1', () => {
+    const W = (n) => `comm: file ${n} is not in sorted order\ncomm: input is not in sorted order`;
+    eq('comm u1 s2', W(1) + '\n\ta\nb\na\n\t\tc\n\td\n\te', 1); // stderr first: the two streams are kept apart
+    eq('comm s2 u1', W(2) + '\na\n\tb\n\ta\n\t\tc\nd\ne', 1);
+    eq('comm u1 u1', '\t\tb\n\t\ta\n\t\tc');
+    eq('comm -12 u1 s2', W(1) + '\nc', 1);
+  });
+});
+
+describe('cut -s, head -c, tail -c, uniq -d -u (Task 10)', () => {
+  const world = () => {
+    const SQ = loadShell();
+    for (const l of ["printf 'a:b:c\\nnodelim\\n:x\\n' > c1", "printf 'hello world\\nsecond line\\n' > h1", "printf 'one\\ntwo\\n' > t1", "printf 'a\\na\\nb\\nc\\nc\\nc\\nd\\n' > uq"]) run(SQ, l);
+    return SQ;
+  };
+  const eq = (l, out, code = 0) => assert.deepEqual(run(world(), l), { out, code }, l);
+  it('cut -s drops lines without the delimiter', () => {
+    eq('cut -d: -f1 c1', 'a\nnodelim');
+    eq('cut -s -d: -f1 c1', 'a');
+    eq('cut -sd: -f2 c1', 'b\nx');
+    eq('cut -d: -f2 -s c1', 'b\nx');
+    eq('cut -s -f1 c1', '');
+    eq('cut -s -c1-2 c1', "cut: suppressing non-delimited lines makes sense\n\tonly when operating on fields\nTry 'cut --help' for more information.", 1);
+  });
+  it('head -c N', () => {
+    eq('head -c 5 h1', 'hello');
+    eq('head -c5 h1', 'hello');
+    eq('head -c 0 h1', '');
+    eq('head -c 100 h1', 'hello world\nsecond line');
+    eq('head -c 12 h1', 'hello world');
+    eq('head -c -3 h1', 'hello world\nsecond li');
+    eq('head -c 3 h1 t1', '==> h1 <==\nhel\n==> t1 <==\none');
+    eq('head -c 3 -n 1 h1', 'hello world');
+    eq('head -n 1 -c 3 h1', 'hel');
+    eq('cat h1 | head -c 4', 'hell');
+    eq('head -c x h1', "head: invalid number of bytes: 'x'", 1);
+    eq('head -c', "head: option requires an argument -- 'c'", 1);
+    eq('head -c 3K h1', 'this practice shell does not support head -c with a size suffix yet', 1);
+    eq('head -n 1 h1', 'hello world');
+  });
+  it('tail -c N', () => {
+    eq('tail -c 5 h1', 'line');
+    eq('tail -c5 h1', 'line');
+    eq('tail -c 0 h1', '');
+    eq('tail -c 100 h1', 'hello world\nsecond line');
+    eq('tail -c 12 h1', 'second line');
+    eq('tail -c +3 h1', 'llo world\nsecond line');
+    eq('tail -c -3 h1', 'ne');
+    eq('tail -c 3 h1 t1', '==> h1 <==\nne\n\n==> t1 <==\nwo');
+    eq('cat h1 | tail -c 4', 'ine');
+    eq('tail -c x h1', "tail: invalid number of bytes: 'x'", 1);
+  });
+  it('uniq -d / -u (and with -c)', () => {
+    eq('uniq uq', 'a\nb\nc\nd');
+    eq('uniq -d uq', 'a\nc');
+    eq('uniq -u uq', 'b\nd');
+    eq('uniq -c uq', '      2 a\n      1 b\n      3 c\n      1 d');
+    eq('uniq -cd uq', '      2 a\n      3 c');
+    eq('uniq -cu uq', '      1 b\n      1 d');
+    eq('uniq -du uq', '');
+    eq('cat uq | uniq -d', 'a\nc');
   });
 });
