@@ -2114,7 +2114,7 @@ function renderMission(){const card=$('mission');
 function renderBadge(){const ch=CH[S.ch];const card=$('mission');
   card.innerHTML=`<div class="eyebrow">Chapter ${S.ch+1} complete</div><div class="badge-art">${S.ch+1}</div><h2>${esc(ch.badge)}</h2>
   <p class="explain">You finished <b>${esc(ch.name)}</b>. You can now use:</p><div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
-  <p class="note">Try the Arcade to practice reading code fast, or open the Field guide to review.</p>
+  <p class="note">Try Quick-fire to practice reading code fast, or open the Field guide to review.</p>
   <div class="actions">${S.ch<CH.length-1?`<button class="btn" id="nextCh">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button>`:`<button class="btn" id="toSb">Open the sandbox</button>`}<button class="btn ghost" id="stay">Back to the chapter</button></div>`;
   if($('nextCh'))$('nextCh').onclick=()=>goMission(S.ch+1,0,false);if($('toSb'))$('toSb').onclick=openSandbox;
   $('stay').onclick=()=>{justWon=false;renderMission()}}
