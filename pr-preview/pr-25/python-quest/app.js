@@ -571,7 +571,7 @@ const CH=[
   starter:'print("Treasure!"\n',answer:'print("Treasure!")',
   check:c=>c.printed('Treasure!')||'Close the bracket so the line reads print("Treasure!")'}
  ]},
-{name:'Variables',badge:'Box Keeper',intro:'A variable is a labelled box that stores a value so you can use it later. Watch the memory map: every variable you make appears there as a box.',
+{name:'Variables',badge:'Box Keeper',intro:'A variable is a labelled box that stores a value so you can use it later. Watch the memory map: every variable you create appears there as a box.',
  learned:['name = value','int, float, str, bool','x = x + 1','+= and -=','f"...{x}..."','NameError'],
  missions:[
  {title:'Make a box',goal:'Store the text <code>"Ada"</code> in a variable called <code>hero</code>, then print <code>hero</code>.',
@@ -579,7 +579,7 @@ const CH=[
   explain:'The <code>=</code> sign means <b>put the value on the right into the box on the left</b>. It is not "equals" from math class. When you write <code>print(hero)</code> with no quotes, Python looks inside the box.',
   starter:'',answer:'hero = "Ada"\nprint(hero)',
   check:c=>c.type('hero')!=='str'?'Make a variable called hero that holds text, like hero = "Ada"':!c.printed(c.val('hero'))?'Now print(hero) so the name appears. No quotes around hero!':true},
- {title:'Number boxes',goal:'Make <code>hp</code> hold <code>100</code> and <code>gold</code> hold <code>25</code>. Print both.',
+ {title:'Number boxes',goal:'Set <code>hp</code> to <code>100</code> and <code>gold</code> to <code>25</code>. Print both.',
   anat:[['hp','var'],['=','op'],['100','num']],
   explain:'Whole numbers are called <b>integers</b> (<code>int</code>). Notice the memory map: two blue boxes with labels.',
   note:'Variable names: lowercase, no spaces (use_underscores), and they cannot start with a digit.',
@@ -595,7 +595,7 @@ const CH=[
   explain:'<code>hp -= 30</code> is short for <code>hp = hp - 30</code>. There is also <code>+=</code>, <code>*=</code> and <code>/=</code>. You will use <code>+=</code> constantly for scores and counters.',
   starter:'hp = 100\n',answer:'hp = 100\nhp -= 30\nprint(hp)',
   check:c=>!/hp\s*-=/.test(c.code)?'Use the -= shortcut.':c.val('hp')!==70?'hp should end at 70.':c.printed('70')||'Print hp.'},
- {title:'Four kinds of value',goal:'Make <code>speed = 1.5</code> and <code>alive = True</code>. Then print <code>type(speed)</code> and <code>type(alive)</code>.',
+ {title:'Four kinds of value',goal:'Set <code>speed = 1.5</code> and <code>alive = True</code>. Then print <code>type(speed)</code> and <code>type(alive)</code>.',
   anat:[['type','fn'],['(','br'],['speed','var'],[')','br']],
   explain:'Every value has a <b>type</b>. <code>int</code> = whole number, <code>float</code> = number with a decimal point, <code>str</code> = text, <code>bool</code> = <code>True</code> or <code>False</code>. <code>type()</code> tells you which one a value is.',
   note:'True and False start with a capital letter and have no quotes.',
@@ -612,7 +612,7 @@ const CH=[
   starter:'hero = "Kai"\nprint("Welcome back,")\nprint(Hero)\n',answer:'hero = "Kai"\nprint("Welcome back,")\nprint(hero)',
   check:c=>c.printed('Kai')||'Print the hero variable so Kai appears.'}
  ]},
-{name:'Math & text',badge:'Calculator',intro:'Python is a great calculator and a great text editor. This chapter covers the operators, then how to slice and change text.',
+{name:'Math & text',badge:'Calculator',intro:'Python is a great calculator and handles text well too. This chapter covers the operators, then how to slice and change text.',
  learned:['+ - * /','// and %','**','len()','.upper()','s[0], s[-1]','s[1:4]','input()','int()'],
  missions:[
  {title:'Damage calculator',goal:'A sword does 7 damage and hits 3 times. Store <code>damage = 7 * 3</code> and print it.',
@@ -695,7 +695,7 @@ const CH=[
 {name:'Lists',badge:'Collector',intro:'A list holds many values in order, inside one box. Inventories, high scores, enemies in a room: all lists.',
  learned:['[a, b, c]','list[0]','.append()','.remove()  .pop()','in','list[i] = x','len(list)'],
  missions:[
- {title:'Pack your bag',goal:'Make <code>inventory</code> a list with <code>"sword"</code>, <code>"shield"</code> and <code>"potion"</code>. Print it.',
+ {title:'Pack your bag',goal:'Set <code>inventory</code> to a list with <code>"sword"</code>, <code>"shield"</code> and <code>"potion"</code>. Print it.',
   anat:[['inventory','var'],['=','op'],['[','br','list'],['"sword", "shield", "potion"','str','items'],[']','br']],
   explain:'Square brackets make a list. Commas separate the items. Look at the memory map: one box with numbered slots.',
   starter:'',answer:'inventory = ["sword", "shield", "potion"]\nprint(inventory)',
@@ -789,7 +789,7 @@ const CH=[
   explain:'<code>bonus=0</code> is a <b>default value</b>. If the caller leaves it out, bonus is 0. If they pass a number, that is used instead.',
   starter:'',answer:'def attack(power, bonus=0):\n    return power * 2 + bonus\n\nprint(attack(5))\nprint(attack(5, 3))',
   check:c=>{if(!c.fn('attack'))return 'Define attack(power, bonus=0).';try{if(c.call('attack',5).v!==10)return 'attack(5) should return 10.';if(c.call('attack',5,3).v!==13)return 'attack(5, 3) should return 13.'}catch(e){return 'attack needs a default: bonus=0'}return c.printed('10')&&c.printed('13')||'Print both results.'}},
- {title:'Boxes inside functions',goal:'Write <code>heal(hp)</code> that adds 20 and returns the new value. Then do <code>hp = heal(hp)</code> and print hp (50 becomes 70).',
+ {title:'Boxes inside functions',goal:'Write <code>heal(hp)</code> that adds 20 and returns the new value. Then run <code>hp = heal(hp)</code> and print hp (50 becomes 70).',
   anat:[['hp','var','global box'],['=','op'],['heal','fn'],['(hp)','var','copy goes in']],
   explain:'Variables made inside a function are <b>local</b>: they live in the function\'s own frame and disappear when it returns. Step through and watch the <code>heal()</code> frame appear, then vanish. The only way out is <code>return</code>.',
   starter:'hp = 50\n',answer:'hp = 50\n\ndef heal(hp):\n    hp = hp + 20\n    return hp\n\nhp = heal(hp)\nprint(hp)',
@@ -803,7 +803,7 @@ const CH=[
 {name:'Dictionaries',badge:'Archivist',intro:'A dictionary (dict) stores pairs: a key and its value. Instead of a position number, you look things up by name, like a real dictionary.',
  learned:['{"key": value}','d["key"]','d["new"] = x','.get(key, default)','.items()','in (keys)'],
  missions:[
- {title:'A character sheet',goal:'Make <code>hero = {"name": "Ada", "hp": 100, "gold": 25}</code> and print <code>hero["name"]</code>.',
+ {title:'A character sheet',goal:'Create <code>hero = {"name": "Ada", "hp": 100, "gold": 25}</code> and print <code>hero["name"]</code>.',
   anat:[['{','br','dict'],['"name"','str','key'],[':','op'],['"Ada"','str','value'],['}','br']],
   explain:'Curly brackets make a dict. Each entry is <code>key: value</code>. To read a value, put its key in square brackets. In the memory map, each key points to its value.',
   starter:'',answer:'hero = {"name": "Ada", "hp": 100, "gold": 25}\nprint(hero["name"])',
@@ -839,7 +839,7 @@ const CH=[
   explain:'<code>import</code> loads extra tools. The <code>random</code> module picks random numbers. <code>randint(1, 6)</code> includes both ends, unlike range.',
   starter:'',answer:'import random\n\nroll = random.randint(1, 6)\nprint(f"You rolled a {roll}")',
   check:c=>!/import random|from random/.test(c.code)?'Start with import random.':c.type('roll')!=='int'||c.val('roll')<1||c.val('roll')>6?'roll should be random.randint(1, 6).':c.out.includes(String(c.val('roll')))||'Print the roll.'},
- {title:'Random loot',goal:'Make a list of loot and use <code>random.choice()</code> to pick one. Print <code>You found: ITEM</code>.',
+ {title:'Random loot',goal:'Create a list of loot and use <code>random.choice()</code> to pick one. Print <code>You found: ITEM</code>.',
   anat:[['random.choice','fn'],['(loot)','var','a list']],
   explain:'<code>random.choice(list)</code> picks one item at random. Games use it for loot drops, enemy moves and dialogue.',
   starter:'import random\n\nloot = ["gold coin", "old boot", "magic ring", "apple"]\n',answer:'import random\n\nloot = ["gold coin", "old boot", "magic ring", "apple"]\nfound = random.choice(loot)\nprint(f"You found: {found}")',
@@ -1080,7 +1080,7 @@ function valHTML(v,nested){const cls='t-'+(['int','float','str','bool','NoneType
   const label=v.t==='function'?'def':v.t==='NoneType'?'':v.t;
   return `<span class="val ${cls}">${esc(v.t==='function'?v.r:v.r)}${label&&!nested?`<em>${esc(label)}</em>`:''}</span>`}
 let aliases={};
-function renderMap(st,stale,prev){$('#mapSub').textContent=st?(st.end?'What your program left in memory when it ended.':`Memory just before line ${st.line} runs.`):stale?'Code changed. Run it again to refresh the map.':'Every variable your program makes, drawn as a labelled box.';
+function renderMap(st,stale,prev){$('#mapSub').textContent=st?(st.end?'What your program left in memory when it ended.':`Memory just before line ${st.line} runs.`):stale?'Code changed. Run it again to refresh the map.':'Every variable your program creates, drawn as a labelled box.';
   if(!st){mapEl.innerHTML=`<div class="mapEmpty"><p style="margin:0">Run your code and each variable appears here as a labelled box, coloured by its type. Lists show numbered slots. Function calls get their own frame.</p>
     <div class="demo" aria-hidden="true"><div class="var"><span class="vname">hero</span><div class="vbox"><span class="val t-str">'Ada'<em>str</em></span></div></div><div class="var"><span class="vname">hp</span><div class="vbox"><span class="val t-int">100<em>int</em></span></div></div><div class="var"><span class="vname">bag</span><div class="vbox"><div class="coll t-list"><em>list · 2 items</em><div class="cells"><div class="cell"><span class="val t-str">'sword'</span><i>0</i></div><div class="cell"><span class="val t-str">'map'</span><i>1</i></div></div></div></div></div></div></div>`;return}
   const names={};st.frames.forEach(f=>f.vars.forEach(([n,v])=>{if(v.id){(names[v.id]=names[v.id]||[]).push(n)}}));aliases={};
@@ -1106,7 +1106,7 @@ function renderMission(){
     <h2>${last?'You finished Python Quest':all?'Badge earned: '+esc(ch.badge):'Chapter finished'}</h2>
     <p class="explain">${last?'You can store values, make decisions, loop over lists, write functions, organise data in dictionaries and build small games. That is the core of Python.':'You can now use these in any Python program:'}</p>
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
-    ${last?`<p class="note">Next: play Quick-fire until reading code feels easy, then install Python on your computer. The field guide shows how.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
+    ${last?`<p class="note">Next: play Quick-fire until reading code feels natural, then install Python on your computer. The field guide shows how.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button><button class="btn ghost" data-act="free">Free play</button></div>`}${dots}`}
   else{const m=ch.missions[S.mi];
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
@@ -1114,6 +1114,7 @@ function renderMission(){
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
+    ${HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button><button class="btn ghost" data-act="fill">Type it for me</button></div>

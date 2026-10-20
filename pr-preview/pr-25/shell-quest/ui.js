@@ -8,7 +8,7 @@ const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'
 const renderText=t=>esc(t).replace(/\x01(\w)([\s\S]*?)\x02/g,'<span class="c-$1">$2</span>');
 const promptHTML=cwd=>`<span class="p-user">explorer@basecamp</span>:<span class="p-path">${esc(disp(cwd))}</span><span class="p-sym">$</span> `;
 const KIND={cmd:'command',opt:'option',arg:'argument',op:'operator',var:'variable',kw:'keyword'};
-const anatomy=t=>t&&t.length?`<div class="anat" aria-label="Command anatomy">${t.map(([v,k])=>`<div class="tok k-${k}"><b>${esc(v)}</b><span>${KIND[k]}</span></div>`).join('')}</div>`:'';
+const anatomy=t=>t&&t.length?`<div class="anat" aria-label="Command anatomy">${t.map(([v,k,l])=>`<div class="tok k-${k}"><b>${esc(v)}</b><span>${esc(l||KIND[k])}</span></div>`).join('')}</div>`:'';
 const ICON_DIR='<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3h4.3l1.6 1.7h7.1v8.8h-13z"/></svg>';
 const ICON_FILE='<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3"/></svg>';
 let pop=false;
@@ -36,7 +36,7 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
   if(S.mi>=n){const all=totalDone(S.ch)===n,last=S.ch===CH.length-1,tier=SQ.tiers.tierOf(S.ch),begin=tier.id==='beginner',tdone=SQ.tiers.status(S).some(x=>x.tier===tier&&x.complete);
     h=`<div class="eyebrow">Chapter ${S.ch+1} complete</div><div class="badge-art${all?'':' dim'}">${all?'★':S.ch+1}</div>
     <h2>${last?(begin?'You finished Shell Quest':(tdone?'You finished the '+esc(tier.name)+' tier':'You reached the last chapter')):all?'Badge earned: '+esc(ch.badge):'Chapter finished'}</h2>
-    <p class="explain">${last?(begin?'You can move around a filesystem, build and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':(tier.id==='expert'&&tdone?'You can take text apart with awk and sed, run and stop background jobs, build pipelines with find -exec, xargs and process substitution, and write scripts that fail safely: set -euo pipefail, set -x, trap and getopts. ':tier.id==='advanced'&&tdone?'You can write real bash scripts now: tests and if, loops and arithmetic, functions with arguments and local variables, here-documents, stderr and exit codes. ':'')+'That is every chapter there is. You can revisit any chapter from the list on the left.'):'You can now use these on any real Linux or Mac terminal:'}</p>
+    <p class="explain">${last?(begin?'You can move around a filesystem, create and reorganise it, search inside files, chain commands with pipes, and write scripts with loops. That is the core of everyday bash.':(tier.id==='expert'&&tdone?'You can take text apart with awk and sed, run and stop background jobs, build pipelines with find -exec, xargs and process substitution, and write scripts that fail safely: set -euo pipefail, set -x, trap and getopts. ':tier.id==='advanced'&&tdone?'You can write real bash scripts now: tests and if, loops and arithmetic, functions with arguments and local variables, here-documents, stderr and exit codes. ':'')+'That is every chapter there is. You can revisit any chapter from the list on the left.'):'You can now use these on any real Linux or Mac terminal:'}</p>
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, then open a real terminal. The field guide shows how on Mac, Windows and Linux.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`}
@@ -47,6 +47,7 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
     ${sc?`<div class="where">Your file: <code>${esc(m.file)}</code></div>`:''}
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
+    ${HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <div class="where">Right now you are in <code>${esc(disp(S.cwd))}</code></div>

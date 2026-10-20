@@ -54,9 +54,9 @@ const CH=[
   check:c=>c.ran('tr',e=>e.out.trim()==='HELLO')},
  {title:'Swap a word',goal:`Print the shop list with apple swapped for pear: <code>sed 's/apple/pear/' village/shop.txt</code>`,
   anat:[['sed','cmd'],[`'s/apple/pear/'`,'arg'],['village/shop.txt','arg']],answer:`sed 's/apple/pear/' village/shop.txt`,
-  explain:`sed is a <b>stream editor</b>. The script <code>s/old/new/</code> means <b>substitute</b>: find old, put new. The file itself does not change, sed only prints the edited text.`,
+  explain:`sed is a <b>stream editor</b>. The script <code>s/old/new/</code> means <b>substitute</b>: find old, replace it with new. The file itself does not change, sed only prints the edited text.`,
   check:c=>c.ran('sed',e=>/pear/.test(e.out)&&!/apple/.test(e.out))},
- {title:'Replace everywhere',goal:`Change every <code>o</code> in the journal to a zero: <code>sed 's/o/0/g' journal.txt</code>`,
+ {title:'Replace everywhere',goal:`Replace every <code>o</code> in the journal with a zero: <code>sed 's/o/0/g' journal.txt</code>`,
   anat:[['sed','cmd'],[`'s/o/0/g'`,'arg'],['journal.txt','arg']],answer:`sed 's/o/0/g' journal.txt`,
   explain:`Without <code>g</code>, <code>s</code> only replaces the <b>first</b> match on each line. The <code>g</code> at the end means <b>global</b>: replace every match on the line.`,
   check:c=>c.ran('sed',e=>e.args.some(x=>/^s(.).*\1.*\1[a-zA-Z0-9]*g[a-zA-Z0-9]*$/.test(x)))},
@@ -81,7 +81,7 @@ const CH=[
 {tier:'intermediate',name:'Substitution & quoting',badge:'Quoter',intro:'Bash can paste the output of one command into another, and quotes decide what it is allowed to touch. Then you will hand values on to scripts.',
  learned:['$(command)','"double" vs \'single\'','export','env','$?'],setup:seedVillage,
  missions:[
- {title:'Capture output',goal:`Put a command's output inside a sentence: <code>echo "Today is $(date)"</code>`,
+ {title:'Capture output',goal:`Insert a command's output into a sentence: <code>echo "Today is $(date)"</code>`,
   anat:[['echo','cmd'],['"Today is $(date)"','arg']],answer:'echo "Today is $(date)"',
   explain:`<code>$(command)</code> is <b>command substitution</b>. Bash runs what is inside, then swaps in its output before echo runs.`,
   check:c=>c.ran('echo',e=>/^Today is\s+\S/.test(e.out))&&c.line.includes('$(')},
@@ -89,7 +89,7 @@ const CH=[
   anat:[['echo','cmd'],['"wolves: $(grep -ic wolf journal.txt)"','arg']],answer:'echo "wolves: $(grep -ic wolf journal.txt)"',
   explain:`Any command can go inside <code>$( )</code>. Here <code>grep -ic</code> counts matching lines, ignoring case, and the number lands in the sentence.`,
   check:c=>c.ran('echo',e=>/^wolves: \d+$/.test(e.out.trim()))&&c.line.includes('$(')},
- {title:'Single vs double',goal:`Stop bash from reading the dollar sign: <code>echo '$HOME'</code>`,
+ {title:'Single vs double',goal:`Stop bash from treating the dollar sign as special: <code>echo '$HOME'</code>`,
   anat:[['echo','cmd'],[`'$HOME'`,'arg']],answer:`echo '$HOME'`,
   explain:`<b>Double quotes</b> still let <code>$</code> work. <b>Single quotes</b> keep everything exactly as typed. Compare <code>echo "$HOME"</code> with <code>echo '$HOME'</code>.`,
   check:c=>c.ran('echo',e=>e.out.trim()==='$HOME')},
@@ -112,12 +112,12 @@ const CH=[
   check:c=>{const v=SQ.S.vars.GREETING;if(!v||!(SQ.S.exp&&SQ.S.exp.GREETING))return false;
     return c.log.some(e=>{const f=e.name.includes('/')?e.name:(e.name==='bash'||e.name==='sh')?e.args[0]:null;if(!f)return false;
       const n=SQ.getNode(SQ.norm(f));return !!n&&n.type==='file'&&/\$\{?GREETING\b/.test(n.content)&&e.code===0&&e.out.trim()===v})}},
- {title:'Did it work?',goal:`Every command leaves an exit code. Make one fail, then read it: <code>ls nothing; echo $?</code>`,
+ {title:'Did it work?',goal:`Every command leaves an exit code. Run a command that fails, then print its exit code: <code>ls nothing; echo $?</code>`,
   anat:[['ls','cmd'],['nothing','arg'],[';','op'],['echo','cmd'],['$?','var']],answer:'ls nothing; echo $?',
   explain:`<code>$?</code> holds the exit code of the last command. <code>0</code> means success and anything else means failure. Scripts use it to decide what to do next.`,
   check:c=>/\$\?/.test(c.line)&&c.log.some((e,k)=>{if(e.name!=='echo')return false;const code=k>0?c.log[k-1].code:SQ.rt.prevLast;return !!code&&e.out.trim()===String(code)})}
  ]},
-{tier:'intermediate',name:'Permissions & links',badge:'Gatekeeper',intro:'Every file says who may read it, change it or run it. Learn to read those marks, change them, and make shortcuts to files.',
+{tier:'intermediate',name:'Permissions & links',badge:'Gatekeeper',intro:'Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
  learned:['ls -l','chmod 600','chmod u+x','chmod a=r','ln -s','stat'],setup:seedPerms,
  missions:[
  {title:'Read the permissions',goal:`Show the details of each file, including its permissions: <code>ls -l</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
@@ -136,9 +136,9 @@ const CH=[
   anat:[['chmod','cmd'],['a=r','opt'],['notes.txt','arg']],answer:'chmod a=r notes.txt',
   explain:`With <code>=</code> you <b>set</b> exactly what is allowed, instead of adding or removing. <code>a=r</code> gives everybody read and nothing else, so the run permission you added a moment ago is gone. The number for it is <code>444</code>.`,
   check:c=>{const n=homeNode('~/notes.txt');return !!n&&n.type==='file'&&modeOf(n)===0o444}},
- {title:'Make a shortcut',goal:`Make <code>today.log</code> point at the first day's log: <code>ln -s village/logs/day1.log today.log</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
+ {title:'Make a shortcut',goal:`Create <code>today.log</code> as a shortcut to the first day's log: <code>ln -s village/logs/day1.log today.log</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['ln','cmd'],['-s','opt'],['village/logs/day1.log','arg'],['today.log','arg']],answer:'ln -s village/logs/day1.log today.log',
-  explain:`<code>ln -s TARGET NAME</code> makes a <b>symbolic link</b>: a small file that just says where the real one is. The target comes first, the new name second. In <code>ls -l</code> a link shows as <code>today.log -&gt; village/logs/day1.log</code>.`,
+  explain:`<code>ln -s TARGET NAME</code> creates a <b>symbolic link</b>: a small file that just says where the real one is. The target comes first, the new name second. In <code>ls -l</code> a link shows as <code>today.log -&gt; village/logs/day1.log</code>.`,
   check:c=>{const d1=homeNode('~/village/logs/day1.log');if(!d1||d1.type!=='file')return false;
     return allLinks(SQ.S.fs,'',[]).some(p=>{const l=lstat(p);return l&&l.type==='link'&&getNode(p)===d1})}},
  {title:'Follow the shortcut',goal:`Read the log through the shortcut: <code>cat today.log</code>`,note:`Needs the link from the last mission. Not there? Run <code>ln -s village/logs/day1.log today.log</code> first, from your home folder.`,
@@ -174,7 +174,7 @@ const CH=[
       return L.length>=want.length&&L.every(l=>FP.test(l))&&want.every(w=>L.some(l=>baseName(l.slice(6).trim())===w))})}},
  {title:'Delete what you found',goal:`Remove every <code>.log</code> file in the scratch folder only: <code>find village/scratch -name "*.log" | xargs rm</code>`,note:`Leave <code>village/logs</code> alone: the next missions need those logs. Run the <code>find</code> part alone first to see what it lists.`,
   anat:[['find','cmd'],['village/scratch','arg'],['-name','opt'],['"*.log"','arg'],['|','op'],['xargs rm','cmd']],answer:'find village/scratch -name "*.log" | xargs rm',
-  explain:`<code>find</code> lists the matching paths, and <code>xargs rm</code> hands them all to <code>rm</code>. It is the same as typing <code>rm</code> followed by every name. Always look at the find output alone before you let rm loose on it.`,
+  explain:`<code>find</code> lists the matching paths, and <code>xargs rm</code> hands them all to <code>rm</code>. It is the same as typing <code>rm</code> followed by every name. Always look at the find output alone before you pass it to rm.`,
   check:c=>{const d=getNode(norm('~/village/scratch'));if(!d||d.type!=='dir')return false;
     return c.log.some(e=>e.name==='xargs'&&e.args.includes('rm'))&&logsIn(norm('~/village/scratch'),'.log').length===0&&!!d.children['keep.txt']&&KEEP_LOGS().every(p=>{const n=getNode(norm(p));return !!n&&n.type==='file'})}},
  {title:'Compare two files',goal:`See what changed between two days: <code>diff village/logs/day1.log village/logs/day2.log</code>`,note:`Needs both logs. If they are gone, click the chapter again.`,
