@@ -20,6 +20,7 @@ const ALLLOG=[
 '10.0.0.7 ERROR timeout','10.0.0.12 INFO baker lit the oven','10.0.0.5 ERROR timeout','10.0.0.9 ERROR bad login',
 '10.0.0.7 INFO wolf seen','10.0.0.5 ERROR disk full','10.0.0.12 WARN gate stuck','10.0.0.7 ERROR bad login',
 '10.0.0.12 ERROR gate jammed'].join('\n');
+SQ.VILLAGE.ALLLOG=ALLLOG; /* the Expert capstone (tier-expert.js 19.7) reads village/logs/all.log too */
 const seedLogs=()=>{for(const k of Object.keys(LOGS))ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/village/logs/all.log',ALLLOG)};
 const seedPerms=()=>{ensureFile('~/notes.txt',NOTES);ensureFile('~/secrets.txt',SECRETS);ensureDir('~/scripts');seedLogs()};
 const seedStreams=()=>{seedPerms();ensureFile('~/village/scratch/old1.log','old line 1');ensureFile('~/village/scratch/old2.log','old line 2');

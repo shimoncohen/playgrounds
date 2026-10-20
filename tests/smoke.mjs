@@ -254,8 +254,8 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   assert.match(heads[1], /^Intermediate.*4\/4.*★/);
   assert.match(heads[2], /^Advanced.*4\/4.*★/);
   const expertChapters = await page.evaluate(() => window.SQ.content.chapters.filter(c => c.tier === 'expert').length);
-  assert.ok(expertChapters >= 2);
-  assert.match(heads[3], new RegExp(`^Expert.*0/${expertChapters}`));
+  assert.equal(expertChapters, 4);
+  assert.match(heads[3], /^Expert.*0\/4/);
   assert.doesNotMatch(heads[3], /★/);
   assert.equal(await page.locator('.chap.earned').count(), 15);
   assert.equal((await page.textContent('#xpText')).trim(), '1890 XP');
@@ -1024,16 +1024,9 @@ test('shell-quest: Reset world also forgets functions and the last exit status',
   await ctx.close();
 });
 
-// ---- Stage 3 Task 17: the Expert tier wiring. tests/fixtures/fake-expert.js fills the Expert tier up to 4 chapters x 7 missions
-// (chapter indexes 15 to 18) while the real chapters are not there yet, and adds nothing once they are; it is appended to
-// content/quickfire.js in transit, like the fake Advanced chapter above. ----
-const FAKE_EXPERT_JS = fs.readFileSync(path.join(ROOT, 'tests/fixtures/fake-expert.js'), 'utf8');
-const expertPage = (opts = {}) => shellPage({ viewport: { width: 1280, height: 900 }, ...opts }, async ctx => {
-  await ctx.route('**/shell-quest/content/quickfire.js', async route => {
-    const r = await route.fetch();
-    await route.fulfill({ response: r, body: (await r.text()) + '\n' + FAKE_EXPERT_JS });
-  });
-});
+// ---- Stage 3 Task 17: the Expert tier wiring, 4 chapters x 7 missions at indexes 15 to 18. Task 17 ran these tests on a
+// test-only fixture that filled the tier; since Task 19 they run on the real chapters (content/tier-expert.js). ----
+const expertPage = (opts = {}) => shellPage({ viewport: { width: 1280, height: 900 }, ...opts });
 const tierHeads = page => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
 
 test('shell-quest Expert tier: four rail headers, Expert in the quick-fire picker and the guide filter', async () => {
@@ -1118,35 +1111,47 @@ test('shell-quest Expert tier: a mission awards 25 XP once; a chapter switch and
   await ctx.close();
 });
 
-// ---- Stage 3 Task 18: the real Expert chapters 16 and 17 played through the UI with "Type it for me" (the editor for 16.7 and 17.7) ----
-test('shell-quest Expert chapters 16 and 17: every mission completes through the UI, wrong scripts are explained, both badges earned', async () => {
+// ---- Stage 3 Tasks 18 and 19: the four real Expert chapters (16 to 19) played through the UI with "Type it for me" (the editor for
+// the script missions 16.7, 17.7, 18.7, 19.6 and the 19.7 capstone, each first with a wrong script whose failure line is pinned) ----
+test('shell-quest Expert chapters 16 to 19: all 28 missions complete through the UI, wrong scripts are explained, four badges, Expert 4/4', async () => {
   const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
   const xp = () => page.evaluate(() => window.SQ.S.xp);
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // per script mission: the Run arguments, the failure line of its first wrong script, and what the answer prints
+  const SCRIPTS = {
+    '15.6': ['village/sales.csv', /Test 1 \(the sales file\) failed: expected "apple      24\.00/, /apple\s+24\.00\s*bread\s+90\.00/],
+    '16.6': ['3 1 2', /Test 1 \(3 1 2\) failed: expected "1 done\\n2 done\\n3 done", got ""/, /1 done\s*2 done\s*3 done/],
+    '17.6': ['village/logs/access.log 2', /Test 1 \(the access log, N 2\) failed: expected "4 10\.0\.0\.5\\n3 10\.0\.0\.7", got "2 10\.0\.0\.12\\n4 10\.0\.0\.5"/, /4 10\.0\.0\.5\s*3 10\.0\.0\.7/],
+    '18.5': ['-vn Ada', /Test 1 \(-n Ada\) failed: expected "Hello, Ada!", got ""/, /verbose on\s*Hello, Ada!/],
+    '18.6': ['village/logs/all.log', /Test 1 \(all\.log, the defaults\) failed: expected "\/tmp empty", got "\/tmp holds tmp\.A00001"/, /3 10\.0\.0\.5\s*3 10\.0\.0\.7\s*1 10\.0\.0\.12/],
+  };
+  const BADGES = { 15: 'Text Wrangler', 16: 'Job Controller', 17: 'Pipeline Architect', 18: 'Toolsmith' };
   const x0 = await xp();
-  for (const ci of [15, 16]) {
+  for (const ci of [15, 16, 17, 18]) {
     await page.click(`.chap[data-ch="${ci}"]`);
     await page.waitForFunction(c => window.SQ.S.ch === c, ci);
     const ms = await page.evaluate(c => window.SQ.content.chapters[c].missions.map(m => ({ title: m.title, kind: m.kind || '', answer: m.answer, wrong: m.wrong || [] })), ci);
+    assert.equal(ms.length, 7);
     for (let mi = 0; mi < ms.length; mi++) {
       const m = ms[mi];
       await page.click(`#mission button[data-mi="${mi}"]`);
       await page.waitForFunction(t => document.querySelector('#mission h2').textContent.includes(t), m.title);
       await page.click('[data-act="fill"]');
-      if (m.kind === 'script') {
+      if (m.kind === 'script' || m.kind === 'challenge') {
+        const [args, failRe, outRe] = SCRIPTS[`${ci}.${mi}`];
         await page.waitForSelector('#editor:not([hidden])');
         assert.equal(await page.inputValue('#edText'), m.answer);
         // a wrong script first: Save & run explains the failing case and awards nothing
         await page.fill('#edText', m.wrong[0]);
-        await page.fill('#edArgs', ci === 15 ? 'village/sales.csv' : '3 1 2');
+        await page.fill('#edArgs', args);
         const before = await xp();
         await page.click('#edRun');
-        await waitScreen(ci === 15 ? /Test 1 \(the sales file\) failed: expected "apple      24\.00/ : /Test 1 \(3 1 2\) failed: expected "1 done\\n2 done\\n3 done", got ""/);
+        await waitScreen(failRe);
         assert.equal(await xp(), before);
         await page.fill('#edText', m.answer);
         await page.click('#edRun');
         await waitScreen(new RegExp(`Mission complete: ${esc(m.title)}\\s+\\+25 XP`));
-        assert.match(await page.textContent('#screen'), ci === 15 ? /apple\s+24\.00\s*bread\s+90\.00/ : /1 done\s*2 done\s*3 done/);
+        assert.match(await page.textContent('#screen'), outRe);
         await page.click('#edClose');
       } else {
         assert.equal(await page.inputValue('#cmd'), m.answer, `Type it for me fills ${m.title}`);
@@ -1154,17 +1159,27 @@ test('shell-quest Expert chapters 16 and 17: every mission completes through the
         await waitScreen(new RegExp(`Mission complete: ${esc(m.title)}\\s+\\+25 XP`));
       }
     }
-    await waitScreen(new RegExp(`Badge earned: ${ci === 15 ? 'Text Wrangler' : 'Job Controller'}`));
+    await waitScreen(new RegExp(`Badge earned: ${BADGES[ci]}`));
   }
-  assert.equal(await xp(), x0 + 2 * (7 * 25 + 25));
+  assert.equal(await xp(), x0 + 4 * (7 * 25 + 25));
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
-  assert.match(heads[3], /^Expert.*2\/2/);
-  // what the learner saw: the access-log counts, the edited config, and a job killed
+  assert.match(heads[3], /^Expert.*4\/4.*★/);
+  assert.match(await page.textContent('#mission h2'), /You finished the Expert tier/);
+  // what the learner saw: the access-log counts, a job killed, the line counts, the diff, the trace and the trap
   const scr = await page.textContent('#screen');
   assert.match(scr, /200 7/);
   assert.match(scr, /Terminated\s+sleep 100/);
   assert.match(scr, /finished 12\d\d/);
+  assert.match(scr, /3 inbox\/a\.txt\s*2 inbox\/b\.txt\s*4 inbox\/c\.txt/);
+  assert.match(scr, /job 1\s*job 2\s*job 3/);
+  assert.match(scr, /2a3\s*> kiwi\s*4d4\s*< plum/);
+  assert.match(scr, /4 10\.0\.0\.5\s*3 10\.0\.0\.9\s*3 10\.0\.0\.7/);
+  assert.match(scr, /bash: nope: unbound variable/);
+  assert.match(scr, /\+ echo hi\s*hi\s*\+ set \+x/);
+  assert.match(scr, /hi\s*bye/);
   assert.equal(await page.evaluate(() => window.SQ.ctxFor('').read('~/config.ini').includes('debug=true')), true);
+  assert.deepEqual(await page.evaluate(() => ['a', 'b', 'c'].map(k => window.SQ.ctxFor('').isFile(`~/archive/${k}.txt`))), [true, true, true]);
+  assert.equal(await page.evaluate(() => window.SQ.rt.opts.x), false, 'tracing is off again');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

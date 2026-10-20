@@ -107,16 +107,10 @@ describe('Tiers.renderRail', () => {
   });
 });
 
-// ---- Stage 3 Task 17: the Expert tier wiring, with the test-only Expert content (tests/fixtures/fake-expert.js) filling the tier
-// up to 4 chapters x 7 missions while the real chapters (Tasks 18 and 19) are not there yet. ----
-import fs from 'node:fs';
-import vm from 'node:vm';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-const FAKE_EXPERT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-expert.js');
+// ---- Stage 3 Task 17: the Expert tier wiring. Task 17 ran these on a test-only fixture that filled the tier up to 4 chapters x 7
+// missions; since Task 19 the real chapters (content/tier-expert.js) are all there, so they run on the shipped content. ----
 function withExpert() {
   const c = loadContext();
-  vm.runInContext(fs.readFileSync(FAKE_EXPERT, 'utf8'), c, { filename: FAKE_EXPERT });
   c.SQ.Tiers = c.Tiers;
   return c.SQ;
 }

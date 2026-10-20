@@ -1,15 +1,12 @@
-// Stage 3 Task 18: the Expert tier, chapters 16 (awk & sed craft) and 17 (Processes & jobs), at indexes 15 and 16.
+// Stage 3 Tasks 18 and 19: the Expert tier, chapters 16 (awk & sed craft), 17 (Processes & jobs), 18 (Pipeline mastery) and
+// 19 (Safe, debuggable scripts), at indexes 15 to 18.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadContext, loadShell, run } from './harness.mjs';
+import { loadShell, run } from './harness.mjs';
 import { assertSolvable } from './solvability-lib.mjs';
 
-const A16 = 15, P17 = 16;
-const EXPERT = [A16, P17];
+const A16 = 15, P17 = 16, PM18 = 17, SS19 = 18;
+const EXPERT = [A16, P17, PM18, SS19];
 const put = (SQ, m, text) => assert.equal(SQ.writeFile(SQ.norm(m.file, SQ.HOME), text, false, m.file), null);
 
 // UI-style: fresh world, the chapter's setup (with starters), every line on its own log, judge the last line.
@@ -41,7 +38,7 @@ function world(ci = A16) {
 }
 const sortedLines = (t) => t.split('\n').filter(Boolean).sort().join('\n');
 
-describe('expert chapters 16 and 17: shape', () => {
+describe('expert chapters: shape', () => {
   const SQ = loadShell();
   const ch = SQ.content.chapters;
   it('sit at indexes 15 and 16, tier expert, 7 missions each, 25 XP per mission', () => {
@@ -50,6 +47,29 @@ describe('expert chapters 16 and 17: shape', () => {
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.badge)], ['Text Wrangler', 'Job Controller']);
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.missions.length)], [7, 7]);
     for (const i of EXPERT) {
+      assert.equal(SQ.tiers.tierOf(i).id, 'expert');
+      assert.equal(SQ.tiers.missionXp(i), 25);
+    }
+  });
+  it('chapters 18 and 19 sit at indexes 17 and 18, tier expert, 7 missions each; 19 chapters in all, the Expert tier is the last', () => {
+    assert.equal(ch.length, 19);
+    assert.deepEqual([...ch.slice(17, 19).map((c) => c.tier)], ['expert', 'expert']);
+    assert.deepEqual([...ch.slice(17, 19).map((c) => c.name)], ['Pipeline mastery', 'Safe, debuggable scripts']);
+    assert.deepEqual([...ch.slice(17, 19).map((c) => c.badge)], ['Pipeline Architect', 'Toolsmith']);
+    assert.deepEqual([...ch.slice(15, 19).map((c) => c.missions.length)], [7, 7, 7, 7]);
+  });
+  it('all 28 Expert missions exist: cumulativeXp("expert") is 1890 + 28*25 + 4*25, the rank Shell Wizard, Advanced still 1890', () => {
+    const ex = ch.filter((c) => c.tier === 'expert');
+    assert.equal(ex.length, 4);
+    assert.equal(ex.reduce((n, c) => n + c.missions.length, 0), 28);
+    assert.equal(SQ.tiers.cumulativeXp('expert'), 1890 + 28 * 25 + 4 * 25);
+    assert.equal(SQ.tiers.cumulativeXp('expert'), 2690);
+    assert.equal(SQ.tiers.cumulativeXp('advanced'), 1890);
+    const r = SQ.tiers.ranks();
+    assert.deepEqual([...r[r.length - 1]], [2690, 'Shell Wizard']);
+    assert.equal(SQ.tiers.rankFor(2690).name, 'Shell Wizard');
+    assert.equal(SQ.tiers.rankFor(2689).name, 'Automator');
+    for (const i of [PM18, SS19]) {
       assert.equal(SQ.tiers.tierOf(i).id, 'expert');
       assert.equal(SQ.tiers.missionXp(i), 25);
     }
@@ -66,7 +86,7 @@ describe('expert chapters 16 and 17: shape', () => {
     assert.equal(SQ.tiers.rankFor(expected - 1).name, 'Automator');
   });
   it('missions have the shared fields, no em dashes; 16.7 and 17.7 are script missions with starters, cases and wrong scripts', () => {
-    for (const c of ch.slice(15, 17)) c.missions.forEach((m, i) => {
+    for (const c of ch.slice(15, 19)) c.missions.forEach((m, i) => {
       for (const k of ['title', 'goal', 'explain', 'answer']) assert.equal(typeof m[k], 'string', `${m.title}.${k}`);
       assert.doesNotMatch(m.explain + m.goal + (m.note || '') + (m.hint || ''), /—/, 'no em dashes');
       assert.ok(Array.isArray(m.anat) && m.anat.length, `${m.title}: anat`);
@@ -96,15 +116,15 @@ describe('expert chapters 16 and 17: shape', () => {
     assert.match(ch[P17].missions[6].answer, /\(sleep "\$n"; echo "\$n done"\) &\ndone\nwait\n/);
   });
   it('no text teaches an unquoted variable inside a test', () => {
-    for (const c of ch.slice(15, 17)) for (const m of c.missions) {
+    for (const c of ch.slice(15, 19)) for (const m of c.missions) {
       const text = [m.goal, m.explain, m.note || '', m.hint || '', m.answer, m.starter || ''].join(' ').replace(/<[^>]+>/g, '');
       assert.doesNotMatch(text, /\[\s+!?\s*\$\w/, `${m.title}: quote variables in [ ]`);
     }
-    for (const g of SQ.content.guide.filter((g) => g.ch === A16 || g.ch === P17)) for (const [e] of g.ex) assert.doesNotMatch(e, /\[\s+\$\w/, `guide ${g.c}: ${e}`);
+    for (const g of SQ.content.guide.filter((g) => EXPERT.includes(g.ch))) for (const [e] of g.ex) assert.doesNotMatch(e, /\[\s+\$\w/, `guide ${g.c}: ${e}`);
   });
 });
 
-describe('expert chapters 16 and 17: world seeding', () => {
+describe('expert chapters: world seeding', () => {
   it('seed scripts/, village/sales.csv, village/logs/access.log and config.ini with the Intermediate data; setup twice changes nothing', () => {
     const SQ = loadShell();
     for (const ci of EXPERT) SQ.setupChapter(SQ.content.chapters[ci]);
@@ -112,9 +132,19 @@ describe('expert chapters 16 and 17: world seeding', () => {
     assert.ok(c.isDir('~/scripts'));
     assert.equal(c.read('~/village/sales.csv'), SQ.VILLAGE.SALES);
     assert.equal(c.read('~/village/logs/access.log'), SQ.VILLAGE.ACCESS);
+    assert.equal(c.read('~/village/logs/all.log'), SQ.VILLAGE.ALLLOG);
     assert.equal(c.read('~/config.ini'), SQ.VILLAGE.CONFIG);
     assert.equal(c.read('~/scripts/report.sh'), SQ.content.chapters[A16].missions[6].starter);
     assert.equal(c.read('~/scripts/fanout.sh'), SQ.content.chapters[P17].missions[6].starter);
+    assert.equal(c.read('~/scripts/topn.sh'), SQ.content.chapters[PM18].missions[6].starter);
+    assert.equal(c.read('~/scripts/opts.sh'), SQ.content.chapters[SS19].missions[5].starter);
+    assert.equal(c.read('~/scripts/logtool.sh'), SQ.content.chapters[SS19].missions[6].starter);
+    // chapter 18's world: three .txt files and a readme.md in inbox/, two unsorted lists, an empty archive/
+    assert.deepEqual([...c.node('~/inbox') && Object.keys(c.node('~/inbox').children).sort()], ['a.txt', 'b.txt', 'c.txt', 'readme.md']);
+    for (const [k, v] of Object.entries(SQ.EXPERT_SEED.INBOX)) assert.equal(c.read(`~/inbox/${k}`), v);
+    for (const [k, v] of Object.entries(SQ.EXPERT_SEED.LISTS)) assert.equal(c.read(`~/lists/${k}`), v);
+    assert.ok(c.isDir('~/archive'));
+    assert.equal(Object.keys(c.node('~/archive').children).length, 0);
     const snap = JSON.stringify(SQ.S.fs);
     for (const ci of EXPERT) SQ.setupChapter(SQ.content.chapters[ci]);
     assert.equal(JSON.stringify(SQ.S.fs), snap, 'second setup changes nothing');
@@ -124,6 +154,10 @@ describe('expert chapters 16 and 17: world seeding', () => {
     a.content.chapters[7].setup();
     b.setupChapter(b.content.chapters[A16]);
     for (const p of ['~/village/sales.csv', '~/village/logs/access.log', '~/config.ini']) assert.equal(b.ctxFor('').read(p), a.ctxFor('').read(p), p);
+    const d = loadShell(), e = loadShell();
+    d.content.chapters[9].setup(); // Intermediate chapter 10 (Permissions & links) seeds village/logs/all.log
+    e.setupChapter(e.content.chapters[SS19]);
+    assert.equal(e.ctxFor('').read('~/village/logs/all.log'), d.ctxFor('').read('~/village/logs/all.log'));
   });
   it('never clobbers learner files', () => {
     const SQ = loadShell();
@@ -131,8 +165,13 @@ describe('expert chapters 16 and 17: world seeding', () => {
     run(SQ, "sed -i 's/debug=false/debug=true/' config.ini");
     run(SQ, 'echo mine > scripts/report.sh');
     run(SQ, 'echo 1,2,3 > village/sales.csv');
+    run(SQ, 'echo mine > inbox/a.txt; echo kept > archive/x.txt; rm lists/b.txt; echo mine > scripts/logtool.sh');
     for (const ci of EXPERT) SQ.setupChapter(SQ.content.chapters[ci]);
     const c = SQ.ctxFor('');
+    assert.equal(c.read('~/inbox/a.txt'), 'mine');
+    assert.equal(c.read('~/archive/x.txt'), 'kept');
+    assert.equal(c.read('~/lists/b.txt'), SQ.EXPERT_SEED.LISTS['b.txt'], 'a deleted seed file comes back');
+    assert.equal(c.read('~/scripts/logtool.sh'), 'mine');
     assert.match(c.read('~/config.ini'), /debug=true/);
     assert.equal(c.read('~/scripts/report.sh').trim(), 'mine');
     assert.equal(c.read('~/village/sales.csv').trim(), '1,2,3');
@@ -148,7 +187,7 @@ describe('expert chapters 16 and 17: world seeding', () => {
   it('jump-in safe after the chapter files were deleted: setup puts them back', () => {
     for (const ci of EXPERT) {
       const SQ = loadShell();
-      run(SQ, 'rm -r village scripts config.ini');
+      run(SQ, 'rm -r village scripts config.ini inbox lists archive');
       const ch = SQ.content.chapters[ci];
       SQ.setupChapter(ch);
       for (const m of ch.missions) assertSolvable(SQ, ch, m);
@@ -162,14 +201,6 @@ describe('expert chapters 16 and 17: world seeding', () => {
       run(SQ, m.answer);
       assert.ok(m.check(SQ.ctxFor(m.answer)), m.title);
     }
-  });
-  it('the test fixture fills only the missing Expert chapters: 15 and 16 stay real', () => {
-    const ctx = loadContext();
-    const FAKE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/fake-expert.js');
-    vm.runInContext(fs.readFileSync(FAKE, 'utf8'), ctx, { filename: FAKE });
-    const ch = ctx.SQ.content.chapters;
-    assert.equal(ch.length, 19);
-    assert.deepEqual([...ch.slice(15, 19).map((c) => c.name)], ['awk & sed craft', 'Processes & jobs', 'Fake expert 3', 'Fake expert 4']);
   });
 });
 
@@ -539,11 +570,26 @@ describe('expert explanations: every claim re-run in the harness', () => {
   });
 });
 
-describe('expert quick-fire and guide (chapters 16 and 17)', () => {
+describe('expert quick-fire and guide (chapters 16 to 19)', () => {
   const SQ = loadShell();
   const QF = SQ.content.quickfire.filter((q) => q[2] === 'expert');
   it('has 6 quick-fire questions per chapter, tagged expert', () => {
-    assert.equal(QF.length, 12);
+    assert.equal(QF.length, 24);
+  });
+  it('chapter 18 and 19 questions cover find -exec, xargs, <( ), set -euo pipefail, -x, trap, mktemp and $?', () => {
+    const all = QF.slice(12).flatMap((q) => q[1]).join('\n');
+    for (const k of ['-exec', 'xargs -I', '-P3', '<(', 'set -euo pipefail', 'set -x', 'trap', 'mktemp', 'echo $?', 'set -e', 'sort -k1,1nr']) assert.ok(all.includes(k), k);
+  });
+  it('chapter 18 and 19 quick-fire answers accept the common spellings', () => {
+    const accepts = (q, v) => { const nm = q[3] && q[3].exact ? (t) => t.trim().replace(/\s+/g, ' ') : (s) => s.trim().replace(/\s+/g, ' ').replace(/['"]/g, ''); return q[1].some((x) => nm(x) === nm(v)); };
+    const q = (t) => QF.find((x) => x[0].startsWith(t));
+    for (const v of ["find inbox -name '*.txt' -exec wc -l {} \\;", "find inbox -name '*.txt' -exec wc -l {} +", 'find inbox -name "*.txt" -exec wc -l {} \\;']) assert.ok(accepts(q('With find -exec'), v), v);
+    for (const v of ['find inbox -name *.txt -exec wc -l {} \\;', "find inbox -exec wc -l {} \\;"]) assert.ok(!accepts(q('With find -exec'), v), v);
+    for (const v of ['set -euo pipefail', 'set -eu -o pipefail', 'set -o errexit -o nounset -o pipefail']) assert.ok(accepts(q('Turn on errexit'), v), v);
+    for (const v of ['set -eu', 'set -e -o pipefail']) assert.ok(!accepts(q('Turn on errexit'), v), v);
+    for (const v of ["trap 'rm -f \"$tmp\"' EXIT", "trap 'rm -f \"$tmp\"' 0"]) assert.ok(accepts(q('Remove the file named'), v), v);
+    for (const v of ['trap "rm -f $tmp" EXIT', "trap 'rm -f $tmp' EXIT"]) assert.ok(!accepts(q('Remove the file named'), v), v);
+    for (const v of ['tmp=$(mktemp)', 'tmp="$(mktemp)"']) assert.ok(accepts(q('Make a new empty temporary'), v), v);
   });
   it('awk and sed questions compare exactly (the quotes are the lesson)', () => {
     for (const q of QF) if (q[1].some((a) => /^(awk|sed)\b/.test(a))) assert.deepEqual({ ...q[3] }, { exact: true }, q[0]);
@@ -560,6 +606,11 @@ describe('expert quick-fire and guide (chapters 16 and 17)', () => {
   });
   it('has 6 guide entries per chapter, covering the new keywords', () => {
     for (const ci of EXPERT) assert.equal(SQ.content.guide.filter((g) => g.ch === ci).length, 6, `chapter ${ci}`);
+    const g2 = SQ.content.guide.filter((g) => g.ch === PM18 || g.ch === SS19);
+    const t2 = g2.map((x) => x.c + ' ' + x.what + ' ' + x.ex.map((e) => e[0]).join(' ')).join(' ');
+    for (const k of ['find', '-exec', 'xargs', '-I{}', '-P', '<(', 'set -euo pipefail', 'set -e', 'set -u', 'pipefail', 'set -x', 'trap', 'getopts', 'mktemp', '$?', 'exit status', 'OPTARG', 'uniq -c', 'sort -k'])
+      assert.ok(t2.includes(k), `guide covers ${k}`);
+    for (const k of ['find -exec', 'xargs', 'xargs -n -P', '<( )', 'uniq -c', 'sort -k', 'set -e', 'set -u', 'set -o pipefail', 'set -x', 'trap', 'getopts']) assert.ok(g2.some((x) => x.c === k), `guide entry ${k}`);
     const g = SQ.content.guide.filter((g) => EXPERT.includes(g.ch));
     const text = g.map((x) => x.c + ' ' + x.what).join(' ');
     for (const k of ['awk', '-F', 'BEGIN', 'END', 'c[key]', 'printf', 'sed -i', 'address', 'sleep', '&', 'jobs', 'wait', 'kill', 'ps', '$!', '$1', '$NF', 'NR'])
@@ -574,18 +625,32 @@ describe('expert quick-fire and guide (chapters 16 and 17)', () => {
       run(S2, 'sleep 50 &');
       const r = run(S2, a);
       assert.doesNotMatch(r.out, /bash:|not support|command not found|awk:|sed:/, `${a}: ${r.out}`);
-      assert.equal(r.code, 0, a);
+      assert.equal(r.code, /^diff /.test(a) ? 1 : 0, a); // diff exits with 1 when the files differ, and the sorted lists do
     }
   });
-  it('guide examples for chapters 16 and 17 run cleanly and print what they say', () => {
+  it('guide examples for the Expert chapters run cleanly and print what they say', () => {
     for (const g of SQ.content.guide.filter((g) => EXPERT.includes(g.ch)))
       for (const [e, note] of g.ex) {
         const S2 = loadShell();
         for (const ci of EXPERT) S2.setupChapter(S2.content.chapters[ci]);
         const r = run(S2, e);
-        assert.doesNotMatch(r.out, /bash:|not support|command not found|awk:|sed:/, `${g.c}: ${e}: ${r.out}`);
+        // a note that says what is printed is compared exactly (set -u's example prints bash's own error on purpose)
         if (/^prints /.test(note)) assert.equal(r.out.replace(/\n/g, ' '), note.slice(7), `${g.c}: ${e}`);
+        else assert.doesNotMatch(r.out, /bash:|not support|command not found|awk:|sed:/, `${g.c}: ${e}: ${r.out}`);
+        assert.doesNotMatch(r.out, /not support|command not found/, `${g.c}: ${e}: ${r.out}`);
       }
+  });
+  it('the chapter 18 and 19 guide notes that are not "prints" hold too', () => {
+    const go = (line) => { const S2 = loadShell(); S2.setupChapter(S2.content.chapters[SS19]); return run(S2, line).out; };
+    assert.equal(go('ls inbox/*.txt | xargs -t wc -l').split('\n')[0], 'wc -l inbox/a.txt inbox/b.txt inbox/c.txt', 'xargs: one wc for the three files');
+    { // -n2: two commands, echo 1 2 and echo 3 (-t shows them on stderr)
+      const S2 = loadShell(); const l = 'echo 1 2 3 | xargs -t -n2 echo'; run(S2, l); const c = S2.ctxFor(l);
+      assert.deepEqual([c.err(), c.out()], ['echo 1 2\necho 3', '1 2\n3']);
+    }
+    assert.equal(go("awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -1").trim(), '4 10.0.0.5');
+    assert.equal(go("printf 'a\\nb\\na\\n' | sort | uniq -c"), '      2 a\n      1 b');
+    assert.equal(go('mktemp'), '/tmp/tmp.A00001');
+    assert.equal(go("bash -c 'while getopts \"vn:\" o; do echo \"$o $OPTARG\"; done' x -v -n Ada"), 'v \nn Ada');
   });
   it('the job guide examples show what their notes say', () => {
     const go = (line) => { const S2 = loadShell(); S2.setupChapter(S2.content.chapters[P17]); return run(S2, line).out; };
@@ -598,5 +663,416 @@ describe('expert quick-fire and guide (chapters 16 and 17)', () => {
     assert.match(go('sleep 2 & pid=$!; wait "$pid"; echo "status $?"'), /status 0/);
     assert.match(go('sleep 100 & kill %1'), /Terminated/);
     assert.match(go('sleep 100 & kill -9 $!'), /Killed/);
+  });
+});
+
+describe('chapter 18 (Pipeline mastery) checks', () => {
+  it('18.1 Run a command on every match', () => {
+    yes(PM18, 0, "find inbox -name '*.txt' -exec wc -l {} \\;");
+    yes(PM18, 0, "find inbox -name '*.txt' -exec wc -l {} +");
+    yes(PM18, 0, 'find ./inbox -name "*.txt" -exec wc -l {} \\;');
+    yes(PM18, 0, "find inbox -type f -name '*.txt' -exec wc -l '{}' ';'");
+    yes(PM18, 0, "find ~/inbox -name '*.txt' -exec wc -l {} \\;");
+    yes(PM18, 0, 'cd inbox', "find . -name '*.txt' -exec wc -l {} \\;");
+    yes(PM18, 0, "find inbox -name '*.txt' -exec wc -l {} \\; | sort -r");
+    no(PM18, 0, 'wc -l inbox/*.txt');
+    no(PM18, 0, "find inbox -name '*.txt' | xargs wc -l");
+    no(PM18, 0, 'find inbox -exec wc -l {} \\;'); // readme.md (and the folder itself) too
+    no(PM18, 0, "find inbox -name '*.txt' -exec cat {} \\;");
+    no(PM18, 0, "find inbox -name '*.txt' -exec wc -c {} \\;");
+    no(PM18, 0, "find inbox -name 'a.txt' -exec wc -l {} \\;");
+    no(PM18, 0, "echo '3 inbox/a.txt'; echo '2 inbox/b.txt'; echo '4 inbox/c.txt'");
+    no(PM18, 0, "find inbox -name '*.txt' -exec echo {} \\; ; wc -l inbox/*.txt");
+  });
+  it('18.1 a file added to inbox (also in a subfolder) is expected too; GNU wc\'s "total" line is allowed', () => {
+    yes(PM18, 0, 'mkdir -p inbox/old; echo x > inbox/old/d.txt', "find inbox -name '*.txt' -exec wc -l {} \\;");
+    no(PM18, 0, 'mkdir -p inbox/old; echo x > inbox/old/d.txt', "find inbox -maxdepth 1 -name '*.txt' -exec wc -l {} \\;");
+    const { SQ, go } = world(PM18);
+    const r = go("find inbox -name '*.txt' -exec wc -l {} \\;");
+    assert.equal(r.out, '3 inbox/a.txt\n2 inbox/b.txt\n4 inbox/c.txt');
+    SQ.rt.lastOut = r.out + '\n9 total';
+    assert.ok(SQ.content.chapters[PM18].missions[0].check(r.c));
+  });
+  it('18.2 Feed a command with xargs', () => {
+    yes(PM18, 1, 'ls inbox/*.txt | xargs -I{} cp {} archive/');
+    yes(PM18, 1, 'ls inbox/*.txt | xargs -I {} cp {} archive/');
+    yes(PM18, 1, "find inbox -name '*.txt' | xargs -I{} cp {} archive/");
+    yes(PM18, 1, "printf '%s\\n' inbox/*.txt | xargs -I % cp % archive");
+    yes(PM18, 1, 'ls inbox/*.txt | xargs -t -I{} cp {} archive/');
+    yes(PM18, 1, 'cd inbox', 'ls *.txt | xargs -I{} cp {} ../archive/');
+    no(PM18, 1, 'cp inbox/*.txt archive/');
+    no(PM18, 1, 'ls inbox/*.txt | xargs -I{} echo {}');
+    no(PM18, 1, 'ls inbox/a.txt | xargs -I{} cp {} archive/');
+    no(PM18, 1, 'ls inbox/*.txt | xargs -I{} mv {} archive/'); // the inbox copies are gone, nothing to compare with
+    no(PM18, 1, 'ls inbox/*.txt | xargs -I{} cp {} inbox/');
+    // leftovers: archive/ already full from an earlier line does not count without an xargs -I cp on this line
+    no(PM18, 1, 'cp inbox/*.txt archive/', 'echo x | xargs -I{} echo {}');
+    no(PM18, 1, 'ls inbox/*.txt | xargs -I{} cp {} archive/', 'ls archive');
+  });
+  it('18.3 Work in parallel (any order)', () => {
+    yes(PM18, 2, 'echo 1 2 3 | xargs -n1 -P3 echo job');
+    yes(PM18, 2, 'echo 1 2 3 | xargs -P3 -n1 echo job');
+    yes(PM18, 2, 'echo 1 2 3 | xargs -n 1 -P 3 echo job');
+    yes(PM18, 2, 'seq 3 | xargs -P 3 -I{} echo job {}');
+    yes(PM18, 2, 'echo 3 2 1 | xargs -n1 -P3 echo job');
+    no(PM18, 2, 'echo 1 2 3 | xargs -n1 echo job');
+    no(PM18, 2, 'echo 1 2 3 | xargs -P3 echo job');
+    no(PM18, 2, 'echo job 1; echo job 2; echo job 3');
+    no(PM18, 2, 'echo 1 2 | xargs -n1 -P3 echo job');
+    no(PM18, 2, 'echo 1 2 3 | xargs -n1 -P3 echo task');
+  });
+  it('18.4 Compare without temp files', () => {
+    yes(PM18, 3, 'diff <(sort lists/a.txt) <(sort lists/b.txt)');
+    yes(PM18, 3, 'diff <(sort < lists/a.txt) <(cat lists/b.txt | sort)');
+    yes(PM18, 3, 'cd lists', 'diff <(sort a.txt) <(sort b.txt)');
+    yes(PM18, 3, 'diff <(sort -u lists/a.txt) <(sort lists/b.txt)');
+    no(PM18, 3, 'diff lists/a.txt lists/b.txt');
+    no(PM18, 3, 'sort lists/a.txt > /tmp/a; sort lists/b.txt > /tmp/b; diff /tmp/a /tmp/b');
+    no(PM18, 3, 'diff <(sort lists/b.txt) <(sort lists/a.txt)');
+    no(PM18, 3, 'diff <(sort lists/a.txt) lists/b.txt');
+    no(PM18, 3, 'diff -u <(sort lists/a.txt) <(sort lists/b.txt)'); // another format: the goal shows plain diff
+    no(PM18, 3, 'comm -3 <(sort lists/a.txt) <(sort lists/b.txt)');
+    no(PM18, 3, "printf '2a3\\n> kiwi\\n4d4\\n< plum\\n'");
+  });
+  it('18.4 the expected diff follows the lists: an edited list changes it', () => {
+    yes(PM18, 3, 'echo melon >> lists/b.txt', 'diff <(sort lists/a.txt) <(sort lists/b.txt)');
+    const { go } = world(PM18);
+    assert.equal(go('diff <(sort lists/a.txt) <(sort lists/b.txt)').out, '2a3\n> kiwi\n4d4\n< plum');
+  });
+  it('18.5 Keep the variable', () => {
+    yes(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n');
+    yes(PM18, 4, 'n=0; while read -r l; do n=$((n+1)); done < <(cat inbox/a.txt); echo "$n"');
+    yes(PM18, 4, 'while IFS= read -r line; do n=$((n + 1)); done < inbox/a.txt; echo "$n"');
+    yes(PM18, 4, 'count=0; while read x; do count=$((count+1)); done < <(cat inbox/a.txt) ; echo $count');
+    // the planned wrong answer: the loop counts in a pipeline's subshell, so n is empty afterwards
+    no(PM18, 4, 'cat inbox/a.txt | while read l; do n=$((n+1)); done; echo $n');
+    // ... and it stays wrong when an earlier run left n=3 behind
+    no(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n', 'cat inbox/a.txt | while read l; do n=$((n+1)); done; echo $n');
+    no(PM18, 4, 'wc -l < inbox/a.txt');
+    no(PM18, 4, 'echo 3');
+    no(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/b.txt); echo $n');
+    no(PM18, 4, 'cat inbox/a.txt | { while read l; do n=$((n+1)); done; echo $n; }'); // right number, but no redirect into the loop
+    // a second run counts on from 3 (6): the note says to start with n=0; and that form passes
+    no(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n', 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n');
+    yes(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n', 'n=0; while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n');
+    yes(PM18, 4, 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n', 'unset n', 'while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo $n');
+  });
+  it('18.6 Top three', () => {
+    yes(PM18, 5, "sort village/logs/access.log | awk '{print $1}' | uniq -c | sort -rn | head -3");
+    yes(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -n 3");
+    yes(PM18, 5, "cut -d' ' -f1 village/logs/access.log | sort | uniq -c | sort -nr | head -3");
+    yes(PM18, 5, "awk '{c[$1]++} END {for (k in c) print c[k], k}' village/logs/access.log | sort -rn | head -3");
+    yes(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -k1,1nr -k2,2 | head -3"); // the tie in the other order
+    no(PM18, 5, "awk '{print $1}' village/logs/access.log | uniq -c | sort -rn | head -3"); // no sort first: every count is 1
+    no(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -n | head -3");
+    no(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn");
+    no(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -2");
+    no(PM18, 5, "awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -3 | awk '{print $2}'");
+    no(PM18, 5, "echo '4 10.0.0.5'; echo '3 10.0.0.9'; echo '3 10.0.0.7'");
+    no(PM18, 5, "awk '{print $1}' village/sales.csv | sort | uniq -c | sort -rn | head -3");
+  });
+  it('18.7 Script: top N (answer, alternatives, wrong ones, failure lines)', () => {
+    const { SQ, m, ok, why } = scriptJudge(PM18, 6);
+    assert.equal(m.check, undefined, 'the cases use files no answer can hard-code');
+    assert.equal(ok(m.answer), true);
+    assert.equal(ok('#!/bin/bash\n[ "$#" -eq 2 ] || { echo "usage: topn.sh FILE N" >&2; exit 2; }\n[ -r "$1" ] || { echo "topn.sh: cannot read $1" >&2; exit 1; }\ncut -d" " -f1 "$1" | sort | uniq -c | sort -k1,1nr -k2 | head -n "$2" | sed \'s/^ *//\'\n'), true, 'cut, -k2, sed');
+    assert.equal(ok('#!/bin/bash\nif [[ $# -ne 2 ]]; then\n  echo "usage: topn.sh FILE N" 1>&2\n  exit 2\nfi\nif [[ ! -r $1 ]]; then\n  echo "topn.sh: cannot read $1" 1>&2\n  exit 1\nfi\nawk \'{c[$1]++} END {for (k in c) print c[k], k}\' "$1" | sort -k1,1nr -k2,2 | head -n "$2"\n'), true, 'an awk array');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(ok("#!/bin/bash\nprintf '4 10.0.0.5\\n3 10.0.0.7\\n'\n"), false, 'hardcoded');
+    assert.equal(why(m.wrong[0]), 'Test 1 (the access log, N 2) failed: expected "4 10.0.0.5\\n3 10.0.0.7", got "2 10.0.0.12\\n4 10.0.0.5"', 'sorted by value');
+    assert.equal(why(m.wrong[1]), 'Test 1 (the access log, N 2) failed: expected "4 10.0.0.5\\n3 10.0.0.7", got "4 10.0.0.5\\n3 10.0.0.9"', 'sort -rn turns a tie round');
+    assert.equal(why(m.wrong[5]), 'Test 4 (a missing file) failed: expected "topn.sh: cannot read ghost.txt", got "awk: can\'t open file ghost.txt"');
+    assert.equal(why(m.answer.replace('exit 2', 'exit 1')), 'Test 5 (no arguments) failed: expected "exit status 2", got "exit status 1 (usage: topn.sh FILE N)"');
+    // the cases do not depend on the learner's copy of the access log
+    run(SQ, 'echo 10.0.0.1 > village/logs/access.log');
+    assert.equal(ok(m.answer), true);
+    // through the terminal
+    run(SQ, 'rm village/logs/access.log');
+    SQ.setupChapter(SQ.content.chapters[PM18]);
+    put(SQ, m, m.answer);
+    assert.equal(run(SQ, 'bash scripts/topn.sh village/logs/access.log 3').out, '4 10.0.0.5\n3 10.0.0.7\n3 10.0.0.9');
+    const r = SQ.execLine('bash scripts/topn.sh');
+    assert.deepEqual([...r.out.map((o) => o.cls === 'out')], [false], 'the usage line is on stderr');
+    assert.equal(SQ.S.last, 2);
+  });
+  it('chapter 18 missions pass in order in one world (each line judged on its own), as a learner plays them', () => {
+    const SQ = loadShell();
+    const ch = SQ.content.chapters[PM18];
+    SQ.setupChapter(ch);
+    for (const m of ch.missions.slice(0, 6)) {
+      run(SQ, m.answer);
+      assert.ok(m.check(SQ.ctxFor(m.answer)), m.title);
+    }
+  });
+});
+
+describe('chapter 19 (Safe, debuggable scripts) checks', () => {
+  it('19.1 Stop on error', () => {
+    yes(SS19, 0, "bash -c 'set -e; false; echo after'; echo $?");
+    yes(SS19, 0, "bash -c 'set -e; false; echo after'"); // on its own line: no output, status 1; echo $? can follow
+    yes(SS19, 0, "bash -c 'set -o errexit; false; echo after'; echo \"$?\"");
+    yes(SS19, 0, "bash -ec 'false; echo after'; echo $?");
+    yes(SS19, 0, "bash -c 'set -e; ls nope; echo after'; echo $?");
+    yes(SS19, 0, "bash -c 'set -euo pipefail; false; echo after'; echo $?");
+    no(SS19, 0, "bash -c 'false; echo after'; echo $?");
+    no(SS19, 0, 'echo 1');
+    no(SS19, 0, 'false; echo $?');
+    no(SS19, 0, "bash -c 'set -e; true; echo after'; echo $?");
+    no(SS19, 0, "bash -c 'set -e; false'; echo $?"); // nothing after the failure to skip
+    no(SS19, 0, "bash -c 'set -e; exit 1'; echo $?");
+    no(SS19, 0, "bash -c 'set -e; false; echo after'; echo $?; echo after");
+    no(SS19, 0, "bash -c 'false; echo after'", 'echo 1');
+  });
+  it('19.2 No unset variables', () => {
+    yes(SS19, 1, "bash -c 'set -u; echo \"$nope\"'");
+    yes(SS19, 1, "bash -uc 'echo \"$nope\"'");
+    yes(SS19, 1, "bash -c 'set -o nounset; echo \"$typo\"'");
+    yes(SS19, 1, "bash -c 'set -u; echo \"$nope\"'; echo $?");
+    yes(SS19, 1, "bash -c 'set -eu; echo \"${nope}\"; echo after'");
+    yes(SS19, 1, 'set -u; echo "$nope"'); // at the prompt: the error, status 1
+    no(SS19, 1, "bash -c 'echo \"$nope\"'");
+    no(SS19, 1, "echo 'bash: nope: unbound variable' >&2; false");
+    no(SS19, 1, "bash -c \"echo 'bash: nope: unbound variable' >&2; exit 1\"");
+    no(SS19, 1, "bash -c 'set -u; echo \"${nope:-x}\"'");
+    no(SS19, 1, "bash -c 'set -u; nope=1; echo \"$nope\"'");
+  });
+  it('19.3 See the whole pipeline\'s status', () => {
+    yes(SS19, 2, "bash -c 'set -o pipefail; false | true; echo $?'");
+    yes(SS19, 2, "bash -c 'set -o pipefail; false | true'; echo $?");
+    yes(SS19, 2, "bash -o pipefail -c 'false | true'; echo $?");
+    yes(SS19, 2, "bash -c 'set -o pipefail; false | true'"); // no output, status 1
+    yes(SS19, 2, 'set -o pipefail; false | true; echo $?');
+    yes(SS19, 2, "bash -c 'set -euo pipefail; ls nope | cat; echo after'; echo $?");
+    no(SS19, 2, "bash -c 'false | true; echo $?'");
+    no(SS19, 2, 'false | true; echo $?');
+    no(SS19, 2, 'echo 1');
+    no(SS19, 2, "bash -c 'set -o pipefail; false; echo $?'");
+    no(SS19, 2, "bash -c 'set -o pipefail; true | true; echo $?'");
+    no(SS19, 2, "bash -c 'set -o pipefail; false || true; echo $?'");
+  });
+  it('19.4 Trace it', () => {
+    yes(SS19, 3, 'set -x; echo hi; set +x');
+    yes(SS19, 3, 'set -x; echo hello; set +x');
+    yes(SS19, 3, 'set -o xtrace; ls inbox; set +o xtrace');
+    yes(SS19, 3, "bash -xc 'echo hi'");
+    yes(SS19, 3, "bash -x -c 'echo hi'");
+    yes(SS19, 3, 'set -x', 'echo hi'); // tracing still on from the line before
+    no(SS19, 3, 'echo hi');
+    no(SS19, 3, "echo '+ echo hi' >&2; echo hi");
+    no(SS19, 3, 'set -x; set +x');
+    no(SS19, 3, 'set +x; echo hi');
+    no(SS19, 3, 'set -x; true; set +x');
+    no(SS19, 3, 'set -x; echo hi; set +x', 'echo hi');
+  });
+  it('19.4 tracing is off again after the answer, and a chapter switch turns it off too', () => {
+    const { SQ, go } = world(SS19);
+    go('set -x; echo hi; set +x');
+    assert.equal(SQ.rt.opts.x, false);
+    go('set -x');
+    assert.equal(SQ.rt.opts.x, true);
+    SQ.resetProcs();
+    assert.ok(!SQ.rt.opts.x);
+  });
+  it('19.5 Clean up after yourself', () => {
+    yes(SS19, 4, "bash -c \"trap 'echo bye' EXIT; echo hi\"");
+    yes(SS19, 4, "bash -c 'trap \"echo bye\" EXIT; echo hi'");
+    yes(SS19, 4, "(trap 'echo bye' EXIT; echo hi)");
+    yes(SS19, 4, "bash -c \"trap 'echo bye' 0; echo hi\"");
+    yes(SS19, 4, "bash -c \"trap 'echo bye' EXIT; echo hi; exit 3\"");
+    yes(SS19, 4, "bash -c 'bye() { echo bye; }; trap bye EXIT; echo hi'");
+    no(SS19, 4, 'echo hi; echo bye');
+    no(SS19, 4, "bash -c \"trap '' EXIT; echo hi; echo bye\"");
+    no(SS19, 4, "trap 'echo bye' EXIT; echo hi"); // the prompt's shell does not exit: only hi
+    no(SS19, 4, "bash -c 'echo hi; echo bye'");
+    no(SS19, 4, "bash -c \"trap 'echo bye' EXIT; echo hi\"; echo extra");
+    no(SS19, 4, "bash -c \"trap 'echo hi' EXIT; echo bye\"");
+  });
+  it('19.6 Script: options (answer, alternatives, wrong ones, failure lines)', () => {
+    const { SQ, m, ok, why } = scriptJudge(SS19, 5);
+    assert.equal(ok(m.answer), true);
+    // the silent form: a leading colon, no message of getopts' own
+    assert.equal(ok('#!/bin/bash\nverbose=0\nname=""\nwhile getopts ":vn:" opt; do\n  case "$opt" in\n    v) verbose=1 ;;\n    n) name="$OPTARG" ;;\n    \\?|:) echo "usage: opts.sh [-v] -n NAME" >&2; exit 2 ;;\n  esac\ndone\n[ -n "$name" ] || { echo "usage: opts.sh [-v] -n NAME" >&2; exit 2; }\n[ "$verbose" = 1 ] && echo "verbose on"\necho "Hello, $name!"\n'), true, 'silent getopts');
+    assert.equal(ok('#!/bin/bash\nusage() { echo "usage: opts.sh [-v] -n NAME" >&2; exit 2; }\nv=""\nwhile getopts "vn:" o; do\n  case $o in\n    v) v=yes ;;\n    n) name=$OPTARG ;;\n    ?) usage ;;\n  esac\ndone\nshift $((OPTIND - 1))\n[[ -z ${name:-} ]] && usage\nif [[ -n $v ]]; then echo "verbose on"; fi\nprintf "Hello, %s!\\n" "$name"\n'), true, '[[ ]], ?) and printf');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    // a hand-made parser passes every case, but the lesson is getopts
+    const hand = '#!/bin/bash\nusage() { echo "usage: opts.sh [-v] -n NAME" >&2; exit 2; }\nv=0\nname=""\nwhile [ "$#" -gt 0 ]; do\n  case "$1" in\n    -v) v=1 ;;\n    -vn) v=1; [ "$#" -ge 2 ] || usage; name="$2"; shift ;;\n    -n) [ "$#" -ge 2 ] || usage; name="$2"; shift ;;\n    *) usage ;;\n  esac\n  shift\ndone\n[ -n "$name" ] || usage\n[ "$v" -eq 1 ] && echo "verbose on"\necho "Hello, $name!"\n';
+    put(SQ, m, hand);
+    assert.equal(SQ.ctxFor('').scriptPasses(m).ok, true, 'the cases alone pass the hand-made parser');
+    assert.equal(ok(hand), false);
+    put(SQ, m, hand);
+    const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
+    assert.equal(SQ.scriptFailLine(m, v.failed), 'The output is right, but read the options with getopts "vn:" in a while loop.');
+    assert.equal(ok(hand.replace('#!/bin/bash\n', '#!/bin/bash\n# getopts "vn:" would be shorter\n')), false, 'getopts only in a comment');
+    assert.equal(why(m.wrong[0]), 'Test 1 (-n Ada) failed: expected "Hello, Ada!", got ""');
+    assert.equal(why(m.wrong[1]), 'Test 4 (no arguments) failed: expected "", got "usage: opts.sh [-v] -n NAME"');
+    assert.equal(why(m.wrong[3]), 'Test 4 (no arguments) failed: expected "", got "Hello, !"');
+    assert.equal(why(m.wrong[5]), 'Test 2 (-v -n Ada) failed: expected "verbose on\\nHello, Ada!", got "verbose on\\nHello, -n!"');
+    // through the terminal: getopts' own message comes first, then the usage line, both on stderr
+    put(SQ, m, m.answer);
+    assert.equal(run(SQ, 'bash scripts/opts.sh -vn Ada').out, 'verbose on\nHello, Ada!');
+    const r = SQ.execLine('bash scripts/opts.sh -x');
+    assert.ok(r.out.every((o) => o.cls !== 'out'), 'both lines are on stderr');
+    assert.equal(r.out.map((o) => o.text.replace(/\n$/, '')).join('\n'), 'scripts/opts.sh: illegal option -- x\nusage: opts.sh [-v] -n NAME');
+    assert.equal(SQ.S.last, 2);
+    assert.equal(run(SQ, 'bash scripts/opts.sh -n').out, 'scripts/opts.sh: option requires an argument -- n\nusage: opts.sh [-v] -n NAME');
+  });
+  it('19.7 Capstone: a robust log tool (answer, alternatives, wrong ones, failure lines)', () => {
+    const { SQ, m, ok, why } = scriptJudge(SS19, 6);
+    assert.equal(m.kind, 'challenge');
+    assert.ok(m.tests.every((t) => JSON.stringify(t.expectEmpty) === '["/tmp"]'), 'expectEmpty /tmp on every case');
+    assert.deepEqual(JSON.parse(JSON.stringify(m.tests.map((t) => [t.args, t.expectOut, t.expectCode ?? 0]))), [
+      [['village/logs/all.log'], '3 10.0.0.5\n3 10.0.0.7\n1 10.0.0.12', 0],
+      [['-l', 'WARN', '-n', '1', 'village/logs/all.log'], '1 10.0.0.12', 0],
+      [['-n', '2', 'village/logs/all.log'], '3 10.0.0.5\n3 10.0.0.7', 0],
+      [['-l', 'DEBUG', 'village/logs/all.log'], '', 0],
+      [['nowhere.log'], '', 1],
+      [['-x', 'village/logs/all.log'], '', 2]]);
+    assert.equal(ok(m.answer), true);
+    // Task 15's logtool.sh (opts.test.mjs), with the tie order of topn.sh: ${1:?} and a function-free trap
+    const t15 = ['#!/bin/bash', 'set -euo pipefail', 'level=ERROR', 'n=3', 'usage() { echo "usage: logtool.sh [-l LEVEL] [-n N] FILE" >&2; exit 2; }',
+      'while getopts "l:n:" opt; do', '  case $opt in', '    l) level=$OPTARG ;;', '    n) n=$OPTARG ;;', '    *) usage ;;', '  esac', 'done',
+      'shift $((OPTIND - 1))', 'file=${1:?usage: logtool.sh [-l LEVEL] [-n N] FILE}', 'if [ ! -r "$file" ]; then echo "error: cannot read $file" >&2; exit 1; fi',
+      'tmp=$(mktemp)', 'trap \'rm -f "$tmp"\' EXIT', 'grep -- "$level" "$file" > "$tmp" || true',
+      'awk \'{ print $1 }\' "$tmp" | sort | uniq -c | sort -k1,1nr -k2,2 | head -n "$n" | sed \'s/^ *//\''].join('\n');
+    assert.equal(ok(t15), true, 'Task 15 logtool with the tie order');
+    assert.equal(ok(t15.replace('sort -k1,1nr -k2,2', 'sort -rn')), false, 'Task 15 logtool as it was: sort -rn turns the ties round');
+    // set -e -u -o pipefail apart, a cleanup function, awk doing the filtering
+    const alt = '#!/bin/bash\nset -e\nset -u\nset -o pipefail\ncleanup() {\n  rm -f "$work"\n}\nlevel=ERROR\nn=3\nwhile getopts ":l:n:" o; do\n  case "$o" in\n    l) level="$OPTARG" ;;\n    n) n="$OPTARG" ;;\n    *) echo "usage: logtool.sh [-l LEVEL] [-n N] FILE" >&2; exit 2 ;;\n  esac\ndone\nshift $((OPTIND - 1))\nif [[ ! -r ${1:-} ]]; then echo "error: cannot read ${1:-}" >&2; exit 1; fi\nwork=$(mktemp)\ntrap cleanup EXIT\nawk -v l="$level" \'index($0, l) {print $1}\' "$1" > "$work"\nsort "$work" | uniq -c | sort -k1,1nr -k2,2 | head -n "$n" | awk \'{print $1, $2}\'\n';
+    assert.equal(ok(alt), true, 'separate set lines, a cleanup function, awk filtering');
+    assert.equal(ok(m.starter), false);
+    for (const w of m.wrong) assert.equal(ok(w), false, w);
+    assert.equal(why(m.wrong[0]), 'Test 1 (all.log, the defaults) failed: expected "/tmp empty", got "/tmp holds tmp.A00001"', 'no trap: the temp file stays');
+    assert.equal(why(m.wrong[1]), 'Test 2 (-l WARN -n 1) failed: expected "1 10.0.0.12", got "1 10.0.0.12\\n1 10.0.0.9"', '-n ignored');
+    assert.equal(why(m.wrong[2]), 'Test 5 (a missing file) failed: expected "exit status 1", got "exit status 0 (error: cannot read nowhere.log)"');
+    assert.equal(why(m.wrong[3]), 'Test 5 (a missing file) failed: expected "error: cannot read nowhere.log", got "awk: can\'t open file nowhere.log"', 'no set -e: awk fails and the script carries on');
+    assert.equal(why(m.wrong[4]), 'Test 4 (a level with no lines) failed: expected "exit status 0", got "exit status 1"', 'grep without || true under set -e');
+    // the cases pass but the habits are missing: the check names them
+    const loose = [m.answer.replace('set -euo pipefail\n', ''), m.answer.replace('tmp=$(mktemp)', 'tmp=/tmp/logtool.work; : > "$tmp"'),
+      m.answer.replace('set -euo pipefail', 'set -eu'), m.answer.replace('trap \'rm -f "$tmp"\' EXIT\n', '').replace(/\n$/, '\nrm -f "$tmp"\n')];
+    for (const t of loose) {
+      put(SQ, m, t);
+      assert.equal(SQ.ctxFor('').scriptPasses(m).ok, true, `cases pass: ${t}`);
+      assert.equal(ok(t), false, t);
+      put(SQ, m, t);
+      const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
+      assert.equal(SQ.scriptFailLine(m, v.failed), 'The tests pass, but a robust tool also needs set -euo pipefail, getopts, a mktemp work file and a trap ... EXIT.');
+    }
+    // the learner's own /tmp leftovers and an edited all.log do not matter: each case starts clean
+    run(SQ, 'mktemp; mktemp; echo junk > village/logs/all.log');
+    assert.equal(ok(m.answer), true);
+    assert.equal(SQ.ctxFor('').tmpFiles().length, 2, 'the learner\'s /tmp is left as it was');
+  });
+  it('19.7 through the terminal: the report, a clean /tmp, the error and usage paths', () => {
+    const { SQ, m } = scriptJudge(SS19, 6);
+    put(SQ, m, m.answer);
+    assert.equal(run(SQ, 'bash scripts/logtool.sh village/logs/all.log').out, '3 10.0.0.5\n3 10.0.0.7\n1 10.0.0.12');
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], []);
+    assert.equal(run(SQ, 'bash scripts/logtool.sh -l WARN village/logs/all.log').out, '1 10.0.0.12\n1 10.0.0.9');
+    assert.equal(run(SQ, 'bash scripts/logtool.sh -l DEBUG village/logs/all.log; echo "status $?"').out, 'status 0');
+    assert.equal(run(SQ, 'bash scripts/logtool.sh nowhere.log; echo "status $?"').out, 'error: cannot read nowhere.log\nstatus 1');
+    assert.equal(run(SQ, 'bash scripts/logtool.sh -q village/logs/all.log; echo "status $?"').out, 'scripts/logtool.sh: illegal option -- q\nusage: logtool.sh [-l LEVEL] [-n N] FILE\nstatus 2');
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], [], 'no path leaves a work file');
+  });
+  it('chapter 19 missions pass in order in one world (each line judged on its own), as a learner plays them', () => {
+    const SQ = loadShell();
+    const ch = SQ.content.chapters[SS19];
+    SQ.setupChapter(ch);
+    for (const m of ch.missions.slice(0, 5)) {
+      run(SQ, m.answer);
+      assert.ok(m.check(SQ.ctxFor(m.answer)), m.title);
+    }
+  });
+});
+
+describe('expert explanations, chapters 18 and 19: every claim re-run in the harness', () => {
+  it('18.1: the pattern leaves readme.md out; {} + hands every path to one command', () => {
+    const { go } = world(PM18);
+    assert.doesNotMatch(go("find inbox -name '*.txt'").out, /readme/);
+    assert.match(go('find inbox').out, /readme\.md/);
+    assert.equal(go("find inbox -name '*.txt' -exec echo {} +").out, 'inbox/a.txt inbox/b.txt inbox/c.txt');
+    assert.equal(go("find inbox -name '*.txt' -exec echo {} \\;").out, 'inbox/a.txt\ninbox/b.txt\ninbox/c.txt');
+  });
+  it('18.2: -I runs cp once per line; without -I one wc gets every file; -t shows the commands', () => {
+    const { go } = world(PM18);
+    const r = go('ls inbox/*.txt | xargs -t -I{} cp {} archive/');
+    assert.equal(r.c.err(), 'cp inbox/a.txt archive/\ncp inbox/b.txt archive/\ncp inbox/c.txt archive/');
+    assert.equal(go('ls inbox/*.txt | xargs -t wc -l').c.err(), 'wc -l inbox/a.txt inbox/b.txt inbox/c.txt');
+  });
+  it('18.3: -n1 gives one word per command; without it, job 1 2 3; this shell runs -P jobs in order', () => {
+    const { go } = world(PM18);
+    assert.equal(go('echo 1 2 3 | xargs -n1 -P3 echo job').out, 'job 1\njob 2\njob 3');
+    assert.equal(go('echo 1 2 3 | xargs -P3 echo job').out, 'job 1 2 3');
+    assert.equal(go('echo 3 1 2 | xargs -n1 -P3 echo job').out, 'job 3\njob 1\njob 2', 'one after another, in input order');
+  });
+  it('18.4: <( ) is a /dev/fd name; 2a3 adds kiwi, 4d4 deletes plum; unsorted, nearly every line differs', () => {
+    const { go } = world(PM18);
+    assert.equal(go('echo <(true)').out, '/dev/fd/63');
+    const r = go('diff <(sort lists/a.txt) <(sort lists/b.txt)');
+    assert.equal(r.out, '2a3\n> kiwi\n4d4\n< plum');
+    assert.equal(r.c.status(), 1);
+    assert.ok(go('diff lists/a.txt lists/b.txt').out.split('\n').filter((l) => /^[<>]/.test(l)).length >= 6);
+  });
+  it('18.5: the piped loop counts in a copy (empty); fed by < <( ) or < file it keeps 3', () => {
+    const { go } = world(PM18);
+    assert.equal(go('cat inbox/a.txt | while read l; do n=$((n+1)); done; echo "$n"').out, '');
+    assert.equal(go('while read l; do n=$((n+1)); done < <(cat inbox/a.txt); echo "$n"').out, '3');
+    assert.equal(go('unset n; while read l; do n=$((n+1)); done < inbox/a.txt; echo "$n"').out, '3');
+  });
+  it('18.6: without the first sort every address counts 1; 4 for 10.0.0.5, 3 each for .7 and .9', () => {
+    const { go } = world(PM18);
+    assert.ok(go("awk '{print $1}' village/logs/access.log | uniq -c").out.split('\n').every((l) => /^\s*1 /.test(l)));
+    assert.equal(go("sort village/logs/access.log | awk '{print $1}' | uniq -c | sort -rn | head -3").out, '      4 10.0.0.5\n      3 10.0.0.9\n      3 10.0.0.7');
+  });
+  it('18.7: sort -rn turns a tie round, -k1,1nr -k2,2 keeps it in order; uniq -c pads; an empty file prints nothing', () => {
+    const { go } = world(PM18);
+    assert.equal(go("awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -n 3 | awk '{print $1, $2}'").out, '4 10.0.0.5\n3 10.0.0.9\n3 10.0.0.7');
+    assert.equal(go("awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -k1,1nr -k2,2 | head -n 3 | awk '{print $1, $2}'").out, '4 10.0.0.5\n3 10.0.0.7\n3 10.0.0.9');
+    assert.match(go("echo a | uniq -c").out, /^ +1 a$/);
+    assert.equal(go(": > empty.txt; awk '{print $1}' empty.txt | sort | uniq -c").out, '');
+  });
+  it('19.1: set -e stops after false with status 1; without it, after and 0; a tested command does not stop it', () => {
+    const { go } = world(SS19);
+    assert.equal(go("bash -c 'set -e; false; echo after'; echo $?").out, '1');
+    assert.equal(go("bash -c 'false; echo after'; echo $?").out, 'after\n0');
+    assert.equal(go("bash -c 'set -e; false || echo saved; echo after'").out, 'saved\nafter');
+  });
+  it('19.2: the error text, status 1, the script stops; an unset variable is empty without -u; a default still works', () => {
+    const { go } = world(SS19);
+    const r = go("bash -c 'set -u; echo \"$nope\"; echo after'");
+    assert.equal(r.out, 'bash: nope: unbound variable');
+    assert.equal(r.c.status(), 1);
+    assert.equal(r.c.err(), 'bash: nope: unbound variable');
+    assert.equal(go("bash -c 'echo \"[$nope]\"'").out, '[]');
+    assert.equal(go("bash -c 'set -u; echo \"${nope:-none}\"'").out, 'none');
+  });
+  it('19.3: false | true is 0; with pipefail 1; set -euo pipefail stops on it', () => {
+    const { go } = world(SS19);
+    assert.equal(go('false | true; echo $?').out, '0');
+    assert.equal(go("bash -c 'set -o pipefail; false | true; echo $?'").out, '1');
+    const r = go("bash -c 'set -euo pipefail; false | true; echo after'");
+    assert.equal(r.out, '');
+    assert.equal(r.c.status(), 1);
+  });
+  it('19.4: the trace shows the expanded command; set +x is traced; bash -x traces a script', () => {
+    const { SQ, go } = world(SS19);
+    assert.equal(go('name=Ada; set -x; echo "hi $name"; set +x').out, "+ echo 'hi Ada'\nhi Ada\n+ set +x");
+    put(SQ, SQ.content.chapters[SS19].missions[5], SQ.content.chapters[SS19].missions[5].answer);
+    const r = go('bash -x scripts/opts.sh -n Ada');
+    assert.match(r.c.err(), /^\+ /m);
+    assert.match(r.c.err(), /\+ echo 'Hello, Ada!'/);
+    assert.equal(r.c.out(), 'Hello, Ada!');
+  });
+  it('19.5: the trap runs after exit 3 and after a set -e stop; mktemp + trap leave /tmp empty', () => {
+    const { SQ, go } = world(SS19);
+    assert.equal(go("bash -c \"trap 'echo bye' EXIT; exit 3\"; echo $?").out, 'bye\n3');
+    assert.equal(go("bash -c \"set -e; trap 'echo bye' EXIT; false; echo after\"").out, 'bye');
+    assert.equal(go('bash -c \'tmp=$(mktemp); trap "rm -f \\"$tmp\\"" EXIT; echo "made $tmp"\'').out, 'made /tmp/tmp.A00001');
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], []);
+  });
+  it('19.6: shift $((OPTIND - 1)) leaves the first word after the options in $1', () => {
+    const { go } = world(SS19);
+    assert.equal(go("bash -c 'while getopts \"v\" o; do :; done; shift $((OPTIND - 1)); echo \"$1\"' x -v file.txt").out, 'file.txt');
   });
 });
