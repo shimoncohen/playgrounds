@@ -64,6 +64,17 @@ test('landing page links to every playground', async () => {
   await ctx.close();
 });
 
+test('landing page links to GitHub and the feature request form', async () => {
+  const { ctx, page, errors } = await open(base + '/');
+  const hrefs = await page.$$eval('a.btn', a => a.map(x => x.getAttribute('href')));
+  assert.deepEqual(hrefs, [
+    'https://github.com/shimoncohen/playgrounds',
+    'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml',
+  ]);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('landing page shows saved XP', async () => {
   const { ctx, page } = await open(base + '/');
   await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
@@ -94,6 +105,18 @@ for (const name of NAMES) {
         ss.filter(s => s.getBoundingClientRect().height > 0 && getComputedStyle(s).display !== 'none').map(s => s.id.slice(4)));
       assert.deepEqual(shown, [tab], `after clicking "${tab}"`);
     }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
+  test(`${name}-quest links back to the landing page and to the feature request form`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+    await page.waitForSelector('#mission');
+    const idea = await page.getAttribute('footer.nv-foot a.nv-idea', 'href');
+    assert.equal(idea, 'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml');
+    await page.click('header.top a.nv-home');
+    await page.waitForSelector('a.card');
+    assert.equal(new URL(page.url()).pathname, '/');
     assert.deepEqual(errors, []);
     await ctx.close();
   });
