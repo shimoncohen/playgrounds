@@ -88,14 +88,17 @@ function loopCtl(name,a,io){
   return Object.assign(ok(),{ctl:{type:name,n}})}
 const errOut=e=>({out:[{text:errOf(e),cls:'err'}],code:e.code||2});
 let nest=0;
+/* the line's stderr as ctx.err() reads it: err and sys items (errors, set -x traces, `[1] 1235`), never tips or background-job output */
+const errText=out=>out.filter(x=>typeof x.text==='string'&&(x.cls==='err'||x.cls==='sys')&&!x.bg).map(x=>x.text).join('\n');
 /* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
 /* The virtual clock (procs.js): each outermost line costs one second, added when it ends (also after an error or a stopped line).
    A $( ) run at the top of a sandboxed script (o.sub) is not a typed line and costs nothing. SQ.advance's Out[] (Task 12a: output of jobs
    that came due) is appended to the line's output, then the job notices (Task 12b, SQ.flushNotices); lastOut keeps only the line's own output. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
-  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.fdTab=null;SQ.rt.fdOwn=false;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[]}
+  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.fdTab=null;SQ.rt.fdOwn=false;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[];if(!o.sub)SQ.rt.lineT0=SQ.rt.clock}
   let charged=!(outer&&!o.sub);
-  const lineCost=r=>{if(charged)return r;charged=true;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
+  /* Task 17: SQ.rt.lineTook = the virtual seconds the line itself took (sleep, wait, ...), measured before its 1-second cost (ctx.elapsed) */
+  const lineCost=r=>{if(charged)return r;charged=true;SQ.rt.lineTook=Math.round((SQ.rt.clock-(SQ.rt.lineT0||0))*1000)/1000;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
   /* Task 12b: the interactive shell's job notices ([1]+  Done  sleep 2) close the typed line, after the jobs that ran during its cost; never in $( ) */
   const notices=r=>{if(outer&&!o.sub&&SQ.flushNotices){const n=SQ.flushNotices();if(n.length)r.out=r.out.concat(n)}return r};
   /* Task 14: signals a job sent the interactive shell during the line run their traps when the line is over (bash runs them at the prompt) */
@@ -104,11 +107,12 @@ function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);cons
   try{const r=execLine0(line,o);if(!outer)return r;
     SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */
     SQ.rt.lastOut=r.out.filter(x=>x.cls==='out'&&!x.bg).map(x=>x.text).join('\n'); /* a background job's output is not the line's */
+    SQ.rt.lastErr=errText(r.out); /* Task 17: ctx.err() */
     return capLines(notices(sigs(lineCost(r))))}
   catch(e){if(!outer)throw e; /* outermost call: any runaway or unexpected failure becomes one error line, state stays usable */
     if(e&&e.tmo!==undefined&&SQ.rt.deadlines.length)throw e; /* a $( ) at the top of a sandboxed script, inside `timeout`: the timeout takes it */
     const code=SQ.isOverflow(e)?2:1; /* a JS stack overflow reads like the parser's nesting error, status 2 */
-    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code; /* background-job output this line already let through (SQ.rt.lineBg, jobs.js) stays on screen */
+    SQ.rt.lastOut='';SQ.rt.lastErr=errText([{text:fatalText(e),cls:'err'}].concat(e&&e.after||[]));CTX.pend.length=0;S.last=code; /* background-job output this line already let through (SQ.rt.lineBg, jobs.js) stays on screen */
     return capLines(notices(lineCost({out:(SQ.rt.lineBg||[]).concat({text:fatalText(e),cls:'err'},e&&e.after||[]),code})))} /* e.after: EXIT handlers that ran on the way out (SQ.abortTrap) */
   finally{CTX.depth=sd;nest--}}
 /* On-screen output per typed line is capped at LIM.LINES; the rest is replaced by one notice. */
@@ -135,7 +139,12 @@ function execLine0(line,o){
 const SCRIPT_CASES=20,REPORT_MAX=2000;
 const cap=t=>t.length>REPORT_MAX?t.slice(0,REPORT_MAX)+'...':t;
 /* ctx.runScript / scriptPasses run on a throwaway copy of the world, from the home directory, with no terminal; a runaway script is a result, never an exception */
-function sandboxRun(path,args,stdin){return SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;
+/* Task 17: inside the sandbox every run starts with /tmp empty (made when the learner removed it), so a temp file the learner left there
+   never fails a case such as expectEmpty:['/tmp']; the learner's /tmp comes back with the rest of the world. SQ.sandbox already gives a
+   clean process state: no jobs, no traps, no shell options, clock 0, pids from 1235, mktemp from A00001 (procs.js procsSave). */
+function freshTmp(){const n=getNode('/tmp');if(n&&n.type==='dir'){n.children=Object.create(null);return}if(!n)SQ.mkdirp('/tmp')}
+const tmpNames=()=>{const n=getNode('/tmp');return n&&n.type==='dir'?Object.keys(n.children).sort(SQ.cmpName):[]};
+function sandboxRun(path,args,stdin){return SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;freshTmp();
   try{const r=SQ.runScript(path,{args:args||[],stdin,depth:1,tty:false,force:true,record:false});return {out:r.out,err:r.err,code:r.code}}
   catch(e){const af=(e&&e.after)||[];return {out:af.filter(x=>x.cls==='out').map(x=>x.text).join('\n'),err:[fatalText(e)].concat(af.filter(x=>x.cls!=='out').map(x=>x.text)),code:1,thrown:true}}})}
 function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
@@ -143,12 +152,18 @@ function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
   const cases=(m.tests||[]).slice(0,SCRIPT_CASES);
   for(let i=0;i<cases.length;i++){const tc=cases[i],label=tc.label||`case ${i+1}`;
     const fail=(expected,got)=>({ok:false,failed:{index:i,label,expected:cap(String(expected)),got:cap(String(got))}});
-    const res=SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;
+    const res=SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;freshTmp();
       for(const [p,c] of Object.entries(tc.files||{})){const abs=norm(p,HOME),[,,pp]=SQ.parentOf(abs);SQ.mkdirp(pp);SQ.writeFile(abs,String(c),false,p)}
-      let r;try{r=SQ.runScript(m.file,{args:(tc.args||[]).map(String),stdin:tc.stdin,depth:1,tty:false,force:true,record:false})}
+      let r;try{r=SQ.runScript(m.file,{args:(tc.args||[]).map(String),stdin:tc.stdin,depth:1,tty:false,force:true,record:false});
+        /* advance: N more virtual seconds after the script ends (at most LIM.SLEEP); the jobs it left behind run, up to and including the end time,
+           and their stdout / stderr join the case's */
+        if(tc.advance>0){const x=(SQ.advance(Math.min(Number(tc.advance),LIM.SLEEP),{tty:false,depth:0})||[]).concat(SQ.tick(SQ.rt.clock,{inclusive:true})); /* inclusive: a job due exactly at the end runs too */
+          const o=x.filter(y=>y.cls==='out').map(y=>y.text),er=x.filter(y=>y.cls!=='out'&&typeof y.text==='string').map(y=>y.text);
+          if(o.length)r=Object.assign({},r,{out:(r.out&&!/\n$/.test(r.out)?r.out+'\n':r.out||'')+o.join('\n')});if(er.length)r=Object.assign({},r,{err:(r.err||[]).concat(er)})}}
       catch(e){return {thrown:fatalText(e)}}
       const files={};for(const p of Object.keys(tc.expectFiles||{})){const n=nd(p);files[p]=n&&n.type==='file'?n.content:'(missing)'}
-      return {r,files}});
+      const empty={};for(const p of tc.expectEmpty||[]){const n=nd(p);empty[p]=n&&n.type==='dir'?Object.keys(n.children).sort(SQ.cmpName):null}
+      return {r,files,empty,clock:SQ.rt.clock}});
     if(res.thrown!==undefined)return fail(tc.expectOut!==undefined?tc.expectOut:'the script to finish',res.thrown);
     const out=res.r.out.replace(/\n$/,'');
     if(tc.expectOut!==undefined&&out!==tc.expectOut)return fail(tc.expectOut,out);
@@ -162,7 +177,9 @@ function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
       if(!re.test(errT))return fail('/'+tc.expectErrMatch+'/',errT)}
     const want=tc.expectCode===undefined?0:tc.expectCode;
     if(res.r.code!==want)return fail('exit status '+want,'exit status '+res.r.code+(res.r.err.length?' ('+res.r.err.join('; ')+')':''));
-    for(const [p,c] of Object.entries(tc.expectFiles||{}))if(res.files[p]!==String(c))return fail(c,res.files[p])}
+    for(const [p,c] of Object.entries(tc.expectFiles||{}))if(res.files[p]!==String(c))return fail(c,res.files[p]);
+    for(const p of tc.expectEmpty||[]){const ks=res.empty[p];if(ks===null)return fail(p+' empty',p+' (missing)');if(ks.length)return fail(p+' empty',p+' holds '+ks.join(' '))}
+    if(tc.expectClock!==undefined&&res.clock!==tc.expectClock)return fail('clock '+tc.expectClock,'clock '+res.clock)}
   return {ok:true}}
 
 function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:SQ.rt.log,
@@ -170,7 +187,14 @@ function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,l
   isDir:p=>{const n=nd(p);return !!n&&n.type==='dir'},isFile:p=>{const n=nd(p);return !!n&&n.type==='file'},
   read:p=>{const n=nd(p);return n&&n.type==='file'?n.content:''},
   flag:(e,ch)=>e.args.some(x=>/^-[A-Za-z]+$/.test(x)&&x.includes(ch)),
-  out:()=>SQ.rt.lastOut||'',exists:p=>!!nd(p),runScript:(p,a,i)=>sandboxRun(p,a,i),scriptPasses}}
+  out:()=>SQ.rt.lastOut||'',exists:p=>!!nd(p),runScript:(p,a,i)=>sandboxRun(p,a,i),scriptPasses,
+  /* Task 17 (Expert): processes and time. jobs(): copies of the job table plus the jobs whose records were cleared during the last typed
+     line (a kill, a Done notice: reaped true), so `sleep 100 & kill %1` can still be judged Terminated. */
+  jobs:()=>{const rt=SQ.rt,cp=j=>{const o={id:j.id,pid:j.pid,cmd:j.cmd,state:j.state,code:j.code,owner:j.owner,reaped:!!j.line};if(j.desc)o.desc=j.desc;return o};
+    return rt.jobs.map(cp).concat((rt.reaped||[]).filter(x=>x.line&&x.line===rt.lineNo).map(cp))},
+  clock:()=>SQ.rt.clock,elapsed:()=>SQ.rt.lineTook||0,
+  ps:()=>SQ.rt.procs.map(p=>Object.assign({},p)),tmpFiles:tmpNames,
+  err:()=>SQ.rt.lastErr||'',status:()=>S.last}}
 /* A chapter's setup(), plus the `starter` text of its script/challenge missions: written only where the file is absent, so revisiting a chapter never clobbers saved work. */
 function setupChapter(ch){ch.setup();for(const m of ch.missions)if(m.file&&typeof m.starter==='string'&&(m.kind==='script'||m.kind==='challenge'))SQ.ensureFile(m.file,m.starter)}
 /* missionVerdict(m, c, why): {good, failed} for any mission. A custom m.check wins; script/challenge missions without one use scriptPasses.

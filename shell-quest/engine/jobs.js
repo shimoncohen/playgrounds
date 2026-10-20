@@ -32,7 +32,8 @@
                    its record in SQ.rt.jobs until then: exec.js prints the queue (SQ.flushNotices, cmds-proc.js) at the end of each outermost typed
                    line, never inside $( ), and drops the ended records (`jobs` showing an ended job does the same). A job of any other scope (script,
                    subshell, $( ), another job) is non-interactive: its record goes as soon as it ends, with no notice (bash -c does the same).
-                   Either way the status stays in SQ.rt.reaped ({pid, owner, code}) for `wait PID`.
+                   Either way the status stays in SQ.rt.reaped ({pid, owner, code}) for `wait PID`; Task 17 adds {id, cmd, state, desc, line: the
+                   SQ.rt.lineNo it was cleared in} so a mission check (ctx.jobs) still sees a job the line ended, e.g. `sleep 100 & kill %1`.
    SQ.spawn(node, env, src) -> Job
                    starts node in the background: at most 16 live jobs and SQ.newPid's 200 processes per session, else it throws an Error with
                    e.fork and the message `bash: fork: retry: Resource temporarily unavailable`. Adds a process record (ps lists it; it goes when
@@ -236,7 +237,7 @@ function endJob(J,state,code,desc,noTrap){const rt=SQ.rt,g=J.gen;J.gen=null;
   else reap(J)} /* a non-interactive shell's finished job leaves the table at once (no notice) */
 /* drop an ended job's record; wait PID still finds its status in SQ.rt.reaped (bounded: pids never repeat and at most 200 exist per session) */
 function reap(J){const rt=SQ.rt;let i=rt.jobs.indexOf(J);if(i>=0)rt.jobs.splice(i,1);i=rt.notices.indexOf(J);if(i>=0)rt.notices.splice(i,1);
-  rt.reaped.push({pid:J.pid,owner:J.owner,code:J.code});if(rt.reaped.length>256)rt.reaped.shift()}
+  rt.reaped.push({pid:J.pid,owner:J.owner,code:J.code,id:J.id,cmd:J.cmd,state:J.state,desc:J.desc,line:rt.lineNo||0});if(rt.reaped.length>256)rt.reaped.shift()}
 const stopText=e=>e&&e.stop&&/^this practice shell stopped the command/.test(e.message)?e.message.replace('stopped the command','stopped the job'):fatalText(e);
 /* run fn with J's state swapped in, and the caller's back afterwards (also when fn throws) */
 function inSlice(J,fn){const rt=SQ.rt,B=SQ.BASE_FRAME;

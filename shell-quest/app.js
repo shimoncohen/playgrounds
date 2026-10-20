@@ -43,7 +43,7 @@ SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const 
   const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
   if(e){addLine(renderText(e),'err');scrollDown();return false}
   addLine(renderText('Saved '+shown),'sys');
-  SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last;
+  SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.lastErr='';SQ.rt.lineTook=0;SQ.rt.prevLast=S.last;
   checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
@@ -52,7 +52,8 @@ SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')|
 function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').filter(Boolean),b=cw.split('/').filter(Boolean);let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}
 
-function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
+/* a chapter switch, like Reset world, starts with no jobs, traps or shell options and the clock at 0 (SQ.resetProcs, procs.js); files and variables stay */
+function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;SQ.resetProcs();
   SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
 
 /* tab completion */

@@ -56,6 +56,13 @@ The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/
 | `c.out()` | everything the whole line printed on stdout (`SQ.rt.lastOut`), so a check can judge `x=1; while ...; done` as one unit |
 | `c.runScript(path, args, stdin)` | runs a script in the sandbox from the home folder: `{out, err, code}` (`err` is an array of lines). A runaway script is a result (`thrown: true`), never an exception |
 | `c.scriptPasses(m)` | runs mission `m`'s test cases in the sandbox: `{ok: true}` or `{ok: false, failed: {index, label, expected, got}}` (`index` -1 means the file is missing) |
+| `c.err()` | everything the line printed on stderr: error messages, `set -x` traces, the `[1] 1235` job notice (`SQ.rt.lastErr`); never tips, background-job output or the closing `[1]+  Done` notices. `''` after an editor Save |
+| `c.status()` | `$?` after the line (`S.last`) |
+| `c.jobs()` | copies of the job table, `{id, pid, cmd, state, code, owner, reaped, desc?}` (`state` `Running`, `Stopped`, `Done`, `Terminated`; `cmd` without the `&`; `owner` 0 for the learner's own jobs), plus the jobs whose records were cleared during the line (`reaped: true`): `sleep 100 & kill %1` lists `{state: 'Terminated', code: 143, reaped: true}`, the next line lists nothing. "No jobs left" is `c.jobs().every(j => j.state !== 'Running')` |
+| `c.clock()` | the virtual clock in seconds, after the line's own 1-second cost (procs.js). A fresh world starts at 0; Reset world and a chapter switch put it back to 0 |
+| `c.elapsed()` | the virtual seconds the line itself took, without its 1-second cost: `sleep 5 & wait` gives 5, `echo hi` 0. Use it for "the clock advanced by at least N" |
+| `c.ps()` | copies of the process table, `{pid, ppid, cmd, start, state}`; the shell itself is `{pid: 1234, cmd: 'bash'}` |
+| `c.tmpFiles()` | the names under `/tmp`, sorted (`[]` when `/tmp` is gone) |
 
 `SQ.missionVerdict(m, c, why)` is what the app calls for every mission: a custom `check` wins; a script or challenge mission without one passes when `c.scriptPasses(m).ok`. It returns `{good, failed}`; with `why` set, a failed script mission also gets the first failing case (see 3a).
 
@@ -118,12 +125,17 @@ A script mission, shortened from 14.7 in `shell-quest/content/tier-advanced.js` 
 | `expectMatch` | a regular expression stdout must match (through `SQ.safeRegex`) |
 | `expectCode` | the exit status; **0 when omitted** |
 | `expectFiles` | `{path: content}` the files must hold afterwards; an absent file reads as `'(missing)'`, so `{'backup/readme.md': '(missing)'}` asserts it was not copied |
-| `expectErr`, `expectErrMatch` | stderr (the lines joined with `\n`), exactly or by regex. `echo msg >&2` and `1>&2` write there |
+| `expectErr`, `expectErrMatch` | stderr (the lines joined with `\n`), exactly or by regex. `echo msg >&2` and `1>&2` write there. The regex has no `m` flag, so `^` and `$` anchor the whole text: a `getopts` script prints `scripts/opts.sh: illegal option -- x` before its own usage line, so match `usage: opts\.sh`, not `^usage` |
+| `expectEmpty` | directories that must be empty after the run (and `advance`), e.g. `['/tmp']`; a missing one fails as `nowhere (missing)`, a full one as `/tmp holds tmp.A00001` |
+| `advance` | virtual seconds (at most 3600) to run after the script ends: the jobs it left behind run, up to and including the end time, so a background write can be checked with `expectFiles`; their stdout joins the case's stdout (`expectOut`), their stderr its stderr |
+| `expectClock` | the virtual clock must read exactly this after the run and `advance`. A case starts at 0 and a script costs no 1-second line cost (it is not a typed line), so `sleep 2` reads 2, and a fan-out of `sleep 3`, `sleep 1`, `sleep 2` jobs plus `wait` reads 3 |
 
 - `check` (optional) wins over the cases and decides alone, so call `c.scriptPasses(m)` inside it when the cases should still count. Use it when the outcome alone is not the lesson. 15.5 demands a here-document with `usesHereDoc(script) && c.scriptPasses(MKCONF).ok`, and gives `checkFail`, the line shown when every case passes but the check still says no.
 - `world` (optional): `fn => result`, a wrapper the check runs the cases in. The capstone uses `backupWorld`, a sandbox that removes a leftover `backup/` (Beginner 6.7 makes one) and re-seeds `docs/`, so a script that never runs `mkdir` cannot pass on luck. `SQ.missionVerdict` judges the failure line in the same `m.world`, so the line always matches the verdict.
 
 **The sandbox.** `SQ.sandbox(fn)` runs `fn` on a throwaway copy of the whole state `S` (a JSON snapshot of the file system, cwd, variables, exports, functions and `$?`) plus the per-line runtime state, and puts everything back afterwards, also when `fn` throws. While it runs, `save()` is a no-op, so a sandboxed run **never touches `localStorage`**. `c.runScript` and every `scriptPasses` case run inside their own sandbox, from the home folder, with no terminal (`tty: false`), so cases cannot see each other's files.
+
+Each case also starts with a clean process state (Stage 3): no jobs, no traps, no shell options, the clock at 0, pids from 1235 (`$!` of the first job is 1235) and `mktemp` names from `tmp.A00001`, and with `/tmp` empty (the learner's `/tmp` is cleared inside the sandbox only, so a temp file they left there never fails `expectEmpty:['/tmp']`; `c.runScript` does the same). Case `files` are written after that, so a case can seed `/tmp`. Afterwards the learner's jobs, traps, clock, counters and `/tmp` come back unchanged: jobs a case started (also orphans of a script `timeout` ended) never survive, never count toward the 16-job or 200-process caps and are never shown by `jobs`. Jobs, traps and the clock are runtime state (`SQ.rt`), never saved; `SQ.resetProcs()` clears them, and app.js calls it on Reset world, Reset all progress and every chapter switch (files and variables stay).
 
 **The editor flow.** `nano FILE` (also `edit`, `vi`, `vim`) creates nothing: it opens the editor panel on that path (a missing file opens with `#!/bin/bash`). **Save** writes through the same `writeFile` the shell uses, prints `Saved <path>` and runs the mission check with the pseudo-line `(saved <path>)`. **Save & run** saves, then runs `bash <path> [args]` as a typed line (with the Run panel's stdin), and checks with `feedback`: if the mission fails and the file that ran is the mission's own file, one red line explains the first failing case, at most 120 characters:
 

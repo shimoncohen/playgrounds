@@ -49,6 +49,8 @@ async function until(fn, ms = 8000) {
   throw new Error('condition not met within ' + ms + 'ms');
 }
 const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
+// How many tier headers the shell-quest rail should draw: one per tier that has chapters (Stage 3 Task 17: 3 until the Expert chapters land, then 4).
+const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(s => s.chapters.length).length);
 
 test('landing page links to every playground', async () => {
   const { ctx, page, errors } = await open(base + '/');
@@ -158,7 +160,7 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
-  assert.equal(await page.locator('.tierhead').count(), 3);
+  assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   let [head, ihead, ahead] = await heads();
   assert.match(head, /^Beginner/);
@@ -272,7 +274,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.goto('http://bundle.test/shell-quest.html');
   await page.waitForSelector('#mission');
-  assert.equal(await page.locator('.tierhead').count(), 3);
+  assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   assert.match(heads[0], /^Beginner/);
   assert.match(heads[1], /^Intermediate/);
@@ -1010,6 +1012,100 @@ test('shell-quest: Reset world also forgets functions and the last exit status',
   assert.equal(await page.evaluate(k => JSON.parse(localStorage.getItem(k)).fns, SQ_KEY), undefined, 'the saved game has no functions either');
   await type('hi');
   await waitScreen(/bash: hi: command not found/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+// ---- Stage 3 Task 17: the Expert tier wiring. tests/fixtures/fake-expert.js fills the Expert tier up to 4 chapters x 7 missions
+// (chapter indexes 15 to 18) while the real chapters are not there yet, and adds nothing once they are; it is appended to
+// content/quickfire.js in transit, like the fake Advanced chapter above. ----
+const FAKE_EXPERT_JS = fs.readFileSync(path.join(ROOT, 'tests/fixtures/fake-expert.js'), 'utf8');
+const expertPage = (opts = {}) => shellPage({ viewport: { width: 1280, height: 900 }, ...opts }, async ctx => {
+  await ctx.route('**/shell-quest/content/quickfire.js', async route => {
+    const r = await route.fetch();
+    await route.fulfill({ response: r, body: (await r.text()) + '\n' + FAKE_EXPERT_JS });
+  });
+});
+const tierHeads = page => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+
+test('shell-quest Expert tier: four rail headers, Expert in the quick-fire picker and the guide filter', async () => {
+  const { ctx, page, errors } = await expertPage();
+  assert.equal(await page.locator('.tierhead').count(), 4);
+  const heads = await tierHeads(page);
+  assert.match(heads[3], /^Expert/);
+  assert.match(heads[3], /0\/4/);
+  assert.doesNotMatch(heads[3], /★/);
+  assert.deepEqual(await page.$$eval('.chap[data-ch="15"], .chap[data-ch="18"]', bs => bs.map(b => b.querySelector('.num').textContent)), ['16', '19']);
+  await page.click('#t-fire');
+  const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
+  assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced'], ['expert', 'Expert']]);
+  await page.click('#t-guide');
+  assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate', 'advanced', 'expert']);
+  assert.deepEqual(await page.$$eval('#guide .gfilter button', bs => bs.map(b => b.textContent.trim())), ['All', 'Beginner', 'Intermediate', 'Advanced', 'Expert']);
+  await page.click('#guide .gfilter button[data-tier="expert"]');
+  assert.ok(await page.isVisible('#guide .gsec[data-tier="expert"]'));
+  assert.ok(!(await page.isVisible('#guide .gsec[data-tier="advanced"]')), 'Advanced hidden under the Expert filter');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest Expert tier: a save with chapters 0 to 18 badged shows four complete headers and the rank Shell Wizard', async () => {
+  const f = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'), 'utf8'));
+  const counts = { 7: [7, 15], 8: [8, 15], 9: [7, 15], 10: [7, 15], 11: [7, 20], 12: [7, 20], 13: [7, 20], 14: [7, 20], 15: [7, 25], 16: [7, 25], 17: [7, 25], 18: [7, 25] };
+  let xp = f.data.xp;
+  for (const [ch, [n, per]] of Object.entries(counts)) {
+    for (let m = 0; m < n; m++) { f.data.done[`${ch}.${m}`] = 1; xp += per; }
+    f.data.badges[ch] = 1; xp += 25;
+  }
+  assert.equal(xp, 1890 + 28 * 25 + 4 * 25);
+  f.data.xp = xp; f.data.ch = 18; f.data.mi = 7;
+  const file = path.join(tmp, 'expert-complete.json');
+  fs.writeFileSync(file, JSON.stringify(f));
+  const { ctx, page, errors } = await expertPage();
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
+  await page.waitForSelector('#mission');
+  const heads = await tierHeads(page);
+  assert.equal(heads.length, 4);
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, true, true, true]);
+  assert.match(heads[0], /^Beginner.*7\/7.*★/);
+  assert.match(heads[1], /^Intermediate.*4\/4.*★/);
+  assert.match(heads[2], /^Advanced.*4\/4.*★/);
+  assert.match(heads[3], /^Expert.*4\/4.*★/);
+  assert.equal(await page.locator('.chap.earned').count(), 19);
+  assert.equal((await page.textContent('#xpText')).trim(), '2690 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Shell Wizard');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('shell-quest Expert tier: a mission awards 25 XP once; a chapter switch and Reset world clear jobs and the clock', async () => {
+  const { ctx, page, errors, type, waitScreen } = await expertPage();
+  const xp = async () => parseInt(await page.textContent('#xpText'), 10);
+  await page.click('.chap[data-ch="15"]');
+  const m = await page.evaluate(() => window.SQ.content.chapters[15].missions[0]);
+  await page.waitForFunction(t => document.querySelector('#mission h2').textContent.includes(t), m.title);
+  const x0 = await xp();
+  await type(m.answer);
+  await waitScreen(/Mission complete/);
+  assert.match(await page.textContent('#screen'), /\+25 XP/);
+  assert.equal(await xp(), x0 + 25);
+  await page.click('#mission .dot[data-mi="0"]');
+  await type(m.answer);
+  await page.waitForFunction(() => document.querySelectorAll('#screen .line.win').length >= 2);
+  assert.equal(await xp(), x0 + 25, 'a replay awards nothing');
+  await type('sleep 30 &');
+  await type('sleep 2');
+  assert.deepEqual(await page.evaluate(() => [window.SQ.rt.jobs.length, window.SQ.rt.clock]), [1, 6], 'two answers, sleep 30 & and sleep 2 since the switch to chapter 16');
+  await page.click('.chap[data-ch="16"]');
+  assert.deepEqual(await page.evaluate(() => [window.SQ.rt.jobs.length, window.SQ.rt.clock]), [0, 0]);
+  await type("sleep 30 & trap 'echo usr' USR1");
+  await page.click('#resetWorld');
+  await page.click('#resetWorld');
+  await waitScreen(/World reset/);
+  assert.deepEqual(await page.evaluate(() => [window.SQ.rt.jobs.length, window.SQ.rt.clock, !!window.SQ.rt.scopeNode.traps]), [0, 0, false]);
+  await type('jobs; trap -p; echo "t=$SECONDS"');
+  await waitScreen(/t=0/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

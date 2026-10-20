@@ -793,3 +793,213 @@ describe('advanced quick-fire and guide (chapters 14 and 15)', () => {
       }
   });
 });
+
+// ---- Stage 3 Task 17: mission machinery for the Expert tier (scriptPasses expectEmpty/advance/expectClock, a clean process state
+// per case, ctx jobs/ended/clock/elapsed/ps/tmpFiles/err/status, Reset world and chapter switches clearing jobs, traps and the clock) ----
+const mission = (SQ, text, tests, file = 'scripts/t.sh') => {
+  const m = { title: 'T', kind: 'script', file, tests };
+  SQ.ensureDir('~/scripts');
+  put(SQ, m, text);
+  return m;
+};
+const passes = (SQ, m) => SQ.ctxFor('').scriptPasses(m);
+
+describe('scriptPasses: expectEmpty', () => {
+  const LEAK = '#!/bin/bash\nt=$(mktemp)\necho hi > "$t"\ncat "$t"\n';
+  const CLEAN = '#!/bin/bash\nt=$(mktemp)\ntrap \'rm -f "$t"\' EXIT\necho hi > "$t"\ncat "$t"\n';
+  it('fails when the script leaves a temp file and passes when it cleans up', () => {
+    const SQ = loadShell();
+    const r = passes(SQ, mission(SQ, LEAK, [{ label: 'temp', expectOut: 'hi', expectEmpty: ['/tmp'] }]));
+    assert.equal(r.ok, false);
+    assert.deepEqual({ ...r.failed }, { index: 0, label: 'temp', expected: '/tmp empty', got: '/tmp holds tmp.A00001' });
+    assert.equal(passes(SQ, mission(SQ, CLEAN, [{ label: 'temp', expectOut: 'hi', expectEmpty: ['/tmp'] }])).ok, true);
+  });
+  it('each case starts with /tmp empty: a file the learner left there does not fail a correct script, and comes back afterwards', () => {
+    const SQ = loadShell();
+    run(SQ, 'touch /tmp/mine; mktemp');
+    const m = mission(SQ, CLEAN, [{ label: 'a', expectOut: 'hi', expectEmpty: ['/tmp'] }, { label: 'b', expectOut: 'hi', expectEmpty: ['/tmp'] }]);
+    assert.equal(passes(SQ, m).ok, true);
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], ['mine', 'tmp.A00001']);
+    const look = mission(SQ, '#!/bin/bash\nls /tmp\nmktemp\n', [{ label: 'ls', expectOut: '/tmp/tmp.A00001' }], 'scripts/l.sh');
+    assert.equal(passes(SQ, look).ok, true, 'an empty /tmp and a fresh mktemp counter inside the case');
+  });
+  it('case files are written after /tmp is cleared; several directories; a missing directory fails', () => {
+    const SQ = loadShell();
+    const m = mission(SQ, '#!/bin/bash\n:\n', [{ label: 'seeded', files: { '/tmp/seed': 'x' }, expectEmpty: ['/tmp'] }]);
+    assert.equal(passes(SQ, m).failed.got, '/tmp holds seed');
+    const two = mission(SQ, '#!/bin/bash\nmkdir -p out\n', [{ label: 'two', expectEmpty: ['/tmp', 'out'] }]);
+    assert.equal(passes(SQ, two).ok, true);
+    const gone = mission(SQ, '#!/bin/bash\n:\n', [{ label: 'gone', expectEmpty: ['nowhere'] }]);
+    assert.equal(passes(SQ, gone).failed.got, 'nowhere (missing)');
+  });
+});
+
+describe('scriptPasses: advance and expectClock', () => {
+  it('advance runs N virtual seconds after the script so a background write can be checked', () => {
+    const SQ = loadShell();
+    const text = '#!/bin/bash\n(sleep 2; echo done > out.txt) &\necho started\n';
+    const late = mission(SQ, text, [{ label: 'bg', expectOut: 'started', expectFiles: { 'out.txt': 'done' } }]);
+    assert.equal(passes(SQ, late).failed.got, '(missing)');
+    const ok = mission(SQ, text, [{ label: 'bg', expectOut: 'started', advance: 2, expectFiles: { 'out.txt': 'done' } }]);
+    assert.equal(passes(SQ, ok).ok, true);
+    const short = mission(SQ, text, [{ label: 'bg', expectOut: 'started', advance: 1, expectFiles: { 'out.txt': 'done' } }]);
+    assert.equal(passes(SQ, short).ok, false);
+  });
+  it('output a job prints during advance is part of the case output', () => {
+    const SQ = loadShell();
+    const m = mission(SQ, '#!/bin/bash\n(sleep 1; echo late) &\necho now\n', [{ label: 'x', advance: 3, expectOut: 'now\nlate' }]);
+    assert.equal(passes(SQ, m).ok, true);
+  });
+  it('expectClock is the clock after the script and advance, from 0, with no 1-second line cost', () => {
+    const SQ = loadShell();
+    run(SQ, 'sleep 7');
+    const s = mission(SQ, '#!/bin/bash\nsleep 2\n', [{ label: 'two', expectClock: 2 }]);
+    assert.equal(passes(SQ, s).ok, true);
+    const s3 = mission(SQ, '#!/bin/bash\nsleep 2\n', [{ label: 'three', expectClock: 3 }]);
+    assert.deepEqual({ ...passes(SQ, s3).failed }, { index: 0, label: 'three', expected: 'clock 3', got: 'clock 2' });
+    const a = mission(SQ, '#!/bin/bash\nsleep 1 &\n', [{ label: 'adv', advance: 4, expectClock: 4 }]);
+    assert.equal(passes(SQ, a).ok, true);
+    assert.equal(SQ.rt.clock, 8, 'the learner clock is untouched');
+  });
+  it('a fan-out script: the jobs end in wake order and the case clock ends at the longest sleep', () => {
+    const SQ = loadShell();
+    const text = '#!/bin/bash\nfor n in "$@"; do\n  (sleep "$n"; echo "$n done") &\ndone\nwait\n';
+    const m = mission(SQ, text, [{ label: '3 1 2', args: [3, 1, 2], expectOut: '1 done\n2 done\n3 done', expectClock: 3 },
+      { label: '1', args: [1], expectOut: '1 done', expectClock: 1 }]);
+    assert.equal(passes(SQ, m).ok, true);
+  });
+});
+
+describe('scriptPasses: every case runs with a clean process state and leaves none behind', () => {
+  it('no jobs, no traps, clock 0, fresh pid and mktemp counters inside; the learner state is back afterwards', () => {
+    const SQ = loadShell();
+    run(SQ, "sleep 30 & trap 'echo usr' USR1; mktemp; sleep 2");
+    const state = () => ({ jobs: SQ.rt.jobs.length, clock: SQ.rt.clock, pid: SQ.rt.nextPid, forks: SQ.rt.forks, tmp: SQ.rt.tmpSeq, traps: SQ.rt.scopeNode.traps && [...SQ.rt.scopeNode.traps.keys()] });
+    const before = state();
+    SQ.rt.log = [];
+    const text = '#!/bin/bash\njobs\necho "clock $SECONDS"\nsleep 1 &\necho "pid $!"\nmktemp\n';
+    const m = mission(SQ, text, [{ label: 'clean', expectOut: 'clock 0\npid 1235\n/tmp/tmp.A00001' }]);
+    assert.equal(passes(SQ, m).ok, true);
+    assert.deepEqual(state(), before);
+    assert.equal(run(SQ, 'trap -p').out, "trap -- 'echo usr' SIGUSR1");
+    assert.equal(SQ.rt.jobs[0].cmd, 'sleep 30');
+  });
+  it('jobs started in a sandboxed check never survive, so 20 cases of 15 orphaned jobs each never reach the job or process cap', () => {
+    const SQ = loadShell();
+    const text = '#!/bin/bash\nfor i in $(seq 15); do sleep 100 & done\necho ok\n';
+    const m = mission(SQ, text, Array.from({ length: 20 }, (_, i) => ({ label: `c${i}`, expectOut: 'ok', advance: 1 })));
+    assert.equal(passes(SQ, m).ok, true);
+    assert.equal(SQ.rt.jobs.length, 0);
+    assert.equal(SQ.rt.procs.length, 1);
+    assert.equal(SQ.rt.forks, 0);
+    assert.equal(run(SQ, 'sleep 1 &').out, '[1] 1235');
+  });
+  it('a timeout-ended script with an orphaned job leaves nothing behind', () => {
+    const SQ = loadShell();
+    const m = mission(SQ, '#!/bin/bash\nsleep 50 &\ntimeout 1 sleep 5\necho "status $?"\n', [{ label: 't', expectOut: 'status 124', expectClock: 1 }]);
+    assert.equal(passes(SQ, m).ok, true);
+    assert.equal(SQ.rt.jobs.length, 0);
+    assert.equal(SQ.rt.clock, 0);
+  });
+  it('expectErrMatch matches inside multi-line stderr (getopts prints its own line before the usage line)', () => {
+    const SQ = loadShell();
+    const text = '#!/bin/bash\nwhile getopts "n:" o; do\n  case $o in\n    n) echo "Hello, $OPTARG!" ;;\n    *) echo "usage: opts.sh -n NAME" >&2; exit 2 ;;\n  esac\ndone\n';
+    const m = mission(SQ, text, [{ label: 'bad', args: ['-x'], expectErrMatch: 'usage: opts\\.sh -n NAME', expectCode: 2 },
+      { label: 'exact', args: ['-x'], expectErr: 'scripts/opts.sh: illegal option -- x\nusage: opts.sh -n NAME', expectCode: 2 },
+      { label: 'ok', args: ['-n', 'Ada'], expectOut: 'Hello, Ada!' }], 'scripts/opts.sh');
+    assert.equal(passes(SQ, m).ok, true);
+  });
+});
+
+describe('ctxFor: jobs, clock, ps, tmpFiles, err, status (Task 17)', () => {
+  it('jobs() lists copies of the job table', () => {
+    const SQ = loadShell();
+    run(SQ, 'sleep 30 &');
+    const c = SQ.ctxFor('sleep 30 &');
+    const j = c.jobs();
+    assert.deepEqual(JSON.parse(JSON.stringify(j)), [{ id: 1, pid: 1235, cmd: 'sleep 30', state: 'Running', code: null, owner: 0, reaped: false }]);
+    j[0].state = 'Done';
+    assert.equal(SQ.rt.jobs[0].state, 'Running', 'a copy');
+    assert.equal(c.err(), '[1] 1235');
+  });
+  it('a job that ended and was cleared during the line is still listed for that line (reaped: true), then gone', () => {
+    const SQ = loadShell();
+    run(SQ, 'sleep 100 & kill %1');
+    assert.equal(SQ.rt.jobs.length, 0, 'the notice cleared the record');
+    const j = SQ.ctxFor('').jobs();
+    assert.deepEqual(JSON.parse(JSON.stringify(j)), [{ id: 1, pid: 1235, cmd: 'sleep 100', state: 'Terminated', code: 143, owner: 0, reaped: true, desc: 'Terminated' }]);
+    run(SQ, 'sleep 9 & kill -9 %1');
+    assert.deepEqual([...SQ.ctxFor('').jobs().map((x) => x.state + ' ' + (x.desc || ''))], ['Terminated Killed']);
+    run(SQ, 'echo hi');
+    assert.deepEqual([...SQ.ctxFor('').jobs()], []);
+  });
+  it('the reaped record keeps pid, owner and code for wait PID (Task 12b) and gains id, cmd, state, desc', () => {
+    const SQ = loadShell();
+    run(SQ, '(sleep 1; exit 3) & p=$!; sleep 2');
+    assert.equal(run(SQ, 'wait $p; echo $?').out, '3');
+    const r = SQ.rt.reaped[SQ.rt.reaped.length - 1];
+    assert.deepEqual({ pid: r.pid, owner: r.owner, code: r.code, id: r.id, state: r.state }, { pid: 1235, owner: 0, code: 3, id: 1, state: 'Done' });
+    assert.equal(r.cmd, '(sleep 1; exit 3)');
+  });
+  it('clock() and elapsed(): elapsed is what the line took without its 1-second cost', () => {
+    const SQ = loadShell();
+    run(SQ, 'sleep 5 & wait');
+    const c = SQ.ctxFor('sleep 5 & wait');
+    assert.equal(c.clock(), 6);
+    assert.equal(c.elapsed(), 5);
+    assert.ok(c.jobs().every((j) => j.state !== 'Running'));
+    run(SQ, 'echo hi');
+    assert.equal(SQ.ctxFor('echo hi').elapsed(), 0);
+    assert.equal(SQ.ctxFor('echo hi').clock(), 7);
+  });
+  it('ps() lists copies of the process table', () => {
+    const SQ = loadShell();
+    run(SQ, 'sleep 30 &');
+    const p = SQ.ctxFor('').ps();
+    assert.deepEqual([...p.map((x) => x.pid + ' ' + x.cmd)], ['1234 bash', '1235 sleep 30']);
+    p.pop();
+    assert.equal(SQ.rt.procs.length, 2);
+  });
+  it('tmpFiles() lists the names under /tmp, sorted; [] when /tmp is gone', () => {
+    const SQ = loadShell();
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], []);
+    run(SQ, 'mktemp; mktemp -d; touch /tmp/a');
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], ['a', 'tmp.A00001', 'tmp.A00002']);
+    run(SQ, 'rm -r /tmp');
+    assert.deepEqual([...SQ.ctxFor('').tmpFiles()], []);
+  });
+  it('err() is the stderr of the typed line (errors, traces, job notices); status() is $?', () => {
+    const SQ = loadShell();
+    run(SQ, `bash -c 'set -u; echo "$nope"'`);
+    let c = SQ.ctxFor('');
+    assert.match(c.err(), /nope: unbound variable/);
+    assert.equal(c.status(), 1);
+    assert.equal(c.out(), '');
+    run(SQ, 'set -x; echo hi; set +x');
+    c = SQ.ctxFor('');
+    assert.equal(c.err(), '+ echo hi\n+ set +x');
+    assert.equal(c.out(), 'hi');
+    assert.equal(c.status(), 0);
+    run(SQ, 'while :; do :; done');
+    assert.match(SQ.ctxFor('').err(), /too many steps/);
+  });
+});
+
+describe('Reset world and chapter switches clear jobs, traps and the clock (SQ.resetProcs)', () => {
+  it('resetProcs drops jobs, traps, shell options, the clock and the counters', () => {
+    const SQ = loadShell();
+    run(SQ, "sleep 30 & trap 'echo usr' USR1; set -u; mktemp; sleep 3");
+    SQ.resetProcs();
+    assert.equal(SQ.rt.clock, 0);
+    assert.deepEqual([...SQ.ctxFor('').jobs()], []);
+    assert.equal(run(SQ, 'trap -p').out, '');
+    assert.equal(run(SQ, 'echo "${nope}x"').out, 'x');
+    assert.equal(run(SQ, 'mktemp').out, '/tmp/tmp.A00002', 'the file from before still exists, so the counter skips it');
+  });
+  it('app.js calls SQ.resetProcs on Reset world, Reset all progress and every chapter switch', () => {
+    const app = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../shell-quest/app.js'), 'utf8');
+    const goChapter = app.slice(app.indexOf('function goChapter'), app.indexOf('\n', app.indexOf('function goChapter') + 200));
+    assert.match(goChapter, /SQ\.resetProcs\(\)/);
+    assert.equal((app.match(/SQ\.resetProcs\(\)/g) || []).length, 3);
+  });
+});
