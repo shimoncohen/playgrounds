@@ -2,7 +2,7 @@
 const {norm,getNode,lstat,isLoop,parentOf,bname,modeOf,modeString,ok,E,flags,globRe,cmpName,realPath,HOME}=SQ;
 const CMDS=SQ.CMDS;
 const KEYWORDS=['if','then','else','elif','fi','case','esac','for','select','while','until','do','done','in','function','time','{','}','!','[[',']]','coproc'];
-const BUILTINS=['cd','export','source','.','[','test','true','false',':','read','shift','unset','local','return','exit','break','continue'];
+const BUILTINS=['cd','export','source','.','[','test','true','false',':','read','shift','unset','local','return','exit','break','continue','jobs','wait','kill'];
 const known=c=>Object.prototype.hasOwnProperty.call(CMDS,c);
 
 // ---- find ----

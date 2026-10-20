@@ -6,12 +6,17 @@
    (reset by SQ.resetProcs, swapped out by SQ.sandbox through procsSave/procsLoad); nothing is ever saved.
 
    SQ.rt.jobs      Job[] in spawn order. Job = {
-                     id        job number [N]: 1 + the highest number among the records of the same owner (numbers count up until 12b reaps records)
+                     id        job number [N]: 1 + the highest number among the records of the same owner (so once every record is reaped the next job is [1])
                      pid       from SQ.newPid() (1235, 1236, ...; never repeats in a session)
                      cmd       the source text of the and-or list, without the `&` ('sleep 30')
                      node      the AST (andor node) it runs
-                     state     'Running' | 'Done' | 'Terminated' | 'Stopped' ('Stopped' is reserved: nothing stops a job yet)
-                     code      exit status once it ended (null while live); 143 when this shell stopped it (step cap, output cap, ...)
+                     state     'Running' | 'Done' | 'Terminated' | 'Stopped' (kill -STOP/-TSTP/-TTIN/-TTOU; kill -CONT resumes it: cmds-proc.js)
+                     code      exit status once it ended (null while live); 143 when this shell stopped it (step cap, output cap, ...); 128+N when signal N ended it
+                     desc      what `jobs` and the notice print for a Terminated job: strsignal's text ('Killed', 'Hangup', ...); unset means 'Terminated'
+                     cur       the order in which jobs became current (spawn, stop): the highest is `+` (%%), the next `-` (%-)
+                     endSeq    the order jobs ended in (wait -n); waited: a wait already returned its status; told: jobs/a notice showed its state
+                     stopSig   the signal that stopped it (wait %N on a stopped job returns 128 + it)
+                     waitReq   set while the job is blocked in `wait` (cmds-proc.js waitReady decides when it may go on; wake is Infinity meanwhile)
                      wake      virtual time of its next slice (Infinity for `sleep infinity`; null once ended)
                      gen       the generator SQ.gen.run made for it (null once ended)
                      cwd oldpwd vars exp fns unsetB last frames baseArgs   its own shell state (copied from the shell at spawn, like a subshell)
@@ -22,9 +27,11 @@
                      ownerNode, scopeNode   the scope tree nodes behind owner and scope
                      seq       spawn order (ties between equal wake time and job number); debt, d, depth, out, lineNo, lineSteps: scheduler bookkeeping
                      sig       null; reserved for Task 14 (a pending signal to deliver at the job's next command boundary) }
-   SQ.rt.notices   the scope-0 jobs that ended, in the order they ended, whose `[N]+  Done ...` notice has not been shown yet. A finished job keeps
-                   its record in SQ.rt.jobs until then. HOOK FOR TASK 12b: print and drain this queue before the next prompt (exec.js, outermost
-                   line, never inside $( )), then drop those records from SQ.rt.jobs.
+   SQ.rt.notices   the scope-0 jobs that ended or stopped and whose `[N]+  Done ...` notice has not been shown yet. A finished scope-0 job keeps
+                   its record in SQ.rt.jobs until then: exec.js prints the queue (SQ.flushNotices, cmds-proc.js) at the end of each outermost typed
+                   line, never inside $( ), and drops the ended records (`jobs` showing an ended job does the same). A job of any other scope (script,
+                   subshell, $( ), another job) is non-interactive: its record goes as soon as it ends, with no notice (bash -c does the same).
+                   Either way the status stays in SQ.rt.reaped ({pid, owner, code}) for `wait PID`.
    SQ.spawn(node, env, src) -> Job
                    starts node in the background: at most 16 live jobs and SQ.newPid's 200 processes per session, else it throws an Error with
                    e.fork and the message `bash: fork: retry: Resource temporarily unavailable`. Adds a process record (ps lists it; it goes when
@@ -78,11 +85,11 @@
    scope or below it, and passes the rest up as r.bg (interactive jobs' output reaches the screen, not the script's redirect).
 
    Extension points for later tasks:
-   - 12b `jobs`/`wait`/`kill`/`$!`: SQ.rt.jobs (filter by owner === SQ.rt.scope for the current shell), SQ.rt.notices, SQ.tick(t, {inclusive:true})
-     to run a job up to its completion time (then set SQ.rt.clock), SQ.rt.lastBg (the pid of the newest job spawned; $! is still to be wired in
-     parse.js). OPEN FOR 12b: rt.lastBg is one global value; bash's $! is per shell (a subshell, $( ) or script that starts a job has its own,
-     and the parent's $! does not change), so 12b should scope it (e.g. save/restore it with snapshotShell, or keep it per scope node). To end a live job (kill), call SQ.endJob(job, 'Terminated', 128+n): it runs the generator's pending finally blocks with the job's
-     state swapped in (function frames, subshell snapshots) and records the end.
+   - 12b (done, cmds-proc.js): `jobs`/`wait`/`kill`, notices, $! (SQ.rt.bang: the newest job's pid, part of the per-shell state swapped by
+     copyShell/snapshotShell/restoreShell/shellState in interp.js). SQ.endJob(job, 'Terminated', 128+n, desc) ends a live job from outside: it runs
+     the generator's pending finally blocks with the job's state swapped in (function frames, subshell snapshots) and records the end. A job that
+     signals itself is ended by a thrown {jobSig} that slice() catches. `wait` inside a job comes back from runPipeline as r.defer = {wait: req}
+     and gWait yields {wait: req} until the jobs it waits for end; tick skips a job while its waitReq is not ready.
    - 13 `set -e`/`-x`: the generator mirrors runList/runAndOr/runIf...; option checks added there must be added here too (gList, gAndOr, gLoop).
    - 14 `trap`/signals: Job.sig, delivered at the job's next command boundary (gPipe is the boundary) or on endJob.
    - 16 process substitution: runs synchronously inside a unit; nothing to do here.
@@ -115,9 +122,11 @@ function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
   if(Pn.cmds.length===1&&own(G,c.type)&&plain(c.redirs)){SQ.nestIn();try{r=yield* G[c.type](c,env)}finally{SQ.nestOut()}}
   else{const p=SQ.runPipeline(Pn,Object.assign({},env,{defer:true}));emit(env,p.out);
     if(!p.defer){yield* pay(env);return {code:p.code,ctl:p.ctl}}
-    r=yield* gCall(p.defer.name,p.defer.args,env)}
+    r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,env)}
   if(Pn.negate)r={code:r.code===0?1:0,ctl:r.ctl};
   S.last=r.code;return r}
+/* `wait` in a job (cmds-proc.js): yield until the jobs it waits for have ended; tick resumes this job once SQ.waitReady says so */
+function* gWait(req,env){let r;while(!(r=SQ.waitReady(req)))yield {wait:req};return {code:SQ.waitDone(req,r)}}
 function* gCall(name,args,env){const fe=SQ.fnEnter(name,args);
   if(fe.fail){emit(env,fe.fail.list);return {code:fe.fail.code}}
   let r;try{r=yield* gList(fe.prog,env)}finally{SQ.fnLeave(fe)} /* break/continue in the body reach the caller's loop, as in callFunction */
@@ -165,24 +174,31 @@ function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   const frames=rt.frames.map(f=>Object.assign({},f,{args:f.args.slice(),locals:f.locals&&new Map(f.locals)}));
   const cmd=String(src===undefined?node.src||'':src);
   const J=Object.assign(SQ.copyShell(),{id,pid,cmd,node,state:'Running',code:null,wake:start,gen:null,frames,baseArgs:SQ.BASE_FRAME.args.slice(),
-    owner,ownerNode,scopeNode:{id:++rt.scopeSeq,up:ownerNode},scope:rt.scopeSeq,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],sig:null});
+    owner,ownerNode,scopeNode:{id:++rt.scopeSeq,up:ownerNode},scope:rt.scopeSeq,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],sig:null,
+    desc:null,endSeq:0,waited:false,told:false,stopSig:0,waitReq:null});
+  J.cur=J.seq; /* the newest job is the current one (%+) */
   J.gen=run(node,{depth:J.depth,tty:!!env.tty,record:false,stdin:null,loops:0,job:J});
-  rt.jobs.push(J);rt.lastBg=pid;
+  rt.jobs.push(J);rt.bang=pid; /* $! of the shell that started it (J itself keeps its parent's $!, copied above) */
   /* ps: a lone simple command shows as itself (sleep 30), anything else as the subshell running it (bash) */
   const one=node.type==='andor'&&!node.rest.length&&node.first.cmds.length===1&&node.first.cmds[0].type==='simple';
   rt.procs.push({pid,ppid:J.ppid,cmd:one?cmd:'bash',start,state:'S'});
   return J}
 function spawnItem(n,env){let J;
   try{J=SQ.spawn(n,env,n.src)}catch(e){if(e&&e.fork){S.last=1;return {out:[errL(e.message)],code:1}}throw e}
-  S.last=0;
-  return {out:SQ.rt.scope===0&&!SQ.rt.slice?[{text:`[${J.id}] ${J.pid}`,cls:'sys'}]:[],code:0}}
+  S.last=0;if(SQ.rt.scope!==0||SQ.rt.slice)return {out:[],code:0};
+  const note={text:`[${J.id}] ${J.pid}`,cls:'sys'};if(SQ.rt.lineBg)SQ.rt.lineBg.push(note); /* already on screen: a line stopped later keeps it (exec.js) */
+  return {out:[note],code:0}}
 
 /* ---------- the scheduler ---------- */
-function endJob(J,state,code){const rt=SQ.rt;
-  if(J.gen){const g=J.gen;J.gen=null;try{inSlice(J,()=>g.return())}catch(e){/* a finally block failed: the job ends anyway */}} /* a live job ended from outside (Task 12b kill) */
-  J.state=state;J.code=code;J.gen=null;J.wake=null;
+function endJob(J,state,code,desc){const rt=SQ.rt;
+  if(J.gen){const g=J.gen;J.gen=null;try{inSlice(J,()=>g.return())}catch(e){/* a finally block failed: the job ends anyway */}} /* a live job ended from outside (kill) */
+  J.state=state;J.code=code;J.gen=null;J.wake=null;J.waitReq=null;J.endSeq=++rt.endSeq;J.told=false;if(desc)J.desc=desc;
   const i=rt.procs.findIndex(p=>p.pid===J.pid);if(i>=0)rt.procs.splice(i,1);
-  if(J.owner===0)rt.notices.push(J)}
+  if(J.owner===0){if(!rt.notices.includes(J))rt.notices.push(J)}
+  else reap(J)} /* a non-interactive shell's finished job leaves the table at once (no notice) */
+/* drop an ended job's record; wait PID still finds its status in SQ.rt.reaped (bounded: pids never repeat and at most 200 exist per session) */
+function reap(J){const rt=SQ.rt;let i=rt.jobs.indexOf(J);if(i>=0)rt.jobs.splice(i,1);i=rt.notices.indexOf(J);if(i>=0)rt.notices.splice(i,1);
+  rt.reaped.push({pid:J.pid,owner:J.owner,code:J.code});if(rt.reaped.length>256)rt.reaped.shift()}
 const stopText=e=>e&&e.stop&&/^this practice shell stopped the command/.test(e.message)?e.message.replace('stopped the command','stopped the job'):fatalText(e);
 /* run fn with J's state swapped in, and the caller's back afterwards (also when fn throws) */
 function inSlice(J,fn){const rt=SQ.rt,B=SQ.BASE_FRAME;
@@ -206,8 +222,10 @@ function slice(J){const rt=SQ.rt,fgSteps=rt.steps,chars=rt.outChars,allow=allowa
   finally{const used=Math.min(allow,Math.max(0,rt.steps-start));J.lineSteps+=used;rt.jobWork=(rt.jobWork||0)+used;rt.steps=fgSteps}
   const out=J.out;J.out=[];
   if(err||res.done)J.gen=null; /* finished: nothing left to unwind */
-  if(err){out.push(errL(stopText(err)));rt.outChars=chars;endJob(J,'Terminated',143)}
+  if(err&&err.jobSig){const s=err.jobSig;endJob(J,'Terminated',128+s.num,s.desc)} /* it signalled itself (kill): no message, like bash */
+  else if(err){out.push(errL(stopText(err)));rt.outChars=chars;endJob(J,'Terminated',143)}
   else if(res.done)endJob(J,'Done',res.value);
+  else if(res.value.wait){J.waitReq=res.value.wait;J.wake=Infinity} /* blocked in wait: tick resumes it once its jobs have ended */
   else J.wake=res.value.wake;
   const tagged=out.map(o=>Object.assign({},o,{bg:true,owner:J.ownerNode}));
   if(rt.lineBg)rt.lineBg.push(...tagged);
@@ -216,7 +234,9 @@ function tick(until,o){const rt=SQ.rt;if(rt.slice||rt.ticking)return [];
   const incl=!!(o&&o.inclusive),out=[];rt.ticking=true;
   try{for(;;){let J=null;
       if((rt.jobWork||0)>=JOB_WORK)break; /* this line's job work is spent: the due jobs wait for the next line */
-      for(const j of rt.jobs)if(j.state==='Running'&&(incl?j.wake<=until:j.wake<until)&&(!J||j.wake<J.wake||(j.wake===J.wake&&(j.id<J.id||(j.id===J.id&&j.seq<J.seq)))))J=j;
+      for(const j of rt.jobs){if(j.state!=='Running')continue;
+        if(j.waitReq){if(!SQ.waitReady(j.waitReq))continue;j.waitReq=null;j.wake=rt.clock} /* its wait is over: it goes on now */
+        if((incl?j.wake<=until:j.wake<until)&&(!J||j.wake<J.wake||(j.wake===J.wake&&(j.id<J.id||(j.id===J.id&&j.seq<J.seq)))))J=j}
       if(!J)break;
       if(J.wake>rt.clock)rt.clock=J.wake;
       out.push(...slice(J))}}
@@ -224,5 +244,5 @@ function tick(until,o){const rt=SQ.rt;if(rt.slice||rt.ticking)return [];
   return out}
 SQ.onAdvance.push(target=>tick(target));
 
-Object.assign(SQ,{spawn,spawnItem,tick,endJob,gen:{run},MAX_JOBS,JOB_WORK});
+Object.assign(SQ,{spawn,spawnItem,tick,endJob,reap,gen:{run},MAX_JOBS,JOB_WORK});
 })(window.SQ = window.SQ || {});

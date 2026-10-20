@@ -8,9 +8,11 @@ const errL=text=>({text,cls:'err'});
 const {errOf,own}=SQ;
 
 /* Shell state a subshell, $( ) or script must not leak. FS changes are not part of it. copyShell() copies it (a background job starts from such a copy).
+   bang is $! (SQ.rt.bang, runtime only, never saved: Task 12b): per shell, so a subshell, $( ), pipeline stage, script or job that starts a job
+   leaves its parent's $! alone (a child inherits the parent's value; a script starts with none).
    snapshotShell() also enters a new process scope (SQ.rt.scope, see jobs.js): the jobs a subshell, $( ), pipeline stage or script starts belong to it,
    and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again. */
-function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last}}
+function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,bang:SQ.rt.bang}}
 /* scopes form a tree: SQ.rt.scopeNode = {id, up} (id mirrored in SQ.rt.scope); a job's output is tagged with its owner's node, so a script can tell its own jobs' output from others' */
 const newScope=()=>{const rt=SQ.rt;rt.scopeNode={id:++rt.scopeSeq,up:rt.scopeNode};rt.scope=rt.scopeNode.id};
 function snapshotShell(){
@@ -22,10 +24,11 @@ function restoreShell(sv){
   if(sv.unsetB)S.unsetB=sv.unsetB;else delete S.unsetB;
   sv.frame.args=sv.args; /* shift inside a subshell, $( ) or pipeline stage does not reach the shell */
   SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames);
-  if(sv.scopeNode){SQ.rt.scopeNode=sv.scopeNode;SQ.rt.scope=sv.scopeNode.id}}
+  if(sv.scopeNode){SQ.rt.scopeNode=sv.scopeNode;SQ.rt.scope=sv.scopeNode.id}
+  if('bang' in sv)SQ.rt.bang=sv.bang}
 /* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
-function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames}}
-function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;
+function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang}}
+function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;
   for(const k of ['exp','fns','unsetB']){if(st[k])S[k]=st[k];else delete S[k]}}
 
 /* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows.
@@ -81,10 +84,11 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
   /* every stage of a multi-command pipeline is a full subshell: directory, variables, exports, functions and positional parameters go back to what they were
      (echo Ada | read x leaves x unset, cd forest | cat stays put, echo a | shift keeps $#). Files and $? come out of a stage as before. */
   const sv0=P.length>1?snapshotShell():null;
+  if(sv0)SQ.rt.scopeNode.inherit=true; /* jobs | cat lists the shell's jobs (cmds-proc.js tableOf) */
   const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
   try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
-    if(sv0&&i>0){back();newScope()}
+    if(sv0&&i>0){back();newScope();SQ.rt.scopeNode.inherit=true}
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
     let toErr=null,pre=null;
@@ -112,7 +116,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
       if(r.defer)return {out:res.concat(r.defer.pend.map(errL)),code:0,defer:r.defer};
       if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
-      const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
+      const cr=runCompound(c,Object.assign({},env,{tty,stdin:box,defer:false})); /* a compound run as one unit (redirected, in a pipeline) runs its function calls and waits here, never deferred to the job interpreter */
       if(cr.ui&&last)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
       if(last&&!out&&!err&&!toErr){res.push(...cr.out);code=cr.code;continue}
       r=asCmd(cr)}
@@ -295,7 +299,7 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
     return E(errOf(e),e.code||2)}
   const box=o.stdinBox||(o.stdin!=null?{text:String(o.stdin),pos:0}:null);
   const sv=snapshotShell(),me=SQ.rt.scopeNode,callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
-  delete S.fns;
+  delete S.fns;SQ.rt.bang=null; /* a new bash: $! is empty until it starts a job */
   const fr=SQ.rt.frames,at=fr.length;fr.push({name:path,args:o.args.slice(),kind:'script',locals:new Map()});
   const out=[],err=[];let code=0,bg=null;
   /* output of a job this script (or a subshell of it) started is the script's own (the job inherits its stdout); any other job's output passes through as bg */

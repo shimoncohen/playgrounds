@@ -107,8 +107,8 @@ describe('parsing the whole text first', () => {
     assert.equal(r.code, 2);
     assert.equal(SQ.getNode('/home/explorer/zz'), null);
   });
-  it('& runs the command in the background (Stage 3 Task 12a)', () => {
-    assert.equal(out('echo hi &'), '[1] 1235\nhi');
+  it('& runs the command in the background (Stage 3 Task 12a; Task 12b adds the Done notice that closes the line)', () => {
+    assert.equal(out('echo hi &'), '[1] 1235\nhi\n[1]+  Done                    echo hi');
   });
   it('backslash-newline joins the lines', () => {
     assert.equal(out('echo a \\\n b'), 'a b');

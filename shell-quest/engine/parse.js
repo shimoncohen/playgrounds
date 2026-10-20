@@ -10,6 +10,7 @@ const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'baseca
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(k==='!')return SQ.rt.bang==null?'':String(SQ.rt.bang); /* the newest job this shell started (jobs.js; per shell, see interp.js copyShell) */
   if(k==='BASHPID')return '1234'; /* jobs and subshells run inside this one shell: always the shell's own pid (procs.js) */
   if(k==='PPID')return String(SQ.PPID);
   if(k==='SECONDS')return secondsNow();
@@ -27,7 +28,7 @@ function secondsNow(){const rt=SQ.rt,c=Math.floor(rt.clock||0);if(!own(S.vars,'S
 const unsetB=k=>!!S.unsetB&&own(S.unsetB,k)
 const badName=k=>k==='__proto__';
 function isSet(k){const f=SQ.frame();
-  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD'||k==='BASHPID'||k==='PPID'||k==='SECONDS')return true;
+  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD'||k==='BASHPID'||k==='PPID'||k==='SECONDS')return true;if(k==='!')return SQ.rt.bang!=null;
   if(/^\d+$/.test(k))return +k<=f.args.length;
   return own(S.vars,k)||(own(BUILTIN_VARS(),k)&&!unsetB(k))}
 function setVar(k,v){
@@ -53,7 +54,7 @@ function splitFields(text,ifs){text=String(text);if(ifs==='')return text===''?[]
   const out=[];let cur='',started=false;
   ifsScan(text,ifs,c=>{cur+=c;started=true},hard=>{if(started||hard)out.push(cur);cur='';started=false});
   if(started)out.push(cur);return out}
-const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
+const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$!])/;
 const CTX={depth:0,pend:[],sub:0,lastSub:null}; /* lastSub: status of the most recently finished $( ), read by an assignment-only command */
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
 /* Nesting guard for the recursive scanners and expanders below (scanSub/scanBrace through quotes, expandStr through ${X:-...} and $(( ))): past
@@ -105,7 +106,7 @@ function scanSub0(line,i){
   throw new Error("unexpected EOF while looking for matching ')'")}
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
-  const sv=SQ.snapshotShell();
+  const sv=SQ.snapshotShell();SQ.rt.scopeNode.inherit=true; /* $(jobs -p) lists the shell's jobs (cmds-proc.js tableOf) */
   CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
   CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */

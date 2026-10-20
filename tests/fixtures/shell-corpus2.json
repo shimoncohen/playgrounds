@@ -923,7 +923,7 @@
   {"line":"echo $#","out":"0","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"echo $-","out":"$-","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"echo $_","out":"","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
-  {"line":"echo $!","out":"$!","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
+  {"line":"echo $!","out":"$!","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"Task 12b (Stage 3): $! is the pid of the newest background job (empty before any)"},
   {"line":"echo $RANDOM | wc -c","out":"0","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"$! $- $SECONDS $RANDOM $LINENO"},
   {"line":"echo $SECONDS","out":"","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"$! $- $SECONDS $RANDOM $LINENO"},
   {"line":"echo $LINENO","out":"","code":0,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"$! $- $SECONDS $RANDOM $LINENO"},

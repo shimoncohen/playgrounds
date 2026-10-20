@@ -288,8 +288,8 @@
     "code": 0
   },
   "echo hi &": {
-    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so hi follows the notice",
-    "out": "[1] 1235\nhi"
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so hi follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\nhi\n[1]+  Done                    echo hi"
   },
   "sleep 1 &": {
     "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost)",
@@ -364,8 +364,8 @@
     ]
   },
   "echo hi > f &": {
-    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); the job writes f",
-    "out": "[1] 1235",
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); the job writes f. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n[1]+  Done                    echo hi > f",
     "files": [
       [
         "/home/explorer/f",
@@ -375,13 +375,13 @@
     ]
   },
   "ls &": {
-    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so the listing follows the notice",
-    "out": "[1] 1235\ncamp/  config.ini  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/",
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so the listing follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\ncamp/  config.ini  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/\n[1]+  Done                    ls",
     "code": 0
   },
   "for i in 1; do echo $i; done &": {
-    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so 1 follows the notice",
-    "out": "[1] 1235\n1",
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so 1 follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n1\n[1]+  Done                    for i in 1; do echo $i; done",
     "code": 0
   },
   "! true": {
@@ -395,8 +395,8 @@
     "code": 0
   },
   "cd forest &": {
-    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); cd inside the job does not move the shell",
-    "out": "[1] 1235",
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); cd inside the job does not move the shell. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n[1]+  Done                    cd forest",
     "code": 0
   },
   "select x in a; do echo $x; done": {
@@ -662,6 +662,16 @@
   "find . -maxdepth 1": {
     "reason": "Task 10: find -maxdepth is built: it lists the start point and its direct children",
     "out": ".\n./camp\n./config.ini\n./forest\n./journal.txt\n./notes.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "wait": {
+    "reason": "Stage 3 Task 12b: wait is a builtin; with no jobs it returns 0 at once and prints nothing",
+    "out": "",
+    "code": 0
+  },
+  "jobs": {
+    "reason": "Stage 3 Task 12b: jobs is a builtin; with no jobs it prints nothing (status 0)",
+    "out": "",
     "code": 0
   }
 }
