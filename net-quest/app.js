@@ -128,6 +128,8 @@ $('.seg').addEventListener('click',e=>{const b=e.target.closest('button[data-vie
 
 /* ---------- chapters and the mission card ---------- */
 let pop=false;
+const mq=q=>{try{return !!(window.matchMedia&&matchMedia(q).matches);}catch(e){return false;}};
+const wide=()=>mq('(min-width:820px)'),reduced=()=>mq('(prefers-reduced-motion: reduce)');
 function anatomy(t){if(!t||!t.length)return '';return `<div class="anat" aria-label="Parts of the command">${t.map(([s,k,l])=>`<div class="tok k-${esc(k)}"><b>${esc(s)}</b><span>${esc(l||KINDS[k]||k)}</span></div>`).join('')}</div>`;}
 function renderChapters(){chaptersEl.innerHTML=CH.map((c,i)=>{const all=chapterDone(i);return `<button class="chap${all?' earned':''}" data-ch="${i}" aria-current="${i===S.ch}"><span class="num">${all?'★':i+1}</span><span class="nm">${esc(c.name)}${all?'<span class="sr"> (badge earned: '+esc(c.badge)+')</span>':''}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`;}).join('');}
 function renderMission(){
@@ -146,20 +148,22 @@ function renderMission(){
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[mkey()]?' · done ✓':''}</div>
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
+    <button type="button" class="btn ghost narrow-only" data-act="toterm">Open the terminal ↓</button>
     ${anatomy(m.anat)}
     ${HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <details class="hint"><summary>Show a hint</summary><p>${m.hint}</p></details>
     <div class="actions"><button class="btn ghost" data-act="fill">Type it for me</button></div>
-    <details class="about"${S.mi===0&&!S.done[mkey()]?' open':''}><summary>About this chapter</summary><p class="intro">${ch.intro}</p></details>${dots}`;}
+    <details class="about"${S.mi===0&&!S.done[mkey()]&&wide()?' open':''}><summary>About this chapter</summary><p class="intro">${ch.intro}</p></details>${dots}`;}
   missionEl.innerHTML=h;
   if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop');pop=false;}
 }
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);const d=missionEl.querySelector(`[data-mi="${S.mi}"]`);if(d)d.focus({preventScroll:true});return;}
   const a=b.dataset.act;
-  if(a==='fill'){const m=curMission();if(!m)return;const ans=m.answer||[];term.fill(ans.find(x=>!lines.includes(x))||ans[ans.length-1]||'');setView('term');}
+  if(a==='toterm'){setView('term');$('#termPanel').scrollIntoView({block:'start',behavior:reduced()?'auto':'smooth'});cmdIn.focus({preventScroll:true});}
+  else if(a==='fill'){const m=curMission();if(!m)return;const ans=m.answer||[];term.fill(ans.find(x=>!lines.includes(x))||ans[ans.length-1]||'');setView('term');}
   else if(a==='nextch')gotoMission(S.ch+1,0);
   else if(a&&a.startsWith('tab-'))showTab(a.slice(4),true);});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi);const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});});
@@ -167,7 +171,7 @@ function gotoMission(ci,mi,focusCmd){
   if(!CH[ci])return;
   S.ch=ci;S.mi=Math.max(0,Math.min(mi,CH[ci].missions.length));save();
   renderChapters();renderMission();startSession();
-  if(innerWidth<820)missionEl.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+  if(innerWidth<820)missionEl.scrollIntoView({behavior:reduced()?'auto':'smooth',block:'start'});
   if(focusCmd)cmdIn.focus({preventScroll:innerWidth<820});
 }
 

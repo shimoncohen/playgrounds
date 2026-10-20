@@ -1610,6 +1610,10 @@ test('net-quest: layout at 390px', async () => {
     const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     assert.equal(await over(), false, `${width}: terminal view`);
     assert.ok(parseFloat(await page.$eval('#cmd', e => getComputedStyle(e).fontSize)) >= 16);
+    assert.equal(await page.$eval('details.about', d => d.open), false, 'the chapter intro starts closed on a phone');
+    await page.focus('#mission .dot[data-mi="0"]');
+    await page.click('#mission [data-act="toterm"]');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'cmd', 'Open the terminal focuses the input');
     assert.equal(await page.isVisible('#termPanel'), true);
     assert.equal(await page.isVisible('#pktPanel'), false);
     await page.click('#feedback [data-act="pkts"]');
@@ -1658,6 +1662,7 @@ test('net-quest: the mission card puts the goal first and keeps the chapter intr
   let c = await card();
   assert.ok(c.h2 < c.goal && c.goal === c.h2 + 1 && c.goal < c.how && c.how < c.about, JSON.stringify(c));
   assert.equal(c.open, true, 'open on the first mission of a chapter until it is done');
+  assert.equal(await page.isVisible('#mission [data-act="toterm"]'), false, 'no terminal shortcut on a wide screen');
   await page.click('#mission .dot[data-mi="1"]');
   assert.equal(await page.evaluate(() => document.activeElement.dataset.mi), '1', 'focus comes back to the dot');
   assert.equal((await card()).open, false);
