@@ -8,13 +8,16 @@ const NQ = loadNet();
 const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/&(?:gt|lt|amp|quot);/g, ' ');
 // the run a learner would make: the reference lines on a fresh net, then the question's computed answer
 const solve = (m, lines = m.answer) => {
-  const net = NQ.createNet(m.scenario, m.setup), history = lines.map((line) => ({ line, code: net.exec(line, m.dev).code }));
+  const net = NQ.createNet(m.scenario, m.setup), history = lines.map((line) => { const r = net.exec(line, m.dev); return { line, code: r.code, entries: r.entries }; });
   const ctx = NQ.makeCtx(net, history, null);
-  return { net, ctx, expect: m.question ? m.question.expect(ctx) : undefined };
+  return { net, ctx, expect: m.question ? m.question.expect(ctx) : undefined, all: m.question ? accepted(m, ctx, m.question.expect(ctx)) : [] };
 };
 // tokens of normalised text, trimmed of sentence punctuation, so "IPv4." still counts as "ipv4"
 const toks = (s) => NQ.norm(plain(s)).split(',').map((t) => t.replace(/^[.:!?()"'`]+|[.:!?()"'`]+$/g, '')).filter(Boolean);
 const leaks = (text, ans) => { const t = toks(text), a = toks(ans); return t.some((_, i) => a.every((x, j) => t[i + j] === x)); };
+// accepted answers that are one common word the lessons must be able to say (the expect value is never exempt)
+const COMMON = ['ip'];
+const accepted = (m, ctx, expect) => [expect, ...(m.question.accept ? m.question.accept(ctx) : []).filter((a) => !COMMON.includes(NQ.norm(a)))];
 
 describe('every mission of every chapter', () => {
   const keys = new Set();
@@ -47,18 +50,19 @@ describe('every mission of every chapter', () => {
       });
       if (m.question) {
         it('the question\'s answer is computed and never written in the mission text', () => {
-          const { expect } = solve(m);
+          const { expect, all } = solve(m);
           assert.ok(typeof expect === 'string' && expect.trim(), 'expect is a non-empty string');
           assert.ok(typeof m.question.ask === 'string' && m.question.ask.trim());
-          for (const t of [m.goal, m.explain, m.hint, m.question.ask, ...m.how]) assert.ok(!leaks(t, expect), `"${expect}" leaks in: ${plain(t)}`);
+          for (const a of all) for (const t of [m.goal, m.explain, m.hint, m.question.ask, ...m.how]) assert.ok(!leaks(t, a), `"${a}" leaks in: ${plain(t)}`);
         });
         it('a wrong or missing answer fails without giving the answer away', () => {
-          const { expect } = solve(m);
+          const { all } = solve(m);
           for (const a of ['not-it', '', '   ']) {
             const r = NQ.runMission(m, m.answer, a);
             assert.equal(typeof r, 'string');
-            assert.ok(!leaks(r, expect), r);
+            for (const x of all) assert.ok(!leaks(r, x), r);
           }
+          assert.equal(NQ.runMission(m, m.answer, ''), NQ.ASK);
         });
       }
     });
@@ -79,7 +83,23 @@ describe('chapter 1: lazy answers are caught', () => {
   it('2-5: the right answer without a ping first does not pass', () => {
     for (const i of [1, 2, 3, 4]) assert.notEqual(run(i, ['ip addr'], solve(m(i)).expect), true, String(i));
   });
-  it('3: the reply\'s TTL line is read from the request\'s own packet', () => assert.notEqual(run(2, m(2).answer, '63'), true));
+  it('3: a TTL other than the request\'s own does not pass', () => assert.notEqual(run(2, m(2).answer, '63'), true));
+  it('2, 3, 5: a traceroute after the ping does not change which packet is asked about', () => {
+    const lines = ['ping 10.0.0.3', 'traceroute 10.0.0.3'];
+    assert.equal(run(1, lines, 'Ethernet, IPv4, ICMP.'), true);
+    assert.equal(run(2, lines, solve(m(2)).expect), true);
+    assert.notEqual(run(2, lines, '1'), true);
+    assert.equal(run(4, lines, 'IPv4'), true);
+  });
+  it('2, 5: the alternate names the missions invite are accepted', () => {
+    assert.equal(run(1, m(1).answer, 'Ethernet / IP / ICMP'), true);
+    assert.equal(run(4, m(4).answer, 'IP'), true);
+    assert.equal(run(4, m(4).answer, 'IPv4.'), true);
+    assert.equal(run(3, m(3).answer, 'ff:ff:ff:ff:ff:ff.'), true);
+  });
+  it('2-5: a ping to yourself leaves no packet to read, with a friendly message', () => {
+    for (const i of [1, 2, 4]) { const r = run(i, ['ping -c 1 10.0.0.2'], 'x'); assert.equal(typeof r, 'string'); assert.match(r, /ping 10\.0\.0\.3/); }
+  });
   it('4: the empty MAC in the ARP body is not the frame\'s destination', () => {
     assert.notEqual(run(3, m(3).answer, '00:00:00:00:00:00'), true);
     assert.notEqual(run(3, m(3).answer, '02:00:00:00:00:02'), true);
@@ -96,6 +116,10 @@ describe('chapter 1: lazy answers are caught', () => {
     assert.equal(run(5, ['ping -c 5 10.0.0.3'], '5'), true);
     assert.notEqual(run(5, ['ping -c 5 10.0.0.3'], '3'), true);
     assert.equal(run(5, ['ping -c 2 10.0.0.3', 'ping -c 4 10.0.0.3'], '4'), true);
+    assert.equal(run(5, ['ping -c 3 10.0.0.3', 'traceroute 10.0.0.3'], '3'), true);
+    const self = run(5, ['ping -c 3 10.0.0.3', 'ping -c 2 10.0.0.2'], '3');
+    assert.notEqual(self, true);
+    assert.match(self, /nothing on the wire/);
   });
 });
 
@@ -128,13 +152,31 @@ describe('the check context', () => {
     assert.equal(ctx.answered, ' 42 ');
     assert.equal(NQ.makeCtx(net, [], undefined).answered, null);
   });
-  it('NQ.norm treats spaces, commas and arrows alike and keeps MACs and numbers', () => {
+  it('NQ.norm treats separators alike, drops trailing sentence punctuation and keeps MACs, addresses and numbers', () => {
     const want = 'ethernet,ipv4,icmp';
-    for (const s of ['Ethernet → IPv4 → ICMP', 'ethernet ipv4 icmp', 'Ethernet,IPv4,ICMP', ' Ethernet > IPv4 | ICMP ', 'ETHERNET; ipv4,  icmp'])
+    for (const s of ['Ethernet → IPv4 → ICMP', 'ethernet ipv4 icmp', 'Ethernet,IPv4,ICMP', ' Ethernet > IPv4 | ICMP ', 'ETHERNET; ipv4,  icmp',
+      'Ethernet, IPv4, ICMP.', 'Ethernet/IPv4/ICMP', 'Ethernet - IPv4 - ICMP', 'Ethernet->IPv4->ICMP', 'Ethernet=IPv4=ICMP!'])
       assert.equal(NQ.norm(s), want, s);
     assert.equal(NQ.norm('FF:FF:FF:FF:FF:FF'), 'ff:ff:ff:ff:ff:ff');
+    assert.equal(NQ.norm('ff:ff:ff:ff:ff:ff.'), 'ff:ff:ff:ff:ff:ff');
+    // a dash-separated MAC splits into words, so it differs from the colon form the questions use
+    assert.notEqual(NQ.norm('ff-ff-ff-ff-ff-ff'), NQ.norm('ff:ff:ff:ff:ff:ff'));
+    assert.equal(NQ.norm('10.0.0.3.'), '10.0.0.3');
+    assert.equal(NQ.norm('IPv4.'), 'ipv4');
+    assert.equal(NQ.norm('64.'), '64');
     assert.equal(NQ.norm(' 64 '), '64');
+    assert.equal(NQ.norm('echo-request'), NQ.norm('Echo request'));
+    assert.equal(NQ.norm('?!.'), '');
     assert.equal(NQ.norm(''), '');
+  });
+  it('lastPing and history entries: each line keeps its own log slice', () => {
+    const m = { scenario: 'pair', answer: [], check: (c) => {
+      const p = c.lastPing();
+      return p && p.line === 'ping -c 1 10.0.0.3' && p.entries.length > 0 && c.history[0].entries.length > 0 && c.history[1].entries.length === 0 ? true : 'no';
+    } };
+    assert.equal(NQ.runMission(m, ['arping 10.0.0.3', 'ip addr', 'ping -c 1 10.0.0.3', 'ip addr']), true);
+    assert.equal(NQ.runMission(m, ['arping 10.0.0.3', 'ip addr', 'ping -c 1 10.0.0.3', 'ping -c 1 10.0.0.2']), 'no');
+    assert.equal(NQ.makeCtx(NQ.createNet('pair'), [], null).lastPing(), null);
   });
   it('runMission runs the lines on the mission\'s dev', () => {
     const m = { scenario: 'office', dev: 'r1', answer: ['ping -c 1 172.16.0.10'],
@@ -147,9 +189,13 @@ describe('the check context', () => {
   });
   it('runMission asks for an answer, then compares it normalised', () => {
     const m = { scenario: 'pair', answer: ['ping -c 1 10.0.0.3'], hint: 'Look at the packet panel.', check: () => true, question: { ask: 'Who?', expect: () => 'Ethernet,IPv4' } };
-    assert.match(NQ.runMission(m, m.answer), /answer/i);
+    assert.equal(NQ.runMission(m, m.answer), NQ.ASK);
     assert.equal(NQ.runMission(m, m.answer, 'ethernet → ipv4'), true);
     assert.equal(typeof NQ.runMission(m, m.answer, 'ipv4'), 'string');
+    const acc = { ...m, question: { ...m.question, accept: () => ['link, IP'] } };
+    assert.equal(NQ.runMission(acc, acc.answer, 'Link / IP.'), true);
+    assert.equal(NQ.runMission(acc, acc.answer, 'Ethernet,IPv4'), true);
+    assert.equal(typeof NQ.runMission(acc, acc.answer, 'link'), 'string');
   });
 });
 
