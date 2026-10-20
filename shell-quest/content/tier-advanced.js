@@ -159,7 +159,7 @@ const CH=[
  missions:[
  {title:'Test a file',goal:`Ask whether <code>journal.txt</code> is a file, and say yes if it is: <code>[ -f journal.txt ] &amp;&amp; echo yes</code>`,note:HOME_NOTE,
   anat:[['[','cmd'],['-f','opt'],['journal.txt','arg'],[']','arg'],['&&','op'],['echo yes','cmd']],answer:'[ -f journal.txt ] && echo yes',
-  explain:`<code>[</code> is a real command, another name for <code>test</code>, and <code>]</code> is its last argument. It prints nothing: it only <b>exits</b> with 0 for true or 1 for false, and <code>&amp;&amp;</code> runs echo only after a 0. <code>-f</code> asks "is this a file?". The spaces matter: <code>[-f journal.txt]</code> gives "command not found".`,
+  explain:`<code>[</code> is a real command, another name for <code>test</code>, and <code>]</code> is its last argument. It prints nothing: it only <b>exits</b> with 0 for true or 1 for false, and <code>&amp;&amp;</code> runs <code>echo</code> only after a 0. <code>-f</code> asks "is this a file?". The spaces matter: <code>[-f journal.txt]</code> gives "command not found".`,
   check:c=>tested(c,'-f',true)&&guarded(c)&&said(c)==='yes'},
  {title:'One-line if',goal:`Make the same kind of choice with <code>if</code>, this time asking about a folder: <code>if [ -d village ]; then echo found; fi</code>`,note:HOME_NOTE,
   anat:[['if','kw'],['[ -d village ]','cmd'],[';','op'],['then','kw'],['echo found','cmd'],[';','op'],['fi','kw']],answer:'if [ -d village ]; then echo found; fi',
@@ -222,7 +222,7 @@ if [ -d "$1" ]; then echo exists; else echo missing; fi
   check:c=>/\$\(\(/.test(c.line)&&said(c)==='42'},
  {title:'Add them up',goal:`Add 1, 2, 3 and 4 in a loop, then print the total: <code>sum=0; for n in 1 2 3 4; do sum=$((sum+n)); done; echo "$sum"</code>`,note:`Keep the loop and the <code>echo</code> on the same line.`,
   anat:[['sum=0','var'],[';','op'],['for','kw'],['n','var'],['in 1 2 3 4','arg'],[';','op'],['do','kw'],['sum=$((sum+n))','var'],[';','op'],['done','kw'],[';','op'],['echo "$sum"','cmd']],answer:'sum=0; for n in 1 2 3 4; do sum=$((sum+n)); done; echo "$sum"',
-  explain:`This is the <b>running total</b>: start at 0, add each item inside the loop, print once at the end. The variable keeps its value after <code>done</code>, so echo sees the final sum. <code>((sum+=n))</code> is a shorter way to write the same step.`,
+  explain:`This is the <b>running total</b>: start at 0, add each item inside the loop, print once at the end. The variable keeps its value after <code>done</code>, so <code>echo</code> sees the final sum. <code>((sum+=n))</code> is a shorter way to write the same step.`,
   check:c=>looped(c)&&/\(\(/.test(c.line)&&said(c)==='10'},
  {title:'Count down',goal:`until is while turned around: it loops as long as the test fails. <code>n=3; until [ "$n" -eq 0 ]; do echo "$n"; n=$((n-1)); done</code>`,
   anat:[['n=3','var'],[';','op'],['until','kw'],['[ "$n" -eq 0 ]','cmd'],[';','op'],['do','kw'],['echo "$n"','cmd'],[';','op'],['n=$((n-1))','var'],[';','op'],['done','kw']],answer:'n=3; until [ "$n" -eq 0 ]; do echo "$n"; n=$((n-1)); done',
@@ -230,7 +230,7 @@ if [ -d "$1" ]; then echo exists; else echo missing; fi
   check:c=>c.ran('until')&&said(c)==='3\n2\n1'},
  {title:'Stop early',goal:`Leave a loop before its list runs out: <code>for i in 1 2 3 4 5; do [ "$i" -eq 3 ] &amp;&amp; break; echo "$i"; done</code>`,
   anat:[['for','kw'],['i','var'],['in 1 2 3 4 5','arg'],[';','op'],['do','kw'],['[ "$i" -eq 3 ]','cmd'],['&&','op'],['break','kw'],[';','op'],['echo "$i"','cmd'],[';','op'],['done','kw']],answer:'for i in 1 2 3 4 5; do [ "$i" -eq 3 ] && break; echo "$i"; done',
-  explain:`<code>break</code> jumps straight out of the loop, so the echo for 3, 4 and 5 never runs. Its sibling <code>continue</code> skips only the rest of this turn and carries on with the next item.`,
+  explain:`<code>break</code> jumps straight out of the loop, so the <code>echo</code> for 3, 4 and 5 never runs. Its sibling <code>continue</code> skips only the rest of this turn and carries on with the next item.`,
   check:c=>c.ran('break')&&looped(c)&&said(c)==='1\n2'},
  {title:'Read a file line by line',goal:`Walk through the journal one line at a time: <code>while read line; do echo "got: $line"; done &lt; journal.txt</code>`,note:HOME_NOTE,
   anat:[['while','kw'],['read','cmd'],['line','var'],[';','op'],['do','kw'],['echo "got: $line"','cmd'],[';','op'],['done','kw'],['<','op'],['journal.txt','arg']],answer:'while read line; do echo "got: $line"; done < journal.txt',
@@ -260,7 +260,7 @@ echo "$sum"
   hint:`Use the running total from mission 3, but loop over <code>"$@"</code>. Save it, then run <code>bash scripts/sum.sh 1 2 3</code>.`,
   explain:`<code>"$@"</code> is every argument, each kept whole, so <code>for n in "$@"</code> visits them in turn. With no arguments the loop body never runs and the total stays 0. Each time you save, the script is tried with <code>1 2 3</code>, <code>10 20</code> and nothing.`}
  ]},
-{tier:'advanced',name:'Functions & arguments',badge:'Function Maker',intro:'A function gives a few commands one name, so you can run them again with different arguments. Inside it, $1, $# and "$@" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
+{tier:'advanced',name:'Functions & arguments',badge:'Function Maker',intro:'A function gives a few commands one name, so you can run them again with different arguments. Inside it, <code>$1</code>, <code>$#</code> and "<code>$@</code>" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
  learned:['name() { … }','$1 and $#','"$@"','return status','local','${VAR:-default}'],setup:seedAdvanced,
  missions:[
  {title:'Define and call',goal:`Give a group of commands a name, then use it: <code>greet() { echo "Hello, $1!"; }; greet Ada</code>`,
@@ -282,7 +282,7 @@ echo "$sum"
   check:c=>said(c)==='big'&&guarded(c)&&callsFn(c,n=>fnRun(n,'20').code===0&&fnRun(n,'5').code!==0)},
  {title:'Keep it local',goal:`Give a function its own variable that leaves the caller's alone: <code>f() { local x=2; echo "$x"; }; x=1; f; echo "$x"</code>`,
   anat:[['f()','kw'],['{','kw'],['local x=2;','cmd'],['echo "$x";','cmd'],['}','kw'],[';','op'],['x=1','var'],[';','op'],['f','cmd'],[';','op'],['echo "$x"','cmd']],answer:'f() { local x=2; echo "$x"; }; x=1; f; echo "$x"',
-  explain:`<code>local x=2</code> makes an x that belongs to this call only. The function prints 2, and when it returns the outer x is back, so the last echo prints 1. Leave out <code>local</code> and the function overwrites the caller's x: both echoes print 2. <code>local</code> works only inside a function.`,
+  explain:`<code>local x=2</code> makes an x that belongs to this call only. The function prints 2, and when it returns the outer x is back, so the last <code>echo</code> prints 1. Leave out <code>local</code> and the function overwrites the caller's x: both echoes print 2. <code>local</code> works only inside a function.`,
   check:c=>said(c)==='2\n1'&&c.ran('local')&&c.log.some(e=>e.name==='local'&&e.args.some(a=>SQ.S.vars[a.split('=')[0]]==='1'))&&callsFn(c,n=>fnRun(n,'').out==='2')},
  {title:'Default values',goal:`Print a variable, with a fallback for when it is unset or empty: <code>echo "\${NAME:-stranger}"</code>`,
   anat:[['echo','cmd'],['"${NAME:-stranger}"','var']],answer:'echo "${NAME:-stranger}"',
@@ -318,9 +318,9 @@ done
   tests:[{label:'a name',args:['Ada'],expectOut:'Hello, Ada!'},{label:'no name',args:[],expectOut:'',expectErrMatch:'usage',expectCode:1},
     {label:'a name with a space',args:['Ada Lovelace'],expectOut:'Hello, Ada Lovelace!'}],
   hint:`Test for a missing name with <code>[ -z "$1" ]</code>, print the usage line with <code>&gt;&amp;2</code> at the end and stop with <code>exit 1</code>. Save it, then try <code>bash scripts/greet.sh Ada</code> and <code>bash scripts/greet.sh; echo $?</code>.`,
-  explain:`<code>&gt;&amp;2</code> sends echo's text to <b>stderr</b>, the error stream: a pipe or <code>&gt; file</code> passes it by and it still reaches the screen. <code>exit 1</code> ends the script with status 1, which tells the caller something went wrong: <code>bash scripts/greet.sh || echo failed</code>. Each time you save, the script is tried with <code>Ada</code>, with nothing, and with <code>"Ada Lovelace"</code>, one argument with a space that must stay whole.`}
+  explain:`<code>&gt;&amp;2</code> sends <code>echo</code>'s text to <b>stderr</b>, the error stream: a pipe or <code>&gt; file</code> passes it by and it still reaches the screen. <code>exit 1</code> ends the script with status 1, which tells the caller something went wrong: <code>bash scripts/greet.sh || echo failed</code>. Each time you save, the script is tried with <code>Ada</code>, with nothing, and with <code>"Ada Lovelace"</code>, one argument with a space that must stay whole.`}
  ]},
-{tier:'advanced',name:'Real scripts',badge:'Scripter',intro:'Real scripts read input, share code through libraries, write files and report success or failure through their exit status. The chapter ends with a capstone: a backup script you could use for real.',
+{tier:'advanced',name:'Real scripts',badge:'Scripter',intro:'Real <code>scripts</code> read input, share code through libraries, write files and report success or failure through their exit status. The chapter ends with a capstone: a <code>backup</code> script you could use for real.',
  learned:['read <<< string','source','exit status','read from stdin','here-documents','wc -l < file','the backup capstone'],setup:seedReal,
  missions:[
  {title:'Read from a string',goal:`Split a string into variables with read and a here-string: <code>read first rest &lt;&lt;&lt; "alpha beta gamma"; echo "$rest"</code>`,
@@ -374,7 +374,7 @@ read name
 echo "Hello, name!"
 `],
   tests:[{label:'Ada on stdin',stdin:'Ada\n',expectOut:'Hello, Ada!'},{label:'Grace on stdin',stdin:'Grace\n',expectOut:'Hello, Grace!'}],
-  hint:`One <code>read name</code>, then an echo with <code>"$name"</code> in it. Save it, then try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>.`,
+  hint:`One <code>read name</code>, then an <code>echo</code> with <code>"$name"</code> in it. Save it, then try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>.`,
   explain:`read takes the next line of the script's input (stdin): whatever is piped or redirected into the script, or what you put in the editor's input box. That is not the same as arguments: <code>$1</code> is typed after the script's name, input arrives on its own. Each time you save, the script is given Ada and then Grace as input.`},
  MKCONF={title:'Script: write a config',kind:'script',file:'scripts/mkconf.sh',
   goal:`Write <code>scripts/mkconf.sh</code>: with a here-document, it writes <code>app.conf</code> holding the two lines <code>name=quest</code> and <code>mode=fast</code>. Running it again must leave the same file.`,
@@ -406,7 +406,7 @@ EOF
   checkFail:'The file is right, but write it with a here-document: cat > app.conf <<EOF, the two lines, then EOF.',
   tests:[{label:'a first run',expectFiles:{'app.conf':'name=quest\nmode=fast'}},{label:'running it a second time',files:{'app.conf':'name=quest\nmode=fast'},expectFiles:{'app.conf':'name=quest\nmode=fast'}}],
   hint:`Put <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, run <code>bash scripts/mkconf.sh</code> twice, then <code>cat app.conf</code>.`,
-  explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in scripts: this practice shell runs one typed line at a time.`},
+  explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in <code>scripts</code>: this practice shell runs one typed line at a time.`},
  {title:'Script: count lines',kind:'script',file:'scripts/loglines.sh',
   goal:`Write <code>scripts/loglines.sh</code>: for every <code>.log</code> file in <code>logs/</code>, it prints the file's name and its number of lines, like <code>app.log: 4</code>, in name order.`,
   anat:[['for','kw'],['f','var'],['in logs/*.log','arg'],['n=$(wc -l < "$f")','var'],['echo "$(basename "$f"): $n"','cmd'],['done','kw']],
@@ -429,7 +429,7 @@ done
   tests:[{label:'the logs here',files:under('logs',LOGS15),expectOut:'app.log: 4\ndb.log: 2\nweb.log: 3'},
     {label:'other logs',files:LOG_CASE2,expectOut:'app.log: 1\ncache.log: 3\ndb.log: 5\nweb.log: 2'}],
   hint:`Loop with <code>for f in logs/*.log</code>. Inside, <code>n=$(wc -l &lt; "$f")</code> and <code>echo "$(basename "$f"): $n"</code>. Save it, then run <code>bash scripts/loglines.sh</code>.`,
-  explain:`<code>wc -l &lt; "$f"</code> prints just the number, because wc reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> (or <code>\${f##*/}</code>) drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
+  explain:`<code>wc -l &lt; "$f"</code> prints just the number, because <code>wc</code> reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> (or <code>\${f##*/}</code>) drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
  BACKUP
  ]}
 ];

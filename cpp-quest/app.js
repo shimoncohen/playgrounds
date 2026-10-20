@@ -995,7 +995,7 @@ cout << "I am learning C++" << endl;`),hint:'Copy the first cout line, paste it 
 cout << "Ready" << endl;`),ans:P(R`cout << "Ready\nPlayer One\n";`),hint:'Put \\n between the two pieces of text: "Ready\\nPlayer One\\n"',
   check:c=>c.ok&&c.lines.length>=2&&c.count(/\bcout\b/)===1&&/"[^"\n]*\\n[^"\n]*"/.test(c.code)},
  {title:'Bug hunt: the missing semicolon',goal:'Press Run, read the error, then fix the program.',
-  explain:`<code>main.cpp:5:30: error</code> means file <b>main.cpp</b>, line <b>5</b>, column <b>30</b>. The compiler reports the spot where it got confused, and with a missing <code>;</code> that is usually the end of the line <i>before</i> the next statement. Fix the first error first: one mistake often causes several messages.`,
+  explain:`<code>main.cpp:5:30: error</code> means file <b><code>main.cpp</code></b>, line <b>5</b>, column <b>30</b>. The compiler reports the spot where it got confused, and with a missing <code>;</code> that is usually the end of the line <i>before</i> the next statement. Fix the first error first: one mistake often causes several messages.`,
   start:P(R`cout << "Loading level 1..." << endl
 cout << "Ready!" << endl;`),ans:P(R`cout << "Loading level 1..." << endl;
 cout << "Ready!" << endl;`),hint:'Line 5 is missing its ; at the end.',
@@ -1169,7 +1169,7 @@ cin >> verb;
 cout << "The " << adjective << " " << animal << " started to " << verb << " in the castle!" << endl;`),hint:'Repeat the cout + cin pair twice, then one cout that mixes text and the three variables.',test:['sparkly','penguin','dance'],
   check:c=>c.ok&&c.tokens.length>=3&&c.tokens.slice(0,3).every(w=>c.lines.some(l=>l.includes(w)&&l.split(/\s+/).length>3))}
  ]},
-{name:'Decisions',badge:'Decider',intro:'Let your program choose. if, else and switch make it react, and rand() adds luck.',
+{name:'Decisions',badge:'Decider',intro:'Let your program choose. if, else and switch make it react, and <code>rand()</code> adds luck.',
  learned:['if','else','else if','== != < >','&& || !','rand()','switch'],
  missions:[
  {title:'if',goal:'Print <code>Game over</code> only when <code>hp</code> is 0 or less. Then change hp to 50 and run again.',

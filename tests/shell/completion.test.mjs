@@ -128,7 +128,7 @@ describe('examples in a mission text complete it only when they teach the same l
       ch.missions.forEach((m, mi) => {
         if (isScript(m) || TWO_STEP[m.title]) return;
         const text = [m.goal, m.explain, m.hint].filter(Boolean).join(' ');
-        const snippets = [...new Set([...text.matchAll(/<code>(.*?)<\/code>/g)].map((x) => decode(x[1]).replace(/<[^>]+>/g, '')))].filter((s) => s !== m.answer && /^[a-z]/.test(s));
+        const snippets = [...new Set([...text.matchAll(/<code>(.*?)<\/code>/g)].map((x) => decode(x[1]).replace(/<[^>]+>/g, '')))].filter((s) => s !== m.answer && s !== m.answer.split(/\s/)[0] && /^[a-z]/.test(s)); // the bare command name is a mention, not an example
         for (const s of snippets) {
           // a fresh world with the earlier missions of the chapter already solved, as a learner would have it
           const SQ = worldBefore(idx, mi);

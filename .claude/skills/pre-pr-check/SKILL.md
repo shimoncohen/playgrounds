@@ -19,5 +19,6 @@ Run in order; stop and fix at the first failure.
    - weakened or skipped test?
    - mission checks passable by `echo`-ing the answer?
    - new or changed missions without `how` steps (whole line first, then each part)?
+   - bare command names, options, file names or variables in learner text (should be `<code>`)?
 6. UI change? Load the page (local server or Playwright), screenshot at desktop and 390px, check the console for errors.
 7. Draft the PR using `.github/pull_request_template.md`: what and why, how checked (commands and results, quoted), screenshots, risks. Say plainly what you did not test.

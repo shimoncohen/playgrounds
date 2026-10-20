@@ -12,7 +12,7 @@ Checklist, all in one PR:
 1. **Folder** `<name>-quest/` with `index.html`, `style.css`, `app.js`. Plain scripts, relative paths, no build step, no new dependency.
 2. **Progress**: in `index.html`, `<script>window.PROGRESS={key:"<name>-quest-v1",name:"<Name> Quest"}</script>`, then load `../shared/progress.css` and `../shared/progress.js` before `app.js`. Never rename the key later.
    **Navigation**: load `../shared/nav.css` and `../shared/nav.js` the same way (back-to-landing link in `header.top`, feature-request footer).
-   **Mission steps**: load `../shared/how.css` and `../shared/how.js` too, and render `HowSteps.html(m.how)` between the anatomy chips and `explain` on the mission card. Write `how` (whole line first, then each part) for every mission; see `docs/tiers-guideline.md` section 3.
+   **Mission steps**: load `../shared/how.css` and `../shared/how.js` too, and render `HowSteps.html(m.how)` between the anatomy chips and `explain` on the mission card. Write `how` (whole line first, then each part) for every mission, with code in `<code>` (where a field is escaped, use backticks and `HowSteps.tick(text, esc)`); see `docs/tiers-guideline.md` section 3.
 3. **Course**: chapters (`CH`), quick-fire, field guide, a `RANKS` ladder with a fun top title. Missions have a reference answer and an honest check. Tiers are optional; see `docs/tiers-guideline.md` section 9.
 4. **Landing page** `index.html`: add a card (title, one playful sentence, XP badge hook like the others).
 5. **Bundling**: `python3 tools/build.py --check` must pass (the bundler picks up any `*-quest/` folder). Inlined files must not contain `</script` or `</style`.
