@@ -100,7 +100,7 @@ const FANOUT={title:'Script: fan out',kind:'script',file:'scripts/fanout.sh',
   /* the cases alone pass a script that sleeps the longest time once and prints the sorted list: ask for real jobs and a wait */
   check:c=>bgAndWait(c.read('~/scripts/fanout.sh'))&&c.scriptPasses(FANOUT).ok,
   checkFail:'The output is right, but start a background job (&) for every argument and wait for them.',
-  hint:`Check <code>"$#"</code> first. In the loop, put the two steps in parentheses and the <code>&amp;</code> after them: <code>(sleep "$n"; echo "$n done") &amp;</code>. After <code>done</code>, one <code>wait</code>. Save it, then run <code>bash scripts/fanout.sh 3 1 2</code>.`,
+  hint:`Check <code>"$#"</code> first. In the loop, wrap the two steps in parentheses and the <code>&amp;</code> after them: <code>(sleep "$n"; echo "$n done") &amp;</code>. After <code>done</code>, one <code>wait</code>. Save it, then run <code>bash scripts/fanout.sh 3 1 2</code>.`,
   explain:`The parentheses make <code>sleep</code> and <code>echo</code> one job, so each <code>echo</code> runs only after its own sleep, and <code>&amp;</code> starts that job without waiting for it. All the jobs sleep at the same time: the 1-second one reports first, and the whole run takes as long as the longest job, 3 seconds. <code>wait</code> at the end keeps the script alive until every job is done; without it the script ends at once and the jobs report after it is gone. Run the steps one after the other, without <code>&amp;</code>, and it takes 6 seconds and prints 3, 1, 2. Each time you save, the script is tried with <code>3 1 2</code> (the virtual clock must end at 3), with no arguments, with <code>1</code> and with <code>1 3</code>, where waiting for job 1 alone is not enough.`};
 
 /* ---- chapter 18: pipeline mastery ---- */
@@ -311,7 +311,7 @@ const CH=[
   check:c=>{const want=rows(c.read('~/village/sales.csv')).map(l=>l.split(',')[0]).join('\n');return !!want&&ranAwk(c,(e,p)=>/\$1\b/.test(p)&&(e.args.some(a=>a.startsWith('-F')||/^FS=/.test(a))||/\bFS\s*=/.test(p)))&&said(c)===want}},
  {title:'Filter rows',goal:`Print the names of the items that sold more than 10: <code>awk -F, '$2 &gt; 10 {print $1}' village/sales.csv</code>`,note:HOME_NOTE,
   anat:[['awk','cmd'],['-F,','opt'],["'$2 > 10",'arg'],["{print $1}'",'arg'],['village/sales.csv','arg']],answer:"awk -F, '$2 > 10 {print $1}' village/sales.csv",
-  explain:`An awk rule is <code>pattern {action}</code>: the action runs only on the lines where the pattern is true. <code>$2 &gt; 10</code> compares the quantity as a number, so apple (12) and bread (30) pass and rope (4) does not. Inside the quotes <code>&gt;</code> belongs to awk, not to bash, so no file is made. Leave the action out and awk prints the whole line: <code>awk -F, '$2 &gt; 10' village/sales.csv</code>. A pattern can also be a regular expression: <code>awk '/404/' village/logs/access.log</code>.`,
+  explain:`An awk rule is <code>pattern {action}</code>: the action runs only on the lines where the pattern is true. <code>$2 &gt; 10</code> compares the quantity as a number, so apple (12) and bread (30) pass and rope (4) does not. Inside the quotes <code>&gt;</code> belongs to awk, not to bash, so no file is created. Leave the action out and awk prints the whole line: <code>awk -F, '$2 &gt; 10' village/sales.csv</code>. A pattern can also be a regular expression: <code>awk '/404/' village/logs/access.log</code>.`,
   check:c=>{const want=rows(c.read('~/village/sales.csv')).map(l=>l.split(',')).filter(r=>+r[1]>10).map(r=>r[0]).join('\n');
     return !!want&&ranAwk(c,(e,p)=>{const pat=p.split('{')[0];return /\$/.test(pat)&&!/^\s*(BEGIN|END)\b/.test(pat)})&&said(c)===want}},
  {title:'Add it up',goal:`Add up quantity times price over every row and print the total once, at the end: <code>awk -F, '{s += $2 * $3} END {print s}' village/sales.csv</code>`,note:HOME_NOTE,
@@ -335,7 +335,7 @@ const CH=[
     return c.read('~/config.ini')===want&&c.ran('sed',e=>e.code===0&&e.args.some(x=>/^-[a-zA-Z]*i/.test(x)||x.startsWith('--in-place'))&&e.args.some(a=>/true/.test(a)))}},
  REPORT
  ]},
-{tier:'expert',name:'Processes & jobs',badge:'Job Controller',intro:'Every running program is a process with a number, its PID. Put a command in the background with & and the prompt comes straight back; jobs, wait and kill keep track of it. Time here is virtual: sleep 30 moves the clock, not your afternoon.',
+{tier:'expert',name:'Processes & jobs',badge:'Job Controller',intro:'Every running program is a process with a number, its PID. Run a command in the background with & and the prompt comes straight back; jobs, wait and kill keep track of it. Time here is virtual: sleep 30 moves the clock, not your afternoon.',
  learned:['ps','sleep','command &','jobs','wait','kill %1','$!'],setup:seedExpert,
  missions:[
  {title:'See the processes',goal:`List the processes running in this terminal: <code>ps</code>`,

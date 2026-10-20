@@ -141,7 +141,7 @@ const CH=[
  {title:'Repeat with a loop',goal:`<code>for c in red green blue; do echo "color: $c"; done</code>`,anat:[['for','kw'],['c','var'],['in red green blue;','arg'],['do echo "color: $c";','cmd'],['done','kw']],answer:'for c in red green blue; do echo "color: $c"; done',
   explain:`A <b>for loop</b> runs the commands between <code>do</code> and <code>done</code> once per item. Each time round, <code>$c</code> holds the next item. Semicolons separate the parts when it's all on one line.`,check:c=>c.ran('for')},
  {title:'Loop over files',goal:`From home: <code>for f in *.txt; do echo "Found $f"; done</code>`,anat:[['for','kw'],['f','var'],['in *.txt;','arg'],['do echo "Found $f";','cmd'],['done','kw']],answer:'for f in *.txt; do echo "Found $f"; done',
-  explain:`Loops plus wildcards: do something to every matching file. Swap echo for <code>wc -l $f</code> or <code>cp $f backup/</code> and you have real automation.`,check:c=>c.ran('for',e=>e.globbed)}
+  explain:`Loops plus wildcards: run a command on every matching file. Swap echo for <code>wc -l $f</code> or <code>cp $f backup/</code> and you have real automation.`,check:c=>c.ran('for',e=>e.globbed)}
  ]}
 ];
 SQ.content.chapters.push(...CH);
