@@ -1,5 +1,5 @@
 // "Mission complete" must be honest: a line that says "command not found" never completes a mission,
-// and the examples in a mission's text may only complete it through the same commands as its answer.
+// and an example in a mission's text completes it only when it teaches the same lesson (ALLOWED_EXAMPLES).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadShell, run } from './harness.mjs';
@@ -11,8 +11,17 @@ const ucFirst = (s) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
 // Same two-step mission as solvability.test.mjs: the answer only finds the path, a later `cat` solves it.
 const TWO_STEP = { 'Treasure hunt': true };
 
-// The first word of every pipeline / list segment, e.g. `sort f | uniq -c` -> sort,uniq.
-const names = (line) => [...new Set(line.split(/\s*(?:\|\||&&|[|;&])\s*/).map((s) => s.trim().split(/\s+/)[0]).filter((w) => /^[a-z][\w-]*$/.test(w)))].sort();
+// Examples written in a mission's text that may complete it, because they teach the same lesson as its answer. Any other example that
+// completes a mission is a check that is too loose (echo village/logs/day?.log is the ? lesson, not the * one; echo $HOME is not the variable you stored).
+const ALLOWED_EXAMPLES = {
+  'Teleport home': ['cd'], // bare cd goes home too
+  'Find the line numbers': ['grep -in map journal.txt'], // -n with -i
+  'List the jobs': ['jobs -l'],
+  'Wait for it': ['wait', 'wait %1'], // the job may start on an earlier line
+  "See the whole pipeline's status": ["bash -c 'set -euo pipefail; false | true; echo after'"], // pipefail makes the failure count: the shell stops
+  'Trace it': ['name=Ada; set -x; echo "hi $name"; set +x'],
+};
+
 
 describe('a command-not-found line never completes a mission', () => {
   it('the reported case: Sort village/people.txt | uniq -c (capital S) is not "Count each name"', () => {
@@ -46,6 +55,29 @@ describe('a command-not-found line never completes a mission', () => {
     run(SQ, 'sleep 30 &'); // a real job to wait on, as an earlier mission leaves behind
     run(SQ, 'Sleep 5 & wait');
     assert.equal(verdict(SQ, m, 'Sleep 5 & wait'), false);
+  });
+
+  it('the ? example does not complete the * mission, and $HOME does not complete "Use the value"', () => {
+    const SQ = loadShell();
+    const ch = SQ.content.chapters.find((c) => c.missions.some((m) => m.title === 'See what the star becomes'));
+    const star = ch.missions.find((x) => x.title === 'See what the star becomes');
+    ch.setup();
+    run(SQ, 'echo village/logs/day?.log');
+    assert.equal(verdict(SQ, star, 'echo village/logs/day?.log'), false);
+    run(SQ, star.answer);
+    assert.equal(verdict(SQ, star, star.answer), true);
+    const ch2 = SQ.content.chapters.find((c) => c.missions.some((m) => m.title === 'Use the value'));
+    const use = ch2.missions.find((x) => x.title === 'Use the value');
+    ch2.setup();
+    for (const l of ['echo $HOME', 'echo $USER']) {
+      run(SQ, l);
+      assert.equal(verdict(SQ, use, l), false, l);
+    }
+    run(SQ, 'NAME="Ada"');
+    for (const l of ['echo $NAME', 'echo "Hello, ${NAME}"', use.answer]) {
+      run(SQ, l);
+      assert.equal(verdict(SQ, use, l), true, l);
+    }
   });
 
   it('a friendly "not supported" refusal (sudo ...) counts as not found too', () => {
@@ -87,7 +119,7 @@ describe('a command-not-found line never completes a mission', () => {
   });
 });
 
-describe('examples in a mission text complete it only through commands of its answer', () => {
+describe('examples in a mission text complete it only when they teach the same lesson', () => {
   SQ_CHAPTERS().forEach((idx) => {
     it(`chapter ${idx + 1}`, () => {
       const ch = loadShell().content.chapters[idx];
@@ -100,7 +132,7 @@ describe('examples in a mission text complete it only through commands of its an
           const SQ = worldBefore(idx, mi);
           const c = SQ.content.chapters[idx];
           run(SQ, s);
-          if (verdict(SQ, c.missions[mi], s)) assert.ok(names(s).every((n) => names(m.answer).includes(n)), `"${m.title}": the text example ${JSON.stringify(s)} completes it with other commands than ${JSON.stringify(m.answer)}`);
+          if (verdict(SQ, c.missions[mi], s)) assert.ok((ALLOWED_EXAMPLES[m.title] || []).includes(s), `"${m.title}": the text example ${JSON.stringify(s)} completes it, but teaches another lesson than ${JSON.stringify(m.answer)} (loosen ALLOWED_EXAMPLES only if it is the same lesson, else tighten the check)`);
         }
       });
     });
