@@ -7,11 +7,11 @@ const esc=UI.esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 
 /* ---------- terminal ---------- */
 /* terminal({screen, input, form, prompt, onRun}): Enter (form submit, so phones work) hands the line to onRun.
-   Up/Down walk this session's history, Ctrl+L clears, Tab stays in the input unless Esc was pressed just before it
-   (the same escape hatch as the code editors). The screen keeps at most MAX lines. */
+   Up/Down walk this session's history, Ctrl+L clears; Tab moves focus on as usual (there is no completion).
+   The screen keeps at most MAX lines. */
 const MAX=1500;
 UI.terminal=({screen,input,form,prompt,onRun})=>{
-  let hist=[],hi=0,draft='',tabEscape=false,promptText='$ ';
+  let hist=[],hi=0,draft='',promptText='$ ';
   const add=(cls,...parts)=>{
     const d=document.createElement('div');d.className='line'+(cls?' '+cls:'');
     for(const [c,t] of parts){const s=document.createElement('span');if(c)s.className=c;s.textContent=t;d.appendChild(s);}
@@ -33,9 +33,6 @@ UI.terminal=({screen,input,form,prompt,onRun})=>{
     hi=hist.length;draft='';onRun(line);T.scroll();
   });
   input.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){tabEscape=true;return;}
-    if(e.key==='Tab'){if(tabEscape){tabEscape=false;return;}e.preventDefault();return;}
-    tabEscape=false;
     if((e.ctrlKey||e.metaKey)&&(e.key==='l'||e.key==='L')){e.preventDefault();T.clear();return;}
     if(e.key==='ArrowUp'||e.key==='ArrowDown'){
       if(!hist.length)return;e.preventDefault();

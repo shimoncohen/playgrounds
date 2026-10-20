@@ -13,18 +13,18 @@ const sentArp=c=>c.last(e=>e.dev===c.net.me&&e.dir==='tx'&&arpReq(e));
 const pinged=c=>sentReq(c)?true:'Ping the phone with <code>ping 10.0.0.3</code>, so there is an echo request from your latest <code>ping</code> to open.';
 const isIp=v=>NQ.ip.parse(v)!==null;
 const PING=[['ping','cmd'],['10.0.0.3','arg','who to ping']];
-const PICK='In the packet panel next to the terminal, pick an entry marked <b>tx</b> (sent; <b>rx</b> means received) on <code>laptop</code> whose note says <b>echo request</b>.';
+const PICK='In the packet panel, pick an entry marked <b>tx</b> (sent; <b>rx</b> means received) on <code>laptop</code> whose note says <b>echo request</b>.';
 
 NQ.CH.push({name:'Layers and packets',badge:'Layer Peeler',
  intro:'Everything that crosses a network travels as a <b>packet</b>: a message wrapped in layers, like a letter inside an envelope inside a parcel. People describe the layers with two models. The <b>OSI model</b> has seven: physical, data link, network, transport, session, presentation and application. The <b>TCP/IP model</b> folds them into four: link, internet, transport and application. This simulator builds four kinds of layer you can open and read: <b>Ethernet</b> and <b>ARP</b> on the link layer, <b>IPv4</b> on the internet (network) layer, and <b>ICMP</b>, the small messages <code>ping</code> sends, which rides inside IPv4 and belongs to the same layer. It does not build the upper layers (like TCP or web pages), so you will not see them here. Each layer starts with a <b>header</b>, a labelled front part that says who the packet is from and where it goes. Every machine on the network has an <b>IP address</b>, four numbers joined by dots. You are on a laptop at <code>10.0.0.2</code>. It is wired to a phone at <code>10.0.0.3</code> through a <b>switch</b>, a box with a row of sockets called <b>ports</b> that passes packets between the machines plugged into it.',
  learned:['ping','ping -c','Ethernet','ARP','IPv4','ICMP','TTL','MAC address'],
  missions:[
- {title:'Send a ping',goal:'The phone sits on the same wire as your laptop, at <code>10.0.0.3</code>. Ping it with <code>ping 10.0.0.3</code> and watch the packets appear in the packet panel next to the terminal.',
+ {title:'Send a ping',goal:'The phone sits on the same wire as your laptop, at <code>10.0.0.3</code>. Ping it with <code>ping 10.0.0.3</code> and watch the packets appear in the packet panel.',
   anat:PING,
   how:['<code>ping 10.0.0.3</code> asks the machine at <code>10.0.0.3</code> to answer, and prints one line for every answer that comes back.',
    '<code>ping</code> is the command. It sends a small <b>echo request</b> packet and waits for an <b>echo reply</b>, like calling "hello?" across a room and hearing "hello!" back.',
    '<code>10.0.0.3</code> is the argument, the thing the command works on: the phone\'s IP address, where the request should go.',
-   'Each line starting <code>64 bytes from 10.0.0.3</code> is one reply that made it home. In the packet panel, the newest entry is that reply arriving at the laptop.'],
+   'Each line starting <code>64 bytes from 10.0.0.3</code> is one reply that made it home. In the packet panel, the last entry in the list is that reply arriving at the laptop.'],
   explain:'Before the first request, the laptop calls out to everyone on the wire with an <b>ARP</b> question: who has <code>10.0.0.3</code>? The phone answers with its <b>MAC address</b> (the hardware address of its network card; mission 4 looks at one up close), and only then can the echo request go out. That is why ARP entries come first in the panel. A real <code>ping</code> keeps going until you press <kbd>Ctrl</kbd>+<kbd>C</kbd>; this one stops after four requests.',
   hint:'Type <code>ping 10.0.0.3</code> and press <kbd>Enter</kbd>.',
   scenario:'pair',answer:['ping 10.0.0.3'],

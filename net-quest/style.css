@@ -89,6 +89,10 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .hint{margin:0;padding:8px 12px;border-radius:10px;border:1.5px dashed var(--line);font-size:14px}
 .hint summary{cursor:pointer;font-weight:700}
 .hint p{margin:6px 0 2px}
+.about{border-top:1px solid var(--line);padding-top:10px}
+.about summary{cursor:pointer;font-weight:700;font-size:14px}
+.about .intro{margin-top:6px}
+@media (min-width:820px){.narrow-only{display:none}}
 .dots{display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid var(--line);padding-top:12px}
 .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:transparent;padding:0;font-size:10px;font-family:var(--font-mono);color:var(--muted);display:grid;place-items:center}
 .dot.done{background:var(--ok);border-color:var(--ok);color:var(--surface)}
@@ -147,7 +151,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .msg{padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:4px}
 .msg .h{font-weight:700;font-family:var(--font-display);font-size:15px}
 .msg p{margin:0;color:var(--ink)}
-.msg.tip{background:color-mix(in srgb,var(--warn) 10%,var(--surface));color:var(--warn);box-shadow:inset 3px 0 0 var(--warn)}
+.msg.tip{background:color-mix(in srgb,var(--warn) 10%,var(--surface));color:var(--ink);box-shadow:inset 3px 0 0 var(--warn)}
 .msg.win{background:color-mix(in srgb,var(--ok) 12%,var(--surface));color:var(--ok);box-shadow:inset 3px 0 0 var(--ok)}
 .msg .btn{align-self:flex-start;margin-top:4px}
 
@@ -176,7 +180,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .answerBox input{flex:1;min-width:0;font-family:var(--font-mono);font-size:14px;padding:7px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
 .afb{margin:0;font-size:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .afb:empty{display:none}
-.afb.good{color:var(--ok);font-weight:700}.afb.bad{color:var(--ink)}
+.afb.good{color:var(--ink);font-weight:700}
+.afb.good>span::before{content:"✓ ";color:var(--ok)}.afb.bad{color:var(--ink)}
 .pgrid{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
 @media (min-width:1180px){.pgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
 .plist{max-height:min(52vh,460px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
@@ -184,16 +189,17 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .plist ul{list-style:none;margin:0;padding:0}
 .plist [role="tree"]{display:flex;flex-direction:column;gap:6px}
 .plist [role="treeitem"]:focus{outline:none}
+.plist .pkt:focus-visible,.plist .grp:focus-visible>.ghead{outline:2px solid var(--accent);outline-offset:-2px}
 .ghead{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surface-2);cursor:pointer;font-size:13px;min-width:0}
 .ghead code{background:none;padding:0;overflow-wrap:anywhere;min-width:0}
 .ghead .cnt{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
 .chev::before{content:"▸"}
 [aria-expanded="true"]>.ghead .chev::before{content:"▾"}
-.grp:focus-visible>.ghead,.pkt:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .pkt{display:grid;grid-template-columns:2.2em 4.8em 7.4em minmax(0,1fr);grid-template-areas:"t dev dir vd" ". . . ly";gap:0 8px;padding:5px 8px;margin-top:2px;font-size:12.5px;border-radius:7px;cursor:pointer;border-left:3px solid transparent}
 .pkt:hover{background:var(--surface-2)}
 .pkt[aria-selected="true"]{background:color-mix(in srgb,var(--accent) 16%,var(--surface));border-left-color:var(--accent-text)}
 .pkt[aria-selected="true"] .vd{font-weight:700}
+.pkt[aria-selected="true"] :is(.t,.dir,.ly){color:var(--ink)}
 .pkt .t{grid-area:t;font-family:var(--font-mono);color:var(--muted);text-align:right}
 .pkt .dev{grid-area:dev;font-family:var(--font-mono);font-weight:600;overflow-wrap:anywhere}
 .pkt .dir{grid-area:dir;font-weight:700;color:var(--muted)}
@@ -263,4 +269,3 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .gtable tr:last-child td{border-bottom:0}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-@media (pointer:coarse){.khint{display:none}}

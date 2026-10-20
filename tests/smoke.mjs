@@ -1480,6 +1480,7 @@ test('net-quest: the packet list works from the keyboard', async () => {
   const first = await sel();
   await page.keyboard.press('ArrowDown');
   assert.notEqual(await sel(), first, 'ArrowDown moves the selection');
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'none', 'the focused row shows a focus ring');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#inspector .pkt:visible').count(), 6 + 12, 'Enter on the older group opens it');
@@ -1596,6 +1597,8 @@ test('net-quest: terminal output is text, never markup', async () => {
   assert.equal(await page.evaluate(() => document.activeElement.id), 'cmd', 'focus stays in the terminal');
   await page.press('#cmd', 'Control+l');
   assert.equal((await page.textContent('#screen')).trim(), '');
+  await page.press('#cmd', 'Tab');
+  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'cmd', 'Tab moves on: there is no completion to trap it');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -1609,6 +1612,9 @@ test('net-quest: layout at 390px', async () => {
     assert.ok(parseFloat(await page.$eval('#cmd', e => getComputedStyle(e).fontSize)) >= 16);
     assert.equal(await page.isVisible('#termPanel'), true);
     assert.equal(await page.isVisible('#pktPanel'), false);
+    await page.click('#feedback [data-act="pkts"]');
+    assert.equal(await page.isVisible('#pktPanel'), true, 'the win message leads to the packets');
+    await page.click('.seg button[data-view="term"]');
     await page.click('.seg button[data-view="pkts"]');
     assert.equal(await page.isVisible('#pktPanel'), true);
     assert.equal(await page.isVisible('#termPanel'), false);
@@ -1639,5 +1645,26 @@ test('net-quest: quick-fire and field guide render', async () => {
   assert.match(await page.inputValue('#cmd'), /ping/);
   assert.deepEqual(errors, []);
   assert.deepEqual(cerr, []);
+  await ctx.close();
+});
+
+test('net-quest: the mission card puts the goal first and keeps the chapter intro one tap away', async () => {
+  const { ctx, page, errors } = await netPage();
+  const card = () => page.evaluate(() => {
+    const m = document.getElementById('mission'), kids = [...m.children];
+    const at = sel => kids.indexOf(m.querySelector(sel));
+    return { h2: at('h2'), goal: at('.goal'), how: at('.how'), about: at('details.about'), open: m.querySelector('details.about').open };
+  });
+  let c = await card();
+  assert.ok(c.h2 < c.goal && c.goal === c.h2 + 1 && c.goal < c.how && c.how < c.about, JSON.stringify(c));
+  assert.equal(c.open, true, 'open on the first mission of a chapter until it is done');
+  await page.click('#mission .dot[data-mi="1"]');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.mi), '1', 'focus comes back to the dot');
+  assert.equal((await card()).open, false);
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.fill('#cmd', 'ping 10.0.0.3'); await page.press('#cmd', 'Enter');
+  await page.click('#mission .dot[data-mi="0"]');
+  assert.equal((await card()).open, false, 'closed once the mission is done');
+  assert.deepEqual(errors, []);
   await ctx.close();
 });

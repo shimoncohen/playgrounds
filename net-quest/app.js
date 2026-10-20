@@ -96,7 +96,7 @@ const nextBtn=()=>`<button type="button" class="btn" data-act="next">${S.mi>=CH[
 const WINS=['Open a few more packets in the panel: every one of them is the real thing, field by field.','Nice. Every network tool you will ever use is built on packets like these.','That is how the pros check a network: send something, then read what happened.','Clean. You are reading the network like a map now.'];
 function renderFeedback(f){
   if(!f){fbEl.innerHTML='';return;}
-  if(f.win){fbEl.innerHTML=`<div class="msg win"><span class="h">${f.first?'Mission complete! +'+XP+' XP':'Mission complete (you had already earned this one)'}${f.badge?' · Badge earned: '+esc(CH[S.ch].badge):''}</span><p>${WINS[(S.ch*7+S.mi)%WINS.length]}</p>${nextBtn()}</div>`;return;}
+  if(f.win){fbEl.innerHTML=`<div class="msg win"><span class="h">${f.first?'Mission complete! +'+XP+' XP':'Mission complete (you had already earned this one)'}${f.badge?' · Badge earned: '+esc(CH[S.ch].badge):''}</span><p>${WINS[(S.ch*7+S.mi)%WINS.length]}</p><div class="actions">${nextBtn()}<button type="button" class="btn ghost narrow-only" data-act="pkts">See the packets</button></div></div>`;return;}
   if(!ran)return;
   if(f.ask){fbEl.innerHTML=`<div class="msg tip"><span class="h">Good, the packets are in</span><p>Now answer the question in the box above the packet list.</p><button type="button" class="btn ghost" data-act="ask">Go to the question</button></div>`;return;}
   fbEl.innerHTML=`<div class="msg tip"><span class="h">Not quite yet</span><p>${f.tip}</p></div>`;
@@ -116,6 +116,7 @@ askBox.addEventListener('submit',e=>{
 });
 const onAct=e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
   if(a==='next'){setView('term');gotoMission(S.ch,S.mi+1,true);}
+  else if(a==='pkts'){setView('pkts');const t=$('#inspector [tabindex="0"]');if(t)t.focus();else $('#pktPanel').scrollIntoView({block:'nearest'});}
   else if(a==='ask'){setView('pkts');askIn.focus();askBox.scrollIntoView({block:'nearest'});}};
 fbEl.addEventListener('click',onAct);afb.addEventListener('click',onAct);
 $('#resetNet').addEventListener('click',()=>{startSession();cmdIn.focus();});
@@ -143,7 +144,6 @@ function renderMission(){
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`;}
   else{const m=ch.missions[S.mi];
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[mkey()]?' · done ✓':''}</div>
-    ${S.mi===0?`<p class="intro">${ch.intro}</p>`:''}
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
@@ -151,17 +151,18 @@ function renderMission(){
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <details class="hint"><summary>Show a hint</summary><p>${m.hint}</p></details>
-    <div class="actions"><button class="btn ghost" data-act="fill">Type it for me</button></div>${dots}`;}
+    <div class="actions"><button class="btn ghost" data-act="fill">Type it for me</button></div>
+    <details class="about"${S.mi===0&&!S.done[mkey()]?' open':''}><summary>About this chapter</summary><p class="intro">${ch.intro}</p></details>${dots}`;}
   missionEl.innerHTML=h;
   if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop');pop=false;}
 }
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);return;}
+  if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);const d=missionEl.querySelector(`[data-mi="${S.mi}"]`);if(d)d.focus({preventScroll:true});return;}
   const a=b.dataset.act;
   if(a==='fill'){const m=curMission();if(!m)return;const ans=m.answer||[];term.fill(ans.find(x=>!lines.includes(x))||ans[ans.length-1]||'');setView('term');}
   else if(a==='nextch')gotoMission(S.ch+1,0);
   else if(a&&a.startsWith('tab-'))showTab(a.slice(4),true);});
-chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi);});
+chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi);const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});});
 function gotoMission(ci,mi,focusCmd){
   if(!CH[ci])return;
   S.ch=ci;S.mi=Math.max(0,Math.min(mi,CH[ci].missions.length));save();
@@ -198,7 +199,7 @@ function pick(i){if(!fireOn||fLocked||!fQ)return;fLocked=true;const ok=fQ.opts[i
   else{fStreak=0;fMiss.push(fQ);fb.className='fb bad';fb.textContent='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
   setStats();clearTimeout(fNext);fNext=setTimeout(()=>{if(fireOn)nextQ();},ok?700:2600);}
 function startFire(){fireOn=true;fLeft=ROUND;fScore=0;fStreak=0;fMiss=[];setStats();nextQ();clearInterval(fT);fT=setInterval(()=>{fLeft--;setStats();if(fLeft<=0)stopFire();},1000);}
-function stopFire(silent){if(!fireOn)return;fireOn=false;clearInterval(fT);clearTimeout(fNext);if(silent){fireIdle();return;}if(fScore>S.best){S.best=fScore;save();}setStats();
+function stopFire(silent){if(!fireOn)return;fireOn=false;clearInterval(fT);clearTimeout(fNext);if(silent){fLeft=ROUND;fScore=0;fStreak=0;fireIdle();return;}if(fScore>S.best){S.best=fScore;save();}setStats();
   fStage.innerHTML=`<div class="task">Round over: ${fScore} points</div><p class="note" style="margin:0">${fScore>=S.best&&fScore>0?'That is your best score so far.':`Your best is ${S.best}.`}</p>
   ${fMiss.length?`<div><p class="explain" style="margin:0 0 8px"><b>Worth another look:</b></p><ul class="misses">${fMiss.map(q=>`<li><span>${q.c}</span><span>Answer: <b>${esc(q.a)}</b></span><span class="note">${esc(q.why)}</span></li>`).join('')}</ul></div>`:'<p class="explain" style="margin:0">No misses. Your packets are in order.</p>'}
   <div class="actions"><button class="btn" id="fStart">Play again</button></div>`;}
