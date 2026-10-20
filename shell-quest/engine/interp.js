@@ -7,21 +7,32 @@ const {CTX,expandWords,expandOne,globExpand}=SQ;
 const errL=text=>({text,cls:'err'});
 const {errOf,own}=SQ;
 
-/* Shell state a subshell, $( ) or script must not leak. FS changes are not part of it. */
+/* Shell state a subshell, $( ) or script must not leak. FS changes are not part of it. copyShell() copies it (a background job starts from such a copy).
+   snapshotShell() also enters a new process scope (SQ.rt.scope, see jobs.js): the jobs a subshell, $( ), pipeline stage or script starts belong to it,
+   and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again. */
+function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last}}
+const newScope=()=>{const rt=SQ.rt;rt.scope=++rt.scopeSeq};
 function snapshotShell(){
-  const f=SQ.frame();
-  return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,frames:SQ.rt.frames.length,frame:f,args:f.args}}
+  const f=SQ.frame(),sv=Object.assign(copyShell(),{frames:SQ.rt.frames.length,frame:f,args:f.args,scope:SQ.rt.scope});newScope();return sv}
 function restoreShell(sv){
   S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;
   if(sv.exp)S.exp=sv.exp;else delete S.exp;
   if(sv.fns)S.fns=sv.fns;else delete S.fns;
   if(sv.unsetB)S.unsetB=sv.unsetB;else delete S.unsetB;
   sv.frame.args=sv.args; /* shift inside a subshell, $( ) or pipeline stage does not reach the shell */
-  SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames)}
+  SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames);
+  if(sv.scope!==undefined)SQ.rt.scope=sv.scope}
+/* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
+function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames}}
+function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;
+  for(const k of ['exp','fns','unsetB']){if(st[k])S[k]=st[k];else delete S[k]}}
 
-/* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows. */
+/* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows.
+   nestIn/nestOut are the same count for the generator interpreter (jobs.js); depths()/setDepths() let a job slice carry its own share of these counters. */
 const IMAX=250;let idepth=0;
-function nested(f){if(idepth>=IMAX)throw new SQ.StepLimit('nesting too deep');idepth++;try{return f()}finally{idepth--}}
+function nestIn(){if(idepth>=IMAX)throw new SQ.StepLimit('nesting too deep');idepth++}
+function nestOut(){idepth--}
+function nested(f){nestIn();try{return f()}finally{nestOut()}}
 
 /* an expansion error marked abort (${X:?msg}) ends the function, script or typed line: the same unwinding signal as `exit 1`, flagged so a typed line prints no friendly message */
 const abortOf=e=>e&&e.abort?{type:'exit',n:1,abort:true}:undefined;
@@ -32,7 +43,9 @@ function runProgram(node,env){
   return runList(node,env)}
 
 function runList(list,env){const out=[];let code=0,ui;
-  for(const it of list.items){const r=runAndOr(it.andor,env);out.push(...r.out);code=r.code;if(r.ui)ui=r.ui;
+  for(const it of list.items){
+    if(it.sep==='&'){const r=SQ.spawnItem(it.andor,env);out.push(...r.out);code=r.code;continue} /* jobs.js: start it in the background, $? = 0 */
+    const r=runAndOr(it.andor,env);out.push(...r.out);code=r.code;if(r.ui)ui=r.ui;
     if(r.ctl)return {out,code,ctl:r.ctl,ui}}
   return {out,code,ui}}
 
@@ -45,9 +58,10 @@ function runAndOr(n,env){
     if(r.ctl)return {out,code,ctl:r.ctl,ui}}
   return {out,code,ui}}
 
-/* stdout text, stderr lines and tips of a compound's Out[] in the shape runCmd returns */
+/* stdout text, stderr lines and tips of a compound's Out[] in the shape runCmd returns; bg = background-job output (Out[] marked bg), which
+   goes to the screen whatever this command's redirects are (the job's output is not this command's) */
 function asCmd(r){const o={out:[],err:[],tips:[],code:r.code,clear:false};
-  for(const x of r.out){if(x.clear){o.clear=true;continue}(x.cls==='out'?o.out:x.cls==='tip'?o.tips:o.err).push(x.text)}
+  for(const x of r.out){if(x.bg){(o.bg=o.bg||[]).push(x);continue}if(x.clear){o.clear=true;continue}(x.cls==='out'?o.out:x.cls==='tip'?o.tips:o.err).push(x.text)}
   o.out=o.out.join('\n');return o}
 
 /* the body of a here-document or here-string as stdin text (no trailing newline, like every other text in this shell) */
@@ -69,7 +83,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
   const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
   try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
-    if(sv0&&i>0)back();
+    if(sv0&&i>0){back();newScope()}
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
     let toErr=null,pre=null;
@@ -88,16 +102,20 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     const tty=env.tty&&last&&!out;let r;
     if(simple){
       const io={tty,depth:env.depth,pipeLen:P.length,record:env.record,redirect:out,errRedirect:err,loops:env.loops,stdinBox:box};
+      /* env.defer (the job interpreter, jobs.js): a lone, unredirected function call comes back as r.defer = {name, args, pend} instead of running here */
+      if(env.defer&&P.length===1&&!R.out&&!R.inp&&!R.err&&!R.doc&&!R.herestr)io.defer=true;
       if(box&&box===env.stdin){let got=null; /* shared box: the first read of io.stdin takes the rest of it */
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
       r=SQ.runCmd(c.words,io,c.assigns);
+      if(r.defer)return {out:res.concat(r.defer.pend.map(errL)),code:0,defer:r.defer};
       if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       const cr=runCompound(c,Object.assign({},env,{tty,stdin:box}));
       if(cr.ui&&last)ui=cr.ui;if(P.length===1&&cr.ctl)ctl=cr.ctl;
       if(last&&!out&&!err&&!toErr){res.push(...cr.out);code=cr.code;continue}
       r=asCmd(cr)}
+    if(r.bg)res.push(...r.bg); /* background-job output that came due while this command ran (sleep, a compound, a function) */
     if(r.ui&&last)ui=r.ui; /* only the last stage may open the editor: nano f | cat does not */
     if(P.length===1&&r.ctl)ctl=r.ctl;
     if(r.clear)res.push({clear:true});
@@ -160,33 +178,38 @@ function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assi
     if(br.ctl){pass=resolveCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}}
   logKw(env,c.type,code);return {out,code,ui}}
 
-/* for: the list expands once, one 'for' log entry with the items, then one step per pass. The loop variable stays set afterwards. */
-function runFor(c,env){const out=[];let code=0,ui;
-  if(SQ.badName(c.var))return {out:[errL(`bash: \`${c.var}': not a valid identifier`)],code:1};
+/* for: the list expands once, one 'for' log entry with the items, then one step per pass. The loop variable stays set afterwards.
+   forItems (shared with jobs.js): {items}, or {fail: {code, ctl?}} after an expansion error; stderr lines go to out. */
+function forItems(c,env,out){
+  if(SQ.badName(c.var)){out.push(errL(`bash: \`${c.var}': not a valid identifier`));return {fail:{code:1}}}
   let items=[],globbed=false;
   if(c.words===null)items=SQ.frame().args.slice();
   else{let toks;
-    try{toks=expandWords(c.words)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||2,ctl:abortOf(e)}}
+    try{toks=expandWords(c.words)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {fail:{code:e.code||2,ctl:abortOf(e)}}}
     ({args:items,globbed}=SQ.globWords(toks))}
   out.push(...CTX.pend.splice(0));
   if(env.record)SQ.rt.log.push({name:'for',args:items,globbed,piped:false,redirect:null,code:0,out:''});
+  return {items}}
+function runFor(c,env){const out=[];let code=0,ui;
+  const fi=forItems(c,env,out);if(fi.fail)return Object.assign({out},fi.fail);const items=fi.items;
   const inner=Object.assign({},env,{loops:env.loops+1});
   for(const it of items){SQ.step();SQ.setVar(c.var,it);
     const br=runList(c.body,inner);out.push(...br.out);if(br.ui)ui=br.ui;code=br.code;
     if(br.ctl){const pass=resolveCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;return {out,code,ctl:pass,ui}}}
   return {out,code,ui}}
 
-function runCase(c,env){const out=[];let code=0,w;
-  try{w=expandOne(c.word)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {out,code:e.code||1,ctl:abortOf(e)}}
+/* caseArm (shared with jobs.js): {arm} (null when no pattern matches; then 'case' is logged with status 0), or {fail: {code, ctl?}} */
+function caseArm(c,env,out){let w;
+  try{w=expandOne(c.word)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {fail:{code:e.code||1,ctl:abortOf(e)}}}
   out.push(...CTX.pend.splice(0));
-  for(const arm of c.arms){let hit=false;
-    for(const p of arm.patterns){let m;
-      try{m=SQ.patMatch(w,p.raw)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));logKw(env,'case',1);return {out,code:1}}
-      out.push(...CTX.pend.splice(0));if(m){hit=true;break}}
-    if(!hit)continue;
-    const br=runList(arm.body,env);out.push(...br.out);code=br.code;
-    logKw(env,'case',code);return {out,code,ctl:br.ctl,ui:br.ui}}
-  logKw(env,'case',code);return {out,code}}
+  for(const arm of c.arms)for(const p of arm.patterns){let m;
+    try{m=SQ.patMatch(w,p.raw)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));logKw(env,'case',1);return {fail:{code:1}}}
+    out.push(...CTX.pend.splice(0));if(m)return {arm}}
+  logKw(env,'case',0);return {arm:null}}
+function runCase(c,env){const out=[];
+  const ca=caseArm(c,env,out);if(ca.fail)return Object.assign({out},ca.fail);if(!ca.arm)return {out,code:0};
+  const br=runList(ca.arm.body,env);out.push(...br.out);
+  logKw(env,'case',br.code);return {out,code:br.code,ctl:br.ctl,ui:br.ui}}
 
 /* ( ... ): a subshell, isolated like $( ); loop control and exit stop at its edge */
 function runSubshell(c,env){const sv=snapshotShell();let r;
@@ -223,17 +246,22 @@ function parsedBody(text){let p=parseCache.get(text);
   if(parseCache.size>CACHE_MAX)parseCache.delete(parseCache.keys().next().value);
   return p}
 function restoreLocals(f){for(const [k,v] of f.locals){if(v===undefined)delete S.vars[k];else S.vars[k]=v}}
+/* The frame code of a call, shared with the job interpreter (jobs.js): fnEnter -> {prog, f, at} (the frame is pushed) or {fail} (a body that does not
+   parse: runCmd's result shape); fnLeave(fe) pops it and puts the locals back; fnResult(r) maps the body's {code, ctl} to the call's (return ends it). */
+function fnEnter(name,args){
+  if(fnDepth>=FN_NEST)throw Object.assign(new Error(`bash: ${name}: maximum function nesting level exceeded`),{stop:true});
+  let prog;try{prog=parsedBody(S.fns[name])}catch(e){if(e&&e.stop)throw e;return {fail:{out:'',err:[errOf(e)],tips:[],code:e.code||2,list:[errL(errOf(e))]}}}
+  const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'function',locals:new Map()};
+  fr.push(f);fnDepth++;return {prog,f,at}}
+function fnLeave(fe){fnDepth--;restoreLocals(fe.f);const fr=SQ.rt.frames;fr.length=Math.min(fr.length,fe.at)}
+function fnResult(r){const ret=r.ctl&&r.ctl.type==='return';return {code:ret?r.ctl.n:r.code,ctl:r.ctl&&!ret?r.ctl:undefined}}
 /* runCmd's result shape plus list (the body's Out[] in order, used when the call's output goes straight to the screen) */
 function callFunction(name,args,io){
-  if(fnDepth>=FN_NEST)throw Object.assign(new Error(`bash: ${name}: maximum function nesting level exceeded`),{stop:true});
-  let prog;try{prog=parsedBody(S.fns[name])}catch(e){if(e&&e.stop)throw e;return {out:'',err:[errOf(e)],tips:[],code:e.code||2,list:[errL(errOf(e))]}}
-  const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'function',locals:new Map()};
-  fr.push(f);fnDepth++;let r;
-  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:io.loops||0})} /* break/continue in the body reach the caller's loop */
-  finally{fnDepth--;restoreLocals(f);fr.length=Math.min(fr.length,at)}
-  const ret=r.ctl&&r.ctl.type==='return';
-  const o=asCmd(r);o.code=ret?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
-  if(r.ctl&&!ret)o.ctl=r.ctl;
+  const fe=fnEnter(name,args);if(fe.fail)return fe.fail;let r;
+  try{r=runProgram(fe.prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:io.loops||0})} /* break/continue in the body reach the caller's loop */
+  finally{fnLeave(fe)}
+  const fr=fnResult(r),o=asCmd(r);o.code=fr.code;o.list=r.out;if(r.ui)o.ui=r.ui;
+  if(fr.ctl)o.ctl=fr.ctl;
   return o}
 /* source FILE: the text runs in the CURRENT shell under a Frame {name:FILE,args,kind:'source'}; `return` ends the file with its status, `exit n` ends that file
    (the status is n; only a typed line shows the friendly exit message). Parse first: a syntax error prints once and nothing runs. The nesting bound matches functions. */
@@ -279,14 +307,14 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
    virtual clock, pid counter and process table (fresh inside: clock 0, next pid 1235) come back
    afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
 function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
-  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
-  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
+  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,jobSteps:rt.jobSteps,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
+  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.jobSteps=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
   const procs=SQ.procsSave(); /* a clean clock, pid counter and process table inside (procs.js) */
   try{return fn()}
   finally{SQ.procsLoad(procs);const back=JSON.parse(snap);SQ.fixTree(back.fs);
     for(const k of Object.keys(S))if(!(k in back))delete S[k];
     for(const k of Object.keys(back))S[k]=back[k];
-    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed});
+    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,jobSteps:keep.jobSteps,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed});
     CTX.pend.length=0;CTX.pend.push(...keep.pend);CTX.depth=keep.depth}}
 
 /* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */
@@ -308,5 +336,10 @@ function returnBuiltin(a){
     n=((Number(a[0])%256)+256)%256}
   return {out:'',err:[],code:n,ctl:{type:'return',n}}}
 
-Object.assign(SQ,{runScript,sandbox,runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache});
+/* the interpreter's depth counters [compound/$( ) nesting, function calls, source] for a job slice (jobs.js) */
+const depths=()=>[idepth,fnDepth,srcDepth];
+function setDepths(d){[idepth,fnDepth,srcDepth]=d}
+Object.assign(SQ,{runScript,sandbox,runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache,
+  /* shared with the job interpreter (jobs.js) */
+  copyShell,shellState,setShellState,runPipeline,runList,resolveCtl,forItems,caseArm,fnEnter,fnLeave,fnResult,nestIn,nestOut,depths,setDepths,asCmd});
 })(window.SQ=window.SQ||{});

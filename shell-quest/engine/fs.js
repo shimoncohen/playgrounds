@@ -55,6 +55,7 @@ SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,san
    locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
 SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
+SQ.BASE_FRAME=BASE_FRAME; /* jobs.js swaps its args per job slice */
 /* Caps that stop runaway commands. TEXT: longest text one command, pipe stage or file may hold. LINES: screen lines per typed line.
    STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. VAR: longest text one variable may hold. STATE: most file text the whole world may hold (keeps the save well inside localStorage).
    SLEEP: the longest virtual time (seconds) one sleep may ask for (procs.js). */

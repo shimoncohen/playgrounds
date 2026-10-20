@@ -108,7 +108,7 @@ function runSub(cmd){
   const sv=SQ.snapshotShell();
   CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
   CTX.lastSub=r.code;
-  const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
+  const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */
   return SQ.trimRun(v.join('\n'),'\n')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
    list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */

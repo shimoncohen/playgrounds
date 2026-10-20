@@ -107,8 +107,8 @@ describe('parsing the whole text first', () => {
     assert.equal(r.code, 2);
     assert.equal(SQ.getNode('/home/explorer/zz'), null);
   });
-  it('& says it is not supported', () => {
-    assert.equal(out('echo hi &'), 'this practice shell does not support & yet');
+  it('& runs the command in the background (Stage 3 Task 12a)', () => {
+    assert.equal(out('echo hi &'), '[1] 1235\nhi');
   });
   it('backslash-newline joins the lines', () => {
     assert.equal(out('echo a \\\n b'), 'a b');

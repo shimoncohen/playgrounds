@@ -288,14 +288,13 @@
     "code": 0
   },
   "echo hi &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so hi follows the notice",
+    "out": "[1] 1235\nhi"
   },
   "sleep 1 &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost)",
+    "out": "[1] 1235",
+    "code": 0
   },
   "if true; then echo y; fi": {
     "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
@@ -365,18 +364,25 @@
     ]
   },
   "echo hi > f &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2,
-    "files": []
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); the job writes f",
+    "out": "[1] 1235",
+    "files": [
+      [
+        "/home/explorer/f",
+        2,
+        "c22b5f91"
+      ]
+    ]
   },
   "ls &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet"
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so the listing follows the notice",
+    "out": "[1] 1235\ncamp/  config.ini  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/",
+    "code": 0
   },
   "for i in 1; do echo $i; done &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet"
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so 1 follows the notice",
+    "out": "[1] 1235\n1",
+    "code": 0
   },
   "! true": {
     "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
@@ -389,9 +395,9 @@
     "code": 0
   },
   "cd forest &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); cd inside the job does not move the shell",
+    "out": "[1] 1235",
+    "code": 0
   },
   "select x in a; do echo $x; done": {
     "reason": "Task 6a: select is parsed and reported as unsupported",

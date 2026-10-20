@@ -31,13 +31,15 @@ function runCmd(words,io,assigns){
     return Object.assign(ok(),{err:pend})}
   if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
     for(const [k,v] of pre){S.vars[k]=v;(S.exp=S.exp||{})[k]=1}
-    try{return runCmd0(ew,io,pend)}
+    try{return runCmd0(ew,io,pend,true)} /* never deferred: the prefix assignments must hold while the function runs */
     finally{for(const [k,v,x] of saved){if(v===undefined)delete S.vars[k];else S.vars[k]=v;if(!x&&S.exp)delete S.exp[k]}}}
   return runCmd0(ew,io,pend)}
-function runCmd0(ew,io,pend){const {args,globbed}=SQ.globWords(ew);
+function runCmd0(ew,io,pend,noDefer){const {args,globbed}=SQ.globWords(ew);
   const name=args[0],a=args.slice(1);let r,lname=name;
   if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)&&!own(CMDS,name)&&!SQ.hasFunction(name)){ /* the tip is for `x = 1`, never for a real command such as sed = file */r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
-  else if(SQ.hasFunction(name)){r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
+  else if(SQ.hasFunction(name)){
+    if(io.defer&&!noDefer)return {out:'',err:[],code:0,defer:{name,args:a,pend}}; /* the job interpreter (jobs.js) runs the body itself */
+    r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
     return r}
   else if(name.includes('/'))r=runPath(name,io,false,a);
@@ -71,17 +73,19 @@ let nest=0;
    A $( ) run at the top of a sandboxed script (o.sub) is not a typed line and costs nothing. SQ.advance's Out[] (Task 12a: output of jobs
    that came due) is appended to the line's output; lastOut keeps only the line's own output. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
-  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.outChars=0;SQ.rt.grewBy=0}
+  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.jobSteps=0;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[]}
   let charged=!(outer&&!o.sub);
   const lineCost=r=>{if(charged)return r;charged=true;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
   const sd=CTX.depth;CTX.depth=o.depth;nest++;
   try{const r=execLine0(line,o);if(!outer)return r;
     SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */
-    SQ.rt.lastOut=r.out.filter(x=>x.cls==='out').map(x=>x.text).join('\n');return capLines(lineCost(r))}
+    SQ.rt.lastOut=r.out.filter(x=>x.cls==='out'&&!x.bg).map(x=>x.text).join('\n'); /* a background job's output is not the line's */
+    return capLines(lineCost(r))}
   catch(e){if(!outer)throw e; /* outermost call: any runaway or unexpected failure becomes one error line, state stays usable */
     if(e&&e.tmo!==undefined&&SQ.rt.deadlines.length)throw e; /* a $( ) at the top of a sandboxed script, inside `timeout`: the timeout takes it */
     const code=SQ.isOverflow(e)?2:1; /* a JS stack overflow reads like the parser's nesting error, status 2 */
-    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code;return lineCost({out:[{text:fatalText(e),cls:'err'}],code})}
+    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code; /* background-job output this line already let through (SQ.rt.lineBg, jobs.js) stays on screen */
+    return capLines(lineCost({out:(SQ.rt.lineBg||[]).concat({text:fatalText(e),cls:'err'}),code}))}
   finally{CTX.depth=sd;nest--}}
 /* On-screen output per typed line is capped at LIM.LINES; the rest is replaced by one notice. */
 function capLines(r){let n=0;const out=[];

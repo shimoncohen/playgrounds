@@ -369,12 +369,8 @@ describe('parseProgram: syntax errors', () => {
     synErr('f() echo', tok('echo'));
     synErr('echo a\n)', tok(')'));
   });
-  it('unsupported & and arrays and select', () => {
-    for (const s of ['echo hi &', 'a & b', 'a &\nb', '{ a & }', 'if x; then y & fi']) {
-      const e = err(s);
-      assert.equal(e.message, 'this practice shell does not support & yet', s);
-      assert.equal(e.code, 2);
-    }
+  it('& is a list separator (Stage 3 Task 12a); arrays and select are unsupported', () => {
+    for (const s of ['echo hi &', 'a & b', 'a &\nb', '{ a & }', 'if x; then y & fi']) assert.doesNotThrow(() => SQ.parseProgram(s), s);
     const a = err('arr=(1 2)');
     assert.equal(a.message, 'this practice shell does not support arrays yet');
     assert.equal(a.code, 2);

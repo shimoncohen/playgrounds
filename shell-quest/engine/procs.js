@@ -16,10 +16,13 @@
                    `bash: fork: retry: Resource temporarily unavailable` (errOf prints it as is). Callers catch it (ps prints it, status 1).
    SQ.advance(seconds, io) -> Out[]
                    moves the clock forward. Every function in SQ.onAdvance is called as fn(target, io) before the clock is set to target and
-                   its returned Out[] ({text, cls}) are concatenated and returned. HOOK FOR TASK 12a: push the scheduler (SQ.tick) onto
-                   SQ.onAdvance; it runs due jobs in wake order, setting SQ.rt.clock to each wake time as it goes, and returns their output.
+                   its returned Out[] ({text, cls}) are concatenated and returned. jobs.js pushes the scheduler (SQ.tick) onto SQ.onAdvance:
+                   it runs due jobs in wake order, setting SQ.rt.clock to each wake time as it goes, and returns their output.
                    Under `timeout` the target is cut at the earliest active deadline (SQ.rt.deadlines); after moving the clock there, advance
                    throws a timeout signal {stop:true, tmo:index, out} that unwinds to the `timeout` that owns that deadline.
+                   Inside a background job's slice (SQ.rt.slice, jobs.js) advance neither moves the clock nor runs onAdvance: it sets
+                   slice.debt (time the job owes) and the job yields that much after the command. SQ.now() = clock + that debt; sleep, timeout
+                   and date read it. A job's sleep is not capped by LIM.SLEEP (it only waits; `sleep infinity &` never wakes).
    $SECONDS        floor(clock); after SECONDS=N it counts on from N (SQ.rt.secAt, parse.js secondsNow). $$ and $BASHPID are always 1234 (jobs and subshells run inside
                    this one shell, so BASHPID never differs). $PPID is 1233 (the shell's parent, never listed by ps).
 
@@ -53,22 +56,29 @@ const EPOCH=1768467600; /* Date.UTC(2026,0,15,9,0,0)/1000: Thu 2026-01-15 09:00:
 const SHELL_PID=1234,FIRST_PID=1235,PPID=1233,MAX_PROCS=200;
 const FORK_MSG='bash: fork: retry: Resource temporarily unavailable';
 const ms=t=>Math.round(t*1000)/1000;
-const fresh=()=>({secAt:undefined,clock:0,nextPid:FIRST_PID,forks:0,deadlines:[],procs:[{pid:SHELL_PID,ppid:PPID,cmd:'bash',start:0,state:'S'}]});
+/* jobs, notices, jobSeq, scope, scopeSeq and slice belong to jobs.js (Task 12a); they live here so one reset / save / load covers them */
+const fresh=()=>({secAt:undefined,clock:0,nextPid:FIRST_PID,forks:0,deadlines:[],procs:[{pid:SHELL_PID,ppid:PPID,cmd:'bash',start:0,state:'S'}],
+  jobs:[],notices:[],jobSeq:0,scope:0,scopeSeq:0,slice:null});
 function resetProcs(){Object.assign(SQ.rt,fresh())}
 /* sandbox support: procsSave() hands back the current state and installs a fresh one; procsLoad(saved) puts it back */
-function procsSave(){const rt=SQ.rt,s={secAt:rt.secAt,clock:rt.clock,nextPid:rt.nextPid,forks:rt.forks,deadlines:rt.deadlines,procs:rt.procs};resetProcs();return s}
+function procsSave(){const rt=SQ.rt,s={};for(const k of Object.keys(fresh()))s[k]=rt[k];resetProcs();return s}
 function procsLoad(s){Object.assign(SQ.rt,s)}
+/* the current virtual time: the clock, plus what the running job slice owes for synchronous sleeps (see advance) */
+function now(){const rt=SQ.rt;return ms(rt.clock+(rt.slice?rt.slice.debt:0))}
 function newPid(){const rt=SQ.rt;
   if(rt.forks>=MAX_PROCS)throw Object.assign(new Error(FORK_MSG),{raw:true,code:1,fork:true});
   rt.forks++;return rt.nextPid++}
 const onAdvance=[];
 /* the index of the earliest active deadline (the outermost on a tie), or -1 */
 function earliest(){const d=SQ.rt.deadlines;let k=-1;for(let i=0;i<d.length;i++)if(k<0||d[i]<d[k])k=i;return k}
-function advance(seconds,io){const rt=SQ.rt;
-  let target=ms(rt.clock+(seconds>0?seconds:0)),hit=-1;
-  const k=earliest();if(k>=0&&rt.deadlines[k]<target){target=Math.max(rt.clock,rt.deadlines[k]);hit=k}
-  const out=[];for(const fn of onAdvance){const o=fn(target,io||{});if(o&&o.length)out.push(...o)}
-  if(rt.clock<target)rt.clock=target;
+function advance(seconds,io){const rt=SQ.rt,base=now(),job=rt.slice;
+  let target=ms(base+(seconds>0?seconds:0)),hit=-1;
+  const k=earliest();if(k>=0&&rt.deadlines[k]<target){target=Math.max(base,rt.deadlines[k]);hit=k}
+  const out=[];
+  /* inside a background job's slice (jobs.js) the clock never moves: the job owes the time (debt) and yields it after the command */
+  if(job)job.debt=ms(target-rt.clock);
+  else{for(const fn of onAdvance){const o=fn(target,io||{});if(o&&o.length)out.push(...o)}
+    if(rt.clock<target)rt.clock=target}
   if(hit>=0)throw Object.assign(new Error('this practice shell stopped the command: timed out'),{stop:true,tmo:hit,out});
   return out}
 
@@ -89,9 +99,9 @@ CMDS.sleep=function(a,io){const ops=[];let opts=true;
     ops.push(x)}
   if(!ops.length)return bad('sleep','sleep: missing operand',1);
   let total=0;for(const x of ops){const n=dur(x);if(Number.isNaN(n))return bad('sleep',`sleep: invalid time interval '${x}'`,1);total+=n}
-  const k=earliest(),cut=k>=0&&SQ.rt.deadlines[k]-SQ.rt.clock<=LIM.SLEEP; /* a timeout fires first: no need to refuse */
-  if(total>LIM.SLEEP&&!cut)throw new SQ.StepLimit('that sleep is too long');
-  const outs=advance(total,io);const r=ok();if(outs.length)r.list=outs; /* Task 12a: output of jobs that ran meanwhile */
+  const k=earliest(),cut=k>=0&&SQ.rt.deadlines[k]-now()<=LIM.SLEEP; /* a timeout fires first: no need to refuse */
+  if(total>LIM.SLEEP&&!cut&&!SQ.rt.slice)throw new SQ.StepLimit('that sleep is too long'); /* a background job may sleep as long as it likes: it only waits */
+  const outs=advance(total,io);const r=ok();if(outs.length){r.list=outs;r.bg=outs} /* output of jobs that ran meanwhile (bg: it reaches the screen even when sleep's output is redirected) */
   return r};
 
 /* ---------- date ---------- */
@@ -122,7 +132,7 @@ CMDS.date=function(a){let fmt=null;
     if(x==='-u'||x==='--utc'||x==='--universal')continue;
     if(x.length>1&&x[0]==='-')return E(`this practice shell does not support date ${x.split('=')[0]} yet`,1);
     return E(`date: invalid date '${x}'`,1)}
-  return ok(strftime(fmt===null?'%a %b %d %H:%M:%S %Y':fmt,SQ.rt.clock))};
+  return ok(strftime(fmt===null?'%a %b %d %H:%M:%S %Y':fmt,now()))};
 
 /* ---------- ps ---------- */
 const hhmm=p=>strftime('%H:%M',p.start);
@@ -181,14 +191,14 @@ CMDS.timeout=function(a,io){const T=m=>bad('timeout',m,125);
   else if(own(CMDS,name)&&CMDS[name]&&!SHELL_ONLY.has(name)&&!SQ.hasFunction(name)&&!own(SQ.FRIENDLY,name))run=()=>CMDS[name](args,io);
   else return E(`timeout: failed to run command '${name}': No such file or directory`,127);
   if(!(d>0)||d===Infinity)return run();
-  const rt=SQ.rt,idx=rt.deadlines.length;rt.deadlines.push(ms(rt.clock+d));
+  const rt=SQ.rt,idx=rt.deadlines.length;rt.deadlines.push(ms(now()+d));
   try{return run()}
   catch(e){if(!(e&&e.tmo===idx))throw e;
     const r={out:'',err:verbose?[`timeout: sending signal ${sig[0]} to command '${name}'`]:[],code:preserve?128+sig[1]:sig[1]===9?137:124};
-    if(e.out&&e.out.length)r.list=e.out.concat(r.err.map(t=>({text:t,cls:'err'})));
+    if(e.out&&e.out.length){r.list=e.out.concat(r.err.map(t=>({text:t,cls:'err'})));r.bg=e.out}
     return r}
   finally{rt.deadlines.length=idx}};
 
 resetProcs();
-Object.assign(SQ,{PPID,EPOCH,newPid,advance,onAdvance,resetProcs,procsSave,procsLoad,strftime});
+Object.assign(SQ,{PPID,EPOCH,FORK_MSG,newPid,now,advance,onAdvance,resetProcs,procsSave,procsLoad,strftime});
 })(window.SQ = window.SQ || {});

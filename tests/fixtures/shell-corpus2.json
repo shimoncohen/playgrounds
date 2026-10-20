@@ -858,7 +858,7 @@
   {"line":"while read l; do :; done < /dev/null; echo done","out":"done","code":0,"cwd":"/home/explorer","vars":{"l":""},"files":[],"gone":[]},
   {"line":"a=(); while true; do a+=(x); done","out":"this practice shell does not support arrays yet","code":2,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":":(){ :|:& };:","out":"bash: syntax error near unexpected token '('","code":2,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"background & and the process table"},
-  {"line":":(){ :|: };:","out":"bash: syntax error near unexpected token '('","code":2,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
+  {"line":":(){ :|: };:","out":"bash: syntax error near unexpected token '('","code":2,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"Task 12a: : is a function name (fork-bomb syntax)"},
   {"line":"eval \"eval \\\"eval echo hi\\\"\"","out":"bash: eval: command not found","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"cat /dev/zero | head -c 10","out":"cat: /dev/zero: No such file or directory\nhead: -c: No such file or directory\nhead: 10: No such file or directory","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"head -c and tail -c (Task 10)"},
   {"line":"head -c 5 /dev/null","out":"head: -c: No such file or directory\nhead: 5: No such file or directory","code":1,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"head -c and tail -c (Task 10)"},

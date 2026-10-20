@@ -1,5 +1,5 @@
 (function (SQ) {
-/* Stage 2 AST parser: SQ.parseProgram(text) -> List. Recursive descent over SQ.tokenize(text,{dry:true,pos:true}); words keep their raw source for run-time expansion.
+/* Stage 2 AST parser: SQ.parseProgram(text) -> List. List = {items: [{andor, sep: ';'|'\n'|'&'}]}; sep '&' (Stage 3 Task 12a) runs that and-or list in the background. Recursive descent over SQ.tokenize(text,{dry:true,pos:true}); words keep their raw source for run-time expansion.
    Wired in by Task 6a: exec.js and interp.js run every typed line, script, function body and sourced file through it. Nodes carry src = exact source slice. Errors: code 2, raw:false (syntax) / raw:true (unsupported). */
 const MAX_DEPTH=100;
 const CLOSERS=new Set(['then','elif','else','fi','do','done','esac','}']);
@@ -34,8 +34,7 @@ function parseProgram(text){
     skipNl();
     while(tk()&&!isStop(stops)){
       const andor=parseAndOr();let sep=';';const t=tk();
-      if(isOp(t,'&'))throw unsup('&');
-      if(isOp(t,';')||isOp(t,'\n')){sep=next().v;skipNl()}
+      if(isOp(t,';')||isOp(t,'\n')||isOp(t,'&')){sep=next().v;skipNl()} /* sep '&': the and-or list runs as a background job (jobs.js) */
       else if(t&&!isStop(stops))throw bad(show(t));
       items.push({andor,sep})}
     if(!items.length&&!allowEmpty){const t=tk();throw t?bad(show(t)):eofErr()}
@@ -87,7 +86,7 @@ function parseProgram(text){
     if(r==='select')throw unsup('select');
     if(r==='[[')return parseCond();
     if(r&&CLOSERS.has(r))throw bad(r);
-    if(NAME.test(t.raw)&&t.raw===t.v&&isOp(toks[p+1],'(')&&isOp(toks[p+2],')'))return nest(parseFuncDef);
+    if((NAME.test(t.raw)||t.raw===':')&&t.raw===t.v&&isOp(toks[p+1],'(')&&isOp(toks[p+2],')'))return nest(parseFuncDef); /* bash also takes : as a name (:(){ :|:& };:) */
     return parseSimple()}
 
   function parseSimple(){
