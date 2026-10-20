@@ -33,4 +33,16 @@
   foot.className = 'nv-foot';
   foot.append(icon('\uD83D\uDCA1 '), 'Have an idea? ', idea);
   document.body.append(foot);
+
+  // The pinned mission column needs to fit under the header at the top of the page, so its height is
+  // measured from where the quest grid starts (the header wraps at some widths) rather than guessed.
+  const measure = () => {
+    const quest = document.querySelector('.quest');
+    if (!quest || !quest.offsetParent) return;
+    document.documentElement.style.setProperty('--qtop', Math.round(quest.getBoundingClientRect().top + scrollY) + 'px');
+  };
+  measure();
+  addEventListener('resize', measure);
+  addEventListener('load', measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
 })();
