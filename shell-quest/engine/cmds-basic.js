@@ -109,16 +109,34 @@ const CMDS={
   date:null, /* the virtual date: defined in procs.js; the key stays here so command suggestions keep their order */
   bash:null, /* bash and sh (FILE, -c, -n, -x, ...): defined in cmds-opts.js; the keys stay here so command suggestions keep their order */
   sh:null,
-  help:()=>ok(['Commands in this practice shell:',
+  /* the commands by tier, in the order the chapters teach them (any argument prints the same list) */
+  help:()=>ok(['Commands in this practice shell, by tier:',
+    'Beginner',
     '  Look around   pwd  ls  cd  tree  cat',
     '  Create        mkdir  touch  echo',
     '  Organize      cp  mv  rm  rmdir',
     '  Read          head  tail  wc  grep  sort  uniq',
     '  Search        find',
     '  Scripts       NAME=value  chmod  bash  ./file  for … do … done',
-    '  Other         history  clear  whoami  date  man <command>',
-    'Symbols:  |  >  >>  <  &&  ;  *  ?  ~  .  ..',
-    'Try: man grep'].join('\n')),
+    'Intermediate',
+    '  Text          cut  tr  sed  tee  printf  seq  diff  xargs',
+    '  Quoting       $( )  \'…\'  "…"  export  env  printenv  $?',
+    '  Streams       2>  2>&1  /dev/null',
+    '  Files         ln -s  stat  chmod 755  basename  dirname  realpath',
+    '  Lookup        which  type  command -v',
+    'Advanced',
+    '  Decisions     if  case  [ ]  [[ ]]  test  true  false',
+    '  Loops         while  until  for  break  continue  $(( ))  (( ))',
+    '  Functions     name() { … }  local  return  shift  $1  $@  $#',
+    '  Scripts       nano  read  source  exit  unset  readonly  <<EOF',
+    'Expert',
+    '  awk & sed     awk  sed -n -i -E  grep -E -o -w -r -A -B',
+    '  More text     tac  nl  paste  comm  find -exec  xargs -I -P  <( )',
+    '  Processes     ps  sleep  &  $!  jobs  wait  kill  trap  timeout',
+    '  Safe scripts  set -euo pipefail  set -x  getopts  mktemp',
+    'Other           history  clear  whoami  hostname  date  man <command>',
+    'Symbols:  |  >  >>  <  &&  ||  ;  &  *  ?  ~  .  ..',
+    'Try: man awk'].join('\n')),
   man(a){if(!a[0])return E('What manual page do you want? For example: man ls');const g=SQ.GUIDE.find(x=>x.c===a[0]||x.c.split(' ')[0]===a[0]);
     if(!g)return E(`No manual entry for ${a[0]}`);
     return ok([`${g.c.toUpperCase()}`,'',`  ${g.what}`,'','EXAMPLES',...g.ex.map(([c,n])=>`  ${c}${n?'    # '+n:''}`),'',"(Short version. Real man pages are long; on a real computer press q to quit them.)"].join('\n'))}

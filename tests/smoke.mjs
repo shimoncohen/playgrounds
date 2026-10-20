@@ -162,7 +162,8 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   await page.waitForSelector('#mission');
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
-  let [head, ihead, ahead] = await heads();
+  assert.equal(await page.locator('.tierhead').count(), 4);
+  let [head, ihead, ahead, xhead] = await heads();
   assert.match(head, /^Beginner/);
   assert.match(head, /0\/7/);
   assert.doesNotMatch(head, /★/);
@@ -172,6 +173,8 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   assert.match(ahead, /^Advanced/);
   assert.match(ahead, /0\/4/);
   assert.doesNotMatch(ahead, /★/);
+  assert.match(xhead, /^Expert.*0\/4/);
+  assert.doesNotMatch(xhead, /★/);
   const before = (await page.textContent('#mission')).replace(/\s+/g, ' ');
   await page.click('.chap[data-ch="7"]');
   await page.waitForFunction(() => /Pick a column/.test(document.querySelector('#mission').textContent));
@@ -180,7 +183,7 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
   await page.waitForSelector('#mission');
-  [head, ihead, ahead] = await heads();
+  [head, ihead, ahead, xhead] = await heads();
   assert.match(head, /7\/7/);
   assert.match(head, /★/);
   assert.match(ihead, /0\/4/);
@@ -189,6 +192,9 @@ test('shell-quest tier rail: Beginner header counts chapters and shows a star wh
   assert.match(ahead, /^Advanced/);
   assert.match(ahead, /0\/4/);
   assert.doesNotMatch(ahead, /★/);
+  assert.match(xhead, /^Expert.*0\/4/);
+  assert.doesNotMatch(xhead, /★/);
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, false, false, false]);
   assert.equal((await page.textContent('#xpText')).trim(), '695 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Pipe Fitter');
   assert.deepEqual(await page.$$eval('.chap[data-ch="11"] .ct, .chap[data-ch="14"] .ct', es => es.map(e => e.textContent)), ['0/7', '0/7']);
@@ -221,6 +227,10 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   assert.match(heads[2], /^Advanced/);
   assert.match(heads[2], /0\/4/);
   assert.doesNotMatch(heads[2], /★/);
+  assert.equal(heads.length, 4);
+  assert.match(heads[3], /^Expert.*0\/4/);
+  assert.doesNotMatch(heads[3], /★/);
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, true, false, false]);
   assert.deepEqual(await page.$$eval('.chap[data-ch="8"] .ct, .chap[data-ch="10"] .ct', es => es.map(e => e.textContent)), ['8/8', '7/7']);
   assert.equal(xp, 1230);
   assert.equal((await page.textContent('#xpText')).trim(), '1230 XP');
@@ -391,6 +401,18 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   await run('mixed', await page.evaluate(() => SQ.content.quickfire.map(q => q[0])));
   await page.setViewportSize({ width: 390, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  // Task 20: the flake seen in Task 19 was a skipped question's revealed answer (the long Expert awk pipeline, in a nowrap <code>)
+  // pushing the page sideways at 390px. Skip Expert questions until that one has been revealed, checking the width every time.
+  await page.selectOption('#fTier', 'expert');
+  await page.click('#fStart');
+  let sawLong = false;
+  for (let i = 0; i < 200 && !sawLong; i++) {
+    sawLong = /most common first fields/.test(await page.textContent('#fTask'));
+    await page.click('#fSkip');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `no horizontal overflow at 390px after skipping question ${i + 1}`);
+  }
+  assert.ok(sawLong, 'the long awk answer was revealed');
+  await page.click('#fStop');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -1111,12 +1133,62 @@ test('shell-quest Expert tier: a mission awards 25 XP once; a chapter switch and
   await ctx.close();
 });
 
-// ---- Stage 3 Tasks 18 and 19: the four real Expert chapters (16 to 19) played through the UI with "Type it for me" (the editor for
-// the script missions 16.7, 17.7, 18.7, 19.6 and the 19.7 capstone, each first with a wrong script whose failure line is pinned) ----
-test('shell-quest Expert chapters 16 to 19: all 28 missions complete through the UI, wrong scripts are explained, four badges, Expert 4/4', async () => {
+// ---- Stage 3 Task 20: the whole course in one session, Beginner to Expert, through the UI with "Type it for me". Chapters 1 to 15 are
+// played straight (the editor's Save & run for their script missions, the two-step Treasure hunt by hand); the four Expert chapters (16 to
+// 19, Tasks 18 and 19) first run a wrong script for each script mission (16.7, 17.7, 18.7, 19.6 and the 19.7 capstone) and pin its
+// failure line. At the end: 19 badges, four complete tier headers with a star, 2690 XP and the top rank, Shell Wizard. ----
+test('shell-quest full course: every mission of chapters 1 to 19 completes through the UI, wrong scripts are explained, 19 badges, four complete tiers, Shell Wizard', async () => {
   const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
   const xp = () => page.evaluate(() => window.SQ.S.xp);
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // a mission is complete when its done key is set (titles repeat across chapters, so the screen text alone could match an earlier one)
+  const doneKey = async k => {
+    try { await page.waitForFunction(key => !!window.SQ.S.done[key], k, { timeout: 15000 }); } catch (e) {
+      const tail = await page.$$eval('#screen .line', els => els.slice(-12).map(x => x.textContent).join('\n'));
+      throw new Error(`mission ${k} did not complete: ${e.message}\n--- screen ---\n${tail}`);
+    }
+  };
+  const missionsOf = c => page.evaluate(i => window.SQ.content.chapters[i].missions.map(m => ({ title: m.title, kind: m.kind || '', answer: m.answer, wrong: m.wrong || [] })), c);
+  const goTo = async (ci, mi, title) => {
+    await page.click(`#mission button[data-mi="${mi}"]`);
+    await page.waitForFunction(t => document.querySelector('#mission h2').textContent.includes(t), title);
+  };
+  const tierXp = { beginner: 10, intermediate: 15, advanced: 20 };
+  for (let ci = 0; ci < 15; ci++) {
+    await page.click(`.chap[data-ch="${ci}"]`);
+    await page.waitForFunction(c => window.SQ.S.ch === c, ci);
+    const tier = await page.evaluate(c => window.SQ.tiers.tierOf(c).id, ci);
+    const ms = await missionsOf(ci);
+    for (let mi = 0; mi < ms.length; mi++) {
+      const m = ms[mi], key = `${ci}.${mi}`, before = await xp();
+      await goTo(ci, mi, m.title);
+      await page.click('[data-act="fill"]');
+      if (m.kind === 'script' || m.kind === 'challenge') {
+        await page.waitForSelector('#editor:not([hidden])');
+        assert.equal(await page.inputValue('#edText'), m.answer, `Type it for me fills the editor for ${key} ${m.title}`);
+        await page.click('#edRun');
+        await doneKey(key);
+        await page.click('#edClose');
+      } else {
+        assert.equal(await page.inputValue('#cmd'), m.answer, `Type it for me fills ${key} ${m.title}`);
+        const n0 = await page.$$eval('#screen .line', els => els.length);
+        await page.press('#cmd', 'Enter');
+        if (m.title === 'Treasure hunt') { // two steps: the find prints the path, the learner cats it
+          const path = l => l.startsWith('./') && l.endsWith('/gold.txt'); // a printed path, not the prompt line that typed the find
+          await page.waitForFunction(n => [...document.querySelectorAll('#screen .line')].slice(n).some(e => /^\.\/.*\/gold\.txt$/.test(e.textContent.trim())), n0);
+          const found = (await page.$$eval('#screen .line', (els, n) => els.slice(n).map(e => e.textContent.trim()), n0)).find(path);
+          await type(`cat ${found}`);
+        }
+        await doneKey(key);
+      }
+      const gain = (await xp()) - before;
+      assert.ok(gain === tierXp[tier] || gain === tierXp[tier] + 25, `${key} ${m.title}: +${gain} XP`);
+    }
+    await page.waitForFunction(c => !!window.SQ.S.badges[c], ci);
+  }
+  assert.equal(await xp(), 1890, 'Beginner, Intermediate and Advanced complete: 1890 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Automator');
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, true, true, false]);
   // per script mission: the Run arguments, the failure line of its first wrong script, and what the answer prints
   const SCRIPTS = {
     '15.6': ['village/sales.csv', /Test 1 \(the sales file\) failed: expected "apple      24\.00/, /apple\s+24\.00\s*bread\s+90\.00/],
@@ -1124,6 +1196,12 @@ test('shell-quest Expert chapters 16 to 19: all 28 missions complete through the
     '17.6': ['village/logs/access.log 2', /Test 1 \(the access log, N 2\) failed: expected "4 10\.0\.0\.5\\n3 10\.0\.0\.7", got "2 10\.0\.0\.12\\n4 10\.0\.0\.5"/, /4 10\.0\.0\.5\s*3 10\.0\.0\.7/],
     '18.5': ['-vn Ada', /Test 1 \(-n Ada\) failed: expected "Hello, Ada!", got ""/, /verbose on\s*Hello, Ada!/],
     '18.6': ['village/logs/all.log', /Test 1 \(all\.log, the defaults\) failed: expected "\/tmp empty", got "\/tmp holds tmp\.A00001"/, /3 10\.0\.0\.5\s*3 10\.0\.0\.7\s*1 10\.0\.0\.12/],
+  };
+  // the done key is set, and the newest win line on the screen names this mission with +25 XP
+  const won = async (key, title) => {
+    await doneKey(key);
+    const last = await page.$$eval('#screen .line.win', els => els.map(e => e.textContent).filter(s => /Mission complete/.test(s)).pop() || '');
+    assert.match(last, new RegExp(`Mission complete: ${esc(title)}\\s+\\+25 XP`));
   };
   const BADGES = { 15: 'Text Wrangler', 16: 'Job Controller', 17: 'Pipeline Architect', 18: 'Toolsmith' };
   const x0 = await xp();
@@ -1150,21 +1228,31 @@ test('shell-quest Expert chapters 16 to 19: all 28 missions complete through the
         assert.equal(await xp(), before);
         await page.fill('#edText', m.answer);
         await page.click('#edRun');
-        await waitScreen(new RegExp(`Mission complete: ${esc(m.title)}\\s+\\+25 XP`));
+        await won(`${ci}.${mi}`, m.title);
         assert.match(await page.textContent('#screen'), outRe);
         await page.click('#edClose');
       } else {
         assert.equal(await page.inputValue('#cmd'), m.answer, `Type it for me fills ${m.title}`);
         await page.press('#cmd', 'Enter');
-        await waitScreen(new RegExp(`Mission complete: ${esc(m.title)}\\s+\\+25 XP`));
+        await won(`${ci}.${mi}`, m.title);
       }
     }
     await waitScreen(new RegExp(`Badge earned: ${BADGES[ci]}`));
   }
   assert.equal(await xp(), x0 + 4 * (7 * 25 + 25));
+  assert.equal(await xp(), 2690);
+  assert.equal((await page.textContent('#xpText')).trim(), '2690 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Shell Wizard');
+  assert.equal(await page.evaluate(() => Object.keys(window.SQ.S.badges).length), 19);
+  assert.equal(await page.locator('.chap.earned').count(), 19);
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
+  assert.deepEqual(await page.$$eval('.tierhead', hs => hs.map(h => h.classList.contains('complete'))), [true, true, true, true]);
+  assert.match(heads[0], /^Beginner.*7\/7.*★/);
+  assert.match(heads[1], /^Intermediate.*4\/4.*★/);
+  assert.match(heads[2], /^Advanced.*4\/4.*★/);
   assert.match(heads[3], /^Expert.*4\/4.*★/);
   assert.match(await page.textContent('#mission h2'), /You finished the Expert tier/);
+  assert.match(await page.textContent('#mission .explain'), /awk and sed.*set -euo pipefail.*That is every chapter there is\./s);
   // what the learner saw: the access-log counts, a job killed, the line counts, the diff, the trace and the trap
   const scr = await page.textContent('#screen');
   assert.match(scr, /200 7/);

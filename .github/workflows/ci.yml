@@ -11,7 +11,7 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20  # the browser smoke suite plays the whole Shell Quest course (about 3 minutes)
     steps:
       - uses: actions/checkout@v7.0.1
 

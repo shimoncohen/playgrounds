@@ -280,9 +280,39 @@ Stage 2 shipped the AST parser and interpreter, the editor panel, `script` and `
 - One unsupported construct anywhere in a script stops the whole file before it runs. (Since Stage 3 Task 3 a script syntax error reads `s.sh: line 3: syntax error near unexpected token 'fi'`, with the path as typed and the line of the offending token; an unexpected end of file names the last line of the text, and `source` still prints the plain `bash:` form.)
 - A typed here-document cannot span lines at the prompt (the terminal takes one line at a time); scripts use them. A typed `exit` prints a friendly message instead of closing anything.
 - `$0` inside a function is the function name; `xargs` cannot call a function.
-- `help` lists only the Beginner commands (an unmarked `help cd` corpus entry pins its text); `man` and `type` cover the rest.
+- `help` lists only the Beginner commands (an unmarked `help cd` corpus entry pins its text); `man` and `type` cover the rest. *Closed in Stage 3 Task 20:* `help` lists every command by tier, and the `help`/`help cd` entries are marked `expectChange` (metadata only) with allow-list reasons.
 - File-descriptor duplication other than `2>&1`, `>&2` and `1>&2` (`2>&2`, `2>&-`, `>&-`, `3>&1`) prints "this practice shell does not support >& yet".
 - `__proto__` is refused as a variable or function name ("not a valid identifier"); names such as `constructor` or `toString` behave like any other unset name.
+
+## Stage 3 as built
+
+Stage 3 shipped the Expert tier: chapters 16 to 19 in the UI (indexes 15 to 18), awk & sed craft, Processes & jobs, Pipeline mastery and Safe, debuggable scripts, 7 missions each (28; five script missions and the 19.7 "robust log tool" capstone a challenge), 25 XP per mission, badges Text Wrangler, Job Controller, Pipeline Architect and Toolsmith, and "Shell Wizard" as the top rank at 2690 XP (1890 + 28 x 25 + 4 x 25). The engine gained everything in §3 Stage 3. A second differential corpus of about 1,800 lines, recorded from the Stage 2 engine before any Stage 3 change (`tests/shell/corpus2.test.mjs`), proves that nothing else changed, apart from entries marked `expectChange` and overridden with a reason in `tests/fixtures/shell-corpus2-allow.json`. The Beginner golden transcript is byte-identical. A browser smoke test plays the whole course, all 19 chapters, through the UI in one session and ends with four complete tiers and Shell Wizard. How to write Stage 3 missions (the clock, jobs, `advance`, `expectEmpty`, `expectClock`, what awk, sed and grep cover) is in `docs/tiers-guideline.md` section 3c. The per-feature differences from bash are the Stage 3 entries of the "Still unsupported" list above (background jobs, `jobs`/`wait`/`kill`, `trap`, `set`, `<( )`).
+
+**Deviations from the plan.**
+
+- Beyond the spec, on purpose: Tasks 2 and 3 closed Stage 2 gaps a safe-scripting tier cannot teach around (file-name prototype bug, the state cap, `${X:?}`, `$(false)` status, subshell pipeline stages), and Task 4 added real word splitting on `IFS` and `VAR=x cmd` prefix assignments, because chapter 19 teaches quoting.
+- Task 9b was inserted after the awk task: the shared regex guard `SQ.safeRegex` now refuses pattern shapes that could run away (nested or adjacent unbounded quantifiers, counted back-references) and long subjects that would be quadratic, with "pattern too complex".
+- The jobs work was split in two, 12a (the job table, the generator interpreter and the scheduler) and 12b (`jobs`, `wait`, `kill`, `$!`, notices). The generator executor duplicates part of `interp.js`'s control flow; it runs lists, loops, functions and compounds, and treats a pipeline, `$( )`, a redirected compound, a sourced file or a script started by a job as one unit.
+- The capstone extends 18.7's tie rule: counts that tie are ordered by value (`sort -k1,1nr -k2,2`), so `sort -rn` fails it.
+- Task 20 found the one intermittent smoke failure: a skipped quick-fire question reveals its answer in a `<code>`, and the long Expert awk pipeline did not wrap, so the page scrolled sideways at 390px when that question came up. Quick-fire code now wraps, and the smoke test skips Expert questions until that answer has been shown.
+- `help` was rewritten to list the commands by tier (Task 20); Task 20 also added short guide (`man`) pages for `tac`, `nl`, `paste`, `comm`, `mktemp` and `timeout`.
+- Where GNU tools and others differ, the practice shell follows GNU: `nl` numbers non-empty lines only by default (`-b t`), `find -exec ... \;` exits 0 even when its command fails or is missing and `-exec ... {} +` exits 1 when its run fails. `find` itself lists a folder sorted by name, where a real `find` uses the order on disk.
+
+**Caps.** At most 16 live jobs and 200 processes per world reset (then `bash: fork: retry: Resource temporarily unavailable`); one `sleep` or `wait` at most `LIM.SLEEP` (3,600 virtual seconds); job slices `LIM.STEPS` each and `3 x LIM.STEPS` together per typed line; a trap handler 1,000 steps; script-case `advance` at most 3,600 seconds; 20 process substitutions per command and 20 nested; `xargs` at most 1,000 runs per typed line; sed 10,000 commands per input line and 100,000 taken branches per run; awk and every command on the shared step, output and text caps of Stage 2.
+
+**Still unsupported (by design, not in this stage):** bash arrays and `declare`; `getline`, `system()`, `close()` and redirects inside awk; sed's hold space (`h H g G x`), `N D P` and `w`/`r`/`e`; output process substitution `>( )`; job control `fg`, `bg`, `disown`, `nohup` (`wait -n`, planned as unsupported, was built with `wait` in Task 12b); interactive prompting (a `read` at the prompt gets no keyboard input; `select`); real wall-clock time (the clock is virtual and only moves with typed lines, `sleep` and `wait`).
+
+**Known limitations that remain (documented, not fixed).**
+
+- Backquote command substitution (`` `cmd` ``) stays literal text; lessons use `$( )`.
+- An EXIT trap set at the prompt never runs (the page never exits); `kill -9 $$` prints nothing and the shell goes on.
+- `bash -n` on an unexpected end of file names a line one off from bash and has no second `near token` line; `set -u` messages keep the older `bash: NAME: unbound variable` form (bash 5.1 and newer add `line N:`), and a `bash -c` stopped by it exits 1 (bash: 127). The 19.2 text and the guide say so.
+- Regex complexity is calibrated on V8; on very long, dense lines a harmless pattern can be refused with "pattern too complex".
+- `$BASHPID` is 1234 everywhere except inside a job (subshells too).
+- Orphan jobs left by a script that `timeout` ended count toward the 16-job cap and are invisible to `jobs` (until Reset world or a chapter switch).
+- `xargs -P` runs its batches one after another; `xargs -t` prints all its traces first.
+- `wc -l` on several files prints no `total` line; `wc --lines` is ignored (all three counts print); `sort -s` and `xargs --max-procs` (any long xargs option) print the unsupported message.
+- `help` wraps on a phone-width terminal (as before); every line is at most 72 characters.
 
 ## Risks and mitigations
 

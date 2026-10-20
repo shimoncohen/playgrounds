@@ -1076,3 +1076,81 @@ describe('expert explanations, chapters 18 and 19: every claim re-run in the har
     assert.equal(go("bash -c 'while getopts \"v\" o; do :; done; shift $((OPTIND - 1)); echo \"$1\"' x -v file.txt").out, 'file.txt');
   });
 });
+
+// ---- Stage 3 Task 20: help by tier, the guide extras for the Stage 3 helpers, and the accuracy fixes ----
+describe('help lists the commands by tier; the Stage 3 helpers have guide (man) pages', () => {
+  const SQ = loadShell();
+  const help = run(SQ, 'help').out;
+  it('help has one heading per tier, in order, and names the Stage 3 commands', () => {
+    const heads = help.split('\n').filter((l) => /^(Beginner|Intermediate|Advanced|Expert)$/.test(l));
+    assert.deepEqual(heads, ['Beginner', 'Intermediate', 'Advanced', 'Expert']);
+    const expert = help.slice(help.indexOf('\nExpert\n'));
+    for (const w of ['awk', 'sed -n -i -E', 'grep -E -o -w -r -A -B', 'tac', 'nl', 'paste', 'comm', 'find -exec', 'xargs -I -P', '<( )', 'ps', 'sleep', '&', 'jobs', 'wait', 'kill', 'trap', 'timeout', 'set -euo pipefail', 'set -x', 'getopts', 'mktemp'])
+      assert.ok(expert.includes(w), `Expert section lists ${w}`);
+  });
+  it('every command of the practice shell is in help (apart from aliases and help itself), and help ignores its argument', () => {
+    const words = new Set(help.split(/\s+/));
+    const skip = new Set(['sh', 'vi', 'vim', 'edit', '.', ':', '[', 'help']);
+    for (const k of Object.keys(SQ.CMDS)) if (!skip.has(k)) assert.ok(words.has(k), `help lists ${k}`);
+    assert.equal(run(SQ, 'help cd').out, help);
+  });
+  it('help lines fit a phone terminal (at most 72 characters)', () => {
+    for (const l of help.split('\n')) assert.ok(l.length <= 72, l);
+  });
+  it('man works for tac, nl, paste, comm, mktemp and timeout, and their guide examples print what they say', () => {
+    for (const c of ['tac', 'nl', 'paste', 'comm', 'mktemp', 'timeout']) {
+      assert.equal(run(SQ, `man ${c}`).code, 0, c);
+      const g = SQ.content.guide.find((x) => x.c === c);
+      assert.equal(g.ch, 'extras');
+      for (const [e, note] of g.ex) {
+        const S2 = loadShell();
+        const r = run(S2, e);
+        assert.doesNotMatch(r.out, /bash:|not support|command not found/, `${c}: ${e}`);
+        if (/^prints /.test(note)) assert.equal(r.out.replace(/\n/g, ' '), note.slice(7), `${c}: ${e}`);
+      }
+    }
+    const go = (l) => run(loadShell(), l).out;
+    assert.equal(go("printf 'a\\n\\nb\\n' | nl"), '     1\ta\n       \n     2\tb', 'GNU default -b t: the blank line has no number');
+    assert.equal(go("printf 'a\\n\\nb\\n' | nl -ba"), '     1\ta\n     2\t\n     3\tb');
+    assert.equal(go('tmp=$(mktemp); echo "$tmp"'), '/tmp/tmp.A00001');
+  });
+});
+
+describe('Task 20 accuracy fixes (carried over from the Task 19 review)', () => {
+  it('19.2 and the set -u guide entry give the real bash wording and statuses; the 19.2 note says set -u stays on', () => {
+    const SQ = loadShell();
+    const m = SQ.content.chapters[SS19].missions[1];
+    assert.match(m.explain, /bash: line 1: nope: unbound variable/);
+    assert.match(m.explain, /status 127/);
+    assert.match(m.note, /set \+u/);
+    const g = SQ.content.guide.find((x) => x.c === 'set -u');
+    assert.match(g.what, /line 1: nope: unbound variable/);
+    assert.match(g.what, /127/);
+    // what the note says: a typed set -u stays on for later lines, set +u ends it, and a chapter switch (resetProcs) clears it here
+    const { SQ: S2, go } = world(SS19);
+    go('set -u');
+    assert.equal(go('echo "[$typo]"').out, 'bash: typo: unbound variable');
+    go('set +u');
+    assert.equal(go('echo "[$typo]"').out, '[]');
+    go('set -u');
+    S2.resetProcs();
+    assert.equal(go('echo "[$typo]"').out, '[]');
+  });
+  it('the find -exec guide entry no longer claims a sorted order; what this shell prints is pinned here', () => {
+    const SQ = loadShell();
+    const g = SQ.content.guide.find((x) => x.c === 'find -exec');
+    assert.match(g.what, /order/);
+    for (const [, note] of g.ex) assert.doesNotMatch(note, /^prints /);
+    const { go } = world(PM18);
+    assert.equal(go("find inbox -name '*.txt' -exec wc -l {} \\;").out, '3 inbox/a.txt\n2 inbox/b.txt\n4 inbox/c.txt');
+    assert.equal(go("find inbox -name '*.txt' -exec echo {} +").out, 'inbox/a.txt inbox/b.txt inbox/c.txt');
+  });
+  it('quick-fire accepts sort -k1nr -k2 for the tie-break question, and it sorts the same as -k1,1nr -k2,2', () => {
+    const SQ = loadShell();
+    const q = SQ.content.quickfire.find((x) => /tie by field 2/.test(x[0]));
+    assert.ok(q[1].includes('sort -k1nr -k2'));
+    const data = "printf '2 pear\\n2 fig\\n3 kiwi\\n10 fig\\n' | ";
+    const want = run(loadShell(), data + 'sort -k1,1nr -k2,2').out;
+    for (const a of q[1]) assert.equal(run(loadShell(), data + a).out, want, a);
+  });
+});
