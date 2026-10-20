@@ -273,6 +273,16 @@ All of these were found in review of the Intermediate and Advanced tiers.
 
 **Don't teach what the engine does not do.** Content must avoid these Stage 2 gaps (the full list is in the spec's "Stage 2 as built" section): arrays, `&` and job control, `set` (`-e`, `-x`, `--`), `trap`, `getopts`, `awk`, `BASH_REMATCH`, `local -r`, function names with `-` or `.`. Stage 3 closed most of these for the Expert tier (`awk`, `&` and job control, `set -e`/`-u`/`-x`/`-o pipefail`, `trap`, `getopts`); bash arrays and `declare` are still unsupported, so array lessons use awk arrays. Also avoid what Stage 3 left out (section 3c and the spec's Stage 3 note): backquotes, `fg`/`bg`, `>( )`, awk's `getline`, sed's hold space. When a typed option such as `set -x` or `set -u` stays on after the mission, say so in a `note` (19.2 and 19.4 do). A here-document cannot be typed at the prompt (one line at a time), so missions use it in scripts. A typed `exit` only prints a friendly message, and `return`/`local` work only inside a function, so quick-fire answers that need them are phrased as definitions.
 
+## 6a. Code in prose
+
+Anything the learner could type or that names a part of the code is shown as code, never as plain text: command names (`ls`, `grep`), options (`-a`, `--replicas`), file and folder paths (`journal.txt`, `village/logs`), variables (`$HOME`) and functions (`console.log`, `add(2, 3)`). In running text a bare `find` or `-i` reads as part of the sentence, so the learner cannot tell it is something to type. Use `<code>` in every field the page renders as HTML (`goal`, `how`, `explain`, `note`, `intro`, a step's `goal`).
+
+- Some fields are escaped by the page (Script Quest `goal` and `intro`, Harbor Quest `after`). There write the code in backticks, `` `find` ``; `HowSteps.tick(text, esc)` (shared/how.js) turns them into `<code>`. Check how a field is rendered before you choose.
+- Plain English stays plain. "Find the file" stays plain, but "the first `sort` is not needed" is the command. When a word is both (find, cat, sort, head, echo, read, test, type, set, time), ask "could the learner type this?". If yes, it is code.
+- Keys use `<kbd>Tab</kbd>`, not `<code>`.
+- The field guide's `what` text is shown escaped *and* feeds the `man` pages, so it stays plain text (changing it would change `man` output, which the differential corpus records).
+- `tests/shell/codestyle.test.mjs` fails on a bare command name that is not an English word, a bare option, file name or variable, and on an ambiguous word followed by a verb ("find walks", "cat prints"), in every Shell Quest mission. The rest (ambiguous words used as nouns, other quests) is the reviewer's job: `review-mission` lists it.
+
 ## 7. Guide and quick-fire tags
 
 - **Guide.** Entries are `{c, ch, what, syn, ex}`. `ch` is the chapter index; the entry's tier is `tierOf(ch)`, so there is no separate tier tag to forget. `ch: 'extras'` puts an entry under "Handy extras", which has its own key and shows only under the All filter. The tier filter buttons are built from the tiers that have chapters.
