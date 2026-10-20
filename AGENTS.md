@@ -29,7 +29,8 @@ CI runs all of these on every PR. A PR is not ready until they pass locally.
 6. **Engine stays DOM-free.** Anything under `shell-quest/engine/` must run in Node. DOM code lives in `ui.js`, `editor.js`, `app.js`.
 7. **Stay in scope.** One concern per PR. No drive-by reformatting, renames or dependency bumps.
 8. **Match the surrounding code**: naming, comment density, idiom. Some files are deliberately compact; do not reformat them.
-9. **Tone.** Learner-facing text is friendly, concrete and a little playful. It is never condescending, and it never assumes prior knowledge the quest has not taught yet.
+9. **Explain the whole, then the parts.** A mission card says what the *whole line* does first, then how each part (command, option, argument, operator) contributes: use the `how` steps list and chip meanings (`docs/tiers-guideline.md` section 3). Never explain only the pieces.
+10. **Tone.** Learner-facing text is friendly, concrete and a little playful. It is never condescending, and it never assumes prior knowledge the quest has not taught yet.
 
 ## Skills
 
@@ -41,7 +42,8 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 |---|---|
 | Add or fix a Shell Quest mission | `shell-quest/content/tier-*.js` (+ tests); use the `add-mission` skill |
 | Add a Shell Quest command or shell feature | `shell-quest/engine/cmds-*.js` / `interp.js` (+ `tests/shell/`) |
-| Change another quest's course | that quest's `app.js` (`CH`, `QF`/`QT`, `GUIDE` arrays) |
+| Change another quest's course | that quest's `app.js` (`CH`, `QF`/`QT`, `GUIDE` arrays); every mission carries `how` steps |
+| Change how mission cards render | `shared/how.js` + `shared/how.css` (affects every quest; keep it bundle-safe) |
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
