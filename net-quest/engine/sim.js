@@ -130,18 +130,20 @@ const switchRx=(ctx,dev,iface,p,tag)=>{
 
 /* host or router NIC: ARP for us gets an answer, IP for us gets handled, the rest is dropped.
    ARP is per segment: only the receiving iface's own address is answered; IP accepts any of the device's addresses. */
+/* ARP learning never overwrites a permanent (ip neigh add) entry */
+const learn=(dev,ip,mac)=>{if(!(dev.permanent||[]).includes(ip))dev.neigh[ip]=mac;};
 const arpRx=(ctx,dev,iface,p)=>{
   const a=layer(p,'ARP').fields;
   if(a.op==='request'){
     const ri=dev.ifaces[iface];
     if(!ri.ip||addr(ri.ip)!==a.tpa)return drop(ctx,dev.id,iface,p,'not addressed to this host');
-    dev.neigh[a.spa]=a.sha;
+    learn(dev,a.spa,a.sha);
     log(ctx,dev.id,iface,'rx','ARP request: '+a.tpa+' is me, learned '+a.spa+' is at '+a.sha,p);
     const m=dev.ifaces[iface].mac;
     return transmit(ctx,dev,iface,P.stack(P.eth(m,a.sha,'ARP'),P.arp('reply',m,a.tpa,a.sha,a.spa)),'ARP reply: '+a.tpa+' is at '+m);
   }
   if(a.tha!==dev.ifaces[iface].mac)return drop(ctx,dev.id,iface,p,'not addressed to this host');
-  dev.neigh[a.spa]=a.sha;
+  learn(dev,a.spa,a.sha);
   log(ctx,dev.id,iface,'rx','ARP reply: learned '+a.spa+' is at '+a.sha,p);
   flush(ctx,dev,a.spa);
 };

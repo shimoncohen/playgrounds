@@ -137,7 +137,12 @@ test('createNet: unknown name lists the valid ones', () => {
   assert.throws(() => NQ.createNet('nope'), (e) => e.name === 'Error' && names.every((n) => e.message.includes(n)));
 });
 
-test('createNet: setup needs the shell for now', () => {
+test('createNet: an empty setup changes nothing; every device has a permanent list', () => {
   assert.deepEqual(J(NQ.createNet('pair', [])), J(NQ.createNet('pair')));
-  assert.throws(() => NQ.createNet('pair', [{ dev: 'laptop', cmd: 'ip addr' }]), /setup needs the shell \(Task 8\)/);
+  for (const n of names) for (const d of Object.values(NQ.createNet(n).devices)) assert.deepEqual(J(d.permanent), []);
+});
+
+test('exec, clone and reset are not enumerable', () => {
+  const net = NQ.createNet('pair');
+  assert.deepEqual(Object.keys(net).sort(), ['clock', 'devices', 'log', 'me', 'name']);
 });
