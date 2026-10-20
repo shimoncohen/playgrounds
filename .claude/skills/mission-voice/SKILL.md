@@ -11,6 +11,7 @@ The reader is a curious beginner, possibly on day one at a new job.
 - **Concrete over abstract.** Use the quest's world (the village, the harbor, the journal) and real values, not "foo/bar".
 - **Playful, not silly.** A light joke or vivid image is welcome; never at the learner's expense, and never in place of the explanation.
 - **Never condescending.** No "simply", "just", "obviously", "easy". Mistakes are normal: errors are clues, say what the clue means.
+- **Whole before parts.** Explain what the whole command or line does before naming its pieces, then tie every piece back to it ("`-i` makes the search ignore capitals"). Never open with a flag or a term. Mission cards do this with the `how` steps.
 - **Don't assume.** Introduce a term before using it; link a new command to one the learner already knows.
 - **Factual.** Every claim is true in this quest's engine. Test it. Variables quoted in examples.
 - **Praise specifically**: say what the learner's line did ("`>` replaced the file; `>>` would have added to it"), not "Great job!".

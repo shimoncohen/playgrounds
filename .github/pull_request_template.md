@@ -18,6 +18,7 @@
 - [ ] `npm test` (engine + browser)
 - [ ] Played the change in a browser (desktop and ~390px wide), no console errors
 - [ ] New missions have a reference answer, plus a wrong and a lazy answer that fail
+- [ ] New or changed missions have `how` steps: the whole line first, then each part
 
 <!-- Paste the commands you ran and what they printed. Screenshots for anything visible. -->
 

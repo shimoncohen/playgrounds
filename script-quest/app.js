@@ -1030,7 +1030,7 @@ async function ensureNeeds(m){
 function goMission(j){S.cur[S.chap]=j;save();renderMission();renderChapters();ensureNeeds(CH[S.chap].missions[j]);cmd.focus({preventScroll:true})}
 
 const missionEl=$('#mission');
-function anatHTML(a){return '<div class="anat">'+a.map(([t,k])=>`<div class="tok k-${k}"><b>${esc(t)}</b><span>${({kw:'keyword',name:'name',op:'symbol',val:'value',fn:'function',type:'type',cmd:'command',arg:'argument',opt:'option'})[k]}</span></div>`).join('')+'</div>'}
+function anatHTML(a){return '<div class="anat">'+a.map(([t,k,l])=>`<div class="tok k-${k}"><b>${esc(t)}</b><span>${l?esc(l):({kw:'keyword',name:'name',op:'symbol',val:'value',fn:'function',type:'type',cmd:'command',arg:'argument',opt:'option'})[k]}</span></div>`).join('')+'</div>'}
 function dotsHTML(c,j){return '<div class="dots" aria-label="Missions in this chapter">'+CH[c].missions.map((m,i)=>`<button class="dot${S.done[mk(c,i)]?' done':''}${i===j?' cur':''}" data-m="${i}" aria-label="Mission ${i+1}: ${esc(m.title)}" title="${esc(m.title)}">${i+1}</button>`).join('')+'</div>'}
 function renderMission(pop){
   const c=S.chap,ch=CH[c],j=curIdx();
@@ -1048,6 +1048,7 @@ function renderMission(pop){
       <div class="goal"><div class="label">${m.editFile?'Your mission · edit '+esc(m.editFile):'Your mission'}</div><p>${esc(m.goal)}</p><pre>${MODE==='sh'&&!m.editFile?esc(m.code):hl(m.code)}</pre></div>
       ${m.expectError?'<span class="errgoal">Goal: get an error</span>':''}
       ${anatHTML(m.anat)}
+      ${HowSteps.html(m.how)}
       <p class="explain">${m.explain}</p>
       <div class="actions"><button class="btn" id="fill">${m.editFile?'Put it in the editor':'Type it for me'}</button><button class="btn ghost" id="hintBtn">Hint</button><button class="btn ghost" id="skip">Skip</button></div>
       <p class="hint" id="hint" hidden>${m.hint||(m.editFile?'Click <b>'+esc(m.editFile)+'</b> in the Project panel (or press the button above), type the code, press Save, then run it in the terminal'+(m.run?' with <code>'+esc(m.run)+'</code>':'')+'.':MODE==='sh'?'Type the command exactly as shown, then press Enter.':'Type the code exactly as shown, then press Enter. For several lines, use Shift+Enter between them.')}</p>

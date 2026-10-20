@@ -12,7 +12,7 @@ For each changed mission, in order:
    Also try every example written in the mission's `goal`/`explain`/`hint`: if one completes the mission but teaches a neighbouring lesson (the `?` example on a `*` mission), that is a finding unless it is allow-listed in `tests/shell/completion.test.mjs` for a stated reason. A typo'd command (`Sort`) must never complete a mission; the completion test checks this for every mission.
 3. **Fair check**: does it reject a sensible alternative (option order, `[[ ]]` vs `[ ]`, a different file name the goal did not fix)? If so, it is a finding.
 4. **Tests**: at least one `yes` (valid alternative) and one `no` (wrong and lazy). Solvability covers `answer` only.
-5. **Engine truth**: every claim in `explain` and `hint` is true in this practice shell; nothing teaches an unsupported feature (the spec's "as built" sections list gaps). Variables quoted in all learner text.
-6. **Teaching**: one idea, goal answerable from what came before, tone per `mission-voice`.
+5. **Engine truth**: every claim in `how`, `explain` and `hint` is true in this practice shell; nothing teaches an unsupported feature (the spec's "as built" sections list gaps). Variables quoted in all learner text.
+6. **Teaching**: one idea, goal answerable from what came before, tone per `mission-voice`. **Whole before parts**: the mission has `how` steps; step 1 says what the whole line does, each later step ties one part back to it, no term is used before it is explained, and `explain` does not just repeat the steps. A mission that only labels pieces is a finding.
 
 Output: findings list, most severe first, each with mission id, the exact input that breaks it, and the fix. Say "no findings" only after trying step 2.
