@@ -74,7 +74,10 @@
    Handlers (runHandler) are parsed when they run (a syntax error prints `bash: exit trap: line 1: ...` / `error trap` / `debug trap` /
    `trap`, each time it runs; bash adds a second line quoting the text) and run in the process's own state through the normal interpreter,
    with $? = the status at that moment; afterwards $? is put back (an EXIT handler leaves the shell's status as it was unless it calls exit n).
-   A handler is not interrupted by the signals it queues (node.inTrap); they run after it.
+   A handler is not interrupted by the signals it queues (node.inTrap); they run after it. Under set -x a signal, ERR or DEBUG handler is
+   traced one level deeper (++), an EXIT handler at + (bash). A handler cut short by its allowance inside a job says `stopped the job`.
+   A background job whose whole program is one unredirected ( list ) runs that list in the job's own node (bash runs an async subshell as one
+   process), so `(trap '' TERM; sleep 30) &` survives kill %1; a ( ) inside a larger job program stays a child process.
    EXIT runs once (it is removed before it runs) whenever a process ends: a script or bash -c (interp.js runChild), a ( ) subshell, $( ),
    pipeline stage, background job (endJob: its end, exit, kill, its step-cap stop), by the end of the text, exit (its status kept, or the
    handler's exit n), set -e, a ${X:?}/set -u abort, a signal (not KILL; the status stays 128+N), a timeout (SQ.abortTrap: the timeout's
@@ -84,8 +87,9 @@
    kept but never runs: bash runs it when the shell exits, and this page never exits.
    ERR runs where set -e would exit (interp.js failAt, the same suppression in conditions, && / || lists and !), set -e on or off, then set -e
    exits as usual; it does not run inside a function body (bash without set -E: the call's failing status fires it in the caller).
-   DEBUG runs before each simple command of the process (exec.js runCmd; not inside a function: no set -T; not before [[ ]], (( )) or a for
-   pass, which bash also traces); its output comes before the command's, like a set -x trace, and exit in it ends the shell before the command.
+   DEBUG runs before each simple command of the process and before each command of a multi-stage pipeline (all of them before the pipeline
+   starts, as bash; exec.js runCmd, interp.js runPipeline; not inside a function: no set -T; not before [[ ]], (( )) or a for pass, which
+   bash also traces); its output comes before the command's, like a set -x trace, and exit in it ends the shell before the command.
    Signal delivery: a queued signal waits at node.sig (SQ.rt.sigPend counts them all) and runs at the target's next command boundary: after the
    pipeline it is in finishes (sigBoundary, called after every pipeline of an and-or list in interp.js and jobs.js). As in bash 5.2: a trapped
    signal to a job sleeping in `sleep 10` runs its handler when the sleep ends and the job goes on; a trapped signal interrupts `wait` (status
@@ -98,7 +102,8 @@
    gets control (the next boundary of the line, or the end of the line: exec.js). STOP/TSTP to a script are ignored.
    Deviations kept on purpose: a script killed by a job while it sleeps dies when its sleep ends (bash: at the kill time); a script under
    `timeout` whose TERM trap runs does not go on afterwards (bash resumes it after the interrupted command) and its earlier output is lost as
-   with any timeout; a job's async INT/QUIT ignore (bash without job control) is not modelled; RETURN, set -E and set -T are unsupported;
+   with any timeout (only the handlers' output is shown); a handler's syntax error prints one line in this shell's syntax-error wording
+   (bash: two lines, `unexpected token `then''); a job's async INT/QUIT ignore (bash without job control) is not modelled; RETURN, set -E and set -T are unsupported;
    `exit` in a sourced file ends only that file (Stage 2), so the EXIT trap runs when the script itself ends.
 */
 const {CMDS,E,own,LIM}=SQ;
@@ -338,12 +343,15 @@ function runHandler(text,key,status,o){o=o||{};const rt=SQ.rt,node=rt.scopeNode,
   let prog;try{prog=SQ.parseCached(text)}catch(e){if(e&&e.stop)throw e;
     const m=e&&e.at!==undefined?`bash: ${label}: line ${SQ.lineOf(text,e.at)}: ${e.message}`:e&&!e.raw&&!SQ.isOverflow(e)?`bash: ${label}: line ${SQ.lineOf(text,text.length)}: ${e.message}`:SQ.errOf(e);
     return {out:[errL(m)],ctl:null}}
-  const saved=S.last;S.last=status;node.inTrap=(node.inTrap||0)+1;
+  const saved=S.last,xb=rt.xbase;S.last=status;node.inTrap=(node.inTrap||0)+1;
+  if(key!=='EXIT')rt.xbase=(rt.xbase||0)-1; /* set -x: bash traces a signal, ERR or DEBUG handler one level deeper (++), an EXIT handler at +. */
   let budget=null,r;
   if(o.budget){budget={steps:rt.steps,chars:rt.outChars};rt.steps=LIM.STEPS-TRAP_STEPS;if(rt.outChars>LIM.TOTAL-TRAP_CHARS)rt.outChars=LIM.TOTAL-TRAP_CHARS}
   try{r=SQ.runProgram(prog,{depth:CTX.depth,tty:!!o.tty,record:false,stdin:null,loops:0})}
-  catch(e){if(!budget||(e&&(e.tmo!==undefined||e.jobSig)))throw e;r={out:CTX.pend.splice(0).concat(errL(SQ.fatalText(e))),code:1}}
-  finally{node.inTrap--;if(budget){rt.steps=budget.steps;rt.outChars=budget.chars}}
+  catch(e){if(!budget||(e&&(e.tmo!==undefined||e.jobSig)))throw e;let m=SQ.fatalText(e);
+    if(rt.slice)m=m.replace(/^this practice shell stopped the command/,'this practice shell stopped the job'); /* a job's handler, like jobs.js stopText */
+    r={out:CTX.pend.splice(0).concat(errL(m)),code:1}}
+  finally{rt.xbase=xb;node.inTrap--;if(budget){rt.steps=budget.steps;rt.outChars=budget.chars}}
   const ctl=r.ctl&&r.ctl.type==='exit'?r.ctl:null;
   if(!o.keep)S.last=saved;
   return {out:r.out,ctl}}

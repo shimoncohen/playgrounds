@@ -230,6 +230,20 @@ describe('signals to jobs', () => {
     run(SQ, "trap - TERM; trap '' USR1; { sleep 5; echo yes; } &");
     assert.equal(run(SQ, 'kill -USR1 %1; sleep 6').out, `yes\n${NOTE(1, 'Done', '{ sleep 5; echo yes; }')}`);
   });
+  it('an async ( list ) is one process: traps set inside it are the job\'s (bash)', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, `bash -c '(trap "echo T" TERM; sleep 3; echo d) & sleep 1; kill $!; wait $!; echo st=$?'`), { out: 'T\nd\nst=0', code: 0 });
+    assert.deepEqual(run(SQ, `bash -c '{ (trap "echo T" TERM; sleep 3; echo d); echo e; } & sleep 1; kill $!; wait $!; echo st=$?'`), { out: 'st=143', code: 0 }, 'a ( ) inside a { } job is a child process');
+    assert.deepEqual(run(SQ, `bash -c '(trap "echo bye" EXIT; sleep 3) & sleep 1; kill $!; wait $!; echo st=$?'`), { out: 'bye\nst=143', code: 0 });
+    assert.equal(run(SQ, "(trap '' TERM; sleep 30) &").out, '[1] 1238');
+    assert.equal(run(SQ, 'kill %1; jobs').out, "[1]+  Running                 (trap '' TERM; sleep 30) &");
+    assert.equal(run(SQ, 'kill -9 %1').out, NOTE(1, 'Killed', "(trap '' TERM; sleep 30)"));
+  });
+  it('a runaway EXIT handler of a killed job says the job was stopped', () => {
+    const SQ = loadShell();
+    run(SQ, "{ trap 'while :; do :; done' EXIT; sleep 9; } &");
+    assert.equal(run(SQ, 'kill %1').out, `this practice shell stopped the job: too many steps\n${NOTE(1, 'Terminated', "{ trap 'while :; do :; done' EXIT; sleep 9; }")}`);
+  });
   it('fork bomb with traps: bounded, the next line works', () => {
     const SQ = loadShell();
     const r = run(SQ, ":(){ trap 'echo x' EXIT; :|:& };:");
@@ -344,6 +358,15 @@ describe('the trap builtin', () => {
     assert.deepEqual(run(SQ, `bash -c "trap 'echo d' DEBUG; f() { echo inf; }; f; x=1; echo a > /dev/null; (echo sub)"`), { out: 'd\ninf\nd\nd\nsub', code: 0 });
     assert.equal(run(SQ, `bash -c "trap -p DEBUG; trap 'echo x' DEBUG; trap -p DEBUG"`).out, "x\ntrap -- 'echo x' DEBUG");
     assert.deepEqual(run(SQ, `bash -c "trap 'exit 3' DEBUG; echo a; echo b"; echo $?`), { out: '3', code: 0 }, 'exit in DEBUG ends the shell before the command');
+  });
+  it('set -x traces signal, ERR and DEBUG handlers at ++ and EXIT handlers at + (bash)', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, `bash -c 'set -x; trap "echo u" USR1; trap "echo e" ERR; trap "echo x" EXIT; kill -USR1 $$; false'`).out,
+      "+ trap 'echo u' USR1\n+ trap 'echo e' ERR\n+ trap 'echo x' EXIT\n+ kill -USR1 1234\n++ echo u\nu\n+ false\n++ echo e\ne\n+ echo x\nx");
+  });
+  it('DEBUG runs before each command of a pipeline (bash)', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, `bash -c 'trap "echo DBG" DEBUG; echo a | cat; x=1'`), { out: 'DBG\nDBG\na\nDBG', code: 0 });
   });
   it('kill 0 and negative pids name no process here (a safe choice; bash signals the process group)', () => {
     const SQ = loadShell();

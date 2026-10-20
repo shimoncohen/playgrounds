@@ -179,8 +179,13 @@ const G={
     finally{if(!done&&SQ.rt.scopeNode.traps){const x=SQ.exitTrap(S.last,{budget:true});if(x)emit(env,x.out)}SQ.restoreShell(sv)}}};
 /* SQ.gen.run: the job's whole program; exit n ends it with n (also set -e's exit), a stray return/break/continue just ends it.
    Its EXIT trap runs in endJob, whichever way it ended. */
-function* run(node,ctx){let r;
-  if(node.type==='list')r=yield* gList(node,ctx);
+/* a job whose whole program is one unredirected ( list ): bash runs the async subshell as ONE process, so its body runs in the job's own node
+   (traps set inside it are the job's: kill %1 finds them in J.topNode); anything around it ({ (...); x; } &) keeps the inner subshell */
+function loneSub(node){if(node.type!=='andor'||node.rest.length)return null;const P=node.first;
+  if(P.negate||P.cmds.length!==1)return null;const c=P.cmds[0];return c.type==='subshell'&&plain(c.redirs)?c:null}
+function* run(node,ctx){let r;const ls=loneSub(node);
+  if(ls)r=yield* gList(ls.body,ctx);
+  else if(node.type==='list')r=yield* gList(node,ctx);
   else if(node.type==='andor')r=yield* gAndOr(node,ctx);
   else if(node.type==='pipeline')r=yield* gPipe(node,ctx);
   else r=yield* gPipe({type:'pipeline',negate:false,cmds:[node]},ctx);

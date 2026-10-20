@@ -123,6 +123,9 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui,pf=0;
   let stdin='';
   /* every stage of a multi-command pipeline is a full subshell: directory, variables, exports, functions and positional parameters go back to what they were
      (echo Ada | read x leaves x unset, cd forest | cat stays put, echo a | shift keeps $#). Files and $? come out of a stage as before. */
+  /* DEBUG (Task 14): bash runs it before each command of a pipeline, all before the pipeline starts (the stages, being subshells, do not keep it) */
+  if(P.length>1&&SQ.rt.scopeNode.traps&&SQ.rt.scopeNode.traps.has('DEBUG'))for(let i=0;i<P.length;i++){const d=SQ.debugTrap(env.tty);if(!d)break;res.push(...d.out);
+    if(d.ctl){S.last=d.ctl.n;return {out:res,code:d.ctl.n,ctl:d.ctl}}}
   const sv0=P.length>1?snapshotShell():null;
   if(sv0)SQ.rt.scopeNode.inherit=true; /* jobs | cat lists the shell's jobs (cmds-proc.js tableOf) */
   const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
