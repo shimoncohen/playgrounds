@@ -43,6 +43,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add or fix a Shell Quest mission | `shell-quest/content/tier-*.js` (+ tests); use the `add-mission` skill |
 | Add a Shell Quest command or shell feature | `shell-quest/engine/cmds-*.js` / `interp.js` (+ `tests/shell/`) |
 | Change another quest's course | that quest's `app.js` (`CH`, `QF`/`QT`, `GUIDE` arrays); every mission carries `how` steps |
+| Add a mission that needs several commands tried | `steps` on the mission (guideline section 3); engine in `shell-quest/engine/exec.js`, list in `ui.js` |
 | Change how mission cards render | `shared/how.js` + `shared/how.css` (affects every quest; keep it bundle-safe) |
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |

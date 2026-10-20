@@ -230,6 +230,7 @@
       "echo village/logs/*.log",
       "find . -name \"*.txt\"",
       "find . -type d",
+      "find . -type f",
       "find . -name gold.txt",
       "cat ./forest/cave/deeper/chest/gold.txt",
       "rm village/logs/*.log",

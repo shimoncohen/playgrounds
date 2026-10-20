@@ -59,6 +59,24 @@ There are four kinds:
 
 Rules: step 1 is one plain sentence about the whole line (what goes in, what comes out); later steps go left to right, one part each, and say how the part changes the whole; end with what the learner will see or one common slip; 3 to 5 steps; never an unexplained term (introduce it, or link it to something taught earlier); variables stay quoted and inside `<code>`. A chip's third element is a short meaning (a few words) that replaces the bare kind label; use it for options, operators and arguments whose role is not obvious. Every quest renders `m.how` (Harbor Quest reads `how` on its `{t,i,g,a,h,ans,ok}` missions too), so the same field works everywhere. It is optional in the data so old missions keep rendering, but new and changed missions must have it, and `tests/shell/how.test.mjs` requires it for every Beginner mission.
 
+**Multi-step missions.** When one line cannot teach the idea (`find -type d` and `find -type f` only make sense side by side), give the mission `steps` instead of `answer`/`check`:
+
+```js
+{ title: 'Find by type', goal: 'Ask <code>find</code> for folders, then for files. Do both, in either order.',
+  steps: [
+    { goal: 'List only the folders: <code>find . -type d</code>', answer: 'find . -type d', check: c => ..., anat, how, hint? },
+    { goal: 'List only the files: <code>find . -type f</code>',   answer: 'find . -type f', check: c => ..., anat, how },
+  ],
+  answer: 'find . -type d',   // the first step's answer, so replay harnesses (the differential corpus) keep working
+  explain: '...' }
+```
+
+- Each step is a small command mission: its own `goal`, `answer` and `check` (the same helpers as section 3). Steps are done **in any order**; the mission completes, pays its XP once and moves on only when every step has been done. A step done on an earlier line stays done.
+- The card shows the steps as a tick-off list inside the goal box. The hint, the chips and the "How it works" list follow the first open step (`step.hint`, `step.anat`, `step.how`, falling back to the mission's), and "Type it for me" types that step's `answer`.
+- Progress is `S.steps['<ch>.<mi>']` (indexes done), created lazily and dropped on completion, so old saves load unchanged and a finished course exports as before. Never reuse it for anything else.
+- Rules: two to four steps; every step is its own goal the learner can name; do not use steps to chop a one-line idea into pieces. The mission-level `answer` must equal the first step's (the solvability test asserts it). Add steps to a **shipped** mission only as a reviewed behaviour change: the golden fixture records its transcript, so say so in the PR (Beginner 6.4 "Find by type" is the example, and its golden record was re-recorded in a commit of its own).
+- Only Shell Quest supports `steps` so far.
+
 The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/exec.js`. The real helpers:
 
 | Helper | Meaning |

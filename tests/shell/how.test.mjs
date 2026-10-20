@@ -25,10 +25,10 @@ describe('HowSteps.html', () => {
 // has `how` opens with a step about the whole line, then ties each part back to it.
 describe('Shell Quest missions with how steps', () => {
   const missions = loadShell().content.chapters.flatMap((ch, c) => ch.missions.map((m, i) => ({ m, at: `${c + 1}.${i + 1} ${m.title}` })));
-  const withHow = missions.filter(({ m }) => m.how);
+  const withHow = missions.flatMap(({ m, at }) => (m.how ? [{ m, at }] : (m.steps || []).map((s, i) => ({ m: s, at: `${at} step ${i + 1}` })).filter(({ m: s }) => s.how)));
   it('Beginner tier is fully covered', () => {
     const beginner = loadShell().content.chapters.filter((c) => c.tier === 'beginner').flatMap((c) => c.missions);
-    assert.ok(beginner.every((m) => m.how), 'every Beginner mission needs how steps');
+    assert.ok(beginner.every((m) => m.how || (m.steps && m.steps.every((s) => s.how))), 'every Beginner mission needs how steps');
   });
   for (const { m, at } of withHow) {
     it(`${at}: steps are well formed`, () => {
