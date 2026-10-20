@@ -11,9 +11,9 @@ const CH=[
 {name:'Arrays',badge:'Row Master',intro:'An array is a numbered row of boxes. Each box holds one value, and the numbers start at 0, not 1. It is the first data structure most people learn, and many others are built on top of it.',
  learned:['[ ]','index [i]','.length','.push()','.pop()','loops over arrays'],
  missions:[
- {title:'Build a row',goal:'Make an array called <code>crew</code> with <b>three names</b> in it, then print how many names it holds using <code>.length</code>.',
+ {title:'Build a row',goal:'Create an array called <code>crew</code> with <b>three names</b> in it, then print how many names it holds using <code>.length</code>.',
   anat:[['const','kw'],['crew','var'],['=','op'],['["Ada", "Bo", "Cy"]','str','array']],
-  explain:'Square brackets make an array and commas separate the items. <code>.length</code> counts them. Use <code>print(...)</code> (or <code>console.log(...)</code>) to show things in the console.',
+  explain:'Square brackets create an array and commas separate the items. <code>.length</code> counts them. Use <code>print(...)</code> (or <code>console.log(...)</code>) to show things in the console.',
   note:'After you press Run, look at the Structure view on the right: your array appears as a row of numbered boxes.',
   starter:'// Type your code below\n',answer:'const crew = ["Ada", "Bo", "Cy"];\nprint(crew.length);',
   check:c=>{const a=c.vars.crew;if(!Array.isArray(a))return 'Make a variable called crew that holds an array, like const crew = ["Ada", "Bo", "Cy"];';
@@ -113,7 +113,7 @@ const CH=[
  missions:[
  {title:'Link three nodes',goal:'Build the chain <code>1 → 2 → 3</code> in a variable called <code>head</code>. Each node is an object with a <code>value</code> and a <code>next</code>. The last node\'s <code>next</code> is <code>null</code>.',
   anat:[['{ value: 1,','num'],['next:','var'],['{ ... }','br','the next node'],['}','br']],
-  explain:'A node is just an object. The <code>next</code> field holds <b>another node</b> (really a reference to it), or <code>null</code> when there is no more. Build it from the inside out: write the last node first.',
+  explain:'A node is an object. The <code>next</code> field holds <b>another node</b> (really a reference to it), or <code>null</code> when there is no more. Build it from the inside out: write the last node first.',
   note:'After running, the Structure view draws your chain with arrows.',
   starter:'const third = { value: 3, next: null };\n// make the second node point at third,\n// then make head point at the second\n',
   answer:'const third = { value: 3, next: null };\nconst second = { value: 2, next: third };\nconst head = { value: 1, next: second };',
@@ -151,7 +151,7 @@ const CH=[
 {name:'Maps & sets',badge:'Hash Wizard',intro:'A <code>Map</code> stores pairs: look up a <b>key</b>, get its <b>value</b>, almost instantly, no matter how many pairs there are. A <code>Set</code> stores unique values and answers "is it in here?" just as fast. Both use a trick called hashing, so searching a huge pile takes about the same time as searching a tiny one.',
  learned:['Map set/get/has','Set add/has','counting with a Map','spotting duplicates','looking up a partner'],
  missions:[
- {title:'Name tags',goal:'Make a <code>Map</code> called <code>ages</code>. Store <code>"ada"</code> → <code>36</code> and <code>"bo"</code> → <code>29</code>, then print Ada\'s age by looking her up.',
+ {title:'Name tags',goal:'Create a <code>Map</code> called <code>ages</code>. Store <code>"ada"</code> → <code>36</code> and <code>"bo"</code> → <code>29</code>, then print Ada\'s age by looking her up.',
   anat:[['ages','var'],['.set','fn'],['("ada", 36)','str']],
   explain:'<code>map.set(key, value)</code> stores a pair, and <code>map.get(key)</code> finds the value again. Setting an existing key replaces its value. A missing key gives <code>undefined</code>.',
   starter:'const ages = new Map();\n',answer:'const ages = new Map();\nages.set("ada", 36);\nages.set("bo", 29);\nprint(ages.get("ada"));',

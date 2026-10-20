@@ -153,7 +153,7 @@ CMDS.getopts=function(a){let i=0;
   return finish('?',undefined,0)};
 
 /* ---------- 4. mktemp ----------
-   mktemp [-d] [-u] [-t] [-p DIR | --tmpdir[=DIR]] [TEMPLATE]: makes a new empty file (mode 600) or directory (-d, mode 700) and prints its name;
+   mktemp [-d] [-u] [-t] [-p DIR | --tmpdir[=DIR]] [TEMPLATE]: creates a new empty file (mode 600) or directory (-d, mode 700) and prints its name;
    -u only prints a name. Names are deterministic: the last run of 3 or more X's in the last component of TEMPLATE becomes a letter and a counter
    (XXXXXX -> A00001, XXX -> A01), and without a TEMPLATE the name is DIR/tmp.A00001, DIR/tmp.A00002, ... The counter is SQ.rt.tmpSeq (runtime
    state: it restarts with Reset world, a reload and inside SQ.sandbox, so a mission check sees the same names every time); a name that already
