@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContext } from './harness.mjs';
+import { loadContext, run } from './harness.mjs';
 
 const ctx = loadContext();
 const SQ = ctx.SQ;
@@ -45,7 +45,7 @@ describe('tiers', () => {
     const expected = 695 + inter.reduce((n, c) => n + c.missions.length * 15 + 25, 0);
     assert.equal(SQ.tiers.cumulativeXp('intermediate'), expected);
     const r = SQ.tiers.ranks();
-    assert.equal(r.length, 7); // + Automator, now that Advanced has chapters
+    assert.equal(r.length, 8); // + Automator and Shell Wizard, now that Advanced and Expert have chapters
     assert.deepEqual([...r[5]], [expected, 'Script Smith']);
     assert.equal(SQ.tiers.rankFor(expected).name, 'Script Smith');
     assert.equal(SQ.tiers.rankFor(695).name, 'Pipe Fitter');
@@ -58,17 +58,18 @@ describe('tiers', () => {
     assert.equal(expected, 1890);
     assert.equal(SQ.tiers.cumulativeXp('advanced'), expected);
     const r = SQ.tiers.ranks();
-    assert.deepEqual([...r[r.length - 1]], [expected, 'Automator']);
+    assert.deepEqual([...r[6]], [expected, 'Automator']);
+    assert.equal(r[r.length - 1][1], 'Shell Wizard', 'Expert has chapters now, so Automator is no longer the top rank');
     assert.equal(SQ.tiers.rankFor(expected).name, 'Automator');
     assert.equal(SQ.tiers.rankFor(expected - 1).name, 'Script Smith');
     assert.equal(SQ.tiers.missionXp(11), 20);
     const S = { done: {}, badges: {} };
     SQ.content.chapters.forEach((c, i) => { S.badges[i] = 1; c.missions.forEach((m, j) => { S.done[`${i}.${j}`] = 1; }); });
-    const st = SQ.tiers.status(S).filter((x) => x.chapters.length); // Expert has no chapters and is not drawn
-    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.complete]))), [['beginner', true], ['intermediate', true], ['advanced', true]]);
+    const st = SQ.tiers.status(S).filter((x) => x.chapters.length);
+    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.complete]))), [['beginner', true], ['intermediate', true], ['advanced', true], ['expert', true]]);
   });
   it('a tier without chapters adds no rank', () => {
-    assert.equal(SQ.tiers.ranks().length, 7); // Expert has no chapters yet
+    assert.equal(SQ.tiers.ranks().length, 8); // every tier has chapters now: 5 base ranks + Script Smith, Automator, Shell Wizard
     const t = Tiers.create({
       tiers: [
         { id: 'a', name: 'A', blurb: '', missionXp: 10 },
@@ -103,5 +104,66 @@ describe('Tiers.renderRail', () => {
     const el = { innerHTML: '' };
     Tiers.renderRail(el, { status: [{ tier: { id: 'x', name: 'X' }, chapters: [], chaptersDone: 0, complete: false }], chapters: [], S: { badges: {}, done: {}, ch: 0 } });
     assert.equal(el.innerHTML, '');
+  });
+});
+
+// ---- Stage 3 Task 17: the Expert tier wiring. Task 17 ran these on a test-only fixture that filled the tier up to 4 chapters x 7
+// missions; since Task 19 the real chapters (content/tier-expert.js) are all there, so they run on the shipped content. ----
+function withExpert() {
+  const c = loadContext();
+  c.SQ.Tiers = c.Tiers;
+  return c.SQ;
+}
+
+describe('Expert tier wiring (Task 17)', () => {
+  it('declares Expert at 25 XP per mission with the end rank Shell Wizard', () => {
+    const t = SQ.tiers.status({}).map((s) => s.tier);
+    assert.deepEqual([...t.map((x) => x.id)], ['beginner', 'intermediate', 'advanced', 'expert']);
+    assert.equal(t[3].name, 'Expert');
+    assert.equal(t[3].missionXp, 25);
+  });
+  it('Expert chapters sit at indexes 15 to 18, after the untouched Advanced tier', () => {
+    const X = withExpert();
+    const ch = X.content.chapters;
+    assert.equal(ch.length, 19);
+    assert.deepEqual([...ch.slice(11, 15).map((c) => c.tier)], Array(4).fill('advanced'));
+    for (let i = 15; i <= 18; i++) {
+      assert.equal(X.tiers.tierOf(i).id, 'expert');
+      assert.equal(X.tiers.missionXp(i), 25);
+    }
+    assert.equal(X.tiers.cumulativeXp('advanced'), 1890, 'Advanced is unchanged');
+  });
+  it('cumulativeXp("expert") is 1890 + 28*25 + 4*25 = 2690 and Shell Wizard is the top rank there', () => {
+    const X = withExpert();
+    assert.equal(X.content.chapters.filter((c) => c.tier === 'expert').reduce((n, c) => n + c.missions.length, 0), 28);
+    assert.equal(X.tiers.cumulativeXp('expert'), 1890 + 28 * 25 + 4 * 25);
+    assert.equal(X.tiers.cumulativeXp('expert'), 2690);
+    const r = X.tiers.ranks();
+    assert.equal(r.length, 8);
+    assert.deepEqual([...r[r.length - 1]], [2690, 'Shell Wizard']);
+    assert.deepEqual([...r[r.length - 2]], [1890, 'Automator']);
+    assert.equal(X.tiers.rankFor(2690).name, 'Shell Wizard');
+    assert.equal(X.tiers.rankFor(2689).name, 'Automator');
+  });
+  it('a save with chapters 0 to 18 badged has four complete tiers', () => {
+    const X = withExpert();
+    const S = { done: {}, badges: {} };
+    X.content.chapters.forEach((c, i) => { S.badges[i] = 1; c.missions.forEach((m, j) => { S.done[`${i}.${j}`] = 1; }); });
+    const st = X.tiers.status(S);
+    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.chaptersDone, s.chapters.length, s.complete]))),
+      [['beginner', 7, 7, true], ['intermediate', 4, 4, true], ['advanced', 4, 4, true], ['expert', 4, 4, true]]);
+    const el = { innerHTML: '' };
+    Object.assign(S, { ch: 18 });
+    X.Tiers.renderRail(el, { status: st, chapters: X.content.chapters, S });
+    assert.equal((el.innerHTML.match(/class="tierhead complete"/g) || []).length, 4);
+  });
+  it('an Expert mission passes on its answer through SQ.missionVerdict', () => {
+    const X = withExpert();
+    X.setupChapter(X.content.chapters[15]);
+    const m = X.content.chapters[15].missions[0];
+    run(X, m.answer);
+    assert.equal(X.missionVerdict(m, X.ctxFor(m.answer)).good, true);
+    run(X, 'echo nope');
+    assert.equal(X.missionVerdict(m, X.ctxFor('echo nope')).good, false);
   });
 });

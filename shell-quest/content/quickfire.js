@@ -68,7 +68,31 @@ const QF=[
  ["Print oops on stderr instead of stdout",["echo oops >&2","echo oops 1>&2","echo \"oops\" >&2"],'advanced'],
  ["End a script with exit status 1",["exit 1"],'advanced'],
  ["Open scripts/greet.sh in the editor",["nano scripts/greet.sh","nano ./scripts/greet.sh"],'advanced'],
- ["Run scripts/greet.sh with the name Ada",["bash scripts/greet.sh Ada","bash ./scripts/greet.sh Ada"],'advanced']
+ ["Run scripts/greet.sh with the name Ada",["bash scripts/greet.sh Ada","bash ./scripts/greet.sh Ada"],'advanced'],
+ ["With awk, print the first field of every line of village/logs/access.log",["awk '{print $1}' village/logs/access.log","awk '{ print $1 }' village/logs/access.log"],'expert',{exact:true}],
+ ["With awk, print the second comma-separated field of every line of village/sales.csv",["awk -F, '{print $2}' village/sales.csv","awk -F, '{ print $2 }' village/sales.csv","awk -F',' '{print $2}' village/sales.csv"],'expert',{exact:true}],
+ ["With awk, print the lines of village/sales.csv whose second field is more than 10",["awk -F, '$2 > 10' village/sales.csv","awk -F, '$2>10' village/sales.csv","awk -F, '$2 > 10 {print}' village/sales.csv","awk -F, '$2 > 10 {print $0}' village/sales.csv"],'expert',{exact:true}],
+ ["With awk and an END block, print how many lines village/sales.csv has",["awk 'END {print NR}' village/sales.csv","awk 'END { print NR }' village/sales.csv"],'expert',{exact:true}],
+ ["Change 8080 to 9090 in config.ini, editing the file in place",["sed -i 's/8080/9090/' config.ini","sed -i 's/port=8080/port=9090/' config.ini","sed -i 's/8080/9090/g' config.ini"],'expert',{exact:true}],
+ ["With sed, print only the lines of config.ini that contain port",["sed -n '/port/p' config.ini"],'expert',{exact:true}],
+ ["List the processes running in this terminal",["ps"],'expert'],
+ ["Run sleep 30 in the background",["sleep 30 &","sleep 30&"],'expert'],
+ ["List this shell's background jobs",["jobs"],'expert'],
+ ["Wait until every background job has finished",["wait"],'expert'],
+ ["Stop job number 1",["kill %1","kill -TERM %1","kill -15 %1","kill -s TERM %1"],'expert'],
+ ["Print the PID of the last background job",["echo $!","echo \"$!\""],'expert'],
+ ["With find -exec, run wc -l on every .txt file under inbox",["find inbox -name '*.txt' -exec wc -l {} \\;","find inbox -name '*.txt' -exec wc -l {} +","find inbox -name \"*.txt\" -exec wc -l {} \\;","find inbox -name \"*.txt\" -exec wc -l {} +"],'expert',{exact:true}],
+ ["Copy every file that ls inbox/*.txt lists into archive/, one cp per name, with xargs -I",["ls inbox/*.txt | xargs -I{} cp {} archive/","ls inbox/*.txt | xargs -I {} cp {} archive/","ls inbox/*.txt | xargs -I{} cp {} archive"],'expert'],
+ ["Run echo job once for each of the words 1 2 3, up to three at a time",["echo 1 2 3 | xargs -n1 -P3 echo job","echo 1 2 3 | xargs -P3 -n1 echo job","echo 1 2 3 | xargs -n 1 -P 3 echo job","echo 1 2 3 | xargs -P 3 -n 1 echo job"],'expert'],
+ ["Compare sorted copies of lists/a.txt and lists/b.txt with diff, without saving them",["diff <(sort lists/a.txt) <(sort lists/b.txt)","diff <(sort < lists/a.txt) <(sort < lists/b.txt)"],'expert'],
+ ["Print the three most common first fields of village/logs/access.log, with their counts",["awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -3","awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -rn | head -n 3","awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -nr | head -3","awk '{print $1}' village/logs/access.log | sort | uniq -c | sort -nr | head -n 3","sort village/logs/access.log | awk '{print $1}' | uniq -c | sort -rn | head -3","cut -d' ' -f1 village/logs/access.log | sort | uniq -c | sort -rn | head -3"],'expert',{exact:true}],
+ ["Sort piped lines by field 1 as a number, biggest first, and lines that tie by field 2",["sort -k1,1nr -k2,2","sort -k1,1rn -k2,2","sort -k1,1nr -k2","sort -k1nr -k2","sort -k1rn -k2"],'expert',{exact:true}],
+ ["Make a script stop at the first command that fails",["set -e","set -o errexit"],'expert'],
+ ["Turn on errexit, nounset and pipefail with one set command",["set -euo pipefail","set -eu -o pipefail","set -e -u -o pipefail","set -ue -o pipefail","set -o errexit -o nounset -o pipefail"],'expert'],
+ ["Print every command before it runs, to debug a script",["set -x","set -o xtrace"],'expert'],
+ ["Make a new empty temporary file and keep its name in tmp",["tmp=$(mktemp)","tmp=\"$(mktemp)\""],'expert',{exact:true}],
+ ["Remove the file named in $tmp when the script exits, however it exits",["trap 'rm -f \"$tmp\"' EXIT","trap 'rm -f \"$tmp\"' 0","trap 'rm \"$tmp\"' EXIT"],'expert',{exact:true}],
+ ["Print the exit status of the last command",["echo $?","echo \"$?\""],'expert']
 ];
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});

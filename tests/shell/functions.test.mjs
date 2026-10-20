@@ -107,8 +107,8 @@ describe('parsing the whole text first', () => {
     assert.equal(r.code, 2);
     assert.equal(SQ.getNode('/home/explorer/zz'), null);
   });
-  it('& says it is not supported', () => {
-    assert.equal(out('echo hi &'), 'this practice shell does not support & yet');
+  it('& runs the command in the background (Stage 3 Task 12a; Task 12b adds the Done notice that closes the line)', () => {
+    assert.equal(out('echo hi &'), '[1] 1235\nhi\n[1]+  Done                    echo hi');
   });
   it('backslash-newline joins the lines', () => {
     assert.equal(out('echo a \\\n b'), 'a b');
@@ -278,5 +278,42 @@ describe('Task 6a review carry-overs', () => {
     const SQ = loadShell();
     run(SQ, 'if x');
     assert.equal(out('echo $?', SQ), '2');
+  });
+});
+
+describe('Stage 3 leftovers: each pipeline stage is a full subshell', () => {
+  const o = (line, SQ = loadShell()) => run(SQ, line).out;
+  it('cd in a stage does not move the shell', () => {
+    const SQ = loadShell();
+    assert.equal(o('cd forest | cat; pwd', SQ), '/home/explorer');
+    assert.equal(o('cd forest | cat; echo $PWD', SQ), '/home/explorer');
+    assert.equal(o('echo hi | cd forest; pwd', SQ), '/home/explorer');
+    assert.equal(o('cd forest | cat; cd ..; pwd', SQ), '/home');
+    assert.equal(o('cd forest; cd - >/dev/null | cat; pwd'), '/home/explorer/forest');
+  });
+  it('a later stage starts in the shell directory; a subshell inside a stage may cd', () => {
+    const SQ = loadShell();
+    assert.equal(o('cd forest | pwd', SQ), '/home/explorer');
+    assert.equal(o('(cd forest; pwd) | cat', SQ), '/home/explorer/forest');
+  });
+  it('shift in a stage leaves the positional parameters alone', () => {
+    const SQ = loadShell();
+    assert.equal(o('f() { echo a | shift; echo $# $1; }; f x y z', SQ), '3 x');
+    assert.equal(o('f() { shift; echo $# $1; }; f x y z', SQ), '2 y');
+  });
+  it('variables, functions and exports stay inside the stage; files and $? come out', () => {
+    const SQ = loadShell();
+    assert.equal(o('x=1 | cat; echo "[$x]"', SQ), '[]');
+    assert.equal(o('g() { echo hi; } | cat; type g', SQ), 'bash: type: g: not found');
+    assert.equal(o('export E1=1 | cat; echo "[$E1]"; env | grep -c E1', SQ), '[]\n0');
+    assert.equal(o('echo data | tee out.txt > /dev/null; cat out.txt', SQ), 'data');
+    assert.equal(o('echo a | cd nosuchdir; echo $?', SQ), 'bash: cd: nosuchdir: No such file or directory\n1');
+    assert.equal(o('true | false; echo $?', SQ), '1');
+    assert.equal(o('mkdir newd | cat; [ -d newd ] && echo yes', SQ), 'yes');
+  });
+  it('a one-command line is not a subshell: cd, shift and assignments still apply', () => {
+    const SQ = loadShell();
+    assert.equal(o('cd forest; pwd', SQ), '/home/explorer/forest');
+    assert.equal(o('y=2; echo $y', SQ), '2');
   });
 });

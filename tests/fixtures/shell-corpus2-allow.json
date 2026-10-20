@@ -1,0 +1,1524 @@
+{
+  "mkdir constructor; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): mkdir constructor creates it and ls lists it",
+    "out": "camp/  config.ini  constructor/  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "touch toString; echo hi > valueOf; cat valueOf": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): touch/echo/cat of toString and valueOf create and read real files",
+    "files": [
+      [
+        "/home/explorer/toString",
+        0,
+        "da39a3ee"
+      ],
+      [
+        "/home/explorer/valueOf",
+        2,
+        "c22b5f91"
+      ]
+    ]
+  },
+  "cd __proto__": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): __proto__ is just a missing name, so cd says No such file or directory",
+    "out": "bash: cd: __proto__: No such file or directory"
+  },
+  "echo x > __proto__; cat content": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): the write creates a file named __proto__ and no longer pollutes Object.prototype, so cat content fails",
+    "out": "cat: content: No such file or directory",
+    "code": 1,
+    "files": [
+      [
+        "/home/explorer/__proto__",
+        1,
+        "11f6ad8e"
+      ]
+    ]
+  },
+  "touch hasOwnProperty; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): hasOwnProperty is created and listed",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  hasOwnProperty  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/hasOwnProperty",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "mkdir __proto__; ls": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): __proto__ is created and listed",
+    "out": "__proto__/  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "cat constructor": {
+    "reason": "Task 2: file names that match Object.prototype members are now ordinary names (null-prototype children maps): constructor is a missing file, so cat reports it",
+    "out": "cat: constructor: No such file or directory",
+    "code": 1
+  },
+  "x=a; for i in $(seq 1 22); do x=$x$x; done; echo ${#x}; unset x": {
+    "reason": "Task 2 (LIM.VAR): the doubling stops at the 1,000,000-character variable cap with the friendly line instead of reaching 4 MB",
+    "out": "this practice shell stopped the command: a value grew too large",
+    "code": 1,
+    "vars": {
+      "x": {
+        "$repeat": "a",
+        "times": 524288
+      },
+      "i": "20"
+    }
+  },
+  "x=aaaaaaaaaa; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do x=$x$x; done; echo ${#x}; unset x": {
+    "reason": "Task 2 (LIM.VAR): the doubling stops at the 1,000,000-character variable cap with the friendly line instead of reaching 10 MB",
+    "out": "this practice shell stopped the command: a value grew too large",
+    "code": 1,
+    "vars": {
+      "x": {
+        "$repeat": "a",
+        "times": 655360
+      },
+      "i": "17"
+    }
+  },
+  "x=$(false); echo $?": {
+    "reason": "Stage 3 Task 3: an assignment-only line takes the status of its last $( ) (bash: x=$(false); echo $? prints 1)",
+    "out": "1"
+  },
+  "x=$(exit 3); echo $?": {
+    "reason": "Stage 3 Task 3: an assignment-only line takes the status of its last $( ) (bash: x=$(false); echo $? prints 1)",
+    "out": "3"
+  },
+  "f() { echo ${X:?msg}; echo after; }; f": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: msg",
+    "code": 1
+  },
+  "echo ${X:?msg}; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: msg",
+    "code": 1
+  },
+  "echo \"${X:?}\"; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: X: parameter null or not set",
+    "code": 1
+  },
+  "a=\"1+2\"; echo $((a*2))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "6"
+  },
+  "a=b; b=3; echo $((a+1))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "4"
+  },
+  "a=a; echo $((a+1))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "bash: expression recursion level exceeded",
+    "code": 1
+  },
+  "a=\"2*3\"; echo $((a))": {
+    "reason": "Stage 3 Task 3: a variable holds text that $(( )) evaluates as an expression (depth cap 10; a cycle prints \"expression recursion level exceeded\")",
+    "out": "6"
+  },
+  "unset HOME; echo \"[$HOME]\"": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "[]"
+  },
+  "unset HOME; cd": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "bash: cd: HOME not set",
+    "code": 1
+  },
+  "unset USER; echo \"[$USER]\"": {
+    "reason": "Stage 3 Task 3: unset hides a built-in variable such as HOME or USER, and cd with no argument says \"HOME not set\"",
+    "out": "[]"
+  },
+  "type if": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "if is a shell keyword",
+    "code": 0
+  },
+  "type for": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "for is a shell keyword",
+    "code": 0
+  },
+  "type [[": {
+    "reason": "Stage 3 Task 3: type names shell keywords (\"if is a shell keyword\")",
+    "out": "[[ is a shell keyword",
+    "code": 0
+  },
+  "echo a > f >&2; ls f": {
+    "reason": "Stage 3 Task 3: \"> f >&2\" creates (truncates) f before the output goes to stderr (bash)",
+    "out": "a\nf",
+    "code": 0,
+    "files": [
+      [
+        "/home/explorer/f",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "echo a > f >&2; cat f": {
+    "reason": "Stage 3 Task 3: \"> f >&2\" creates (truncates) f before the output goes to stderr (bash)",
+    "out": "a",
+    "code": 0,
+    "files": [
+      [
+        "/home/explorer/f",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "cd forest | cat; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat; echo $PWD": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "echo hi | cd forest; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | cat; cd ..; pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash)",
+    "out": "/home",
+    "cwd": "/home"
+  },
+  "f() { break; }; for i in 1 2 3; do echo $i; f; done": {
+    "reason": "Stage 3 Task 3: break/continue in a function reach the loop that called it, without the warning (bash)",
+    "out": "1",
+    "vars": {
+      "i": "1"
+    }
+  },
+  "f() { continue; }; for i in 1 2; do f; echo $i; done": {
+    "reason": "Stage 3 Task 3: break/continue in a function reach the loop that called it, without the warning (bash)",
+    "out": ""
+  },
+  "echo ${NOSUCH:?boom}; echo after": {
+    "reason": "Stage 3 Task 3: a failing ${X:?msg} prints its message and ends the function, script or typed line with status 1 (bash)",
+    "out": "bash: NOSUCH: boom",
+    "code": 1
+  },
+  "printf \"echo a\\nif\\necho b\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 3: syntax error: unexpected end of file"
+  },
+  "printf \"echo a\\nfi\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error near unexpected token 'fi'"
+  },
+  "printf \"x=1\\nwhile true\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error: unexpected end of file"
+  },
+  "printf \"echo a\\necho (\\n\" > s.sh\nbash s.sh": {
+    "reason": "Stage 3 Task 3: a script syntax error reads \"NAME: line N: syntax error ...\" (the path as typed, the line of the offending token) instead of \"bash: syntax error ...\"",
+    "out": "s.sh: line 2: syntax error near unexpected token '('"
+  },
+  "x=$(false) y=$(true); echo $?": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "0",
+    "vars": {
+      "x": "",
+      "y": ""
+    }
+  },
+  "x=\"a b  c\"; printf \"[%s]\" $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[a][b][c]"
+  },
+  "e=; printf \"[%s]\" $e a": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "[a]"
+  },
+  "n=\"a*\"; touch ab; echo $n": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "ab"
+  },
+  "IFS=,; y=\"1,2,,3\"; printf \"[%s]\" $y": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "[1][2][][3]"
+  },
+  "[ -n $unset ] && echo true || echo false": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "true"
+  },
+  "IFS=, read a b <<< \"1,2\"; echo $a $b": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "1 2",
+    "vars": {
+      "a": "1",
+      "b": "2"
+    }
+  },
+  "f() { echo \"[$X]\"; }; X=7 f; echo \"[$X]\"": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "[7]\n[]"
+  },
+  "X=1 echo $X": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "x=`echo a b`; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
+    "out": "bash: a: command not found"
+  },
+  "[ -n $UNSET ] && echo weird": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "weird",
+    "code": 0
+  },
+  "[ $UNSET = x ] || echo noeq": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: [: =: binary operator expected\nnoeq"
+  },
+  "x=\"a b\"; [ $x = \"a b\" ]; echo $?": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: [: a: binary operator expected\n2"
+  },
+  "x=$(for i in 1 2 3; do echo $i; done); echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "1 2 3"
+  },
+  "set -- a b c; echo $1 $2 $3 $#": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash; Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a b c 3"
+  },
+  "echo $0 $1 $2": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "bash"
+  },
+  "x=1 y=2; echo $x $y": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "1 2",
+    "vars": {
+      "x": "1",
+      "y": "2"
+    }
+  },
+  "x=1 echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "x=1 env | grep ^x=": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "x=1",
+    "code": 0
+  },
+  "x=1; x=2 true; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "1"
+  },
+  "FOO=bar printenv FOO": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; Stage 3 Task 15: printenv is built, so it prints the exported FOO",
+    "out": "bar",
+    "code": 0
+  },
+  "LC_ALL=C sort readme.txt": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "Folders hold other things. Files hold text.\nThis world is made of folders and files.\nType help any time to see the commands you can use.\nWelcome, explorer!",
+    "code": 0
+  },
+  "x=a b": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "bash: b: command not found"
+  },
+  "x=`echo a`; echo $x": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
+    "out": "bash: a`: command not found"
+  },
+  "x=\"a  b\"; echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "x=\"  a  \"; echo [$x]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[ a ]"
+  },
+  "x=\"a b c\"; for w in $x; do echo $w; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a\nb\nc",
+    "vars": {
+      "x": "a b c",
+      "w": "c"
+    }
+  },
+  "x=\"*\"; echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "x=$(ls); echo $x": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "x=\"a b\"; touch $x; ls": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a  b  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/a",
+        0,
+        "da39a3ee"
+      ],
+      [
+        "/home/explorer/b",
+        0,
+        "da39a3ee"
+      ]
+    ]
+  },
+  "x=\"a b\"; mkdir $x; ls": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a/  b/  camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/"
+  },
+  "x=\"\"; echo $x end": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "end"
+  },
+  "IFS=,; x=\"a,b,c\"; for i in $x; do echo $i; done": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "a\nb\nc",
+    "vars": {
+      "IFS": ",",
+      "x": "a,b,c",
+      "i": "c"
+    }
+  },
+  "IFS=:; echo $PATH": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "/usr/local/bin /usr/bin /bin"
+  },
+  "IFS=,; read a b <<< \"1,2\"; echo $a $b": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "1 2",
+    "vars": {
+      "IFS": ",",
+      "a": "1",
+      "b": "2"
+    }
+  },
+  "IFS= read -r l <<< \"  x  \"; echo \"[$l]\"": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "out": "[  x  ]",
+    "vars": {
+      "l": "  x  "
+    }
+  },
+  "OLDIFS=$IFS; IFS=,; IFS=$OLDIFS; echo ok": {
+    "reason": "Stage 3 Task 4: IFS governs splitting and read; it defaults to space, tab and newline (bash)",
+    "vars": {
+      "OLDIFS": " \t\n",
+      "IFS": " \t\n"
+    }
+  },
+  "v='a b'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": "a b",
+      "w": "b"
+    }
+  },
+  "v='a b'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v='a b'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "v=' a  b '; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "v=' a  b '; echo [$v]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[ a b ]"
+  },
+  "v=' a  b '; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": " a  b ",
+      "w": "b"
+    }
+  },
+  "v=' a  b '; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v=' a  b '; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "v='*'; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "v='*'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<camp>\n<config.ini>\n<docs>\n<drafts>\n<forest>\n<journal.txt>\n<lib>\n<logs>\n<notes.txt>\n<numbers.txt>\n<readme.txt>\n<scripts>\n<secrets.txt>\n<village>",
+    "vars": {
+      "v": "*",
+      "w": "village"
+    }
+  },
+  "v='*'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp|config.ini|docs|drafts|forest|journal.txt|lib|logs|notes.txt|numbers.txt|readme.txt|scripts|secrets.txt|village|"
+  },
+  "v='*'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: too many arguments\nempty"
+  },
+  "v=''; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "",
+    "vars": {
+      "v": ""
+    }
+  },
+  "v=''; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
+    "out": "set"
+  },
+  "v='a\tb'; echo $v": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a b"
+  },
+  "v='a\tb'; echo [$v]": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "[a b]"
+  },
+  "v='a\tb'; for w in $v; do echo \"<$w>\"; done": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "<a>\n<b>",
+    "vars": {
+      "v": "a\tb",
+      "w": "b"
+    }
+  },
+  "v='a\tb'; printf \"%s|\" $v; echo": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "a|b|"
+  },
+  "v='a\tb'; test -n $v && echo set || echo empty": {
+    "reason": "Stage 3 Task 4: an unquoted $var is split before [ / test see it, so [ $x = \"a b\" ] gets too many words, as in bash (the [ error wording is the engine's existing one)",
+    "out": "bash: test: a: binary operator expected\nempty"
+  },
+  "printf \"%.0s-\" {1..10}; echo": {
+    "reason": "Task 5: printf honours precision, so %.0s prints nothing for its argument and only the literal dash is left (the brace range is still one literal word until brace expansion exists)",
+    "out": "-"
+  },
+  "printf \"%d\\n\" abc": {
+    "reason": "Task 5: the invalid-number message is bash-style, with the \"bash: \" prefix real bash prints (stdout still shows 0, status still 1)",
+    "out": "bash: printf: abc: invalid number\n0"
+  },
+  "printf \"%x\\n\" 255": {
+    "reason": "Task 5: %x was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "ff",
+    "code": 0
+  },
+  "printf \"%o\\n\" 8": {
+    "reason": "Task 5: %o was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "10",
+    "code": 0
+  },
+  "printf \"%c\\n\" abc": {
+    "reason": "Task 5: %c was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a",
+    "code": 0
+  },
+  "printf \"%.2s\\n\" abcdef": {
+    "reason": "Task 5: printf honours precision, so %.2s truncates the argument to \"ab\" instead of printing the directive text",
+    "out": "ab"
+  },
+  "printf \"%b\\n\" \"a\\tb\"": {
+    "reason": "Task 5: %b was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a\tb",
+    "code": 0
+  },
+  "printf \"%q\\n\" \"a b\"": {
+    "reason": "Task 5: %q was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "a\\ b",
+    "code": 0
+  },
+  "printf \"%5.2f\\n\" 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": " 3.14"
+  },
+  "printf '%5.2f\\n' 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": " 3.14"
+  },
+  "printf \"%f\\n\" 1.5": {
+    "reason": "Task 5: %f now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "1.500000",
+    "code": 0
+  },
+  "printf \"%e\\n\" 1.5": {
+    "reason": "Task 5: %e was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "1.500000e+00",
+    "code": 0
+  },
+  "printf \"%.3f\\n\" 2": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "2.000"
+  },
+  "printf \"%u\\n\" 7": {
+    "reason": "Task 5: %u was an \"invalid directive\" error (status 1) in the Stage 2 engine and is now a real conversion, so the line prints its formatted value with status 0",
+    "out": "7",
+    "code": 0
+  },
+  "printf \"%10.3f|\\n\" 3.14159": {
+    "reason": "Task 5: a width/precision float directive now formats the number (the old engine printed the directive text or refused it); out is the C-style rounded value",
+    "out": "     3.142|"
+  },
+  "grep -r a / | wc -l": {
+    "reason": "Stage 3 Task 6: -r is built: it now searches every file under / (91 matching lines) instead of printing the unsupported message",
+    "out": "91"
+  },
+  "grep -l wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -l is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -L wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -L is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -h wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -h is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -H wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -H is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -q wolf forest/notes.txt; echo $?": {
+    "reason": "Stage 3 Task 6: grep -q is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory\n2"
+  },
+  "grep -o wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -o is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -o \"[a-z]*\" readme.txt": {
+    "reason": "Stage 3 Task 6: -o is built: every non-empty match prints on its own line",
+    "out": "elcome\nexplorer\nhis\nworld\nis\nmade\nof\nfolders\nand\nfiles\nolders\nhold\nother\nthings\niles\nhold\ntext\nype\nhelp\nany\ntime\nto\nsee\nthe\ncommands\nyou\ncan\nuse",
+    "code": 0
+  },
+  "grep -w wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -w wol forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -x wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -x is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -r wolf .": {
+    "reason": "Stage 3 Task 6: grep -r is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.\n./village/logs/all.log:10.0.0.7 INFO wolf seen\n./village/logs/day2.log:13:10 wolf seen near the river",
+    "code": 0
+  },
+  "grep -r wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -rn wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -rl wolf .": {
+    "reason": "Stage 3 Task 6: -r and -l are built: files with a match are listed in sorted order",
+    "out": "./journal.txt\n./village/logs/all.log\n./village/logs/day2.log",
+    "code": 0
+  },
+  "grep -R wolf forest": {
+    "reason": "Stage 3 Task 6: -r/-R is built: nothing under forest contains \"wolf\", so grep prints nothing and exits 1",
+    "out": ""
+  },
+  "grep -A1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -A1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -B1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -B1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -C1 wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep -C1 is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep -m1 a readme.txt": {
+    "reason": "Stage 3 Task 6: -m is built: stops after the first selected line",
+    "out": "This world is made of folders and files.",
+    "code": 0
+  },
+  "grep -e wolf -e owl forest/*": {
+    "reason": "Stage 3 Task 6: -e is built; forest/* includes the directory forest/cave, which grep reports as \"Is a directory\" (status 2)",
+    "out": "grep: forest/cave: Is a directory",
+    "code": 2
+  },
+  "grep -F \"a.b\" readme.txt": {
+    "reason": "Stage 3 Task 6: -F is built: \"a.b\" is matched literally and readme.txt has no such text, so nothing prints (status 1)",
+    "out": ""
+  },
+  "grep -s wolf nosuch.txt; echo $?": {
+    "reason": "Stage 3 Task 6: -s is built: it hides the missing-file message, and the status stays 2",
+    "out": "2"
+  },
+  "grep --color=never wolf forest/notes.txt": {
+    "reason": "Stage 3 Task 6: grep --color=never is built; forest/notes.txt does not exist in the corpus world, so the built flag now reaches the file lookup and grep reports it (status 2) instead of the unsupported-flag message",
+    "out": "grep: forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "grep --include=\"*.txt\" -r wolf .": {
+    "reason": "Stage 3 Task 6: grep --include=\"*.txt\" is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.",
+    "code": 0
+  },
+  "echo abc | grep -o b": {
+    "reason": "Stage 3 Task 6: -o is built: each match prints on its own line",
+    "out": "b",
+    "code": 0
+  },
+  "echo abc | grep -e": {
+    "reason": "Stage 3 Task 6: -e is built; a missing pattern argument prints GNU's \"option requires an argument\" lines with the usage hint and exits 2",
+    "out": "grep: option requires an argument -- 'e'\nUsage: grep [OPTION]... PATTERNS [FILE]...\nTry 'grep --help' for more information.",
+    "code": 2
+  },
+  "grep -E \"(\" readme.txt": {
+    "reason": "Stage 3 Task 6: an unclosed ( under -E is a bad regular expression: GNU grep prints \"grep: Unmatched ( or \\(\" and exits 2",
+    "out": "grep: Unmatched ( or \\(",
+    "code": 2
+  },
+  "grep \"[\" readme.txt": {
+    "reason": "Stage 3 Task 6: an unclosed [ is a bad regular expression: GNU grep prints \"grep: Invalid regular expression\" and exits 2 instead of matching a literal [",
+    "out": "grep: Invalid regular expression",
+    "code": 2
+  },
+  "echo ab | grep -E \"a|b\" -o": {
+    "reason": "Stage 3 Task 6: -o is built: each match prints on its own line",
+    "out": "a\nb",
+    "code": 0
+  },
+  "find . -name \"*.txt\" | xargs grep -l wolf": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt",
+    "code": 0
+  },
+  "sed 's/a/b/2' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: the numeric s flag replaces the 2nd match",
+    "out": "Welcome, explorer!\nThis world is made of folders bnd files.\nFolders hold other things. Files hold text.\nType help any time to see the commbnds you can use.",
+    "code": 0
+  },
+  "sed '/wolf/d' forest/notes.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "sed -n '/wolf/p' forest/notes.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read forest/notes.txt: No such file or directory",
+    "code": 2
+  },
+  "sed 's/a/b/;s/c/d/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: ; separates commands",
+    "out": "Weldome, explorer!\nThis world is mbde of folders and files.\nFolders hold other things. Files hold text.\nType help bny time to see the dommands you can use.",
+    "code": 0
+  },
+  "sed 'y/abc/xyz/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: the y command transliterates",
+    "out": "Welzome, explorer!\nThis world is mxde of folders xnd files.\nFolders hold other things. Files hold text.\nType help xny time to see the zommxnds you zxn use.",
+    "code": 0
+  },
+  "sed '2q' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: q prints the line and quits",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.",
+    "code": 0
+  },
+  "sed '1!d' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: ! negates an address",
+    "out": "Welcome, explorer!",
+    "code": 0
+  },
+  "sed 's/\\(a\\)/[\\1]/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: BRE \\( \\) groups and \\1 back-references (a plain ( is literal in a BRE)",
+    "out": "Welcome, explorer!\nThis world is m[a]de of folders and files.\nFolders hold other things. Files hold text.\nType help [a]ny time to see the commands you can use."
+  },
+  "sed 'y/abc/xy/' readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: y with unequal sets is GNU's error",
+    "out": "sed: -e expression #1, char 9: strings for `y' command are different lengths"
+  },
+  "sed -i 's/a/b/' readme.txt; cat readme.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: -i edits the file in place and prints nothing",
+    "out": "Welcome, explorer!\nThis world is mbde of folders and files.\nFolders hold other things. Files hold text.\nType help bny time to see the commands you can use.",
+    "files": [
+      [
+        "/home/explorer/readme.txt",
+        155,
+        "26e5033d"
+      ]
+    ]
+  },
+  "sed -i.bak 's/a/b/' readme.txt; ls": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: -i.bak edits the file in place and keeps readme.txt.bak",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  readme.txt.bak  scripts/  secrets.txt  village/",
+    "files": [
+      [
+        "/home/explorer/readme.txt",
+        155,
+        "26e5033d"
+      ],
+      [
+        "/home/explorer/readme.txt.bak",
+        155,
+        "b69cd96c"
+      ]
+    ]
+  },
+  "sed -i 's/a/b/' nosuch.txt": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a missing input file is \"sed: can't read X: No such file or directory\", exit 2",
+    "out": "sed: can't read nosuch.txt: No such file or directory",
+    "code": 2
+  },
+  "echo abc | sed '1i\\\\top'": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: i inserts text before the line (GNU one-line form; \\t in the text is a tab)",
+    "out": "\top\nabc",
+    "code": 0
+  },
+  "echo abc | sed 'a\\\\bottom'": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: a appends text after the line (GNU one-line form; \\b in the text is b)",
+    "out": "abc\nbottom",
+    "code": 0
+  },
+  "printf 'a\\nb\\n' | sed -n '$='": {
+    "reason": "Task 7: real sed (sed.js), output checked against GNU sed 4.9: = prints the line number, so -n '$=' counts lines",
+    "out": "2",
+    "code": 0
+  },
+  "awk '{print $1}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; prints the first blank-separated field of each line (matches mawk 1.3.4 on the same file)",
+    "out": "apple\nbread\nrope\ntorch\nmap",
+    "code": 0
+  },
+  "awk '{print}' readme.txt": {
+    "reason": "Task 9: awk is a real command; a bare print prints $0, so the file is copied (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "awk -F, '{print $2}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; -F, splits on commas and these lines have none, so $2 is empty on all five lines (matches mawk 1.3.4 on the same file)",
+    "out": "\n\n\n",
+    "code": 0
+  },
+  "awk 'BEGIN{print 1+2}'": {
+    "reason": "Task 9: awk is a real command; BEGIN runs without reading input (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'END{print NR}' readme.txt": {
+    "reason": "Task 9: awk is a real command; NR in END is the record count, 4 lines (matches mawk 1.3.4 on the same file)",
+    "out": "4",
+    "code": 0
+  },
+  "awk 'NR==1' readme.txt": {
+    "reason": "Task 9: awk is a real command; a pattern without an action prints the matching record (line 1) (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!",
+    "code": 0
+  },
+  "awk '/wolf/' forest/notes.txt": {
+    "reason": "Task 9: awk is a real command; the file is missing in this world; awk reports it in BWK wording (`awk: can't open file F`, exit 2; mawk says cannot open \"F\" (No such file or directory), also exit 2)",
+    "out": "awk: can't open file forest/notes.txt",
+    "code": 2
+  },
+  "awk '{s+=$1} END{print s}' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; $1 is a word on every line, so the numeric sum is 0 (matches mawk 1.3.4 on the same file)",
+    "out": "0",
+    "code": 0
+  },
+  "echo 'a b c' | awk '{print $2}'": {
+    "reason": "Task 9: awk is a real command; reads stdin from the pipe and prints field 2 (matches mawk 1.3.4 on the same file)",
+    "out": "b",
+    "code": 0
+  },
+  "echo 'a b c' | awk '{print NF}'": {
+    "reason": "Task 9: awk is a real command; NF is the field count, 3 (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "echo 'a:b' | awk -F: '{print $1}'": {
+    "reason": "Task 9: awk is a real command; -F: splits on colons (matches mawk 1.3.4 on the same file)",
+    "out": "a",
+    "code": 0
+  },
+  "echo 'a b' | awk '{print $2, $1}'": {
+    "reason": "Task 9: awk is a real command; the comma in print inserts OFS (a space) (matches mawk 1.3.4 on the same file)",
+    "out": "b a",
+    "code": 0
+  },
+  "echo 3 | awk '{print $1*2}'": {
+    "reason": "Task 9: awk is a real command; a numeric-looking field does arithmetic (matches mawk 1.3.4 on the same file)",
+    "out": "6",
+    "code": 0
+  },
+  "echo x | awk '{printf \"%s!\\n\", $1}'": {
+    "reason": "Task 9: awk is a real command; printf formats through SQ.fmtPrintf (matches mawk 1.3.4 on the same file)",
+    "out": "x!",
+    "code": 0
+  },
+  "echo abc | awk '{print length($0)}'": {
+    "reason": "Task 9: awk is a real command; length of the record (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "echo abc | awk '{print toupper($0)}'": {
+    "reason": "Task 9: awk is a real command; toupper (matches mawk 1.3.4 on the same file)",
+    "out": "ABC",
+    "code": 0
+  },
+  "echo 'a b' | awk '{$1=\"z\"; print}'": {
+    "reason": "Task 9: awk is a real command; assigning a field rebuilds $0 with OFS (matches mawk 1.3.4 on the same file)",
+    "out": "z b",
+    "code": 0
+  },
+  "awk 'BEGIN{for(i=0;i<3;i++)print i}'": {
+    "reason": "Task 9: awk is a real command; a C-style for loop in BEGIN (matches mawk 1.3.4 on the same file)",
+    "out": "0\n1\n2",
+    "code": 0
+  },
+  "awk 'BEGIN{x[1]=2; print x[1]}'": {
+    "reason": "Task 9: awk is a real command; arrays (matches mawk 1.3.4 on the same file)",
+    "out": "2",
+    "code": 0
+  },
+  "awk '{a[$1]++} END{for(k in a)print k,a[k]}' readme.txt": {
+    "reason": "Task 9: awk is a real command; counts first words; real awk's for-in order is unspecified (mawk prints Folders, This, Type, Welcome,) and this shell uses insertion order (documented in awk.js); the same four lines each with count 1",
+    "out": "Welcome, 1\nThis 1\nFolders 1\nType 1",
+    "code": 0
+  },
+  "awk": {
+    "reason": "Task 9: awk is a real command; no program prints the usage line (BWK wording) with exit 2 (mawk prints a long help text instead)",
+    "out": "usage: awk [-F fs][-v var=value][prog | -f progfile][file ...]",
+    "code": 2
+  },
+  "awk -f prog.awk readme.txt": {
+    "reason": "Task 9: awk is a real command; -f of a missing program file is an error in BWK wording, exit 2 (mawk: cannot open \"prog.awk\", also exit 2)",
+    "out": "awk: can't open file prog.awk",
+    "code": 2
+  },
+  "awk '{'": {
+    "reason": "Task 9: awk is a real command; the unclosed brace is a syntax error before anything runs (Task 8 parser, BWK shape), exit 2 (mawk: missing } near end of file, exit 2)",
+    "out": "awk: syntax error at source line 1\n context is { >>>  <<<",
+    "code": 2
+  },
+  "awk 'BEGIN{print 1/0}'": {
+    "reason": "Task 9: awk is a real command; division by zero is an error, `awk: division by zero` with exit 2, as the plan requires (BWK and gawk stop the same way; mawk alone prints inf)",
+    "out": "awk: division by zero\n source line number 1",
+    "code": 2
+  },
+  "awk 'BEGIN{system(\"ls\")}'": {
+    "reason": "Task 9: awk is a real command; system() is refused with the practice-shell message, exit 2 (Review Focus 2)",
+    "out": "this practice shell does not support awk system() yet",
+    "code": 2
+  },
+  "awk 'BEGIN{getline; print}'": {
+    "reason": "Task 9: awk is a real command; getline is refused with the practice-shell message, exit 2 (Review Focus 2)",
+    "out": "this practice shell does not support awk getline yet",
+    "code": 2
+  },
+  "echo 10 9 | awk '{print ($1<$2)}'": {
+    "reason": "Task 9: awk is a real command; fields that look numeric compare as numbers, 10 < 9 is false (matches mawk 1.3.4 on the same file)",
+    "out": "0",
+    "code": 0
+  },
+  "awk 'BEGIN{print substr(\"hello\",2,3)}'": {
+    "reason": "Task 9: awk is a real command; substr (matches mawk 1.3.4 on the same file)",
+    "out": "ell",
+    "code": 0
+  },
+  "awk 'BEGIN{print index(\"abc\",\"c\")}'": {
+    "reason": "Task 9: awk is a real command; index is 1-based (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'BEGIN{print split(\"a b c\",arr)}'": {
+    "reason": "Task 9: awk is a real command; split returns the piece count (matches mawk 1.3.4 on the same file)",
+    "out": "3",
+    "code": 0
+  },
+  "awk 'BEGIN{printf \"%5.2f\\n\", 3.14159}'": {
+    "reason": "Task 9: awk is a real command; printf %5.2f (matches mawk 1.3.4 on the same file)",
+    "out": " 3.14",
+    "code": 0
+  },
+  "awk '$1>2' village/shop.txt": {
+    "reason": "Task 9: awk is a real command; $1 is a word, so $1>2 is a string comparison and every word sorts after \"2\": all lines print (matches mawk 1.3.4 on the same file)",
+    "out": "apple 2\nbread 3\nrope 12\ntorch 8\nmap 20",
+    "code": 0
+  },
+  "awk 'NF' readme.txt": {
+    "reason": "Task 9: awk is a real command; NF as a pattern selects non-empty lines (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "awk '!seen[$0]++' readme.txt": {
+    "reason": "Task 9: awk is a real command; the dedupe idiom; readme.txt has no repeated lines (matches mawk 1.3.4 on the same file)",
+    "out": "Welcome, explorer!\nThis world is made of folders and files.\nFolders hold other things. Files hold text.\nType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "cat /dev/zero | head -c 10": {
+    "reason": "Task 10: head -c N is built (the first N bytes), where it used to treat -c and N as file names",
+    "out": "cat: /dev/zero: No such file or directory",
+    "code": 0
+  },
+  "head -c 5 /dev/null": {
+    "reason": "Task 10: head -c N is built (the first N bytes), where it used to treat -c and N as file names",
+    "out": "",
+    "code": 0
+  },
+  "find . -maxdepth 1": {
+    "reason": "Task 10: find -maxdepth is built: it lists the start point and its direct children",
+    "out": ".\n./camp\n./config.ini\n./docs\n./drafts\n./forest\n./journal.txt\n./lib\n./logs\n./notes.txt\n./numbers.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "find . -mindepth 1 -maxdepth 1": {
+    "reason": "Task 10: find -mindepth and -maxdepth are built: the direct children of the start point, without the start point",
+    "out": "./camp\n./config.ini\n./docs\n./drafts\n./forest\n./journal.txt\n./lib\n./logs\n./notes.txt\n./numbers.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "find . -empty": {
+    "reason": "Task 10: find -empty is built: it lists empty files and empty folders",
+    "out": "./camp/supplies/food\n./camp/tent.txt\n./drafts\n./scripts",
+    "code": 0
+  },
+  "find . -name \"*.txt\" -exec echo {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "find . -name \"*.txt\" -exec cat {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "find . -name \"*.txt\" -exec grep -l wolf {} +": {
+    "reason": "Task 10: find -exec ... {} + is built: one grep -l run with every .txt file; only journal.txt mentions wolf",
+    "out": "./journal.txt",
+    "code": 0
+  },
+  "find . -name \"*.txt\" -print0 | xargs -0 echo": {
+    "reason": "Task 10: find -print0 and xargs -0 are built: the NUL-separated names reach echo as arguments",
+    "out": "./camp/tent.txt ./docs/ideas.txt ./docs/notes.txt ./docs/todo.txt ./forest/cave/deeper/chest/gold.txt ./forest/cave/echo.txt ./forest/mushroom.txt ./forest/owl.txt ./journal.txt ./logs/readme.txt ./notes.txt ./numbers.txt ./readme.txt ./secrets.txt ./village/logs/notes.txt ./village/people.txt ./village/scratch/keep.txt ./village/shop.txt",
+    "code": 0
+  },
+  "find . -name \"*.log\" -delete": {
+    "reason": "Task 10: find -delete is built: it removes the matching files (10 .log files) and prints nothing",
+    "out": "",
+    "code": 0,
+    "gone": [
+      "/home/explorer/logs/app.log",
+      "/home/explorer/logs/db.log",
+      "/home/explorer/logs/web.log",
+      "/home/explorer/village/logs/access.log",
+      "/home/explorer/village/logs/all.log",
+      "/home/explorer/village/logs/day1.log",
+      "/home/explorer/village/logs/day2.log",
+      "/home/explorer/village/logs/day3.log",
+      "/home/explorer/village/scratch/old1.log",
+      "/home/explorer/village/scratch/old2.log"
+    ]
+  },
+  "find . -type f -exec wc -l {} ;": {
+    "reason": "Task 10: find -exec is built. The unquoted ; ends the typed command (the shell treats it as a separator), so find has no terminator for -exec and says what GNU find says: missing argument to -exec (write ; or ';' to run it)",
+    "out": "find: missing argument to '-exec'"
+  },
+  "echo a b c | xargs -P 2 echo": {
+    "reason": "Task 10: xargs -P is accepted (batches run one after another in input order); without -n all items go to one echo",
+    "out": "a b c",
+    "code": 0
+  },
+  "echo a b c | xargs -P 2 -n 1 echo": {
+    "reason": "Task 10: xargs -P is accepted (batches run one after another in input order); -n 1 gives one echo per item",
+    "out": "a\nb\nc",
+    "code": 0
+  },
+  "printf \"a\\0b\\0\" | xargs -0 echo": {
+    "reason": "Task 10: xargs -0 is built: the NUL-separated items a and b reach echo",
+    "out": "a b",
+    "code": 0
+  },
+  "echo a b | xargs -t echo": {
+    "reason": "Task 10: xargs -t is built: it prints each command line to stderr before running it",
+    "out": "echo a b\na b",
+    "code": 0
+  },
+  "tac readme.txt": {
+    "reason": "Task 10: tac is built: it prints the lines last to first, where the name used to be unknown",
+    "out": "Type help any time to see the commands you can use.\nFolders hold other things. Files hold text.\nThis world is made of folders and files.\nWelcome, explorer!",
+    "code": 0
+  },
+  "nl readme.txt": {
+    "reason": "Task 10: nl is built: it numbers the lines (-b t by default, six-wide number, tab), where the name used to be unknown",
+    "out": "     1\tWelcome, explorer!\n     2\tThis world is made of folders and files.\n     3\tFolders hold other things. Files hold text.\n     4\tType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "comm readme.txt readme.txt": {
+    "reason": "Task 10: comm is built: a file against itself puts every line in column 3 (two tabs), where the name used to be unknown",
+    "out": "\t\tWelcome, explorer!\n\t\tThis world is made of folders and files.\n\t\tFolders hold other things. Files hold text.\n\t\tType help any time to see the commands you can use.",
+    "code": 0
+  },
+  "echo $SECONDS": {
+    "reason": "Task 11: $SECONDS reads the virtual clock (whole seconds since the session started; a fresh world is at 0 during its first line)",
+    "out": "0"
+  },
+  "echo $PPID": {
+    "reason": "Task 11: $PPID is the shell's virtual parent pid 1233 (ps -ef shows it as bash's PPID)",
+    "out": "1233"
+  },
+  "date +%Y | wc -c": {
+    "reason": "Task 11: date +FORMAT is supported on the virtual clock: +%Y prints the epoch year 2026 (4 characters plus the newline), where the old wall-clock date ignored its argument",
+    "out": "5"
+  },
+  "sleep 1": {
+    "reason": "Task 11: sleep is built on the virtual clock: it advances the clock by 1 second, prints nothing and succeeds at once",
+    "out": "",
+    "code": 0
+  },
+  "sleep 0": {
+    "reason": "Task 11: sleep is built on the virtual clock: sleep 0 prints nothing and succeeds",
+    "out": "",
+    "code": 0
+  },
+  "sleep": {
+    "reason": "Task 11: sleep is built: no operand prints GNU's missing operand message, status 1",
+    "out": "sleep: missing operand\nTry 'sleep --help' for more information.",
+    "code": 1
+  },
+  "sleep abc": {
+    "reason": "Task 11: sleep is built: a bad interval prints GNU's message, status 1",
+    "out": "sleep: invalid time interval 'abc'\nTry 'sleep --help' for more information.",
+    "code": 1
+  },
+  "sleep 1; echo done": {
+    "reason": "Task 11: sleep is built on the virtual clock, so only echo prints",
+    "out": "done"
+  },
+  "sleep 0.1": {
+    "reason": "Task 11: sleep is built on the virtual clock and keeps fractions: it advances 0.1 seconds and succeeds",
+    "out": "",
+    "code": 0
+  },
+  "ps": {
+    "reason": "Task 11: ps is built: the process table lists the shell (pid 1234) and the ps run itself (the first new pid, 1235)",
+    "out": "  PID TTY          TIME CMD\n 1234 pts/0    00:00:00 bash\n 1235 pts/0    00:00:00 ps",
+    "code": 0
+  },
+  "timeout 1 sleep 5": {
+    "reason": "Task 11: timeout is built: the sleep is stopped at the 1-second deadline (the clock moves exactly 1 second), status 124 and no output",
+    "out": "",
+    "code": 124
+  },
+  ":(){ :|:& };:": {
+    "reason": "Stage 3 Task 12a: : is a function name and & starts jobs: the fork bomb runs into the 16-live-job and 200-process caps (bash: fork: retry: Resource temporarily unavailable, printed by the jobs that tried) and the shell stays usable. Stage 3 Task 12b: the first job (the one the line started) ends during the line, so its notice \"[1]+  Done                    :|:\" closes the line",
+    "out": "[1] 1235\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\nbash: fork: retry: Resource temporarily unavailable\n[1]+  Done                    :|:",
+    "code": 0
+  },
+  ":(){ :|: };:": {
+    "reason": "Stage 3 Task 12a: : is a function name now (as in bash), so this reaches the body, where } is an argument of the second : and the group never closes: bash reports the same unexpected end of file",
+    "out": "bash: syntax error: unexpected end of file"
+  },
+  "sleep 5 &": {
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost)",
+    "out": "[1] 1235",
+    "code": 0
+  },
+  "sleep 1 & echo bg": {
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); bg prints first because the job only runs after the line",
+    "out": "[1] 1235\nbg",
+    "code": 0
+  },
+  "echo a & echo b": {
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); b prints first because the job only runs after the line. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\nb\na\n[1]+  Done                    echo a",
+    "code": 0
+  },
+  "echo $!": {
+    "reason": "Stage 3 Task 12b: $! is the pid of the newest background job and empty before any, so echo prints an empty line",
+    "out": ""
+  },
+  "jobs": {
+    "reason": "Stage 3 Task 12b: jobs is a builtin; with no jobs it prints nothing (status 0)",
+    "out": "",
+    "code": 0
+  },
+  "wait": {
+    "reason": "Stage 3 Task 12b: wait is a builtin; with no jobs it returns 0 at once and prints nothing",
+    "out": "",
+    "code": 0
+  },
+  "wait; echo $?": {
+    "reason": "Stage 3 Task 12b: wait is a builtin; with no jobs it returns 0 at once",
+    "out": "0"
+  },
+  "kill 1": {
+    "reason": "Stage 3 Task 12b: kill is a builtin; pid 1 is no process of this practice shell, so bash's \"(1) - No such process\" (status 1)",
+    "out": "bash: kill: (1) - No such process",
+    "code": 1
+  },
+  "kill -9 1234": {
+    "reason": "Task 14: kill $$ reaches the interactive shell, which never exits (bash would close it on KILL; TERM, INT and QUIT it ignores): nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "wait $!": {
+    "reason": "Stage 3 Task 12b: $! is empty before any job, so this is a plain wait: no jobs, status 0, no output",
+    "out": "",
+    "code": 0
+  },
+  "set -- a b; echo x | shift; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "2"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" $@; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a][b][c]"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" \"$@\"; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a b][c]"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" \"$*\"; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a b c]"
+  },
+  "set -- a b c; echo ${@:2}": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "b c"
+  },
+  "set -- a b c; echo ${#@}": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "3"
+  },
+  "bash -c \"echo hi\"": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "hi",
+    "code": 0
+  },
+  "bash -c \"exit 3\"; echo $?": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "3"
+  },
+  "set -- a b c; shift; echo $@": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "b c"
+  },
+  "set -- a b c; shift 2; echo $@": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "c"
+  },
+  "set -- a b; shift 3; echo $?": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "1"
+  },
+  "set -- \"a b\" c; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "2"
+  },
+  "set --; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "0"
+  },
+  "set -- a b; for x; do echo $x; done": {
+    "reason": "Task 13: set -- a b sets the positional parameters, so for x (in \"$@\") loops over a and b and leaves x=b",
+    "out": "a\nb",
+    "vars": {
+      "x": "b"
+    }
+  },
+  "set -- a b; for x in \"$@\"; do echo $x; done": {
+    "reason": "Task 13: set -- a b sets the positional parameters, so for x (in \"$@\") loops over a and b and leaves x=b",
+    "out": "a\nb",
+    "vars": {
+      "x": "b"
+    }
+  },
+  "set -- a b; echo \"$*\"": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a b"
+  },
+  "set -- a b; IFS=,; echo \"$*\"": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a,b"
+  },
+  "set -e; false; echo after": {
+    "reason": "Task 13: set -e ends the line at the failing false (a typed line stops; bash would close the shell), status 1",
+    "out": "",
+    "code": 1
+  },
+  "set -e; true; echo after": {
+    "reason": "Task 13: set -e with nothing failing changes nothing; set now exists, so no command-not-found line",
+    "out": "after"
+  },
+  "set -u; echo $UNSET": {
+    "reason": "Task 13: set -u makes $UNSET an error: bash: UNSET: unbound variable, status 1, the line ends",
+    "out": "bash: UNSET: unbound variable",
+    "code": 1
+  },
+  "set -x; echo hi": {
+    "reason": "Task 13: set -x traces the expanded command to stderr (+ echo hi) before it runs",
+    "out": "+ echo hi\nhi"
+  },
+  "set -o pipefail; false | true; echo $?": {
+    "reason": "Task 13: set -o pipefail makes false | true fail with the status of false (1)",
+    "out": "1"
+  },
+  "set -euo pipefail": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "set +e": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "set -o": {
+    "reason": "Task 13: set -o lists the 27 bash option names in bash order with the values of bash -c (errexit nounset pipefail xtrace live)",
+    "out": "allexport      \toff\nbraceexpand    \ton\nemacs          \toff\nerrexit        \toff\nerrtrace       \toff\nfunctrace      \toff\nhashall        \ton\nhistexpand     \toff\nhistory        \toff\nignoreeof      \toff\ninteractive-comments\ton\nkeyword        \toff\nmonitor        \toff\nnoclobber      \toff\nnoexec         \toff\nnoglob         \toff\nnolog          \toff\nnotify         \toff\nnounset        \toff\nonecmd         \toff\nphysical       \toff\npipefail       \toff\nposix          \toff\nprivileged     \toff\nverbose        \toff\nvi             \toff\nxtrace         \toff",
+    "code": 0
+  },
+  "set": {
+    "reason": "Task 13: set alone lists the set variables as NAME=value, sorted and quoted as bash prints them",
+    "out": "HOME=/home/explorer\nHOSTNAME=basecamp\nIFS=$' \\t\\n'\nPATH=/usr/local/bin:/usr/bin:/bin\nPWD=/home/explorer\nSHELL=/bin/bash\nUSER=explorer",
+    "code": 0
+  },
+  "set -n": {
+    "reason": "Task 13: set -n is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -n yet",
+    "code": 2
+  },
+  "set -f; echo *": {
+    "reason": "Task 13: set -f is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -f yet\ncamp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "set -C; echo a > readme.txt": {
+    "reason": "Task 13: set -C is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -C yet"
+  },
+  "bash -x -c \"echo hi\"": {
+    "reason": "Task 13: bash -x -c TEXT runs TEXT with xtrace on: the trace line + echo hi (stderr) comes before hi",
+    "out": "+ echo hi\nhi",
+    "code": 0
+  },
+  "bash -n -c \"echo hi\"": {
+    "reason": "Task 13: bash -n -c TEXT only parses TEXT: nothing runs, status 0",
+    "out": "",
+    "code": 0
+  },
+  "v='a b'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v='a b'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v=' a  b '; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v=' a  b '; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='*'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "14"
+  },
+  "v='*'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='x*y'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='x*y'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v=''; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "0"
+  },
+  "v=''; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='a\tb'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v='a\tb'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "trap \"echo bye\" EXIT": {
+    "reason": "Task 14: trap is a builtin; at the prompt an EXIT trap is stored and never runs (the page never exits): nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "trap": {
+    "reason": "Task 14: trap is a builtin; with no traps set, trap alone lists nothing (status 0, as bash)",
+    "out": "",
+    "code": 0
+  },
+  "trap -l": {
+    "reason": "Task 14: trap is a builtin; trap -l prints the bash 5.2 signal table (the same as kill -l)",
+    "out": " 1) SIGHUP\t 2) SIGINT\t 3) SIGQUIT\t 4) SIGILL\t 5) SIGTRAP\n 6) SIGABRT\t 7) SIGBUS\t 8) SIGFPE\t 9) SIGKILL\t10) SIGUSR1\n11) SIGSEGV\t12) SIGUSR2\t13) SIGPIPE\t14) SIGALRM\t15) SIGTERM\n16) SIGSTKFLT\t17) SIGCHLD\t18) SIGCONT\t19) SIGSTOP\t20) SIGTSTP\n21) SIGTTIN\t22) SIGTTOU\t23) SIGURG\t24) SIGXCPU\t25) SIGXFSZ\n26) SIGVTALRM\t27) SIGPROF\t28) SIGWINCH\t29) SIGIO\t30) SIGPWR\n31) SIGSYS\t34) SIGRTMIN\t35) SIGRTMIN+1\t36) SIGRTMIN+2\t37) SIGRTMIN+3\n38) SIGRTMIN+4\t39) SIGRTMIN+5\t40) SIGRTMIN+6\t41) SIGRTMIN+7\t42) SIGRTMIN+8\n43) SIGRTMIN+9\t44) SIGRTMIN+10\t45) SIGRTMIN+11\t46) SIGRTMIN+12\t47) SIGRTMIN+13\n48) SIGRTMIN+14\t49) SIGRTMIN+15\t50) SIGRTMAX-14\t51) SIGRTMAX-13\t52) SIGRTMAX-12\n53) SIGRTMAX-11\t54) SIGRTMAX-10\t55) SIGRTMAX-9\t56) SIGRTMAX-8\t57) SIGRTMAX-7\n58) SIGRTMAX-6\t59) SIGRTMAX-5\t60) SIGRTMAX-4\t61) SIGRTMAX-3\t62) SIGRTMAX-2\n63) SIGRTMAX-1\t64) SIGRTMAX\t",
+    "code": 0
+  },
+  "trap \"\" INT": {
+    "reason": "Task 14: trap is a builtin; trap \"\" INT ignores SIGINT silently, status 0",
+    "out": "",
+    "code": 0
+  },
+  "trap - INT": {
+    "reason": "Task 14: trap is a builtin; trap - INT resets SIGINT silently, status 0",
+    "out": "",
+    "code": 0
+  },
+  "type -t ls": {
+    "reason": "Stage 3 Task 15: type -t prints one word per name (builtin, file, function, keyword); ls is a command, so file",
+    "out": "file"
+  },
+  "command -v ls": {
+    "reason": "Stage 3 Task 15: command is a builtin; command -v prints the path a command would run from (/usr/bin/NAME, like which and type)",
+    "out": "/usr/bin/ls",
+    "code": 0
+  },
+  "command ls": {
+    "reason": "Stage 3 Task 15: command NAME runs the builtin or command NAME (skipping functions), so this is a plain ls",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "code": 0
+  },
+  "readonly r=1; r=2": {
+    "reason": "Stage 3 Task 15: readonly is built; assigning a readonly variable prints bash: r: readonly variable, status 1, and r keeps its value",
+    "out": "bash: r: readonly variable",
+    "code": 1,
+    "vars": {
+      "r": "1"
+    }
+  },
+  "FOO=bar; export FOO; printenv FOO": {
+    "reason": "Stage 3 Task 15: printenv is built and prints the value of the exported FOO",
+    "out": "bar",
+    "code": 0
+  },
+  "getopts \"ab:\" opt -a; echo $opt": {
+    "reason": "Stage 3 Task 15: getopts is built: -a matches option a, so opt=a and OPTIND moves to 2 (bash sets both)",
+    "out": "a",
+    "vars": {
+      "OPTIND": "2",
+      "opt": "a"
+    }
+  },
+  "getopts": {
+    "reason": "Stage 3 Task 15: getopts is built; with no arguments it prints bash's usage line, status 2",
+    "out": "getopts: usage: getopts optstring name [arg ...]",
+    "code": 2
+  },
+  "mktemp": {
+    "reason": "Stage 3 Task 15: mktemp is built; names come from a per-session counter, so the first one is /tmp/tmp.A00001",
+    "out": "/tmp/tmp.A00001",
+    "code": 0
+  },
+  "mktemp -d": {
+    "reason": "Stage 3 Task 15: mktemp -d is built; it makes /tmp/tmp.A00001 as a directory and prints its name",
+    "out": "/tmp/tmp.A00001",
+    "code": 0
+  },
+  "realpath readme.txt": {
+    "reason": "Stage 3 Task 15: realpath is built and prints the absolute path",
+    "out": "/home/explorer/readme.txt",
+    "code": 0
+  },
+  "printenv HOME": {
+    "reason": "Stage 3 Task 15: printenv is built and prints HOME from the environment",
+    "out": "/home/explorer",
+    "code": 0
+  },
+  "echo <(echo hi)": {
+    "reason": "Stage 3 Task 16: process substitution is built; the word expands to the hidden file /dev/fd/63",
+    "out": "/dev/fd/63",
+    "code": 0
+  },
+  "cat <(echo hi)": {
+    "reason": "Stage 3 Task 16: process substitution is built; cat reads /dev/fd/63, which holds the output of echo hi",
+    "out": "hi",
+    "code": 0
+  },
+  "diff <(echo a) <(echo b)": {
+    "reason": "Stage 3 Task 16: process substitution is built; diff compares /dev/fd/63 (a) with /dev/fd/62 (b), status 1 as the files differ",
+    "out": "1c1\n< a\n---\n> b",
+    "code": 1
+  },
+  "cat <(ls) | wc -l": {
+    "reason": "Stage 3 Task 16: process substitution is built; the 14 names ls prints reach wc through /dev/fd/63",
+    "out": "14",
+    "code": 0
+  },
+  "echo hi > >(cat)": {
+    "reason": "Stage 3 Task 16: >( ) is refused when the line is parsed with the unsupported-syntax message (status 2)",
+    "out": "this practice shell does not support >( ) yet"
+  },
+  "sort <(printf \"b\\na\\n\")": {
+    "reason": "Stage 3 Task 16: process substitution is built; sort reads the two printf lines from /dev/fd/63",
+    "out": "a\nb",
+    "code": 0
+  },
+  "while read l; do echo $l; done < <(echo x)": {
+    "reason": "Stage 3 Task 16: process substitution is built; the loop reads its input from /dev/fd/63 (< <( ) form)",
+    "out": "x",
+    "code": 0,
+    "vars": {
+      "l": ""
+    }
+  },
+  "paste <(echo a) <(echo b)": {
+    "reason": "Stage 3 Task 16: process substitution is built; paste joins /dev/fd/63 and /dev/fd/62 with a tab",
+    "out": "a\tb",
+    "code": 0
+  },
+  "help": {
+    "reason": "Stage 3 Task 20: help lists the commands by tier, Beginner to Expert (awk, sed -i, tac/nl/paste/comm, jobs/wait/kill/trap, getopts, mktemp, ...), so the learner can find the Stage 2 and Stage 3 commands",
+    "out": "Commands in this practice shell, by tier:\nBeginner\n  Look around   pwd  ls  cd  tree  cat\n  Create        mkdir  touch  echo\n  Organize      cp  mv  rm  rmdir\n  Read          head  tail  wc  grep  sort  uniq\n  Search        find\n  Scripts       NAME=value  chmod  bash  ./file  for … do … done\nIntermediate\n  Text          cut  tr  sed  tee  printf  seq  diff  xargs\n  Quoting       $( )  '…'  \"…\"  export  env  printenv  $?\n  Streams       2>  2>&1  /dev/null\n  Files         ln -s  stat  chmod 755  basename  dirname  realpath\n  Lookup        which  type  command -v\nAdvanced\n  Decisions     if  case  [ ]  [[ ]]  test  true  false\n  Loops         while  until  for  break  continue  $(( ))  (( ))\n  Functions     name() { … }  local  return  shift  $1  $@  $#\n  Scripts       nano  read  source  exit  unset  readonly  <<EOF\nExpert\n  awk & sed     awk  sed -n -i -E  grep -E -o -w -r -A -B\n  More text     tac  nl  paste  comm  find -exec  xargs -I -P  <( )\n  Processes     ps  sleep  &  $!  jobs  wait  kill  trap  timeout\n  Safe scripts  set -euo pipefail  set -x  getopts  mktemp\nOther           history  clear  whoami  hostname  date  man <command>\nSymbols:  |  >  >>  <  &&  ||  ;  &  *  ?  ~  .  ..\nTry: man awk"
+  }
+}

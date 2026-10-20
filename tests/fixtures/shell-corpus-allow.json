@@ -288,14 +288,13 @@
     "code": 0
   },
   "echo hi &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so hi follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\nhi\n[1]+  Done                    echo hi"
   },
   "sleep 1 &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost)",
+    "out": "[1] 1235",
+    "code": 0
   },
   "if true; then echo y; fi": {
     "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
@@ -365,18 +364,25 @@
     ]
   },
   "echo hi > f &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2,
-    "files": []
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); the job writes f. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n[1]+  Done                    echo hi > f",
+    "files": [
+      [
+        "/home/explorer/f",
+        2,
+        "c22b5f91"
+      ]
+    ]
   },
   "ls &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet"
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so the listing follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\ncamp/  config.ini  forest/  journal.txt  notes.txt  readme.txt  scripts/  secrets.txt  village/\n[1]+  Done                    ls",
+    "code": 0
   },
   "for i in 1; do echo $i; done &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet"
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost), so 1 follows the notice. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n1\n[1]+  Done                    for i in 1; do echo $i; done",
+    "code": 0
   },
   "! true": {
     "reason": "Task 7: true, false and : are builtins (status 0, 1, 0); compounds and ! use them",
@@ -389,9 +395,9 @@
     "code": 0
   },
   "cd forest &": {
-    "reason": "Task 6a: unquoted & reaches the parser: \"this practice shell does not support & yet\" (nothing runs)",
-    "out": "this practice shell does not support & yet",
-    "code": 2
+    "reason": "Stage 3 Task 12a: & runs the and-or list as a background job: a typed line prints \"[1] 1235\" (job number, pid) and the job runs when the clock moves (here at the line's 1-second cost); cd inside the job does not move the shell. Stage 3 Task 12b: the job ends during the line's 1-second cost, so the interactive shell's job notice (\"[1]+  Done                    CMD\", bash's 24-column state field) closes the line",
+    "out": "[1] 1235\n[1]+  Done                    cd forest",
+    "code": 0
   },
   "select x in a; do echo $x; done": {
     "reason": "Task 6a: select is parsed and reported as unsupported",
@@ -408,13 +414,13 @@
     "code": 0
   },
   "cat <(echo hi)": {
-    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
-    "out": "bash: syntax error near unexpected token '('",
-    "code": 2
+    "reason": "Stage 3 Task 16: process substitution is built; cat reads /dev/fd/63, which holds the output of echo hi",
+    "out": "hi",
+    "code": 0
   },
   "echo hi >(cat)": {
-    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
-    "out": "bash: syntax error near unexpected token '('",
+    "reason": "Stage 3 Task 16: >( ) is refused when the line is parsed with the unsupported-syntax message (status 2); no file is written",
+    "out": "this practice shell does not support >( ) yet",
     "code": 2,
     "files": []
   },
@@ -571,5 +577,124 @@
   "code f": {
     "reason": "Task 13: the old message said the shell has no text editor, which is false since Task 9; it now points to nano",
     "out": "code opens VS Code, which this practice shell does not have. Use its own small editor instead: nano FILE."
+  },
+  "cd forest | cat": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash behaviour); the shell stays in the home directory",
+    "cwd": "/home/explorer"
+  },
+  "cd forest | pwd": {
+    "reason": "Stage 3 Task 3: every pipeline stage is a full subshell, so cd in a stage no longer moves the shell (bash behaviour); pwd, a later stage, and the shell both stay in the home directory",
+    "out": "/home/explorer",
+    "cwd": "/home/explorer"
+  },
+  "X=a Y=b": {
+    "reason": "Stage 3 Task 4: a command made only of NAME=value words sets each one, left to right, as in bash",
+    "out": "",
+    "code": 0,
+    "vars": {
+      "X": "a",
+      "Y": "b"
+    }
+  },
+  "X= 1": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "bash: 1: command not found"
+  },
+  "X=*; echo $X": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "camp config.ini forest journal.txt notes.txt readme.txt scripts secrets.txt village"
+  },
+  "X=$(ls forest); echo $X": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "cave mushroom.txt owl.txt"
+  },
+  "a=b echo hi": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "hi",
+    "code": 0
+  },
+  "X=1 echo $X": {
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
+    "out": "",
+    "code": 0
+  },
+  "[setup 0..8]\necho \"Today is $(date)\"\necho \"wolves: $(grep -ic wolf journal.txt)\"\necho '$HOME'\nFILES=$(ls village); echo $FILES": {
+    "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
+    "out": "logs people.txt sales.csv shop.txt"
+  },
+  "grep -l wolf *": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "grep: camp: Is a directory\ngrep: forest: Is a directory\ngrep: scripts: Is a directory\ngrep: village: Is a directory\njournal.txt",
+    "code": 2
+  },
+  "grep -r wolf .": {
+    "reason": "Stage 3 Task 6: grep -r is built and now searches instead of printing the unsupported message",
+    "out": "./journal.txt:Heard a wolf howling far away.\n./journal.txt:The wolf followed me to the gate, then turned away.\n./village/logs/all.log:10.0.0.7 INFO wolf seen\n./village/logs/day2.log:13:10 wolf seen near the river",
+    "code": 0
+  },
+  "grep -l wolf journal.txt": {
+    "reason": "Stage 3 Task 6: grep -l is built and now searches instead of printing the unsupported message",
+    "out": "journal.txt",
+    "code": 0
+  },
+  "grep -w wolf journal.txt": {
+    "reason": "Stage 3 Task 6: grep -w is built and now searches instead of printing the unsupported message",
+    "out": "Heard a wolf howling far away.\nThe wolf followed me to the gate, then turned away.",
+    "code": 0
+  },
+  "grep \"[\" journal.txt": {
+    "reason": "Stage 3 Task 6: an unclosed [ is a bad regular expression: GNU grep prints \"grep: Invalid regular expression\" and exits 2 instead of matching a literal [",
+    "out": "grep: Invalid regular expression",
+    "code": 2
+  },
+  "grep -x x journal.txt": {
+    "reason": "Stage 3 Task 6: grep -x is built and now searches instead of printing the unsupported message",
+    "out": ""
+  },
+  "sort village/people.txt | uniq -d": {
+    "reason": "Task 10: uniq -d prints only the lines that repeat (before, the flag was ignored and every distinct line printed)",
+    "out": "Ada\nBen\nMira"
+  },
+  "sort village/people.txt | uniq -u": {
+    "reason": "Task 10: uniq -u prints only the lines that are not repeated (before, the flag was ignored and every distinct line printed)",
+    "out": "Kai\nLena\nOmar\nTomas\nZoe"
+  },
+  "find . -maxdepth 1": {
+    "reason": "Task 10: find -maxdepth is built: it lists the start point and its direct children",
+    "out": ".\n./camp\n./config.ini\n./forest\n./journal.txt\n./notes.txt\n./readme.txt\n./scripts\n./.secret_map\n./secrets.txt\n./village",
+    "code": 0
+  },
+  "wait": {
+    "reason": "Stage 3 Task 12b: wait is a builtin; with no jobs it returns 0 at once and prints nothing",
+    "out": "",
+    "code": 0
+  },
+  "jobs": {
+    "reason": "Stage 3 Task 12b: jobs is a builtin; with no jobs it prints nothing (status 0)",
+    "out": "",
+    "code": 0
+  },
+  "bash -c \"echo hi\"": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "hi",
+    "code": 0
+  },
+  "set -e": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "trap x EXIT": {
+    "reason": "Task 14: trap is a builtin; at the prompt an EXIT trap is stored and never runs (the page never exits), so nothing is printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "help": {
+    "reason": "Stage 3 Task 20: help lists the commands by tier, Beginner to Expert (awk, sed -i, tac/nl/paste/comm, jobs/wait/kill/trap, getopts, mktemp, ...), so the learner can find the Stage 2 and Stage 3 commands",
+    "out": "Commands in this practice shell, by tier:\nBeginner\n  Look around   pwd  ls  cd  tree  cat\n  Create        mkdir  touch  echo\n  Organize      cp  mv  rm  rmdir\n  Read          head  tail  wc  grep  sort  uniq\n  Search        find\n  Scripts       NAME=value  chmod  bash  ./file  for … do … done\nIntermediate\n  Text          cut  tr  sed  tee  printf  seq  diff  xargs\n  Quoting       $( )  '…'  \"…\"  export  env  printenv  $?\n  Streams       2>  2>&1  /dev/null\n  Files         ln -s  stat  chmod 755  basename  dirname  realpath\n  Lookup        which  type  command -v\nAdvanced\n  Decisions     if  case  [ ]  [[ ]]  test  true  false\n  Loops         while  until  for  break  continue  $(( ))  (( ))\n  Functions     name() { … }  local  return  shift  $1  $@  $#\n  Scripts       nano  read  source  exit  unset  readonly  <<EOF\nExpert\n  awk & sed     awk  sed -n -i -E  grep -E -o -w -r -A -B\n  More text     tac  nl  paste  comm  find -exec  xargs -I -P  <( )\n  Processes     ps  sleep  &  $!  jobs  wait  kill  trap  timeout\n  Safe scripts  set -euo pipefail  set -x  getopts  mktemp\nOther           history  clear  whoami  hostname  date  man <command>\nSymbols:  |  >  >>  <  &&  ||  ;  &  *  ?  ~  .  ..\nTry: man awk"
+  },
+  "help cd": {
+    "reason": "Stage 3 Task 20: help lists the commands by tier, Beginner to Expert (awk, sed -i, tac/nl/paste/comm, jobs/wait/kill/trap, getopts, mktemp, ...), so the learner can find the Stage 2 and Stage 3 commands (help ignores its argument, as before)",
+    "out": "Commands in this practice shell, by tier:\nBeginner\n  Look around   pwd  ls  cd  tree  cat\n  Create        mkdir  touch  echo\n  Organize      cp  mv  rm  rmdir\n  Read          head  tail  wc  grep  sort  uniq\n  Search        find\n  Scripts       NAME=value  chmod  bash  ./file  for … do … done\nIntermediate\n  Text          cut  tr  sed  tee  printf  seq  diff  xargs\n  Quoting       $( )  '…'  \"…\"  export  env  printenv  $?\n  Streams       2>  2>&1  /dev/null\n  Files         ln -s  stat  chmod 755  basename  dirname  realpath\n  Lookup        which  type  command -v\nAdvanced\n  Decisions     if  case  [ ]  [[ ]]  test  true  false\n  Loops         while  until  for  break  continue  $(( ))  (( ))\n  Functions     name() { … }  local  return  shift  $1  $@  $#\n  Scripts       nano  read  source  exit  unset  readonly  <<EOF\nExpert\n  awk & sed     awk  sed -n -i -E  grep -E -o -w -r -A -B\n  More text     tac  nl  paste  comm  find -exec  xargs -I -P  <( )\n  Processes     ps  sleep  &  $!  jobs  wait  kill  trap  timeout\n  Safe scripts  set -euo pipefail  set -x  getopts  mktemp\nOther           history  clear  whoami  hostname  date  man <command>\nSymbols:  |  >  >>  <  &&  ||  ;  &  *  ?  ~  .  ..\nTry: man awk"
   }
 }

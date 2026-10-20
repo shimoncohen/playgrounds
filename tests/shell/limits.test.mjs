@@ -224,7 +224,7 @@ describe('safeRegex', () => {
     const SQ = loadShell();
     run(SQ, `echo ${hang} > h.txt`);
     for (const pat of ['(a|a)*$', '((a+))+$', '(a+)+$', '(a*)*$', '(.*a)+$', '(a|aa)+$']) {
-      const r = fast(SQ, `sed 's/${pat}/x/' h.txt`, 1000);
+      const r = fast(SQ, `sed -E 's/${pat}/x/' h.txt`, 1000); // -E: in a BRE these characters are literals (Task 7)
       assert.equal(r.out, 'sed: pattern too complex for this practice shell', pat);
       assert.notEqual(r.code, 0);
     }
@@ -255,6 +255,258 @@ describe('safeRegex', () => {
   });
 });
 
+describe('regex backtracking guard (Task 9b)', () => {
+  const put = (SQ, name, text) => SQ.writeFile(SQ.norm(name), text);
+  const TOO = 'pattern too complex for this practice shell';
+  const after = (SQ) => assert.equal(run(SQ, 'echo next').out, 'next');
+  it('pinned slow patterns end quickly with the friendly message, and the next command works', () => {
+    const SQ = loadShell();
+    put(SQ, 'l128.txt', 'a'.repeat(128));
+    put(SQ, 'l32k.txt', 'a'.repeat(32000));
+    put(SQ, 'l30k.txt', 'a'.repeat(30000));
+    const cases = [
+      [`grep -E '.*.*.*.*.*c' l128.txt`, 'grep: ' + TOO],
+      [`sed 's/a*a*a*a*a*a*a*a*b/x/' l32k.txt`, 'sed: ' + TOO],
+      [`awk '/a*a*a*a*b/' l32k.txt`, 'awk: ' + TOO],
+      [`grep 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`grep -c 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`grep -o 'a*b' l30k.txt`, 'grep: ' + TOO],
+      [`sed 's/a*b/x/g' l30k.txt`, 'sed: ' + TOO],
+      [`sed -n '/a*b/p' l30k.txt`, 'sed: ' + TOO],
+      [`awk '{ gsub(/a*b/, "x"); print }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '{ n = split($0, p, /a*b/); print n }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '{ print match($0, /a*b/) }' l30k.txt`, 'awk: ' + TOO],
+      [`awk '$1 ~ /a*b/' l30k.txt`, 'awk: ' + TOO],
+      [`awk -F 'a*b' '{ print NF }' l30k.txt`, 'awk: ' + TOO],
+      [`x=$(cat l30k.txt); [[ $x =~ a*b ]]`, 'bash: [[: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      const r = fast(SQ, line, 1000);
+      assert.equal(r.out, want, line);
+      assert.notEqual(r.code, 0, line);
+      after(SQ);
+    }
+  });
+  it('awk strings built inside the program are guarded too', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, `awk 'BEGIN { s = "a"; while (length(s) < 30000) s = s s; print (s ~ /a*a*a*b/) }'`, 1000);
+    assert.equal(r.out, 'awk: ' + TOO);
+    after(SQ);
+  });
+  it('glob patterns with many stars stay fast on long names (find -name, grep --include)', () => {
+    const SQ = loadShell();
+    const name = 'a'.repeat(250);
+    run(SQ, `mkdir g; touch g/${name}`);
+    const r = fast(SQ, `find g -name '*a*a*a*a*a*a*a*a*b'`, 1000);
+    assert.equal(r.out, '');
+    assert.equal(fast(SQ, `find g -name '*a*a'`, 1000).out, 'g/' + name);
+    assert.equal(fast(SQ, `ls g/*a*a*a*a*a*a*a*a*b 2>&1 | wc -l`, 1000).out, '1');
+  });
+  it('many lines that each fit cannot add up to a freeze: the work is charged to the step budget', () => {
+    const SQ = loadShell();
+    put(SQ, 'many.txt', ('a'.repeat(200) + '\n').repeat(4900)); // a*a*c is cubic; 200 characters fit, 4,900 such lines would take minutes
+    for (const line of [`grep -c 'a*a*c' many.txt`, `sed -n '/a*a*c/p' many.txt`, `awk '/a*a*c/' many.txt`]) {
+      const r = fast(SQ, line, 2000);
+      assert.equal(r.out, 'this practice shell stopped the command: too many steps', line);
+      after(SQ);
+    }
+    assert.equal(run(SQ, `head -3 many.txt | grep -c 'a*a*c'`).out, '0');
+  });
+  it('everyday patterns keep working on normal lines, and on long lines when they are linear', () => {
+    const SQ = loadShell();
+    put(SQ, 't.txt', ['foo and bar', 'ver 3.14 ok', 'abba', 'the wolf howls', 'an error here', 'root:x:0:0:root:/root:/bin/bash', 'nothing'].join('\n'));
+    const want = [
+      [`grep '^.*foo.*bar$' t.txt`, 'foo and bar'],
+      [`grep -E '[0-9]+\\.[0-9]+' t.txt`, 'ver 3.14 ok'],
+      [`grep -E '^(a|b)+$' t.txt`, 'abba'],
+      [`grep '\\bwolf\\b' t.txt`, 'the wolf howls'],
+      [`grep '.*error.*' t.txt`, 'an error here'],
+      [`grep -c '^[^:]*:[^:]*:' t.txt`, '1'],
+      [`sed -n 's/^\\([^:]*\\):.*/\\1/p' t.txt`, 'root'],
+      [`awk -F: '/^root/ { print $7 }' t.txt`, '/bin/bash'],
+      [`awk '{ gsub(/o+/, "0"); print }' t.txt | head -1`, 'f0 and bar'],
+    ];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+    const long = 'x'.repeat(200000) + ' wolf ' + 'y'.repeat(200000);
+    put(SQ, 'long.txt', long);
+    assert.equal(fast(SQ, `grep -c '\\bwolf\\b' long.txt`, 2000).out, '1');
+    assert.equal(fast(SQ, `grep -c 'wolf' long.txt`, 2000).out, '1');
+    assert.equal(fast(SQ, `sed 's/.*/z/' long.txt`, 2000).out, 'z');
+    assert.equal(fast(SQ, `awk '{ print length($0) }' long.txt`, 2000).out, String(long.length));
+    assert.equal(fast(SQ, `sed 's/o/0/g' long.txt | grep -c w0lf`, 2000).out, '1');
+  });
+  it('regexFits: refuses by subject length, deterministically', () => {
+    const { safeRegex, regexFits, LIM } = loadShell();
+    const ab = safeRegex('a*b', '');
+    assert.equal(regexFits(ab, 200), true);
+    assert.equal(regexFits(ab, 30000), false);
+    assert.equal(regexFits(safeRegex('\\bwolf\\b', ''), LIM.TEXT), true);
+    assert.equal(regexFits(safeRegex('^foo', ''), LIM.TEXT), true);
+    for (const p of ['^.*foo.*bar$', '[0-9]+\\.[0-9]+', '^(a|b)+$', '\\bwolf\\b', '.*error.*', '^[^:]*:[^:]*:'])
+      assert.equal(regexFits(safeRegex(p, 'g'), 1000), true, p);
+    assert.equal(regexFits(safeRegex('.*.*.*.*.*c', ''), 128), false); // polynomial: refused by subject length only
+    for (const p of ['a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '(a|a){25}b', '(?:a|ab|b){25}c', '(a|aa){20}b'])
+      assert.throws(() => safeRegex(p, ''), (e) => e.complex === true, p); // exponential: refused outright
+  });
+  it('review cases: counted groups, mandatory passes and lookbehinds end quickly with the friendly message', () => {
+    const SQ = loadShell();
+    put(SQ, 'a40.txt', 'a'.repeat(40));
+    put(SQ, 'a120.txt', 'a'.repeat(120));
+    const cases = [
+      [`grep -E '(a|a){25}b' a40.txt`, 'grep: ' + TOO],
+      [`sed -E 's/(a|aa){20}b/x/' a40.txt`, 'sed: ' + TOO],
+      [`awk '/(a|a){22}b/' a40.txt`, 'awk: ' + TOO],
+      [`x=$(cat a40.txt); [[ $x =~ (a|a){22}b ]]`, 'bash: [[: ' + TOO],
+      [`grep -cE '(a|b|ab){12}c' ab.txt`, 'grep: ' + TOO],
+      [`grep -cE 'a{1000}b' a1m.txt`, 'grep: ' + TOO],
+      [`grep -cE '\\w{1000}x' a1m.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?:ab){400}c' ab.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?<=c.*.*.*.*)x' a120.txt`, 'grep: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      run(SQ, 'rm -f a1m.txt ab.txt'); // the world holds one big file at a time (LIM.STATE)
+      if (line.includes('a1m.txt')) put(SQ, 'a1m.txt', 'a'.repeat(999000));
+      if (line.includes('ab.txt')) put(SQ, 'ab.txt', 'ab'.repeat(405000));
+      const r = fast(SQ, line, 1000);
+      assert.equal(r.out, want, line);
+      after(SQ);
+    }
+  });
+  it('a large count on an atom that can match empty (back-reference, empty group, lookaround) is refused at once', () => {
+    const SQ = loadShell();
+    put(SQ, 'a.txt', 'a'.repeat(300));
+    const cases = [
+      [`grep -c '()\\1{1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()\\1{3000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()(?:\\1){1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?<e>)\\k<e>{1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()(?:(?=\\1)\\1){1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(a*)\\1{100000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?=a){5000}x' a.txt`, 'grep: ' + TOO],
+      [`sed 's/\\(\\)\\1\\{32767\\}x/Y/' a.txt`, 'sed: ' + TOO],
+      [`sed -E 's/()\\1{32767}x/Y/' a.txt`, 'sed: ' + TOO],
+      [`s=$(cat a.txt); [[ $s =~ ()\\1{3000000}x ]]`, 'bash: [[: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      const t = Date.now(); const r = run(SQ, line);
+      assert.ok(Date.now() - t < 100, `${line} took ${Date.now() - t} ms`);
+      assert.equal(r.out, want, line);
+      after(SQ);
+    }
+    // awk EREs have no back-references and counts above 255: refused as a syntax error, also at once
+    const t = Date.now(); assert.match(run(SQ, `awk '/()\\1{1000000}x/' a.txt`).out, /^awk: /); assert.ok(Date.now() - t < 100);
+    put(SQ, 'n.txt', ['aaa', '10.0.0.1', 'ababab', 'x'.repeat(100), 'hello_world'].join('\n'));
+    const want = [[`grep -cE 'a{3}' n.txt`, '1'], [`grep -cE '^[0-9]{1,3}\\.' n.txt`, '1'], [`grep -cE '^(ab){2,5}$' n.txt`, '1'],
+      [`grep -cE 'x{100}' n.txt`, '1'], [`grep -cE '^\\w{1,20}$' n.txt`, '3'], [`grep -E '^([0-9]{1,3}\\.){3}[0-9]{1,3}$' n.txt`, '10.0.0.1'],
+      [`grep -cE '()\\1{3}a' n.txt`, '2']];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+  });
+  it('command not found: no slow suggestion for a huge word, short typos still get one', () => {
+    const SQ = loadShell();
+    put(SQ, 'w.txt', 'q'.repeat(100000));
+    const t = Date.now(); const r = run(SQ, '$(cat w.txt)');
+    assert.ok(Date.now() - t < 100, `took ${Date.now() - t} ms`);
+    assert.match(r.out, /command not found/);
+    assert.doesNotMatch(r.out, /Did you mean/);
+    assert.match(run(SQ, 'gerp x w.txt').out, /Did you mean: grep\?/);
+    assert.match(run(SQ, 'hlep').out, /Did you mean: /);
+  });
+  it('learner patterns with several wildcards still run on ordinary lines', () => {
+    const SQ = loadShell();
+    // Each must run on ordinary text lines: the first eight at 200 characters, the last two at 80. On adversarial lines (the pattern's own characters
+    // repeated) the guard may refuse, and when it accepts, a fresh (first, interpreted) regex run must stay under 50 ms (measured: under 5 ms locally).
+    const pats = [['^.*,.*,.*,.*$', '', 200], ['(.*)-(.*)-(.*)-(.*)', '', 200], ['.*:.*:.*:.*', '', 200], ['<.*>.*<.*>', '', 200],
+      ['^(.*),(.*),(.*),(.*)$', '', 200], ['^.*a.*b.*c.*$', '', 200], ['r.*o.*o.*t', 'i', 200], ['(.*)-(.*)-(.*)', '', 200],
+      ['x.*y.*z.*w', '', 80], ['a.*e.*i.*o.*u', '', 80]];
+    const records = ['The quick brown fox jumps over the lazy dog; ', 'root:x:0:0:root:/root:/bin/bash ', 'alice,30,paris,engineer,', '<b>bold</b> and <i>it</i> ',
+      '2024-05-06-log-entry ', 'an error: disk full at 10.0.0.1 on 2024-05-06; wolf bear <b>x</b> "q" a,b,c root:x:0:0 '];
+    const pad = (t, n) => { let u = t; while (u.length < n) u += 'the quick brown fox jumps over the lazy dog '; return u.slice(0, n); };
+    const guard = (re, s) => { SQ.rt.steps = 0; try { SQ.reGuard(re, s); return true; } catch (e) { assert.equal(e.complex, true); return false; } };
+    let uniq = 0;
+    for (const [p, fl, n] of pats) {
+      const re = SQ.safeRegex(p, 'g' + fl);
+      for (const t of records) assert.ok(guard(re, pad(t, n)), `${p} refused on an ordinary ${n}-character line: ${t}`);
+      const lits = [...new Set(p.replace(/[.*()^$|\\]/g, '').split(''))];
+      const subs = [...lits, 'x', ' '].map((c) => c.repeat(n));
+      for (let k = 1; k <= lits.length; k++) { let u = ''; for (let j = 0; j < k; j++) u += lits[j].repeat(Math.ceil(n / k)); subs.push(u.slice(0, n)); }
+      let u = ''; while (u.length < n) u += lits.join(''); subs.push(u.slice(0, n));
+      for (const sub of subs.concat(records.map((t) => pad(t, n)))) {
+        if (!guard(re, sub)) continue;
+        const fresh = new RegExp(p + '(?:){' + (++uniq) + '}', fl); // a new source: V8 caches compiled regexes by source
+        const t = performance.now(); fresh.test(sub); const ms = performance.now() - t;
+        assert.ok(ms < 50, `${p} took ${ms.toFixed(1)} ms on ${JSON.stringify(sub.slice(0, 12))}`);
+      }
+    }
+    put(SQ, 'p.txt', ['root:x:0:0:root:/root:/bin/bash', 'alice,30,paris,engineer', '2024-05-06-log-entry', '<b>bold</b> and <i>it</i>', 'education'].join('\n'));
+    const want = [[`grep -E '^.*,.*,.*,.*$' p.txt`, 'alice,30,paris,engineer'], [`grep -E '(.*)-(.*)-(.*)-(.*)' p.txt`, '2024-05-06-log-entry'],
+      [`grep -c '.*:.*:.*:.*' p.txt`, '1'], [`grep -E '<.*>.*<.*>' p.txt`, '<b>bold</b> and <i>it</i>'], [`grep 'a.*e.*i.*o.*u' p.txt`, ''],
+      [`grep -iE 'r.*o.*o.*t' p.txt`, 'root:x:0:0:root:/root:/bin/bash'], [`grep 'e.*u.*a.*i.*o' p.txt`, 'education'],
+      [`x="a-b-c-d"; [[ $x =~ (.*)-(.*)-(.*)-(.*) ]] && echo yes`, 'yes']];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+  });
+  it('trailing runs are trimmed in linear time (awk default FS, $( ), basename, dirname, line numbers)', () => {
+    const SQ = loadShell();
+    put(SQ, 'sp.txt', 'x' + ' '.repeat(100000) + 'x');
+    put(SQ, 'nl.txt', '\n'.repeat(100000) + 'x');
+    put(SQ, 'sl.txt', '/'.repeat(60000) + 'x');
+    assert.equal(fast(SQ, `awk '{ print NF }' sp.txt`, 100).out, '2');
+    assert.equal(fast(SQ, `x=$(cat nl.txt); echo \${#x}`, 100).out, '100001');
+    assert.equal(fast(SQ, `basename $(cat sl.txt)`, 100).out, 'x');
+    assert.equal(fast(SQ, `dirname $(cat sl.txt)`, 100).out, '/');
+    const t = Date.now();
+    assert.equal(SQ.lineOf('\n'.repeat(100000) + 'x', 5), 6);
+    assert.ok(Date.now() - t < 100);
+  });
+  it('a 12,000-line log of about 900 KB: everyday multi-wildcard greps finish within the step budget', () => {
+    const SQ = loadShell();
+    const line = '2024-05-06 10:00:01 host app[123]: request ok user=alice path=/home/x took 12ms error';
+    const lines = []; for (let i = 0; i < 12000; i++) lines.push(line.slice(0, 70 + (i % 10)) + (i % 7 ? '' : ' error: disk full'));
+    put(SQ, 'big.log', lines.join('\n'));
+    for (const c of [`grep -c '.*error.*' big.log`, `grep -cE '(.*):(.*):(.*)' big.log`, `grep -c '^.*user=.*path=.*$' big.log`, `awk '/user=.*path=/' big.log | wc -l`])
+      assert.match(fast(SQ, c, 3000).out, /^\d+$/, c);
+  });
+  it('seeded random patterns: each is refused, or runs fast on worst-case subjects up to the longest length reGuard accepts', () => {
+    const SQ = loadShell();
+    const { safeRegex, regexFits, LIM } = SQ;
+    let seed = 12345;
+    const rnd = (k) => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor((seed / 2147483648) * k); };
+    const atoms = ['a', 'b', '.', '[ab]', '[^b]', '\\w', '(?:ab)', '(a|b)', '(a|bc)', 'ab', '(?:a|ab)', '(?<=a.*)', '(?<=a)', '(?:a{1,2})'];
+    const quants = ['', '', '*', '*', '+', '?', '{2,5}', '{1,}', '*?', '+?', '{3}', '{8}', '{20}'];
+    const fams = [(n) => 'a'.repeat(n), (n) => 'a'.repeat(n - 1) + 'c', (n) => 'ab'.repeat(n).slice(0, n - 1) + 'c', (n) => 'b'.repeat(n - 1) + 'c', (n) => 'aab'.repeat(n).slice(0, n - 1) + 'x'];
+    const ok = (re, s, all) => { SQ.rt.steps = 0; try { SQ.reGuard(re, s, all); return true; } catch (e) { assert.equal(e.complex, true); return false; } };
+    let accepted = 0, refused = 0, worst = 0, worstPat = '', uniq = 0;
+    const t0 = Date.now();
+    for (let k = 0; k < 70; k++) {
+      let p = rnd(3) === 0 ? '^' : '';
+      const len = 1 + rnd(6);
+      for (let i = 0; i < len; i++) p += atoms[rnd(atoms.length)] + quants[rnd(quants.length)];
+      if (rnd(3) === 0) p += rnd(2) ? '$' : 'c';
+      let re;
+      try { re = safeRegex(p, 'g'); } catch (e) { if (e.name === 'SyntaxError') continue; assert.equal(e.complex, true, p); refused++; continue; }
+      accepted++;
+      for (const all of [false, true]) {
+        let lo = 0, hi = LIM.TEXT; // longest length that fits any subject (no line breaks) ...
+        while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (regexFits(re, mid, all, true)) lo = mid; else hi = mid - 1; }
+        for (const fam of fams) {
+          let n = Math.max(lo, 4); // ... and then as long as reGuard accepts this subject (it also counts the subject's characters)
+          if (!ok(re, fam(n), all)) continue;
+          while (n * 2 <= LIM.TEXT && ok(re, fam(n * 2), all)) n *= 2;
+          const s = fam(n), fresh = new RegExp(p + '(?:){' + (++uniq) + '}', 'g'); // new source: a first, interpreted run
+          const t = performance.now();
+          if (!all) fresh.test(s);
+          else for (let j = 0, m; j < 2000 && (m = fresh.exec(s)); j++) if (m[0] === '') fresh.lastIndex++; // a /g loop; past 2,000 matches only linear work is left
+          const ms = performance.now() - t;
+          if (ms > worst) { worst = ms; worstPat = `${p} n=${n} all=${all}`; }
+          // the budget aims at about 150 ms here (measured worst ~100 ms locally); the assertion is generous so a slow CI machine cannot flake
+          assert.ok(ms < 1000, `${p} took ${ms.toFixed(0)} ms on ${s.length} chars (all=${all})`);
+        }
+      }
+    }
+    assert.ok(accepted > 30 && refused > 3, `accepted ${accepted}, refused ${refused}`);
+    assert.ok(Date.now() - t0 < 8000, `took ${Date.now() - t0} ms; worst ${worst.toFixed(0)} ms ${worstPat}`);
+  });
+});
+
 describe('every mission answer, guide example and quick-fire answer stays inside the caps', () => {
   const SQ0 = loadShell();
   const chapters = SQ0.content.chapters;
@@ -278,5 +530,273 @@ describe('every mission answer, guide example and quick-fire answer stays inside
       const r = run(SQ, line);
       assert.doesNotMatch(r.out, /too complex|too large|too many steps|cut off/, line);
     }
+  });
+});
+
+describe('Stage 2 hardening (Task 2)', () => {
+  const overCap = (SQ) => { // a world whose files hold more than LIM.STATE, built directly so no check fires
+    const big = 'x'.repeat(SQ.LIM.TEXT);
+    for (let i = 0; i < 3; i++) SQ.S.fs.children.tmp.children['big' + i] = SQ.F(big);
+    assert.ok(SQ.stateText(SQ.S.fs) > SQ.LIM.STATE);
+  };
+  it('file names that match Object.prototype members behave like any other name', () => {
+    const SQ = loadShell();
+    assert.match(run(SQ, 'mkdir constructor; ls').out, /constructor\//);
+    assert.equal(run(SQ, 'touch toString; echo hi > valueOf; cat valueOf').out, 'hi');
+    assert.match(run(SQ, 'cd __proto__').out, /No such file or directory/);
+    run(SQ, 'echo x > __proto__');
+    assert.match(run(SQ, 'cat content').out, /No such file or directory/);
+    assert.equal(({}).content, undefined);
+    assert.equal(Object.prototype.content, undefined);
+  });
+  it('names with prototype members survive the JSON round trip, and old saves still load', () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir constructor; echo a > constructor/__proto__; touch toString');
+    const saved = JSON.stringify(SQ.S);
+    const SQ2 = loadShell();
+    SQ2.resetState(Object.assign(SQ2.fresh(), JSON.parse(saved)));
+    assert.equal(run(SQ2, 'cat constructor/__proto__').out, 'a');
+    assert.match(run(SQ2, 'ls').out, /constructor\//);
+    assert.equal(run(SQ2, 'cat constructor/hasOwnProperty').code !== 0, true);
+    // a save written by the old code (plain objects, no __proto__ keys) still loads
+    const old = JSON.stringify(loadShell().S);
+    const SQ3 = loadShell();
+    SQ3.resetState(Object.assign(SQ3.fresh(), JSON.parse(old)));
+    assert.equal(run(SQ3, 'cat ~/readme.txt').code, 0);
+    run(SQ3, 'cp readme.txt constructor; echo y > hasOwnProperty'); // clone() and fresh writes keep working
+    assert.equal(run(SQ3, 'cat constructor').out.startsWith('Welcome'), true);
+  });
+  it('cat s | tee $(seq 1 3000) cannot overshoot the state cap by more than 60,000', () => {
+    const SQ = loadShell();
+    run(SQ, "printf '%0999d' 0 > s");
+    const r = fast(SQ, 'cat s | tee $(seq 1 3000) >/dev/null', 8000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000, 'state ' + SQ.stateText(SQ.S.fs));
+    assert.match(r.out, /grew too large/);
+  });
+  it('LIM.VAR: a doubling loop stops with a friendly line and the shell stays usable', () => {
+    const SQ = loadShell();
+    assert.equal(SQ.LIM.VAR, 1000000);
+    const r = fast(SQ, 'x=a; for i in $(seq 30); do x=$x$x; done');
+    assert.equal(r.out, 'this practice shell stopped the command: a value grew too large');
+    assert.equal(run(SQ, 'echo ${#x}').out, String(2 ** 19));
+  });
+  it('any RangeError maps to the friendly line; Firefox "too much recursion" maps to the nesting message', () => {
+    const SQ = loadShell();
+    assert.equal(SQ.fatalText(new RangeError('Invalid string length')), 'this practice shell stopped the command: a value grew too large');
+    assert.equal(SQ.errOf(new RangeError('Invalid array length')), 'this practice shell stopped the command: a value grew too large');
+    assert.equal(SQ.fatalText(new RangeError('Maximum call stack size exceeded')), 'bash: ' + SQ.NEST_DEEP);
+    const ff = Object.assign(new Error('too much recursion'), { name: 'InternalError' });
+    assert.equal(SQ.fatalText(ff), 'bash: ' + SQ.NEST_DEEP);
+    assert.equal(SQ.errOf(ff), 'bash: ' + SQ.NEST_DEEP);
+    assert.equal(SQ.isOverflow(ff), true);
+  });
+  it('a stale write flag does not charge the next line in an over-cap world', () => {
+    const SQ = loadShell();
+    overCap(SQ);
+    SQ.writeFile('/home/explorer/saved.txt', 'hello', false, 'saved.txt'); // what an editor Save does
+    assert.ok(SQ.rt.grewBy > 0);
+    assert.equal(run(SQ, 'echo hi').out, 'hi');
+  });
+  it('mv in an over-cap world does not print the cap message', () => {
+    const SQ = loadShell();
+    run(SQ, 'echo a > a');
+    overCap(SQ);
+    const r = run(SQ, 'mv a b; echo done');
+    assert.equal(r.out, 'done');
+  });
+  it('small writes in a loop still hit the cap through grewBy', () => {
+    const SQ = loadShell();
+    run(SQ, "printf '%0999d' 0 > s");
+    const r = fast(SQ, 'for i in $(seq 3000); do cp s f$i; done', 8000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000);
+    assert.match(r.out, /too large/);
+  });
+});
+
+// Stage 3 Task 4 review: an unquoted expansion that splits into many glob patterns is charged to the step budget and capped.
+describe('globbing of split fields', () => {
+  const setup = () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir d; cd d; for i in $(seq 1000); do touch f$i; done');
+    assert.equal(run(SQ, 'ls | wc -l').out, '1000');
+    return SQ;
+  };
+  it('echo $z with 65,536 * fields in a 1,000-file folder stops with the friendly line, quickly', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; echo $z');
+    assert.match(r.out, /^this practice shell stopped the command: /);
+    assert.equal(r.code, 1);
+    assert.equal(run(SQ, 'echo ok').out, 'ok');
+  });
+  it('the same expansion in a for list stops too', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; for f in $z; do :; done');
+    assert.match(r.out, /^this practice shell stopped the command: /);
+    assert.equal(run(SQ, 'echo ok').out, 'ok');
+  });
+  it('many globs that match nothing are charged to the step budget', () => {
+    const SQ = setup();
+    const r = fast(SQ, 'z="q* "; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do z=$z$z; done; echo $z | wc -c');
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+  });
+  it('a few globs over the folder still work', () => {
+    const SQ = setup();
+    assert.equal(run(SQ, 'z="f1* f2*"; echo $z | wc -w').out, '223');
+  });
+});
+
+describe('path caps: File name too long (Stage 3 final review)', () => {
+  const deep = (n) => Array(n).fill('d').join('/');
+  it('mkdir -p of a 2,500-deep path is refused at once and creates nothing', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, `mkdir -p /tmp/x/${deep(2500)}; echo $?`, 2000);
+    assert.match(r.out, /^mkdir: cannot create directory '\/tmp\/x\/d\/d.*': File name too long\n1$/);
+    assert.equal(run(SQ, 'ls /tmp').out, '');
+    assert.doesNotThrow(() => JSON.stringify(SQ.S));
+  });
+  it('the mkdir + cd loop stops at the depth cap quickly, and the world still saves and checks', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 9000); do mkdir d; cd d; done', 3000);
+    assert.match(r.out, /too many steps$/);
+    assert.equal(run(SQ, 'mkdir d').out, "mkdir: cannot create directory 'd': File name too long");
+    assert.ok(SQ.S.cwd.split('/').filter(Boolean).length <= SQ.DEPTH_MAX);
+    assert.doesNotThrow(() => JSON.stringify(SQ.S));
+    assert.doesNotThrow(() => SQ.stateText(SQ.S.fs));
+    assert.doesNotThrow(() => SQ.sandbox(() => run(SQ, 'echo hi')));
+    assert.equal(run(SQ, 'cd ~; tree d | tail -1').out, `${SQ.DEPTH_MAX - 3} directories, 0 files`);
+  });
+  it('touch, redirections, ln -s and mktemp refuse a long name or a too-deep path', () => {
+    const SQ = loadShell();
+    const long = 'x'.repeat(256);
+    assert.equal(run(SQ, `touch ${long}`).out, `touch: cannot touch '${long}': File name too long`);
+    assert.equal(run(SQ, `echo hi > ${long}`).out, `bash: ${long}: File name too long`);
+    assert.equal(run(SQ, `ln -s . ${long}`).out, `ln: failed to create symbolic link '${long}': File name too long`);
+    assert.equal(run(SQ, `mkdir ${'y'.repeat(255)}; echo $?`).out, '0', '255 characters is still fine');
+    run(SQ, `mkdir -p ${deep(126)}`); // ~/d/.../d: 128 components, the most there may be
+    assert.match(run(SQ, `mkdir -p ${deep(127)}`).out, /File name too long$/);
+    assert.match(run(SQ, `mktemp -p ${deep(126)}`).out, /^mktemp: failed to create file via template '.*': File name too long$/);
+    assert.match(run(SQ, `touch ${deep(126)}/f; echo $?`).out, /File name too long\n1$/);
+  });
+  it('cp -r and mv count the subtree they bring along', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p a/${deep(100)} b/${deep(100)}`);
+    const into = `b/${deep(100)}`;
+    assert.match(run(SQ, `mv a ${into}`).out, /^mv: cannot move 'a' to '.*\/a': File name too long$/);
+    assert.match(run(SQ, `cp -r a ${into}`).out, /^cp: cannot create directory '.*\/a': File name too long$/);
+    assert.match(run(SQ, 'ls').out, /(^|\s)a\//, 'a stays where it was');
+  });
+});
+
+describe('path caps hold through symlinks (Stage 3 re-review)', () => {
+  const deep = (n) => Array(n).fill('d').join('/');
+  const maxDepth = (SQ) => { let d = 0; (function r(n, k) { if (k > d) d = k; if (n.type === 'dir') for (const c of Object.values(n.children)) r(c, k + 1); })(SQ.S.fs, 0); return d; };
+  it('the re-pointed link loop ends fast, never passes the depth cap, and the world still saves and checks', () => {
+    const ctx = loadContext();
+    const SQ = ctx.SQ;
+    const r = fast(SQ, 'cd /tmp; mkdir r; ln -s r c; t=r; for i in $(seq 1 3000); do mkdir c/d; t=$t/d; rm c; ln -s $t c; done', 3000);
+    assert.match(r.out, /mkdir: cannot create directory 'c\/d': File name too long/);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX, 'depth ' + maxDepth(SQ));
+    fast(SQ, 'cd /tmp; for i in $(seq 1 3000); do mkdir c/d; t=$t/d; rm c; ln -s $t c; done', 3000);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX, 'depth after a second line ' + maxDepth(SQ));
+    SQ.rt.sandboxed = false;
+    SQ.save();
+    assert.equal(SQ.rt.saveFailed, false);
+    assert.ok(ctx.localStorage.getItem(SQ.KEY).length > 0);
+    assert.equal(SQ.sandbox(() => run(SQ, 'echo hi')).out, 'hi');
+  });
+  it('writes through a link to a 126-deep folder are refused', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p /tmp/${deep(126)}; ln -s /tmp/${deep(126)} L`); // /tmp + 126 = 127 components; one more name is fine, two are not
+    assert.equal(run(SQ, 'touch L/ok; echo $?').out, '0');
+    run(SQ, 'mkdir L/x');
+    assert.equal(run(SQ, 'echo hi > L/x/f').out, 'bash: L/x/f: File name too long');
+    assert.equal(run(SQ, 'touch L/x/g').out, "touch: cannot touch 'L/x/g': File name too long");
+    assert.equal(run(SQ, 'cp readme.txt L/x/h').out, "cp: cannot create regular file 'L/x/h': File name too long");
+    assert.equal(run(SQ, 'mkdir L/x/y').out, "mkdir: cannot create directory 'L/x/y': File name too long");
+    assert.equal(run(SQ, 'ln -s . L/x/l').out, "ln: failed to create symbolic link 'L/x/l': File name too long");
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX);
+  });
+  it('cp -r and mv through a link count the subtree', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p /tmp/${deep(119)} s/${deep(49)}; ln -s /tmp/${deep(119)} L`);
+    assert.match(run(SQ, 'cp -r s L/').out, /^cp: cannot create directory '.*s': File name too long$/);
+    assert.match(run(SQ, 'mv s L/').out, /^mv: cannot move 's' to '.*s': File name too long$/);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX);
+  });
+  it('a link target longer than PATH_MAX is refused', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, `ln -s ${'a/'.repeat(2100)} l`).out, "ln: failed to create symbolic link 'l': File name too long");
+  });
+});
+
+describe('big inputs are charged to the step budget (Stage 3 final review)', () => {
+  it('sort -u of 100,000 distinct lines is fast and keeps the first of each duplicate', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 10000 > a; for p in a b c d e f g h i j; do sed "s/^/$p/" a; done > b');
+    assert.equal(fast(SQ, 'sort -u b | wc -l', 2000).out, '100000');
+    assert.equal(run(SQ, 'printf "b\\na\\nb\\nc\\na\\n" | sort -u').out, 'a\nb\nc');
+    assert.equal(run(SQ, 'printf "2\\n10\\n2\\n1\\n" | sort -nu').out, '1\n2\n10');
+  });
+  it('a loop of big diffs stops with the step message instead of running for an hour', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 1500 > a; seq 2 1501 > b');
+    assert.equal(run(SQ, 'diff a b').out, '1d0\n< 1\n1500a1500\n> 1501');
+    const r = fast(SQ, 'for i in $(seq 1 6000); do diff a b; done > /dev/null', 3000);
+    assert.equal(r.out, 'this practice shell stopped the command: too many steps');
+  });
+  it('one big diff, sort or uniq is charged steps', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 1500 > a; seq 2 1501 > b');
+    run(SQ, 'diff a b > /dev/null');
+    assert.ok(SQ.rt.steps > 1000, 'diff charged ' + SQ.rt.steps);
+    run(SQ, 'seq 1 10000 > c; cat c c > c2');
+    run(SQ, 'sort c2 > /dev/null');
+    assert.ok(SQ.rt.steps > 100, 'sort charged ' + SQ.rt.steps);
+  });
+});
+
+describe('background jobs share the line\'s caps (Stage 3 final review)', () => {
+  it('16 jobs printing 4,000-character lines end quickly with one bounded output', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 16); do (while :; do echo $(seq 1 1000); done) & done; sleep 1; echo ok', 2000);
+    assert.ok(r.out.length < SQ.LIM.TOTAL + 100000, 'printed ' + r.out.length);
+    assert.match(r.out, /stopped the (job|command): output too large/);
+    assert.equal(run(SQ, 'echo next').out, 'next');
+  });
+  it('16 jobs appending to files end quickly', () => {
+    const SQ = loadShell();
+    fast(SQ, 'for i in $(seq 1 16); do (while :; do echo $(seq 1 1000) >> /tmp/g$i; done) & done; sleep 1; echo ok', 2000);
+    fast(SQ, 'seq 1 300 > /tmp/s; for i in $(seq 1 16); do (while :; do cat /tmp/s >> /tmp/h$i; done) & done; sleep 1; echo ok', 2000);
+    assert.ok(SQ.stateText(SQ.S.fs) <= SQ.LIM.STATE + 60000);
+  });
+  it('the saved-state cap still refuses a big write near the cap, and frees up after rm', () => {
+    const SQ = loadShell();
+    run(SQ, 'seq 1 10000 > a; cat a a a a a a a a a a > f'); // 488,950 characters
+    let refused = '';
+    for (let i = 0; i < 8 && !refused; i++) { const o = run(SQ, `cat f > g${i}`).out; if (/too large/.test(o)) refused = o; }
+    assert.match(refused, /file too large for this practice shell|grew too large/);
+    // one line: refused, then rm frees space, and the same line's next big write is let through (the estimate is re-walked after a removal)
+    const r = run(SQ, 'cat f > z; rm g*; cat f > h; echo $?');
+    assert.match(r.out, /^bash: z: file too large for this practice shell\n0$/);
+    assert.equal(run(SQ, 'wc -l < h').out, '100000');
+  });
+});
+
+describe('command not found stays cheap (Stage 3 final review)', () => {
+  it('10,000 different unknown names take well under the old ~5 s', () => {
+    const SQ = loadShell();
+    const r = fast(SQ, 'for i in $(seq 1 10000); do foo$i; done', 2500);
+    assert.match(r.out, /too many steps$/);
+    assert.equal(SQ.suggest('grpe'), 'grep');
+    assert.equal(SQ.suggest('ehco'), 'echo');
+    assert.equal(SQ.suggest('x'), null);
+  });
+  it('a DEBUG trap full of unknown commands does not make later lines slow', () => {
+    const SQ = loadShell();
+    run(SQ, 'trap "$(seq 1 1000)" DEBUG');
+    fast(SQ, 'echo a', 1000);
+    fast(SQ, 'echo b; echo c', 1000);
+    run(SQ, 'trap - DEBUG');
+    assert.equal(run(SQ, 'echo d').out, 'd');
   });
 });

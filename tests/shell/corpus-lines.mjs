@@ -137,7 +137,7 @@ export const LINES = [
   ['ln -s b a', 'ln -s a b', 'cat a'], ['ln -s readme.txt L', 'rm L', 'ls'], ['ln -s readme.txt L', 'cat L | head -n 1'], ['ln -s forest F', 'cd F', 'pwd'], ['ln -s forest F', 'ls F/cave'],
   'tee t.txt', 'echo hi | tee t.txt', 'echo hi | tee t.txt; cat t.txt', 'echo hi | tee -a t.txt', 'echo hi | tee', 'tee', 'echo hi | tee /nosuch/x',
   'which ls', 'which nosuch', 'which', 'type ls', 'type cd', 'type nosuch', 'type export', 'type', 'type cd ls',
-  'history', 'clear', 'clear; echo after', 'date_zz', { line: 'help', change: 'help text may list the new builtins' }, 'help cd', 'man ls', 'man cd', 'man grep', 'man pwd', 'man nosuch', 'man', 'man man', 'ls --help', 'cd --help', 'tree --help', 'man help',
+  'history', 'clear', 'clear; echo after', 'date_zz', { line: 'help', change: 'help text may list the new builtins' }, { line: 'help cd', change: 'Stage 3 Task 20: help is rewritten to list the commands by tier (help ignores its argument)' }, 'man ls', 'man cd', 'man grep', 'man pwd', 'man nosuch', 'man', 'man man', 'ls --help', 'cd --help', 'tree --help', 'man help',
 
   // ---- typo suggestions / friendly messages ----
   'lss', 'cta readme.txt', 'grp wolf journal.txt', 'sl', 'ech hi', 'mkdr d', 'tuch f', 'cd..', 'tar', 'tee_', 'pws', 'cat_', 'ls-l', 'lsl', 'whoam', 'hlep', 'mkdi x', 'celar', 'x', 'zzzzzz', 'gerp', 'sudo ls', 'sudo', 'dir', 'cls', 'copy a b', 'move a b', 'del a',

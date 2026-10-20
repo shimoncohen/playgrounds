@@ -79,7 +79,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .explain,.note{margin:0;max-width:62ch}
 .note{font-size:13.5px;color:var(--muted)}
 .where{font-size:13px;color:var(--muted)}
-.where code{color:var(--dir);font-weight:600}
+.where code{color:var(--dir);font-weight:600;white-space:normal;overflow-wrap:anywhere} /* a deep folder's path (up to 128 components) wraps instead of pushing the page sideways */
 .actions{display:flex;flex-wrap:wrap;gap:8px}
 .btn{border:0;border-radius:9px;padding:8px 14px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink)}
 .btn:hover{filter:brightness(1.05)}
@@ -122,8 +122,9 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .line.err{color:var(--term-err)} .line.tip{color:var(--term-prompt)} .line.sys{color:var(--term-dim)}
 .line.win{color:var(--term-exec);font-weight:600}
 .line.big{color:var(--term-prompt)}
-.inputline{display:flex;align-items:baseline;white-space:pre}
-#cmd{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--term-fg);font:inherit;caret-color:var(--term-prompt);padding:0}
+.inputline{display:flex;flex-wrap:wrap;align-items:baseline;white-space:pre}
+#prompt{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0} /* a very deep folder's prompt wraps, and the input drops below it instead of shrinking to nothing */
+#cmd{flex:1;min-width:12ch;background:transparent;border:0;outline:0;color:var(--term-fg);font:inherit;caret-color:var(--term-prompt);padding:0}
 @media (pointer:coarse){#cmd{font-size:16px}}
 .termbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12.5px;color:var(--muted)}
 .termbar .sp{flex:1}
@@ -163,6 +164,8 @@ ul.tree.root{border:0;padding:0;margin:0}
 .fire h2,.guide h2{font-size:32px;font-weight:800}
 .lede{margin:6px 0 0;color:var(--muted);max-width:62ch}
 .fireCard{padding:20px;display:flex;flex-direction:column;gap:16px}
+/* a revealed answer can be a long pipeline (the Expert awk top-three): let it wrap, or a 390px screen scrolls sideways */
+.fire code{white-space:normal;overflow-wrap:anywhere}
 .ftier{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:14px;color:var(--muted)}
 .ftier select{max-width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line,currentColor);border-radius:8px;padding:6px 10px}
 .fstats{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
