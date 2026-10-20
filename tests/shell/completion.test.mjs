@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { loadShell, run } from './harness.mjs';
 
 const isScript = (m) => m.kind === 'script' || m.kind === 'challenge';
-const verdict = (SQ, m, line) => SQ.missionVerdict(m, SQ.ctxFor(line)).good;
+// a steps mission has no check of its own: judge it by its first step, whose answer is the mission's answer
+const unit = (m) => (m.steps ? m.steps[0] : m);
+const verdict = (SQ, m, line) => SQ.missionVerdict(unit(m), SQ.ctxFor(line)).good;
 const decode = (s) => s.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 const ucFirst = (s) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
 // Same two-step mission as solvability.test.mjs: the answer only finds the path, a later `cat` solves it.
