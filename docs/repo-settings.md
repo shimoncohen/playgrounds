@@ -24,12 +24,12 @@ Settings → General → Pull Requests:
 Settings → Actions → General:
 
 - Workflow permissions: **Read repository contents** by default (each workflow asks for what it needs).
-- Tick **Allow GitHub Actions to create and approve pull requests**, so *Release PR* can open its PR.
+- Tick **Allow GitHub Actions to create and approve pull requests**, so release-please can open its PR.
 - Fork PR workflows: **Require approval for first-time contributors**.
 
 ## Release token (recommended)
 
-Pull requests opened with the built-in `GITHUB_TOKEN` do not trigger other workflows, so the required checks would never run on the release PR and it could not be merged. Create a fine-grained personal access token (or a GitHub App token) limited to this repository with **Contents: read/write** and **Pull requests: read/write**, and store it as the repository secret **`RELEASE_TOKEN`**. *Release PR* uses it when present. Without it, open the PR, then push any commit to its branch by hand to start the checks.
+Pull requests opened with the built-in `GITHUB_TOKEN` do not trigger other workflows, so the required checks would never run on the release PR and it could not be merged. Create a fine-grained personal access token (or a GitHub App token) limited to this repository with **Contents: read/write** and **Pull requests: read/write**, and store it as the repository secret **`RELEASE_TOKEN`**. The *Release* workflow (release-please) uses it when present. Without it, the release PR is created but the required checks never report; push any commit to its branch by hand to start them.
 
 ## Pages
 

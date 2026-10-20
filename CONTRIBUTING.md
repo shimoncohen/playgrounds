@@ -58,17 +58,17 @@ feat(shell)!: rename the saved-state key      # breaking change
 - **The PR title is what lands on `main`** (we squash-merge), so it must follow the format; a check enforces it. Individual commit messages are checked locally by a git hook after `npm ci`.
 - Breaking changes (for example anything that would invalidate saved progress) use `!` and a `BREAKING CHANGE:` footer.
 
-Version bumps follow SemVer: `feat` is minor, `fix` and `perf` are patch, `!` is major. Contributors never bump versions or edit `CHANGELOG.md`; maintainers do that when releasing.
+Version bumps follow SemVer: `feat` is minor, `fix` and `perf` are patch, `!` is major. Contributors never bump versions or edit `CHANGELOG.md`; release-please does that.
 
 ## Releasing (maintainers)
 
-`main` is protected, so releases go through a pull request and nobody pushes to `main` directly.
+Releases are automated with [release-please](https://github.com/googleapis/release-please). `main` is protected and nobody pushes to it directly.
 
-1. **Actions → Release PR → Run workflow.** Pick `auto` (the version comes from the Conventional Commits since the last tag), or force `patch`/`minor`/`major`. Use `first-release` once to keep 0.1.0.
-2. The workflow opens a **`chore(release): X.Y.Z`** PR that bumps `package.json` and writes `CHANGELOG.md`. Read the changelog, fix wording if needed, wait for the checks, and squash-merge.
-3. On merge, **Release tag** tags the merge commit `vX.Y.Z` and publishes a GitHub Release with that version's changelog section.
+1. Every merge to `main` updates one open pull request titled **`chore(release): X.Y.Z`**. It bumps `package.json` and writes `CHANGELOG.md` from the Conventional Commits since the last release (`feat` is minor, `fix`/`perf` patch, `!` major; while we are on 0.x a breaking change bumps the minor).
+2. When you want to ship, read that PR, wait for the checks, and squash-merge it.
+3. release-please then tags `vX.Y.Z` and publishes the GitHub Release with the changelog section. Nothing to run by hand.
 
-Locally, `npm run release -- --dry-run` previews the next version and changelog. The tool is [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version), the maintained fork of `standard-version`; config is in `.versionrc.json`. Repo settings the flow depends on (branch protection, a token so CI runs on the release PR) are listed in [docs/repo-settings.md](docs/repo-settings.md).
+Config: `release-please-config.json` and `.release-please-manifest.json` (the current version). Repo settings the flow depends on (branch protection, a token so CI runs on the release PR) are in [docs/repo-settings.md](docs/repo-settings.md).
 
 ## What a good PR looks like
 
