@@ -1,5 +1,6 @@
 {
   "name": "playgrounds",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -11,9 +12,16 @@
     "check": "python3 tools/build.py --check",
     "test:engine": "node --test \"tests/shell/*.test.mjs\"",
     "test:browser": "node tests/smoke.mjs && node tests/shell-golden.mjs",
-    "test": "npm run test:engine && npm run test:browser"
+    "test": "npm run test:engine && npm run test:browser",
+    "prepare": "husky",
+    "commitlint": "commitlint",
+    "release": "commit-and-tag-version"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "commit-and-tag-version": "^13.3.0",
+    "husky": "^9.1.7",
     "playwright": "1.64.1"
   }
 }

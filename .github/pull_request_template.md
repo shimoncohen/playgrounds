@@ -1,5 +1,7 @@
 ## What and why
 
+<!-- PR title must be a Conventional Commit: type(scope): subject, e.g. feat(shell): add wc --lines. It becomes the commit on main. -->
+
 <!-- One or two sentences. Link the issue: Closes #123 -->
 
 ## Type

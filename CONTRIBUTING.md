@@ -40,9 +40,40 @@ The agent finds the rules in [AGENTS.md](AGENTS.md) and the task skills in [`.cl
 7. **Open the PR.** Fill in the template: what changed, why, how you checked it, screenshots for UI.
 8. **Respond to review.** CI must be green. PRs from branches in this repo also get a live preview link; PRs from forks do not, so say how you tested.
 
+## Commits and PR titles
+
+We use [Conventional Commits](https://www.conventionalcommits.org/), checked by commitlint. Releases and the changelog are generated from them, so the messages matter.
+
+```
+<type>(<scope>): <what changed, imperative, lower case>
+
+feat(shell): add the wc --lines option
+fix(python): keep the memory map in view on phones
+docs: explain how to run a quest from disk
+feat(shell)!: rename the saved-state key      # breaking change
+```
+
+- **Types**: `feat` (new learner-visible thing), `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, `revert`.
+- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`.
+- **The PR title is what lands on `main`** (we squash-merge), so it must follow the format; a check enforces it. Individual commit messages are checked locally by a git hook after `npm ci`.
+- Breaking changes (for example anything that would invalidate saved progress) use `!` and a `BREAKING CHANGE:` footer.
+
+Version bumps follow SemVer: `feat` is minor, `fix` and `perf` are patch, `!` is major. Contributors never bump versions or edit `CHANGELOG.md`; maintainers do that when releasing.
+
+## Releasing (maintainers)
+
+```
+git switch main && git pull
+npm run release -- --dry-run     # preview the version and changelog
+npm run release                  # bumps package.json, writes CHANGELOG.md, commits and tags vX.Y.Z
+git push --follow-tags origin main
+```
+
+The first release: `npm run release -- --first-release` (keeps 0.1.0). Uses [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version), the maintained fork of `standard-version`. Config is in `.versionrc.json`. If `main` is protected, run the release on a branch and merge it with a `chore(release): X.Y.Z` PR.
+
 ## What a good PR looks like
 
-- Small and focused, with a title that says what it does.
+- Small and focused, with a Conventional Commit title (`feat(shell): ...`).
 - Tests included. New Shell Quest missions are covered by the solvability test automatically; add a case that proves a *wrong* or *lazy* answer fails.
 - Learner-facing text that is friendly, concrete and a touch playful. Short sentences. No jargon the quest has not introduced yet.
 - No unrelated formatting changes, no new dependencies, no build step.

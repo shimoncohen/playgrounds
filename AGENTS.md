@@ -21,7 +21,7 @@ CI runs all of these on every PR. A PR is not ready until they pass locally.
 
 ## Hard rules
 
-1. **No build step, no framework, no new runtime dependency.** Plain browser scripts. Pages must work opened from disk and served by GitHub Pages. Fonts and `acorn`/`typescript` come from CDNs; do not add more without an issue.
+1. **No build step, no framework, no new runtime dependency (dev tooling such as commitlint is fine).** Plain browser scripts. Pages must work opened from disk and served by GitHub Pages. Fonts and `acorn`/`typescript` come from CDNs; do not add more without an issue.
 2. **Must bundle.** `tools/build.py` inlines local `style.css`/`app.js`/`shared/*` into one body-only file. Local assets must be referenced as `<script src="...">` / `<link rel="stylesheet" href="...">` with relative paths, and an inlined file must not contain `</script` or `</style`.
 3. **Never regenerate fixtures to make a test pass.** `tests/fixtures/` (golden transcript, corpus 1 and 2) record what old content did. If one fails, your code is wrong. A deliberate change to old behaviour is its own reviewed decision; see the "differential guards" part of the guideline.
 4. **Saved progress must keep working.** Never rename a `localStorage` key (`<name>-quest-v1`), never renumber missions that shipped (state is keyed `'<chapter>.<mission>'`); append to the end of a chapter. See guideline section 4.
@@ -53,7 +53,7 @@ Use the `pre-pr-check` skill, or by hand: run the commands above, re-read your o
 ## Agent etiquette
 
 - Branch from `main`; one branch per issue. Do not push to `main` or to someone else's branch.
-- Commit messages: imperative, one concern each. Keep any attribution trailer your tooling adds.
+- **Conventional Commits** for commit messages and the PR title (`type(scope): subject`, see CONTRIBUTING.md; enforced by commitlint locally and in CI). Never bump the version or edit `CHANGELOG.md`; releases are cut by maintainers. Keep any attribution trailer your tooling adds.
 - Do not weaken, skip or delete a test to get green. If a test is wrong, say so in the PR and explain.
 - Unsure or the issue is ambiguous? Ask on the issue before building; a question is cheaper than a rewrite.
 - Plans and specs for larger work go in `docs/superpowers/` (specs, plans) and merge before the code that implements them.

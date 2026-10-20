@@ -68,6 +68,7 @@ git clone https://github.com/<you>/playgrounds && cd playgrounds
 npm ci && npx playwright install chromium   # once
 # ...make your change...
 npm run check && npm test                    # must pass before you open a PR
+# commits and PR titles use Conventional Commits: feat(shell): add a mission
 ```
 
 ## 💾 Saving progress
