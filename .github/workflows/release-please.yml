@@ -1,8 +1,5 @@
 name: Release
 
-# release-please keeps one "chore(release): X.Y.Z" pull request open on main. It bumps package.json and writes
-# CHANGELOG.md from the Conventional Commits since the last release. Merging that PR tags the commit and publishes
-# the GitHub Release. Nobody pushes to main directly, so branch protection stays on.
 on:
   push:
     branches: [main]

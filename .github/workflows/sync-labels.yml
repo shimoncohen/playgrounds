@@ -1,6 +1,4 @@
 name: Sync labels
-
-# Manual: Actions -> Sync labels -> Run workflow. Creates or updates the labels in .github/labels.json.
 on:
   workflow_dispatch:
 

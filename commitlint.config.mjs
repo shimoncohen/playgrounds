@@ -1,7 +1,6 @@
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    // Optional scope, but if present it must be one of these.
     'scope-enum': [2, 'always', [
       'script', 'python', 'cpp', 'shell', 'harbor',
       'landing', 'shared', 'progress', 'engine', 'content', 'release',
