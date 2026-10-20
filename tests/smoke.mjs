@@ -750,6 +750,18 @@ test('shell-quest: touch extra keys include the script punctuation; tab completi
   await ctx.close();
 });
 
+test('shell-quest: a folder at the depth cap wraps in the prompt and mission card at 390px, and the input stays usable', async () => {
+  const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await type('mkdir -p $(printf "dd/%.0s" $(seq 1 126)); cd $(printf "dd/%.0s" $(seq 1 126)); mkdir dd');
+  assert.match(await page.textContent('#screen'), /mkdir: cannot create directory 'dd': File name too long/);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.ok(await page.evaluate(() => document.querySelector('#cmd').getBoundingClientRect().width > 50), 'the input keeps its width');
+  await type('cd ~; echo back');
+  assert.match(await page.textContent('#screen'), /back/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest editor: extra keys type into the field that was used last', async () => {
   const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   await type('nano k.sh');

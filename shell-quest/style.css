@@ -79,7 +79,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .explain,.note{margin:0;max-width:62ch}
 .note{font-size:13.5px;color:var(--muted)}
 .where{font-size:13px;color:var(--muted)}
-.where code{color:var(--dir);font-weight:600}
+.where code{color:var(--dir);font-weight:600;white-space:normal;overflow-wrap:anywhere} /* a deep folder's path (up to 128 components) wraps instead of pushing the page sideways */
 .actions{display:flex;flex-wrap:wrap;gap:8px}
 .btn{border:0;border-radius:9px;padding:8px 14px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink)}
 .btn:hover{filter:brightness(1.05)}

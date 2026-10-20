@@ -687,6 +687,48 @@ describe('path caps: File name too long (Stage 3 final review)', () => {
   });
 });
 
+describe('path caps hold through symlinks (Stage 3 re-review)', () => {
+  const deep = (n) => Array(n).fill('d').join('/');
+  const maxDepth = (SQ) => { let d = 0; (function r(n, k) { if (k > d) d = k; if (n.type === 'dir') for (const c of Object.values(n.children)) r(c, k + 1); })(SQ.S.fs, 0); return d; };
+  it('the re-pointed link loop ends fast, never passes the depth cap, and the world still saves and checks', () => {
+    const ctx = loadContext();
+    const SQ = ctx.SQ;
+    const r = fast(SQ, 'cd /tmp; mkdir r; ln -s r c; t=r; for i in $(seq 1 3000); do mkdir c/d; t=$t/d; rm c; ln -s $t c; done', 3000);
+    assert.match(r.out, /mkdir: cannot create directory 'c\/d': File name too long/);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX, 'depth ' + maxDepth(SQ));
+    fast(SQ, 'cd /tmp; for i in $(seq 1 3000); do mkdir c/d; t=$t/d; rm c; ln -s $t c; done', 3000);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX, 'depth after a second line ' + maxDepth(SQ));
+    SQ.rt.sandboxed = false;
+    SQ.save();
+    assert.equal(SQ.rt.saveFailed, false);
+    assert.ok(ctx.localStorage.getItem(SQ.KEY).length > 0);
+    assert.equal(SQ.sandbox(() => run(SQ, 'echo hi')).out, 'hi');
+  });
+  it('writes through a link to a 126-deep folder are refused', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p /tmp/${deep(126)}; ln -s /tmp/${deep(126)} L`); // /tmp + 126 = 127 components; one more name is fine, two are not
+    assert.equal(run(SQ, 'touch L/ok; echo $?').out, '0');
+    run(SQ, 'mkdir L/x');
+    assert.equal(run(SQ, 'echo hi > L/x/f').out, 'bash: L/x/f: File name too long');
+    assert.equal(run(SQ, 'touch L/x/g').out, "touch: cannot touch 'L/x/g': File name too long");
+    assert.equal(run(SQ, 'cp readme.txt L/x/h').out, "cp: cannot create regular file 'L/x/h': File name too long");
+    assert.equal(run(SQ, 'mkdir L/x/y').out, "mkdir: cannot create directory 'L/x/y': File name too long");
+    assert.equal(run(SQ, 'ln -s . L/x/l').out, "ln: failed to create symbolic link 'L/x/l': File name too long");
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX);
+  });
+  it('cp -r and mv through a link count the subtree', () => {
+    const SQ = loadShell();
+    run(SQ, `mkdir -p /tmp/${deep(119)} s/${deep(49)}; ln -s /tmp/${deep(119)} L`);
+    assert.match(run(SQ, 'cp -r s L/').out, /^cp: cannot create directory '.*s': File name too long$/);
+    assert.match(run(SQ, 'mv s L/').out, /^mv: cannot move 's' to '.*s': File name too long$/);
+    assert.ok(maxDepth(SQ) <= SQ.DEPTH_MAX);
+  });
+  it('a link target longer than PATH_MAX is refused', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, `ln -s ${'a/'.repeat(2100)} l`).out, "ln: failed to create symbolic link 'l': File name too long");
+  });
+});
+
 describe('big inputs are charged to the step budget (Stage 3 final review)', () => {
   it('sort -u of 100,000 distinct lines is fast and keeps the first of each duplicate', () => {
     const SQ = loadShell();

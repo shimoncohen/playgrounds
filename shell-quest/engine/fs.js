@@ -380,7 +380,14 @@ function markTree(abs,n,grow){SQ.rt.changed.add(abs);if(grow&&n.type==='file')SQ
 const NAME_MAX=255,PATH_MAX=4096,DEPTH_MAX=128,TOO_LONG='File name too long';
 function span(n){if(!n||n.type!=='dir')return {d:0,len:0};let d=0,len=0;for(const k of Object.keys(n.children)){const s=span(n.children[k]);d=Math.max(d,s.d+1);len=Math.max(len,s.len+k.length+1);if(k.length>NAME_MAX)len=Infinity}return {d,len}}
 function tooLong(abs,sub){const parts=abs.split('/').filter(Boolean);if(parts.some(x=>x.length>NAME_MAX))return true;
-  const s=sub?span(sub):{d:0,len:0};return parts.length+s.d>DEPTH_MAX||abs.length+s.len>PATH_MAX}
+  const s=sub?span(sub):{d:0,len:0},over=(n,len)=>n+s.d>DEPTH_MAX||len+s.len>PATH_MAX;
+  if(over(parts.length,abs.length))return true;
+  /* where the node really lands: the deepest existing folder on the way, with its links followed (a link can point 120 deep
+     while the typed path is 3 components), plus the components still to be made. The typed path passed above, so this is at most 128 short walks. */
+  for(let k=parts.length-1;k>0;k--){const rp=realPath('/'+parts.slice(0,k).join('/'),true);if(rp===null)continue;
+    const rest=parts.slice(k),depth=rp.split('/').filter(Boolean).length+rest.length;
+    return over(depth,(rp==='/'?'':rp).length+1+rest.join('/').length)}
+  return false}
 function mkdirp(abs){if(tooLong(abs))return abs;let n=S.fs,path='';for(const s of abs.split('/').filter(Boolean)){path+='/'+s;if(!own(n.children,s)){n.children[s]=D();SQ.rt.changed.add(path)}n=n.children[s];if(n.type!=='dir')return path}return null}
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);stateGrew(c.length);SQ.rt.changed.add(abs)}}

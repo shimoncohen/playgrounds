@@ -103,7 +103,7 @@ CMDS.ln=function(a){const {fl,rest}=flags(a);
   if(ex){if(!fl.has('f'))return E(`ln: failed to create symbolic link '${link}': File exists`);if(ex.type==='dir')return E(`ln: failed to create symbolic link '${link}': File exists`)}
   const [par,name]=parentOf(abs);
   if(!par||par.type!=='dir')return E(`ln: failed to create symbolic link '${link}': No such file or directory`);
-  if(SQ.tooLong(abs))return E(`ln: failed to create symbolic link '${link}': ${SQ.TOO_LONG}`);
+  if(SQ.tooLong(abs)||target.length>SQ.PATH_MAX)return E(`ln: failed to create symbolic link '${link}': ${SQ.TOO_LONG}`); /* a link's target is a path too (PATH_MAX) */
   par.children[name]={type:'link',target};SQ.rt.changed.add(abs);return ok()};
 
 // ---- which / type ----
