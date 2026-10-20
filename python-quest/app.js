@@ -742,7 +742,7 @@ const CH=[
  {title:'Add it all up',goal:'Add up the coins in <code>coins</code> with a loop. Start <code>total = 0</code>, add each coin, then print the total.',
   anat:[['total','var'],['+=','op'],['coin','var']],
   explain:'This is the <b>accumulator pattern</b>: start a box at 0, then add to it each time around the loop. You will use it for scores, totals and counts.',
-  note:'Python also has sum(coins), but writing the loop shows how it works.',
+  note:'Python also has <code>sum(coins)</code>, but writing the loop shows how it works.',
   starter:'coins = [5, 10, 20, 15]\ntotal = 0\n',answer:'coins = [5, 10, 20, 15]\ntotal = 0\nfor coin in coins:\n    total += coin\nprint(total)',
   check:c=>!/^\s*for\b/m.test(c.code)?'Use a for loop to add each coin.':c.val('total')!==50?'total should end at 50.':c.printed('50')||'Print total after the loop (not indented).'},
  {title:'Fight until it falls',goal:'A slime has <code>hp = 50</code>. Use <code>while hp > 0:</code> to hit it for 15 each time and print hp after every hit.',
@@ -853,7 +853,7 @@ const CH=[
  {title:'Guess the number',goal:'Build the guessing game: the secret is 7. Keep asking until the guess is right. Say <code>Too low</code> or <code>Too high</code> each time, and <code>You got it!</code> at the end.',
   anat:[['while','kw'],['True','kw','forever...'],[':','op'],['break','kw','...until this']],
   explain:'<code>while True:</code> loops forever, so you need a <code>break</code> when the player wins. The tray holds three guesses: 3, 9, then 7.',
-  note:'When it works, change secret = 7 to secret = random.randint(1, 10) and import random. Now it is a real game.',
+  note:'When it works, change secret = 7 to secret = <code>random.randint(1, 10)</code> and import random. Now it is a real game.',
   inputs:['3','9','7'],starter:'secret = 7\n\nwhile True:\n    guess = int(input("Guess (1-10): "))\n    # compare guess to secret here\n',answer:'secret = 7\n\nwhile True:\n    guess = int(input("Guess (1-10): "))\n    if guess < secret:\n        print("Too low")\n    elif guess > secret:\n        print("Too high")\n    else:\n        print("You got it!")\n        break',
   check:c=>{if(!/\bbreak\b/.test(c.code))return 'Use break when the guess is right.';if(c.err&&c.err.type==='EOFError')return 'The loop kept asking after the right guess. Add break after You got it!';
     return !/Too low/i.test(c.out)?'Print Too low when the guess is smaller.':!/Too high/i.test(c.out)?'Print Too high when the guess is bigger.':/You got it!/.test(c.out)||'Print You got it! when they guess right.'}},
@@ -1110,7 +1110,7 @@ function renderMission(){
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button><button class="btn ghost" data-act="free">Free play</button></div>`}${dots}`}
   else{const m=ch.missions[S.mi];
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
-    ${S.mi===0?`<p class="intro">${esc(ch.intro)}</p>`:''}
+    ${S.mi===0?`<p class="intro">${HowSteps.tick(ch.intro,esc)}</p>`:''}
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
