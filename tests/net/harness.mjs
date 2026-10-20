@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'net-quest', 'engine');
-export const FILES = ['ip.js', 'packets.js'];
+export const FILES = ['ip.js', 'packets.js', 'topology.js'];
 
 export function loadNet() {
   const sandbox = {};
