@@ -13,6 +13,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`cpp-quest/`](cpp-quest/) |
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`shell-quest/`](shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
+| 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
 
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
 

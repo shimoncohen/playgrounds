@@ -10,7 +10,7 @@
   "scripts": {
     "build": "python3 tools/build.py",
     "check": "python3 tools/build.py --check",
-    "test:engine": "node --test \"tests/shell/*.test.mjs\"",
+    "test:engine": "node --test \"tests/shell/*.test.mjs\" \"tests/ds/*.test.mjs\"",
     "test:browser": "node tests/smoke.mjs && node tests/shell-golden.mjs",
     "test": "npm run test:engine && npm run test:browser",
     "prepare": "husky",

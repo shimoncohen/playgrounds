@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
