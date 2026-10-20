@@ -110,7 +110,7 @@ test('local failures: interface down, no address, no route (nothing is sent)', (
 });
 
 test('reason constants are exported verbatim', () => {
-  assert.deepEqual(J(NQ.sim.REASONS), { noRoute: 'no route', ifDown: 'interface down', unreachable: 'host unreachable', ttl: 'ttl exceeded', noAddr: 'no address' });
+  assert.deepEqual(J(NQ.sim.REASONS), { noRoute: 'no route', ifDown: 'interface down', unreachable: 'host unreachable', ttl: 'ttl exceeded', noAddr: 'no address', noReply: 'no reply' });
 });
 
 test('broadcast ARP is flooded; a bystander drops it as not addressed to this host', () => {
@@ -229,24 +229,25 @@ test('hops follow the copy the target accepted, not flood copies to a dead-end s
   assert.deepEqual(J(r.hops), ['laptop', 'sw1', 'phone']);
 });
 
-test('off-origin send failure: phone cannot route the reply, logs a drop, and ping reports no route', () => {
+// Task 6 ruling: a failure away from the origin that sends no ICMP error back is 'no reply', not the far device's reason
+test('off-origin send failure: phone cannot route the reply, logs a drop, and ping reports no reply', () => {
   const net = NQ.createNet('pair');
   net.devices.phone.ifaces.eth0.ip = '10.0.0.3/32'; // phone answers ARP but has no route back to 10.0.0.2
   const r = NQ.sim.ping(net, 'laptop', PHONE);
-  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no route', null]);
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no reply', null]);
   const last = r.entries[r.entries.length - 1];
   assert.deepEqual([last.dev, last.iface, last.dir, last.verdict], ['phone', 'eth0', 'drop', 'cannot send to 10.0.0.2: no route']);
   assert.deepEqual(J(NQ.pkt.layerNames(last.packet)), ['IPv4', 'ICMP']);
   assert.deepEqual(J(r.hops), ['laptop', 'sw1', 'phone'], 'the request still arrived');
 });
 
-test('off-origin send failure: the reply would leave through a down iface, ping reports interface down', () => {
+test('off-origin send failure: the reply would leave through a down iface, ping reports no reply', () => {
   const net = NQ.createNet('pair');
   const ph = net.devices.phone.ifaces;
   ph.eth0.ip = '10.0.0.3/32';
   ph.eth1 = { mac: NQ.ip.mac(70), ip: '10.0.0.1/30', up: false, peer: null }; // the only route back to 10.0.0.2
   const r = NQ.sim.ping(net, 'laptop', PHONE);
-  assert.deepEqual([r.delivered, r.reason], [false, 'interface down']);
+  assert.deepEqual([r.delivered, r.reason], [false, 'no reply']);
   const last = r.entries[r.entries.length - 1];
   assert.deepEqual([last.dev, last.iface, last.dir, last.verdict], ['phone', 'eth1', 'drop', 'cannot send to 10.0.0.2: interface down']);
 });

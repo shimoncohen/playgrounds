@@ -6,7 +6,10 @@
 const NQ=globalThis.NQ=globalThis.NQ||{};
 const P=NQ.pkt;
 const BCAST='ff:ff:ff:ff:ff:ff',ZERO='00:00:00:00:00:00',STEP_LIMIT=500;
-const REASONS={noRoute:'no route',ifDown:'interface down',unreachable:'host unreachable',ttl:'ttl exceeded',noAddr:'no address'};
+/* why a ping failed. no route / interface down / no address: the origin could not send (or a router said so in an ICMP
+   error). host unreachable: the origin's ARP got no answer (or a router's did). ttl exceeded: a router said so.
+   no reply: the request left, but neither a reply nor an ICMP error came back (a silent drop on the way, or a lost reply). */
+const REASONS={noRoute:'no route',ifDown:'interface down',unreachable:'host unreachable',ttl:'ttl exceeded',noAddr:'no address',noReply:'no reply'};
 const addr=c=>c.split('/')[0];
 const layer=(p,name)=>p.layers.find(l=>l.name===name);
 const ERRTYPES=['time-exceeded','dest-unreachable'];
@@ -24,6 +27,7 @@ const drop=(ctx,dev,iface,packet,verdict)=>log(ctx,dev,iface,'drop',verdict,pack
    {path, reason} on an ICMP error a router sends back about it (path: the request's path up to that router). */
 const transmit=(ctx,dev,iface,packet,verdict,dir,tag)=>{
   log(ctx,dev.id,iface,dir||'tx',verdict,packet);
+  if(tag&&!tag.reason&&dev.id===ctx.from)ctx.left=true;
   const peer=dev.ifaces[iface].peer;
   if(!peer)return;
   const [d,i]=peer.split('.');
@@ -53,7 +57,7 @@ const route=(dev,dstIp)=>{
   for(const r of dev.routes||[]){
     if(!r||typeof r!=='object')continue;
     const via=r.via==null?null:r.via;
-    if(via!==null&&NQ.ip.parse(via)===null)continue;
+    if(via!==null&&(NQ.ip.parse(via)===null||Object.values(dev.ifaces).some(i=>i.ip&&addr(i.ip)===via)))continue;
     if(r.dst==='default'){offer(0,2,via,r.dev);continue;}
     const c=NQ.ip.cidr(r.dst);
     if(c&&NQ.ip.inSubnet(n,c))offer(c.prefix,1,via,r.dev);
@@ -79,14 +83,14 @@ const pendingKey=(dev,ip)=>dev.id+'|'+ip;
    o: {tag, inIface, quiet, dir, back}. dir is the log direction ('fwd' at a router); back is what a router needs to
    send an ICMP error if the ARP for the next hop is never answered ({iface, ip, ic}: ingress iface, the original
    IPv4 and ICMP fields). Unless quiet (the origin's first send, reported by ping itself), a failure is logged as a
-   drop at this device (on the egress iface, or inIface when there is none) and becomes ctx.fail. */
+   drop at this device (on the egress iface, or inIface when there is none); the origin hears nothing, so the ping
+   reports no reply. */
 const ipSend=(ctx,dev,ipLayers,verdict,o)=>{
   o=o||{};
   const ip=ipLayers[0].fields,h=nextHop(dev,ip.dst);
   const fail=reason=>{
     if(!o.quiet){
       drop(ctx,dev.id,h?h.iface:o.inIface,P.stack(...ipLayers),'cannot send to '+ip.dst+': '+reason);
-      if(!ctx.fail)ctx.fail=reason;
     }
     return reason;
   };
@@ -151,17 +155,17 @@ const icmpError=(ctx,dev,inIface,ip,ic,tag,reason)=>{
   const verdict='ICMP '+(reason===REASONS.ttl?'time exceeded':'destination unreachable ('+reason+')')+' to '+ip.src;
   ipSend(ctx,dev,[P.ipv4(addr(src),ip.src,64,'ICMP'),P.icmp(type,ic?ic.id:0,ic?ic.seq:0)],verdict,{inIface,tag:tag&&{path:tag.path.slice(),reason}});
 };
-/* the probe died here (dropped on iface; it came in on inIface): the first failure is the ping's reason, and hops end
-   here unless the target already took a copy */
+/* the probe died here (dropped on iface; it came in on inIface): hops end here unless the target already took a copy,
+   and the sender learns why only if the ICMP error reaches it */
 const died=(ctx,dev,iface,p,verdict,reason,ip,ic,tag,inIface)=>{
   drop(ctx,dev.id,iface,p,verdict);
-  if(!ctx.fail)ctx.fail=reason;
   if(tag&&!ctx.hit)ctx.hops=tag.path;
   icmpError(ctx,dev,inIface||iface,ip,ic,tag,reason);
 };
 /* not for any of our addresses: hosts drop it; a router checks TTL, looks up the route and sends it on with a new
-   Ethernet header (its egress MAC to the next hop's MAC) and ttl - 1. The IPv4 addresses never change here: NAT
-   (Task 7) hooks in at this point, between the route lookup and the send. */
+   Ethernet header (its egress MAC to the next hop's MAC) and ttl - 1. The IPv4 addresses never change here. NAT
+   (Task 7) source translation hooks in here, before the route lookup and send; inbound (de-NAT) traffic is addressed
+   to the router's own outside IP, so it is accepted locally in ipRx and never reaches forward (see ipRx). */
 const forward=(ctx,dev,iface,p,tag)=>{
   if(dev.kind!=='router')return drop(ctx,dev.id,iface,p,'not addressed to this host');
   const ip=layer(p,'IPv4').fields,icl=layer(p,'ICMP'),ic=icl&&icl.fields,t=via(tag,dev.id);
@@ -176,6 +180,7 @@ const forward=(ctx,dev,iface,p,tag)=>{
 };
 const ipRx=(ctx,dev,iface,p,tag)=>{
   const ip=layer(p,'IPv4').fields,ic=layer(p,'ICMP');
+  /* Task 7: inbound NAT translation must hook in BEFORE this own-address check, or return traffic stops here */
   if(!ownIface(dev,ip.dst))return forward(ctx,dev,iface,p,tag);
   if(tag&&!tag.reason){ctx.hops=via(tag,dev.id).path;ctx.hit=true;}
   if(!ic)return drop(ctx,dev.id,iface,p,'no one is listening for this protocol');
@@ -253,7 +258,7 @@ const ping=(net,from,dstIp,opts)=>{
   if(!dev)throw new Error('unknown device: '+from);
   if(NQ.ip.parse(dstIp)===null)throw new Error('bad IPv4 address: '+dstIp);
   const ttl=int(o.ttl,0,255,'ttl')??64,seq=int(o.seq,0,65535,'seq')??1,id=int(o.id,0,65535,'id')??1;
-  const ctx={net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,fail:null,replyFrom:null,err:null,hit:false};
+  const ctx={net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,left:false,replyFrom:null,err:null,hit:false};
   const done=(reason)=>({delivered:reason===null,reason,replyFrom:ctx.replyFrom??(ctx.err&&ctx.err.from),hops:ctx.hops,entries:ctx.entries});
   if(!Object.values(dev.ifaces).some(i=>i.ip))return done(REASONS.noAddr);
   if(ownIface(dev,dstIp)){ctx.replyFrom=dstIp;ctx.hops.push(from);return done(null);}
@@ -265,10 +270,13 @@ const ping=(net,from,dstIp,opts)=>{
   if(err)return done(err);
   ctx.hops=[from];
   settle(ctx);
-  return done(ctx.replyFrom!==null?null:(ctx.err&&ctx.err.reason)||ctx.fail||REASONS.unreachable);
+  if(ctx.replyFrom!==null)return done(null);
+  if(ctx.err)return done(ctx.err.reason);
+  return done(ctx.left?REASONS.noReply:REASONS.unreachable);
 };
 /* traceroute: ping with ttl 1, 2, ... ; each router on the way answers time-exceeded. Stops at the target, or at any
-   other failure (the simulation is deterministic, so a larger TTL cannot learn more), or at maxHops. */
+   other failure (the simulation is deterministic, so a larger TTL cannot learn more), or at maxHops. A hop whose
+   answer never came back (no reply) has from:null, which the shell renders as '*'. */
 const traceroute=(net,from,dstIp,maxHops)=>{
   const max=int(maxHops,1,64,'maxHops')??30,hops=[],entries=[];
   for(let ttl=1;ttl<=max;ttl++){

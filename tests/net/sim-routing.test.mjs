@@ -232,3 +232,45 @@ test('deterministic: the same traceroute on two fresh nets logs identical entrie
   const b = NQ.sim.traceroute(NQ.createNet('office'), 'laptop', SERVER);
   assert.deepEqual(J(a.entries), J(b.entries));
 });
+
+// Task 7 (NAT) will change these home outcomes on purpose: home will translate laptop's address, so isp can answer.
+test('home, no NAT yet: the request reaches web but isp has no route back, so ping reports no reply', () => {
+  const net = NQ.createNet('home');
+  const r = NQ.sim.ping(net, 'laptop', '198.51.100.10');
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no reply', null]);
+  assert.ok([...r.entries].some((e) => e.dev === 'web' && e.dir === 'rx' && icmpType(e) === 'echo-request'), 'web got the request');
+  const d = [...r.entries].find((e) => e.dir === 'drop' && e.dev === 'isp');
+  assert.equal(d.verdict, 'no route to 192.168.1.10', 'isp drops web\'s reply while forwarding it');
+  assert.equal(NQ.sim.ping(NQ.createNet('home'), 'laptop', '203.0.113.6').reason, 'no reply', 'isp itself cannot answer either');
+});
+
+test('home: the same ping without laptop\'s default route is a local no route with no entries', () => {
+  const net = NQ.createNet('home');
+  net.devices.laptop.routes = [];
+  const r = NQ.sim.ping(net, 'laptop', '198.51.100.10');
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no route', null]);
+  assert.equal(r.entries.length, 0);
+});
+
+test('home traceroute (no NAT yet): home answers, isp\'s time-exceeded is lost, so hop 2 is no reply and tracing stops', () => {
+  const t = NQ.sim.traceroute(NQ.createNet('home'), 'laptop', '198.51.100.10');
+  assert.deepEqual(J(t.hops), [
+    { ttl: 1, from: '192.168.1.1', reached: false },
+    { ttl: 2, from: null, reached: false, reason: 'no reply' }]);
+});
+
+test('traceroute: target reached but its reply lost is a no-reply hop with from null', () => {
+  const net = NQ.createNet('office');
+  net.devices.server.routes = [];
+  const t = NQ.sim.traceroute(net, 'laptop', SERVER);
+  assert.deepEqual(J(t.hops), [
+    { ttl: 1, from: '192.168.1.1', reached: false }, { ttl: 2, from: '10.0.1.2', reached: false },
+    { ttl: 3, from: null, reached: false, reason: 'no reply' }]);
+});
+
+test('route(): a via equal to one of the device\'s own addresses is malformed and never matches', () => {
+  const d = dev({ eth0: nic('10.0.0.1/24') }, [{ dst: 'default', via: '10.0.0.1', dev: 'eth0' }]);
+  assert.equal(NQ.sim.route(d, '8.8.8.8'), null);
+  d.routes.push({ dst: 'default', via: '10.0.0.254', dev: 'eth0' });
+  assert.deepEqual(J(NQ.sim.route(d, '8.8.8.8')), { via: '10.0.0.254', dev: 'eth0' });
+});
