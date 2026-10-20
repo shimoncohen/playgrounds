@@ -1275,7 +1275,7 @@ const totalDone=i=>CH[i].missions.filter((m,j)=>S.done[i+'.'+j]).length;
 function renderChapters(){$('#chapters').innerHTML=CH.map((c,i)=>`${i===0?'<div class="rail-lbl">Docker</div>':i===7?'<div class="rail-lbl">Kubernetes</div>':''}<button class="chap${S.badges[i]?' earned':''}" data-ch="${i}" aria-current="${i===S.ch}"><span class="num">${S.badges[i]?'★':i+1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`).join('')}
 const LBL={cmd:'program',sub:'action',opt:'option',arg:'target',img:'image',val:'value',op:'joins'};
 const KCL={cmd:'k-cmd',sub:'k-kw',opt:'k-opt',arg:'k-arg',img:'k-arg',val:'k-var',op:'k-op'};
-function anatomy(a){return `<div class="anat">${a.map(([t,k])=>`<div class="tok ${KCL[k]}"><b>${esc(t)}</b><span>${LBL[k]}</span></div>`).join('')}</div>`}
+function anatomy(a){return `<div class="anat">${a.map(([t,k,l])=>`<div class="tok ${KCL[k]}"><b>${esc(t)}</b><span>${esc(l||LBL[k])}</span></div>`).join('')}</div>`}
 const ansOf=m=>typeof m.ans==='function'?m.ans():m.ans;
 let hintOpen=false;
 function renderMission(){const ch=CH[S.ch],n=ch.missions.length;const el=$('#mission');
@@ -1291,7 +1291,7 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;const el=$('#mis
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${picH(false)}${dotsH}`}
   else{const m=ch.missions[S.mi];const done=S.done[S.ch+'.'+S.mi];
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${done?' · done':''}</div><h2>${esc(m.t)}</h2><p class="intro">${m.i}</p>
-    <div class="goal"><div class="label">Your move</div><p>${m.g}</p></div>${m.a?anatomy(m.a):''}
+    <div class="goal"><div class="label">Your move</div><p>${m.g}</p></div>${m.a?anatomy(m.a):''}${HowSteps.html(m.how)}
     <div class="actions"><button class="btn ghost" data-act="hint">${hintOpen?'Hide hint':'Hint'}</button><button class="btn ghost" data-act="show">Fill it in for me</button>${done?`<button class="btn ghost" data-act="skip">Next mission</button>`:''}</div>
     ${hintOpen?`<p class="hint">${esc(m.h)}</p>`:''}${picH(S.mi===0)}${dotsH}`}
   el.innerHTML=h;if(pop){el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');pop=false}}

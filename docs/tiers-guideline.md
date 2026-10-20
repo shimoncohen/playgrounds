@@ -33,7 +33,7 @@ Each chapter carries `tier: 'intermediate'`. What you get back:
 
 ## 3. Mission kinds and the check context
 
-A mission is `{ title, goal, anat, answer, explain, check, hint?, note? }`. `answer` is the reference solution: it powers "Type it for me" and the solvability test. `check(ctx)` decides whether the learner passed.
+A mission is `{ title, goal, anat, how, answer, explain, check, hint?, note? }`. `answer` is the reference solution: it powers "Type it for me" and the solvability test. `check(ctx)` decides whether the learner passed. `how` explains the line step by step; see "Explain the whole, then the parts" below.
 
 There are four kinds:
 
@@ -41,6 +41,23 @@ There are four kinds:
 - `outcome`: the check reads the resulting state (files, modes, links, exported variables, what the line printed) and accepts any way of getting there. Intermediate missions are written this way. There is no separate flag; it is a style of check, built from the helpers below.
 - `script` (`kind: 'script'`): the learner writes a file in the editor panel, and the engine runs it against test cases in a sandbox. See section 3a.
 - `challenge` (`kind: 'challenge'`): a capstone. It has the same fields as a script mission, plus usually its own `check` (which wins over the cases) and a `world`. The mission card shows a "Challenge" tag.
+
+**Explain the whole, then the parts.** A card that only labels pieces (a chip that says `option`, an `explain` that covers one flag) leaves the learner guessing what the line is *for*. So every mission carries `how`, rendered as a numbered "How it works" list by `shared/how.js` (styled by `shared/how.css`, loaded by every quest):
+
+```js
+{ title: 'Ignore upper and lower case', goal: '...',
+  anat: [['grep','cmd'], ['-i','opt','ignore case'], ['wolf','arg','what to find'], ['journal.txt','arg','where to look']],
+  how: [
+    '<code>grep -i wolf journal.txt</code> finds every line with wolf in it, however it is capitalised.',   // 1. the whole
+    '<code>grep</code> is the command: search inside text.',                                                    // 2. each part,
+    '<code>-i</code> is an option: <b>i</b>gnore case. Now wolf, Wolf and WOLF all match.',                    //    tied to the whole
+    '<code>wolf</code> is what to look for and <code>journal.txt</code> is where to look.',
+  ],
+  explain: '...',   // the extra fact or gotcha, not a repeat of the steps
+  ... }
+```
+
+Rules: step 1 is one plain sentence about the whole line (what goes in, what comes out); later steps go left to right, one part each, and say how the part changes the whole; end with what the learner will see or one common slip; 3 to 5 steps; never an unexplained term (introduce it, or link it to something taught earlier); variables stay quoted and inside `<code>`. A chip's third element is a short meaning (a few words) that replaces the bare kind label; use it for options, operators and arguments whose role is not obvious. Every quest renders `m.how` (Harbor Quest reads `how` on its `{t,i,g,a,h,ans,ok}` missions too), so the same field works everywhere. It is optional in the data so old missions keep rendering, but new and changed missions must have it, and `tests/shell/how.test.mjs` requires it for every Beginner mission.
 
 The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/exec.js`. The real helpers:
 
@@ -232,6 +249,7 @@ All of these were found in review of the Intermediate and Advanced tiers.
 - **Quote variables.** Answers, explanations, hints, guide examples and quick-fire answers always quote: `[ -n "$x" ]`, `cp "$f" backup/`. Like bash, this practice shell splits an unquoted `$var` or `$( )` on `IFS` and expands any wildcard in it, and an unquoted empty `$var` passes no argument at all (`[ -n $x ]` is true when `x` is empty). A test enforces that no Advanced text teaches `[ $var`.
 - **Script tests must pin the lesson.** Give the case that the obvious shortcut fails: an empty folder for a backup script, a file name with spaces, a second run over an existing output, a missing argument with `expectCode: 1` and `expectErrMatch`. For outcome-only cases the shortcut wins (15.5 accepted two `echo` lines until a `check` demanded the here-document).
 - **Fresh-world jump-in.** Learners can open any chapter first, and "Reset world" re-runs only the current `setup()`. Setup must create everything the chapter needs with `ensureFile` / `ensureDir` (they never overwrite learner work). Don't rely on an earlier chapter, and don't let one mission destroy files a later mission in the same chapter needs (the 11.5 `xargs rm` mission works on a scratch folder for this reason).
+- **Whole before parts.** Do not open with a flag. A learner who reads "`-r` means recursive" before knowing what `cp` is doing has nothing to hang it on. Put the whole-line step first (`how[0]`), then the parts.
 - **Factual explain text.** `explain` is read as truth. Test every claim it makes against the engine (`man`, `help`, run it). Don't describe options the practice shell doesn't support; unsupported options print "this practice shell does not support X yet" rather than doing something silently wrong.
 - **Exact-match quick-fire.** Quick-fire answers are compared after dropping quotes and collapsing spaces. When the quoting is the lesson (`echo '$HOME'`), add `{exact:true}` as the fourth tuple element, so only whitespace is normalised.
 

@@ -19,7 +19,7 @@ Prefer your own machine? Every playground is a static page. Open `index.html` (t
 
 ## 🧭 How a quest works
 
-- **Missions.** One small goal at a time. Type the answer, read why it worked, move on. Stuck? Ask for a hint, or let it *type it for you* and learn from the explanation.
+- **Missions.** One small goal at a time. Type the answer, then read *how it works*: what the whole command does first, then what each part contributes. Move on. Stuck? Ask for a hint, or let it *type it for you* and learn from the explanation.
 - **Chapters and badges.** Missions group into chapters, and each finished chapter earns a badge (and bonus XP).
 - **Quick-fire.** Short timed rounds that turn what you learned into reflexes.
 - **Field guide.** A cheat sheet that grows with you.
@@ -102,7 +102,7 @@ Node 24 or newer, and Python 3 for the bundler. Set `PW_CHROMIUM=/path/to/chromi
 
 ```
 index.html              landing page
-shared/                 code every playground reuses: progress saving, tier model
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps
 script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)

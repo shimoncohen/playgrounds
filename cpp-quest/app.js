@@ -2084,7 +2084,7 @@ $('chapters').addEventListener('click',e=>{const b=e.target.closest('.chap');if(
   let mi=CH[ci].missions.findIndex((_,i)=>!S.done[mkey(ci,i)]);if(mi<0)mi=0;goMission(ci,mi,false)});
 const KLAB={kw:'keyword',type:'type',name:'name',val:'value',op:'symbol',pp:'directive',fn:'function'};
 let showHint=false,showAns=false,justWon=false;
-function anatHTML(a){return a?`<div class="anat">${a.map(([t,k])=>`<span class="tok k-${k}"><b>${esc(t)}</b><span>${KLAB[k]}</span></span>`).join('')}</div>`:''}
+function anatHTML(a){return a?`<div class="anat">${a.map(([t,k,l])=>`<span class="tok k-${k}"><b>${esc(t)}</b><span>${l?esc(l):KLAB[k]}</span></span>`).join('')}</div>`:''}
 function renderMission(){const card=$('mission');
   if(S.inSandbox){card.innerHTML=`<div class="eyebrow">Free play</div><h2>Sandbox</h2>
     <p class="explain">No goals, no checks. Write any program, run it, step through it. Field guide examples open here when you press Try.</p>
@@ -2097,7 +2097,7 @@ function renderMission(){const card=$('mission');
   let html=`<div class="eyebrow">Chapter ${S.ch+1} · ${esc(ch.name)} · Mission ${S.mi+1} of ${ch.missions.length}</div><h2>${esc(m.title)}</h2>`;
   if(S.mi===0)html+=`<p class="intro">${ch.intro}</p>`;
   html+=`<div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>`;
-  html+=anatHTML(m.anat);
+  html+=anatHTML(m.anat);html+=HowSteps.html(m.how);
   html+=`<p class="explain">${m.explain}</p>`;if(m.note)html+=`<p class="note">${m.note}</p>`;
   if(done&&justWon){const last=S.mi===ch.missions.length-1;
     html+=`<div class="won"><span><b>Mission complete!</b>${justWon===2?' +10 XP':''}</span><button class="btn" id="nextM">${last?(allDone?'Chapter reward':'Next mission'):'Next mission →'}</button></div>`}
