@@ -19,7 +19,8 @@
                                (SQ.rt.scope, set by snapshotShell in interp.js). Only scope-0 jobs print `[N] PID` and get Done notices.
                      scope     the scope its commands currently run in (the jobs it starts belong to it)
                      ppid      the pid of the job that started it, else the shell (1234)
-                     seq       spawn order (ties between equal wake time and job number); debt, d, depth, out: scheduler bookkeeping
+                     ownerNode, scopeNode   the scope tree nodes behind owner and scope
+                     seq       spawn order (ties between equal wake time and job number); debt, d, depth, out, lineNo, lineSteps: scheduler bookkeeping
                      sig       null; reserved for Task 14 (a pending signal to deliver at the job's next command boundary) }
    SQ.rt.notices   the scope-0 jobs that ended, in the order they ended, whose `[N]+  Done ...` notice has not been shown yet. A finished job keeps
                    its record in SQ.rt.jobs until then. HOOK FOR TASK 12b: print and drain this queue before the next prompt (exec.js, outermost
@@ -52,20 +53,35 @@
                    end: `(sleep 2; echo hi) &` at clock 0 shows `hi` after the second following line. A job's file writes happen during its
                    slice, i.e. at its virtual time.
 
-   Caps. Job slices count SQ.step()s per typed line too, against a budget of their own (SQ.rt.jobSteps, LIM.STEPS for all jobs together,
-   reset with rt.steps when an outermost line starts), so background work never stops the foreground command; their output counts against
-   the line's LIM.TOTAL. A job that hits a cap is stopped with `this practice shell stopped the job: too many steps` (state Terminated,
-   status 143) and the job budget and output counter go back to what they were before that slice, so the other jobs and the line go on
-   (at most one refund per job, and at most 200 jobs per session). A job only yields when it owes time, so
+   Caps. Job slices count SQ.step()s per typed line, never against the foreground's budget (so background work never stops the foreground
+   command), with two limits that are never refunded: each job may take LIM.STEPS per typed line (Job.lineSteps, reset when SQ.rt.lineNo
+   changes, i.e. when an outermost line starts), and all jobs together SQ.JOB_WORK = 3 x LIM.STEPS per typed line (SQ.rt.jobWork, reset by
+   exec.js and swapped by SQ.sandbox). A slice may run min(both remainders) steps. The job whose slice crosses a limit is stopped with
+   `this practice shell stopped the job: too many steps` (state Terminated, status 143; its output counter is refunded so the line goes on).
+   CHOICE: once SQ.rt.jobWork is spent, tick runs nothing more in this line: the other due jobs are left due (not stopped) and run, late,
+   at the next line's ticks, so an honest long job survives a busy line and the line's total job work stays bounded (a one-line spawner of
+   runaway jobs costs at most 3 x LIM.STEPS per typed line). A sync unit cannot be paused, so the job that happens to cross the shared
+   limit is stopped even if it is honest. Task 12b's `wait`: when tick returns with jobs still due before the target and SQ.rt.jobWork
+   >= SQ.JOB_WORK, stop the wait (a step message) instead of looping. A job only yields when it owes time, so
    `while :; do :; done &` and `while :; do sleep 0; done &` run into the cap in one slice; every slice that yields moves its job's wake
    forward (time resolution 1 ms), which keeps a tick finite. `f() { f & }; f` and `:(){ :|:& };:` run into the 16-job and 200-process caps
    (`bash: fork: retry: ...`, printed by the job that tried); the shell stays usable, but the session's 200 processes are spent until
    "Reset world" (procs.js).
 
+   Known limitations (also in the spec's as-built list): a $( ) does not wait for the stdout of a job started inside it
+   (x=$( (sleep 1; echo cap) & echo got ) gives got); a sleep inside a unit that runs in one go is paid after the unit; job output that comes
+   due during a foreground $( ) travels with that command's stderr (err class); during xargs/find -exec sleep it is lost (runArgv keeps r.out
+   only); after the 200-process cap a surviving spawner prints up to LIM.LINES fork errors per line until it ends.
+
+   Scopes: SQ.rt.scopeNode = {id, up} is the current process scope (interp.js snapshotShell/restoreShell; id mirrored in SQ.rt.scope).
+   Job output is tagged {bg:true, owner: the owner's scope node}; runScript keeps as its own output only items whose owner is the script's
+   scope or below it, and passes the rest up as r.bg (interactive jobs' output reaches the screen, not the script's redirect).
+
    Extension points for later tasks:
    - 12b `jobs`/`wait`/`kill`/`$!`: SQ.rt.jobs (filter by owner === SQ.rt.scope for the current shell), SQ.rt.notices, SQ.tick(t, {inclusive:true})
      to run a job up to its completion time (then set SQ.rt.clock), SQ.rt.lastBg (the pid of the newest job spawned; $! is still to be wired in
-     parse.js). To end a live job (kill), call SQ.endJob(job, 'Terminated', 128+n): it runs the generator's pending finally blocks with the job's
+     parse.js). OPEN FOR 12b: rt.lastBg is one global value; bash's $! is per shell (a subshell, $( ) or script that starts a job has its own,
+     and the parent's $! does not change), so 12b should scope it (e.g. save/restore it with snapshotShell, or keep it per scope node). To end a live job (kill), call SQ.endJob(job, 'Terminated', 128+n): it runs the generator's pending finally blocks with the job's
      state swapped in (function frames, subshell snapshots) and records the end.
    - 13 `set -e`/`-x`: the generator mirrors runList/runAndOr/runIf...; option checks added there must be added here too (gList, gAndOr, gLoop).
    - 14 `trap`/signals: Job.sig, delivered at the job's next command boundary (gPipe is the boundary) or on endJob.
@@ -144,12 +160,12 @@ function* run(node,ctx){let r;
 const forkErr=()=>Object.assign(new Error(SQ.FORK_MSG),{raw:true,code:1,fork:true});
 function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   if(rt.jobs.filter(isLive).length>=MAX_JOBS)throw forkErr();
-  const pid=SQ.newPid(),owner=rt.scope,start=SQ.now();
+  const pid=SQ.newPid(),ownerNode=rt.scopeNode,owner=ownerNode.id,start=SQ.now();
   let id=1;for(const j of rt.jobs)if(j.owner===owner&&j.id>=id)id=j.id+1;
   const frames=rt.frames.map(f=>Object.assign({},f,{args:f.args.slice(),locals:f.locals&&new Map(f.locals)}));
   const cmd=String(src===undefined?node.src||'':src);
   const J=Object.assign(SQ.copyShell(),{id,pid,cmd,node,state:'Running',code:null,wake:start,gen:null,frames,baseArgs:SQ.BASE_FRAME.args.slice(),
-    owner,scope:++rt.scopeSeq,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],sig:null});
+    owner,ownerNode,scopeNode:{id:++rt.scopeSeq,up:ownerNode},scope:rt.scopeSeq,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],sig:null});
   J.gen=run(node,{depth:J.depth,tty:!!env.tty,record:false,stdin:null,loops:0,job:J});
   rt.jobs.push(J);rt.lastBg=pid;
   /* ps: a lone simple command shows as itself (sleep 30), anything else as the subshell running it (bash) */
@@ -170,30 +186,36 @@ function endJob(J,state,code){const rt=SQ.rt;
 const stopText=e=>e&&e.stop&&/^this practice shell stopped the command/.test(e.message)?e.message.replace('stopped the command','stopped the job'):fatalText(e);
 /* run fn with J's state swapped in, and the caller's back afterwards (also when fn throws) */
 function inSlice(J,fn){const rt=SQ.rt,B=SQ.BASE_FRAME;
-  const fg={sh:SQ.shellState(),pend:CTX.pend,depth:CTX.depth,lastSub:CTX.lastSub,deadlines:rt.deadlines,scope:rt.scope,d:SQ.depths(),args:B.args,slice:rt.slice};
-  SQ.setShellState(J);CTX.pend=[];CTX.depth=J.depth;CTX.lastSub=null;rt.deadlines=[];rt.scope=J.scope;B.args=J.baseArgs;
+  const fg={sh:SQ.shellState(),pend:CTX.pend,depth:CTX.depth,lastSub:CTX.lastSub,deadlines:rt.deadlines,scopeNode:rt.scopeNode,d:SQ.depths(),args:B.args,slice:rt.slice};
+  SQ.setShellState(J);CTX.pend=[];CTX.depth=J.depth;CTX.lastSub=null;rt.deadlines=[];rt.scopeNode=J.scopeNode;rt.scope=J.scopeNode.id;B.args=J.baseArgs;
   SQ.setDepths(fg.d.map((x,i)=>x+J.d[i]));rt.slice=J; /* the counters go on from the caller's: the slice runs on top of the caller's JS stack */
   try{return fn()}
-  finally{Object.assign(J,SQ.shellState());J.scope=rt.scope;J.baseArgs=B.args;J.d=SQ.depths().map((x,i)=>x-fg.d[i]);J.debt=0;
+  finally{Object.assign(J,SQ.shellState());J.scopeNode=rt.scopeNode;J.scope=rt.scope;J.baseArgs=B.args;J.d=SQ.depths().map((x,i)=>x-fg.d[i]);J.debt=0;
     if(CTX.pend.length)J.out.push(...CTX.pend);
-    rt.slice=fg.slice;SQ.setShellState(fg.sh);CTX.pend=fg.pend;CTX.depth=fg.depth;CTX.lastSub=fg.lastSub;rt.deadlines=fg.deadlines;rt.scope=fg.scope;
+    rt.slice=fg.slice;SQ.setShellState(fg.sh);CTX.pend=fg.pend;CTX.depth=fg.depth;CTX.lastSub=fg.lastSub;rt.deadlines=fg.deadlines;rt.scopeNode=fg.scopeNode;rt.scope=fg.scopeNode.id;
     B.args=fg.args;SQ.setDepths(fg.d)}}
 /* one slice of J: resume its generator until it yields or ends; returns its Out[] marked bg */
-function slice(J){const rt=SQ.rt,fgSteps=rt.steps,pre=rt.jobSteps||0,chars=rt.outChars;let res,err=null;
-  rt.steps=pre; /* job slices draw on their own per-line budget (rt.jobSteps), never on the foreground's */
+/* step budgets (see the header): the slice may take min(the job's own allowance left this line, the line's job work left) steps; SQ.step()
+   counts up to LIM.STEPS, so rt.steps starts at LIM.STEPS - allowance. What it used is charged to both and never refunded. */
+const LIM=SQ.LIM,JOB_WORK=3*LIM.STEPS;
+function allowance(J){const rt=SQ.rt;if(J.lineNo!==rt.lineNo){J.lineNo=rt.lineNo;J.lineSteps=0}
+  return Math.min(LIM.STEPS-J.lineSteps,JOB_WORK-(rt.jobWork||0))}
+function slice(J){const rt=SQ.rt,fgSteps=rt.steps,chars=rt.outChars,allow=allowance(J),start=LIM.STEPS-allow;let res,err=null;
+  rt.steps=start; /* never the foreground's budget */
   try{res=inSlice(J,()=>J.gen.next())}catch(e){err=e}
-  finally{rt.jobSteps=err?pre:rt.steps;rt.steps=fgSteps} /* a stopped job's steps go back, so the other jobs keep theirs */
+  finally{const used=Math.min(allow,Math.max(0,rt.steps-start));J.lineSteps+=used;rt.jobWork=(rt.jobWork||0)+used;rt.steps=fgSteps}
   const out=J.out;J.out=[];
   if(err||res.done)J.gen=null; /* finished: nothing left to unwind */
   if(err){out.push(errL(stopText(err)));rt.outChars=chars;endJob(J,'Terminated',143)}
   else if(res.done)endJob(J,'Done',res.value);
   else J.wake=res.value.wake;
-  const tagged=out.map(o=>Object.assign({},o,{bg:true}));
+  const tagged=out.map(o=>Object.assign({},o,{bg:true,owner:J.ownerNode}));
   if(rt.lineBg)rt.lineBg.push(...tagged);
   return tagged}
 function tick(until,o){const rt=SQ.rt;if(rt.slice||rt.ticking)return [];
   const incl=!!(o&&o.inclusive),out=[];rt.ticking=true;
   try{for(;;){let J=null;
+      if((rt.jobWork||0)>=JOB_WORK)break; /* this line's job work is spent: the due jobs wait for the next line */
       for(const j of rt.jobs)if(j.state==='Running'&&(incl?j.wake<=until:j.wake<until)&&(!J||j.wake<J.wake||(j.wake===J.wake&&(j.id<J.id||(j.id===J.id&&j.seq<J.seq)))))J=j;
       if(!J)break;
       if(J.wake>rt.clock)rt.clock=J.wake;
@@ -202,5 +224,5 @@ function tick(until,o){const rt=SQ.rt;if(rt.slice||rt.ticking)return [];
   return out}
 SQ.onAdvance.push(target=>tick(target));
 
-Object.assign(SQ,{spawn,spawnItem,tick,endJob,gen:{run},MAX_JOBS});
+Object.assign(SQ,{spawn,spawnItem,tick,endJob,gen:{run},MAX_JOBS,JOB_WORK});
 })(window.SQ = window.SQ || {});

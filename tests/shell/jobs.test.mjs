@@ -197,6 +197,46 @@ describe('runaway jobs and caps', () => {
     assert.ok(r.out.split('\n').length <= SQ.LIM.LINES + 1);
     assert.equal(run(SQ, 'echo ok').out, 'ok');
   });
+  it('total job work per typed line is bounded (never refunded): one-line spawners of runaway jobs', () => {
+    for (const line of ['(while :; do (while :; do :; done) & sleep 0.001; done) &', 'b(){ while :; do :; done; }; s(){ while :; do b & sleep 0.001; done; }; s &']) {
+      const SQ = loadShell();
+      for (let k = 0; k < 2; k++) {
+        const t0 = performance.now();
+        run(SQ, k ? 'echo next' : line);
+        const ms = performance.now() - t0;
+        assert.ok(SQ.rt.jobWork <= SQ.JOB_WORK, `${line}: job work ${SQ.rt.jobWork} > ${SQ.JOB_WORK}`);
+        assert.ok(ms < 1500, `${line}: ${ms.toFixed(0)} ms`);
+      }
+      assert.equal(run(SQ, 'echo ok').out.split('\n')[0], 'ok');
+    }
+  });
+  it('16 busy jobs in one line stay within the job-work bound; the rest wait for the next line', () => {
+    const SQ = loadShell();
+    const t0 = performance.now();
+    run(SQ, 'for i in $(seq 16); do (while :; do sleep 0.0001; done) & done');
+    assert.ok(SQ.rt.jobWork <= SQ.JOB_WORK, `job work ${SQ.rt.jobWork}`);
+    assert.ok(performance.now() - t0 < 1500);
+    assert.ok(SQ.rt.jobs.some((j) => j.state === 'Running'), 'some jobs left due for the next line');
+    for (let k = 0; k < 8; k++) { run(SQ, 'echo x'); assert.ok(SQ.rt.jobWork <= SQ.JOB_WORK); }
+    assert.equal(SQ.rt.jobs.filter((j) => j.state === 'Running').length, 0);
+  });
+  it('each job has its own step allowance: two honest 5,000-pass loops both finish; 16 polling jobs survive', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, '(for i in $(seq 5000); do :; done; echo A) & (for i in $(seq 5000); do :; done; echo B) &').out, '[1] 1235\n[2] 1236\nA\nB');
+    const S2 = loadShell();
+    run(S2, 'for i in $(seq 16); do (while :; do sleep 0.001; done) & done');
+    run(S2, 'echo x');
+    assert.equal(S2.rt.jobs.filter((j) => j.state === 'Running').length, 16);
+  });
+  it("a script keeps only its own jobs' output; the interactive shell's jobs still reach the screen", () => {
+    const SQ = loadShell();
+    run(SQ, "printf 'sleep 3\\n' > s1.sh; printf 'sleep 3 > x\\n' > s2.sh; printf '{ sleep 3; } > x\\n' > s3.sh; printf '(echo mine) &\\nsleep 1\\n' > s4.sh");
+    for (const s of ['s1.sh', 's2.sh', 's3.sh']) {
+      run(SQ, '(sleep 1; echo J) &');
+      assert.equal(run(SQ, `bash ${s} > o.txt; echo [; cat o.txt; echo ]`).out, 'J\n[\n]', s);
+    }
+    assert.equal(run(SQ, 'bash s4.sh > o.txt; echo [; cat o.txt; echo ]').out, '[\nmine\n]');
+  });
   it('at most 16 live jobs: the 17th fork fails', () => {
     const SQ = loadShell();
     const o = run(SQ, 'for i in $(seq 20); do sleep 100 & done').out.split('\n');

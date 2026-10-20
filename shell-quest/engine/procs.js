@@ -56,9 +56,9 @@ const EPOCH=1768467600; /* Date.UTC(2026,0,15,9,0,0)/1000: Thu 2026-01-15 09:00:
 const SHELL_PID=1234,FIRST_PID=1235,PPID=1233,MAX_PROCS=200;
 const FORK_MSG='bash: fork: retry: Resource temporarily unavailable';
 const ms=t=>Math.round(t*1000)/1000;
-/* jobs, notices, jobSeq, scope, scopeSeq and slice belong to jobs.js (Task 12a); they live here so one reset / save / load covers them */
+/* jobs, notices, jobSeq, scope, scopeSeq, scopeNode and slice belong to jobs.js (Task 12a); they live here so one reset / save / load covers them */
 const fresh=()=>({secAt:undefined,clock:0,nextPid:FIRST_PID,forks:0,deadlines:[],procs:[{pid:SHELL_PID,ppid:PPID,cmd:'bash',start:0,state:'S'}],
-  jobs:[],notices:[],jobSeq:0,scope:0,scopeSeq:0,slice:null});
+  jobs:[],notices:[],jobSeq:0,scope:0,scopeSeq:0,scopeNode:{id:0,up:null},slice:null});
 function resetProcs(){Object.assign(SQ.rt,fresh())}
 /* sandbox support: procsSave() hands back the current state and installs a fresh one; procsLoad(saved) puts it back */
 function procsSave(){const rt=SQ.rt,s={};for(const k of Object.keys(fresh()))s[k]=rt[k];resetProcs();return s}

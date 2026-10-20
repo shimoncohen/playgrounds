@@ -11,9 +11,10 @@ const {errOf,own}=SQ;
    snapshotShell() also enters a new process scope (SQ.rt.scope, see jobs.js): the jobs a subshell, $( ), pipeline stage or script starts belong to it,
    and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again. */
 function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last}}
-const newScope=()=>{const rt=SQ.rt;rt.scope=++rt.scopeSeq};
+/* scopes form a tree: SQ.rt.scopeNode = {id, up} (id mirrored in SQ.rt.scope); a job's output is tagged with its owner's node, so a script can tell its own jobs' output from others' */
+const newScope=()=>{const rt=SQ.rt;rt.scopeNode={id:++rt.scopeSeq,up:rt.scopeNode};rt.scope=rt.scopeNode.id};
 function snapshotShell(){
-  const f=SQ.frame(),sv=Object.assign(copyShell(),{frames:SQ.rt.frames.length,frame:f,args:f.args,scope:SQ.rt.scope});newScope();return sv}
+  const f=SQ.frame(),sv=Object.assign(copyShell(),{frames:SQ.rt.frames.length,frame:f,args:f.args,scopeNode:SQ.rt.scopeNode});newScope();return sv}
 function restoreShell(sv){
   S.cwd=sv.cwd;S.oldpwd=sv.oldpwd;S.vars=sv.vars;S.last=sv.last;
   if(sv.exp)S.exp=sv.exp;else delete S.exp;
@@ -21,7 +22,7 @@ function restoreShell(sv){
   if(sv.unsetB)S.unsetB=sv.unsetB;else delete S.unsetB;
   sv.frame.args=sv.args; /* shift inside a subshell, $( ) or pipeline stage does not reach the shell */
   SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames);
-  if(sv.scope!==undefined)SQ.rt.scope=sv.scope}
+  if(sv.scopeNode){SQ.rt.scopeNode=sv.scopeNode;SQ.rt.scope=sv.scopeNode.id}}
 /* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
 function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames}}
 function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;
@@ -293,28 +294,30 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
     if(e&&e.at!==undefined)return E(`${path}: line ${SQ.lineOf(n.content,e.at)}: ${e.message}`,e.code||2);
     return E(errOf(e),e.code||2)}
   const box=o.stdinBox||(o.stdin!=null?{text:String(o.stdin),pos:0}:null);
-  const sv=snapshotShell(),callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
+  const sv=snapshotShell(),me=SQ.rt.scopeNode,callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
   delete S.fns;
   const fr=SQ.rt.frames,at=fr.length;fr.push({name:path,args:o.args.slice(),kind:'script',locals:new Map()});
-  const out=[],err=[];let code=0;
+  const out=[],err=[];let code=0,bg=null;
+  /* output of a job this script (or a subshell of it) started is the script's own (the job inherits its stdout); any other job's output passes through as bg */
+  const mine=n=>{for(;n;n=n.up)if(n===me)return true;return false};
   try{const r=runProgram(prog,{depth:o.depth+1,tty:o.tty,record:o.record,stdin:box,loops:0});
-    for(const x of r.out){if(x.clear)continue;(x.cls==='out'?out:err).push(x.text)}
+    for(const x of r.out){if(x.bg&&!mine(x.owner)){(bg=bg||[]).push(x);continue}if(x.clear)continue;(x.cls==='out'?out:err).push(x.text)}
     code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code}
   finally{fr.length=Math.min(fr.length,at);restoreShell(sv)}
-  return {out:out.join('\n'),err,code}}
+  const res={out:out.join('\n'),err,code};if(bg)res.bg=bg;return res}
 
 /* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...), the per-line runtime state and the
    virtual clock, pid counter and process table (fresh inside: clock 0, next pid 1235) come back
    afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
 function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
-  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,jobSteps:rt.jobSteps,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
-  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.jobSteps=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
+  const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,jobWork:rt.jobWork,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
+  rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.jobWork=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
   const procs=SQ.procsSave(); /* a clean clock, pid counter and process table inside (procs.js) */
   try{return fn()}
   finally{SQ.procsLoad(procs);const back=JSON.parse(snap);SQ.fixTree(back.fs);
     for(const k of Object.keys(S))if(!(k in back))delete S[k];
     for(const k of Object.keys(back))S[k]=back[k];
-    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,jobSteps:keep.jobSteps,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed});
+    Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,jobWork:keep.jobWork,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed});
     CTX.pend.length=0;CTX.pend.push(...keep.pend);CTX.depth=keep.depth}}
 
 /* the frame `return` acts on: the innermost function or sourced-script frame on top of the stack */
