@@ -1,8 +1,8 @@
 /* Progress save/restore control (see progress.js). Uses each playground's own theme variables. */
 .pg-wrap{position:relative;flex:none}
-.pg-trigger{position:relative;border:0;border-radius:9px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+.pg-trigger,.theme-toggle{position:relative;border:0;border-radius:9px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;
   background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
-.pg-trigger:hover{background:var(--surface-2)}
+.pg-trigger:hover,.theme-toggle:hover{background:var(--surface-2)}
 .pg-trigger[aria-expanded="true"]{background:var(--surface-2)}
 .pg-trigger.pg-alert::after{content:"";position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--err);box-shadow:0 0 0 2px var(--bg)}
 .pg-panel{position:absolute;top:calc(100% + 8px);right:0;z-index:50;width:min(360px,calc(100vw - 32px));padding:14px;
