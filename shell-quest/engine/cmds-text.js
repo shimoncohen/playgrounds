@@ -141,10 +141,15 @@ CMDS.seq=function(a){const nums=[];
 function runArgv(argv,io){
   const name=argv[0],a=argv.slice(1);
   const child={tty:false,depth:io.depth,pipeLen:1,record:io.record,loops:0,stdin:'',stdinBox:null};
-  if(SQ.hasFunction(name))return SQ.callFunction(name,a,child);
-  if(name.includes('/'))return SQ.runPath(name,child,false,a);
   const f=SQ.own(CMDS,name)&&CMDS[name];
-  return typeof f==='function'?f(a,child):null}
+  if(!SQ.hasFunction(name)&&!name.includes('/')&&typeof f!=='function')return null;
+  /* a child is a separate process: directory, variables, exports, functions and positional parameters go back to what they were; files and the result stay */
+  const sv=SQ.snapshotShell();
+  try{
+    if(SQ.hasFunction(name))return SQ.callFunction(name,a,child);
+    if(name.includes('/'))return SQ.runPath(name,child,false,a);
+    return f(a,child)}
+  finally{const l=SQ.S.last;SQ.restoreShell(Object.assign({},sv,{vars:Object.assign({},sv.vars),exp:sv.exp&&Object.assign({},sv.exp),fns:sv.fns&&Object.assign({},sv.fns),unsetB:sv.unsetB&&Object.assign({},sv.unsetB),last:l}))}}
 /* a word as xargs -t shows it: bare when plain, else quoted so it could be pasted back */
 function shq(w){if(/^[A-Za-z0-9_@%+=:,.\/-]+$/.test(w))return w;
   if(w==='')return "''";

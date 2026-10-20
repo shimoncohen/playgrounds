@@ -739,3 +739,40 @@ describe('cut -s, head -c, tail -c, uniq -d -u (Task 10)', () => {
     eq('cat uq | uniq -d', 'a\nc');
   });
 });
+
+describe('find -exec and xargs children are separate processes (Task 10 fix)', () => {
+  const probe = (SQ) => ({ cwd: run(SQ, 'pwd').out, x: run(SQ, 'echo "[$X][$Z][$HOME]"').out, fn: run(SQ, 'type g').out, home: run(SQ, 'echo $HOME').out });
+  const base = () => {
+    const SQ = loadShell();
+    run(SQ, 'X=1; g() { echo old; }; f() { cd /tmp 2>/dev/null || cd /; X=9; export Z=1; g() { echo new; }; echo made > ~/made.txt; }');
+    return SQ;
+  };
+  for (const l of [
+    'find . -maxdepth 0 -exec cd / \\;',
+    'find . -maxdepth 0 -exec export Z=1 \\;',
+    'find . -maxdepth 0 -exec unset HOME \\;',
+    'find . -maxdepth 0 -exec f \\;',
+    'find . -maxdepth 0 -exec f {} +',
+    'xargs f <<< a',
+    'xargs -n1 f <<< "a b"',
+    'xargs cd <<< /',
+    'echo a | xargs -I{} f',
+  ]) it(`${l} leaves cwd, variables, exports and functions alone`, () => {
+    const SQ = base(), before = probe(SQ);
+    run(SQ, l);
+    assert.deepEqual(probe(SQ), before);
+  });
+  it('files written by the child remain', () => {
+    const SQ = base();
+    run(SQ, 'find . -maxdepth 0 -exec f \\;');
+    assert.equal(run(SQ, 'cat made.txt').out, 'made');
+    run(SQ, 'rm made.txt; xargs f <<< a');
+    assert.equal(run(SQ, 'cat made.txt').out, 'made');
+  });
+  it('the child still sees the state it was started in, and caps still hold', () => {
+    const SQ = base();
+    assert.equal(run(SQ, 'h() { echo "$X"; }; find . -maxdepth 0 -exec h \\;').out, '1');
+    assert.match(run(SQ, 'r() { find . -maxdepth 0 -exec r \\; ; }; r').out, /nesting|maximum|stopped/);
+    assert.deepEqual(run(SQ, 'echo ok'), { out: 'ok', code: 0 });
+  });
+});
