@@ -210,9 +210,19 @@ function missionVerdict(m,c,why){const isScript=m.kind==='script'||m.kind==='cha
     return {good,failed}}
   if(isScript&&m.file){const r=world(()=>c.scriptPasses(m));return {good:!!r.ok,failed:r.failed||null}}
   return {good:false,failed:null}}
+/* Multi-step missions: m.steps=[{goal,answer,check,hint?,anat?,how?}], done in any order; the mission passes when every step has.
+   Progress lives in S.steps['<ch>.<mi>'] (indexes of the steps done). It is created lazily, so old saves and a finished course export look as they did, and it is dropped when the mission completes. */
+const stepsDone=key=>(S.steps&&S.steps[key])||[];
+const stepNext=(m,key)=>{const d=stepsDone(key);return m.steps.findIndex((s,i)=>!d.includes(i))};
+/* judge the line just typed against every open step: {newly: indexes done by this line, all: the mission is complete} */
+function stepsApply(m,key,c){const d=stepsDone(key).slice(),newly=[];
+  m.steps.forEach((s,i)=>{if(!d.includes(i)&&missionVerdict(s,c,false).good){d.push(i);newly.push(i)}});
+  if(d.length>=m.steps.length){if(S.steps){delete S.steps[key];if(!Object.keys(S.steps).length)delete S.steps}return {newly,all:true}}
+  if(newly.length){S.steps=S.steps||{};S.steps[key]=d}
+  return {newly,all:false}}
 /* the one err line explaining a failed test case (scriptPasses().failed), at most 120 characters */
 const oneLine=(t,n)=>{t=t.replace(/\n/g,'\\n');return t.length>n?t.slice(0,n-3)+'...':t};
 function scriptFailLine(m,f){if(f.index===-2)return oneLine(f.text,120);if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
   return oneLine(`Test ${f.index+1} (${f.label}) failed: expected "${f.expected}", got "${f.got}"`,120)}
-Object.assign(SQ,{runNamed,runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict});
+Object.assign(SQ,{runNamed,runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict,stepsDone,stepNext,stepsApply});
 })(window.SQ = window.SQ || {});

@@ -16,7 +16,9 @@ const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
   if(S.done[S.ch+'.'+S.mi])return; /* revisiting a finished mission (clicked in the list) never celebrates it again */
   const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
-  try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
+  if(m.steps){try{const r=SQ.stepsApply(m,S.ch+'.'+S.mi,ctxFor(line));good=r.all;
+      if(r.newly.length&&!good){const left=m.steps.length-SQ.stepsDone(S.ch+'.'+S.mi).length;addLine(renderText(`✓ Step done: ${m.title}. ${left} more to go.`),'win');SQ.ui.setPop()}}catch(e){}}
+  else try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
   if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
@@ -93,7 +95,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
-  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.answer)}
+  else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.steps?m.steps[SQ.stepNext(m,S.ch+'.'+S.mi)].answer:m.answer)}
   else if(a==='nextch')goChapter(S.ch+1);
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
