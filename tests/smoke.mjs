@@ -124,6 +124,25 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
+  test(`${name}-quest mission column fits the screen on desktop and stays plain on a phone`, async () => {
+    for (const [w, h] of [[1440, 800], [1000, 700]]) {
+      const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: w, height: h } });
+      await page.waitForSelector('#mission');
+      const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, h: c.getBoundingClientRect().height }; });
+      assert.equal(r.pos, 'sticky', `${w}x${h}`);
+      assert.ok(r.h <= h, `column is ${r.h}px in ${h}px`);
+      assert.deepEqual(errors, []);
+      await ctx.close();
+    }
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 390, height: 800 } });
+    await page.waitForSelector('#mission');
+    const m = await page.evaluate(() => ({ pos: getComputedStyle(document.querySelector('.missionCol')).position, over: document.documentElement.scrollWidth > innerWidth }));
+    assert.equal(m.pos, 'static');
+    assert.equal(m.over, false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
   test(`${name}-quest links back to the landing page and to the feature request form`, async () => {
     const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
     await page.waitForSelector('#mission');
