@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
@@ -1364,4 +1364,23 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
     assert.deepEqual(errors, []);
     await ctx.close();
   }
+});
+
+test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
+  const { ctx, page, errors } = await open(`${base}/ds-quest/`, { viewport: { width: 1280, height: 900 } });
+  await page.waitForSelector('#mission');
+  await page.click('.tabs button[data-tab="guide"]');
+  await page.waitForSelector('#demo-tree .dbtn');
+  assert.ok((await page.$$('#guide .exviz')).length >= 10, 'guide examples should each draw what they build');
+  for (const id of ['array', 'stack', 'queue', 'list', 'map', 'set', 'tree']) {
+    await page.click(`#demo-${id} .dbtn >> nth=0`);
+    await until(async () => !(await page.$(`#demo-${id} .dbtn:disabled`)));
+    assert.ok((await page.textContent(`#demo-${id} .demosay`)).length > 20, `${id} explains what happened`);
+    assert.ok((await page.textContent(`#demo-${id} .democode`)).trim().length > 0, `${id} shows the code`);
+  }
+  await page.click('.tabs button[data-tab="quest"]');
+  await page.click('[data-act="watch"]');
+  await until(async () => !(await page.isHidden('#tab-guide')));
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });

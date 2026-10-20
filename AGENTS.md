@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 
@@ -14,7 +14,7 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs; do node --check "$f" || break; done
+for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs all of these on every PR. A PR is not ready until they pass locally.
@@ -42,6 +42,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add or fix a Shell Quest mission | `shell-quest/content/tier-*.js` (+ tests); use the `add-mission` skill |
 | Add a Shell Quest command or shell feature | `shell-quest/engine/cmds-*.js` / `interp.js` (+ `tests/shell/`) |
 | Change another quest's course | that quest's `app.js` (`CH`, `QF`/`QT`, `GUIDE` arrays) |
+| Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
 | Change CI / deploy | `.github/workflows/`, `tools/` (separate PR, flag it) |
