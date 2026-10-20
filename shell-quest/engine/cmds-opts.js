@@ -312,7 +312,8 @@ CMDS.realpath=function(a){let mode='E',nosym=false,end=false;const ops=[];
       else return {out:'',err:[`realpath: invalid option -- '${c}'`,RP_TRY],code:1}}}
   if(!ops.length)return {out:'',err:['realpath: missing operand',RP_TRY],code:1};
   const out=[],err=[],list=[];
-  for(const p of ops){const r=p===''?{err:'No such file or directory'}:rpResolve(p,mode,nosym);
+  for(const p of ops){const fd=p!==''&&SQ.rt.fdTab&&SQ.fdNode(SQ.norm(p))?{path:SQ.norm(p)}:null; /* a live <( ) file (fs.js fdTable) is its own path */
+    const r=fd||(p===''?{err:'No such file or directory'}:rpResolve(p,mode,nosym));
     if(r.err){const m=`realpath: ${p===''?"''":p}: ${r.err}`;err.push(m);list.push({text:m,cls:'err'})}else{out.push(r.path);list.push({text:r.path,cls:'out'})}}
   const res={out:out.join('\n'),err,code:err.length?1:0};if(err.length&&out.length)res.list=list; /* on the screen, stdout and stderr in order */
   return res};

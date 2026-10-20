@@ -172,8 +172,8 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
-    const fdm=move&&SQ.rt.fdTab&&SQ.fdNode(sabs); /* mv of a <( ) file (fs.js fdTable): copied, and the original cannot go, as in bash */
-    const copy=move&&!fdm?sn:clone(sn);
+    const fds=!!SQ.rt.fdTab&&!!SQ.fdNode(sabs),fdm=move&&fds; /* a <( ) file (fs.js fdTable): mv copies it and the original cannot go, as in bash */
+    const copy=move&&!fdm?sn:clone(sn);if(fds)delete copy.mode; /* the copy is an ordinary file (0644), not read-only like the source */
     if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
     if(fdm)err.push(`mv: cannot remove '${s}': Permission denied`);
     else if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}

@@ -158,6 +158,11 @@ describe('process substitution: the hidden /dev/fd files', () => {
     assert.deepEqual(R(SQ, "awk '{print NR\": \"$0}' <(echo x)"), { out: '1: x', code: 0 });
     assert.deepEqual(R(SQ, "sed 's/a/A/' <(echo abc)"), { out: 'Abc', code: 0 });
     assert.deepEqual(R(SQ, 'cp <(echo copied) c.txt; cat c.txt'), { out: 'copied', code: 0 });
+    assert.match(R(SQ, 'cp <(echo x) ff; ls -l ff').out, /^-rw-r--r-- /);
+    assert.deepEqual(R(SQ, 'echo y >> ff; cat ff'), { out: 'x\ny', code: 0 });
+    assert.match(R(SQ, 'mv <(echo z) mm 2>/dev/null; ls -l mm').out, /^-rw-r--r-- /);
+    assert.deepEqual(R(SQ, 'realpath <(true)'), { out: '/dev/fd/63', code: 0 });
+    assert.deepEqual(R(SQ, 'x=<(true); realpath $x'), { out: 'realpath: /dev/fd/63: No such file or directory', code: 1 });
     assert.deepEqual(R(SQ, 'read -r line < <(printf "l1\\nl2\\n"); echo $line'), { out: 'l1', code: 0 });
     assert.deepEqual(R(SQ, 'source <(echo "v=7"); echo $v'), { out: '7', code: 0 });
     assert.deepEqual(R(SQ, 'bash <(echo "echo hi from bash")'), { out: 'hi from bash', code: 0 });
