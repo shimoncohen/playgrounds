@@ -52,7 +52,7 @@ function runCmd1(words,io,assigns){
 function runCmd0(ew,io,pend,noDefer,xt){const {args,globbed}=SQ.globWords(ew);
   const name=args[0],a=args.slice(1);let r,lname=name;
   if(SQ.rt.opts.x)xt=(xt||[]).concat(pend.splice(0).map(t=>({text:t,cls:'err'})),SQ.xline(args.map(SQ.xq).join(' ')));
-  if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)&&!own(CMDS,name)&&!SQ.hasFunction(name)){ /* the tip is for `x = 1`, never for a real command such as sed = file */r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
+  if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)&&!own(CMDS,name)&&!SQ.hasFunction(name)){ /* the tip is for `x = 1`, never for a real command such as sed = file */r=E(`bash: ${name}: command not found`,127);r.nf=true;r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){
     if(io.defer&&!noDefer){const d={out:'',err:[],code:0,defer:{name,args:a,pend}};if(xt)d.xt=xt;return d} /* the job interpreter (jobs.js) runs the body itself */
     r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
@@ -67,15 +67,15 @@ function runNamed(name,a,io){let r;
   else if(name==='local'&&!own(CMDS,'local'))r=SQ.localBuiltin(a);
   else if(name==='return'&&!own(CMDS,'return'))r=SQ.returnBuiltin(a);
   else if(own(CMDS,name))r=CMDS[name](a,io);
-  else if(own(FRIENDLY,name))r=E(FRIENDLY[name],127);
-  else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
+  else if(own(FRIENDLY,name)){r=E(FRIENDLY[name],127);r.nf=true}
+  else{r=E(`bash: ${name}: command not found`,127);r.nf=true;const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
   return r}
 /* the common tail of a command: stderr from its $( ) first, the output caps, the log entry */
 function finishCmd(r,lname,a,globbed,io,pend){
   if(pend.length)r.err=pend.concat(r.err||[]);
   if(r.out&&r.out.length>LIM.TEXT){r.out='';r.err=(r.err||[]).concat(`${lname}: output too large for this practice shell`);r.code=1}
   SQ.rt.outChars+=(r.out||'').length;if(SQ.rt.outChars>LIM.TOTAL)throw new SQ.StepLimit('output too large');
-  if(io.record)SQ.rt.log.push({name:lname,args:a,globbed,piped:io.pipeLen>1,redirect:io.redirect,errRedirect:io.errRedirect,code:r.code,out:r.out||''});
+  if(io.record)SQ.rt.log.push({name:lname,args:a,globbed,piped:io.pipeLen>1,redirect:io.redirect,errRedirect:io.errRedirect,code:r.code,out:r.out||'',nf:!!r.nf});
   return r}
 
 /* break/continue [N] inside a loop: a ctl signal the interpreter unwinds (loops catch it in interp.js resolveCtl); outside a loop it only prints bash's notice */
@@ -197,10 +197,14 @@ function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,l
   err:()=>SQ.rt.lastErr||'',status:()=>S.last}}
 /* A chapter's setup(), plus the `starter` text of its script/challenge missions: written only where the file is absent, so revisiting a chapter never clobbers saved work. */
 function setupChapter(ch){ch.setup();for(const m of ch.missions)if(m.file&&typeof m.starter==='string'&&(m.kind==='script'||m.kind==='challenge'))SQ.ensureFile(m.file,m.starter)}
-/* missionVerdict(m, c, why): {good, failed} for any mission. A custom m.check wins; script/challenge missions without one use scriptPasses.
+/* missionVerdict(m, c, why): {good, failed} for any mission. A line with a command-not-found never passes a command mission. A custom m.check wins; script/challenge missions without one use scriptPasses.
    With why, a failed script/challenge mission also says why: the first failing case, judged inside the same world the check uses
    (m.world: fn => result, e.g. a sandbox with no leftover backup/), or m.checkFail when every case passes but the check still says no. */
+/* a line that says "command not found" (a typo such as Sort) never completes a mission, even if the commands around it ran. The log knows foreground
+   commands; a background job (Sleep 5 & wait) is only seen failing with status 127 when the line ends. */
+const notFound=c=>(c.log||[]).some(e=>e.nf)||(c.jobs?c.jobs():[]).some(j=>j.reaped&&j.code===127);
 function missionVerdict(m,c,why){const isScript=m.kind==='script'||m.kind==='challenge',world=typeof m.world==='function'?m.world:(fn=>fn());
+  if(!isScript&&notFound(c))return {good:false,failed:null};
   if(typeof m.check==='function'){const good=!!m.check(c);let failed=null;
     if(!good&&why&&isScript&&m.tests){failed=world(()=>c.scriptPasses(m)).failed||null;if(!failed&&m.checkFail)failed={index:-2,label:'check',text:m.checkFail}}
     return {good,failed}}
