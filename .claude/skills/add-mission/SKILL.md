@@ -12,8 +12,9 @@ Goal: a mission that teaches one thing, can be solved, and cannot be passed by a
 3. **Write the mission**: `{ title, goal, anat, answer, explain, check, hint? }`.
    - `goal`: one friendly sentence, one concrete task. `answer`: the reference solution. `explain`: factual (test every claim against the engine).
    - Prefer an **outcome** check (file content, mode, variable) over "output contains X". Derive expected values from the world, accept sensible alternatives, quote variables in all learner-facing text.
+   - The examples you write in `goal`/`explain`/`hint` must not complete the mission unless they teach the same lesson (`echo ...day?.log` must not pass a `*` mission). Tighten the check, or add the example to `ALLOWED_EXAMPLES` in `tests/shell/completion.test.mjs` with a reason.
    - Only teach what the practice shell supports (`help`, spec "as built" sections list gaps).
-4. **Tests** (fail first): the solvability test picks the mission up automatically. Add to the tier's test file (`tests/shell/<tier>.test.mjs`) at least one `yes` (a different valid answer) and one `no` (nearest wrong command, and a lazy cheat such as `echo`-ing the expected output).
+4. **Tests** (fail first): the solvability test picks the mission up automatically. Add to the tier's test file (`tests/shell/<tier>.test.mjs`) at least one `yes` (a different valid answer) and one `no` (nearest wrong command, and a lazy cheat such as `echo`-ing the expected output). `tests/shell/completion.test.mjs` already covers typos (a not-found command anywhere in the line) and text examples for every mission.
 5. **Optional extras**: a quick-fire entry (`content/quickfire.js`) and a guide entry (`content/guide.js`) for what the mission introduces.
 6. **Run**: `npm run test:engine`, then `npm run check && npm test`. If a golden or corpus fixture fails, your code is wrong; never regenerate fixtures.
 7. **Play it** in the browser: mission card, hint, "Type it for me", explanation. Check 390px width.
