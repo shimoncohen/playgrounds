@@ -1440,3 +1440,204 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+/* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */
+async function netPage(opts = {}, prep) {
+  const o = await open(`${base}/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  o.console = [];
+  o.page.on('console', m => { if (m.type() === 'error') o.console.push(m.text()); });
+  await o.page.waitForSelector('#cmd');
+  o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
+  o.xp = async () => (await o.page.textContent('#xpText')).trim();
+  return o;
+}
+
+test('net-quest: ping shows a reply and an inspector entry', async () => {
+  const { ctx, page, errors, type } = await netPage();
+  await type('ping -c 1 10.0.0.3');
+  assert.match(await page.textContent('#screen'), /1 packets transmitted, 1 received/);
+  const rows = page.locator('#inspector .pkt');
+  assert.ok(await rows.count() >= 4, 'expected at least 4 packet rows');
+  await rows.filter({ hasText: 'echo request' }).first().click();
+  const layers = await page.textContent('#layers');
+  for (const l of ['Ethernet', 'IPv4', 'ICMP']) assert.ok(layers.includes(l), `layer table shows ${l}`);
+  assert.match(await page.textContent('#hex'), /[0-9a-f]{2} [0-9a-f]{2}/);
+  assert.ok(await page.$('#diagram svg .dg-sel'), 'the diagram highlights the device');
+  assert.match(await page.textContent('#diagram .dg-text'), /laptop eth0 ↔ sw1 p1/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: the packet list works from the keyboard', async () => {
+  const { ctx, page, errors, type } = await netPage();
+  await type('ping -c 1 10.0.0.3');
+  await type('ping -c 1 10.0.0.3');
+  assert.equal(await page.locator('#inspector [role="tree"] > [role="treeitem"]').count(), 2, 'one group per command');
+  assert.equal(await page.locator('#inspector .pkt:visible').count(), 6, 'only the newest group is open (no ARP the second time)');
+  assert.equal(await page.locator('#inspector [tabindex="0"]').count(), 1, 'the list is one tab stop');
+  await page.focus('#inspector [tabindex="0"]');
+  const sel = () => page.$eval('#inspector .pkt[aria-selected="true"]', e => e.textContent);
+  const first = await sel();
+  await page.keyboard.press('ArrowDown');
+  assert.notEqual(await sel(), first, 'ArrowDown moves the selection');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#inspector .pkt:visible').count(), 6 + 12, 'Enter on the older group opens it');
+  await page.keyboard.press('End');
+  assert.match(await sel(), /echo reply/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: finishing a mission awards XP once', async () => {
+  const { ctx, page, errors, type, xp } = await netPage();
+  assert.equal(await xp(), '0 XP');
+  assert.equal(await page.$$eval('#feedback .win', e => e.length), 0);
+  await type('ping 10.0.0.3');
+  assert.equal(await xp(), '10 XP');
+  assert.equal(await page.$$eval('#feedback .win', e => e.length), 1);
+  await type('ping 10.0.0.3');
+  await type('pign 10.0.0.3');
+  await type('ping 10.0.0.99');
+  assert.equal(await xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="0"]');
+  await type('ping 10.0.0.3');
+  assert.equal(await xp(), '10 XP', 'replaying a finished mission gives nothing');
+  await page.waitForTimeout(400);
+  await page.reload();
+  await page.waitForSelector('#cmd');
+  assert.equal(await xp(), '10 XP');
+  assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 1);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: a failed command never completes a mission', async () => {
+  const { ctx, page, errors, type, xp } = await netPage();
+  await type('ping 10.0.0.99');
+  await type('pong 10.0.0.3');
+  assert.equal(await xp(), '0 XP');
+  assert.equal(await page.$$eval('#feedback .win', e => e.length), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: a damaged save loads without errors', async () => {
+  for (const [raw, want] of [['{"done":5,"xp":"x"}', '0 XP'], ['not json', '0 XP'], ['[1,2]', '0 XP'],
+    ['{"done":{"9.9":true,"0.0":true},"xp":-5,"ch":99,"mi":-1,"tab":"nope","answers":7,"best":"x"}', '10 XP']]) {
+    const o = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, raw));
+    assert.equal(await o.xp(), want, raw);
+    assert.ok((await o.page.textContent('#mission h2')).trim().length > 3, raw);
+    assert.equal(await o.page.isHidden('#tab-quest'), false);
+    await o.type('ping 10.0.0.3');
+    assert.deepEqual(o.errors, [], raw);
+    assert.deepEqual(o.console, [], raw);
+    await o.ctx.close();
+  }
+});
+
+test('net-quest: opening the page does not write a save', async () => {
+  const { ctx, page, errors } = await netPage();
+  await page.waitForTimeout(400);
+  assert.equal(await read(page, 'net-quest-v1'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: a question mission takes an answer', async () => {
+  const { ctx, page, errors, type, xp } = await netPage();
+  await page.click('#mission .dot[data-mi="1"]');
+  assert.equal(await page.isHidden('#answerBox'), true, 'no question before the ping');
+  await type('ping 10.0.0.3');
+  assert.equal(await page.isVisible('#answerBox'), true);
+  const above = await page.evaluate(() => document.getElementById('answerBox').getBoundingClientRect().bottom <= document.getElementById('inspector').getBoundingClientRect().top + 1);
+  assert.ok(above, 'the answer box sits above the packet list');
+  assert.match(await page.textContent('#answerBox'), /Which layers/);
+  await page.fill('#answer', 'Ethernet, ARP');
+  await page.click('#answerBox button[type="submit"]');
+  assert.match(await page.textContent('#afb'), /Not quite/);
+  assert.equal(await xp(), '0 XP');
+  await page.fill('#answer', 'Ethernet, IPv4, ICMP');
+  await page.click('#answerBox button[type="submit"]');
+  assert.equal(await xp(), '10 XP');
+  assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 1);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: reset scenario and mission switching start a fresh net', async () => {
+  const { ctx, page, errors, type } = await netPage();
+  const arpRows = () => page.locator('#inspector .pkt', { hasText: 'ARP request' }).count();
+  await type('ping -c 1 10.0.0.3');
+  assert.ok(await arpRows() > 0);
+  await type('ping -c 1 10.0.0.3');
+  assert.equal(await page.locator('#inspector .pkt:visible', { hasText: 'ARP' }).count(), 0, 'ARP is cached the second time');
+  await page.click('#resetNet');
+  assert.equal(await page.locator('#inspector .pkt').count(), 0);
+  assert.doesNotMatch(await page.textContent('#screen'), /packets transmitted/);
+  await type('ping -c 1 10.0.0.3');
+  assert.ok(await page.locator('#inspector .pkt:visible', { hasText: 'ARP request' }).count() > 0, 'ARP again after a reset');
+  await page.click('#mission .dot[data-mi="2"]');
+  assert.equal(await page.locator('#inspector .pkt').count(), 0);
+  await type('ping -c 1 10.0.0.3');
+  assert.ok(await page.locator('#inspector .pkt:visible', { hasText: 'ARP request' }).count() > 0, 'ARP again in a new mission');
+  await page.press('#cmd', 'ArrowUp');
+  assert.equal(await page.inputValue('#cmd'), 'ping -c 1 10.0.0.3');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: terminal output is text, never markup', async () => {
+  const { ctx, page, errors, type } = await netPage();
+  await type('<img src=x onerror=alert(1)>');
+  await type('ping "<b>x</b>"');
+  assert.equal(await page.$$eval('img, #screen b, #inspector b', e => e.length), 0);
+  assert.match(await page.textContent('#screen'), /<img src=x onerror=alert\(1\)>/);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'cmd', 'focus stays in the terminal');
+  await page.press('#cmd', 'Control+l');
+  assert.equal((await page.textContent('#screen')).trim(), '');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: layout at 390px', async () => {
+  for (const width of [390, 360]) {
+    const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });
+    await type('ping -c 1 10.0.0.3');
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    assert.equal(await over(), false, `${width}: terminal view`);
+    assert.ok(parseFloat(await page.$eval('#cmd', e => getComputedStyle(e).fontSize)) >= 16);
+    assert.equal(await page.isVisible('#termPanel'), true);
+    assert.equal(await page.isVisible('#pktPanel'), false);
+    await page.click('.seg button[data-view="pkts"]');
+    assert.equal(await page.isVisible('#pktPanel'), true);
+    assert.equal(await page.isVisible('#termPanel'), false);
+    await page.locator('#inspector .pkt', { hasText: 'echo request' }).first().click();
+    assert.equal(await over(), false, `${width}: packets view`);
+    await page.click('.seg button[data-view="map"]');
+    assert.equal(await page.isVisible('#mapPanel'), true);
+    assert.equal(await page.isVisible('#diagram ul'), true, 'the text map is visible on a phone');
+    assert.equal(await over(), false, `${width}: map view`);
+    await page.click('.seg button[data-view="term"]');
+    assert.equal(await page.isVisible('#termPanel'), true);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test('net-quest: quick-fire and field guide render', async () => {
+  const { ctx, page, errors, console: cerr } = await netPage();
+  await page.click('.tabs button[data-tab="fire"]');
+  await page.click('#fStart');
+  assert.ok(await page.locator('#fStage .opt').count() >= 2);
+  await page.locator('#fStage .opt').first().click();
+  assert.match(await page.textContent('#fFb'), /\S/);
+  await page.click('.tabs button[data-tab="guide"]');
+  assert.equal(await page.locator('#guide .card').count(), 4);
+  await page.locator('#guide [data-cmd]').first().click();
+  assert.equal(await page.isHidden('#tab-quest'), false);
+  assert.match(await page.inputValue('#cmd'), /ping/);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(cerr, []);
+  await ctx.close();
+});
