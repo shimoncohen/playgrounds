@@ -56,8 +56,9 @@ This is an open-source project and pull requests are very welcome: new missions,
 
 - 📖 **[CONTRIBUTING.md](CONTRIBUTING.md)**: the PR workflow, step by step.
 - 🤖 **[AGENTS.md](AGENTS.md)**: the rules of the repo for coding agents (and for humans who like rules). `CLAUDE.md` points to it.
-- 🧩 **[`.claude/skills/`](.claude/skills/)**: ready-made agent skills for the common jobs: adding a mission, starting a new playground, running the pre-PR checks.
+- 🧩 **[`.claude/skills/`](.claude/skills/)**: ready-made agent skills: `add-mission`, `new-playground`, `pre-pr-check`, `review-mission`, `playtest`, `mission-voice`, `triage-issue`.
 - 📐 **[docs/tiers-guideline.md](docs/tiers-guideline.md)**: how to add tiers, write missions and checks that hold up, and keep old saves working.
+- 🤝 **[Code of Conduct](CODE_OF_CONDUCT.md)** and **[Security policy](SECURITY.md)**.
 - 📝 **[Design: Shell Quest tiers](docs/superpowers/specs/2026-10-19-shell-quest-tiers-design.md)**: what was built and why.
 
 The 60-second version:

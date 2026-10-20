@@ -31,6 +31,10 @@ CI runs all of these on every PR. A PR is not ready until they pass locally.
 8. **Match the surrounding code**: naming, comment density, idiom. Some files are deliberately compact; do not reformat them.
 9. **Tone.** Learner-facing text is friendly, concrete and a little playful. It is never condescending, and it never assumes prior knowledge the quest has not taught yet.
 
+## Skills
+
+In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a PR), `review-mission` (adversarial content review), `playtest` (play it in a browser), `mission-voice` (learner-facing tone), `triage-issue`. Use them when the task matches.
+
 ## Where things go
 
 | You want to... | Touch |

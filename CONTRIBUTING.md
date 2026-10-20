@@ -63,7 +63,7 @@ The agent finds the rules in [AGENTS.md](AGENTS.md) and the task skills in [`.cl
 
 ## Conduct
 
-Be kind and assume good faith. Critique code, not people. Beginners are the audience, so patience with beginners is the culture.
+See the [Code of Conduct](CODE_OF_CONDUCT.md). Short version: be kind, assume good faith, critique code not people. Security issues go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## License
 
