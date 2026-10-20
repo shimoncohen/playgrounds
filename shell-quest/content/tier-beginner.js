@@ -30,9 +30,9 @@ const CH=[
  learned:['mkdir','touch','echo','>','>>','mkdir -p'],setup(){},
  missions:[
  {title:'Build a camp',goal:`From home, create a folder: <code>mkdir camp</code>`,anat:[['mkdir','cmd'],['camp','arg']],answer:'mkdir camp',note:`Not at home? Run <code>cd ~</code> first.`,
-  explain:`mkdir means <b>make directory</b>. Directory is the older word for folder; they mean the same thing. Watch the new folder flash onto the map.`,check:c=>c.isDir('~/camp')},
+  explain:`mkdir means <b>make directory</b>, which creates a new folder. Directory is the older word for folder; they mean the same thing. Watch the new folder flash onto the map.`,check:c=>c.isDir('~/camp')},
  {title:'Pitch a tent',goal:`Create an empty file inside camp: <code>touch camp/tent.txt</code>`,anat:[['touch','cmd'],['camp/tent.txt','arg']],answer:'touch camp/tent.txt',
-  explain:`touch creates an empty file. Look at the path: you can make a file inside a folder without walking into it first.`,check:c=>c.isFile('~/camp/tent.txt')},
+  explain:`touch creates an empty file. Look at the path: you can create a file inside a folder without walking into it first.`,check:c=>c.isFile('~/camp/tent.txt')},
  {title:'Say something',goal:`Print a message: <code>echo "Hello, world"</code>`,anat:[['echo','cmd'],['"Hello, world"','arg']],answer:'echo "Hello, world"',
   explain:`echo prints back whatever you give it. The quotes keep <code>Hello, world</code> together as one argument, spaces included.`,check:c=>c.ran('echo',e=>!e.redirect)},
  {title:'Start a diary',goal:`Send text into a file: <code>echo "Day 1: made camp" &gt; camp/diary.txt</code>`,anat:[['echo','cmd'],['"Day 1: made camp"','arg'],['>','op'],['camp/diary.txt','arg']],answer:'echo "Day 1: made camp" > camp/diary.txt',
@@ -118,7 +118,7 @@ const CH=[
   explain:`Wildcards make bulk work fast, and bulk mistakes fast too. A good habit: run <code>ls</code> with the same pattern first, check the list, then swap ls for rm.`,
   check:c=>{const n=c.node('~/village/logs');return c.ran('rm')&&(!n||n.type!=='dir'||!Object.keys(n.children).some(k=>k.endsWith('.log')))}},
  {title:'Chain with &&',goal:`From home: <code>mkdir -p backup &amp;&amp; cp *.txt backup/</code>`,anat:[['mkdir','cmd'],['-p','opt'],['backup','arg'],['&&','op'],['cp','cmd'],['*.txt','arg'],['backup/','arg']],answer:'mkdir -p backup && cp *.txt backup/',
-  explain:`<code>&amp;&amp;</code> runs the second command only if the first one worked. Here: make the folder, and only then copy every .txt file from home into it.`,
+  explain:`<code>&amp;&amp;</code> runs the second command only if the first one worked. Here: create the folder, and only then copy every .txt file from home into it.`,
   check:c=>{const n=c.node('~/backup');return !!n&&n.type==='dir'&&Object.keys(n.children).filter(k=>k.endsWith('.txt')).length>=2}}
  ]},
 {tier:'beginner',name:'Your first script',badge:'Scripter',intro:'A script is a file full of commands that bash runs for you, top to bottom. This is where bash turns into programming.',

@@ -1486,7 +1486,7 @@ function renderGuide(){
     <ol class="steps">
       <li class="panel"><div><b>Install Node.js</b><p>Download the LTS version (long-term support, the stable one) from nodejs.org. npm comes with it. Then open a terminal and check:</p><pre>node -v\nnpm -v</pre></div></li>
       <li class="panel"><div><b>Install an editor</b><p>VS Code is free and the most common choice. It understands JavaScript and TypeScript out of the box, with autocomplete and red squiggles for errors.</p></div></li>
-      <li class="panel"><div><b>Make a project</b><p>Create a folder, step into it, and make a package.json, just like in chapter 12.</p><pre>mkdir my-app\ncd my-app\nnpm init -y</pre></div></li>
+      <li class="panel"><div><b>Make a project</b><p>Create a folder, step into it, and create a package.json, just like in chapter 12.</p><pre>mkdir my-app\ncd my-app\nnpm init -y</pre></div></li>
       <li class="panel"><div><b>Write and run a file</b><p>Create index.js in VS Code with a console.log in it, then:</p><pre>node index.js</pre></div></li>
       <li class="panel"><div><b>Add TypeScript</b><p>Install the compiler into the project, create its settings file, then check and compile your .ts files. Recent Node versions can also run a .ts file directly by stripping the types, but only tsc checks them.</p><pre>npm install -D typescript\nnpx tsc --init\nnpx tsc</pre></div></li>
       <li class="panel"><div><b>Keep going</b><p>Good next steps: the browser DOM (make web pages react to clicks), Git for saving versions of your work, a web server with Express, and later a UI library like React.</p></div></li>

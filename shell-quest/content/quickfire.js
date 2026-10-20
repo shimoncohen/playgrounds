@@ -4,7 +4,7 @@ const QF=[
  ['Show the folder you are in',['pwd']],['List the files here',['ls']],
  ['List files here, including hidden ones',['ls -a','ls -la','ls -al','ls -A']],
  ['Go into the folder "forest"',['cd forest','cd forest/','cd ./forest']],['Go up one folder',['cd ..','cd ../']],
- ['Go to your home folder',['cd','cd ~','cd ~/','cd $HOME']],['Make a folder called "tools"',['mkdir tools']],
+ ['Go to your home folder',['cd','cd ~','cd ~/','cd $HOME']],['Create a folder called "tools"',['mkdir tools']],
  ['Create an empty file called list.txt',['touch list.txt']],['Print the word hi',['echo hi']],
  ['Show what is inside notes.txt',['cat notes.txt']],['Show the first 10 lines of log.txt',['head log.txt','head -n 10 log.txt','head -10 log.txt']],
  ['Show the last 5 lines of log.txt',['tail -n 5 log.txt','tail -5 log.txt','tail -n5 log.txt']],
