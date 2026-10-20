@@ -969,14 +969,14 @@ function makeCtx(r){
   return c}
 
 const CH=[
-{name:'Hello, World',badge:'First Words',intro:'Every C++ program has the same skeleton. Learn its parts, make it talk, and learn to read the compiler when it complains.',
+{name:'Hello, World',badge:'First Words',intro:'Every C++ program has the same skeleton. Learn its parts, make it talk, and learn to read what the compiler complains about.',
  learned:['#include','main()','cout <<','endl','"\\n"','std::'],
  missions:[
  {title:'Run your first program',goal:'Press <b>Run</b> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) and read what appears in the console.',
   anat:[['#include <iostream>','pp'],['int main()','fn'],['cout','name'],['<<','op'],['"Hello, World!"','val'],[';','op']],
   explain:`This is a complete C++ program. When you press Run, two things happen. First the <b>compiler</b> (g++) translates your C++ into machine code. Then the machine code <b>runs</b>. Every program starts at <code>main</code> and runs the lines inside its <code>{ }</code> from top to bottom.`,
   note:'<code>#include &lt;iostream&gt;</code> brings in the input/output library. <code>cout</code> (say "see-out") is the console. <code>&lt;&lt;</code> sends something to it. Every statement ends with <code>;</code>.',
-  start:P(R`cout << "Hello, World!" << endl;`),hint:'Just press the Run button above the editor.',
+  start:P(R`cout << "Hello, World!" << endl;`),hint:'Press the Run button above the editor.',
   check:c=>c.ok&&/Hello/.test(c.out)},
  {title:'Make it yours',goal:'Change the text so the program prints <code>Hello, </code> followed by your name.',keep:true,
   explain:`Text inside double quotes is a <b>string</b>. The program prints it exactly as written, letter for letter, but without the quotes. Change only what is between the quotes, and keep both <code>"</code> marks.`,
@@ -1093,7 +1093,7 @@ cout << "Lives: " << lives << endl;`),hint:'int lives = 3;',
   check:c=>c.ok&&c.v('lives')&&c.v('lives').v===3&&!c.warned(/uninitialized/)},
  {title:'Constants',goal:'Create <code>const int MAX_HP = 100;</code>. Try adding <code>MAX_HP = 200;</code> to see the error, then delete that line and print MAX_HP.',
   anat:[['const','kw'],['int','type'],['MAX_HP','name'],['=','op'],['100','val']],
-  explain:`<code>const</code> makes a value that can never change. The compiler stops you if you try, which protects you from your own mistakes. Programmers usually name constants in <code>ALL_CAPS</code> so they stand out.`,
+  explain:`<code>const</code> makes a variable whose value can never change. The compiler stops you if you try, which protects you from your own mistakes. Programmers usually name constants in <code>ALL_CAPS</code> so they stand out.`,
   start:P(R`// a constant that never changes
 `),ans:P(R`const int MAX_HP = 100;
 cout << "Max HP: " << MAX_HP << endl;`),hint:'const int MAX_HP = 100;  cout << MAX_HP << endl;',
@@ -1114,7 +1114,7 @@ cin >> name;
 cout << "Welcome, " << name << "!" << endl;`),hint:'cin >> name;  then  cout << "Welcome, " << name << endl;',test:['Ada'],
   check:c=>c.ok&&c.inputs.length>=1&&c.has(/cin\s*>>/)&&c.tokens[0]&&c.out.includes(c.tokens[0])},
  {title:'Numbers from the keyboard',goal:'Ask for the player\'s age as an <code>int</code> and print how old they will be next year.',
-  explain:`cin converts what you type into the variable's type. For an <code>int</code> it reads digits. Try typing a word instead: cin <b>fails</b>, sets the variable to 0, and ignores later cin lines. Real programs check for that; for now just notice what happens.`,
+  explain:`cin converts what you type into the variable's type. For an <code>int</code> it reads digits. Try typing a word instead: cin <b>fails</b>, sets the variable to 0, and ignores later cin lines. Real programs check for that; for now, notice what happens.`,
   start:P(R`int age;
 cout << "How old are you? ";
 `),ans:P(R`int age;
@@ -1197,7 +1197,7 @@ if (code == 42) {
 }`),hint:'if (code == 42) { ... } else { ... }',test:['42'],
   check:c=>c.ok&&c.has(/\belse\b/)&&c.has(/==/)&&c.inputs.length>=1&&c.lines.length>=1},
  {title:'Grade machine',goal:'Read a score. Print <code>A</code> for 90+, <code>B</code> for 80+, <code>C</code> for 70+, otherwise <code>F</code>. Use <code>else if</code>.',
-  explain:`An <code>else if</code> chain checks each condition from top to bottom and runs the <b>first</b> one that's true, then skips the rest. That's why the order matters: checking <code>score &gt;= 70</code> first would give everyone above 70 a C.`,
+  explain:`An <code>else if</code> chain checks each condition from top to bottom and runs the <b>first</b> one that's true, then skips the rest. That's why the order matters: checking <code>score &gt;= 70</code> first would give everyone at 70 or above a C.`,
   start:P(R`int score;
 cout << "Score: ";
 cin >> score;
@@ -1389,7 +1389,7 @@ cout << endl;`),ans:P(R`for (int i = 1; i <= 20; i++) {
 cout << endl;`),hint:'Inside the loop, before the cout: if (i > 15) break;  if (i % 3 == 0) continue;',
   check:c=>c.ok&&c.has(/\bbreak\b/)&&c.has(/\bcontinue\b/)&&c.nums(c.out).join()==='1,2,4,5,7,8,10,11,13,14'},
  {title:'Bug hunt: the endless loop',goal:'Run this. It never finishes, so the playground stops it. Find out why and fix it.',
-  explain:`The loop checks <code>i &lt; 5</code>, but nothing ever changes <code>i</code>, so the condition stays true forever. That's an <b>infinite loop</b>. On a real computer the program would just hang; you'd stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. Step through it and watch <code>i</code> stay at 0.`,
+  explain:`The loop checks <code>i &lt; 5</code>, but nothing ever changes <code>i</code>, so the condition stays true forever. That's an <b>infinite loop</b>. On a real computer the program would hang; you'd stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. Step through it and watch <code>i</code> stay at 0.`,
   start:P(R`int i = 0;
 while (i < 5) {
     cout << i << " ";
@@ -1568,7 +1568,7 @@ for (int i = 0; i < 5; i++) {
 }`),hint:'for (int i = 0; i < 5; i++) cout << scores[i] << endl;',
   check:c=>c.ok&&c.has(/\[\s*i\s*\]/)&&['90','72','85','60','99'].every(x=>c.lines.includes(x))},
  {title:'Bug hunt: off by one',goal:'This loop reads one box too many. Run it, read the error, fix it.',
-  explain:`An array of 5 has indexes 0 to 4. The condition <code>i &lt;= 5</code> also tries index 5, which isn't there. Real C++ <b>doesn't check</b>: it reads whatever memory comes next and carries on with garbage, or crashes. This playground catches it for you. Off-by-one errors are the most common bug in all of programming.`,
+  explain:`An array of 5 has indexes 0 to 4. The condition <code>i &lt;= 5</code> also tries index 5, which isn't there. Real C++ <b>doesn't check</b>: it reads whatever memory comes next and carries on with garbage, or crashes. This playground catches it for you. Off-by-one errors are among the most common bugs in programming.`,
   start:P(R`int scores[5] = {90, 72, 85, 60, 99};
 for (int i = 0; i <= 5; i++) {
     cout << scores[i] << endl;
@@ -1577,7 +1577,7 @@ for (int i = 0; i < 5; i++) {
     cout << scores[i] << endl;
 }`),hint:'Use i < 5, not i <= 5.',
   check:c=>c.ok&&['90','72','85','60','99'].every(x=>c.lines.includes(x))},
- {title:'Vectors grow',goal:'Make <code>vector&lt;string&gt; inventory;</code>, add three items with <code>push_back</code>, and print <code>inventory.size()</code>.',
+ {title:'Vectors grow',goal:'Create <code>vector&lt;string&gt; inventory;</code>, add three items with <code>push_back</code>, and print <code>inventory.size()</code>.',
   anat:[['vector','type'],['<string>','type'],['inventory','name'],[';','op']],
   explain:`A <b>vector</b> is an array that can grow. It starts empty, and <code>push_back</code> adds an item to the end. <code>.size()</code> tells you how many it holds. You need <code>#include &lt;vector&gt;</code>. Use Step and watch new boxes appear in Memory.`,
   start:P(R`vector<string> inventory;
@@ -1659,7 +1659,7 @@ for (int row = 0; row < 3; row++) {
  missions:[
  {title:'Design a Player',goal:'Finish <code>struct Player</code> with a <code>string name</code>, <code>int hp</code> and <code>int attack</code>. Create <code>hero</code>, fill in its fields, and print them.',
   anat:[['struct','kw'],['Player','type'],['{','op'],['string name; int hp; int attack;','name'],['};','op']],
-  explain:`A <b>struct</b> creates a new type made of several named fields. <code>Player hero;</code> makes one, and the dot reaches inside: <code>hero.hp = 100;</code>. In Memory, hero is one big box holding smaller boxes. Note the <code>;</code> after the struct's closing brace.`,
+  explain:`A <b>struct</b> creates a new type made of several named fields. <code>Player hero;</code> creates one, and the dot reaches inside: <code>hero.hp = 100;</code>. In Memory, hero is one big box holding smaller boxes. Note the <code>;</code> after the struct's closing brace.`,
   start:P(R`Player hero;
 hero.name = "Aria";
 // set hp and attack, then print all three
@@ -1742,7 +1742,7 @@ void takeDamage(Player& p, int dmg) {
     }
 }`}),hint:'p.hp -= dmg;  if (p.hp < 0) p.hp = 0;',
   check:c=>c.ok&&c.v('goblin')&&c.v('goblin').v.hp===0},
- {title:'A party of heroes',goal:'Make a <code>vector&lt;Player&gt; party</code> with three heroes. Loop over it to print each name, then print the party\'s total HP.',
+ {title:'A party of heroes',goal:'Create a <code>vector&lt;Player&gt; party</code> with three heroes. Loop over it to print each name, then print the party\'s total HP.',
   explain:`Vectors can hold structs too. <code>party[0].name</code> reads the first hero's name, and a range-for gives you each hero in turn. Use <code>const Player&amp; p</code> in the loop to avoid copying each hero.`,
   start:P(R`vector<Player> party = {
     {"Aria", 100, 12},
@@ -1861,7 +1861,7 @@ int* p = &score;
 cout << "score is now " << score << endl;`),hint:'*p = 99;',
   check:c=>c.ok&&c.v('score')&&c.v('score').v===99&&c.has(/\*\s*p\s*=/)},
  {title:'Bug hunt: the null pointer',goal:'This crashes. Run it, read the error, then guard the read with <code>if (p != nullptr)</code> and print <code>Nothing here</code> otherwise.',
-  explain:`<code>nullptr</code> means "points at nothing". Following it with <code>*</code> is a crash: a <b>segmentation fault</b>, the operating system stopping a program for touching memory it doesn't own. Uninitialized pointers are even worse: they point at random places. Always set a pointer, and check it before following it.`,
+  explain:`<code>nullptr</code> means "points at nothing". Following it with <code>*</code> is a crash: a <b>segmentation fault</b>, the operating system stopping a program for touching memory it doesn't own. Uninitialized pointers are even worse: they point at random places. Always give a pointer a value, and check it before following it.`,
   start:P(R`int* p = nullptr;
 cout << *p << endl;`),ans:P(R`int* p = nullptr;
 if (p != nullptr) {
@@ -2088,7 +2088,7 @@ function anatHTML(a){return a?`<div class="anat">${a.map(([t,k,l])=>`<span class
 function renderMission(){const card=$('mission');
   if(S.inSandbox){card.innerHTML=`<div class="eyebrow">Free play</div><h2>Sandbox</h2>
     <p class="explain">No goals, no checks. Write any program, run it, step through it. Field guide examples open here when you press Try.</p>
-    <div class="goal"><div class="label">Ideas to try</div><ul class="ideas"><li>Print a multiplication table with two loops</li><li>Ask for a word and print it backwards</li><li>Make a vector of names and sort it (needs #include &lt;algorithm&gt;)</li><li>Write a function that tells you if a number is prime</li><li>Draw a diamond of stars</li></ul></div>
+    <div class="goal"><div class="label">Ideas to try</div><ul class="ideas"><li>Print a multiplication table with two loops</li><li>Ask for a word and print it backwards</li><li>Create a vector of names and sort it (needs #include &lt;algorithm&gt;)</li><li>Write a function that tells you if a number is prime</li><li>Draw a diamond of stars</li></ul></div>
     <div class="actions"><button class="btn" id="backQuest">Back to chapter ${S.ch+1}</button><button class="btn ghost" id="blankSb">Blank program</button></div>`;
     $('backQuest').onclick=()=>goMission(S.ch,S.mi,false);$('blankSb').onclick=()=>{stop();setCode(P(R`// your code here
 `));saveCode()};return}
@@ -2114,7 +2114,7 @@ function renderMission(){const card=$('mission');
 function renderBadge(){const ch=CH[S.ch];const card=$('mission');
   card.innerHTML=`<div class="eyebrow">Chapter ${S.ch+1} complete</div><div class="badge-art">${S.ch+1}</div><h2>${esc(ch.badge)}</h2>
   <p class="explain">You finished <b>${esc(ch.name)}</b>. You can now use:</p><div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
-  <p class="note">Try the Arcade to practise reading code fast, or open the Field guide to review.</p>
+  <p class="note">Try Quick-fire to practice reading code fast, or open the Field guide to review.</p>
   <div class="actions">${S.ch<CH.length-1?`<button class="btn" id="nextCh">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button>`:`<button class="btn" id="toSb">Open the sandbox</button>`}<button class="btn ghost" id="stay">Back to the chapter</button></div>`;
   if($('nextCh'))$('nextCh').onclick=()=>goMission(S.ch+1,0,false);if($('toSb'))$('toSb').onclick=openSandbox;
   $('stay').onclick=()=>{justWon=false;renderMission()}}
@@ -2199,7 +2199,7 @@ const G=[
   {c:'Declare a variable',what:'Type, name, starting value. Create it once; after that, assign without the type.',ex:[['int coins = 10;\ncoins = coins + 5;\ncout << coins;','prints 15']]},
   {c:'+  -  *  /  %',what:'Math operators. int / int drops the decimal part. % is the remainder.',ex:[['cout << 17 / 5 << " " << 17 % 5 << " " << 17.0 / 5;','3 2 3.4']]},
   {c:'++  --  +=  -=',what:'Shortcuts for changing a variable by itself.',ex:[['int lvl = 1;\nlvl++;\nlvl += 3;\ncout << lvl;','prints 5']]},
-  {c:'const',what:'A value that can never change. Name it in ALL_CAPS.',ex:[['const double PI = 3.14159;\ncout << PI * 2 * 2;','area of a circle with radius 2']]},
+  {c:'const',what:'A variable whose value can never change. Name it in ALL_CAPS.',ex:[['const double PI = 3.14159;\ncout << PI * 2 * 2;','area of a circle with radius 2']]},
   {c:'sqrt  pow  abs',what:'Math functions from <cmath>. They work with doubles.',inc:['cmath'],ex:[['cout << sqrt(16) << " " << pow(2, 10) << " " << abs(-7);','4 1024 7']]},
   {c:'to_string  stoi',what:'Turn a number into text, or text into a number.',ex:[['string s = "Level " + to_string(3);\nint n = stoi("42");\ncout << s << " " << n + 1;','Level 3 43']]},
  ]},

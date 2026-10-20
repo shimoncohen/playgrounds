@@ -32,7 +32,7 @@ The biggest quest, and the best one to show off. It has **four open tiers** (eve
 
 | Tier | What you do | Ends with the rank |
 |---|---|---|
-| **Beginner** | Find your way around, make, copy and move things, read files, pipes, wildcards, and your first script | Pipe Fitter |
+| **Beginner** | Find your way around, create, copy and move things, read files, pipes, wildcards, and your first script | Pipe Fitter |
 | **Intermediate** | Text tools, substitution and quoting, permissions and links, streams and `xargs` | Script Smith |
 | **Advanced** | Real scripts: decisions, loops and numbers, functions and arguments, input, here-documents and exit codes (written in an editor panel and tested against hidden cases) | Automator |
 | **Expert** | `awk` and `sed` craft, processes and background jobs on a virtual clock, pipeline mastery (`find -exec`, `xargs`, process substitution), safe scripts (`set -euo pipefail`, `getopts`), and a capstone command-line tool | **Shell Wizard** 🧙 |
@@ -129,7 +129,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 The Artifact service wraps pages in its own skeleton, so it needs a single body-only file:
 
 ```
-python3 tools/build.py            # all five -> dist/<name>-quest.html
+python3 tools/build.py            # all six -> dist/<name>-quest.html
 python3 tools/build.py shell      # just one
 python3 tools/build.py --check    # verify the folders bundle cleanly
 ```

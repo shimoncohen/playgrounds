@@ -56,7 +56,7 @@ const LIST={id:'list',ch:3,title:'Linked list: a chain of nodes',name:'head',
  ops:[
   {label:'addFirst',run:s=>{if(llLen(s.v)>=7)return full(7,'nodes');const n=rnd(1,9);s.v={value:n,next:s.v};return {code:`head = { value: ${n}, next: head };`,say:`<b>addFirst</b>: a new node points at the old head, then becomes the head. Two steps, no matter how long the list is. This is where linked lists beat arrays.`,hi:[{i:0}]}}},
   {label:'add (end)',run:s=>{const len=llLen(s.v);if(len>=7)return full(7,'nodes');const n=rnd(1,9);const node={value:n,next:null};
-    if(!s.v){s.v=node;return {code:`head = { value: ${n}, next: null };`,say:'The list was empty, so the new node simply becomes the head.',hi:[{i:0}]}}
+    if(!s.v){s.v=node;return {code:`head = { value: ${n}, next: null };`,say:'The list was empty, so the new node becomes the head.',hi:[{i:0}]}}
     let last=s.v;while(last.next)last=last.next;last.next=node;
     return {code:`// walk to the last node, then:\nlast.next = { value: ${n}, next: null };`,say:`To add at the <b>end</b> you first have to <b>walk</b> the whole chain to find the last node (the one whose next is null), then point it at the new node.`,walk:idxs(len).map(x=>[x]),hi:[{i:len}]}}},
   {label:'removeFirst',run:s=>{if(!s.v)return empty('list');const n=s.v.value;s.v=s.v.next;return {code:'head = head.next;',say:`<b>removeFirst</b>: the head just moves on to the next node. The old node (${n}) is left with nothing pointing at it, so it is gone.`,hi:s.v?[{i:0}]:[]}}},
