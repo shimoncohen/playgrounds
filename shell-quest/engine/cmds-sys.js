@@ -2,7 +2,8 @@
 const {norm,getNode,lstat,isLoop,parentOf,bname,modeOf,modeString,ok,E,flags,globRe,cmpName,realPath,HOME}=SQ;
 const CMDS=SQ.CMDS;
 const KEYWORDS=['if','then','else','elif','fi','case','esac','for','select','while','until','do','done','in','function','time','{','}','!','[[',']]','coproc'];
-const BUILTINS=['cd','export','source','.','[','test','true','false',':','read','shift','unset','local','return','exit','break','continue','jobs','wait','kill'];
+const BUILTINS=['cd','export','source','.','[','test','true','false',':','read','shift','unset','local','return','exit','break','continue','jobs','wait','kill',
+  'getopts','command','readonly','type','set','trap'];
 const known=c=>Object.prototype.hasOwnProperty.call(CMDS,c);
 
 // ---- find ----
@@ -107,7 +108,15 @@ CMDS.ln=function(a){const {fl,rest}=flags(a);
 CMDS.which=function(a){const {rest}=flags(a);const out=[];let code=0;
   for(const c of rest){if(known(c))out.push('/usr/bin/'+c);else code=1}
   return {out:out.join('\n'),err:[],code:rest.length?code:1}};
-CMDS.type=function(a){const {rest}=flags(a);const out=[],err=[];
-  for(const c of rest){if(KEYWORDS.includes(c))out.push(`${c} is a shell keyword`);else if(SQ.hasFunction(c))out.push(`${c} is a function`);else if(BUILTINS.includes(c))out.push(`${c} is a shell builtin`);else if(known(c))out.push(`${c} is /usr/bin/${c}`);else err.push(`bash: type: ${c}: not found`)}
-  return {out:out.join('\n'),err,code:err.length?1:0}};
+/* kindOf(name): how bash would run it, in type's order: 'keyword', 'function', 'builtin', 'file' (a command, shown as /usr/bin/NAME) or null.
+   describe(name, who): type's sentence for it, or null (shared with command -V, cmds-opts.js) */
+function kindOf(c){if(KEYWORDS.includes(c))return 'keyword';if(SQ.hasFunction(c))return 'function';if(BUILTINS.includes(c))return 'builtin';if(c&&known(c))return 'file';return null}
+const SENT={keyword:c=>`${c} is a shell keyword`,function:c=>`${c} is a function`,builtin:c=>`${c} is a shell builtin`,file:c=>`${c} is /usr/bin/${c}`};
+const describe=c=>{const k=kindOf(c);return k?SENT[k](c):null};
+/* type NAME...: one sentence each; type -t NAME...: one word each (builtin, file, function, keyword; nothing for a missing name); status 1 when one is missing */
+CMDS.type=function(a){const {fl,rest}=flags(a);const out=[],err=[];let miss=false;
+  for(const c of rest){if(fl.has('t')){const k=kindOf(c);if(k)out.push(k);else miss=true;continue}
+    const d=describe(c);if(d)out.push(d);else err.push(`bash: type: ${c}: not found`)}
+  return {out:out.join('\n'),err,code:err.length||miss?1:0}};
+Object.assign(SQ,{kindOf,describeCmd:describe});
 })(window.SQ = window.SQ || {});

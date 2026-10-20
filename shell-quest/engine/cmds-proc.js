@@ -224,7 +224,7 @@ function waitReady(req){const its=req.items;
 /* the wait is over: mark what it collected, set -p VAR, return the status */
 function waitDone(req,r){
   if(req.mode!=='any'){for(const x of req.items)if(x.job&&ended(x.job))x.job.waited=true}else if(r.job)r.job.waited=true;
-  if(req.pvar){const pid=r.job?r.job.pid:r.pid;if(pid!==undefined)SQ.setVar(req.pvar,String(pid))}
+  if(req.pvar){const pid=r.job?r.job.pid:r.pid;if(pid!==undefined&&SQ.canSet(req.pvar))SQ.setVar(req.pvar,String(pid))} /* a readonly VAR keeps its value */
   return r.code}
 /* the foreground waits: move the clock from one job wake to the next until req is ready; returns the jobs' output */
 function block(req,io){const rt=SQ.rt,start=SQ.now(),out=[];

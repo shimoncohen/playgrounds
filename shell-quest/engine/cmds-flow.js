@@ -145,7 +145,11 @@ CMDS.read=function(a,io){let raw=false,i=0;
   const names=a.slice(i);
   for(const n of names)if(!NAME.test(n)||SQ.badName(n))return E(`bash: read: \`${n}': not a valid identifier`,1);
   const box=io.stdinBox;if(!box)return E(NOT_TYPING,1);
-  const set=(n,v)=>{S.vars[n]=v};
+  const r=read0(names,box,raw);return roHit?E(SQ.roMsg(roHit),1):r};
+/* readonly (Task 15): a readonly name keeps its value and read fails with status 1 after taking its line */
+let roHit=null;
+function read0(names,box,raw){roHit=null;
+  const set=(n,v)=>{if(!SQ.canSet(n)){roHit=roHit||n;return}S.vars[n]=v};
   if(box.pos>=box.text.length){for(const n of names.length?names:['REPLY'])set(n,'');return {out:'',err:[],code:1}}
   let line='';
   for(;;){const k=box.text.indexOf('\n',box.pos);let seg=box.text.slice(box.pos,k<0?box.text.length:k);box.pos=k<0?box.text.length:k+1;
@@ -185,7 +189,7 @@ CMDS.unset=function(a){let fn=false,i=0;
   const err=[];
   for(const n of a.slice(i)){
     if(!NAME.test(n)){err.push(`bash: unset: \`${n}': not a valid identifier`);continue}
-    if(fn){if(S.fns)delete S.fns[n]}else{delete S.vars[n];if(S.exp)delete S.exp[n];if(BUILTIN_NAMES.includes(n))(S.unsetB=S.unsetB||{})[n]=1}}
+    if(fn){if(S.fns)delete S.fns[n]}else{if(!SQ.canSet(n)){err.push(`bash: unset: ${n}: cannot unset: readonly variable`);continue}delete S.vars[n];if(S.exp)delete S.exp[n];if(BUILTIN_NAMES.includes(n))(S.unsetB=S.unsetB||{})[n]=1}}
   return {out:'',err,code:err.length?1:0}};
 
 CMDS.exit=function(a){let n=S.last;

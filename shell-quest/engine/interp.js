@@ -13,8 +13,10 @@ const {errOf,own}=SQ;
    snapshotShell() also enters a new process scope (SQ.rt.scope, see jobs.js): the jobs a subshell, $( ), pipeline stage or script starts belong to it,
    and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again.
    opts are the shell options (SQ.rt.opts, Task 13): immutable objects, so a copy is a reference; a subshell, $( ), pipeline stage, script or job starts
-   with its parent's (a script with none set) and its changes go when it ends; a function or sourced file shares the caller's (changes persist). */
-function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,bang:SQ.rt.bang,opts:SQ.rt.opts}}
+   with its parent's (a script with none set) and its changes go when it ends; a function or sourced file shares the caller's (changes persist).
+   ro (the readonly names) and gopt (getopts' place inside a word of grouped options) follow the same rules (Task 15): immutable values, a script starts
+   with none. */
+function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,bang:SQ.rt.bang,opts:SQ.rt.opts,ro:SQ.rt.ro,gopt:SQ.rt.gopt}}
 /* scopes form a tree: SQ.rt.scopeNode = {id, up} (id mirrored in SQ.rt.scope); a job's output is tagged with its owner's node, so a script can tell its own jobs' output from others' */
 /* a new process scope also gets its traps (Task 14, cmds-proc.js): only the parent's ignored signals, shown as the parent's until it changes one */
 const newScope=()=>{const rt=SQ.rt,up=rt.scopeNode;rt.scopeNode={id:++rt.scopeSeq,up};if(up.traps)rt.scopeNode.traps=SQ.childTraps(up.traps,true);rt.scope=rt.scopeNode.id};
@@ -29,10 +31,11 @@ function restoreShell(sv){
   SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames);
   if(sv.scopeNode){SQ.rt.scopeNode=sv.scopeNode;SQ.rt.scope=sv.scopeNode.id}
   if('bang' in sv)SQ.rt.bang=sv.bang;
-  if(sv.opts)SQ.rt.opts=sv.opts}
+  if(sv.opts)SQ.rt.opts=sv.opts;
+  if('ro' in sv){SQ.rt.ro=sv.ro;SQ.rt.gopt=sv.gopt}}
 /* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
-function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang,opts:SQ.rt.opts}}
-function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;SQ.rt.opts=st.opts||SQ.OPTS0;
+function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang,opts:SQ.rt.opts,ro:SQ.rt.ro,gopt:SQ.rt.gopt}}
+function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;SQ.rt.opts=st.opts||SQ.OPTS0;SQ.rt.ro=st.ro||null;SQ.rt.gopt=st.gopt||null;
   for(const k of ['exp','fns','unsetB']){if(st[k])S[k]=st[k];else delete S[k]}}
 
 /* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows.
@@ -240,6 +243,7 @@ function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assi
    forItems (shared with jobs.js): {items}, or {fail: {code, ctl?}} after an expansion error; stderr lines go to out. */
 function forItems(c,env,out){
   if(SQ.badName(c.var)){out.push(errL(`bash: \`${c.var}': not a valid identifier`));return {fail:{code:1}}}
+  if(SQ.isRO(c.var)){out.push(errL(SQ.roMsg(c.var)));return {fail:{code:1}}} /* bash: the loop does not run */
   let items=[],globbed=false;
   if(c.words===null)items=SQ.frame().args.slice();
   else{let toks;
@@ -310,7 +314,8 @@ function parsedBody(text){ /* also the parser of trap handlers (SQ.parseCached) 
   p=SQ.parseProgram(text);parseCache.set(text,p);
   if(parseCache.size>CACHE_MAX)parseCache.delete(parseCache.keys().next().value);
   return p}
-function restoreLocals(f){for(const [k,v] of f.locals){if(v===undefined)delete S.vars[k];else S.vars[k]=v}}
+/* a name that is readonly now was made so inside the call (`local` refuses a readonly name): that local's readonly goes with it, as in bash */
+function restoreLocals(f){for(const [k,v] of f.locals){if(v===undefined)delete S.vars[k];else S.vars[k]=v;if(SQ.rt.ro&&SQ.isRO(k))SQ.dropRO(k);if(k==='OPTIND')SQ.rt.gopt=null}}
 /* The frame code of a call, shared with the job interpreter (jobs.js): fnEnter -> {prog, f, at} (the frame is pushed) or {fail} (a body that does not
    parse: runCmd's result shape); fnLeave(fe) pops it and puts the locals back; fnResult(r) maps the body's {code, ctl} to the call's (return ends it). */
 function fnEnter(name,args){
@@ -369,6 +374,7 @@ function runChild(prog,name,o){
   const sv=snapshotShell(),me=SQ.rt.scopeNode,callerVars=S.vars;
   me.script=true;me.traps=sv.scopeNode.traps?SQ.childTraps(sv.scopeNode.traps,false,true):null; /* a new bash: only the ignored signals, locked */S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
   delete S.fns;SQ.rt.bang=null; /* a new bash: $! is empty until it starts a job */
+  SQ.rt.ro=null;SQ.rt.gopt=null;if(own(S.vars,'OPTIND'))S.vars.OPTIND='1'; /* nothing readonly (an exported readonly name is a plain variable there); OPTIND starts at 1 */
   SQ.rt.opts=o.opts?Object.assign({},SQ.OPTS0,o.opts):SQ.OPTS0; /* a new bash starts with no options set (restoreShell puts the caller's back) */
   const xb=SQ.rt.xbase;SQ.rt.xbase=CTX.sub; /* its set -x trace starts at one +, also when it runs inside a $( ) */
   const fr=SQ.rt.frames,at=fr.length;fr.push({name,args:o.args.slice(),kind:'script',locals:new Map()});
@@ -414,6 +420,7 @@ function localBuiltin(a){const fr=SQ.rt.frames;let f=null;
   const err=[];let code=0;
   for(const x of a){const eq=x.indexOf('='),k=eq<0?x:x.slice(0,eq);
     if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: local: \`${x}': not a valid identifier`);code=1;continue}
+    if(!SQ.canSet(k)){err.push(`bash: local: ${k}: readonly variable`);code=1;continue}
     if(!f.locals.has(k))f.locals.set(k,own(S.vars,k)?S.vars[k]:undefined);
     if(eq<0)delete S.vars[k];else S.vars[k]=x.slice(eq+1)}
   return {out:'',err,code}}

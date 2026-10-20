@@ -52,7 +52,7 @@ SQ.fresh=fresh;
 SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];fixTree(next&&next.fs);Object.assign(S,next)};
 /* Shell options (Task 13, cmds-opts.js): SQ.rt.opts is an immutable {e, u, pipefail, x}; `set` installs a new object, so a snapshot can keep a reference. */
 SQ.OPTS0=Object.freeze({e:false,u:false,pipefail:false,x:false});
-SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[],opts:SQ.OPTS0};
+SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[],opts:SQ.OPTS0,ro:null};
 /* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame.
    locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};

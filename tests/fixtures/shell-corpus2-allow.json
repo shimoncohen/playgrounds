@@ -323,8 +323,9 @@
     "out": "1"
   },
   "FOO=bar printenv FOO": {
-    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
-    "out": "bash: printenv: command not found"
+    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; Stage 3 Task 15: printenv is built, so it prints the exported FOO",
+    "out": "bar",
+    "code": 0
   },
   "LC_ALL=C sort readme.txt": {
     "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash",
@@ -1412,6 +1413,66 @@
   "trap - INT": {
     "reason": "Task 14: trap is a builtin; trap - INT resets SIGINT silently, status 0",
     "out": "",
+    "code": 0
+  },
+  "type -t ls": {
+    "reason": "Stage 3 Task 15: type -t prints one word per name (builtin, file, function, keyword); ls is a command, so file",
+    "out": "file"
+  },
+  "command -v ls": {
+    "reason": "Stage 3 Task 15: command is a builtin; command -v prints the path a command would run from (/usr/bin/NAME, like which and type)",
+    "out": "/usr/bin/ls",
+    "code": 0
+  },
+  "command ls": {
+    "reason": "Stage 3 Task 15: command NAME runs the builtin or command NAME (skipping functions), so this is a plain ls",
+    "out": "camp/  config.ini  docs/  drafts/  forest/  journal.txt  lib/  logs/  notes.txt  numbers.txt  readme.txt  scripts/  secrets.txt  village/",
+    "code": 0
+  },
+  "readonly r=1; r=2": {
+    "reason": "Stage 3 Task 15: readonly is built; assigning a readonly variable prints bash: r: readonly variable, status 1, and r keeps its value",
+    "out": "bash: r: readonly variable",
+    "code": 1,
+    "vars": {
+      "r": "1"
+    }
+  },
+  "FOO=bar; export FOO; printenv FOO": {
+    "reason": "Stage 3 Task 15: printenv is built and prints the value of the exported FOO",
+    "out": "bar",
+    "code": 0
+  },
+  "getopts \"ab:\" opt -a; echo $opt": {
+    "reason": "Stage 3 Task 15: getopts is built: -a matches option a, so opt=a and OPTIND moves to 2 (bash sets both)",
+    "out": "a",
+    "vars": {
+      "OPTIND": "2",
+      "opt": "a"
+    }
+  },
+  "getopts": {
+    "reason": "Stage 3 Task 15: getopts is built; with no arguments it prints bash's usage line, status 2",
+    "out": "getopts: usage: getopts optstring name [arg ...]",
+    "code": 2
+  },
+  "mktemp": {
+    "reason": "Stage 3 Task 15: mktemp is built; names come from a per-session counter, so the first one is /tmp/tmp.A00001",
+    "out": "/tmp/tmp.A00001",
+    "code": 0
+  },
+  "mktemp -d": {
+    "reason": "Stage 3 Task 15: mktemp -d is built; it makes /tmp/tmp.A00001 as a directory and prints its name",
+    "out": "/tmp/tmp.A00001",
+    "code": 0
+  },
+  "realpath readme.txt": {
+    "reason": "Stage 3 Task 15: realpath is built and prints the absolute path",
+    "out": "/home/explorer/readme.txt",
+    "code": 0
+  },
+  "printenv HOME": {
+    "reason": "Stage 3 Task 15: printenv is built and prints HOME from the environment",
+    "out": "/home/explorer",
     "code": 0
   }
 }

@@ -448,3 +448,438 @@ describe('hot path with the options off', () => {
     assert.ok(times[2] < 400, `median ${times[2].toFixed(1)} ms (about 55 ms before Task 13 on the dev machine)`);
   });
 });
+
+/* ---------- Task 15: getopts, mktemp, command, type -t, readonly, printenv, realpath ----------
+   GETOPTS: [script text, args, expected output (stdout and stderr in order), status], recorded with GNU bash 5.2.21 as `bash s.sh ARGS`.
+   bash's `s.sh: line N: ` prefix on builtin errors is shown in this shell's typed-line `bash: ` form (the getopts option messages keep the
+   script name, `s.sh: illegal option -- x`, as bash prints them). */
+const GETOPTS = [
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v -n Ada file", "opt=v OPTARG=unset OPTIND=2\nopt=n OPTARG=Ada OPTIND=4\nend 0 opt=? OPTIND=4\nrest=file", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-vn Ada", "opt=v OPTARG=unset OPTIND=1\nopt=n OPTARG=Ada OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-nAda x y", "opt=n OPTARG=Ada OPTIND=2\nend 0 opt=? OPTIND=2\nrest=x y", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v -- -n x", "opt=v OPTARG=unset OPTIND=2\nend 0 opt=? OPTIND=3\nrest=-n x", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-n", "s.sh: option requires an argument -- n\nopt=? OPTARG=unset OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v -n", "opt=v OPTARG=unset OPTIND=2\ns.sh: option requires an argument -- n\nopt=? OPTARG=unset OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-x", "s.sh: illegal option -- x\nopt=? OPTARG=unset OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-vx -n A", "opt=v OPTARG=unset OPTIND=1\ns.sh: illegal option -- x\nopt=? OPTARG=unset OPTIND=2\nopt=n OPTARG=A OPTIND=4\nend 0 opt=? OPTIND=4\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "a -v", "end 0 opt=? OPTIND=1\nrest=a -v", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "", "end 0 opt=? OPTIND=1\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-", "end 0 opt=? OPTIND=1\nrest=-", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v - x", "opt=v OPTARG=unset OPTIND=2\nend 0 opt=? OPTIND=2\nrest=- x", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "--", "end 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v --x", "opt=v OPTARG=unset OPTIND=2\ns.sh: illegal option -- -\nopt=? OPTARG=unset OPTIND=2\ns.sh: illegal option -- x\nopt=? OPTARG=unset OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-n -v", "opt=n OPTARG=-v OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-nv", "opt=n OPTARG=v OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-vvv", "opt=v OPTARG=unset OPTIND=1\nopt=v OPTARG=unset OPTIND=1\nopt=v OPTARG=unset OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-n ''", "opt=n OPTARG= OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v -n 'A B' c", "opt=v OPTARG=unset OPTIND=2\nopt=n OPTARG=A B OPTIND=4\nend 0 opt=? OPTIND=4\nrest=c", 0],
+  ["while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-x", "opt=? OPTARG=x OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-v -n", "opt=v OPTARG=unset OPTIND=2\nopt=: OPTARG=n OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-vxn A", "opt=v OPTARG=unset OPTIND=1\nopt=? OPTARG=x OPTIND=1\nopt=n OPTARG=A OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-n A -v b", "opt=n OPTARG=A OPTIND=3\nopt=v OPTARG=unset OPTIND=4\nend 0 opt=? OPTIND=4\nrest=b", 0],
+  ["while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-xn", "opt=? OPTARG=x OPTIND=1\nopt=: OPTARG=n OPTIND=2\nend 0 opt=? OPTIND=2\nrest=", 0],
+  ["OPTERR=0; while getopts \"vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-x -n", "opt=? OPTARG=unset OPTIND=2\nopt=? OPTARG=unset OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["OPTERR=0; while getopts \":vn:\" opt; do echo \"opt=$opt OPTARG=${OPTARG-unset} OPTIND=$OPTIND\"; done; echo \"end $? opt=$opt OPTIND=$OPTIND\"; shift $((OPTIND-1)); echo \"rest=$*\"", "-x -n", "opt=? OPTARG=x OPTIND=2\nopt=: OPTARG=n OPTIND=3\nend 0 opt=? OPTIND=3\nrest=", 0],
+  ["while getopts \"vn:\" o -v -n Ada x; do echo \"$o ${OPTARG-u} $OPTIND\"; done; echo \"end $OPTIND $*\"", "ignored -n B", "v u 2\nn Ada 4\nend 4 ignored -n B", 0],
+  ["f() { while getopts \"a\" o; do echo \"f $o $OPTIND\"; done; echo \"f end $OPTIND\"; }; f -a -a x; echo \"main $OPTIND\"; f -a", "-v", "f a 2\nf a 3\nf end 3\nmain 3\nf end 2", 0],
+  ["f() { local OPTIND=1 o; while getopts \"a\" o; do echo \"f $o $OPTIND\"; done; echo \"f end $OPTIND\"; }; f -a; f -a -a; echo \"main $OPTIND\"", "", "f a 2\nf end 2\nf a 2\nf a 3\nf end 3\nmain 1", 0],
+  ["getopts \"ab\" o -ab; echo \"$o $OPTIND\"; OPTIND=1; getopts \"ab\" o -ab; echo \"$o $OPTIND\"; getopts \"ab\" o -ab; echo \"$o $OPTIND\"; getopts \"ab\" o -ab; echo \"$? $o $OPTIND\"", "", "a 1\na 1\nb 2\n1 ? 2", 0],
+  ["getopts; echo \"s=$?\"; getopts a; echo \"s=$?\"", "", "getopts: usage: getopts optstring name [arg ...]\ns=2\ngetopts: usage: getopts optstring name [arg ...]\ns=2", 0],
+  ["getopts a 1x -a; echo \"s=$?\"; getopts a \"a b\" -a; echo \"s=$?\"", "", "bash: getopts: `1x': not a valid identifier\ns=1\nbash: getopts: `a b': not a valid identifier\ns=1", 0],
+  ["while getopts \":a:\" o; do echo \"$o ${OPTARG-u}\"; done", "-: -a: -:", "? :\na :\n? :", 0],
+  ["while getopts \"a?\" o; do echo \"$o ${OPTARG-u}\"; done", "-? -a", "? u\na u", 0],
+  ["while getopts \"12\" o; do echo \"$o\"; done; echo \"$OPTIND $*\"", "-1 -2 x", "1\n2\n3 -1 -2 x", 0],
+  ["getopts \"a\" o; echo \"s=$? o=$o OPTIND=$OPTIND OPTARG=${OPTARG-u}\"", "", "s=1 o=? OPTIND=1 OPTARG=u", 0],
+  ["getopts \"a\" o; echo \"s=$? o=$o\"", "-x", "s.sh: illegal option -- x\ns=0 o=?", 0],
+  ["while getopts \"abc\" o; do echo \"$o $OPTIND\"; done", "-abc -c", "a 1\nb 1\nc 2\nc 3", 0],
+  ["OPTARG=keep; getopts \"v\" o; echo \"${OPTARG-unset}\"", "-v", "unset", 0],
+  ["OPTARG=keep; getopts \"v\" o; echo \"${OPTARG-unset}\"", "-x", "s.sh: illegal option -- x\nunset", 0],
+  ["OPTARG=keep; getopts \":v\" o; echo \"${OPTARG-unset}\"", "-x", "x", 0],
+  ["OPTIND=9; getopts \"v\" o; echo \"s=$? o=$o $OPTIND\"", "-v", "s=1 o=? 2", 0],
+  ["OPTIND=x; getopts \"v\" o; echo \"s=$? o=$o $OPTIND\"", "-v", "s=0 o=v 2", 0],
+  ["OPTIND=0; getopts \"v\" o; echo \"s=$? o=$o $OPTIND\"", "-v", "s=0 o=v 2", 0],
+  ["getopts \"\" o; echo \"s=$? o=$o ${OPTARG-u}\"", "-v", "s.sh: illegal option -- v\ns=0 o=? u", 0],
+  ["getopts \":\" o; echo \"s=$? o=$o ${OPTARG-u}\"", "-v", "s=0 o=? v", 0],
+  ["getopts \"v\" o; echo \"s=$? o=$o\"; getopts \"v\" o; echo \"s=$? o=$o $OPTIND\"", "-v", "s=0 o=v\ns=1 o=? 2", 0],
+  ["set -- -v -n Z q; while getopts vn: o; do echo \"$o ${OPTARG-}\"; done; echo $OPTIND", "", "v \nn Z\n4", 0],
+  ["getopts \"vn:\" o -n; echo \"s=$? o=$o ${OPTARG-u} $OPTIND\"", "", "s.sh: option requires an argument -- n\ns=0 o=? u 2", 0],
+  ["getopts \":vn:\" o -n; echo \"s=$? o=$o ${OPTARG-u} $OPTIND\"", "", "s=0 o=: n 2", 0],
+  ["getopts \"n:\" o -n --; echo \"s=$? o=$o ${OPTARG-u} $OPTIND\"", "", "s=0 o=n -- 3", 0],
+  ["while getopts \"n:\" o; do echo \"$o $OPTARG\"; done; echo $OPTIND", "-n -n -n", "n -n\ns.sh: option requires an argument -- n\n? \n4", 0],
+  ["while getopts \"v\" o; do echo \"$o\"; done; echo \"$OPTIND\"; while getopts \"v\" o; do echo \"again $o\"; done; echo \"$OPTIND\"", "-v -v", "v\nv\n3\n3", 0],
+  ["unset OPTIND; getopts \"v\" o; echo \"s=$? $o $OPTIND\"", "-v", "s=0 v 2", 0],
+  ["echo \"$OPTIND ${OPTERR-u}\"", "", "1 1", 0],
+  ["while getopts \"v\" o; do case $o in v) echo V;; \\?) echo \"bad\"; exit 2;; esac; done", "-v -q", "V\ns.sh: illegal option -- q\nbad", 2],
+  ["getopts \"v\" o 2>/dev/null; echo \"s=$? o=$o\"", "-q", "s=0 o=?", 0],
+  ["while getopts \"a:\" o; do echo \"[$OPTARG]\"; done", "-a '' -a x", "[]\n[x]", 0],
+  ["getopts \"a\" \"o\" -a; echo $o; getopts a o -a -a; echo \"$o $OPTIND\"", "", "a\na 3", 0],
+];
+
+describe('getopts', () => {
+  for (const [text, args, out, code] of GETOPTS) {
+    it(`${text.length > 70 ? text.slice(0, 67) + '...' : text} [${args}]`, () => {
+      const SQ = loadShell();
+      assert.deepEqual(script(SQ, text, args), { out, code });
+    });
+  }
+  it('the plan loop: case on $opt over every argument shape, then shift $((OPTIND-1))', () => {
+    const SQ = loadShell();
+    const loop = 'V=0 N=none\nwhile getopts "vn:" opt; do\n  case $opt in\n    v) V=1;;\n    n) N=$OPTARG;;\n    \\?) echo "usage: s.sh [-v] -n NAME" >&2; exit 2;;\n  esac\ndone\nshift $((OPTIND-1))\necho "V=$V N=$N rest=$*"';
+    assert.deepEqual(script(SQ, loop, '-v -n Ada file'), { out: 'V=1 N=Ada rest=file', code: 0 });
+    assert.deepEqual(script(SQ, loop, '-vn Ada'), { out: 'V=1 N=Ada rest=', code: 0 });
+    assert.deepEqual(script(SQ, loop, '-nAda'), { out: 'V=0 N=Ada rest=', code: 0 });
+    assert.deepEqual(script(SQ, loop, '-v -- -n x'), { out: 'V=1 N=none rest=-n x', code: 0 });
+    assert.deepEqual(script(SQ, loop, '-n'), { out: 's.sh: option requires an argument -- n\nusage: s.sh [-v] -n NAME', code: 2 });
+    assert.deepEqual(script(SQ, loop, '-x'), { out: 's.sh: illegal option -- x\nusage: s.sh [-v] -n NAME', code: 2 });
+    const silent = 'while getopts ":vn:" opt; do\n  case $opt in\n    n) N=$OPTARG;;\n    :) echo "missing $OPTARG"; exit 3;;\n    \\?) echo "bad $OPTARG"; exit 2;;\n  esac\ndone';
+    assert.deepEqual(script(SQ, silent, '-n'), { out: 'missing n', code: 3 });
+    assert.deepEqual(script(SQ, silent, '-x'), { out: 'bad x', code: 2 });
+  });
+  it('the message prefix is $0 of the script or bash -c (bash at the prompt); a function or sourced file keeps it', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'getopts v o -x; echo "s=$? o=$o"'), { out: 'bash: illegal option -- x\ns=0 o=?', code: 0 });
+    assert.equal(run(SQ, "bash -c 'getopts v o -x'").out, 'bash: illegal option -- x');
+    assert.equal(run(SQ, "bash -c 'getopts v o -x' nm").out, 'nm: illegal option -- x');
+    assert.equal(run(SQ, "bash -c 'f() { getopts v o -x; }; f' myname").out, 'myname: illegal option -- x');
+    run(SQ, 'mkdir -p scripts');
+    put(SQ, 'scripts/o.sh', 'f() { getopts "n:" o; }\nf "$@"\necho "src" > /dev/null\nsource scripts/inner.sh');
+    put(SQ, 'scripts/inner.sh', 'OPTIND=1; getopts v o -y');
+    assert.equal(run(SQ, 'bash scripts/o.sh -n').out, 'scripts/o.sh: option requires an argument -- n\nscripts/o.sh: illegal option -- y');
+    assert.equal(run(SQ, 'OPTIND=1; getopts "ab:" opt -a; echo $opt').out, 'a');
+    assert.deepEqual(run(SQ, 'getopts'), { out: 'getopts: usage: getopts optstring name [arg ...]', code: 2 });
+    assert.deepEqual(run(SQ, 'getopts -a x -a'), { out: 'bash: getopts: -a: invalid option\ngetopts: usage: getopts optstring name [arg ...]', code: 2 });
+    assert.deepEqual(run(SQ, 'OPTIND=1; getopts -- a x -a; echo $x'), { out: 'a', code: 0 });
+  });
+  it('OPTIND: 1 in a new shell or script, kept by functions, copied into a subshell, reset by assignment and by local OPTIND', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'echo "$OPTIND $OPTERR"').out, '1 1');
+    assert.equal(run(SQ, 'getopts a o -a -a; echo $OPTIND').out, '2');
+    put(SQ, 's2.sh', 'echo "in $OPTIND"; getopts a o -a; echo "in $OPTIND"');
+    assert.equal(run(SQ, 'bash s2.sh; echo "out $OPTIND"').out, 'in 1\nin 2\nout 2');
+    assert.equal(run(SQ, '(getopts a o -a -a; echo "sub $OPTIND"); echo "main $OPTIND"').out, 'sub 3\nmain 2');
+    assert.equal(run(SQ, 'echo $(getopts a o -a -a; echo $OPTIND) $OPTIND').out, '3 2');
+    assert.equal(run(SQ, 'OPTIND=1; getopts ab o -ab; echo "$o $OPTIND"; OPTIND=1; getopts ab o -ab; echo "$o $OPTIND"').out, 'a 1\na 1');
+    assert.equal(run(SQ, '(( OPTIND = 1 )); getopts ab o -ab; echo "$o $OPTIND"').out, 'a 1');
+    assert.equal(run(SQ, 'f() { local OPTIND=1 o; while getopts a o "$@"; do echo "f $o $OPTIND"; done; }; OPTIND=1; f -a; f -a -a; echo "main $OPTIND"').out, 'f a 2\nf a 2\nf a 3\nmain 1');
+  });
+  it('a readonly name or OPTIND: the error and bash\'s statuses', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'readonly X=1; getopts a X -a; echo "s=$? X=$X"').out, 'bash: X: readonly variable\ns=2 X=1');
+    assert.equal(run(SQ, 'readonly OPTIND=1; getopts a o -a; echo "s=$? $o"').out, 'bash: OPTIND: readonly variable\ns=0 a');
+    assert.deepEqual(run(SQ, 'getopts a 1x -a; echo "s=$?"'), { out: "bash: getopts: `1x': not a valid identifier\ns=1", code: 0 });
+  });
+});
+
+describe('mktemp', () => {
+  const ls = (SQ, p) => run(SQ, `ls -A ${p}`).out;
+  it('names come from a per-session counter: files and directories under /tmp, private modes', () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir camp');
+    assert.deepEqual(run(SQ, 'mktemp'), { out: '/tmp/tmp.A00001', code: 0 });
+    assert.deepEqual(run(SQ, 'mktemp'), { out: '/tmp/tmp.A00002', code: 0 });
+    assert.deepEqual(run(SQ, 'mktemp -d'), { out: '/tmp/tmp.A00003', code: 0 });
+    assert.equal(run(SQ, 'ls -l /tmp').out, '-rw-------  explorer      0  tmp.A00001\n-rw-------  explorer      0  tmp.A00002\ndrwx------  explorer   4096  tmp.A00003/');
+    assert.equal(run(SQ, 't=$(mktemp); echo hi > "$t"; cat "$t"; echo $t').out, 'hi\n/tmp/tmp.A00004');
+    assert.equal(run(SQ, 'mktemp /tmp/foo.XXXXXX').out, '/tmp/foo.A00005');
+    assert.equal(run(SQ, 'mktemp fooXXX; ls fooA06').out, 'fooA06\nfooA06');
+    assert.equal(run(SQ, 'mktemp -p camp').out, 'camp/tmp.A00007');
+    assert.equal(run(SQ, 'mktemp -t bar.XXXX').out, '/tmp/bar.A008');
+    assert.equal(run(SQ, 'mktemp -u; ls /tmp/tmp.A00009').out, "/tmp/tmp.A00009\nls: cannot access '/tmp/tmp.A00009': No such file or directory");
+    assert.equal(run(SQ, 'mktemp --tmpdir=camp x.XXX; mktemp --tmpdir y.XXX').out, 'camp/x.A10\n/tmp/y.A11');
+    assert.equal(run(SQ, 'mktemp -d -p camp/ dXXXXX').out, 'camp/dA0012');
+    assert.equal(run(SQ, 'mktemp -- -XXX').out, '-A13');
+    assert.equal(run(SQ, 'mktemp fooXXXbar').out, 'fooA14bar');
+    assert.equal(run(SQ, 'export TMPDIR=camp; mktemp; unset TMPDIR; mktemp').out, 'camp/tmp.A00015\n/tmp/tmp.A00016');
+  });
+  it('GNU errors', () => {
+    const SQ = loadShell();
+    const TRY = "\nTry 'mktemp --help' for more information.";
+    const cases = [
+      ['mktemp abc', "mktemp: too few X's in template 'abc'"],
+      ['mktemp XX', "mktemp: too few X's in template 'XX'"],
+      ["mktemp ''", "mktemp: too few X's in template ''"],
+      ['mktemp nodir/fooXXX', "mktemp: failed to create file via template 'nodir/fooXXX': No such file or directory"],
+      ['mktemp -d nodir/fooXXX', "mktemp: failed to create directory via template 'nodir/fooXXX': No such file or directory"],
+      ['mktemp -p nodir', "mktemp: failed to create file via template 'nodir/tmp.XXXXXXXXXX': No such file or directory"],
+      ['mktemp -d -p nodir', "mktemp: failed to create directory via template 'nodir/tmp.XXXXXXXXXX': No such file or directory"],
+      ['mktemp -p readme.txt', "mktemp: failed to create file via template 'readme.txt/tmp.XXXXXXXXXX': Not a directory"],
+      ['mktemp readme.txt/XXX', "mktemp: failed to create file via template 'readme.txt/XXX': Not a directory"],
+      ['mktemp -t foo/XXX', "mktemp: invalid template, 'foo/XXX', contains directory separator"],
+      ['mktemp -p /tmp /abs/XXX', "mktemp: invalid template, '/abs/XXX'; with --tmpdir, it may not be absolute"],
+      ['mktemp a b', 'mktemp: too many templates' + TRY],
+      ['mktemp -z', "mktemp: invalid option -- 'z'" + TRY],
+      ['mktemp --bogus', "mktemp: unrecognized option '--bogus'" + TRY],
+      ['mktemp -p', "mktemp: option requires an argument -- 'p'" + TRY],
+      ['mktemp -q', 'this practice shell does not support mktemp -q yet'],
+      ['mktemp --suffix=.x', 'this practice shell does not support mktemp --suffix yet'],
+    ];
+    for (const [line, out] of cases) assert.deepEqual(run(SQ, line), { out, code: 1 }, line);
+    assert.equal(ls(SQ, '/tmp'), '', 'nothing was created');
+    assert.deepEqual(run(SQ, 'mktemp'), { out: '/tmp/tmp.A00001', code: 0 }, 'a failure does not use up a name');
+  });
+  it('an existing name is skipped; the counter restarts with Reset world and inside the sandbox', () => {
+    const SQ = loadShell();
+    run(SQ, 'touch /tmp/tmp.A00001; mkdir /tmp/tmp.A00002');
+    assert.equal(run(SQ, 'mktemp').out, '/tmp/tmp.A00003');
+    assert.equal(SQ.sandbox(() => run(SQ, 'mktemp; mktemp').out), '/tmp/tmp.A00004\n/tmp/tmp.A00005');
+    assert.equal(run(SQ, 'mktemp').out, '/tmp/tmp.A00004', 'the sandbox used its own counter and world');
+    SQ.resetProcs();
+    run(SQ, 'rm -r /tmp/tmp.A0000*');
+    assert.equal(run(SQ, 'mktemp').out, '/tmp/tmp.A00001');
+  });
+  it('flooding /tmp: 500 in one line works, 1000 entries in a folder is the limit, a runaway loop hits the step cap', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'for i in $(seq 1 500); do mktemp; done | wc -l'), { out: '500', code: 0 });
+    const r = run(SQ, 'for i in $(seq 1 600); do mktemp > /dev/null; done 2>&1 | sort | uniq -c');
+    assert.equal(r.out, "    100 mktemp: failed to create file via template '/tmp/tmp.XXXXXXXXXX': No space left on device");
+    assert.equal(run(SQ, 'ls /tmp | wc -l').out, '1000');
+    assert.equal(run(SQ, 'mktemp -d; echo $?').out, "mktemp: failed to create directory via template '/tmp/tmp.XXXXXXXXXX': No space left on device\n1");
+    run(SQ, 'rm -r /tmp/tmp.*');
+    assert.equal(run(SQ, 'while :; do mktemp -u > /dev/null; done').out, 'this practice shell stopped the command: too many steps');
+    assert.equal(run(SQ, 'mktemp -p forest').out.startsWith('forest/tmp.A'), true, 'the next line works');
+  });
+  it("a script's trap 'rm -f \"$t\"' EXIT leaves /tmp empty", () => {
+    const SQ = loadShell();
+    assert.equal(script(SQ, 't=$(mktemp)\ntrap \'rm -f "$t"\' EXIT\necho data > "$t"\ncat "$t"').out, 'data');
+    assert.equal(ls(SQ, '/tmp'), '');
+    assert.equal(script(SQ, 'set -e\nt=$(mktemp -d)\ntrap \'rm -rf "$t"\' EXIT\ntouch "$t/a"\nfalse\necho no').code, 1);
+    assert.equal(ls(SQ, '/tmp'), '');
+  });
+});
+
+describe('command', () => {
+  it('-v prints how a name would run: a path, or the name of a builtin, keyword or function; status 1 when none is found', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'command -v ls'), { out: '/usr/bin/ls', code: 0 });
+    assert.equal(run(SQ, 'command -v cd if getopts readonly command type mktemp printenv realpath').out, 'cd\nif\ngetopts\nreadonly\ncommand\ntype\n/usr/bin/mktemp\n/usr/bin/printenv\n/usr/bin/realpath');
+    assert.equal(run(SQ, 'f() { :; }; command -v f').out, 'f');
+    assert.deepEqual(run(SQ, 'command -v nope; echo $?'), { out: '1', code: 0 });
+    assert.deepEqual(run(SQ, 'command -v nope ls; echo $?'), { out: '/usr/bin/ls\n0', code: 0 });
+    assert.deepEqual(run(SQ, "command -v ''; echo $?"), { out: '1', code: 0 });
+    assert.deepEqual(run(SQ, 'command -v; echo $?'), { out: '0', code: 0 });
+    put(SQ, 'run.sh', 'echo ran');
+    assert.deepEqual(run(SQ, 'command -v ./run.sh; echo $?'), { out: '1', code: 0 });
+    run(SQ, 'chmod +x run.sh');
+    assert.equal(run(SQ, 'command -v ./run.sh').out, './run.sh');
+    assert.equal(run(SQ, 'command -vp ls').out, '/usr/bin/ls');
+  });
+  it('-V describes it like type', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'command -V ls cd if').out, 'ls is /usr/bin/ls\ncd is a shell builtin\nif is a shell keyword');
+    assert.deepEqual(run(SQ, 'command -V nope; echo $?'), { out: 'bash: command: nope: not found\n1', code: 0 });
+    assert.deepEqual(run(SQ, 'command -V nope ls; echo $?'), { out: 'bash: command: nope: not found\nls is /usr/bin/ls\n0', code: 0 });
+    assert.equal(run(SQ, 'f() { :; }; command -V f').out, 'f is a function');
+  });
+  it('command NAME ARGS skips functions and runs the builtin or command', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'f() { echo mine; }; command f; echo $?'), { out: 'bash: f: command not found\n127', code: 0 });
+    assert.equal(run(SQ, 'f').out, 'mine');
+    assert.equal(run(SQ, 'echo() { printf "fake\\n"; }; command echo real; echo also').out, 'real\nfake');
+    assert.equal(run(SQ, 'unset -f echo; cd() { echo nope; }; command cd /; pwd; unset -f cd; cd').out, '/');
+    assert.deepEqual(run(SQ, 'command; echo $?'), { out: '0', code: 0 });
+    assert.equal(run(SQ, 'command -p echo hi; command -- echo x').out, 'hi\nx');
+    assert.deepEqual(run(SQ, 'command -x'), { out: 'bash: command: -x: invalid option\ncommand: usage: command [-pVv] command [arg ...]', code: 2 });
+    assert.deepEqual(run(SQ, 'command nosuchcmd'), { out: 'bash: nosuchcmd: command not found', code: 127 });
+    assert.equal(run(SQ, 'g() { command local x=1; echo "[$x]"; }; g; echo "[${x-unset}]"').out, '[1]\n[unset]');
+    assert.equal(run(SQ, 'command exit 3; echo no').code, 127);
+  });
+});
+
+describe('type -t', () => {
+  it('one word per name: builtin, file, function, keyword; nothing and status 1 when missing', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'type -t cd'), { out: 'builtin', code: 0 });
+    assert.deepEqual(run(SQ, 'type -t ll; echo $?'), { out: '1', code: 0 });
+    assert.deepEqual(run(SQ, 'type -t cd ls if nope; echo $?'), { out: 'builtin\nfile\nkeyword\n1', code: 0 });
+    assert.equal(run(SQ, 'f() { :; }; type -t f getopts readonly command type').out, 'function\nbuiltin\nbuiltin\nbuiltin\nbuiltin');
+    assert.deepEqual(run(SQ, 'type -t; echo $?'), { out: '0', code: 0 });
+    assert.equal(run(SQ, 'type cd ls').out, 'cd is a shell builtin\nls is /usr/bin/ls');
+    assert.equal(run(SQ, 'type getopts').out, 'getopts is a shell builtin');
+  });
+});
+
+describe('readonly', () => {
+  const RO = (n) => `bash: ${n}: readonly variable`;
+  it('every way of assigning or unsetting is refused with status 1', () => {
+    const SQ = loadShell();
+    const cases = [
+      ['readonly X=1; X=2; echo "s=$? X=$X"', `${RO('X')}\ns=1 X=1`],
+      ['readonly X=1; X=2 echo hi; echo "s=$? X=$X"', `${RO('X')}\nhi\ns=0 X=1`],
+      ['readonly X=1; X=2 Y=3; echo "s=$? Y=${Y-unset}"', `${RO('X')}\ns=1 Y=unset`],
+      ['readonly X=1; export X=2; echo "s=$? X=$X"', `${RO('X')}\ns=1 X=1`],
+      ['readonly X=1; unset X; echo "s=$? X=$X"', 'bash: unset: X: cannot unset: readonly variable\ns=1 X=1'],
+      ['readonly X=1; read X <<< hi; echo "s=$? X=$X"', `${RO('X')}\ns=1 X=1`],
+      ['readonly X=1; for X in a b; do echo in $X; done; echo "s=$?"', `${RO('X')}\ns=1`],
+      ['readonly X=1; f() { local X=2; echo "f $X"; }; f; echo "s=$?"', 'bash: local: X: readonly variable\nf 1\ns=0'],
+      ['readonly X=1; (( X=2 )); echo "s=$? $X"', `${RO('X')}\ns=1 1`],
+      ['readonly X=1; (( X++ )); echo "s=$? $X"', `${RO('X')}\ns=1 1`],
+      ['readonly X=1; echo $((X=2)); echo "s=$? $X"', `${RO('X')}\ns=1 1`],
+      ['readonly Z; echo ${Z:=4}; echo "s=$?"', `${RO('Z')}\ns=1`],
+      ['readonly X=1; echo ${X:=5}', '1'],
+      ['readonly X=1; printf -v X hi; echo "s=$? $X"', `${RO('X')}\ns=1 1`],
+      ['readonly X; echo "s=$?"; X=3; echo "s=$? X=$X"', `s=0\n${RO('X')}\ns=1 X=`],
+      ['X=5; readonly X; X=6; echo $X', `${RO('X')}\n5`],
+      ['readonly X=1 X=2; echo "s=$? $X"', `${RO('X')}\ns=1 1`],
+      ['readonly X=1; readonly X; echo "s=$? $X"', 's=0 1'],
+      ['readonly X=1; true; X=2 && echo yes || echo no', `${RO('X')}\nno`],
+    ];
+    for (const [line, out] of cases) assert.equal(run(loadShell(), line).out, out, line);
+  });
+  it('readonly -p and readonly list the names as declare -r, sorted; export adds -x', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'readonly; readonly -p'), { out: '', code: 0 });
+    run(SQ, 'readonly B="a b" A=1 C; Q=\'say "hi" $x \\ `\'; readonly Q; export E=1; readonly E');
+    const want = 'declare -r A="1"\ndeclare -r B="a b"\ndeclare -r C\ndeclare -rx E="1"\ndeclare -r Q="say \\"hi\\" \\$x \\\\ \\`"';
+    assert.equal(run(SQ, 'readonly -p').out, want);
+    assert.equal(run(SQ, 'readonly').out, want);
+    assert.equal(run(SQ, 'export').out, 'declare -rx E="1"');
+  });
+  it('option and name errors', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'readonly 1x=3'), { out: "bash: readonly: `1x=3': not a valid identifier", code: 1 });
+    assert.deepEqual(run(SQ, 'readonly -z'), { out: 'bash: readonly: -z: invalid option\nreadonly: usage: readonly [-aAf] [name[=value] ...] or readonly -p', code: 2 });
+    assert.deepEqual(run(SQ, 'readonly -f; echo s=$?'), { out: 's=0', code: 0 });
+    assert.deepEqual(run(SQ, 'readonly -f g'), { out: 'this practice shell does not support readonly -f yet', code: 2 });
+    assert.deepEqual(run(SQ, 'readonly -a A'), { out: 'this practice shell does not support readonly -a yet', code: 2 });
+    assert.deepEqual(run(SQ, 'readonly -- K=1; K=2'), { out: RO('K'), code: 1 });
+  });
+  it('per shell: subshells, $( ) and pipeline stages inherit it and keep their own; functions share it; a script starts without', () => {
+    const SQ = loadShell();
+    assert.equal(run(SQ, 'readonly X=1; ( X=2; echo "sub $?" ); echo $X').out, `${RO('X')}\nsub 1\n1`);
+    assert.equal(run(SQ, 'y=$(X=2; echo "in $?"); echo $y').out, `${RO('X')}\nin 1`);
+    assert.equal(run(SQ, 'X=2 | cat; echo done').out, `${RO('X')}\ndone`);
+    assert.equal(run(SQ, '( readonly S=1 ); S=2; echo $S').out, '2');
+    assert.equal(run(SQ, 'echo | readonly P=1; P=2; echo $P').out, '2');
+    assert.equal(run(SQ, 'f() { readonly L=1; }; f; L=2; echo $L').out, `${RO('L')}\n1`);
+    assert.equal(run(SQ, 'g() { local Y=1; readonly Y; }; g; Y=2; echo $Y').out, '2', "a local's readonly goes with it (bash)");
+    assert.equal(run(SQ, "export E=1; readonly E; bash -c 'E=2; echo $E'").out, '2');
+    put(SQ, 'r.sh', 'readonly Q=1\nQ=2\necho "after $?"');
+    assert.deepEqual(run(SQ, 'bash r.sh; Q=3; echo $Q'), { out: `${RO('Q')}\nafter 1\n3`, code: 0 });
+    put(SQ, 'e.sh', 'set -e\nreadonly Q=1\nQ=2\necho after');
+    assert.deepEqual(run(SQ, 'bash e.sh'), { out: RO('Q'), code: 1 });
+    assert.equal(run(SQ, '{ X=2; echo "job $?"; } & wait').out.split('\n').slice(1, 3).join('\n'), `${RO('X')}\njob 1`, 'a background job inherits it');
+  });
+  it('Reset world and the sandbox clear it, and it is never saved', () => {
+    const SQ = loadShell();
+    run(SQ, 'readonly X=1');
+    assert.equal(SQ.sandbox(() => run(SQ, 'X=3; echo $X').out), '3');
+    assert.equal(run(SQ, 'X=4').out, RO('X'));
+    assert.ok(!/readonly|"ro"/.test(JSON.stringify(SQ.S)));
+    SQ.resetProcs();
+    assert.equal(run(SQ, 'X=5; echo $X').out, '5');
+  });
+});
+
+describe('printenv', () => {
+  it('the environment, or the named exported variables; status 1 when one is missing', () => {
+    const SQ = loadShell();
+    assert.deepEqual(run(SQ, 'printenv HOME'), { out: '/home/explorer', code: 0 });
+    assert.deepEqual(run(SQ, 'printenv NOPE; echo $?'), { out: '1', code: 0 });
+    assert.deepEqual(run(SQ, 'printenv NOPE HOME; echo $?'), { out: '/home/explorer\n1', code: 0 });
+    assert.equal(run(SQ, 'FOO=bar printenv FOO').out, 'bar');
+    assert.deepEqual(run(SQ, 'FOO=bar; printenv FOO; echo $?'), { out: '1', code: 0 });
+    assert.equal(run(SQ, 'export FOO; printenv FOO USER').out, 'bar\nexplorer');
+    assert.equal(run(SQ, 'printenv').out, run(SQ, 'env').out);
+    assert.deepEqual(run(SQ, 'printenv -z'), { out: "printenv: invalid option -- 'z'\nTry 'printenv --help' for more information.", code: 2 });
+    assert.deepEqual(run(SQ, 'printenv -0 HOME'), { out: 'this practice shell does not support printenv -0 yet', code: 2 });
+  });
+});
+
+describe('realpath', () => {
+  it('resolves . .. and links; GNU rules for what must exist (-e all, -m none, default all but the last); -s keeps links', () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir -p d/e; touch d/f; ln -s d/e le; ln -s nowhere dang; ln -s loop2 loop1; ln -s loop1 loop2');
+    const H = '/home/explorer';
+    const cases = [
+      ['realpath readme.txt', `${H}/readme.txt`, 0],
+      ['realpath d/../d/f', `${H}/d/f`, 0],
+      ['realpath le/..', `${H}/d`, 0],
+      ['realpath -s le/..', H, 0],
+      ['realpath le', `${H}/d/e`, 0],
+      ['realpath -s le', `${H}/le`, 0],
+      ['realpath --no-symlinks le', `${H}/le`, 0],
+      ['realpath dang', `${H}/nowhere`, 0],
+      ['realpath -e dang', 'realpath: dang: No such file or directory', 1],
+      ['realpath nope/x', 'realpath: nope/x: No such file or directory', 1],
+      ['realpath -m nope/x/../y', `${H}/nope/y`, 0],
+      ['realpath d/f/x', 'realpath: d/f/x: Not a directory', 1],
+      ['realpath -m d/f/x', `${H}/d/f/x`, 0],
+      ['realpath loop1', 'realpath: loop1: Too many levels of symbolic links', 1],
+      ['realpath -e nope a', 'realpath: nope: No such file or directory\nrealpath: a: No such file or directory', 1],
+      ['realpath d/new', `${H}/d/new`, 0],
+      ['realpath . .. /', `${H}\n/home\n/`, 0],
+      ['realpath -e d/f nope d', `${H}/d/f\nrealpath: nope: No such file or directory\n${H}/d`, 1],
+      ['cd le; realpath .; cd', `${H}/d/e`, 0],
+      ["realpath ''", "realpath: '': No such file or directory", 1],
+      ['realpath', "realpath: missing operand\nTry 'realpath --help' for more information.", 1],
+      ['realpath -x', "realpath: invalid option -- 'x'\nTry 'realpath --help' for more information.", 1],
+      ['realpath -q nope', 'this practice shell does not support realpath -q yet', 1],
+      ['realpath --relative-to=d d', 'this practice shell does not support realpath --relative-to yet', 1],
+    ];
+    for (const [line, out, code] of cases) assert.deepEqual(run(SQ, line), { out, code }, line);
+  });
+});
+
+describe('a capstone-style script in the sandbox (getopts, mktemp, trap EXIT, set -euo pipefail, awk, sed, ${1:?})', () => {
+  const LOGTOOL = [
+    '#!/bin/bash',
+    'set -euo pipefail',
+    'level=ERROR',
+    'n=3',
+    'usage() { echo "usage: logtool.sh [-l LEVEL] [-n N] FILE" >&2; exit 2; }',
+    'while getopts "l:n:" opt; do',
+    '  case $opt in',
+    '    l) level=$OPTARG ;;',
+    '    n) n=$OPTARG ;;',
+    '    *) usage ;;',
+    '  esac',
+    'done',
+    'shift $((OPTIND - 1))',
+    'file=${1:?usage: logtool.sh [-l LEVEL] [-n N] FILE}',
+    'if [ ! -r "$file" ]; then echo "error: cannot read $file" >&2; exit 1; fi',
+    'tmp=$(mktemp)',
+    'trap \'rm -f "$tmp"\' EXIT',
+    'grep -- "$level" "$file" > "$tmp" || true',
+    'awk \'{ print $1 }\' "$tmp" | sort | uniq -c | sort -rn | head -n "$n" | sed \'s/^ *//\'',
+  ].join('\n');
+  const LOG = ['10.0.0.2 ERROR w', '10.0.0.1 ERROR disk', '10.0.0.2 WARN slow', '10.0.0.1 ERROR disk', '10.0.0.3 ERROR net', '10.0.0.2 ERROR x', '10.0.0.2 ERROR y', '10.0.0.4 ERROR z', '10.0.0.2 WARN q'].join('\n');
+  const setup = () => {
+    const SQ = loadShell();
+    run(SQ, 'mkdir -p scripts logs');
+    put(SQ, 'scripts/logtool.sh', LOGTOOL);
+    put(SQ, 'logs/all.log', LOG);
+    return SQ;
+  };
+  it('every path gives the right output and status and leaves /tmp empty inside the sandbox', () => {
+    const SQ = setup();
+    const cases = [
+      [['logs/all.log'], '3 10.0.0.2\n2 10.0.0.1\n1 10.0.0.4', [], 0],
+      [['-l', 'WARN', '-n', '1', 'logs/all.log'], '2 10.0.0.2', [], 0],
+      [['-n', '2', 'logs/all.log'], '3 10.0.0.2\n2 10.0.0.1', [], 0],
+      [['-l', 'NOPE', 'logs/all.log'], '', [], 0],
+      [['logs/missing.log'], '', ['error: cannot read logs/missing.log'], 1],
+      [['-x', 'logs/all.log'], '', ['scripts/logtool.sh: illegal option -- x', 'usage: logtool.sh [-l LEVEL] [-n N] FILE'], 2],
+      [['-n'], '', ['scripts/logtool.sh: option requires an argument -- n', 'usage: logtool.sh [-l LEVEL] [-n N] FILE'], 2],
+      [[], '', ['bash: 1: usage: logtool.sh [-l LEVEL] [-n N] FILE'], 1],
+    ];
+    for (const [args, out, err, code] of cases) {
+      const got = SQ.sandbox(() => {
+        SQ.S.cwd = '/home/explorer';
+        const r = SQ.runScript('scripts/logtool.sh', { args, depth: 1, tty: false, force: true, record: false });
+        return JSON.stringify({ out: r.out, err: r.err, code: r.code, tmp: Object.keys(SQ.getNode('/tmp').children) });
+      });
+      assert.deepEqual(JSON.parse(got), { out, err, code, tmp: [] }, args.join(' '));
+    }
+  });
+  it('ctx.runScript and scriptPasses do not move the learner\'s world, counter or state', () => {
+    const SQ = setup();
+    run(SQ, 'cd logs; X=keep; readonly R=1');
+    const before = JSON.stringify(SQ.S);
+    const c = SQ.ctxFor('x');
+    assert.deepEqual(JSON.parse(JSON.stringify(c.runScript('scripts/logtool.sh', ['-n', '1', 'logs/all.log']))), { out: '3 10.0.0.2', err: [], code: 0 });
+    const m = { kind: 'challenge', file: 'scripts/logtool.sh', tests: [{ args: ['logs/all.log'], expectOut: '3 10.0.0.2\n2 10.0.0.1\n1 10.0.0.4' }, { args: ['-q', 'logs/all.log'], expectCode: 2, expectErrMatch: 'usage' }] };
+    assert.deepEqual(JSON.parse(JSON.stringify(c.scriptPasses(m))), { ok: true });
+    assert.equal(JSON.stringify(SQ.S), before);
+    assert.equal(run(SQ, 'mktemp; echo $X; R=2').out, '/tmp/tmp.A00001\nkeep\n' + 'bash: R: readonly variable');
+  });
+});

@@ -261,7 +261,7 @@ CMDS.printf=function(a){let i=0,vname=null;
   const r=SQ.fmtPrintf(a[i],a.slice(i+1));
   const err=r.err?r.err.split('\n'):[];
   if(r.err&&r.text===''&&/printf: (width|precision|output) too large|invalid directive/.test(r.err))return {out:'',err,code:1};
-  if(vname!==null){if(r.text.length>SQ.LIM.VAR)return E('bash: printf: value too large for this practice shell',1);SQ.S.vars[vname]=r.text;return {out:'',err,code:r.code}}
+  if(vname!==null){if(!SQ.canSet(vname))return E(SQ.roMsg(vname),1);if(r.text.length>SQ.LIM.VAR)return E('bash: printf: value too large for this practice shell',1);SQ.S.vars[vname]=r.text;return {out:'',err,code:r.code}}
   return {out:r.text.endsWith('\n')?r.text.slice(0,-1):r.text,err,code:r.code}};
 
 // ---- grep ----

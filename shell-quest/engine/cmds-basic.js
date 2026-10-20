@@ -94,9 +94,9 @@ const CMDS={
       if(m===defMode(n))delete n.mode;else n.mode=m;
       SQ.rt.changed.add(abs)}
     return {out:'',err,code:err.length?1:0}},
-  export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
+  export(a){if(!a.length)return ok(Object.keys(S.exp||{}).sort().map(k=>`declare -${SQ.isRO(k)?'r':''}x ${k}="${SQ.getVar(k)}"`).join('\n'));const err=[];
     for(const x of a){const m=x.match(/^([^=]*)(=([\s\S]*))?$/);const k=m[1];if(!/^[A-Za-z_]\w*$/.test(k)||SQ.badName(k)){err.push(`bash: export: \`${x}': not a valid identifier`);continue}
-      if(m[2]!==undefined)S.vars[k]=m[3];(S.exp=S.exp||{})[k]=1}
+      if(m[2]!==undefined){if(!SQ.canSet(k)){err.push(SQ.roMsg(k));continue}S.vars[k]=m[3]}(S.exp=S.exp||{})[k]=1}
     return {out:'',err,code:err.length?1:0}},
   env(){const L={};for(const k of ['HOME','USER','SHELL','HOSTNAME','PATH','PWD'])if(SQ.isSet(k))L[k]=SQ.getVar(k);
     for(const k of Object.keys(S.exp||{}))if(SQ.own(S.vars,k))L[k]=S.vars[k];

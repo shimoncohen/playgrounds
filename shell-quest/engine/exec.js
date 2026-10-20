@@ -31,15 +31,18 @@ function runCmd1(words,io,assigns){
   const all=!(assigns&&assigns.length)&&words.every(w=>/^[A-Za-z_]\w*=/.test(w.raw));
   try{if(all){ew=[]; /* a=1 b=$a: left to right, each value sees the ones before it */
       for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps){if(X)(xt=xt||[]).push(...CTX.pend.splice(0),xAssign(k,v)); /* traced before it takes effect (PS4=x is shown with the old PS4) */
-        S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}}}
+        if(!SQ.canSet(k)){bad=E(SQ.roMsg(k),1);break} /* readonly (Task 15): status 1, the later assignments are not made */
+        S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}if(bad)break}}
     else ew=expandWords(words,true);
     if(assigns&&assigns.length)pre=assigns.map(x=>SQ.expandOne(x.word))}
   catch(e){return failExp(e)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
+  let roFail=false;
   if(pre){pre=assignPairs(pre);if(!Array.isArray(pre))return Object.assign(pre,{err:pend.concat(pre.err)});
-    if(X)xt=pend.splice(0).map(t=>({text:t,cls:'err'})).concat(pre.map(([k,v])=>xAssign(k,v)))}
+    if(X)xt=pend.splice(0).map(t=>({text:t,cls:'err'})).concat(pre.map(([k,v])=>xAssign(k,v)));
+    if(SQ.rt.ro)pre=pre.filter(([k])=>{if(!SQ.isRO(k))return true;pend.push(SQ.roMsg(k));roFail=true;return false})} /* bash 5.2: X=2 cmd with X readonly reports it and runs cmd with the old X */
   if(all){const r=bad||ok();if(!bad&&CTX.lastSub!==null)r.code=CTX.lastSub;if(xt)r.xt=xt;return finishCmd(r,'(assign)',ew.slice(1).map(w=>w.v),false,io,pend)} /* each one was set above, left to right */
-  if(!ew.length){if(pre){for(const [k,v] of pre)S.vars[k]=v;const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;if(xt)r.xt=xt;return r}
+  if(!ew.length){if(pre){for(const [k,v] of pre){S.vars[k]=v;SQ.canSet(k)}const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;if(roFail)r.code=1;if(xt)r.xt=xt;return r}
     return Object.assign(ok(),{err:pend})}
   if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
     for(const [k,v] of pre){S.vars[k]=v;(S.exp=S.exp||{})[k]=1}
@@ -55,14 +58,18 @@ function runCmd0(ew,io,pend,noDefer,xt){const {args,globbed}=SQ.globWords(ew);
     r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
     if(xt)r.xt=xt;return r}
-  else if(name.includes('/'))r=runPath(name,io,false,a);
+  else r=runNamed(name,a,io);
+  r=finishCmd(r,lname,a,globbed,io,pend);return xt?Object.assign({},r,{xt}):r} /* a copy: a command may hand back a shared result object */
+/* a name that is not a function: a path, a builtin or command, a friendly message, or command not found (also `command NAME`, cmds-opts.js) */
+function runNamed(name,a,io){let r;
+  if(name.includes('/'))r=runPath(name,io,false,a);
   else if((name==='break'||name==='continue')&&!own(CMDS,name))r=loopCtl(name,a,io);
   else if(name==='local'&&!own(CMDS,'local'))r=SQ.localBuiltin(a);
   else if(name==='return'&&!own(CMDS,'return'))r=SQ.returnBuiltin(a);
   else if(own(CMDS,name))r=CMDS[name](a,io);
   else if(own(FRIENDLY,name))r=E(FRIENDLY[name],127);
   else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
-  r=finishCmd(r,lname,a,globbed,io,pend);return xt?Object.assign({},r,{xt}):r} /* a copy: a command may hand back a shared result object */
+  return r}
 /* the common tail of a command: stderr from its $( ) first, the output caps, the log entry */
 function finishCmd(r,lname,a,globbed,io,pend){
   if(pend.length)r.err=pend.concat(r.err||[]);
@@ -179,5 +186,5 @@ function missionVerdict(m,c,why){const isScript=m.kind==='script'||m.kind==='cha
 const oneLine=(t,n)=>{t=t.replace(/\n/g,'\\n');return t.length>n?t.slice(0,n-3)+'...':t};
 function scriptFailLine(m,f){if(f.index===-2)return oneLine(f.text,120);if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
   return oneLine(`Test ${f.index+1} (${f.label}) failed: expected "${f.expected}", got "${f.got}"`,120)}
-Object.assign(SQ,{runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict});
+Object.assign(SQ,{runNamed,runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict});
 })(window.SQ = window.SQ || {});

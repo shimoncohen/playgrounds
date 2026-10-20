@@ -5,7 +5,7 @@ const M=(c,s)=>'\x01'+c+s+'\x02';
 const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
-const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin',IFS:' \t\n'});
+const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin',IFS:' \t\n',OPTIND:'1',OPTERR:'1'}); /* OPTIND/OPTERR: 1 in a new shell or script (Task 15, getopts) */
 /* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope).
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
@@ -31,9 +31,15 @@ function isSet(k){const f=SQ.frame();
   if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD'||k==='BASHPID'||k==='PPID'||k==='SECONDS')return true;if(k==='!')return SQ.rt.bang!=null;
   if(/^\d+$/.test(k))return +k<=f.args.length;
   return own(S.vars,k)||(own(BUILTIN_VARS(),k)&&!unsetB(k))}
+/* readonly (Task 15, cmds-opts.js): SQ.rt.ro is null (no readonly names: every check is one null test) or a frozen null-prototype set of names.
+   canSet(k): false when k is readonly; assigning OPTIND (true) also restarts getopts' scan inside a word of grouped options, as in bash. */
+const isRO=k=>{const r=SQ.rt.ro;return r!=null&&r[k]===1};
+function canSet(k){if(isRO(k))return false;if(k==='OPTIND')SQ.rt.gopt=null;return true}
+const roMsg=k=>`bash: ${k}: readonly variable`;
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
   if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
+  if(!canSet(k))throw perr(k+': readonly variable',1);
   if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
   S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
@@ -365,5 +371,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
+Object.assign(SQ,{isRO,canSet,roMsg,splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});
