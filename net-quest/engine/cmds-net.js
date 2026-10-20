@@ -29,7 +29,11 @@ const parse=(cmd,args,def)=>{
   if(IPX.parse(dst)===null)return {error:fail(2,cmd+': '+dst+': Name or service not known')};
   return {n,dst};
 };
-const own=dev=>{const i=Object.values(dev.ifaces).find(x=>x.ip);return i?addr(i.ip):'0.0.0.0';};
+/* the address of the interface a packet to dst leaves by (the route's iface), else the first address the device has */
+const egressAddr=(dev,dst)=>{
+  const r=NQ.sim.route(dev,dst),i=(r&&dev.ifaces[r.dev])||Object.values(dev.ifaces).find(x=>x.ip);
+  return i&&i.ip?addr(i.ip):'0.0.0.0';
+};
 const ICMP=(e,type)=>e.packet.layers.some(l=>l.name==='ICMP'&&l.fields.type===type);
 /* the ttl the echo reply had when it reached the origin (64 when the target was the origin itself) */
 const replyTtl=(r,dev)=>{
@@ -54,7 +58,7 @@ const ping=(net,dev,args)=>{
     const msg=why===R.noRoute||why===R.ifDown||why===R.noAddr?'Destination Net Unreachable':why===R.unreachable?'Destination Host Unreachable':why===R.ttl?'Time to live exceeded':null;
     if(!msg)continue; // no reply: a real ping prints nothing for a timeout
     errs++;
-    out.push('From '+(r.replyFrom||own(dev))+' icmp_seq='+i+' '+msg);
+    out.push('From '+(r.replyFrom||egressAddr(dev,p.dst))+' icmp_seq='+i+' '+msg);
   }
   out.push('','--- '+p.dst+' ping statistics ---',p.n+' packets transmitted, '+got+' received, '+(errs?'+'+errs+' errors, ':'')+Math.round(100*(p.n-got)/p.n)+'% packet loss');
   return ret(out,[],got?0:1);
@@ -68,7 +72,7 @@ const traceroute=(net,dev,args)=>{
   if(h1&&h1.from===null&&LOCAL[h1.reason]&&!t.entries.length)return fail(2,'traceroute: connect: Network is unreachable');
   const out=['traceroute to '+dst+' ('+dst+'), 30 hops max, 60 byte packets'];
   for(const h of t.hops){
-    const ms=(0.5*h.ttl).toFixed(2)+' ms',flag=h.reason===R.unreachable?' !H':h.reason&&LOCAL[h.reason]?' !N':'';
+    const ms=(0.5*h.ttl).toFixed(2)+' ms',flag=h.reason===R.unreachable?' !H':h.reason===R.noRoute?' !N':'';
     out.push(String(h.ttl).padStart(2)+'  '+(h.from===null?'* * *':h.from+'  '+ms+'  '+ms+'  '+ms+flag));
   }
   return ret(out,[],0);

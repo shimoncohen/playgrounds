@@ -234,3 +234,37 @@ test('shell guard: a throwing or malformed command gives a friendly error and th
   assert.equal(run(net, 'ping -c 1 10.0.0.3').code, 0);
   delete NQ.CMDS.boom; delete NQ.CMDS.mangled; delete NQ.CMDS.noout;
 });
+
+const line = (net, cmd, dev) => run(net, cmd, dev).out[1];
+
+test('host unreachable names the interface the packet leaves by', () => {
+  let net = NQ.createNet('office');
+  assert.equal(line(net, 'ping -c 1 172.16.0.99', 'r2'), 'From 172.16.0.1 icmp_seq=1 Destination Host Unreachable');
+  assert.equal(line(net, 'ping -c 1 192.168.1.99', 'r1'), 'From 192.168.1.1 icmp_seq=1 Destination Host Unreachable');
+  // a destination reached by the default route leaves by the route's interface (eth1 here, not the first interface)
+  net = NQ.createNet('office');
+  ok(net, 'ip route del default', 'r2');
+  ok(net, 'ip route add default via 172.16.0.250 dev eth1', 'r2');
+  assert.equal(line(net, 'ping -c 1 8.8.8.8', 'r2'), 'From 172.16.0.1 icmp_seq=1 Destination Host Unreachable');
+});
+
+test('traceroute: a router with a down egress interface gets no !N', () => {
+  const net = NQ.createNet('office');
+  ok(net, 'ip link set eth1 down', 'r1'); // r1 has no other route to 172.16.0.0/24, so its answer is 'interface down'
+  const o = ok(net, 'traceroute 172.16.0.10');
+  assert.deepEqual(o.slice(1), [' 1  192.168.1.1  0.50 ms  0.50 ms  0.50 ms', ' 2  192.168.1.1  1.00 ms  1.00 ms  1.00 ms']);
+});
+
+test('ping statistics round the loss to the nearest whole percent', () => {
+  const net = NQ.createNet('office'), real = NQ.sim.ping;
+  // probes whose seq is listed leave with ttl 1 and die at r1 (a real "Time to live exceeded"); the rest go through
+  const lossy = (bad) => { NQ.sim.ping = (n, f, d, o) => real(n, f, d, bad.includes(o.seq) ? { ...o, ttl: 1 } : o); };
+  try {
+    lossy([1, 2]);
+    let o = ok(net, 'ping -c 3 172.16.0.10');
+    assert.equal(o.at(-1), '3 packets transmitted, 1 received, +2 errors, 67% packet loss');
+    lossy([1]);
+    o = ok(net, 'ping -c 3 172.16.0.10');
+    assert.equal(o.at(-1), '3 packets transmitted, 2 received, +1 errors, 33% packet loss');
+  } finally { NQ.sim.ping = real; }
+});
