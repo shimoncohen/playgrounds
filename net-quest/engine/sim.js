@@ -167,19 +167,21 @@ const silent=(ctx,dev,iface,p,verdict,tag)=>{
   drop(ctx,dev.id,iface,p,verdict);
   if(tag&&!tag.reason&&!ctx.hit)ctx.hops=via(tag,dev.id).path;
 };
-/* NAT. The ICMP id plays the part a TCP/UDP port will: a packet entering nat.inside and leaving nat.outside gets the
-   outside iface's address as its source and a new id. Table entries {inside, outside, id, outId, dst}: one per
-   (inside, id, dst, outside), outIds allocated from NAT_FIRST up and never reused. Returns the log verdict, or
-   {fail} when the packet cannot be translated. Rewrites layers (the router's own copy) in place. */
+/* NAT. The ICMP id plays the part a TCP/UDP port will: an echo request entering nat.inside and leaving nat.outside gets
+   the outside iface's address as its source and a new id (other ICMP, e.g. a reply to a flow started outside, passes
+   untranslated). Table entries {proto:'icmp', inside, outside, id, outId, dst}: one per (inside, id, dst, outside),
+   outIds allocated from NAT_FIRST up and never reused. Returns the log verdict, or {fail} when the packet cannot be
+   translated. Rewrites layers (the router's own copy) in place. */
 const NAT_FIRST=1024,NAT_LAST=65535;
 const snat=(nat,outIp,layers)=>{
   const ip=layers[0].fields,icl=layers[1],ic=icl&&icl.name==='ICMP'&&icl.fields;
   if(!ic)return {fail:'NAT cannot translate this protocol'};
-  let m=nat.table.find(e=>e.inside===ip.src&&e.id===ic.id&&e.dst===ip.dst&&e.outside===outIp);
+  nat.table=nat.table||[];
+  let m=nat.table.find(e=>e.proto==='icmp'&&e.inside===ip.src&&e.id===ic.id&&e.dst===ip.dst&&e.outside===outIp);
   if(!m){
     const outId=nat.table.reduce((n,e)=>Number.isInteger(e.outId)&&e.outId>=n?e.outId+1:n,NAT_FIRST);
     if(outId>NAT_LAST)return {fail:'NAT table full: no free ICMP identifier'};
-    m={inside:ip.src,outside:outIp,id:ic.id,outId,dst:ip.dst};
+    m={proto:'icmp',inside:ip.src,outside:outIp,id:ic.id,outId,dst:ip.dst}; // like conntrack: made before the send succeeds
     nat.table.push(m);
   }
   const v='translated: src '+ip.src+' → '+outIp+', id '+ic.id+' → '+m.outId;
@@ -188,7 +190,7 @@ const snat=(nat,outIp,layers)=>{
 };
 /* the way back: an echo reply (from the mapped destination) or an ICMP error (from any router on the way, carrying the
    id it was sent with) for the outside address. Returns the matching entry or undefined. */
-const natBack=(nat,ip,f)=>nat.table.find(e=>e.outside===ip.dst&&e.outId===f.id&&(f.type!=='echo-reply'||e.dst===ip.src));
+const natBack=(nat,ip,f)=>(nat.table||[]).find(e=>e.proto==='icmp'&&e.outside===ip.dst&&e.outId===f.id&&(f.type!=='echo-reply'||e.dst===ip.src));
 /* not for any of our addresses: hosts drop it; a router checks TTL, looks up the route and sends it on with a new
    Ethernet header (its egress MAC to the next hop's MAC) and ttl - 1. The IPv4 addresses change only by NAT: source
    translation happens here, after the route lookup; inbound (de-NAT) traffic is addressed to the router's own outside
@@ -203,7 +205,7 @@ const forward=(ctx,dev,iface,p,tag)=>{
   const layers=p.layers.slice(1).map(P.clone),ttl=ip.ttl-1;
   layers[0].fields.ttl=ttl;
   const nat=dev.nat;
-  if(nat&&iface===nat.inside&&h.iface===nat.outside){
+  if(nat&&iface===nat.inside&&h.iface===nat.outside&&!(ic&&ic.type!=='echo-request')){
     const v=snat(nat,addr(dev.ifaces[h.iface].ip),layers);
     if(v.fail)return silent(ctx,dev,iface,p,v.fail,tag);
     log(ctx,dev.id,h.iface,'nat',v,P.stack(...layers));

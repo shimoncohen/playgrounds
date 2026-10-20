@@ -9,7 +9,7 @@ const WEB = '198.51.100.10', OUT = '203.0.113.5';
 const L = (e, name) => e.packet.layers.find((l) => l.name === name);
 const icmpType = (e) => (L(e, 'ICMP') || { fields: {} }).fields.type;
 const at = (r, dev, dir, type) => [...r.entries].find((e) => e.dev === dev && e.dir === dir && icmpType(e) === type);
-const entry = (inside, id, outId) => ({ inside, outside: OUT, id, outId, dst: WEB });
+const entry = (inside, id, outId) => ({ proto: 'icmp', inside, outside: OUT, id, outId, dst: WEB });
 
 test('home: laptop reaches web through NAT; web sees the outside address and a rewritten id', () => {
   const net = NQ.createNet('home');
@@ -138,7 +138,7 @@ test('NAT router with its outside iface down: interface down from 192.168.1.1, n
 
 test('NAT ids run out at 65535: the router drops the packet with a readable verdict', () => {
   const net = NQ.createNet('home');
-  net.devices.home.nat.table.push({ inside: '192.168.1.99', outside: OUT, id: 1, outId: 65535, dst: WEB });
+  net.devices.home.nat.table.push({ proto: 'icmp', inside: '192.168.1.99', outside: OUT, id: 1, outId: 65535, dst: WEB });
   const r = NQ.sim.ping(net, 'laptop', WEB);
   assert.deepEqual([r.delivered, r.reason], [false, 'no reply']);
   const d = [...r.entries].find((e) => e.dir === 'drop' && e.dev === 'home');
@@ -158,6 +158,32 @@ test('home with web unable to reply (no default route) is still no reply', () =>
   const r = NQ.sim.ping(net, 'laptop', WEB);
   assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no reply', null]);
   assert.ok(at(r, 'web', 'rx', 'echo-request'));
+});
+
+test('a request from outside forced in by a route: laptop\'s echo reply leaves untranslated, isp drops its private source, web hears no reply', () => {
+  const net = NQ.createNet('home');
+  net.devices.isp.routes.push({ dst: '192.168.1.0/24', via: OUT, dev: 'eth0' });
+  const r = NQ.sim.ping(net, 'web', '192.168.1.10');
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no reply', null]);
+  assert.ok(at(r, 'laptop', 'rx', 'echo-request'), 'the request is routed in untranslated');
+  const out = at(r, 'home', 'fwd', 'echo-reply');
+  assert.deepEqual([L(out, 'IPv4').fields.src, L(out, 'ICMP').fields.id], ['192.168.1.10', 1], 'replies are not source-translated');
+  assert.equal([...r.entries].some((e) => e.dir === 'nat'), false);
+  assert.deepEqual(J(net.devices.home.nat.table), []);
+  const d = [...r.entries].find((e) => e.dir === 'drop' && e.dev === 'isp');
+  assert.equal(d.verdict, 'dropped: private source address 192.168.1.10');
+});
+
+test('a nat config without a table gets one on first use', () => {
+  const net = NQ.createNet('home');
+  net.devices.home.nat = { inside: 'eth0', outside: 'eth1' };
+  assert.equal(NQ.sim.ping(net, 'laptop', WEB).delivered, true);
+  assert.deepEqual(J(net.devices.home.nat.table), [entry('192.168.1.10', 1, 1024)]);
+  const n2 = NQ.createNet('home');
+  n2.devices.home.nat = { inside: 'eth0', outside: 'eth1' };
+  assert.equal(NQ.sim.ping(n2, 'web', OUT).delivered, true, 'inbound traffic before any mapping does not throw');
+  const p = NQ.pkt.stack(NQ.pkt.eth(n2.devices.isp.ifaces.eth0.mac, n2.devices.home.ifaces.eth1.mac, 'IPv4'), NQ.pkt.ipv4(WEB, OUT, 63, 'ICMP'), NQ.pkt.icmp('echo-reply', 1024, 1));
+  assert.deepEqual(J(NQ.sim.inject(n2, 'home', 'eth1', p).entries.map((e) => e.verdict)), ['no NAT mapping for this packet']);
 });
 
 test('deterministic: the same session on two fresh nets logs identical entries and tables', () => {
