@@ -372,6 +372,45 @@ describe('regex backtracking guard (Task 9b)', () => {
       after(SQ);
     }
   });
+  it('a large count on an atom that can match empty (back-reference, empty group, lookaround) is refused at once', () => {
+    const SQ = loadShell();
+    put(SQ, 'a.txt', 'a'.repeat(300));
+    const cases = [
+      [`grep -c '()\\1{1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()\\1{3000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()(?:\\1){1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?<e>)\\k<e>{1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '()(?:(?=\\1)\\1){1000000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(a*)\\1{100000}x' a.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?=a){5000}x' a.txt`, 'grep: ' + TOO],
+      [`sed 's/\\(\\)\\1\\{32767\\}x/Y/' a.txt`, 'sed: ' + TOO],
+      [`sed -E 's/()\\1{32767}x/Y/' a.txt`, 'sed: ' + TOO],
+      [`s=$(cat a.txt); [[ $s =~ ()\\1{3000000}x ]]`, 'bash: [[: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      const t = Date.now(); const r = run(SQ, line);
+      assert.ok(Date.now() - t < 100, `${line} took ${Date.now() - t} ms`);
+      assert.equal(r.out, want, line);
+      after(SQ);
+    }
+    // awk EREs have no back-references and counts above 255: refused as a syntax error, also at once
+    const t = Date.now(); assert.match(run(SQ, `awk '/()\\1{1000000}x/' a.txt`).out, /^awk: /); assert.ok(Date.now() - t < 100);
+    put(SQ, 'n.txt', ['aaa', '10.0.0.1', 'ababab', 'x'.repeat(100), 'hello_world'].join('\n'));
+    const want = [[`grep -cE 'a{3}' n.txt`, '1'], [`grep -cE '^[0-9]{1,3}\\.' n.txt`, '1'], [`grep -cE '^(ab){2,5}$' n.txt`, '1'],
+      [`grep -cE 'x{100}' n.txt`, '1'], [`grep -cE '^\\w{1,20}$' n.txt`, '3'], [`grep -E '^([0-9]{1,3}\\.){3}[0-9]{1,3}$' n.txt`, '10.0.0.1'],
+      [`grep -cE '()\\1{3}a' n.txt`, '2']];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+  });
+  it('command not found: no slow suggestion for a huge word, short typos still get one', () => {
+    const SQ = loadShell();
+    put(SQ, 'w.txt', 'q'.repeat(100000));
+    const t = Date.now(); const r = run(SQ, '$(cat w.txt)');
+    assert.ok(Date.now() - t < 100, `took ${Date.now() - t} ms`);
+    assert.match(r.out, /command not found/);
+    assert.doesNotMatch(r.out, /Did you mean/);
+    assert.match(run(SQ, 'gerp x w.txt').out, /Did you mean: grep\?/);
+    assert.match(run(SQ, 'hlep').out, /Did you mean: /);
+  });
   it('learner patterns with several wildcards still run on ordinary lines', () => {
     const SQ = loadShell();
     // Each must run on ordinary text lines: the first eight at 200 characters, the last two at 80. On adversarial lines (the pattern's own characters

@@ -129,7 +129,7 @@ function reShapeRisky(src){
    W_CNT per pass of a counted quantifier like {2,5}, and W_UNROLL times the work of a counted group costed pass by pass. RE_CHUNK units are one step of
    the step budget (20,000 steps: about 1e9 units, under a second of the worst cumulative regex work). */
 const RE_BUDGET=4e7,RE_CHUNK=5e4,RE_EXP_LINE=16,RMAX=0xFFFF;
-const W_BACK=3,W_GRP=2,W_CAP=8,W_PASS=8,W_PASSCAP=60,W_CNT=8,W_UNROLL=8;
+const W_BACK=3,W_GRP=2,W_CAP=8,W_PASS=8,W_PASSCAP=60,W_CNT=8,W_UNROLL=8,RE_EMPTY_COUNT=1000;
 const rsNorm=a=>{a=a.slice().sort((x,y)=>x[0]-y[0]);const o=[];for(const r of a){const l=o[o.length-1];if(l&&r[0]<=l[1]+1){if(r[1]>l[1])l[1]=r[1]}else o.push([r[0],r[1]])}return o};
 const rsInv=a=>{const o=[];let lo=0;for(const [x,y] of a){if(y<0)continue;const xx=Math.max(x,0);if(xx>lo)o.push([lo,xx-1]);lo=Math.max(lo,y+1)}if(lo<=RMAX)o.push([lo,RMAX]);return o};
 const rsMeets=(a,b)=>{let i=0,j=0;while(i<a.length&&j<b.length){if(a[i][1]<b[j][0])i++;else if(b[j][1]<a[i][0])j++;else return true}return false};
@@ -179,7 +179,7 @@ function reParse(src,fl){let i=0;
       if(src[i]==='?'){if(src[i+1]===':')i+=2;else if(src[i+1]==='='||src[i+1]==='!'){t='look';i+=2}
         else if(src[i+1]==='<'&&(src[i+2]==='='||src[i+2]==='!')){t='look';behind=true;i+=3}
         else{const k=src.indexOf('>',i);i=k<0?src.length:k+1}}
-      let b=alt();i++;const n={t,cap,behind,ml:maxLen(b),ovl:ovl(b)||b.some(s=>s.some(x=>x.t==='grp'&&x.ovl))};n.inner=b.some(s=>s.some(x=>x.q||x.inner));n.b=behind?rev(b):b;return n}
+      let b=alt();i++;const n={t,cap,behind,ml:maxLen(b),mn:minLen(b),ovl:ovl(b)||b.some(s=>s.some(x=>x.t==='grp'&&x.ovl))};n.inner=b.some(s=>s.some(x=>x.q||x.inner));n.b=behind?rev(b):b;return n}
     if(c==='[')return {t:'set',s:cls()};
     if(c==='.')return {t:'set',s:fl.s?R_ALL:rsInv(R_NL)};
     if(c==='^')return {t:'bol'};
@@ -188,6 +188,8 @@ function reParse(src,fl){let i=0;
       if(src[i]==='k'&&src[i+1]==='<'){const k=src.indexOf('>',i);i=k<0?src.length:k+1;return {t:'ref'}}
       const a=esc(false);if(a===null){while(/[0-9]/.test(src[i]||''))i++;return {t:'ref'}}return {t:'set',s:fold(a)}}
     const k=src.charCodeAt(i-1);return {t:'set',s:fold([[k,k]])}};
+  const minLen=bs=>{let best=Infinity;for(const s of bs){let t=0;for(const x of s){const r=x.q?x.q.min:1;
+      t+=x.t==='set'?r:x.t==='grp'?x.mn*r:0}best=Math.min(best,t)}return best===Infinity?0:best};
   const maxLen=bs=>{let best=0;for(const s of bs){let t=0;for(const x of s){const r=x.q?x.q.max:1;
       t+=x.t==='set'?r:x.t==='grp'?x.ml*r:x.t==='ref'?Infinity:0}best=Math.max(best,t)}return best};
   return alt()}
@@ -233,6 +235,9 @@ function reCost(m,n,nlFree,cnt,all){let wmax=1;
     if(!rsMeets(A,K.F))return {F,sure:false,end,f:pAdd(pAdd(mand,pMul(L,pAddC(w,W_BACK))),K.f),s:K.s};
     const x=pAdd(pAdd(mand,pMul(L,pAddC(w,W_BACK+lit.length))),T(K.f,L,lit));return {F,sure:false,end,f:x,s:pAdd(x,K.s)}};
   const item=(it,K)=>{const q=it.q;if(q&&q.max===0)return K;
+    /* a counted atom that can match empty (a back-reference, a lookaround, a group whose shortest match is 0) makes every one of its q.min passes
+       even when nothing is consumed, so ()\1{1000000}x costs n x 1,000,000 (and deep counts overflow V8's stack): refused above RE_EMPTY_COUNT */
+    if(q&&q.min>RE_EMPTY_COUNT&&(it.t==='ref'||it.t==='look'||(it.t==='grp'&&it.mn===0)))return K_INF;
     switch(it.t){
       case 'set':return q?rep(it.s,[1],q,K,true):{F:it.s,sure:false,f:pAddC(K.f,1),s:K.s,lit:[it.s].concat((K.lit||[]).slice(0,7))};
       case 'ref':return q?rep(R_ANY,[1,1],q,K):{F:R_ANY,sure:false,f:pAdd(K.f,[1,1]),s:pAdd(K.s,[1,1])};
