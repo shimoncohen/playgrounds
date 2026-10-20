@@ -83,7 +83,7 @@ describe('expert chapters 16 and 17: shape', () => {
     assert.equal(rep.tests[3].expectErr, 'report.sh: cannot read ghost.csv');
     assert.equal(rep.tests[3].expectCode, 1);
     assert.deepEqual(JSON.parse(JSON.stringify(fan.tests.map((t) => [t.args, t.expectOut, t.expectClock ?? null, t.expectCode ?? 0]))),
-      [[['3', '1', '2'], '1 done\n2 done\n3 done', 3, 0], [[], '', null, 1], [['1'], '1 done', 1, 0]]);
+      [[['3', '1', '2'], '1 done\n2 done\n3 done', 3, 0], [[], '', null, 1], [['1'], '1 done', 1, 0], [['1', '3'], '1 done\n3 done', 3, 0]]);
     assert.equal(fan.tests[1].expectErr, 'usage: fanout.sh SECONDS...');
   });
   it('the answers are the ones the plan names', () => {
@@ -175,6 +175,9 @@ describe('expert chapters 16 and 17: world seeding', () => {
 
 describe('chapter 16 (awk & sed craft) checks', () => {
   it('16.1 First column', () => {
+    // fix round 1: awk must do the field work ($1 in its program), not act as cat
+    no(A16, 0, "awk '{print}' village/logs/access.log | cut -d' ' -f1");
+    no(A16, 0, "awk 1 village/logs/access.log | cut -d' ' -f1");
     yes(A16, 0, "awk '{print $1}' village/logs/access.log");
     yes(A16, 0, "awk '{ print $1 }' < village/logs/access.log");
     yes(A16, 0, "cat village/logs/access.log | awk '{print $1}'");
@@ -186,6 +189,9 @@ describe('chapter 16 (awk & sed craft) checks', () => {
     no(A16, 0, 'echo 10.0.0.5');
   });
   it('16.2 Pick a separator', () => {
+    no(A16, 1, "awk -F, '{print}' village/sales.csv | cut -d, -f1");
+    no(A16, 1, "awk -F x '{print}' village/sales.csv | cut -d, -f1");
+    yes(A16, 1, "awk -v FS=, '{print $1}' village/sales.csv");
     yes(A16, 1, "awk -F, '{print $1}' village/sales.csv");
     yes(A16, 1, "awk -F ',' '{print $1}' village/sales.csv");
     yes(A16, 1, "awk -F',' '{ print $1 }' < village/sales.csv");
@@ -208,6 +214,11 @@ describe('chapter 16 (awk & sed craft) checks', () => {
     no(A16, 2, 'echo apple; echo bread');
   });
   it('16.4 Add it up', () => {
+    // fix round 1: the requirements hold across every awk of the line, and the total must not be typed in
+    yes(A16, 3, "awk -F, '{print $2*$3}' village/sales.csv | awk '{s+=$1} END {print s}'");
+    no(A16, 3, "awk -F, '{x=$2;y=$3} END {print 274}' village/sales.csv");
+    no(A16, 3, "awk -F, '{print $2, $3}' village/sales.csv | awk 'END {print 274}'");
+    no(A16, 3, "awk -F, '{print $2*$3}' village/sales.csv | awk '{s+=$1} {print s}'");
     yes(A16, 3, "awk -F, '{s += $2 * $3} END {print s}' village/sales.csv");
     yes(A16, 3, "awk -F, '{s += $3 * $2} END {print s}' village/sales.csv");
     yes(A16, 3, "awk -F, 'BEGIN {s = 0} {s = s + $2 * $3} END {printf \"%d\\n\", s}' village/sales.csv");
@@ -218,6 +229,10 @@ describe('chapter 16 (awk & sed craft) checks', () => {
     no(A16, 3, "awk 'END {print 274}' village/sales.csv");
   });
   it('16.5 Count with an array (any order)', () => {
+    // fix round 1: a dummy array with the counts typed in fails; a for-in over the array is required
+    no(A16, 4, "awk '{x[1]=1} END {print \"200 7\"; print \"404 3\"; print \"500 2\"}' village/logs/access.log");
+    no(A16, 4, "awk '{c[$4]++} END {print \"200\", c[200]; print \"404\", c[404]; print \"500\", c[500]}' village/logs/access.log");
+    yes(A16, 4, "awk '{c[$4]++} END {for (k in c) print k \" \" c[k]}' village/logs/access.log");
     yes(A16, 4, "awk '{c[$4]++} END {for (k in c) print k, c[k]}' village/logs/access.log");
     yes(A16, 4, "awk '{c[$4]++} END {for (k in c) print k, c[k]}' village/logs/access.log | sort -r");
     yes(A16, 4, "awk '{n[$NF]++} END {for (s in n) print s, n[s]}' village/logs/access.log");
@@ -256,14 +271,14 @@ describe('chapter 16 (awk & sed craft) checks', () => {
   it('16.7 Script: report (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(A16, 6);
     assert.equal(ok(m.answer), true);
-    assert.equal(ok('#!/bin/bash\n[ -r "$1" ] || { echo "report.sh: cannot read $1" >&2; exit 1; }\nawk -F, \'NR == 1 && $2 !~ /^[0-9]/ {next} {printf "%-8s %7.2f\\n", $1, $2 * $3}\' "$1"\n'), true, 'next on a header row');
+    assert.equal(ok('#!/bin/bash\n[ -r "$1" ] || { echo "report.sh: cannot read $1" >&2; exit 1; }\nawk -F, \'NR > 1 || $2 ~ /^[0-9]/ {printf "%-8s %7.2f\\n", $1, $2 * $3}\' "$1"\n'), true, 'NR > 1 || a number on line 1');
     assert.equal(ok('#!/bin/bash\nif [ ! -f "$1" ]; then\n  echo "report.sh: cannot read $1" 1>&2\n  exit 1\nfi\nawk -F, \'$2 ~ /^[0-9]/ {printf "%-8s %7.2f\\n", $1, $2*$3}\' < "$1"\n'), true, '-f, every row with a number, stdin');
     assert.equal(ok(m.starter), false);
     for (const w of m.wrong) assert.equal(ok(w), false, w);
     assert.equal(ok("#!/bin/bash\nprintf 'apple      24.00\\nbread      90.00\\nrope       48.00\\ntorch      72.00\\nmap        40.00\\n'\n"), false, 'hardcoded');
-    assert.equal(ok(m.answer.replace("NR > 1 || $2 ~ /^[0-9]/ ", 'NR > 1 ')), false, 'NR > 1 drops the first row');
-    assert.ok(why(m.answer.replace("NR > 1 || $2 ~ /^[0-9]/ ", 'NR > 1 ')).startsWith('Test 1 (the sales file) failed: expected "apple      24.00\\nbread'));
-    assert.ok(why(m.answer.replace("NR > 1 || $2 ~ /^[0-9]/ ", '')).startsWith('Test 3 (a file with a header row) failed: expected "lamp       15.00\\noil        12.50", got "name        0.00'));
+    assert.equal(ok(m.answer.replace("NR == 1 && $2 !~ /^[0-9]/ {next} ", 'NR > 1 ')), false, 'NR > 1 drops the first row');
+    assert.ok(why(m.answer.replace("NR == 1 && $2 !~ /^[0-9]/ {next} ", 'NR > 1 ')).startsWith('Test 1 (the sales file) failed: expected "apple      24.00\\nbread'));
+    assert.ok(why(m.answer.replace("NR == 1 && $2 !~ /^[0-9]/ {next} ", '')).startsWith('Test 3 (a file with a header row) failed: expected "lamp       15.00\\noil        12.50", got "name        0.00'));
     assert.equal(why(m.answer.replace(' >&2', '')), 'Test 4 (a missing file) failed: expected "", got "report.sh: cannot read ghost.csv"');
     // through the terminal
     put(SQ, m, m.answer);
@@ -307,6 +322,10 @@ describe('chapter 17 (Processes & jobs) checks', () => {
     assert.equal(r.c.out(), '');
   });
   it('17.3 List the jobs (the job from 17.2, or both on one line for a jump-in)', () => {
+    // fix round 1: the (sleep 30) & job that 17.2 accepts is listed as Running (sleep 30) &
+    yes(P17, 2, '(sleep 30) &', 'jobs');
+    yes(P17, 2, '{ sleep 30; } &', 'jobs');
+    no(P17, 2, '(echo hi) &', 'jobs');
     yes(P17, 2, 'sleep 30 &', 'jobs');
     yes(P17, 2, 'sleep 30 & jobs');
     yes(P17, 2, 'sleep 30 &', 'jobs -l');
@@ -328,11 +347,22 @@ describe('chapter 17 (Processes & jobs) checks', () => {
     no(P17, 3, 'sleep 1 & wait');
     no(P17, 3, 'wait');
     no(P17, 3, 'sleep 5 & sleep 30 & wait %1'); // a job is left running
-    // on two lines the wait line itself moves the clock only 4 seconds: the goal asks for one line
-    no(P17, 3, 'sleep 5 &', 'wait');
+    // on two lines the first line's 1-second cost leaves 4 seconds to wait: a waited 5-second job still counts
+    yes(P17, 3, 'sleep 5 &', 'wait');
+    yes(P17, 3, 'sleep 5 &', 'wait %1');
+    yes(P17, 3, '(sleep 5) & wait');
+    no(P17, 3, 'sleep 5 &', 'sleep 9', 'wait'); // nothing left to wait for
+    no(P17, 3, 'sleep 2 &', 'wait');
     no(P17, 3, "bash -c 'sleep 5 & wait'");
   });
   it('17.5 Kill it', () => {
+    // fix round 1: other job specs
+    yes(P17, 4, 'sleep 100 & kill %%');
+    yes(P17, 4, 'sleep 100 & kill %+');
+    yes(P17, 4, 'sleep 100 & kill %sleep');
+    yes(P17, 4, 'sleep 100 & kill -s TERM %1');
+    no(P17, 4, 'sleep 100 & kill %2');
+    no(P17, 4, 'kill %%');
     yes(P17, 4, 'sleep 100 & kill %1');
     yes(P17, 4, 'sleep 100 & kill $!');
     yes(P17, 4, 'sleep 100 &', 'kill %1');
@@ -364,6 +394,21 @@ describe('chapter 17 (Processes & jobs) checks', () => {
   });
   it('17.7 Script: fan out (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(P17, 6);
+    // fix round 1: output alone is not enough (a check asks for & and wait), and wait %1 fails on the 1 3 case
+    assert.equal(typeof m.check, 'function');
+    const noJobs = '#!/bin/bash\nif [ "$#" -eq 0 ]; then\n  echo "usage: fanout.sh SECONDS..." >&2\n  exit 1\nfi\nmax=0\nfor n in "$@"; do [ "$n" -gt "$max" ] && max=$n; done\nsleep "$max"\nfor n in $(printf "%s\\n" "$@" | sort -n); do echo "$n done"; done\n';
+    put(SQ, m, noJobs);
+    assert.equal(SQ.ctxFor('').scriptPasses(m).ok, true, 'the cases alone pass the no-jobs script');
+    assert.equal(ok(noJobs), false, 'no background job');
+    put(SQ, m, noJobs);
+    const v = SQ.missionVerdict(m, SQ.ctxFor(''), true);
+    assert.equal(v.good, false);
+    assert.match(SQ.scriptFailLine(m, v.failed), /background job \(&\) for every argument and wait/);
+    assert.equal(ok(noJobs.replace('sleep "$max"', 'sleep "$max" &\nwait # & and wait, but no fan-out')), true, 'contrived: a single job plus wait passes (accepted)');
+    assert.equal(ok(m.answer.replace('done\nwait\n', 'done\nwait %1\n')), false, 'wait %1 only');
+    assert.equal(why(m.answer.replace('done\nwait\n', 'done\nwait %1\n')), 'Test 4 (1 3) failed: expected "1 done\\n3 done", got "1 done"');
+    assert.equal(ok(m.answer.replace(/\nwait\n$/, '\n# wait\n')), false, 'wait only in a comment');
+    assert.equal(ok('#!/bin/bash\n[ "$#" -gt 0 ] || { echo "usage: fanout.sh SECONDS..." >&2; exit 1; }\nfor n; do sleep "$n" && echo "$n done" & done\nwait\n'), true, 'an and-list in the background');
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\n[ "$#" -gt 0 ] || { echo "usage: fanout.sh SECONDS..." >&2; exit 1; }\nwhile [ "$#" -gt 0 ]; do\n  (sleep "$1"; echo "$1 done") &\n  shift\ndone\nwait\n'), true, 'a shift loop');
     assert.equal(ok('#!/bin/bash\nif [ -z "$1" ]; then echo "usage: fanout.sh SECONDS..." 1>&2; exit 1; fi\nfor n; do\n  ( sleep "$n" && echo "$n done" ) &\ndone\nwait\n'), true, 'for n; && inside');
@@ -502,6 +547,16 @@ describe('expert quick-fire and guide (chapters 16 and 17)', () => {
   });
   it('awk and sed questions compare exactly (the quotes are the lesson)', () => {
     for (const q of QF) if (q[1].some((a) => /^(awk|sed)\b/.test(a))) assert.deepEqual({ ...q[3] }, { exact: true }, q[0]);
+  });
+  it('job quick-fire questions accept the common spellings (fix round 1)', () => {
+    // the same normalisation as app.js answer(): exact collapses spaces, otherwise quotes are dropped too
+    const accepts = (q, v) => { const nm = q[3] && q[3].exact ? (t) => t.trim().replace(/\s+/g, ' ') : (s) => s.trim().replace(/\s+/g, ' ').replace(/['"]/g, ''); return q[1].some((x) => nm(x) === nm(v)); };
+    const bg = QF.find((q) => q[0] === 'Run sleep 30 in the background');
+    const kill = QF.find((q) => q[0] === 'Stop job number 1');
+    for (const v of ['sleep 30 &', 'sleep 30&', ' sleep  30 & ']) assert.ok(accepts(bg, v), v);
+    for (const v of ['sleep 30', 'sleep 30 && wait', 'sleep 3 &']) assert.ok(!accepts(bg, v), v);
+    for (const v of ['kill %1', 'kill -TERM %1', 'kill -15 %1', 'kill -s TERM %1']) assert.ok(accepts(kill, v), v);
+    for (const v of ['kill %2', 'kill -s TERM %2', 'kill -9 %1', 'kill']) assert.ok(!accepts(kill, v), v);
   });
   it('has 6 guide entries per chapter, covering the new keywords', () => {
     for (const ci of EXPERT) assert.equal(SQ.content.guide.filter((g) => g.ch === ci).length, 6, `chapter ${ci}`);

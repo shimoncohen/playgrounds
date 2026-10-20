@@ -76,10 +76,10 @@ const QF=[
  ["Change 8080 to 9090 in config.ini, editing the file in place",["sed -i 's/8080/9090/' config.ini","sed -i 's/port=8080/port=9090/' config.ini","sed -i 's/8080/9090/g' config.ini"],'expert',{exact:true}],
  ["With sed, print only the lines of config.ini that contain port",["sed -n '/port/p' config.ini"],'expert',{exact:true}],
  ["List the processes running in this terminal",["ps"],'expert'],
- ["Run sleep 30 in the background",["sleep 30 &"],'expert'],
+ ["Run sleep 30 in the background",["sleep 30 &","sleep 30&"],'expert'],
  ["List this shell's background jobs",["jobs"],'expert'],
  ["Wait until every background job has finished",["wait"],'expert'],
- ["Stop job number 1",["kill %1","kill -TERM %1","kill -15 %1"],'expert'],
+ ["Stop job number 1",["kill %1","kill -TERM %1","kill -15 %1","kill -s TERM %1"],'expert'],
  ["Print the PID of the last background job",["echo $!","echo \"$!\""],'expert']
 ];
 SQ.content.quickfire.push(...QF);
