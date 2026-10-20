@@ -201,6 +201,6 @@ function parseProgram(text){
     return list}
   catch(e){if(e&&e.code===2&&!e.raw&&e.at===undefined&&/^syntax error/.test(e.message))e.at=tk()?tk().s:text.length;throw e}}
 /* the 1-based line of offset `at` in text; an offset at or past the end (unexpected end of file) reports the last line of text */
-SQ.lineOf=(text,at)=>{text=String(text);const end=text.replace(/\n+$/,'').length;at=Math.min(at,Math.max(end-1,0));let n=1;for(let i=text.indexOf('\n');i>=0&&i<at;i=text.indexOf('\n',i+1))n++;return n};
+SQ.lineOf=(text,at)=>{text=String(text);const end=SQ.trimRun(text,'\n').length;at=Math.min(at,Math.max(end-1,0));let n=1;for(let i=text.indexOf('\n');i>=0&&i<at;i=text.indexOf('\n',i+1))n++;return n};
 SQ.parseProgram=parseProgram;
 })(window.SQ=window.SQ||{});

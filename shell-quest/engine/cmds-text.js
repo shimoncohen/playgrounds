@@ -255,11 +255,11 @@ CMDS.grep=function(a,io){
     if(++compiled%100===0)SQ.step();
     let src;
     if(o.F)src=reEsc(p);
-    else{try{SQ.safeRegex(p,'');src=p}catch(e){if(e.complex)return E('grep: '+e.message,2);const m=grepBadRe(p,o.E);if(m)return E('grep: '+m,2);src=reEsc(p)}}
+    else{try{SQ.safeRegex(p,o.i?'i':'');src=p}catch(e){if(e.complex)return E('grep: '+e.message,2);const m=grepBadRe(p,o.E);if(m)return E('grep: '+m,2);src=reEsc(p)}}
     if(o.x)src='^(?:'+src+')$';else if(o.w)src='(?<![A-Za-z0-9_])(?:'+src+')(?![A-Za-z0-9_])';
     try{res.push(SQ.watchRegex(new RegExp(src,o.i?'gi':'g')))}catch(e){return E('grep: Invalid regular expression',2)}}
   let work=0;
-  const hit=ln=>{work+=res.length;if(work>=100){SQ.step();work=0}for(const r of res){SQ.reGuard(r,ln);r.lastIndex=0;if(r.test(ln))return true}return false};
+  const hit=ln=>{work+=res.length;if(work>=100){SQ.step();work=0}for(const r of res)if(SQ.reExec(r,ln))return true;return false};
   const spans=ln=>{const sp=[];let pos=0;for(const r of res)SQ.reGuard(r,ln,true);while(pos<=ln.length){let best=null;
       for(const r of res){r.lastIndex=pos;const m=r.exec(ln);if(m&&(best===null||m.index<best.index||(m.index===best.index&&m[0].length>best[0].length)))best=m}
       if(!best)break;if(best[0].length===0){pos=best.index+1;continue}sp.push([best.index,best.index+best[0].length]);pos=best.index+best[0].length}
@@ -313,10 +313,10 @@ CMDS.grep=function(a,io){
 // ---- basename / dirname ----
 CMDS.basename=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('basename',a[0][1]);
   const p=a[i];if(p===undefined)return E('basename: missing operand');if(a.length>i+2)return E(`basename: extra operand '${a[i+2]}'`);
-  const t=p.replace(/\/+$/,'');if(t==='')return ok(p.startsWith('/')?'/':'');
+  const t=SQ.trimRun(p,'/');if(t==='')return ok(p.startsWith('/')?'/':'');
   let b=t.slice(t.lastIndexOf('/')+1);const sfx=a[i+1];if(sfx&&b!==sfx&&b.endsWith(sfx))b=b.slice(0,-sfx.length);return ok(b)};
 CMDS.dirname=function(a){let i=0;if(a[0]==='--')i=1;else if(a[0]&&isOpt(a[0]))return badOpt('dirname',a[0][1]);
   if(a.length<=i)return E('dirname: missing operand');
-  return ok(a.slice(i).map(p=>{const t=p.replace(/\/+$/,'');if(t==='')return p.startsWith('/')?'/':'.';const k=t.lastIndexOf('/');if(k<0)return '.';
-    const d=t.slice(0,k).replace(/\/+$/,'');return d===''?'/':d}).join('\n'))};
+  return ok(a.slice(i).map(p=>{const t=SQ.trimRun(p,'/');if(t==='')return p.startsWith('/')?'/':'.';const k=t.lastIndexOf('/');if(k<0)return '.';
+    const d=SQ.trimRun(t.slice(0,k),'/');return d===''?'/':d}).join('\n'))};
 })(window.SQ = window.SQ || {});

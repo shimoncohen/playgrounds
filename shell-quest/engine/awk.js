@@ -140,8 +140,8 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
     if(cache.size>=CACHE_MAX)cache.clear();
     cache.set(src,re);return re}
   const reOf=(node)=>node.type==='regex'?node.re:compile(toStr(ev(node)));
-  const guard=(re,s,all)=>{try{SQ.reGuard(re,s,all)}catch(e){if(e&&e.complex)throw new AwkErr(e.message,-1);throw e}};
-  const test=(re,s)=>{guard(re,s,false);re.lastIndex=0;return re.test(s)};
+  const guard=(re,s,all,ex)=>{try{return ex?SQ.reExec(re,s):SQ.reGuard(re,s,all)}catch(e){if(e&&e.complex)throw new AwkErr(e.message,-1);throw e}};
+  const test=(re,s)=>!!guard(re,s,false,true);
 
   /* ---- values ---- */
   /* OFMT/CONVFMT: one numeric conversion (and any %%); anything else is unusable and %.6g is used instead */
@@ -183,7 +183,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
 
   /* ---- records and fields ---- */
   function splitStr(s,fs,isRe){
-    if(!isRe&&fs===' '){const t=s.replace(/^[ \t\n]+|[ \t\n]+$/g,'');return t===''?[]:t.split(/[ \t\n]+/)}
+    if(!isRe&&fs===' '){const t=SQ.trimRun(s,' \t\n',true);return t===''?[]:t.split(/[ \t\n]+/)}
     if(s==='')return [];
     if(!isRe&&fs==='')return Array.from(s);
     if(!isRe&&fs.length===1)return s.split(fs);
@@ -312,7 +312,7 @@ function awkRun(progText,inputs,o){o=o||{};inputs=inputs||[];
         const arr=getArr(a[1].name);arr.m.clear();parts.forEach((p,i)=>arr.m.set(String(i+1),mkInput(p)));return parts.length}
       case 'sub':return subst(e,false);
       case 'gsub':return subst(e,true);
-      case 'match':{const s=toStr(ev(a[0])),re=reOf(a[1]);guard(re,s,false);re.lastIndex=0;const mm=re.exec(s);
+      case 'match':{const s=toStr(ev(a[0])),re=reOf(a[1]);const mm=guard(re,s,false,true);
         if(mm){G.RSTART=mm.index+1;G.RLENGTH=mm[0].length}else{G.RSTART=0;G.RLENGTH=-1}return G.RSTART}
       case 'sprintf':{const vals=a.map(ev);return format(toStr(vals[0]),vals.slice(1),false)}
       case 'sin':return Math.sin(toNum(ev(a[0])));

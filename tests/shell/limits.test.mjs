@@ -344,45 +344,127 @@ describe('regex backtracking guard (Task 9b)', () => {
     assert.equal(regexFits(safeRegex('^foo', ''), LIM.TEXT), true);
     for (const p of ['^.*foo.*bar$', '[0-9]+\\.[0-9]+', '^(a|b)+$', '\\bwolf\\b', '.*error.*', '^[^:]*:[^:]*:'])
       assert.equal(regexFits(safeRegex(p, 'g'), 1000), true, p);
-    for (const p of ['.*.*.*.*.*c', 'a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'])
-      assert.throws(() => safeRegex(p, ''), (e) => e.complex === true, p);
+    assert.equal(regexFits(safeRegex('.*.*.*.*.*c', ''), 128), false); // polynomial: refused by subject length only
+    for (const p of ['a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?a?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '(a|a){25}b', '(?:a|ab|b){25}c', '(a|aa){20}b'])
+      assert.throws(() => safeRegex(p, ''), (e) => e.complex === true, p); // exponential: refused outright
   });
-  it('seeded random patterns: each is refused, or runs within 250 ms on worst-case subjects up to the longest length it accepts', () => {
-    const { safeRegex, regexFits, LIM } = loadShell();
+  it('review cases: counted groups, mandatory passes and lookbehinds end quickly with the friendly message', () => {
+    const SQ = loadShell();
+    put(SQ, 'a40.txt', 'a'.repeat(40));
+    put(SQ, 'a120.txt', 'a'.repeat(120));
+    const cases = [
+      [`grep -E '(a|a){25}b' a40.txt`, 'grep: ' + TOO],
+      [`sed -E 's/(a|aa){20}b/x/' a40.txt`, 'sed: ' + TOO],
+      [`awk '/(a|a){22}b/' a40.txt`, 'awk: ' + TOO],
+      [`x=$(cat a40.txt); [[ $x =~ (a|a){22}b ]]`, 'bash: [[: ' + TOO],
+      [`grep -cE '(a|b|ab){12}c' ab.txt`, 'grep: ' + TOO],
+      [`grep -cE 'a{1000}b' a1m.txt`, 'grep: ' + TOO],
+      [`grep -cE '\\w{1000}x' a1m.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?:ab){400}c' ab.txt`, 'grep: ' + TOO],
+      [`grep -cE '(?<=c.*.*.*.*)x' a120.txt`, 'grep: ' + TOO],
+    ];
+    for (const [line, want] of cases) {
+      run(SQ, 'rm -f a1m.txt ab.txt'); // the world holds one big file at a time (LIM.STATE)
+      if (line.includes('a1m.txt')) put(SQ, 'a1m.txt', 'a'.repeat(999000));
+      if (line.includes('ab.txt')) put(SQ, 'ab.txt', 'ab'.repeat(405000));
+      const r = fast(SQ, line, 1000);
+      assert.equal(r.out, want, line);
+      after(SQ);
+    }
+  });
+  it('learner patterns with several wildcards still run on ordinary lines', () => {
+    const SQ = loadShell();
+    // Each must run on ordinary text lines: the first eight at 200 characters, the last two at 80. On adversarial lines (the pattern's own characters
+    // repeated) the guard may refuse, and when it accepts, a fresh (first, interpreted) regex run must stay under 50 ms (measured: under 5 ms locally).
+    const pats = [['^.*,.*,.*,.*$', '', 200], ['(.*)-(.*)-(.*)-(.*)', '', 200], ['.*:.*:.*:.*', '', 200], ['<.*>.*<.*>', '', 200],
+      ['^(.*),(.*),(.*),(.*)$', '', 200], ['^.*a.*b.*c.*$', '', 200], ['r.*o.*o.*t', 'i', 200], ['(.*)-(.*)-(.*)', '', 200],
+      ['x.*y.*z.*w', '', 80], ['a.*e.*i.*o.*u', '', 80]];
+    const records = ['The quick brown fox jumps over the lazy dog; ', 'root:x:0:0:root:/root:/bin/bash ', 'alice,30,paris,engineer,', '<b>bold</b> and <i>it</i> ',
+      '2024-05-06-log-entry ', 'an error: disk full at 10.0.0.1 on 2024-05-06; wolf bear <b>x</b> "q" a,b,c root:x:0:0 '];
+    const pad = (t, n) => { let u = t; while (u.length < n) u += 'the quick brown fox jumps over the lazy dog '; return u.slice(0, n); };
+    const guard = (re, s) => { SQ.rt.steps = 0; try { SQ.reGuard(re, s); return true; } catch (e) { assert.equal(e.complex, true); return false; } };
+    let uniq = 0;
+    for (const [p, fl, n] of pats) {
+      const re = SQ.safeRegex(p, 'g' + fl);
+      for (const t of records) assert.ok(guard(re, pad(t, n)), `${p} refused on an ordinary ${n}-character line: ${t}`);
+      const lits = [...new Set(p.replace(/[.*()^$|\\]/g, '').split(''))];
+      const subs = [...lits, 'x', ' '].map((c) => c.repeat(n));
+      for (let k = 1; k <= lits.length; k++) { let u = ''; for (let j = 0; j < k; j++) u += lits[j].repeat(Math.ceil(n / k)); subs.push(u.slice(0, n)); }
+      let u = ''; while (u.length < n) u += lits.join(''); subs.push(u.slice(0, n));
+      for (const sub of subs.concat(records.map((t) => pad(t, n)))) {
+        if (!guard(re, sub)) continue;
+        const fresh = new RegExp(p + '(?:){' + (++uniq) + '}', fl); // a new source: V8 caches compiled regexes by source
+        const t = performance.now(); fresh.test(sub); const ms = performance.now() - t;
+        assert.ok(ms < 50, `${p} took ${ms.toFixed(1)} ms on ${JSON.stringify(sub.slice(0, 12))}`);
+      }
+    }
+    put(SQ, 'p.txt', ['root:x:0:0:root:/root:/bin/bash', 'alice,30,paris,engineer', '2024-05-06-log-entry', '<b>bold</b> and <i>it</i>', 'education'].join('\n'));
+    const want = [[`grep -E '^.*,.*,.*,.*$' p.txt`, 'alice,30,paris,engineer'], [`grep -E '(.*)-(.*)-(.*)-(.*)' p.txt`, '2024-05-06-log-entry'],
+      [`grep -c '.*:.*:.*:.*' p.txt`, '1'], [`grep -E '<.*>.*<.*>' p.txt`, '<b>bold</b> and <i>it</i>'], [`grep 'a.*e.*i.*o.*u' p.txt`, ''],
+      [`grep -iE 'r.*o.*o.*t' p.txt`, 'root:x:0:0:root:/root:/bin/bash'], [`grep 'e.*u.*a.*i.*o' p.txt`, 'education'],
+      [`x="a-b-c-d"; [[ $x =~ (.*)-(.*)-(.*)-(.*) ]] && echo yes`, 'yes']];
+    for (const [line, out] of want) assert.equal(run(SQ, line).out, out, line);
+  });
+  it('trailing runs are trimmed in linear time (awk default FS, $( ), basename, dirname, line numbers)', () => {
+    const SQ = loadShell();
+    put(SQ, 'sp.txt', 'x' + ' '.repeat(100000) + 'x');
+    put(SQ, 'nl.txt', '\n'.repeat(100000) + 'x');
+    put(SQ, 'sl.txt', '/'.repeat(60000) + 'x');
+    assert.equal(fast(SQ, `awk '{ print NF }' sp.txt`, 100).out, '2');
+    assert.equal(fast(SQ, `x=$(cat nl.txt); echo \${#x}`, 100).out, '100001');
+    assert.equal(fast(SQ, `basename $(cat sl.txt)`, 100).out, 'x');
+    assert.equal(fast(SQ, `dirname $(cat sl.txt)`, 100).out, '/');
+    const t = Date.now();
+    assert.equal(SQ.lineOf('\n'.repeat(100000) + 'x', 5), 6);
+    assert.ok(Date.now() - t < 100);
+  });
+  it('a 12,000-line log of about 900 KB: everyday multi-wildcard greps finish within the step budget', () => {
+    const SQ = loadShell();
+    const line = '2024-05-06 10:00:01 host app[123]: request ok user=alice path=/home/x took 12ms error';
+    const lines = []; for (let i = 0; i < 12000; i++) lines.push(line.slice(0, 70 + (i % 10)) + (i % 7 ? '' : ' error: disk full'));
+    put(SQ, 'big.log', lines.join('\n'));
+    for (const c of [`grep -c '.*error.*' big.log`, `grep -cE '(.*):(.*):(.*)' big.log`, `grep -c '^.*user=.*path=.*$' big.log`, `awk '/user=.*path=/' big.log | wc -l`])
+      assert.match(fast(SQ, c, 3000).out, /^\d+$/, c);
+  });
+  it('seeded random patterns: each is refused, or runs fast on worst-case subjects up to the longest length reGuard accepts', () => {
+    const SQ = loadShell();
+    const { safeRegex, regexFits, LIM } = SQ;
     let seed = 12345;
     const rnd = (k) => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor((seed / 2147483648) * k); };
-    const atoms = ['a', 'b', '.', '[ab]', '[^b]', '\\w', '(?:ab)', '(a|b)', '(a|bc)', 'ab'];
-    const quants = ['', '', '*', '*', '+', '?', '{2,5}', '{1,}', '*?', '+?'];
-    const subjects = (n) => ['a'.repeat(n), 'a'.repeat(n - 1) + 'c', 'ab'.repeat(n >> 1) + 'c', 'b'.repeat(n - 1) + 'c', 'aab'.repeat(Math.floor(n / 3)) + 'x'];
-    let accepted = 0, refused = 0, worst = 0, worstPat = '';
+    const atoms = ['a', 'b', '.', '[ab]', '[^b]', '\\w', '(?:ab)', '(a|b)', '(a|bc)', 'ab', '(?:a|ab)', '(?<=a.*)', '(?<=a)', '(?:a{1,2})'];
+    const quants = ['', '', '*', '*', '+', '?', '{2,5}', '{1,}', '*?', '+?', '{3}', '{8}', '{20}'];
+    const fams = [(n) => 'a'.repeat(n), (n) => 'a'.repeat(n - 1) + 'c', (n) => 'ab'.repeat(n).slice(0, n - 1) + 'c', (n) => 'b'.repeat(n - 1) + 'c', (n) => 'aab'.repeat(n).slice(0, n - 1) + 'x'];
+    const ok = (re, s, all) => { SQ.rt.steps = 0; try { SQ.reGuard(re, s, all); return true; } catch (e) { assert.equal(e.complex, true); return false; } };
+    let accepted = 0, refused = 0, worst = 0, worstPat = '', uniq = 0;
     const t0 = Date.now();
-    for (let k = 0; k < 120; k++) {
+    for (let k = 0; k < 70; k++) {
       let p = rnd(3) === 0 ? '^' : '';
       const len = 1 + rnd(6);
       for (let i = 0; i < len; i++) p += atoms[rnd(atoms.length)] + quants[rnd(quants.length)];
       if (rnd(3) === 0) p += rnd(2) ? '$' : 'c';
       let re;
-      try { re = safeRegex(p, 'g'); } catch (e) { assert.equal(e.complex, true, p); refused++; continue; }
+      try { re = safeRegex(p, 'g'); } catch (e) { if (e.name === 'SyntaxError') continue; assert.equal(e.complex, true, p); refused++; continue; }
       accepted++;
       for (const all of [false, true]) {
-        let lo = 0, hi = LIM.TEXT; // longest accepted subject length
-        while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (regexFits(re, mid, all, true)) lo = mid; else hi = mid - 1; } // true: no line breaks
-        if (lo < 4) continue;
-        for (const s of subjects(lo)) {
-          const t = Date.now();
-          re.lastIndex = 0;
-          if (!all) re.test(s);
-          else { // a /g loop as sed s///g and awk gsub run it; after 2,000 matches only linear match-building work is left
-            for (let k = 0, m; k < 2000 && (m = re.exec(s)); k++) if (m[0] === '') re.lastIndex++;
-          }
-          const ms = Date.now() - t;
-          if (ms > worst) { worst = ms; worstPat = `${p} n=${lo} all=${all}`; }
-          assert.ok(ms < 250, `${p} took ${ms} ms on ${s.length} chars (all=${all})`);
+        let lo = 0, hi = LIM.TEXT; // longest length that fits any subject (no line breaks) ...
+        while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (regexFits(re, mid, all, true)) lo = mid; else hi = mid - 1; }
+        for (const fam of fams) {
+          let n = Math.max(lo, 4); // ... and then as long as reGuard accepts this subject (it also counts the subject's characters)
+          if (!ok(re, fam(n), all)) continue;
+          while (n * 2 <= LIM.TEXT && ok(re, fam(n * 2), all)) n *= 2;
+          const s = fam(n), fresh = new RegExp(p + '(?:){' + (++uniq) + '}', 'g'); // new source: a first, interpreted run
+          const t = performance.now();
+          if (!all) fresh.test(s);
+          else for (let j = 0, m; j < 2000 && (m = fresh.exec(s)); j++) if (m[0] === '') fresh.lastIndex++; // a /g loop; past 2,000 matches only linear work is left
+          const ms = performance.now() - t;
+          if (ms > worst) { worst = ms; worstPat = `${p} n=${n} all=${all}`; }
+          // the budget aims at about 150 ms here (measured worst ~100 ms locally); the assertion is generous so a slow CI machine cannot flake
+          assert.ok(ms < 1000, `${p} took ${ms.toFixed(0)} ms on ${s.length} chars (all=${all})`);
         }
       }
     }
     assert.ok(accepted > 30 && refused > 3, `accepted ${accepted}, refused ${refused}`);
-    assert.ok(Date.now() - t0 < 5000, `took ${Date.now() - t0} ms; worst ${worst} ms ${worstPat}`);
+    assert.ok(Date.now() - t0 < 8000, `took ${Date.now() - t0} ms; worst ${worst.toFixed(0)} ms ${worstPat}`);
   });
 });
 

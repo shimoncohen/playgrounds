@@ -119,7 +119,7 @@ function floatBody(conv, abs, prec, alt) {
   if (X >= -4 && X < P) s = fixedStr(abs, P - 1 - X); else s = expStr(abs, P - 1, alt);
   if (!alt) { // %g drops trailing zeros (and a bare point) unless '#'
     const k = s.indexOf('e'); let mant = k < 0 ? s : s.slice(0, k); const rest = k < 0 ? '' : s.slice(k);
-    if (mant.includes('.')) mant = mant.replace(/0+$/, '').replace(/\.$/, '');
+    if (mant.includes('.')) mant = SQ.trimRun(mant, '0').replace(/\.$/, '');
     s = mant + rest;
   }
   return s;

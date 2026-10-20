@@ -82,15 +82,19 @@ const fatalText=e=>e&&e.stop?e.message:isOverflow(e)?'bash: '+NEST_DEEP:isRange(
    1. Shape (exponential backtracking): a group that is repeated (* + {n,} {n,m}) must not contain a quantifier (* + ? {..}) at any depth, and must not
       contain an alternation, with one exception: a flat group of plain literal alternatives whose first characters all differ, like (a|b)+ or (cat|dog)*,
       is safe because only one alternative can match at each position. Patterns over LIM.PATTERN characters are refused too.
-   2. Cost (polynomial backtracking, see reModel below): JS tries every start position and, at each, every way to share the text between quantifiers that
-      can match the same characters, so .*.*.*c costs about n^4 on n characters and even a*b is n^2. reModel walks the pattern right to left and bounds
-      the work of one match on a subject of length n: an unbounded quantifier whose characters can also begin what follows it multiplies the work of what
-      follows by n (it gives back one character at a time and retries); when they cannot overlap (like [^:]*: or [0-9]+\.) the retries fail at once
-      and only add n; when what follows always succeeds (a trailing .*, or .*$ on a line without line breaks) it adds nothing; and a literal such as
-      error that cannot overlap itself lets only n/5 positions get past it. A pattern is refused when this bound passes RE_BUDGET (about 50 ms in a
-      fresh browser regex, measured) for an 80-character line, and SQ.reGuard(re, subject) refuses a subject too long for it: an everyday ^.*foo.*bar$
-      or .*error.* fits lines of about 2,000 to 3,000 characters, a*b about 3,800, \bwolf\b, ^[^:]*: and plain words fit any. reGuard also charges the
-      work to the step budget (one step per RE_CHUNK), so many lines that each fit cannot add up to a freeze. Invalid patterns still throw SyntaxError. */
+   2. Cost (polynomial backtracking, see "regex cost model" below): JS tries every start position and, at each, every way to share the text between
+      quantifiers that can match the same characters, so .*.*.*c costs about n^4/24 on n characters and even a*b is n^2/2. The model walks the pattern
+      right to left and bounds the work of one match as a polynomial in the characters left: an unbounded quantifier whose characters can also begin
+      what follows it adds what follows once per give-back point (summed over the shrinking rest, which gives the n^k/k! of ordered splits); when they
+      cannot overlap (like [^:]*: or [0-9]+\.) the retries fail at once and only add n; when what follows always succeeds (a trailing .*, or .*$ on a
+      line without line breaks) it adds nothing; a literal that cannot overlap itself (error) or a character the subject holds only k times (the : of
+      .*:.*:.*) lets only that many give-back points pay for what follows. Mandatory passes ({1000}), counted groups whose passes vary (costed pass by
+      pass, so (a|a){25} is 2^25) and lookbehinds (costed right to left, as V8 runs them) are included. safeRegex refuses a pattern whose bound passes
+      RE_BUDGET already for a 16-character line (the exponential ones); SQ.reGuard(re, subject) refuses a subject too long for the pattern. RE_BUDGET
+      is calibrated so the worst accepted case of thousands of fuzzed patterns and adversarial subjects takes under about 100 ms on a fresh
+      (interpreted) V8 regex on this machine; ordinary 200-character lines fit four-wildcard patterns like (.*)-(.*)-(.*)-(.*), a*b fits about 4,500
+      characters, \bwolf\b, ^[^:]*: and plain words fit any. The work is also charged to the step budget (one step per RE_CHUNK units; a match found
+      at index i is charged i+1 attempts), so many lines that each fit cannot add up to a freeze. Invalid patterns still throw SyntaxError. */
 function reShapeRisky(src){
   if(src.length>LIM.PATTERN)return true;
   const mk=()=>({q:false,alt:false,lit:true,kids:false,firsts:[],want:true});
@@ -115,14 +119,21 @@ function reShapeRisky(src){
     atom(f,c,!/[.^$]/.test(c));i++}
   return false}
 /* ---- regex cost model ----
-   Character sets are sorted lists of [lo, hi] UTF-16 code unit ranges; -1 stands for the end of the subject. A continuation K describes what follows a
-   point in the pattern: F = the characters it can start with (ANY when a zero-width test like \b or a lookaround comes first), sure = it always matches
-   at once (only optional items and nothing else follow), f = the most work of one failing attempt, s = the extra work of one succeeding attempt beyond the
-   characters it consumes. Repeated groups hold no quantifier (rule 1), so one pass through them costs a fixed amount. */
-const RE_P=3,RE_BUDGET=6e7,RE_CHUNK=5e4,RE_LINE=80,RMAX=0xFFFF;
+   Character sets are sorted lists of [lo, hi] UTF-16 code unit ranges; -1 stands for the end of the subject. Costs are polynomials in r, the number of
+   characters left in the subject (arrays of coefficients, lowest first, all >= 0, so each is an upper bound that grows with r). A continuation K
+   describes what follows a point in the pattern: F = the characters it can start with (ANY when a zero-width test like \b or a lookaround comes first),
+   sure = it always matches at once (only optional items follow), end = it always matches at the end of the subject, f = the most work of one failing
+   attempt, s = the extra work of one succeeding attempt beyond the characters it consumes, lit = the plain characters it must start with.
+   Weights (work units, calibrated together with RE_BUDGET on first, interpreted V8 runs; a unit is roughly 0.5 ns native, 2 to 2.5 ns interpreted): W_BACK per give-back
+   point of a quantifier, W_GRP/W_CAP to enter a group (a capturing one saves and restores its capture), W_PASS/W_PASSCAP per pass of a repeated group,
+   W_CNT per pass of a counted quantifier like {2,5}, and W_UNROLL times the work of a counted group costed pass by pass. RE_CHUNK units are one step of
+   the step budget (20,000 steps: about 1e9 units, under a second of the worst cumulative regex work). */
+const RE_BUDGET=4e7,RE_CHUNK=5e4,RE_EXP_LINE=16,RMAX=0xFFFF;
+const W_BACK=3,W_GRP=2,W_CAP=8,W_PASS=8,W_PASSCAP=60,W_CNT=8,W_UNROLL=8;
 const rsNorm=a=>{a=a.slice().sort((x,y)=>x[0]-y[0]);const o=[];for(const r of a){const l=o[o.length-1];if(l&&r[0]<=l[1]+1){if(r[1]>l[1])l[1]=r[1]}else o.push([r[0],r[1]])}return o};
 const rsInv=a=>{const o=[];let lo=0;for(const [x,y] of a){if(y<0)continue;const xx=Math.max(x,0);if(xx>lo)o.push([lo,xx-1]);lo=Math.max(lo,y+1)}if(lo<=RMAX)o.push([lo,RMAX]);return o};
 const rsMeets=(a,b)=>{let i=0,j=0;while(i<a.length&&j<b.length){if(a[i][1]<b[j][0])i++;else if(b[j][1]<a[i][0])j++;else return true}return false};
+const rsHas=(a,c)=>{for(const [x,y] of a){if(c<x)return false;if(c<=y)return true}return false};
 const rsFold=a=>{const o=a.slice();for(const [x,y] of a){
     const up=[Math.max(x,65),Math.min(y,90)],lo=[Math.max(x,97),Math.min(y,122)];
     if(up[0]<=up[1])o.push([up[0]+32,up[1]+32]);if(lo[0]<=lo[1])o.push([lo[0]-32,lo[1]-32]);if(y>=128)o.push([128,RMAX])}
@@ -156,14 +167,19 @@ function reParse(src,fl){let i=0;
   const seq=()=>{const it=[];while(i<src.length&&src[i]!=='|'&&src[i]!==')'){const a=atom(),q=quant();if(q)a.q=q;it.push(a)}return it};
   const quant=()=>{const c=src[i];let q=null;
     if(c==='*')q={min:0,max:Infinity};else if(c==='+')q={min:1,max:Infinity};else if(c==='?')q={min:0,max:1};
-    else if(c==='{'){const m=/^\{(\d+)(,(\d*))?\}/.exec(src.slice(i,i+40));if(m){q={min:+m[1],max:m[2]?(m[3]===''?Infinity:+m[3]):+m[1]};i+=m[0].length-1}}
+    else if(c==='{'){const m=/^\{(\d+)(,(\d*))?\}/.exec(src.slice(i,i+40));if(m){q={min:+m[1],max:m[2]?(m[3]===''?Infinity:+m[3]):+m[1],cnt:true};i+=m[0].length-1}}
     if(!q)return null;i++;if(src[i]==='?'){i++;q.lazy=true}return q};
+  /* rev: V8 runs a lookbehind from right to left, so its body is costed reversed */
+  const rev=bs=>bs.map(s=>s.slice().reverse().map(x=>x.t==='grp'?Object.assign({},x,{b:rev(x.b)}):x));
+  /* ovl: the alternatives of a group can start alike (or one is empty or starts with a non-character), so a counted pass may try several */
+  const ovl=bs=>{if(bs.length<2)return false;const fs=[];
+    for(const s of bs){const x=s[0];if(!x||x.t!=='set'||x.q)return true;for(const f of fs)if(rsMeets(f,x.s))return true;fs.push(x.s)}return false};
   const atom=()=>{const c=src[i++];
-    if(c==='('){let t='grp';const cap=src[i]!=='?'||(src[i+1]==='<'&&src[i+2]!=='='&&src[i+2]!=='!');
+    if(c==='('){let t='grp',behind=false;const cap=src[i]!=='?'||(src[i+1]==='<'&&src[i+2]!=='='&&src[i+2]!=='!');
       if(src[i]==='?'){if(src[i+1]===':')i+=2;else if(src[i+1]==='='||src[i+1]==='!'){t='look';i+=2}
-        else if(src[i+1]==='<'&&(src[i+2]==='='||src[i+2]==='!')){t='look';i+=3}
+        else if(src[i+1]==='<'&&(src[i+2]==='='||src[i+2]==='!')){t='look';behind=true;i+=3}
         else{const k=src.indexOf('>',i);i=k<0?src.length:k+1}}
-      const b=alt();i++;const n={t,b,cap,ml:maxLen(b)};n.inner=b.some(s=>s.some(x=>x.q||x.inner));return n}
+      let b=alt();i++;const n={t,cap,behind,ml:maxLen(b),ovl:ovl(b)||b.some(s=>s.some(x=>x.t==='grp'&&x.ovl))};n.inner=b.some(s=>s.some(x=>x.q||x.inner));n.b=behind?rev(b):b;return n}
     if(c==='[')return {t:'set',s:cls()};
     if(c==='.')return {t:'set',s:fl.s?R_ALL:rsInv(R_NL)};
     if(c==='^')return {t:'bol'};
@@ -175,67 +191,122 @@ function reParse(src,fl){let i=0;
   const maxLen=bs=>{let best=0;for(const s of bs){let t=0;for(const x of s){const r=x.q?x.q.max:1;
       t+=x.t==='set'?r:x.t==='grp'?x.ml*r:x.t==='ref'?Infinity:0}best=Math.max(best,t)}return best};
   return alt()}
-const K_SURE={F:R_ANY,sure:true,end:true,f:0,s:0},K_NONE={F:[],sure:false,f:0,s:0},K_INF={F:R_ANY,sure:false,f:Infinity,s:Infinity};
-function reCost(m,n,nlFree){
-  const alt=(bs,K)=>{if(bs.length===1)return seq(bs[0],K);let F=[],sure=false,end=false,f=0,sm=0;
-    for(const b of bs){const r=seq(b,K);F=F.concat(r.F);sure=sure||r.sure;end=end||!!r.end;f+=r.f;sm=Math.max(sm,r.s)}return {F:rsNorm(F),sure,end,f,s:f+sm}};
+/* polynomials in r */
+const BINOM=[[1]];for(let k=1;k<48;k++){const p=BINOM[k-1],o=[1];for(let j=1;j<k;j++)o.push(p[j-1]+p[j]);o.push(1);BINOM.push(o)}
+const PINF=[Infinity];
+const pClean=a=>a.length>44||a.some(x=>x===Infinity||x!==x)?PINF:a;
+const pAdd=(a,b)=>{const o=[];for(let i=0;i<Math.max(a.length,b.length);i++)o.push((a[i]||0)+(b[i]||0));return pClean(o)};
+const pAddC=(a,c)=>pAdd(a,[c]);
+const pMax=(a,b)=>{const o=[];for(let i=0;i<Math.max(a.length,b.length);i++)o.push(Math.max(a[i]||0,b[i]||0));return pClean(o)};
+const pMul=(a,b)=>{if(a===PINF||b===PINF)return PINF;const o=new Array(a.length+b.length-1).fill(0);
+  for(let i=0;i<a.length;i++)if(a[i])for(let j=0;j<b.length;j++)if(b[j])o[i+j]+=a[i]*b[j];return pClean(o)};
+/* pSum(a)(r) >= a(0)+a(1)+...+a(r): sum of j^k for j <= r is at most (r+1)^(k+1)/(k+1) */
+const pSum=a=>{if(a===PINF)return PINF;const o=new Array(a.length+1).fill(0);
+  for(let k=0;k<a.length;k++)if(a[k])for(let j=0;j<=k+1;j++)o[j]+=a[k]*BINOM[k+1][j]/(k+1);return pClean(o)};
+const pEv=(a,n)=>{if(a===PINF)return Infinity;let v=0;for(let i=a.length-1;i>=0;i--)v=v*n+a[i];return v};
+const K_SURE={F:R_ANY,sure:true,end:true,f:[0],s:[0]},K_NONE={F:[],sure:false,f:[0],s:[0]},K_INF={F:R_ANY,sure:false,f:PINF,s:PINF};
+/* reCost(m, n, nlFree, cnt) -> the bound on the work of matching a subject of n characters. nlFree: the subject has no line break. cnt(set): how many
+   characters of the subject are in set (only when the subject is known). */
+function reCost(m,n,nlFree,cnt,all){let wmax=1;
+  const best=ps=>{let b=null,bv=0;for(const p of ps){const v=pEv(p,n);if(b===null||v<bv){b=p;bv=v}}return b};
+  /* lit cannot overlap a copy of itself shifted by less than period(lit), so it matches at no more than r/period+1 positions */
+  const period=lit=>{const k=lit.length;let d=1;for(;d<k;d++){let ok=true;for(let i=0;i+d<k;i++)if(!rsMeets(lit[i],lit[i+d])){ok=false;break}if(ok)break}return d};
+  /* the work of running K at each of L give-back points (L = [count] or [1,1] = r+1): only points where K's leading literal matches pay K.f */
+  const T=(Kf,L,lit)=>{const c=[pMul(L,Kf),pSum(Kf)];const k=lit.length;
+    if(k>=2){const d=period(lit);if(d>1)c.push(pMul([1,1/d],Kf))}
+    if(cnt&&k>=1)c.push(pMul([cnt(lit[0])+1],Kf));
+    return best(c)};
+  const alt=(bs,K)=>{if(bs.length===1)return seq(bs[0],K);let F=[],sure=false,end=false,f=[0],sm=[0];
+    for(const b of bs){const r=seq(b,K);F=F.concat(r.F);sure=sure||r.sure;end=end||!!r.end;f=pAdd(f,r.f);sm=pMax(sm,r.s)}
+    return {F:rsNorm(F),sure,end,f,s:pAdd(f,sm)}};
   /* covers(A): A matches every character the subject can hold (with nlFree, a subject without line breaks, . covers it all) */
   const covers=A=>!rsMeets(rsInv(A),nlFree?rsInv(R_NL):R_ALL);
   const seq=(it,K)=>{for(let k=it.length-1;k>=0;k--)K=item(it[k],K);return K};
-  /* lit: the plain characters K must start with. Where they cannot overlap a shifted copy of themselves (error, [0-9]\.), at most n/k+1 positions
-     get past them, so only those pay K's full work. occ(lit) = that number of positions. */
-  const occ=lit=>{const k=lit.length;if(k<2)return n+1;let d=1;
-    for(;d<k;d++){let ok=true;for(let i=0;i+d<k;i++)if(!rsMeets(lit[i],lit[i+d])){ok=false;break}if(ok)break}
-    return Math.floor(n/d)+1};
-  /* A repeated w-work atom (first characters A) before K: L = the number of repeat counts tried. */
-  /* end: K always matches at the end of the subject (so a greedy .* that runs to the end, then $, cannot fail after its run) */
-  const rep=(A,w,q,K,one)=>{const L=Math.max(1,Math.min(q.max,n)-q.min+1),F=q.min===0?rsNorm(A.concat(K.F)):A,end=q.min===0&&!!K.end;
-    if(K.sure)return {F,sure:q.min===0,end,f:(Math.min(q.min,n)+1)*w,s:K.s};
-    if(one&&K.end&&!q.lazy&&q.max===Infinity&&covers(A))return {F,sure:false,end,f:(Math.min(q.min,n)+1)*w,s:K.s};
-    if(!rsMeets(A,K.F))return {F,sure:false,end,f:L*(w+RE_P)+K.f,s:K.s};
-    const lit=K.lit||[],x=L*(w+RE_P+lit.length)+Math.min(L,occ(lit))*K.f;return {F,sure:false,end,f:x,s:x+K.s}};
+  /* A repeated atom (first characters A, w = work of one pass) before K */
+  const rep=(A,w,q,K,one)=>{
+    const L=q.max!==Infinity&&q.max-q.min<1e4?[q.max-q.min+1]:[1,1],F=q.min===0?rsNorm(A.concat(K.F)):A,end=q.min===0&&!!K.end;
+    if(q.cnt)w=pAddC(w,W_CNT);if(w.length===1)wmax=Math.max(wmax,w[0]);
+    const mand=q.min===0?[0]:q.min<1e4?pMul([q.min],w):pMul([0,1],w); /* the passes it must make */
+    if(K.sure)return {F,sure:q.min===0,end,f:pAdd(mand,w),s:K.s};
+    if(one&&K.end&&!q.lazy&&q.max===Infinity&&covers(A))return {F,sure:false,end,f:pAdd(mand,w),s:K.s};
+    const lit=K.lit||[];
+    if(!rsMeets(A,K.F))return {F,sure:false,end,f:pAdd(pAdd(mand,pMul(L,pAddC(w,W_BACK))),K.f),s:K.s};
+    const x=pAdd(pAdd(mand,pMul(L,pAddC(w,W_BACK+lit.length))),T(K.f,L,lit));return {F,sure:false,end,f:x,s:pAdd(x,K.s)}};
   const item=(it,K)=>{const q=it.q;if(q&&q.max===0)return K;
     switch(it.t){
-      case 'set':return q?rep(it.s,1,q,K,true):{F:it.s,sure:false,f:1+K.f,s:K.s,lit:[it.s].concat((K.lit||[]).slice(0,7))};
-      case 'ref':return q?rep(R_ANY,n+1,q,K):{F:R_ANY,sure:false,f:n+1+K.f,s:n+K.s};
-      case 'bol':return {F:K.F,sure:false,f:1+K.f,s:1+K.s};
-      case 'eol':return {F:m.fl.m?rsNorm(R_END.concat(R_NL)):R_END,sure:false,end:K.end,f:1+K.f,s:1+K.s};
-      case 'wb':return {F:R_ANY,sure:false,f:1+K.f,s:1+K.s};
-      case 'look':{const b=alt(it.b,K_SURE),c=1+b.f+b.s+Math.min(n,it.ml);return {F:R_ANY,sure:false,f:c+K.f,s:c+K.s}}
+      case 'set':return q?rep(it.s,[1],q,K,true):{F:it.s,sure:false,f:pAddC(K.f,1),s:K.s,lit:[it.s].concat((K.lit||[]).slice(0,7))};
+      case 'ref':return q?rep(R_ANY,[1,1],q,K):{F:R_ANY,sure:false,f:pAdd(K.f,[1,1]),s:pAdd(K.s,[1,1])};
+      case 'bol':return {F:K.F,sure:false,f:pAddC(K.f,1),s:pAddC(K.s,1)};
+      case 'eol':return {F:m.fl.m?rsNorm(R_END.concat(R_NL)):R_END,sure:false,end:K.end,f:pAddC(K.f,1),s:pAddC(K.s,1)};
+      case 'wb':return {F:R_ANY,sure:false,f:pAddC(K.f,1),s:pAddC(K.s,1)};
+      case 'look':{const b=alt(it.b,K_SURE);
+        /* a lookahead sees the r characters left; a lookbehind sees the ones before, at most n */
+        const c=it.behind?[1+pEv(b.f,n)+pEv(b.s,n)+Math.min(n,it.ml)]:pAdd(pAdd(b.f,b.s),it.ml===Infinity?[1,1]:[1+it.ml]);
+        return {F:R_ANY,sure:false,f:pAdd(K.f,c),s:pAdd(K.s,c)}}
       default:{ /* grp */
-        const e=it.cap?6:1; /* entering a group (a capturing one saves and restores its capture) */
-        if(!q||(q.min===1&&q.max===1)){const g=alt(it.b,K);return {F:g.F,sure:g.sure,end:g.end,f:g.f+e,s:g.s+e,lit:it.b.length===1?g.lit:undefined}}
-        if(q.max===1){const g=alt(it.b,K);return {F:rsNorm(g.F.concat(K.F)),sure:g.sure||K.sure,end:g.end||K.end,f:g.f+e+K.f,s:g.f+e+Math.max(g.s,K.s)}}
-        if(it.inner){if(q.min!==q.max||q.min>300)return K_INF;for(let r=0;r<q.min;r++)K=alt(it.b,K);return K}
-        const g=alt(it.b,K_NONE);return rep(g.F.length?g.F:R_ANY,g.f+g.s+(it.cap?60:4),q,K)}}};
-  const K=alt(m.ast,K_SURE);return {f:K.f,s:K.s,lit:(K.lit||[]).length,occ:occ(K.lit||[])}}
-/* reModel(src, flags) -> {cost(n, all)}: the bound on the work of matching a subject of n characters once (all: every match, as a /g loop does). */
+        const e=it.cap?W_CAP:W_GRP;
+        if(!q||(q.min===1&&q.max===1)){const g=alt(it.b,K);return {F:g.F,sure:g.sure,end:g.end,f:pAddC(g.f,e),s:pAddC(g.s,e),lit:it.b.length===1?g.lit:undefined}}
+        if(q.max===1){const g=alt(it.b,K);return {F:rsNorm(g.F.concat(K.F)),sure:g.sure||K.sure,end:g.end||K.end,f:pAdd(pAddC(g.f,e),K.f),s:pAdd(pAddC(g.f,e),pMax(g.s,K.s))}}
+        /* a counted group whose passes are not fixed work (inner quantifiers, or alternatives that start alike) is costed pass by pass */
+        if(it.inner||it.ovl){if(q.min!==q.max||q.min>300)return K_INF;
+          for(let r=0;r<q.min;r++){const g=alt(it.b,K);K={F:g.F,sure:g.sure,end:g.end,f:pAddC(g.f,e+W_CNT),s:pAddC(g.s,e+W_CNT)}}
+          return {F:K.F,sure:K.sure,end:K.end,f:pMul([W_UNROLL],K.f),s:pMul([W_UNROLL],K.s)}} /* V8 saves and restores the pass counter on each retry */
+        const g=alt(it.b,K_NONE);return rep(g.F.length?g.F:R_ANY,pAddC(pAdd(g.f,g.s),it.cap?W_PASSCAP:W_PASS),q,K)}}};
+  const K=alt(m.ast,K_SURE),lit=K.lit||[];
+  let c;
+  if(m.anchored)c=pEv(K.f,n)+pEv(K.s,n);
+  else{ /* every start position pays the leading literal; the rest are bounded like give-back points */
+    let wins=n+1;if(lit.length>=2)wins=Math.min(wins,Math.floor(n/period(lit))+1);if(cnt&&lit.length)wins=Math.min(wins,cnt(lit[0])+1);
+    c=(n+1)*(lit.length+1)+pEv(T(K.f,[1,1],lit),n)+(all?wins:1)*pEv(K.s,n)}
+  const eat=(n+1)*(1+wmax); /* the characters a match consumes, at most once each over all matches */
+  c+=eat;const att=pEv(K.f,n)+pEv(K.s,n)+eat; /* att: one attempt from one start position */
+  return {c:c<=Number.MAX_VALUE?c:Infinity,att:att<=Number.MAX_VALUE?att:Infinity}}
+/* reModel(src, flags) -> {cost(n, all, nlFree, cnt)}: the bound on the work of matching a subject of n characters once (all: every match, as a /g
+   loop does). Results without cnt are memoised by length. */
 function reModel(src,flags){
   const fl={i:flags.includes('i'),m:flags.includes('m'),s:flags.includes('s')};
-  const ast=reParse(src,fl),anchored=!fl.m&&ast.every(s=>s.length&&s[0].t==='bol'&&!s[0].q);
-  const memo=new Map(),m={fl,ast};
-  m.cost=(n,all,nlFree)=>{const key=n*4+(all?1:0)+(nlFree?2:0);let c=memo.get(key);if(c!==undefined)return c;
-    const K=reCost(m,n,nlFree); /* unanchored: every start position pays the leading literal, K.occ of them pay the rest */
-    c=anchored?K.f+K.s+n+1:(n+1)*(K.lit+1)+K.occ*K.f+(all?K.occ:1)*K.s+n+1;
-    if(!(c<=Number.MAX_VALUE))c=Infinity;if(memo.size>=512)memo.clear();memo.set(key,c);return c};
+  const ast=reParse(src,fl),m={fl,ast,anchored:!fl.m&&ast.every(s=>s.length&&s[0].t==='bol'&&!s[0].q)};
+  const memo=new Map();
+  m.cost=(n,all,nlFree,cnt)=>m.bound(n,all,nlFree,cnt).c;
+  /* sets: the leading-literal sets whose counts in the subject the cost can use (the same for every n) */
+  m.sets=[];reCost(m,RE_EXP_LINE,false,set=>{if(!m.sets.includes(set))m.sets.push(set);return 0},false);
+  const memo2=new Map();
+  /* boundIn(s, all, nlFree): the bound using s's counts of m.sets, memoised by length and counts */
+  m.boundIn=(s,all,nlFree)=>{const k=m.sets.map(set=>{let c=0;for(let i=0;i<s.length;i++)if(rsHas(set,s.charCodeAt(i)))c++;return c});
+    const key=(s.length*4+(all?1:0)+(nlFree?2:0))+':'+k.join(',');let b=memo2.get(key);if(b)return b;
+    b=reCost(m,s.length,!!nlFree,set=>k[m.sets.indexOf(set)],!!all);if(memo2.size>=512)memo2.clear();memo2.set(key,b);return b};
+  m.bound=(n,all,nlFree,cnt)=>{if(cnt)return reCost(m,n,!!nlFree,cnt,!!all);
+    const key=n*4+(all?1:0)+(nlFree?2:0);let c=memo.get(key);if(c!==undefined)return c;
+    c=reCost(m,n,!!nlFree,null,!!all);if(memo.size>=512)memo.clear();memo.set(key,c);return c};
   return m}
+/* trimRun(s, chars, start): s without the run of chars at its end (and at its start too when start is true). A regex like /\n+$/ would retry the run
+   from every position in it, which is quadratic on a long run (Task 9b). */
+const trimRun=(s,chars,start)=>{let a=0,e=s.length;while(e>0&&chars.includes(s[e-1]))e--;if(start)while(a<e&&chars.includes(s[a]))a++;return a||e<s.length?s.slice(a,e):s};
 const RE_MODELS=new WeakMap();
 const tooComplex=()=>{const e=new Error('pattern too complex for this practice shell');e.complex=true;return e};
 const RE_NL=/[\n\r\u2028\u2029]/;
 const reFlags=f=>(f||'').replace(/[^ims]/g,'');
-/* regexRisky(src, flags): would safeRegex refuse src? (rule 1, or rule 2 at an 80-character line: see the comment above reShapeRisky) */
+/* regexRisky(src, flags): would safeRegex refuse src? (rule 1, or rule 2 on a 16-character line: see the comment above reShapeRisky) */
 function regexRisky(src,flags){if(reShapeRisky(src))return true;
   try{new RegExp(src,reFlags(flags))}catch(e){return false} /* invalid: the caller's new RegExp reports it */
-  return reModel(src,reFlags(flags)).cost(RE_LINE,false)>RE_BUDGET}
+  return reModel(src,reFlags(flags)).cost(RE_EXP_LINE,false,true)>RE_BUDGET}
 /* watchRegex(re): remember re's cost model so reGuard can check subjects against it (safeRegex does this; grep calls it for the regex it wraps). */
 function watchRegex(re){if(!RE_MODELS.has(re))RE_MODELS.set(re,reModel(re.source,reFlags(re.flags)));return re}
 function safeRegex(src,flags){if(reShapeRisky(src))throw tooComplex();const re=new RegExp(src,flags);watchRegex(re);
-  if(RE_MODELS.get(re).cost(RE_LINE,false)>RE_BUDGET)throw tooComplex();return re}
-/* regexFits(re, n, all): may re run on a subject of n characters? reGuard(re, s, all): throw the complex error when it may not, else charge its work
-   to the step budget. Call reGuard once before matching a subject (with all=true before a loop that finds every match). Unwatched regexes always fit. */
+  if(RE_MODELS.get(re).cost(RE_EXP_LINE,false,true)>RE_BUDGET)throw tooComplex();return re}
+/* regexFits(re, n, all, nlFree): may re run on some subject of n characters (nlFree: one without line breaks)? It does not know the subject, so it
+   cannot use the character counts reGuard uses. reGuard(re, s, all): throw the complex error when re may not run on s, else charge its work to the
+   step budget. Call reGuard once before matching a subject (with all=true before a loop that finds every match). Unwatched regexes always fit. */
 function regexFits(re,n,all,nlFree){const m=RE_MODELS.get(re);return !m||m.cost(n,!!all,!!nlFree)<=RE_BUDGET}
-function reGuard(re,s,all){const m=RE_MODELS.get(re);if(!m)return;const c=m.cost(s.length,!!all,!RE_NL.test(s));if(c>RE_BUDGET)throw tooComplex();
-  const rt=SQ.rt;rt.reWork=(rt.reWork||0)+c;if(rt.reWork>=RE_CHUNK){const k=Math.floor(rt.reWork/RE_CHUNK);rt.reWork-=k*RE_CHUNK;rt.steps+=k;if(rt.steps>LIM.STEPS)throw new StepLimit()}}
+/* reBound(re, s, all) -> {c, att} or null for an unwatched regex; throws the complex error when re may not run on s */
+function reBound(re,s,all){const m=RE_MODELS.get(re);if(!m)return null;const nl=!RE_NL.test(s);let b=m.bound(s.length,!!all,nl);
+  if(b.c>RE_CHUNK&&m.sets.length){const b2=m.boundIn(s,all,nl);if(b2.c<b.c)b=b2} /* worth a closer look: count the subject's characters */
+  if(b.c>RE_BUDGET)throw tooComplex();return b}
+const reCharge=u=>{const rt=SQ.rt;rt.reWork=(rt.reWork||0)+u;if(rt.reWork>=RE_CHUNK){const k=Math.floor(rt.reWork/RE_CHUNK);rt.reWork-=k*RE_CHUNK;rt.steps+=k;if(rt.steps>LIM.STEPS)throw new StepLimit()}};
+function reGuard(re,s,all){const b=reBound(re,s,all);if(b)reCharge(b.c)}
+/* reExec(re, s): reGuard, then re.exec(s) from the start. A match at index i cost at most i+1 attempts, so only that much is charged. */
+function reExec(re,s){const b=reBound(re,s,false);re.lastIndex=0;const m=re.exec(s);
+  if(b)reCharge(m?Math.min(b.c,(m.index+1)*b.att):b.c);return m}
 
 try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw);if(o&&o.fs)SQ.resetState(Object.assign(fresh(),o))}}catch(e){}
 /* A failed save (quota, blocked storage) is no longer silent: SQ.rt.saveFailed is set and the UI is told once through SQ.rt.onSaveFail. */
@@ -285,5 +356,5 @@ function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const
   if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);if(delta>0){SQ.rt.grewBy+=delta;grewCheck()}return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,regexFits,reGuard,watchRegex,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,regexFits,reGuard,reExec,watchRegex,trimRun,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

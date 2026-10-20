@@ -101,7 +101,7 @@ function runSub(cmd){
   CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
   CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
-  return v.join('\n').replace(/\n+$/,'')}
+  return SQ.trimRun(v.join('\n'),'\n')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
    list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */
 const arithEnv={get:k=>getVar(k),set:(k,v)=>setVar(k,v)};
@@ -312,7 +312,8 @@ function parse(toks){
   if(pipe.length)seq.push({op,pipe});else if(op&&op!==';')bad('newline');
   return seq}
 /* globRe(p, ci) -> {test(name)}: * and ? wildcards (every other character literal; neither wildcard matches a line break), matched with one backtrack
-   point (the last *), so the work is at most name length x pattern length: a JS regex like ^.*a.*a.*b$ would backtrack polynomially (Task 9b). */
+   point (the last *), so the work is at most name length x pattern length: a JS regex like ^.*a.*a.*b$ would backtrack polynomially (Task 9b).
+   ci lower-cases both sides, which differs from the old /i regex only for exotic letters (the Kelvin sign, dotted capital I). */
 const GLOB_NL=/[\n\r\u2028\u2029]/;
 function globRe(p,ci){if(ci)p=p.toLowerCase();
   return {test(s){if(ci)s=s.toLowerCase();let i=0,j=0,star=-1,mark=0;

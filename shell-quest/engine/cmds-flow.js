@@ -104,8 +104,7 @@ function evalTree(tree,d,name){
     case 'bin':{const op=n.op;
       if(op==='=~'){const a=val(n.a),pat=regexSrc(n.b.raw);let re;
         try{re=SQ.safeRegex(pat,'')}catch(e){throw ce(e.complex?`bash: [[: ${e.message}`:`bash: [[: invalid regular expression: ${pat}`)}
-        try{SQ.reGuard(re,a)}catch(e){if(e&&e.complex)throw ce(`bash: [[: ${e.message}`);throw e}
-        return re.test(a)}
+        try{return !!SQ.reExec(re,a)}catch(e){if(e&&e.complex)throw ce(`bash: [[: ${e.message}`);throw e}}
       if(op==='='||op==='=='||op==='!='){const a=val(n.a),m=d?SQ.patMatch(a,n.b.raw):a===val(n.b);return op==='!='?!m:m}
       if(op==='<'||op==='>'){const a=val(n.a),b=val(n.b);return op==='<'?a<b:a>b}
       const x=num(n.a),y=num(n.b);
