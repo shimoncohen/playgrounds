@@ -17,5 +17,5 @@ Checklist, all in one PR:
 5. **Bundling**: `python3 tools/build.py --check` must pass (the bundler picks up any `*-quest/` folder). Inlined files must not contain `</script` or `</style`.
 6. **Tests**: add the name to the list in `tests/smoke.mjs` (loads cleanly, tabs, progress export/import). Engine-like logic that runs without a DOM gets Node tests under `tests/`.
 7. **CI scripts**: add the new JS files to the `node --check` glob in `.github/workflows/ci.yml` if they live outside `*/app.js`.
-8. **Docs**: a row in the README table; a mention in `AGENTS.md` "Where things go" if it has its own layout.
+8. **Docs**: a row in the README table, and an entry in the README "Map of the repo" (plus its test folder, if it has one) if the quest has files beyond `index.html` + `style.css` + `app.js`; a mention in `AGENTS.md` "Where things go" if it has its own layout.
 9. **Run** `npm run check && npm test`, play every chapter once, check 390px width, and attach screenshots to the PR.
