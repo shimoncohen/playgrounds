@@ -263,11 +263,18 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .loopback{font-size:11px;font-weight:700;color:var(--warn)}
 .k{font-family:var(--font-mono);font-size:11.5px;font-weight:600;color:var(--muted)}
 .tree{overflow-x:auto;padding:4px 2px}
-.tnode{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
-.tkids{display:flex;gap:8px;align-items:flex-start;justify-content:center;border-top:1.5px solid var(--line);padding-top:6px}
-.tkid{display:flex;justify-content:center;min-width:0}
+.tnode{display:flex;flex-direction:column;align-items:center;gap:0;min-width:0}
+.tkids{position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:8px}
+.tkids::before{content:'';position:absolute;top:0;left:50%;height:8px;border-left:1.5px solid var(--line)}
+.tkid{position:relative;display:flex;justify-content:center;min-width:0;padding:8px 4px 0}
+.tkid::before,.tkid::after{content:'';position:absolute;top:0;width:50%;height:8px;border-top:1.5px solid var(--line)}
+.tkid::before{right:50%}
+.tkid::after{left:50%;border-left:1.5px solid var(--line)}
+.tkid:first-child::before{border-top-color:transparent}
+.tkid:last-child::after{border-top-color:transparent}
+.tkid:only-child::before{border-top-color:transparent}
 .tv{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 6px;border-radius:999px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 8%,var(--surface))}
-.tv .val{border:0;background:none;padding:0 2px}
+.tv .val{border:0;background:none;padding:0 2px;white-space:nowrap;word-break:normal}
 .nil{font-size:12px;color:var(--muted);padding:2px 6px}
 .defs{display:flex;flex-wrap:wrap;gap:5px}
 .frames.stale,#map.stale{opacity:.45}
