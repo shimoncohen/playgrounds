@@ -215,3 +215,48 @@ test('switch loop: the broadcast storm stops at the step limit instead of hangin
   assert.ok(r.entries.length < 2000);
   assert.equal(net.clock, net.log.length);
 });
+
+test('hops follow the copy the target accepted, not flood copies to a dead-end switch', () => {
+  const net = NQ.createNet('pair');
+  const d = net.devices;
+  d.sw2 = { id: 'sw2', kind: 'switch', ifaces: { p1: { mac: NQ.ip.mac(60), ip: null, up: true, peer: 'sw1.p3' }, p2: { mac: NQ.ip.mac(62), ip: null, up: true, peer: null } }, routes: [], neigh: {}, macTable: {}, nat: null };
+  d.sw1.ifaces.p3 = { mac: NQ.ip.mac(61), ip: null, up: true, peer: 'sw2.p1' };
+  NQ.sim.ping(net, 'laptop', PHONE);
+  d.sw1.macTable = {}; // the echo request is flooded, one copy towards sw2
+  const r = NQ.sim.ping(net, 'laptop', PHONE, { seq: 2 });
+  assert.equal(r.delivered, true);
+  assert.ok([...r.entries].some((e) => e.dev === 'sw2' && e.dir === 'fwd'), 'a copy was flooded on by sw2');
+  assert.deepEqual(J(r.hops), ['laptop', 'sw1', 'phone']);
+});
+
+test('off-origin send failure: phone cannot route the reply, logs a drop, and ping reports no route', () => {
+  const net = NQ.createNet('pair');
+  net.devices.phone.ifaces.eth0.ip = '10.0.0.3/32'; // phone answers ARP but has no route back to 10.0.0.2
+  const r = NQ.sim.ping(net, 'laptop', PHONE);
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no route', null]);
+  const last = r.entries[r.entries.length - 1];
+  assert.deepEqual([last.dev, last.iface, last.dir, last.verdict], ['phone', 'eth0', 'drop', 'cannot send to 10.0.0.2: no route']);
+  assert.deepEqual(J(NQ.pkt.layerNames(last.packet)), ['IPv4', 'ICMP']);
+  assert.deepEqual(J(r.hops), ['laptop', 'sw1', 'phone'], 'the request still arrived');
+});
+
+test('off-origin send failure: the reply would leave through a down iface, ping reports interface down', () => {
+  const net = NQ.createNet('pair');
+  const ph = net.devices.phone.ifaces;
+  ph.eth0.ip = '10.0.0.3/32';
+  ph.eth1 = { mac: NQ.ip.mac(70), ip: '10.0.0.1/30', up: false, peer: null }; // the only route back to 10.0.0.2
+  const r = NQ.sim.ping(net, 'laptop', PHONE);
+  assert.deepEqual([r.delivered, r.reason], [false, 'interface down']);
+  const last = r.entries[r.entries.length - 1];
+  assert.deepEqual([last.dev, last.iface, last.dir, last.verdict], ['phone', 'eth1', 'drop', 'cannot send to 10.0.0.2: interface down']);
+});
+
+test('ARP is per segment: r1 does not answer on its LAN for the address of its other iface', () => {
+  const net = NQ.createNet('office');
+  net.devices.laptop.ifaces.eth0.ip = '192.168.1.10/0'; // laptop now thinks everything is on its LAN, so it ARPs for 10.0.1.1
+  const r = NQ.sim.ping(net, 'laptop', '10.0.1.1');
+  assert.deepEqual([r.delivered, r.reason], [false, 'host unreachable']);
+  assert.deepEqual([...r.entries].filter((e) => e.dev === 'r1').map((e) => [e.iface, e.dir, e.verdict]), [['eth0', 'drop', 'not addressed to this host']]);
+  assert.deepEqual(J(net.devices.r1.neigh), {});
+  assert.equal(tx(r.entries).some((e) => kind(e) === 'arp-reply'), false);
+});
