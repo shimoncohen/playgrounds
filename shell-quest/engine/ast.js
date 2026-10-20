@@ -1,10 +1,11 @@
 (function (SQ) {
-/* Stage 2 AST parser: SQ.parseProgram(text) -> List. Recursive descent over SQ.tokenize(text,{dry:true,pos:true}); words keep their raw source for run-time expansion.
+/* Stage 2 AST parser: SQ.parseProgram(text) -> List. List = {items: [{andor, sep: ';'|'\n'|'&'}]}; sep '&' (Stage 3 Task 12a) runs that and-or list in the background. Recursive descent over SQ.tokenize(text,{dry:true,pos:true}); words keep their raw source for run-time expansion.
    Wired in by Task 6a: exec.js and interp.js run every typed line, script, function body and sourced file through it. Nodes carry src = exact source slice. Errors: code 2, raw:false (syntax) / raw:true (unsupported). */
 const MAX_DEPTH=100;
 const CLOSERS=new Set(['then','elif','else','fi','do','done','esac','}']);
 const REDIR_OPS=new Set(['>','>>','<','2>','2>>','2>&1','>&2','<<','<<-','<<<']);
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
+const ASSIGN=/^[A-Za-z_][A-Za-z0-9_]*=/;
 const fail=(m,raw)=>Object.assign(new Error(m),{code:2,raw:!!raw});
 const bad=t=>fail("syntax error near unexpected token '"+(t===undefined||t==='\n'?'newline':t)+"'");
 const eofErr=()=>fail('syntax error: unexpected end of file');
@@ -33,8 +34,7 @@ function parseProgram(text){
     skipNl();
     while(tk()&&!isStop(stops)){
       const andor=parseAndOr();let sep=';';const t=tk();
-      if(isOp(t,'&'))throw unsup('&');
-      if(isOp(t,';')||isOp(t,'\n')){sep=next().v;skipNl()}
+      if(isOp(t,';')||isOp(t,'\n')||isOp(t,'&')){sep=next().v;skipNl()} /* sep '&': the and-or list runs as a background job (jobs.js) */
       else if(t&&!isStop(stops))throw bad(show(t));
       items.push({andor,sep})}
     if(!items.length&&!allowEmpty){const t=tk();throw t?bad(show(t)):eofErr()}
@@ -56,7 +56,7 @@ function parseProgram(text){
   /* one redirect operator at tk(), merged into r (parse() shapes: out/err {path,append,w}, inp token, err {dup}) */
   function redirect(r){const o=next();
     if(o.v==='2>&1'){r.err={dup:true};return}
-    if(o.v==='>&2'){r.out={toErr:true,after:!!r.err};return}
+    if(o.v==='>&2'){r.out={toErr:true,after:!!r.err,pre:r.out&&r.out.path!==undefined?r.out:null};return} /* pre: `> f >&2` still creates f */
     const w=tk();if(!w)throw bad('newline');
     if(w.t!=='w')throw bad(show(w));
     next();
@@ -86,17 +86,20 @@ function parseProgram(text){
     if(r==='select')throw unsup('select');
     if(r==='[[')return parseCond();
     if(r&&CLOSERS.has(r))throw bad(r);
-    if(NAME.test(t.raw)&&t.raw===t.v&&isOp(toks[p+1],'(')&&isOp(toks[p+2],')'))return nest(parseFuncDef);
+    if((NAME.test(t.raw)||t.raw===':')&&t.raw===t.v&&isOp(toks[p+1],'(')&&isOp(toks[p+2],')'))return nest(parseFuncDef); /* bash also takes : as a name (:(){ :|:& };:) */
     return parseSimple()}
 
   function parseSimple(){
-    const s=startOf(),n={type:'simple',words:[],out:null,inp:null,err:null,doc:null,herestr:null};
+    const s=startOf(),n={type:'simple',words:[],assigns:[],out:null,inp:null,err:null,doc:null,herestr:null};
     for(;;){const t=tk();if(!t)break;
       if(t.t==='w'){n.words.push(next());continue}
       if(REDIR_OPS.has(t.v)){redirect(n);continue}
       if(t.v==='('&&n.words.length&&/=$/.test(n.words[n.words.length-1].raw)&&toks[p-1].e===t.s)throw unsup('arrays');
       break}
     if(!n.words.length&&!n.out&&!n.inp&&!n.err&&!n.doc&&!n.herestr){const t=tk();throw t?bad(show(t)):eofErr()}
+    /* leading NAME=word items before a command name are prefix assignments (X=1 cmd); a command of assignments only keeps them as words */
+    let a=0;while(a<n.words.length&&ASSIGN.test(n.words[a].raw))a++;
+    if(a&&a<n.words.length){n.assigns=n.words.slice(0,a).map(w=>({name:w.raw.slice(0,w.raw.indexOf('=')),word:w}));n.words=n.words.slice(a)}
     if(n.doc&&isOp(tk(),'\n'))lastEnd=tk().e; /* the here-document body follows the line break */
     return mk(n,s)}
 
@@ -190,8 +193,13 @@ function parseProgram(text){
     const body=parseGroup();
     return mk({type:'func',name,body},s)}
 
-  const list=parseList(new Set(),true);
-  if(p<toks.length)throw bad(show(tk()));
-  return list}
+  /* a syntax error carries `at`, the source offset of the token it was found at (the end of the text for an unexpected end), so a script can name the line */
+  try{
+    const list=parseList(new Set(),true);
+    if(p<toks.length)throw bad(show(tk()));
+    return list}
+  catch(e){if(e&&e.code===2&&!e.raw&&e.at===undefined&&/^syntax error/.test(e.message))e.at=tk()?tk().s:text.length;throw e}}
+/* the 1-based line of offset `at` in text; an offset at or past the end (unexpected end of file) reports the last line of text */
+SQ.lineOf=(text,at)=>{text=String(text);const end=SQ.trimRun(text,'\n').length;at=Math.min(at,Math.max(end-1,0));let n=1;for(let i=text.indexOf('\n');i>=0&&i<at;i=text.indexOf('\n',i+1))n++;return n};
 SQ.parseProgram=parseProgram;
 })(window.SQ=window.SQ||{});

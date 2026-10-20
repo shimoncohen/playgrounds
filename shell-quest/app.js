@@ -31,7 +31,9 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
 function runLine(line,opts){opts=opts||{};const before=S.cwd;let edit=null;
   if(opts.echo!==false)addLine(promptHTML(before)+esc(line));
   if(line.trim()){S.hist.push(line)}histIdx=S.hist.length;SQ.rt.log=[];SQ.rt.changed=new Set();
-  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
+  if(line.trim()){const r=execLine(line,typeof opts.stdin==='string'?{stdin:opts.stdin}:{});for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(renderText(o.text),o.cls)}
+    /* the process cap (procs.js MAX_PROCS) lasts until a chapter switch or Reset world: say so once per line (a page tip, so the engine's bash text stays as recorded) */
+    if(r.out.some(o=>o.text===SQ.FORK_MSG))addLine(renderText('Tip: this practice shell has used up its processes. Click your chapter in the list (your files stay) or Reset world to start fresh.'),'tip');S.last=r.code;if(r.ui&&r.ui.edit)edit=r.ui;checkMission(line,{feedback:!!opts.feedback,ranAbs:opts.ranAbs})}
   renderAll();save();scrollDown();
   if(edit)openFor(edit.edit,edit.isNew)}
 const run=line=>runLine(line,{echo:true});
@@ -39,11 +41,11 @@ const run=line=>runLine(line,{echo:true});
 /* the editor panel: nano/edit/vi/vim ask for it, Save writes through the same writeFile the shell uses */
 function openFor(abs,isNew){const n=getNode(abs);SQ.ui.openEditor(abs,n&&n.type==='file'?n.content:'#!/bin/bash\n',{isNew:!n})}
 const shownPath=abs=>{const r=rel(abs);return r==='.'?disp(abs):r};
-SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();
+SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();SQ.rt.grewBy=0; /* a Save is judged on its own, never on the line typed before it */
   const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
   if(e){addLine(renderText(e),'err');scrollDown();return false}
   addLine(renderText('Saved '+shown),'sys');
-  SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.prevLast=S.last; /* a Save is judged on its own, never on the line typed before it */
+  SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.lastErr='';SQ.rt.lineTook=0;SQ.rt.prevLast=S.last;
   checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
@@ -52,7 +54,8 @@ SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')|
 function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').filter(Boolean),b=cw.split('/').filter(Boolean);let i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
   const ups=b.length-i;if(ups===0)return a.slice(i).join('/');if(ups<=2)return [...Array(ups).fill('..'),...a.slice(i)].join('/')||'..';return disp(abs)}
 
-function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
+/* a chapter switch, like Reset world, starts with no jobs, traps or shell options and the clock at 0 (SQ.resetProcs, procs.js); files and variables stay */
+function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;SQ.resetProcs();
   SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
 
 /* tab completion */
@@ -94,7 +97,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.resetProcs();SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
@@ -133,14 +136,16 @@ fStage.addEventListener('keydown',e=>{if(e.target.id==='fIn'&&e.key==='Enter'&&Q
 let armP=null;
 $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');if(t){showTab('quest');fill(t.dataset.try);return}
   if(e.target.id==='resetProgress'){const b=e.target;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase progress, XP and world';clearTimeout(armP);armP=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},3500);return}
-    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
+    clearTimeout(armP);SQ.resetState(fresh());SQ.resetProcs();S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
 
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');
   addLine('Your mission is on the left. Type help to list commands, or man ls to learn about one.','sys');addLine('')}
 
 /* a save the browser refused (storage full or blocked) is reported once in the terminal instead of failing silently */
-SQ.rt.onSaveFail=()=>{addLine(renderText('Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'),'err');scrollDown()};
+SQ.rt.onSaveFail=e=>{const storage=!!e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.name==='SecurityError'||e.code===22||e.code===1014);
+  addLine(renderText(storage?'Warning: this browser would not store your progress (its storage is full or blocked). Use Progress, then Export to file, to keep a copy. Reset world frees space if big files are the cause.'
+    :`Warning: your progress could not be saved (${e&&e.name||'Error'}). Use Progress, then Export to file, to keep a copy. Reset world clears the files if they are the cause.`),'err');scrollDown()};
 
 /* boot */
 if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}

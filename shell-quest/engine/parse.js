@@ -5,28 +5,67 @@ const M=(c,s)=>'\x01'+c+s+'\x02';
 const ok=(out='')=>({out,err:[],code:0});
 const E=(m,c=1)=>({out:'',err:[m],code:c});
 const lines=t=>t===''?[]:t.split('\n');
-const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin'});
+const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'basecamp',PATH:'/usr/local/bin:/usr/bin:/bin',IFS:' \t\n',OPTIND:'1',OPTERR:'1'}); /* OPTIND/OPTERR: 1 in a new shell or script (Task 15, getopts) */
 /* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope).
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(k==='!')return SQ.rt.bang==null?'':String(SQ.rt.bang); /* the newest job this shell started (jobs.js; per shell, see interp.js copyShell) */
+  if(k==='BASHPID')return SQ.rt.slice?String(SQ.rt.slice.pid):'1234'; /* a job's own pid inside it (kill $BASHPID); else the shell's, also in a subshell (procs.js) */
+  if(k==='PPID')return String(SQ.PPID);
+  if(k==='SECONDS')return secondsNow();
   if(k==='BASH_REMATCH')throw unsup('BASH_REMATCH');
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
   if(k==='PWD')return S.cwd;if(own(S.vars,k))return S.vars[k];
-  const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+  if(unsetB(k))return '';const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+/* $SECONDS: whole virtual seconds since the session started (procs.js). SECONDS=N (plain assignment or arithmetic) restarts the count from N:
+   the value is then N plus the whole seconds since the assignment (SQ.rt.secAt, the clock when it was made; runtime state, so after a reload
+   a saved SECONDS reads as assigned just now). */
+function secondsNow(){const rt=SQ.rt,c=Math.floor(rt.clock||0);if(!own(S.vars,'SECONDS'))return String(c);
+  if(rt.secAt===undefined)rt.secAt=rt.clock||0;return String((parseInt(S.vars.SECONDS,10)||0)+c-Math.floor(rt.secAt))}
+/* `unset HOME` (or USER, SHELL, ...) hides the built-in value: S.unsetB lists those names. Assigning the name again puts it back. */
+const unsetB=k=>!!S.unsetB&&own(S.unsetB,k)
 const badName=k=>k==='__proto__';
 function isSet(k){const f=SQ.frame();
-  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
+  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD'||k==='BASHPID'||k==='PPID'||k==='SECONDS')return true;if(k==='!')return SQ.rt.bang!=null;
   if(/^\d+$/.test(k))return +k<=f.args.length;
-  return own(S.vars,k)||own(BUILTIN_VARS(),k)}
+  return own(S.vars,k)||(own(BUILTIN_VARS(),k)&&!unsetB(k))}
+/* readonly (Task 15, cmds-opts.js): SQ.rt.ro is null (no readonly names: every check is one null test) or a frozen null-prototype set of names.
+   canSet(k): false when k is readonly; assigning OPTIND (true) also restarts getopts' scan inside a word of grouped options, as in bash. */
+const isRO=k=>{const r=SQ.rt.ro;return r!=null&&r[k]===1};
+function canSet(k){if(isRO(k))return false;if(k==='OPTIND')SQ.rt.gopt=null;return true}
+const roMsg=k=>`bash: ${k}: readonly variable`;
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
   if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
-  S.vars[k]=v}
+  if(!canSet(k))throw perr(k+': readonly variable',1);
+  if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
+  S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
-const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$])/;
-const CTX={depth:0,pend:[],sub:0};
+/* set -u (Task 13): reading an unset variable is an error that ends the function, script or typed line (abort, like ${X:?}). $@ and $* never are;
+   $# $? $$ $0 always exist; $1.. and $! are unset until given. The callers test SQ.rt.opts.u first, so this costs nothing when the option is off. */
+const unbound=k=>Object.assign(perr((/^[A-Za-z_]/.test(k)?k:'$'+k)+': unbound variable',1),{abort:true});
+function nounset(k){if(k!=='@'&&k!=='*'&&!isSet(k))throw unbound(k)}
+/* ---------- word splitting ----------
+   ifsNow(): the current IFS (unset = the default space, tab, newline). ifsScan walks text calling ch(c) for a field character and brk(hard) at a field break:
+   a run of IFS whitespace is one soft break; one other IFS character (with the IFS whitespace around it) is one hard break, which ends a field even when it is empty. */
+const DEF_IFS=' \t\n';
+const ifsNow=()=>isSet('IFS')?getVar('IFS'):DEF_IFS;
+function ifsScan(text,ifs,ch,brk){const n=text.length,set=new Set(ifs);
+  const W=c=>(c===' '||c==='\t'||c==='\n')&&set.has(c),D=c=>set.has(c);
+  for(let j=0;j<n;){const c=text[j];
+    if(!D(c)){ch(c);j++;continue}
+    let k=j,hard=false;while(k<n&&W(text[k]))k++;
+    if(k<n&&D(text[k])&&!W(text[k])){hard=true;k++;while(k<n&&W(text[k]))k++}
+    brk(hard);j=k}}
+/* SQ.splitFields(text, ifs) -> the fields of text split on ifs, as an unquoted expansion would be (IFS whitespace collapses and trims, other IFS characters keep empty fields) */
+function splitFields(text,ifs){text=String(text);if(ifs==='')return text===''?[]:[text];
+  const out=[];let cur='',started=false;
+  ifsScan(text,ifs,c=>{cur+=c;started=true},hard=>{if(started||hard)out.push(cur);cur='';started=false});
+  if(started)out.push(cur);return out}
+const VRX=/^\$([A-Za-z_]\w*|\d|[?@*#$!])/;
+const CTX={depth:0,pend:[],sub:0,lastSub:null}; /* lastSub: status of the most recently finished $( ), read by an assignment-only command */
 const unsup=x=>Object.assign(new Error('this practice shell does not support '+x+' yet'),{raw:true});
 /* Nesting guard for the recursive scanners and expanders below (scanSub/scanBrace through quotes, expandStr through ${X:-...} and $(( ))): past
    EXP_NEST levels they stop with the parser's nesting error (status 2) instead of overflowing the JS stack. */
@@ -51,10 +90,11 @@ function scanBrace0(line,i,dq){let d=1,j=i+2;
     j++}
   throw new Error("unexpected EOF while looking for matching '}'")}
 /* $( ... ): index of the matching ). Honours quotes, nested $( ) and here-documents (a body line is skipped up to its delimiter line, so ) and quotes in it do not count). */
-function scanSub(line,i){return guarded(()=>scanSub0(line,i))}
-function scanSub0(line,i){
-  if(line[i+2]==='(')return scanArith(line,i);
-  let d=0,j=i+1;const docs=[];
+/* ps (process substitution <( ), Task 16): line[i] is <, and <(( is <( followed by a subshell, never arithmetic */
+function scanSub(line,i,ps){return guarded(()=>scanSub0(line,i,ps))}
+function scanSub0(line,i,ps){
+  if(!ps&&line[i+2]==='(')return scanArith(line,i);
+  let d=ps?1:0,j=ps?i+2:i+1;const docs=[];
   while(j<line.length){const c=line[j];
     if(c==='('&&line[j+1]==='('){let e=-1;try{e=scanArith(line,j-1)}catch(x){} /* (( ... )) or $(( ... )): its << is a shift, not a here-document */
       if(e>0){j=e+1;continue}}
@@ -77,13 +117,34 @@ function scanSub0(line,i){
   throw new Error("unexpected EOF while looking for matching ')'")}
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
-  const sv=SQ.snapshotShell();
-  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
-  const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out')v.push(o.text);else CTX.pend.push(o)}
-  return v.join('\n').replace(/\n+$/,'')}
+  const r=subRun(cmd,false);CTX.lastSub=r.code;return SQ.trimRun(r.text,'\n')}
+/* subRun(cmd, keepE): run cmd as a subshell whose stdout is captured: {text, code}; its stderr (and any background job's output) goes to CTX.pend.
+   keepE: set -e stays on inside (a process substitution); $( ) turns it off (bash's default, no inherit_errexit). */
+function subRun(cmd,keepE){
+  const sv=SQ.snapshotShell();SQ.rt.scopeNode.inherit=true; /* $(jobs -p) lists the shell's jobs (cmds-proc.js tableOf) */
+  if(!keepE&&SQ.rt.opts.e)SQ.rt.opts=Object.assign({},SQ.rt.opts,{e:false});
+  CTX.sub++;let r;
+  try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true});
+    if(SQ.rt.scopeNode.traps){const x=SQ.exitTrap(r.code,{});if(x)r={out:r.out.concat(x.out),code:x.code}}} /* its own EXIT trap (Task 14) */
+  catch(e){if(SQ.rt.scopeNode.traps)SQ.abortTrap(e,{});throw e}
+  finally{CTX.sub--;SQ.restoreShell(sv)}
+  const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */
+  return {text:v.join('\n'),code:r.code}}
+/* <( list ) (Task 16): run list (stdout captured as by $( ) but kept as is, like `list > file`; stderr passes through; its status is ignored) and
+   keep the text in a hidden read-only file /dev/fd/N of the current command's table (fs.js fdNew; numbered 63, 62, ... per command, at most
+   FD_MAX per command); expands to that path. The list runs with no table of its own above it, so its own <( )s number from 63 again, as in bash. */
+const FD_MAX=20;
+function runProc(cmd){const rt=SQ.rt;
+  if(CTX.sub>=20)throw new Error('process substitution nested too deeply');
+  const tab=SQ.fdTable();if(tab.map.size>=FD_MAX)throw perr('too many process substitutions in one command (at most '+FD_MAX+' in this practice shell)',1);
+  const path='/dev/fd/'+(tab.next--);
+  const sv=[rt.fdTab,rt.fdOwn];rt.fdTab=null;rt.fdOwn=false;let r;
+  try{r=subRun(cmd,true)}finally{rt.fdTab=sv[0];rt.fdOwn=sv[1]}
+  if(r.text.length>SQ.LIM.TEXT)throw new SQ.StepLimit('a value grew too large');
+  tab.map.set(path,Object.assign(SQ.F(r.text),{mode:0o444}));return path}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
    list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */
-const arithEnv={get:k=>getVar(k),set:(k,v)=>setVar(k,v)};
+const arithEnv={get:k=>{if(SQ.rt.opts.u&&!isSet(k))throw unbound(k);return getVar(k)},peek:k=>getVar(k),set:(k,v)=>setVar(k,v)};
 function arithVal(expr){
   try{return SQ.arith(expandStr(expr),arithEnv)}catch(e){if(e&&e.stop)throw e;if(e&&e.code===undefined)e.code=1;throw e}}
 function evalDollar(line,i,dry,dq){
@@ -91,7 +152,7 @@ function evalDollar(line,i,dry,dq){
   if(line[i+1]==='{'){const e=scanBrace(line,i,dq);if(dry)return {end:e+1,val:''};
     const r=braceVal(line.slice(i+2,e));r.end=e+1;return r}
   const m=line.slice(i).match(VRX);if(!m)return null;
-  const k=m[1];return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
+  const k=m[1];if(!dry&&SQ.rt.opts.u)nounset(k);return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
 /* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
 /* case pattern: str matches the whole of the pattern word (quoted parts literal) */
 function patMatch(str,raw){pguard(str);const L=matchLens(globItems(expandStr(raw,false,true)),str,0);return L.length>0&&L[L.length-1]===str.length}
@@ -137,17 +198,19 @@ function matchLens(it,str,from){const m=it.length,out=[];let cur=new Uint8Array(
 const rev=a=>a.slice().reverse();
 const pguard=v=>{if(v.length>5000)throw perr('value too long for this practice shell',1)};
 function braceVal(body){let m;
-  if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body)))return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)};
+  if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body))){if(SQ.rt.opts.u)nounset(m[1]);return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)}}
   m=/^(\w+|[?@*#$!])/.exec(body);if(!m)throw perr('${'+body+'}: bad substitution',1);
   const k=m[1],rest=body.slice(k.length);
+  if(rest===''&&SQ.rt.opts.u)nounset(k);
   if(rest==='')return (k==='@'||k==='*')?{val:getVar(k),list:SQ.frame().args.slice()}:{val:getVar(k)};
   const val=getVar(k),set=isSet(k),n=val.length;
   if((m=/^(:?)([-=+?])([\s\S]*)$/.exec(rest))){const nul=m[1]===':',op=m[2],w=m[3],empty=!set||(nul&&val==='');
     if(op==='-')return {val:empty?expandStr(w):val};
     if(op==='=')return {val:empty?(()=>{const d=expandStr(w);setVar(k,d);return d})():val};
     if(op==='+')return {val:empty?'':expandStr(w)};
-    if(empty)throw perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1);
+    if(empty)throw Object.assign(perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1),{abort:true}); /* ends the function, script or typed line (see abortCtl) */
     return {val}}
+  if(SQ.rt.opts.u)nounset(k); /* ${x#p} ${x/p/r} ${x:1} read x */
   if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const it=globItems(expandStr(m[2],false,true)),op=m[1];
     if(op[0]==='#'){const L=matchLens(it,val,0);if(L.length)return {val:val.slice(op==='#'?L[0]:L[L.length-1])}}
     else{const L=matchLens(rev(it),val.split('').reverse().join(''),0);if(L.length)return {val:val.slice(0,n-(op==='%'?L[0]:L[L.length-1]))}}
@@ -169,11 +232,18 @@ function braceVal(body){let m;
 function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   const toks=[],pending=[],P=!!opt.pos;let i=0,cur=null;
   if(P){const tp=toks.push.bind(toks);toks.push=t=>{if(t.t==='op'){t.s=(t.v==='<<'||t.v==='<<-')?i-t.v.length:i;t.e=t.s+t.v.length}return tp(t)}} /* opt.pos (AST parser): tokens carry source offsets s/e */
-  const push=()=>{if(cur){if(!(cur.empt&&cur.v===''))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
-  /* splice a substitution result into the current word, splitting it on whitespace; e = index of the expansion's last character */
-  const inject=(val,e)=>{const ws=val.split(/\s+/).filter(Boolean),lead=/^\s/.test(val),trail=/\s$/.test(val);
-    if(!ws.length){if(cur.v===''&&!cur.keep)cur=null;else if(val!==''){i=e+1;push();i=e}}
-    else{if(lead){push();cur=fresh()}ws.forEach((w,k)=>{if(k>0){push();cur=fresh()}cur.v+=w});if(trail){i=e+1;push();i=e}}};
+  /* a word that is empty and was never quoted came only from expansions: it vanishes (e= ; printf '[%s]' $e a -> [a]); a dry scan keeps it for the AST */
+  const push=()=>{if(cur){if(!(cur.v===''&&(cur.empt||(!dry&&!cur.keep))))toks.push(P?{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i),s:cur.s,e:i}:{t:'w',v:cur.v,glob:cur.glob,raw:line.slice(cur.s,i)});cur=null}};
+  /* splice an unquoted expansion's result into the current word: split on IFS (a field break ends the word so far; a hard break ends it even when empty),
+     and * or ? in the result make the word a glob pattern. opt.nosplit (assignments, redirect targets, case words): appended as is. */
+  const started=()=>cur.v!==''||cur.keep;
+  const splice=val=>{if(opt.nosplit){cur.v+=val;return}
+    const ifs=ifsNow(),add=c=>{cur.v+=c;if(c==='*'||c==='?')cur.glob=true};
+    if(ifs===''){for(const c of val)add(c);return}
+    ifsScan(val,ifs,add,hard=>{if(started()||hard){if(hard){cur.keep=true;delete cur.empt}push()}cur=fresh()})};
+  /* unquoted $@ / $*: each argument is spliced on its own, with a field break between them (an empty argument vanishes) */
+  const spliceList=list=>{if(opt.nosplit){cur.v+=list.join(' ');return}
+    list.forEach((a,k)=>{if(k>0){if(started())push();cur=fresh()}splice(a)})};
   const fresh=()=>({v:'',glob:false,s:i});
   /* opt.pos only: (( ... )) and [[ ... ]] at command position are one raw span token, so << < > inside are never redirects or here-docs; null = not a span (unterminated or ((a); (b)) -> normal tokens) */
   const spanOk=()=>{const l=toks[toks.length-1];
@@ -219,8 +289,11 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     if(c===';'){push();if(line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
     if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='&')throw unsup('>&');else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
-    if(c==='>'){push();if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
-    if(c==='<'){push();
+    if(c==='>'){push();if(line[i+1]==='(')throw unsup('>( )');if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
+    if(c==='<'){
+      if(line[i+1]==='('){const e=scanSub(line,i,true);cur=cur||fresh();cur.keep=true; /* <( list ): one piece of the word, never split or globbed */
+        if(!dry)cur.v+=runProc(line.slice(i+2,e));i=e+1;continue}
+      push();
       if(line[i+1]==='<'){
         if(line[i+2]==='<'){toks.push({t:'op',v:'<<<'});i+=3;continue}
         const strip=line[i+2]==='-',op={t:'op',v:strip?'<<-':'<<'};i+=strip?3:2;toks.push(op);heredocWord(op,strip);continue}
@@ -233,16 +306,15 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
         if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
         if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
           if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
-            if(!d.list.length)atEmpty=true;else{s+=d.list[0];for(let k=1;k<d.list.length;k++){cur.v+=s;push();cur=fresh();s=d.list[k]}}}
-          else s+=d.list?d.list.join(' '):d.val;
+            if(!d.list.length)atEmpty=true;else{s+=d.list[0];for(let k=1;k<d.list.length;k++){cur.v+=s;push();cur=fresh();cur.keep=true;s=d.list[k]}}}
+          else s+=d.list?d.list.join(line[j+1]==='*'||line[j+2]==='*'?ifsJoin():' '):d.val; /* "$*" joins with the first IFS character */
           j=d.end;continue}}s+=line[j];j++}
       if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;if(atEmpty&&s===''&&cur.v==='')cur.empt=true;i=j+1;continue}
     if(c==='$'&&line[i+1]==='('&&line[i+2]!=='('){const e=scanSub(line,i);
-      if(!dry){const val=runSub(line.slice(i+2,e));
-        if(opt.nosplit)cur.v+=val;else inject(val,e)}
+      if(!dry)splice(runSub(line.slice(i+2,e)));
       i=e+1;continue}
     if(c==='$'){const d=evalDollar(line,i,dry,false);if(d){
-      if(d.list&&!opt.nosplit)inject(d.list.join(' '),d.end-1);else cur.v+=d.list?d.list.join(' '):d.val;
+      if(dry)cur.v+=d.val;else if(d.list)spliceList(d.list);else splice(d.val);
       i=d.end;continue}}
     if(c==='\\'&&i+1<line.length){cur.v+=line[i+1];i+=2;continue}
     if(c==='*'||c==='?')cur.glob=true;
@@ -250,9 +322,15 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   push();return toks}
 /* Words from parse() carry their raw source; expand them at run time so earlier commands on the line (X=1; echo $X) and $(...) take effect in order. */
 const ASSIGN=/^[A-Za-z_]\w*=/;
+const ifsJoin=()=>{const f=ifsNow();return f===''?'':f[0]};
 function expandWord(w,nosplit){return tokenize(w.raw,{nosplit}).filter(t=>t.t==='w')}
-function expandWords(words,exporting){const out=[];
-  words.forEach((w,k)=>{const ns=(k===0&&ASSIGN.test(w.raw))||(exporting&&k>0&&ASSIGN.test(w.raw));out.push(...expandWord(w,ns))});return out}
+/* expandWords(words, cmd): cmd = the words of a simple command. Then NAME=value words are not split or globbed when every word is one (an assignment-only
+   command, marked assign) or when the command is a declaration builtin (export, local, readonly, declare), as in bash. A for list (cmd false) splits every word. */
+const DECL=/^(export|local|readonly|declare)$/;
+function expandWords(words,cmd){const out=[];
+  const all=cmd&&words.every(w=>ASSIGN.test(w.raw)),decl=cmd&&DECL.test(words[0].raw);
+  words.forEach((w,k)=>{const ns=all||(decl&&k>0&&ASSIGN.test(w.raw));const ts=expandWord(w,ns);
+    for(const t of ts){if(all){t.assign=true;t.glob=false}out.push(t)}});return out} /* no push(...ts): a split value can give 500,000 fields */
 function expandOne(w){return expandWord(w,true).map(t=>t.v).join(' ')}
 /* Body of a here-document whose delimiter was unquoted: $VAR ${ } $( ) $(( )) expand; \$ \` \\ and backslash-newline are escapes, every other backslash and all quotes stay literal. */
 function expandHeredoc(raw){let o='',j=0;
@@ -278,11 +356,31 @@ function parse(toks){
   if(cmd.words.length||cmd.out)pipe.push(cmd);else if(pipe.length)bad('newline');
   if(pipe.length)seq.push({op,pipe});else if(op&&op!==';')bad('newline');
   return seq}
-function globRe(p,ci){return new RegExp('^'+p.replace(/[.+^${}()|[\]\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.')+'$',ci?'i':'')}
+/* globRe(p, ci) -> {test(name)}: * and ? wildcards (every other character literal; neither wildcard matches a line break), matched with one backtrack
+   point (the last *), so the work is at most name length x pattern length: a JS regex like ^.*a.*a.*b$ would backtrack polynomially (Task 9b).
+   ci lower-cases both sides, which differs from the old /i regex only for exotic letters (the Kelvin sign, dotted capital I). */
+const GLOB_NL=/[\n\r\u2028\u2029]/;
+function globRe(p,ci){if(ci)p=p.toLowerCase();
+  return {test(s){if(ci)s=s.toLowerCase();let i=0,j=0,star=-1,mark=0;
+    while(j<s.length){const c=p[i];
+      if(c==='*'){star=i++;mark=j;continue}
+      if(i<p.length&&(c==='?'?!GLOB_NL.test(s[j]):c===s[j])){i++;j++;continue}
+      if(star<0||GLOB_NL.test(s[mark]))return false;
+      i=star+1;j=++mark}
+    while(p[i]==='*')i++;return i===p.length}}}
+/* every glob is charged to the step budget: one step, plus one per 100 names it looks at */
 function globExpand(pat){const idx=pat.lastIndexOf('/');const dp=idx>=0?pat.slice(0,idx+1):'';const b=pat.slice(idx+1);
-  if(/[*?]/.test(dp)||!b)return [pat];const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
-  const rx=globRe(b);const m=Object.keys(dn.children).filter(k=>(b.startsWith('.')||!k.startsWith('.'))&&rx.test(k)).sort(cmpName).map(k=>dp+k);
+  if(/[*?]/.test(dp)||!b)return [pat];SQ.step();const dn=getNode(norm(dp||'.'));if(!dn||dn.type!=='dir')return [pat];
+  const names=Object.keys(dn.children);for(let k=100;k<=names.length;k+=100)SQ.step();
+  const rx=globRe(b);const m=names.filter(k=>(b.startsWith('.')||!k.startsWith('.'))&&rx.test(k)).sort(cmpName).map(k=>dp+k);
   return m.length?m:[pat]}
+/* globWords(tokens) -> {args, globbed}: the expanded words with their glob patterns expanded. Split fields can make many patterns, so the words are capped
+   at ARGS_MAX and their text at twice LIM.TEXT (a StepLimit, the friendly 'stopped the command' line). */
+const ARGS_MAX=500000;
+function globWords(ws){const args=[];let globbed=false,chars=0;
+  const add=v=>{args.push(v);chars+=v.length;if(args.length>ARGS_MAX||chars>2*SQ.LIM.TEXT)throw new SQ.StepLimit('the expanded words grew too large')};
+  for(const w of ws){if(w.glob){globbed=true;for(const v of globExpand(w.v))add(v)}else add(w.v)}
+  return {args,globbed}}
 function flags(a){const fl=new Set(),rest=[];let end=false;for(const x of a){if(!end&&x==='--'){end=true;continue}
   if(!end&&x.startsWith('-')&&x.length>1){if(x.startsWith('--'))fl.add(x);else for(const ch of x.slice(1))fl.add(ch)}else rest.push(x)}return {fl,rest}}
 function readInputs(rest,io,cmd){const src=[],err=[];if(!rest.length){src.push({name:'',text:io.stdin});return {src,err}}
@@ -292,5 +390,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,flags,readInputs,paint,parseN});
+Object.assign(SQ,{isRO,canSet,roMsg,splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});

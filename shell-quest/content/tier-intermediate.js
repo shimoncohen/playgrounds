@@ -9,6 +9,7 @@ const ACCESS=[
 '10.0.0.7 POST /order 200','10.0.0.5 GET /map 404','10.0.0.12 GET /shop 200','10.0.0.9 POST /order 500'].join('\n');
 const CONFIG='[village]\nname=Oakford\nport=8080\ndebug=false\n\n[shop]\nopen=09:00\nclose=18:00';
 const NOTES='Buy Bread and rope\nCheck the Wolf tracks\nfeed the OWL\nWrite to Mira\nlight the torch';
+SQ.VILLAGE={SALES,ACCESS,CONFIG}; /* the Expert tier (tier-expert.js) seeds the same files, so a jump-in there finds them */
 const seedVillage=()=>{ensureFile('~/village/shop.txt',SHOP);ensureFile('~/journal.txt',JOURNAL);
   ensureFile('~/village/sales.csv',SALES);ensureFile('~/village/logs/access.log',ACCESS);
   ensureFile('~/config.ini',CONFIG);ensureFile('~/notes.txt',NOTES)};
@@ -19,6 +20,7 @@ const ALLLOG=[
 '10.0.0.7 ERROR timeout','10.0.0.12 INFO baker lit the oven','10.0.0.5 ERROR timeout','10.0.0.9 ERROR bad login',
 '10.0.0.7 INFO wolf seen','10.0.0.5 ERROR disk full','10.0.0.12 WARN gate stuck','10.0.0.7 ERROR bad login',
 '10.0.0.12 ERROR gate jammed'].join('\n');
+SQ.VILLAGE.ALLLOG=ALLLOG; /* the Expert capstone (tier-expert.js 19.7) reads village/logs/all.log too */
 const seedLogs=()=>{for(const k of Object.keys(LOGS))ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/village/logs/all.log',ALLLOG)};
 const seedPerms=()=>{ensureFile('~/notes.txt',NOTES);ensureFile('~/secrets.txt',SECRETS);ensureDir('~/scripts');seedLogs()};
 const seedStreams=()=>{seedPerms();ensureFile('~/village/scratch/old1.log','old line 1');ensureFile('~/village/scratch/old2.log','old line 2');

@@ -7,6 +7,7 @@ const errL=text=>({text,cls:'err'});
 const {errOf}=SQ;
 const ce=(m,code=2)=>Object.assign(new Error(m),{raw:true,code});
 const NAME=/^[A-Za-z_]\w*$/;
+const BUILTIN_NAMES=['HOME','USER','SHELL','HOSTNAME','PATH','IFS']; /* the variables a fresh shell already has; `unset` hides them through S.unsetB (see getVar in parse.js) */
 
 /* ---------- test expressions ----------
    Tokens are {raw}: for [ and test the raw text IS the already-expanded value; for [[ it is source text expanded lazily (no word splitting, no globbing) so && and || short-circuit.
@@ -103,7 +104,7 @@ function evalTree(tree,d,name){
     case 'bin':{const op=n.op;
       if(op==='=~'){const a=val(n.a),pat=regexSrc(n.b.raw);let re;
         try{re=SQ.safeRegex(pat,'')}catch(e){throw ce(e.complex?`bash: [[: ${e.message}`:`bash: [[: invalid regular expression: ${pat}`)}
-        return re.test(a)}
+        try{return !!SQ.reExec(re,a)}catch(e){if(e&&e.complex)throw ce(`bash: [[: ${e.message}`);throw e}}
       if(op==='='||op==='=='||op==='!='){const a=val(n.a),m=d?SQ.patMatch(a,n.b.raw):a===val(n.b);return op==='!='?!m:m}
       if(op==='<'||op==='>'){const a=val(n.a),b=val(n.b);return op==='<'?a<b:a>b}
       const x=num(n.a),y=num(n.b);
@@ -111,10 +112,11 @@ function evalTree(tree,d,name){
     return false};
   return ev(tree)}
 
-/* SQ.evalCond(raw): the text between [[ and ]] -> status 0/1, or 2 for a syntax or regex problem. stderr lines are left in CTX.pend for the caller. */
+/* SQ.evalCond(raw): the text between [[ and ]] -> status 0/1, or 2 for a syntax or regex problem. stderr lines are left in CTX.pend for the caller.
+   An expansion error marked abort is thrown on. */
 function evalCond(raw){SQ.step();
   try{return evalTree(parseTest(condTokens(raw),true,'[['),true,'[[')?0:1}
-  catch(e){if(e&&e.stop)throw e;CTX.pend.push(errL(errOf(e)));return e.code||2}}
+  catch(e){if(e&&(e.stop||e.abort))throw e;CTX.pend.push(errL(errOf(e)));return e.code||2}} /* abort (set -u, ${X:?}): interp.js runCond ends the line */
 
 function testCmd(name,a){let args=a;
   if(name==='['){if(!a.length||a[a.length-1]!==']')return E("bash: [: missing ']'",2);args=a.slice(0,-1)}
@@ -143,7 +145,11 @@ CMDS.read=function(a,io){let raw=false,i=0;
   const names=a.slice(i);
   for(const n of names)if(!NAME.test(n)||SQ.badName(n))return E(`bash: read: \`${n}': not a valid identifier`,1);
   const box=io.stdinBox;if(!box)return E(NOT_TYPING,1);
-  const set=(n,v)=>{S.vars[n]=v};
+  const r=read0(names,box,raw);return roHit?E(SQ.roMsg(roHit),1):r};
+/* readonly (Task 15): a readonly name keeps its value and read fails with status 1 after taking its line */
+let roHit=null;
+function read0(names,box,raw){roHit=null;
+  const set=(n,v)=>{if(!SQ.canSet(n)){roHit=roHit||n;return}S.vars[n]=v};
   if(box.pos>=box.text.length){for(const n of names.length?names:['REPLY'])set(n,'');return {out:'',err:[],code:1}}
   let line='';
   for(;;){const k=box.text.indexOf('\n',box.pos);let seg=box.text.slice(box.pos,k<0?box.text.length:k);box.pos=k<0?box.text.length:k+1;
@@ -151,12 +157,21 @@ CMDS.read=function(a,io){let raw=false,i=0;
     line+=seg;break}
   const ch=[];
   for(let j=0;j<line.length;j++){if(!raw&&line[j]==='\\'&&j+1<line.length){ch.push({c:line[++j],e:true});continue}if(!raw&&line[j]==='\\')continue;ch.push({c:line[j],e:false})}
-  const text=s=>s.map(x=>x.c).join(''),ws=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n');
+  const text=s=>s.map(x=>x.c).join('');
   if(!names.length){set('REPLY',text(ch));return ok()}
-  let p=0;
-  names.forEach((n,idx)=>{while(p<ch.length&&ws(ch[p]))p++;
-    if(idx===names.length-1){let e=ch.length;while(e>p&&ws(ch[e-1]))e--;set(n,text(ch.slice(p,e)));p=ch.length;return}
-    const s=p;while(p<ch.length&&!ws(ch[p]))p++;set(n,text(ch.slice(s,p)))});
+  /* fields split on IFS like an unquoted expansion (an escaped character never splits); the last name takes the rest of the line without its leading and
+     trailing IFS whitespace, and without one trailing IFS delimiter when only a single field is left (bash: IFS=, read a b <<< "1,2," gives b=2) */
+  const ifs=SQ.ifsNow();
+  if(ifs===''){names.forEach((n,k)=>set(n,k?'':text(ch)));return ok()}
+  const ifsSet=new Set(ifs),W=x=>!x.e&&(x.c===' '||x.c==='\t'||x.c==='\n')&&ifsSet.has(x.c),D=x=>!x.e&&ifsSet.has(x.c);
+  const delimEnd=(s,q)=>{let k=q;while(k<s.length&&W(s[k]))k++;if(k<s.length&&D(s[k])&&!W(s[k])){k++;while(k<s.length&&W(s[k]))k++}return k};
+  let p=0;while(p<ch.length&&W(ch[p]))p++;
+  names.forEach((n,idx)=>{
+    if(idx===names.length-1){let e=ch.length;while(e>p&&W(ch[e-1]))e--;const rest=ch.slice(p,e);
+      let f=0;while(f<rest.length&&!D(rest[f]))f++;
+      set(n,text(f<rest.length&&delimEnd(rest,f)===rest.length?rest.slice(0,f):rest));p=ch.length;return}
+    const s=p;while(p<ch.length&&!D(ch[p]))p++;set(n,text(ch.slice(s,p)));
+    if(p<ch.length)p=delimEnd(ch,p)});
   return ok()};
 
 /* ---------- shift unset exit source ---------- */
@@ -174,7 +189,7 @@ CMDS.unset=function(a){let fn=false,i=0;
   const err=[];
   for(const n of a.slice(i)){
     if(!NAME.test(n)){err.push(`bash: unset: \`${n}': not a valid identifier`);continue}
-    if(fn){if(S.fns)delete S.fns[n]}else{delete S.vars[n];if(S.exp)delete S.exp[n]}}
+    if(fn){if(S.fns)delete S.fns[n]}else{if(!SQ.canSet(n)){err.push(`bash: unset: ${n}: cannot unset: readonly variable`);continue}delete S.vars[n];if(S.exp)delete S.exp[n];if(BUILTIN_NAMES.includes(n))(S.unsetB=S.unsetB||{})[n]=1}}
   return {out:'',err,code:err.length?1:0}};
 
 CMDS.exit=function(a){let n=S.last;
