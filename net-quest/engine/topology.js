@@ -4,15 +4,16 @@
 'use strict';
 const NQ=globalThis.NQ=globalThis.NQ||{};
 const copy=x=>JSON.parse(JSON.stringify(x));
-/* spec builder: devs are [id,kind,[[iface,cidr|null],...],{routes,nat}], links are ['a.eth0','sw1.p1'] pairs.
-   MACs count up in the order devices (then ifaces) are listed. */
+/* spec builder: devs are [id,kind,[[iface,cidr|null],...],{routes,nat,dropPrivate}], links are ['a.eth0','sw1.p1'] pairs.
+   MACs count up in the order devices (then ifaces) are listed. dropPrivate: the device drops any packet it receives from
+   a private (RFC 1918) source, as ISPs do. */
 const spec=(me,devs,links)=>{
   let n=0;
   const devices={};
   for(const [id,kind,ifs,o] of devs){
     const ifaces={};
     for(const [name,ip] of ifs)ifaces[name]={mac:NQ.ip.mac(++n),ip,up:true,peer:null};
-    devices[id]={id,kind,ifaces,routes:(o&&o.routes)||[],neigh:{},macTable:{},nat:(o&&o.nat)||null};
+    devices[id]={id,kind,ifaces,routes:(o&&o.routes)||[],neigh:{},macTable:{},nat:(o&&o.nat)||null,dropPrivate:!!(o&&o.dropPrivate)};
   }
   const at=p=>{const [d,i]=p.split('.');return devices[d].ifaces[i];};
   for(const [a,b] of links){at(a).peer=b;at(b).peer=a;}
@@ -39,7 +40,7 @@ const SCENARIOS={
     ['phone','host',E('192.168.1.11/24'),{routes:[def('192.168.1.1')]}],
     ['sw1','switch',[['p1',null],['p2',null],['p3',null]]],
     ['home','router',[['eth0','192.168.1.1/24'],['eth1','203.0.113.5/30']],{routes:[{dst:'default',via:'203.0.113.6',dev:'eth1'}],nat:{inside:'eth0',outside:'eth1',table:[]}}],
-    ['isp','router',[['eth0','203.0.113.6/30'],['eth1','198.51.100.1/24']]],
+    ['isp','router',[['eth0','203.0.113.6/30'],['eth1','198.51.100.1/24']],{dropPrivate:true}],
     ['web','host',E('198.51.100.10/24'),{routes:[def('198.51.100.1')]}]
   ],[['laptop.eth0','sw1.p1'],['phone.eth0','sw1.p2'],['home.eth0','sw1.p3'],['home.eth1','isp.eth0'],['isp.eth1','web.eth0']])
 };

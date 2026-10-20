@@ -56,6 +56,10 @@ test('NAT only on home', () => {
   assert.equal(Object.values(home.devices).filter((d) => d.nat).length, 1);
 });
 
+test('dropPrivate only on home\'s isp', () => {
+  for (const n of names) for (const d of Object.values(NQ.createNet(n).devices)) assert.equal(d.dropPrivate, n === 'home' && d.id === 'isp', n + '.' + d.id);
+});
+
 test('pair: devices and addresses', () => {
   const net = NQ.createNet('pair');
   assert.equal(net.me, 'laptop');

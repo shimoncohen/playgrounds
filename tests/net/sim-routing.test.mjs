@@ -233,15 +233,17 @@ test('deterministic: the same traceroute on two fresh nets logs identical entrie
   assert.deepEqual(J(a.entries), J(b.entries));
 });
 
-// Task 7 (NAT) will change these home outcomes on purpose: home will translate laptop's address, so isp can answer.
-test('home, no NAT yet: the request reaches web but isp has no route back, so ping reports no reply', () => {
+// Updated on purpose in Task 7: these pinned the pre-NAT home outcome (isp had no route back to 192.168.1.10). With NAT
+// the ping succeeds (tests/net/sim-nat.test.mjs), so the no-reply pin moves to a web that cannot send its reply back.
+test('home: the request reaches web but web has no route back, so ping reports no reply', () => {
   const net = NQ.createNet('home');
+  net.devices.web.routes = [];
   const r = NQ.sim.ping(net, 'laptop', '198.51.100.10');
   assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'no reply', null]);
   assert.ok([...r.entries].some((e) => e.dev === 'web' && e.dir === 'rx' && icmpType(e) === 'echo-request'), 'web got the request');
-  const d = [...r.entries].find((e) => e.dir === 'drop' && e.dev === 'isp');
-  assert.equal(d.verdict, 'no route to 192.168.1.10', 'isp drops web\'s reply while forwarding it');
-  assert.equal(NQ.sim.ping(NQ.createNet('home'), 'laptop', '203.0.113.6').reason, 'no reply', 'isp itself cannot answer either');
+  const d = [...r.entries].find((e) => e.dir === 'drop' && e.dev === 'web');
+  assert.equal(d.verdict, 'cannot send to 203.0.113.5: no route', 'web replies to the NAT outside address');
+  assert.equal(NQ.sim.ping(NQ.createNet('home'), 'laptop', '203.0.113.6').delivered, true, 'with NAT, isp itself answers');
 });
 
 test('home: the same ping without laptop\'s default route is a local no route with no entries', () => {
@@ -252,9 +254,11 @@ test('home: the same ping without laptop\'s default route is a local no route wi
   assert.equal(r.entries.length, 0);
 });
 
-test('home traceroute (no NAT yet): home answers, isp\'s time-exceeded is lost, so hop 2 is no reply and tracing stops', () => {
-  const t = NQ.sim.traceroute(NQ.createNet('home'), 'laptop', '198.51.100.10');
-  assert.deepEqual(J(t.hops), [
+// Updated on purpose in Task 7: without NAT, isp now drops the private source silently (dropPrivate) at hop 2.
+test('home traceroute without NAT: home answers, isp drops the private source, so hop 2 is no reply and tracing stops', () => {
+  const net = NQ.createNet('home');
+  net.devices.home.nat = null;
+  assert.deepEqual(J(NQ.sim.traceroute(net, 'laptop', '198.51.100.10').hops), [
     { ttl: 1, from: '192.168.1.1', reached: false },
     { ttl: 2, from: null, reached: false, reason: 'no reply' }]);
 });

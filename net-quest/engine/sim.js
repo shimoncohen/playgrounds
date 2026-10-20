@@ -1,6 +1,6 @@
 /* Network Quest simulator: frames move through an explicit FIFO queue, one delivery at a time, and every step is a
    log entry. A ping is one "session" (ctx) holding the queue, the packets parked while ARP resolves, and what came
-   back. ARP, switching, local delivery, routing with TTL and ICMP errors, traceroute; NAT arrives in Task 7. DOM-free. */
+   back. ARP, switching, local delivery, routing with TTL and ICMP errors, traceroute, NAT. DOM-free. */
 (()=>{
 'use strict';
 const NQ=globalThis.NQ=globalThis.NQ||{};
@@ -162,10 +162,37 @@ const died=(ctx,dev,iface,p,verdict,reason,ip,ic,tag,inIface)=>{
   if(tag&&!ctx.hit)ctx.hops=tag.path;
   icmpError(ctx,dev,inIface||iface,ip,ic,tag,reason);
 };
+/* a probe dropped here with no ICMP error (a filter, a NAT miss): hops end here unless the target already took a copy */
+const silent=(ctx,dev,iface,p,verdict,tag)=>{
+  drop(ctx,dev.id,iface,p,verdict);
+  if(tag&&!tag.reason&&!ctx.hit)ctx.hops=via(tag,dev.id).path;
+};
+/* NAT. The ICMP id plays the part a TCP/UDP port will: a packet entering nat.inside and leaving nat.outside gets the
+   outside iface's address as its source and a new id. Table entries {inside, outside, id, outId, dst}: one per
+   (inside, id, dst, outside), outIds allocated from NAT_FIRST up and never reused. Returns the log verdict, or
+   {fail} when the packet cannot be translated. Rewrites layers (the router's own copy) in place. */
+const NAT_FIRST=1024,NAT_LAST=65535;
+const snat=(nat,outIp,layers)=>{
+  const ip=layers[0].fields,icl=layers[1],ic=icl&&icl.name==='ICMP'&&icl.fields;
+  if(!ic)return {fail:'NAT cannot translate this protocol'};
+  let m=nat.table.find(e=>e.inside===ip.src&&e.id===ic.id&&e.dst===ip.dst&&e.outside===outIp);
+  if(!m){
+    const outId=nat.table.reduce((n,e)=>Number.isInteger(e.outId)&&e.outId>=n?e.outId+1:n,NAT_FIRST);
+    if(outId>NAT_LAST)return {fail:'NAT table full: no free ICMP identifier'};
+    m={inside:ip.src,outside:outIp,id:ic.id,outId,dst:ip.dst};
+    nat.table.push(m);
+  }
+  const v='translated: src '+ip.src+' → '+outIp+', id '+ic.id+' → '+m.outId;
+  ip.src=outIp;ic.id=m.outId;
+  return v;
+};
+/* the way back: an echo reply (from the mapped destination) or an ICMP error (from any router on the way, carrying the
+   id it was sent with) for the outside address. Returns the matching entry or undefined. */
+const natBack=(nat,ip,f)=>nat.table.find(e=>e.outside===ip.dst&&e.outId===f.id&&(f.type!=='echo-reply'||e.dst===ip.src));
 /* not for any of our addresses: hosts drop it; a router checks TTL, looks up the route and sends it on with a new
-   Ethernet header (its egress MAC to the next hop's MAC) and ttl - 1. The IPv4 addresses never change here. NAT
-   (Task 7) source translation hooks in here, before the route lookup and send; inbound (de-NAT) traffic is addressed
-   to the router's own outside IP, so it is accepted locally in ipRx and never reaches forward (see ipRx). */
+   Ethernet header (its egress MAC to the next hop's MAC) and ttl - 1. The IPv4 addresses change only by NAT: source
+   translation happens here, after the route lookup; inbound (de-NAT) traffic is addressed to the router's own outside
+   IP, so ipRx translates it back first and then hands it to forward. */
 const forward=(ctx,dev,iface,p,tag)=>{
   if(dev.kind!=='router')return drop(ctx,dev.id,iface,p,'not addressed to this host');
   const ip=layer(p,'IPv4').fields,icl=layer(p,'ICMP'),ic=icl&&icl.fields,t=via(tag,dev.id);
@@ -175,12 +202,32 @@ const forward=(ctx,dev,iface,p,tag)=>{
   if(!dev.ifaces[h.iface].up)return died(ctx,dev,iface,p,'cannot send to '+ip.dst+': '+REASONS.ifDown,REASONS.ifDown,ip,ic,t);
   const layers=p.layers.slice(1).map(P.clone),ttl=ip.ttl-1;
   layers[0].fields.ttl=ttl;
+  const nat=dev.nat;
+  if(nat&&iface===nat.inside&&h.iface===nat.outside){
+    const v=snat(nat,addr(dev.ifaces[h.iface].ip),layers);
+    if(v.fail)return silent(ctx,dev,iface,p,v.fail,tag);
+    log(ctx,dev.id,h.iface,'nat',v,P.stack(...layers));
+  }
   const verdict='forwarded out '+h.iface+(h.via?' via '+h.via:' to '+ip.dst+' (directly connected)')+', ttl '+ttl;
   ipSend(ctx,dev,layers,verdict,{tag:t,inIface:iface,dir:'fwd',back:{iface,ip,ic}});
 };
 const ipRx=(ctx,dev,iface,p,tag)=>{
-  const ip=layer(p,'IPv4').fields,ic=layer(p,'ICMP');
-  /* Task 7: inbound NAT translation must hook in BEFORE this own-address check, or return traffic stops here */
+  const ip=layer(p,'IPv4').fields,ic=layer(p,'ICMP'),nat=dev.nat;
+  const pn=NQ.ip.parse(ip.src);
+  if(dev.dropPrivate&&pn!==null&&NQ.ip.isPrivate(pn))return silent(ctx,dev,iface,p,'dropped: private source address '+ip.src,tag);
+  /* return traffic through NAT is addressed to our outside IP: translate it back before the own-address check. Echo
+     requests to that IP are answered by the router itself; replies and errors with no mapping are dropped, unless they
+     belong to the router's own ping (this session's origin). */
+  if(nat&&iface===nat.outside&&ic&&ownIface(dev,ip.dst)===iface&&(ic.fields.type==='echo-reply'||ERRTYPES.includes(ic.fields.type))){
+    const m=natBack(nat,ip,ic.fields);
+    if(m){
+      const q=P.clone(p),qi=layer(q,'IPv4').fields,qc=layer(q,'ICMP').fields;
+      qi.dst=m.inside;qc.id=m.id;
+      log(ctx,dev.id,iface,'nat','translated: dst '+ip.dst+' → '+m.inside+', id '+m.outId+' → '+m.id,q);
+      return forward(ctx,dev,iface,q,tag);
+    }
+    if(ctx.from!==dev.id)return silent(ctx,dev,iface,p,'no NAT mapping for this packet',tag);
+  }
   if(!ownIface(dev,ip.dst))return forward(ctx,dev,iface,p,tag);
   if(tag&&!tag.reason){ctx.hops=via(tag,dev.id).path;ctx.hit=true;}
   if(!ic)return drop(ctx,dev.id,iface,p,'no one is listening for this protocol');
@@ -253,12 +300,13 @@ const int=(v,lo,hi,what)=>{
   if(!Number.isInteger(v)||v<lo||v>hi)throw new RangeError(what+' must be an integer '+lo+'..'+hi);
   return v;
 };
+const session=(net,from,id,seq)=>({net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,left:false,replyFrom:null,err:null,hit:false});
 const ping=(net,from,dstIp,opts)=>{
   const o=opts||{},dev=net.devices[from];
   if(!dev)throw new Error('unknown device: '+from);
   if(NQ.ip.parse(dstIp)===null)throw new Error('bad IPv4 address: '+dstIp);
   const ttl=int(o.ttl,0,255,'ttl')??64,seq=int(o.seq,0,65535,'seq')??1,id=int(o.id,0,65535,'id')??1;
-  const ctx={net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,left:false,replyFrom:null,err:null,hit:false};
+  const ctx=session(net,from,id,seq);
   const done=(reason)=>({delivered:reason===null,reason,replyFrom:ctx.replyFrom??(ctx.err&&ctx.err.from),hops:ctx.hops,entries:ctx.entries});
   if(!Object.values(dev.ifaces).some(i=>i.ip))return done(REASONS.noAddr);
   if(ownIface(dev,dstIp)){ctx.replyFrom=dstIp;ctx.hops.push(from);return done(null);}
@@ -289,5 +337,16 @@ const traceroute=(net,from,dstIp,maxHops)=>{
   }
   return {hops,entries};
 };
-NQ.sim={ping,traceroute,route,nextHop,REASONS,STEP_LIMIT};
+/* low-level helper: one frame arrives on devId.ifaceName as if off the wire, and the queue runs until nothing is left
+   (same step limit). There is no ping session, so nothing counts as a reply. Returns this call's log entries. */
+const inject=(net,devId,ifaceName,packet)=>{
+  const dev=net.devices[devId];
+  if(!dev)throw new Error('unknown device: '+devId);
+  if(!dev.ifaces[ifaceName])throw new Error('unknown interface: '+devId+'.'+ifaceName);
+  const ctx=session(net,null,null,null);
+  ctx.queue.push({dev:devId,iface:ifaceName,packet:P.clone(packet),tag:null});
+  settle(ctx);
+  return {entries:ctx.entries};
+};
+NQ.sim={ping,traceroute,inject,route,nextHop,REASONS,STEP_LIMIT};
 })();
