@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Network Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/nav.css">
+<link rel="stylesheet" href="../shared/how.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">⇄</span>Network Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Packet Rookie</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+
+<main>
+<section id="tab-quest" class="quest" role="tabpanel" aria-labelledby="t-quest">
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite"></article>
+  </aside>
+  <div class="codeCol">
+    <div class="termbox" id="term">
+      <div class="screen" id="screen" role="log" aria-live="polite" aria-label="Terminal output"></div>
+      <form class="cmdline" id="cmdline" autocomplete="off"><label class="prompt" id="prompt" for="cmd">$</label><input id="cmd" aria-label="Type a command" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"></form>
+    </div>
+  </div>
+  <aside class="mapCol">
+    <div class="panel">
+      <h3>Network view</h3>
+      <div id="inspector"><p class="mapsub">Pick a device on the map to see its addresses, tables and settings here.</p></div>
+      <div id="diagram" aria-label="Network diagram"></div>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire"><h2>Quick-fire</h2><p class="lede">Quick questions about addresses, routes and packets are on their way.</p></div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"><h2>Field guide</h2><p class="lede">The field guide fills up as the chapters arrive.</p></div>
+</section>
+</main>
+</div>
+<script>window.PROGRESS={key:"net-quest-v1",name:"Network Quest"}</script>
+<script src="../shared/theme.js"></script>
+<script src="../shared/nav.js"></script>
+<script src="../shared/progress.js"></script>
+<script src="../shared/how.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
