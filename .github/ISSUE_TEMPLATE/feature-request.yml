@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest an improvement to how a playground or the project works (not new course content)
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a new mission or chapter use **Mission or chapter idea**. For a whole new quest use **New playground proposal**. For something broken use **Bug**. This form is for everything else: the interface, the practice shell's features, progress saving, accessibility, tooling.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which part?
+      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Landing page, Progress saving, Accessibility, Tooling or CI, Docs, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve, and for whom?
+      description: A learner, a team lead onboarding people, a contributor? Describe the situation, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to see?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered (optional)
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Want to build it?
+      options:
+        - label: I would like to open a PR for this (or have my agent do it)
