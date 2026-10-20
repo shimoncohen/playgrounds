@@ -90,10 +90,11 @@ function scanBrace0(line,i,dq){let d=1,j=i+2;
     j++}
   throw new Error("unexpected EOF while looking for matching '}'")}
 /* $( ... ): index of the matching ). Honours quotes, nested $( ) and here-documents (a body line is skipped up to its delimiter line, so ) and quotes in it do not count). */
-function scanSub(line,i){return guarded(()=>scanSub0(line,i))}
-function scanSub0(line,i){
-  if(line[i+2]==='(')return scanArith(line,i);
-  let d=0,j=i+1;const docs=[];
+/* ps (process substitution <( ), Task 16): line[i] is <, and <(( is <( followed by a subshell, never arithmetic */
+function scanSub(line,i,ps){return guarded(()=>scanSub0(line,i,ps))}
+function scanSub0(line,i,ps){
+  if(!ps&&line[i+2]==='(')return scanArith(line,i);
+  let d=ps?1:0,j=ps?i+2:i+1;const docs=[];
   while(j<line.length){const c=line[j];
     if(c==='('&&line[j+1]==='('){let e=-1;try{e=scanArith(line,j-1)}catch(x){} /* (( ... )) or $(( ... )): its << is a shift, not a here-document */
       if(e>0){j=e+1;continue}}
@@ -116,16 +117,31 @@ function scanSub0(line,i){
   throw new Error("unexpected EOF while looking for matching ')'")}
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
+  const r=subRun(cmd,false);CTX.lastSub=r.code;return SQ.trimRun(r.text,'\n')}
+/* subRun(cmd, keepE): run cmd as a subshell whose stdout is captured: {text, code}; its stderr (and any background job's output) goes to CTX.pend.
+   keepE: set -e stays on inside (a process substitution); $( ) turns it off (bash's default, no inherit_errexit). */
+function subRun(cmd,keepE){
   const sv=SQ.snapshotShell();SQ.rt.scopeNode.inherit=true; /* $(jobs -p) lists the shell's jobs (cmds-proc.js tableOf) */
-  if(SQ.rt.opts.e)SQ.rt.opts=Object.assign({},SQ.rt.opts,{e:false}); /* bash's default (no inherit_errexit): set -e is off inside $( ) */
+  if(!keepE&&SQ.rt.opts.e)SQ.rt.opts=Object.assign({},SQ.rt.opts,{e:false});
   CTX.sub++;let r;
   try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true});
     if(SQ.rt.scopeNode.traps){const x=SQ.exitTrap(r.code,{});if(x)r={out:r.out.concat(x.out),code:x.code}}} /* its own EXIT trap (Task 14) */
   catch(e){if(SQ.rt.scopeNode.traps)SQ.abortTrap(e,{});throw e}
   finally{CTX.sub--;SQ.restoreShell(sv)}
-  CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */
-  return SQ.trimRun(v.join('\n'),'\n')}
+  return {text:v.join('\n'),code:r.code}}
+/* <( list ) (Task 16): run list (stdout captured as by $( ) but kept as is, like `list > file`; stderr passes through; its status is ignored) and
+   keep the text in a hidden read-only file /dev/fd/N of the current command's table (fs.js fdNew; numbered 63, 62, ... per command, at most
+   FD_MAX per command); expands to that path. The list runs with no table of its own above it, so its own <( )s number from 63 again, as in bash. */
+const FD_MAX=20;
+function runProc(cmd){const rt=SQ.rt;
+  if(CTX.sub>=20)throw new Error('process substitution nested too deeply');
+  const tab=SQ.fdTable();if(tab.map.size>=FD_MAX)throw perr('too many process substitutions in one command (at most '+FD_MAX+' in this practice shell)',1);
+  const path='/dev/fd/'+(tab.next--);
+  const sv=[rt.fdTab,rt.fdOwn];rt.fdTab=null;rt.fdOwn=false;let r;
+  try{r=subRun(cmd,true)}finally{rt.fdTab=sv[0];rt.fdOwn=sv[1]}
+  if(r.text.length>SQ.LIM.TEXT)throw new SQ.StepLimit('a value grew too large');
+  tab.map.set(path,Object.assign(SQ.F(r.text),{mode:0o444}));return path}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
    list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */
 const arithEnv={get:k=>{if(SQ.rt.opts.u&&!isSet(k))throw unbound(k);return getVar(k)},peek:k=>getVar(k),set:(k,v)=>setVar(k,v)};
@@ -273,8 +289,11 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     if(c===';'){push();if(line[i+1]===';'){toks.push({t:'op',v:';;'});i+=2}else{toks.push({t:'op',v:';'});i++}continue}
     if(!cur&&c==='2'&&line[i+1]==='>'){if(line.startsWith('2>&1',i)){toks.push({t:'op',v:'2>&1'});i+=4}else if(line[i+2]==='&')throw unsup('>&');else if(line[i+2]==='>'){toks.push({t:'op',v:'2>>'});i+=3}else{toks.push({t:'op',v:'2>'});i+=2}continue}
     if(!cur&&c==='1'&&line[i+1]==='>'){i++;continue}
-    if(c==='>'){push();if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
-    if(c==='<'){push();
+    if(c==='>'){push();if(line[i+1]==='(')throw unsup('>( )');if(line[i+1]==='&'){if(line[i+2]==='2'&&(i+3>=line.length||/[\s;|&<>()]/.test(line[i+3]))){toks.push({t:'op',v:'>&2'});i+=3;continue}throw unsup('>&')}if(line[i+1]==='>'){toks.push({t:'op',v:'>>'});i+=2}else{toks.push({t:'op',v:'>'});i++}continue}
+    if(c==='<'){
+      if(line[i+1]==='('){const e=scanSub(line,i,true);cur=cur||fresh();cur.keep=true; /* <( list ): one piece of the word, never split or globbed */
+        if(!dry)cur.v+=runProc(line.slice(i+2,e));i=e+1;continue}
+      push();
       if(line[i+1]==='<'){
         if(line[i+2]==='<'){toks.push({t:'op',v:'<<<'});i+=3;continue}
         const strip=line[i+2]==='-',op={t:'op',v:strip?'<<-':'<<'};i+=strip?3:2;toks.push(op);heredocWord(op,strip);continue}

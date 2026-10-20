@@ -414,13 +414,13 @@
     "code": 0
   },
   "cat <(echo hi)": {
-    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
-    "out": "bash: syntax error near unexpected token '('",
-    "code": 2
+    "reason": "Stage 3 Task 16: process substitution is built; cat reads /dev/fd/63, which holds the output of echo hi",
+    "out": "hi",
+    "code": 0
   },
   "echo hi >(cat)": {
-    "reason": "Task 6a: unquoted ( is an operator now: process substitution is a syntax error (as in bash without process substitution)",
-    "out": "bash: syntax error near unexpected token '('",
+    "reason": "Stage 3 Task 16: >( ) is refused when the line is parsed with the unsupported-syntax message (status 2); no file is written",
+    "out": "this practice shell does not support >( ) yet",
     "code": 2,
     "files": []
   },

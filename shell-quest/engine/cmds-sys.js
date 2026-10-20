@@ -54,6 +54,7 @@ CMDS.find=function(a,io){let start='.',i=0;if(a[0]&&!a[0].startsWith('-')&&a[0]!
     if(abs==='/'||abs===HOME||HOME.startsWith(abs+'/')){err.push(`find: cannot delete '${path}': that would wipe out your whole world`);code=1;return false}
     const rc=rcwd();if(rc===abs||rc.startsWith(abs+'/')){err.push(`find: cannot delete '${path}': you are standing inside it. cd out of it first.`);code=1;return false}
     const cur=lstat(abs);if(!cur)return true;
+    if(SQ.rt.fdTab&&SQ.fdNode(abs)){err.push(`find: cannot delete '${path}': Permission denied`);code=1;return false} /* a <( ) file is read-only */
     if(cur.type==='dir'&&Object.keys(cur.children).length){err.push(`find: cannot delete '${path}': Directory not empty`);code=1;return false}
     const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp);return true};
   const test=(n,path,name)=>{ /* the expression for one entry: tests until one fails, actions in order */

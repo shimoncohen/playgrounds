@@ -52,7 +52,14 @@ SQ.fresh=fresh;
 SQ.resetState=next=>{for(const k of Object.keys(S))delete S[k];fixTree(next&&next.fs);Object.assign(S,next)};
 /* Shell options (Task 13, cmds-opts.js): SQ.rt.opts is an immutable {e, u, pipefail, x}; `set` installs a new object, so a snapshot can keep a reference. */
 SQ.OPTS0=Object.freeze({e:false,u:false,pipefail:false,x:false});
-SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[],opts:SQ.OPTS0,ro:null};
+SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,sandboxed:false,onSaveFail:null,frames:[],opts:SQ.OPTS0,ro:null,fdTab:null,fdOwn:false};
+/* Process substitution files (Task 16): /dev/fd/N exists only while the command that expanded its <( ) runs. SQ.rt.fdTab is the innermost command's
+   table {up, next, map: path -> file node} (null: none), linked to the tables of the commands around it; fdOwn says whether it belongs to the
+   command running now. runPipeline (interp.js) gives each stage a new, lazily made table and drops it when the stage ends; fdTable() makes it on
+   the first <( ) (numbering goes on below the enclosing command's: a function called with <( ) that uses <( ) itself gets 62). walk() finds the
+   files, innermost table first, only for paths under /dev/fd/; nothing lists them, they are not in S.fs (never saved) and writeFile refuses them. */
+function fdTable(){const rt=SQ.rt;if(!rt.fdOwn){const up=rt.fdTab;rt.fdTab={up,next:up?up.next:63,map:new Map()};rt.fdOwn=true}return rt.fdTab}
+function fdNode(abs){for(let t=SQ.rt.fdTab;t;t=t.up){const n=t.map.get(abs);if(n)return n}return null}
 /* Call frames: Frame={name,args,kind:'script'|'function'|'source',locals:Map|null}. frame() is the top one, or the base shell frame.
    locals maps a name to the value it had before `local` (undefined = it was unset); the function's return restores them. */
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
@@ -330,7 +337,8 @@ function norm(p,base){base=base||S.cwd;if(p==null||p==='')return base;if(p==='~'
   return '/'+parts.join('/')}
 const MAX_HOPS=20;
 /* walk the tree; links in the path are followed, and the final one only when follow is true. Sets walk.loop when too many hops. */
-function walk(abs,follow){let parts=abs.split('/').filter(Boolean),hops=0;walk.loop=false;
+function walk(abs,follow){if(SQ.rt.fdTab&&abs.startsWith('/dev/fd/')){const f=fdNode(abs);if(f){walk.loop=false;walk.path=abs;return f}}
+  let parts=abs.split('/').filter(Boolean),hops=0;walk.loop=false;
   let n=S.fs,path='',i=0;
   while(i<parts.length){if(!n||n.type!=='dir')return null;let c=own(n.children,parts[i])?n.children[parts[i]]:null;if(!c)return null;
     if(c.type==='link'&&(follow||i<parts.length-1)){if(++hops>MAX_HOPS){walk.loop=true;return null}
@@ -358,12 +366,12 @@ function mkdirp(abs){let n=S.fs,path='';for(const s of abs.split('/').filter(Boo
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);SQ.rt.changed.add(abs)}}
 const isNull=p=>norm(p)==='/dev/null';
-function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const wt=writeTarget(abs);if(wt===null)return `bash: ${shown}: Too many levels of symbolic links`;abs=wt;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
+function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;if(SQ.rt.fdTab&&fdNode(abs))return `bash: ${shown}: Permission denied`;const wt=writeTarget(abs);if(wt===null)return `bash: ${shown}: Too many levels of symbolic links`;abs=wt;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   const old=n&&n.type==='file'?n.content:'',newLen=append&&old?old.length+1+text.length:text.length,delta=newLen-old.length;
   if(newLen>LIM.TEXT||(delta>1000&&stateText(S.fs)+delta>LIM.STATE))return `bash: ${shown}: file too large for this practice shell`;
   if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);if(delta>0){SQ.rt.grewBy+=delta;grewCheck()}return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
-Object.assign(SQ,{stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,regexFits,reGuard,reExec,watchRegex,trimRun,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
+Object.assign(SQ,{fdTable,fdNode,stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,regexFits,reGuard,reExec,watchRegex,trimRun,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
 })(window.SQ = window.SQ || {});

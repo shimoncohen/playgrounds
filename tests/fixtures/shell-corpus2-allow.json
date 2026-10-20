@@ -1474,5 +1474,47 @@
     "reason": "Stage 3 Task 15: printenv is built and prints HOME from the environment",
     "out": "/home/explorer",
     "code": 0
+  },
+  "echo <(echo hi)": {
+    "reason": "Stage 3 Task 16: process substitution is built; the word expands to the hidden file /dev/fd/63",
+    "out": "/dev/fd/63",
+    "code": 0
+  },
+  "cat <(echo hi)": {
+    "reason": "Stage 3 Task 16: process substitution is built; cat reads /dev/fd/63, which holds the output of echo hi",
+    "out": "hi",
+    "code": 0
+  },
+  "diff <(echo a) <(echo b)": {
+    "reason": "Stage 3 Task 16: process substitution is built; diff compares /dev/fd/63 (a) with /dev/fd/62 (b), status 1 as the files differ",
+    "out": "1c1\n< a\n---\n> b",
+    "code": 1
+  },
+  "cat <(ls) | wc -l": {
+    "reason": "Stage 3 Task 16: process substitution is built; the 14 names ls prints reach wc through /dev/fd/63",
+    "out": "14",
+    "code": 0
+  },
+  "echo hi > >(cat)": {
+    "reason": "Stage 3 Task 16: >( ) is refused when the line is parsed with the unsupported-syntax message (status 2)",
+    "out": "this practice shell does not support >( ) yet"
+  },
+  "sort <(printf \"b\\na\\n\")": {
+    "reason": "Stage 3 Task 16: process substitution is built; sort reads the two printf lines from /dev/fd/63",
+    "out": "a\nb",
+    "code": 0
+  },
+  "while read l; do echo $l; done < <(echo x)": {
+    "reason": "Stage 3 Task 16: process substitution is built; the loop reads its input from /dev/fd/63 (< <( ) form)",
+    "out": "x",
+    "code": 0,
+    "vars": {
+      "l": ""
+    }
+  },
+  "paste <(echo a) <(echo b)": {
+    "reason": "Stage 3 Task 16: process substitution is built; paste joins /dev/fd/63 and /dev/fd/62 with a tab",
+    "out": "a\tb",
+    "code": 0
   }
 }

@@ -35,6 +35,7 @@ const CMDS={
       if(rcwd===abs||rcwd.startsWith(abs+'/')){err.push(`rm: you are standing inside '${t}'. cd out of it first.`);continue}
       const n=lstat(abs);if(!n){if(!f)err.push(`rm: cannot remove '${t}': No such file or directory`);continue}
       if(n.type==='dir'&&!r){err.push(`rm: cannot remove '${t}': Is a directory`);tips.push(`Tip: folders need -r (recursive): rm -r ${t}`);continue}
+      if(SQ.rt.fdTab&&SQ.fdNode(abs)){err.push(`rm: cannot remove '${t}': Permission denied`);continue} /* a <( ) file (fs.js fdTable) is read-only */
       const [par,name,pp]=parentOf(abs);delete par.children[name];SQ.rt.changed.add(pp)}
     return {out:'',err,code:err.length?1:0,tips}},
   rmdir(a){if(!a.length)return E('rmdir: missing operand');const err=[];for(const t of a){const abs=norm(t),n=getNode(abs);
@@ -171,10 +172,12 @@ function copyMove(a,move){const nm=move?'mv':'cp';const {fl,rest}=flags(a);const
     if(move&&(rcwd===rs||rcwd.startsWith(rs+'/'))){err.push(`mv: you are standing inside '${s}'. cd out of it first.`);continue}
     const ex=getNode(tabs);if(ex&&ex.type==='dir'){err.push(`${nm}: cannot overwrite directory '${disp(tabs)}'`);continue}
     const [par,name]=parentOf(tabs);if(!par||par.type!=='dir'){err.push(`${nm}: cannot create '${dest}': No such file or directory`);continue}
-    const copy=move?sn:clone(sn);
+    const fdm=move&&SQ.rt.fdTab&&SQ.fdNode(sabs); /* mv of a <( ) file (fs.js fdTable): copied, and the original cannot go, as in bash */
+    const copy=move&&!fdm?sn:clone(sn);
     if(!move){const sz=SQ.stateText(copy);if(sz>1000&&SQ.stateText(S.fs)+sz>SQ.LIM.STATE){err.push(`cp: ${dest}: file too large for this practice shell`);continue}} /* the saved-state cap, as writeFile applies it to a big write */
-    if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
-    par.children[name]=copy;markTree(tabs,copy,!move);SQ.grewCheck()}
+    if(fdm)err.push(`mv: cannot remove '${s}': Permission denied`);
+    else if(move){const [sp,sname,spp]=parentOf(sabs);delete sp.children[sname];SQ.rt.changed.add(spp)}
+    par.children[name]=copy;markTree(tabs,copy,!move||fdm);SQ.grewCheck()}
   return {out:'',err,code:err.length?1:0,tips}}
 
 /* nano/edit/vi/vim FILE: no file is made here; the page opens its editor on the absolute path and Save writes it */

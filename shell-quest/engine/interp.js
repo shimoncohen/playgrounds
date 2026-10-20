@@ -34,8 +34,9 @@ function restoreShell(sv){
   if(sv.opts)SQ.rt.opts=sv.opts;
   if('ro' in sv){SQ.rt.ro=sv.ro;SQ.rt.gopt=sv.gopt}}
 /* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
-function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang,opts:SQ.rt.opts,ro:SQ.rt.ro,gopt:SQ.rt.gopt}}
-function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;SQ.rt.opts=st.opts||SQ.OPTS0;SQ.rt.ro=st.ro||null;SQ.rt.gopt=st.gopt||null;
+/* fdTab/fdOwn: the process substitution tables (fs.js fdTable); a job starts with its parent's tables (jobs.js spawn), not owning any */
+function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang,opts:SQ.rt.opts,ro:SQ.rt.ro,gopt:SQ.rt.gopt,fdTab:SQ.rt.fdTab,fdOwn:SQ.rt.fdOwn}}
+function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;SQ.rt.opts=st.opts||SQ.OPTS0;SQ.rt.ro=st.ro||null;SQ.rt.gopt=st.gopt||null;SQ.rt.fdTab=st.fdTab||null;SQ.rt.fdOwn=!!st.fdOwn;
   for(const k of ['exp','fns','unsetB']){if(st[k])S[k]=st[k];else delete S[k]}}
 
 /* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows.
@@ -131,9 +132,11 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui,pf=0;
     if(d.ctl){S.last=d.ctl.n;return {out:res,code:d.ctl.n,ctl:d.ctl}}}
   const sv0=P.length>1?snapshotShell():null;
   if(sv0)SQ.rt.scopeNode.inherit=true; /* jobs | cat lists the shell's jobs (cmds-proc.js tableOf) */
+  const rt=SQ.rt,fd0=rt.fdTab,fdOwn0=rt.fdOwn; /* process substitution files (fs.js fdTable): each stage has its own table, dropped when it ends */
   const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
   try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
+    rt.fdTab=fd0;rt.fdOwn=false;
     if(sv0&&i>0){back();newScope();SQ.rt.scopeNode.inherit=true;if(code!==0)pf=code} /* pf: the rightmost failing stage so far (pipefail) */
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
@@ -161,7 +164,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui,pf=0;
       r=SQ.runCmd(c.words,io,c.assigns);
       if(sv0&&SQ.rt.scopeNode.traps)r=stageExit(r,tty); /* a stage is a process: its EXIT trap runs at its end */
       if(r.xt)res.push(...r.xt); /* set -x: the trace reaches the screen before the command's output, whatever its redirects */
-      if(r.defer)return {out:res.concat(r.defer.pend.map(errL)),code:0,defer:r.defer};
+      if(r.defer){if(rt.fdOwn)r.defer.fdTab=rt.fdTab;return {out:res.concat(r.defer.pend.map(errL)),code:0,defer:r.defer}} /* fdTab: jobs.js keeps it for the body */
       if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
       let cr=runCompound(c,Object.assign({},env,{tty,stdin:box,defer:false}));
@@ -188,7 +191,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui,pf=0;
     else if(last){if(text!=='')res.push({text,cls:'out'})}
     else stdin=text}
   }catch(e){if(sv0&&SQ.rt.scopeNode.traps)SQ.abortTrap(e,{tty:env.tty});throw e}
-  finally{if(sv0)back()}
+  finally{rt.fdTab=fd0;rt.fdOwn=fdOwn0;if(sv0)back()}
   if(sv0&&SQ.rt.opts.pipefail){if(code!==0)pf=code;code=pf} /* set -o pipefail: the rightmost non-zero status of the stages */
   if(Pn.negate)code=code===0?1:0;
   S.last=code;

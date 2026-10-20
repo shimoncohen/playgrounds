@@ -93,7 +93,7 @@ let nest=0;
    A $( ) run at the top of a sandboxed script (o.sub) is not a typed line and costs nothing. SQ.advance's Out[] (Task 12a: output of jobs
    that came due) is appended to the line's output, then the job notices (Task 12b, SQ.flushNotices); lastOut keeps only the line's own output. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
-  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[]}
+  if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.fdTab=null;SQ.rt.fdOwn=false;SQ.rt.jobWork=0;SQ.rt.lineNo=(SQ.rt.lineNo||0)+1;SQ.rt.outChars=0;SQ.rt.grewBy=0;SQ.rt.lineBg=[]}
   let charged=!(outer&&!o.sub);
   const lineCost=r=>{if(charged)return r;charged=true;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
   /* Task 12b: the interactive shell's job notices ([1]+  Done  sleep 2) close the typed line, after the jobs that ran during its cost; never in $( ) */

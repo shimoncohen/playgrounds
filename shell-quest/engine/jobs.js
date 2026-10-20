@@ -99,7 +99,9 @@
      (not for KILL) inside inSlice with its own allowance (SQ.TRAP_STEPS), after the unwinding, whichever way the job ended (its end, exit,
      kill, the step-cap stop: the message first); a Done job's handler may change its status with exit n. Its output goes to J.out (slice()
      returns it; kill collects it with SQ.jobOut). A ( ) inside a job runs its own EXIT trap at its end, also when the job is killed inside it.
-   - 16 process substitution: runs synchronously inside a unit; nothing to do here.
+   - 16 process substitution: runs synchronously inside a unit. The /dev/fd tables (fs.js fdTable) are part of a job's shell state: a job starts
+     with its parent's (it can read the /dev/fd files of the command that started it), a for list or case word the generator expands itself gets a
+     table dropped when that compound ends, and a deferred function call keeps its command's table while the body runs (fdKeep).
    - 17 mission ctx.jobs/clock: read SQ.rt.jobs / SQ.rt.clock.
 */
 const S=SQ.S,{CTX,fatalText}=SQ;
@@ -135,7 +137,8 @@ function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
   if(Pn.cmds.length===1&&own(G,c.type)&&plain(c.redirs)){SQ.nestIn();try{r=yield* G[c.type](c,Pn.negate?SQ.quiet(env):env)}finally{SQ.nestOut()}} /* set -e is ignored under ! */
   else{const p=SQ.runPipeline(Pn,Object.assign({},env,{defer:true}));emit(env,p.out);
     if(!p.defer){yield* pay(env);return {code:p.code,ctl:p.ctl}}
-    r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,Pn.negate?SQ.quiet(env):env)}
+    const rt=SQ.rt,fd=[rt.fdTab,rt.fdOwn];if(p.defer.fdTab){rt.fdTab=p.defer.fdTab;rt.fdOwn=false} /* the call's <( ) files live while its body runs */
+    try{r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,Pn.negate?SQ.quiet(env):env)}finally{rt.fdTab=fd[0];rt.fdOwn=fd[1]}}
   if(Pn.negate)r={code:r.code===0?1:0,ctl:r.ctl};
   S.last=r.code;return r}
 /* `wait` in a job (cmds-proc.js): yield until the jobs it waits for have ended; tick resumes this job once SQ.waitReady says so */
@@ -161,13 +164,15 @@ const G={
     for(const b of c.branches){const cr=yield* gList(b.cond,q);if(cr.ctl)return cr;if(cr.code!==0)continue;return yield* gList(b.body,env)}
     return c.else?yield* gList(c.else,env):{code:0}},
   while:gLoop,until:gLoop,
-  *for(c,env){const out=[],fi=SQ.forItems(c,env,out);emit(env,out);if(fi.fail)return fi.fail;
+  *for(c,env){const rt=SQ.rt,fd=[rt.fdTab,rt.fdOwn];rt.fdOwn=false; /* the <( ) files of the list live until the loop ends */
+    try{const out=[],fi=SQ.forItems(c,env,out);emit(env,out);if(fi.fail)return fi.fail;
     const inner=Object.assign({},env,{loops:env.loops+1});let code=0;
     for(const it of fi.items){SQ.step();SQ.setVar(c.var,it);if(SQ.rt.opts.x)emit(env,[SQ.forTrace(c)]);
       const br=yield* gList(c.body,inner);code=br.code;
       if(br.ctl){const p=SQ.resolveCtl(br.ctl,env.loops);if(p==='next')continue;if(p==='stop')break;return {code,ctl:p}}}
-    return {code}},
-  *case(c,env){const out=[],ca=SQ.caseArm(c,env,out);emit(env,out);if(ca.fail)return ca.fail;return ca.arm?yield* gList(ca.arm.body,env):{code:0}},
+    return {code}}finally{rt.fdTab=fd[0];rt.fdOwn=fd[1]}},
+  *case(c,env){const rt=SQ.rt,fd=[rt.fdTab,rt.fdOwn];rt.fdOwn=false;
+    try{const out=[],ca=SQ.caseArm(c,env,out);emit(env,out);if(ca.fail)return ca.fail;return ca.arm?yield* gList(ca.arm.body,env):{code:0}}finally{rt.fdTab=fd[0];rt.fdOwn=fd[1]}},
   *group(c,env){return yield* gList(c.body,env)},
   /* ( ... ) inside a job: isolated like runSubshell (snapshotShell/restoreShell, also when the job is ended while suspended inside) */
   /* its EXIT trap runs at its end, also when the job is ended while suspended inside (g.return() runs the finally block) */
@@ -202,7 +207,7 @@ function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   const cmd=String(src===undefined?node.src||'':src);
   const J=Object.assign(SQ.copyShell(),{id,pid,cmd,node,state:'Running',code:null,wake:start,gen:null,frames,baseArgs:SQ.BASE_FRAME.args.slice(),
     owner,ownerNode,scopeNode:top,topNode:top,scope:top.id,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],waitIntr:0,
-    desc:null,endSeq:0,waited:false,told:false,stopSig:0,waitReq:null});
+    desc:null,endSeq:0,waited:false,told:false,stopSig:0,waitReq:null,fdTab:rt.fdTab,fdOwn:false});
   J.cur=J.seq; /* the newest job is the current one (%+) */
   J.gen=run(node,{depth:J.depth,tty:!!env.tty,record:false,stdin:null,loops:0,job:J});
   rt.jobs.push(J);rt.bang=pid; /* $! of the shell that started it (J itself keeps its parent's $!, copied above) */
