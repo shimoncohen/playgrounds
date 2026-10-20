@@ -1,5 +1,5 @@
 (function (SQ) {
-/* jobs, wait, kill, the job notices and the signal table (Stage 3 Task 12b). Runtime state only (SQ.rt, procs.js); nothing here is saved.
+/* jobs, wait, kill, the job notices and the signal table (Stage 3 Task 12b), trap and signal delivery (Task 14). Runtime state only (SQ.rt, procs.js); nothing here is saved.
 
    Job tables. Every job record (jobs.js) has an owner: the process scope that started it (0 = the interactive shell). The current shell's
    table is tableOf(): the records owned by SQ.rt.scope. A $( ) or a pipeline stage (scope node marked inherit by parse.js runSub and interp.js
@@ -43,24 +43,69 @@
    `bash: kill: -s: option requires an argument`. A PID names any live job of the session (whoever started it); a job that has ended is
    `No such process` by pid and `no such job` by spec. kill -0 only checks that the target exists.
 
-   SQ.signal(job, {num, name}) -> 'ok' | 'ignored' | 'stopped' | 'continued' | 'ended' | 'self' delivers a signal to a job with its default
-   action (DEFAULT ACTION TABLE): 0 nothing; CONT resumes a stopped job (state Running; it runs at the next tick); STOP, TSTP, TTIN, TTOU stop a
-   running job (state Stopped, ps state T, it becomes current, notice `Stopped`; tick never runs it; a job that stops itself runs on until it
-   next yields); CHLD, URG, WINCH are ignored; every other signal (TERM, INT, HUP, KILL, QUIT, USR1, ...) ends it: SQ.endJob(job, 'Terminated',
-   128 + N, strsignal text) unwinds the generator's finally blocks with the job's state swapped in, so the shell's own state (cwd, variables,
-   function frames, scope) is untouched wherever the job was suspended. A terminating signal to a stopped job ends it at once. 'self': the job
-   signalled itself from its own slice; kill throws {jobSig} after its other targets and jobs.js slice() ends the job (no message).
-   HOOK FOR TASK 14 (trap): signal() is the one place a signal reaches a job: a trap the job set for that signal intercepts it there (marked
-   below), e.g. by setting Job.sig and running the handler at the job's next command boundary (jobs.js gPipe). Signals to the shell itself
-   (PID $$ = 1234) go through SQ.signalShell(sig), which for now accepts signal 0 and answers anything else with
-   `this practice shell does not support signals to the shell itself yet` (status 2): Task 14 replaces it (trap handlers, kill $$ in scripts;
-   an interactive bash ignores TERM).
+   SQ.signal(job, {num, name}) -> 'ok' | 'ignored' | 'trapped' | 'stopped' | 'continued' | 'ended' | 'self' delivers a signal to a job. (The plan's
+   interface named it signal(pid, name) -> Out[]; the 12b hook takes the job record, and the output of an EXIT handler it causes stays in J.out for
+   kill to collect with SQ.jobOut.) First the job's traps (Task 14, below): '' ignores it, a handler queues it ('trapped'); KILL and STOP cannot be
+   caught. Otherwise the DEFAULT ACTION TABLE: 0 nothing; CONT resumes a stopped job (state Running; it runs at the next tick); STOP, TSTP, TTIN,
+   TTOU stop a running job (state Stopped, ps state T, it becomes current, notice `Stopped`; tick never runs it; a job that stops itself runs on
+   until it next yields); CHLD, URG, WINCH are ignored; every other signal (TERM, INT, HUP, KILL, QUIT, USR1, ...) ends it: SQ.endJob(job,
+   'Terminated', 128 + N, strsignal text) unwinds the generator's finally blocks with the job's state swapped in, so the shell's own state (cwd,
+   variables, function frames, scope) is untouched wherever the job was suspended, then runs the job's EXIT trap (not for KILL). A terminating
+   signal to a stopped job ends it at once. 'self': the job signalled itself from its own slice; kill throws {jobSig} after its other targets and
+   jobs.js slice() ends the job (no message). $BASHPID inside a job is the job's pid (parse.js), so `kill $BASHPID` there signals the job itself.
+   kill 0 and negative pids (process groups) name no process here: `bash: kill: (0) - No such process` (status 1), a safe choice (bash would
+   signal the whole group, the shell included).
+
+   TRAPS (Task 14). Traps belong to a process: the scope node SQ.rt.scopeNode (jobs.js header) holds them as node.traps = Map<key, text> | null,
+   key EXIT DEBUG ERR RETURN or a signal name (INT, RTMIN+1, ...), text '' = ignored. SQ.rt.traps is a read-only view of the current node's map,
+   null when none is set, so every check in the interpreter is O(1) without traps. A function and a sourced file run in the caller's process,
+   so they see and change its traps; a ( ) subshell, $( ), pipeline stage and background job start a new node with only the ignored real
+   signals (childTraps), and show (trap / trap -p) the parent's traps until they change one, as bash does for `saved=$(trap)`; a script or
+   bash -c starts with only the ignored ones, which it cannot trap or reset (bash: signals ignored on entry to a non-interactive shell).
+   Runtime state only: never saved; Reset world (resetProcs: a fresh root node) and SQ.sandbox (procsSave) start with none.
+   trap [-lp] [[ARG] SPEC...]: `trap 'cmd' SPEC...` sets, `trap '' SPEC` ignores, `trap - SPEC`, `trap SPEC` (one argument that is a spec) and
+   `trap N SPEC...` (N a signal number, as bash) reset; `trap` / `trap -p` list every trap as `trap -- 'cmd' SIGINT` (EXIT, DEBUG, ERR, RETURN
+   without SIG; text in single quotes with '\'' for a quote) in signal order (EXIT, 1..64, DEBUG, ERR, RETURN); `trap -p SPEC...` those;
+   `trap -l` (also with -p or arguments) prints the kill -l table. Specs: names in any case with or without SIG, numbers 0..64 (0 = EXIT), the
+   pseudo signals without SIG (SIGEXIT is invalid, as in bash). Errors (bash wording): `bash: trap: SIGFOO: invalid signal specification`
+   (status 1, the other specs still apply), `bash: trap: -z: invalid option` + usage and a lone action (`trap 'x'`, `trap ''`, `trap -`):
+   `trap: usage: trap [-lp] [[arg] signal_spec ...]` (status 2). KILL and STOP are accepted and listed but never caught. `trap 'x' RETURN`
+   prints `this practice shell does not support trap RETURN yet` (2).
+   Handlers (runHandler) are parsed when they run (a syntax error prints `bash: exit trap: line 1: ...` / `error trap` / `debug trap` /
+   `trap`, each time it runs; bash adds a second line quoting the text) and run in the process's own state through the normal interpreter,
+   with $? = the status at that moment; afterwards $? is put back (an EXIT handler leaves the shell's status as it was unless it calls exit n).
+   A handler is not interrupted by the signals it queues (node.inTrap); they run after it.
+   EXIT runs once (it is removed before it runs) whenever a process ends: a script or bash -c (interp.js runChild), a ( ) subshell, $( ),
+   pipeline stage, background job (endJob: its end, exit, kill, its step-cap stop), by the end of the text, exit (its status kept, or the
+   handler's exit n), set -e, a ${X:?}/set -u abort, a signal (not KILL; the status stays 128+N), a timeout (SQ.abortTrap: the timeout's
+   signal handler first, then EXIT; KILL runs neither) and a step / output / nesting cap (abortTrap again: the cap's message is printed first,
+   the handler's output after it, and the handler gets its own TRAP_STEPS = 1000 steps and output room, so a runaway handler is cut short with
+   a second cap message). A job's EXIT handler always gets that allowance (it runs outside the job's slice). At a typed prompt an EXIT trap is
+   kept but never runs: bash runs it when the shell exits, and this page never exits.
+   ERR runs where set -e would exit (interp.js failAt, the same suppression in conditions, && / || lists and !), set -e on or off, then set -e
+   exits as usual; it does not run inside a function body (bash without set -E: the call's failing status fires it in the caller).
+   DEBUG runs before each simple command of the process (exec.js runCmd; not inside a function: no set -T; not before [[ ]], (( )) or a for
+   pass, which bash also traces); its output comes before the command's, like a set -x trace, and exit in it ends the shell before the command.
+   Signal delivery: a queued signal waits at node.sig (SQ.rt.sigPend counts them all) and runs at the target's next command boundary: after the
+   pipeline it is in finishes (sigBoundary, called after every pipeline of an and-or list in interp.js and jobs.js). As in bash 5.2: a trapped
+   signal to a job sleeping in `sleep 10` runs its handler when the sleep ends and the job goes on; a trapped signal interrupts `wait` (status
+   128+N, then the handler; a job's wait too); an untrapped terminating signal ends a job at once (its EXIT trap runs at the kill time).
+   `kill SIG $$` names the shell $$ stands for: the innermost script / bash -c on the scope chain, else the interactive shell (inside a job or
+   subshell that is its parent, as in bash, where $$ is the parent's pid). Trapped or ignored: as above. Untrapped, a script dies at its next
+   command boundary with status 128+N: its EXIT trap runs (not for KILL) and its caller prints the strsignal text (`Terminated`, `Killed`,
+   `User defined signal 1`; nothing for INT and PIPE, like bash). The interactive shell ignores TERM, INT and QUIT (as bash) and, since the page
+   never exits, every other untrapped signal too (kill -9 $$ prints nothing, status 0); its trapped signals from a job run when the shell next
+   gets control (the next boundary of the line, or the end of the line: exec.js). STOP/TSTP to a script are ignored.
+   Deviations kept on purpose: a script killed by a job while it sleeps dies when its sleep ends (bash: at the kill time); a script under
+   `timeout` whose TERM trap runs does not go on afterwards (bash resumes it after the interrupted command) and its earlier output is lost as
+   with any timeout; a job's async INT/QUIT ignore (bash without job control) is not modelled; RETURN, set -E and set -T are unsupported;
+   `exit` in a sourced file ends only that file (Stage 2), so the EXIT trap runs when the script itself ends.
 */
 const {CMDS,E,own,LIM}=SQ;
 const SHELL_PID=1234;
 const errL=text=>({text,cls:'err'}),outL=text=>({text,cls:'out'});
 /* a result whose stdout and stderr lines keep their order on screen (list), with out/err for a redirected command */
-const fromList=(list,code,bg)=>{const r={out:list.filter(x=>x.cls==='out').map(x=>x.text).join('\n'),err:list.filter(x=>x.cls==='err').map(x=>x.text),code,list};if(bg&&bg.length)r.bg=bg;return r};
+const fromList=(list,code,bg)=>{const r={out:list.filter(x=>x.cls==='out'&&!x.bg).map(x=>x.text).join('\n'),err:list.filter(x=>x.cls==='err'&&!x.bg).map(x=>x.text),code,list};if(bg&&bg.length)r.bg=bg;return r};
 
 /* ---------- signals (Linux numbering, bash 5.2 names) ---------- */
 const NAMES=['HUP','INT','QUIT','ILL','TRAP','ABRT','BUS','FPE','KILL','USR1','SEGV','USR2','PIPE','ALRM','TERM','STKFLT','CHLD','CONT','STOP','TSTP',
@@ -84,9 +129,19 @@ function sigTable(){const ns=Object.keys(SIGNAME).map(Number).filter(n=>n>0).sor
   ns.forEach((n,i)=>{o+=`${String(n).padStart(2)}) SIG${SIGNAME[n]}${(i+1)%5===0?'\n':'\t'}`});return o.replace(/\n$/,'')}
 
 const setProc=(J,st)=>{const p=SQ.rt.procs.find(x=>x.pid===J.pid);if(p)p.state=st};
+/* queue signal num at a process scope node (delivered by sigBoundary at its next command boundary) */
+const queue=(n,num)=>{(n.sig=n.sig||[]).push(num);SQ.rt.sigPend=(SQ.rt.sigPend||0)+1};
+const UNCATCHABLE=n=>n===9||n===19;
 function signal(J,s){const rt=SQ.rt;
   if(s.num===0)return 'ok';
-  /* HOOK FOR TASK 14: a trap set inside J for s would intercept the signal here, before the default action */
+  /* a trap the job set (on its top scope node) intercepts the signal before the default action; KILL and STOP cannot be caught */
+  const top=J.topNode,h=top&&top.traps?top.traps.get(s.name):undefined;
+  if(h!==undefined&&!UNCATCHABLE(s.num)){
+    if(h==='')return 'ignored';
+    queue(top,s.num);
+    if(J.waitReq){J.waitIntr=128+s.num;J.waitReq=null;J.wake=rt.clock} /* a trapped signal interrupts wait (status 128+n), then the handler runs */
+    if(s.num===18&&J.state==='Stopped'){J.state='Running';setProc(J,'S');if(J.wake!==null&&J.wake<rt.clock)J.wake=rt.clock}
+    return 'trapped'}
   const act=action(s.num);
   if(act==='ignore')return 'ignored';
   if(act==='cont'){if(J.state==='Stopped'){J.state='Running';setProc(J,'S');if(J.wake!==null&&J.wake<rt.clock)J.wake=rt.clock}return 'continued'}
@@ -94,9 +149,16 @@ function signal(J,s){const rt=SQ.rt;
       if(J.owner===0&&!rt.notices.includes(J))rt.notices.push(J)}
     return 'stopped'}
   if(J===rt.slice)return 'self';
-  SQ.endJob(J,'Terminated',128+s.num,descOf(s.num));return 'ended'}
-/* the shell itself ($$): Task 14 replaces this */
-function signalShell(s){if(s.num===0)return {ok:true};return {ok:false,err:'this practice shell does not support signals to the shell itself yet'}}
+  SQ.endJob(J,'Terminated',128+s.num,descOf(s.num),s.num===9);return 'ended'}
+/* the shell $$ names (see TRAPS in the header): the innermost script or bash -c on the scope chain, else the interactive shell */
+function signalShell(s){const rt=SQ.rt;if(s.num===0)return {ok:true};
+  let n=rt.scopeNode;while(n.up&&!n.script)n=n.up;
+  if(n.dead)return {ok:true};
+  const h=n.traps?n.traps.get(s.name):undefined;
+  if(h!==undefined&&!UNCATCHABLE(s.num)){if(h!=='')queue(n,s.num);return {ok:true}}
+  if(n.id===0)return {ok:true}; /* the interactive shell: ignores TERM, INT and QUIT like bash, and the page never exits on any other signal */
+  if(s.num===9||action(s.num)==='term')queue(n,s.num); /* a script dies at its next command boundary (KILL: without its EXIT trap) */
+  return {ok:true}}
 
 /* ---------- job tables, job specs, formatting ---------- */
 const byId=(a,b)=>a.id-b.id;
@@ -161,7 +223,8 @@ function waitDone(req,r){
   return r.code}
 /* the foreground waits: move the clock from one job wake to the next until req is ready; returns the jobs' output */
 function block(req,io){const rt=SQ.rt,start=SQ.now(),out=[];
-  try{for(;;){if(waitReady(req))return out;
+  try{for(;;){const sn=rt.scopeNode;if(rt.sigPend&&sn.sig&&sn.sig.length){req.intr=128+sn.sig[0];return out} /* a signal for this shell interrupts the wait (Task 14) */
+      if(waitReady(req))return out;
       SQ.step();
       if((rt.jobWork||0)>=SQ.JOB_WORK)throw new SQ.StepLimit(); /* no job may run again in this line: the wait cannot end */
       let T=Infinity;
@@ -201,7 +264,7 @@ CMDS.wait=function(a,io){let any=false,pvar=null,i=0;const bad=m=>({out:'',err:[
   if(rt.slice){ /* inside a background job: a lone wait makes the job yield (jobs.js gWait); anywhere else in it the job cannot pause */
     if(io&&io.defer){const o={out:'',err:errs,code:0};o.defer={wait:req,get pend(){return o.err}};return o}
     return fromList(el.concat(errL('this practice shell does not support wait inside that part of a background job yet')),2)}
-  const bg=block(req,io);r=waitReady(req);
+  const bg=block(req,io);if(req.intr)return fromList(el.concat(bg),req.intr,bg);r=waitReady(req);
   return fromList(el.concat(bg),waitDone(req,r),bg)};
 
 /* ---------- kill ---------- */
@@ -227,11 +290,11 @@ CMDS.kill=function(a){let i=0,listing=false,sig=null,spec=null,saw=false;
   if(saw&&!sig)return E(`bash: kill: ${spec}: invalid signal specification`,1);
   const targets=a.slice(i);if(!targets.length)return {out:'',err:[KILL_USAGE],code:2};
   if(!sig)sig={num:15,name:'TERM'};
-  const T=tableOf(),errs=[];let any=false,unsup=false,self=false;
-  const hit=J=>{const r=signal(J,sig);if(r==='self')self=true;any=true};
+  const T=tableOf(),errs=[],bg=[];let any=false,self=false;
+  const hit=J=>{const r=signal(J,sig);if(r==='self')self=true;any=true;bg.push(...SQ.jobOut(J))}; /* the EXIT handler of a job it ended */
   for(const w0 of targets){const neg=w0[0]==='-',w=neg?w0.slice(1):w0;
     if(w&&/^\d+$/.test(w)){const pid=+w;
-      if(!neg&&pid===SHELL_PID){const r=SQ.signalShell(sig);if(r.ok)any=true;else{errs.push(r.err);unsup=true}continue}
+      if(!neg&&pid===SHELL_PID){SQ.signalShell(sig);any=true;continue}
       const J=!neg&&SQ.rt.jobs.find(j=>j.pid===pid&&!ended(j));
       if(J){hit(J);continue}
       errs.push(`bash: kill: (${neg?'-':''}${pid}) - No such process`);continue}
@@ -243,7 +306,98 @@ CMDS.kill=function(a){let i=0,listing=false,sig=null,spec=null,saw=false;
     hit(f.job)}
   /* the job killed itself: end its slice now (jobs.js slice() records it) */
   if(self)throw Object.assign(new Error('killed by '+sig.name),{stop:true,jobSig:{num:sig.num,desc:descOf(sig.num)}});
-  return {out:'',err:errs,code:unsup&&!any?2:any?0:1}};
+  return fromList(errs.map(errL).concat(bg),any?0:1,bg)};
 
-Object.assign(SQ,{signal,signalShell,sigOf,sigName:n=>SIGNAME[n],sigDesc:descOf,flushNotices,waitReady,waitDone,jobTable:tableOf});
+/* ---------- trap (Task 14; see TRAPS in the header) ---------- */
+const S=SQ.S,CTX=SQ.CTX;
+const TRAP_USAGE='trap: usage: trap [-lp] [[arg] signal_spec ...]';
+const TRAP_STEPS=1000,TRAP_CHARS=100000; /* the allowance of a handler that runs after an abort (and of a job's EXIT handler) */
+const PSEUDO=['EXIT','DEBUG','ERR','RETURN'];
+const ORDER=k=>k==='EXIT'?0:k==='DEBUG'?65:k==='ERR'?66:k==='RETURN'?67:SIGNUM[k];
+const shownName=k=>PSEUDO.includes(k)?k:'SIG'+k;
+const LABEL={EXIT:'exit trap',ERR:'error trap',DEBUG:'debug trap'};
+/* a trap key from a spec: EXIT DEBUG ERR RETURN (any case, never with SIG), a signal name (any case, SIG optional) or number; 0 is EXIT. null if invalid */
+function trapKey(spec){spec=String(spec);
+  if(/^\d+$/.test(spec)){const n=+spec;return n===0?'EXIT':n<=64&&SIGNAME[n]!==undefined?SIGNAME[n]:null}
+  let u=spec.toUpperCase();if(PSEUDO.includes(u))return u;
+  if(u.startsWith('SIG')&&u.length>3)u=u.slice(3);
+  return SIGNUM[u]!==undefined&&u!=='EXIT'?u:null}
+const sq1=t=>"'"+t.replace(/'/g,"'\\''")+"'";
+/* the traps a new process starts with: only the ignored real signals ('' handlers). show: a subshell, $( ), pipeline stage or job also
+   shows (trap -p) the parent's until it changes one (bash); lock: a script cannot trap or reset a signal ignored on entry (non-interactive bash) */
+function childTraps(p,show,lock){if(!p)return null;const m=new Map();
+  for(const [k,v] of p)if(v===''&&!PSEUDO.includes(k))m.set(k,'');
+  const disp=p.shown||p;if(show&&disp.size)m.shown=new Map(disp);
+  if(lock&&m.size)m.locked=new Set(m.keys());
+  return m.size||m.shown?m:null}
+const inFunction=()=>{const f=SQ.rt.frames;for(let i=f.length-1;i>=0;i--){if(f[i].kind==='function')return true;if(f[i].kind==='script')return false}return false};
+/* run handler text in the current shell: $? = status while it runs and is put back afterwards (keep: an EXIT handler, the shell is ending).
+   budget: it runs after an abort (or at a job's end), with its own TRAP_STEPS steps and output room; a cap inside it prints its message.
+   A syntax error prints `bash: exit trap: line N: ...` (bash adds a second line quoting the text). -> {out, ctl} (ctl: an exit inside it) */
+function runHandler(text,key,status,o){o=o||{};const rt=SQ.rt,node=rt.scopeNode,label=LABEL[key]||'trap';
+  let prog;try{prog=SQ.parseCached(text)}catch(e){if(e&&e.stop)throw e;
+    const m=e&&e.at!==undefined?`bash: ${label}: line ${SQ.lineOf(text,e.at)}: ${e.message}`:e&&!e.raw&&!SQ.isOverflow(e)?`bash: ${label}: line ${SQ.lineOf(text,text.length)}: ${e.message}`:SQ.errOf(e);
+    return {out:[errL(m)],ctl:null}}
+  const saved=S.last;S.last=status;node.inTrap=(node.inTrap||0)+1;
+  let budget=null,r;
+  if(o.budget){budget={steps:rt.steps,chars:rt.outChars};rt.steps=LIM.STEPS-TRAP_STEPS;if(rt.outChars>LIM.TOTAL-TRAP_CHARS)rt.outChars=LIM.TOTAL-TRAP_CHARS}
+  try{r=SQ.runProgram(prog,{depth:CTX.depth,tty:!!o.tty,record:false,stdin:null,loops:0})}
+  catch(e){if(!budget||(e&&(e.tmo!==undefined||e.jobSig)))throw e;r={out:CTX.pend.splice(0).concat(errL(SQ.fatalText(e))),code:1}}
+  finally{node.inTrap--;if(budget){rt.steps=budget.steps;rt.outChars=budget.chars}}
+  const ctl=r.ctl&&r.ctl.type==='exit'?r.ctl:null;
+  if(!o.keep)S.last=saved;
+  return {out:r.out,ctl}}
+/* the current process's EXIT trap, run once (it is removed first): null when none, else {out, code} (code: the handler's exit n, else status) */
+function exitTrap(status,o){const n=SQ.rt.scopeNode,t=n.traps;if(!t||!t.has('EXIT'))return null;
+  const h=t.get('EXIT');t.delete('EXIT');if(h==='')return null;
+  const r=runHandler(h,'EXIT',status,Object.assign({keep:true},o));
+  return {out:r.out,code:r.ctl?r.ctl.n:status}}
+/* error e (a cap, a timeout, ...) is ending the current process: for a timeout its signal's handler first (TERM by default; KILL runs nothing), then
+   the EXIT trap, each with the small allowance; their output rides on e.after (printed after the abort message). Returns e. */
+function abortTrap(e,o){const t=SQ.rt.scopeNode.traps;if(!t||!e||e.jobSig)return e;const outs=[];let kill=false;
+  if(e.tmo!==undefined){const d=SQ.rt.deadlines,s=(d.sigs&&d.sigs[e.tmo])||{num:15,name:'TERM'};
+    if(s.num===9)kill=true;else{const h=t.get(s.name);if(h)outs.push(...runHandler(h,s.name,S.last,Object.assign({budget:true},o)).out)}}
+  if(!kill){const x=exitTrap(S.last,Object.assign({budget:true},o));if(x)outs.push(...x.out)}
+  if(outs.length)e.after=(e.after||[]).concat(outs);
+  return e}
+/* a command boundary of the current process: run the handlers of the signals queued for it, in order. -> null | {out, ctl?}; ctl: a handler
+   ran exit, or a queued signal with no trap ends the shell ({type:'exit', n:128+N, abort:true, sig:N}; the interactive shell never ends) */
+function sigBoundary(tty){const rt=SQ.rt,n=rt.scopeNode;if(!n.sig||!n.sig.length||n.inTrap)return null;
+  const out=[];
+  while(n.sig.length){const num=n.sig.shift();rt.sigPend--;const name=SIGNAME[num],h=n.traps?n.traps.get(name):undefined;
+    if(h!==undefined&&!UNCATCHABLE(num)){if(h==='')continue;const r=runHandler(h,name,S.last,{tty});out.push(...r.out);if(r.ctl)return {out,ctl:r.ctl};continue}
+    if(n.id!==0&&(num===9||action(num)==='term'))return {out,ctl:{type:'exit',n:128+num,abort:true,sig:num}}}
+  return {out}}
+/* ERR (where set -e would exit; not inside a function body: no set -E) and DEBUG (before a simple command, not inside a function: no set -T) */
+function errTrap(code,tty){const n=SQ.rt.scopeNode,h=n.traps&&n.traps.get('ERR');if(!h||n.inTrap||inFunction())return null;return runHandler(h,'ERR',code,{tty})}
+function debugTrap(tty){const n=SQ.rt.scopeNode,h=n.traps&&n.traps.get('DEBUG');if(!h||n.inTrap||inFunction())return null;return runHandler(h,'DEBUG',S.last,{tty})}
+/* drop what is still queued for a process that ends */
+function sigDrop(n){if(n.sig&&n.sig.length){SQ.rt.sigPend-=n.sig.length;n.sig=null}n.dead=true}
+
+CMDS.trap=function(a,io){let i=0,list=false,print=false;
+  for(;i<a.length;i++){const x=a[i];if(x==='--'){i++;break}if(x[0]!=='-'||x.length<2)break;
+    for(const c of x.slice(1)){if(c==='l')list=true;else if(c==='p')print=true;else return {out:'',err:[`bash: trap: -${c}: invalid option`,TRAP_USAGE],code:2}}}
+  const args=a.slice(i),rt=SQ.rt,node=rt.scopeNode;
+  if(list)return fromList([outL(sigTable())],0);
+  if(print||!args.length){const t=node.traps,disp=t?(t.shown||t):null,line=k=>outL(`trap -- ${sq1(disp.get(k))} ${shownName(k)}`);
+    if(!args.length)return fromList(disp?[...disp.keys()].sort((x,y)=>ORDER(x)-ORDER(y)).map(line):[],0);
+    const L=[];let code=0;
+    for(const w of args){const k=trapKey(w);if(k===null){L.push(errL(`bash: trap: ${w}: invalid signal specification`));code=1;continue}if(disp&&disp.has(k))L.push(line(k))}
+    return fromList(L,code)}
+  let act=args[0],specs=args.slice(1),op;
+  if(!specs.length){if(trapKey(act)===null)return {out:'',err:[TRAP_USAGE],code:2};op='reset';specs=[act]}
+  else if(act==='-'||(/^\d+$/.test(act)&&trapKey(act)!==null))op='reset'; /* trap - SIG..., and bash's trap N SIG... */
+  else op=act===''?'ignore':'set';
+  const L=[];let code=0;
+  for(const w of specs){const k=trapKey(w);
+    if(k===null){L.push(errL(`bash: trap: ${w}: invalid signal specification`));code=1;continue}
+    if(k==='RETURN'&&op!=='reset'){L.push(errL('this practice shell does not support trap RETURN yet'));code=2;continue}
+    let m=node.traps;if(!m)m=node.traps=new Map();delete m.shown;
+    if(m.locked&&m.locked.has(k))continue; /* ignored when this script started: bash silently keeps it ignored */
+    if(op==='reset')m.delete(k);else m.set(k,op==='ignore'?'':act)}
+  if(node.traps&&!node.traps.size&&!node.traps.shown)node.traps=null; /* none left: the interpreter's checks stay O(1) */
+  return fromList(L,code)};
+Object.defineProperty(SQ.rt,'traps',{configurable:true,get(){return SQ.rt.scopeNode.traps||null}});
+
+Object.assign(SQ,{childTraps,exitTrap,abortTrap,sigBoundary,errTrap,debugTrap,sigDrop,TRAP_STEPS,signal,signalShell,sigOf,sigName:n=>SIGNAME[n],sigDesc:descOf,flushNotices,waitReady,waitDone,jobTable:tableOf});
 })(window.SQ = window.SQ || {});

@@ -1192,9 +1192,9 @@
     "code": 1
   },
   "kill -9 1234": {
-    "reason": "Stage 3 Task 12b: kill is a builtin; signals to the shell itself ($$ = 1234) are Task 14's (trap), so for now the unsupported message (status 2)",
-    "out": "this practice shell does not support signals to the shell itself yet",
-    "code": 2
+    "reason": "Task 14: kill $$ reaches the interactive shell, which never exits (bash would close it on KILL; TERM, INT and QUIT it ignores): nothing printed, status 0",
+    "out": "",
+    "code": 0
   },
   "wait $!": {
     "reason": "Stage 3 Task 12b: $! is empty before any job, so this is a plain wait: no jobs, status 0, no output",
@@ -1388,5 +1388,30 @@
   "v='a\tb'; set -- \"$v\"; echo $#": {
     "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
     "out": "1"
+  },
+  "trap \"echo bye\" EXIT": {
+    "reason": "Task 14: trap is a builtin; at the prompt an EXIT trap is stored and never runs (the page never exits): nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "trap": {
+    "reason": "Task 14: trap is a builtin; with no traps set, trap alone lists nothing (status 0, as bash)",
+    "out": "",
+    "code": 0
+  },
+  "trap -l": {
+    "reason": "Task 14: trap is a builtin; trap -l prints the bash 5.2 signal table (the same as kill -l)",
+    "out": " 1) SIGHUP\t 2) SIGINT\t 3) SIGQUIT\t 4) SIGILL\t 5) SIGTRAP\n 6) SIGABRT\t 7) SIGBUS\t 8) SIGFPE\t 9) SIGKILL\t10) SIGUSR1\n11) SIGSEGV\t12) SIGUSR2\t13) SIGPIPE\t14) SIGALRM\t15) SIGTERM\n16) SIGSTKFLT\t17) SIGCHLD\t18) SIGCONT\t19) SIGSTOP\t20) SIGTSTP\n21) SIGTTIN\t22) SIGTTOU\t23) SIGURG\t24) SIGXCPU\t25) SIGXFSZ\n26) SIGVTALRM\t27) SIGPROF\t28) SIGWINCH\t29) SIGIO\t30) SIGPWR\n31) SIGSYS\t34) SIGRTMIN\t35) SIGRTMIN+1\t36) SIGRTMIN+2\t37) SIGRTMIN+3\n38) SIGRTMIN+4\t39) SIGRTMIN+5\t40) SIGRTMIN+6\t41) SIGRTMIN+7\t42) SIGRTMIN+8\n43) SIGRTMIN+9\t44) SIGRTMIN+10\t45) SIGRTMIN+11\t46) SIGRTMIN+12\t47) SIGRTMIN+13\n48) SIGRTMIN+14\t49) SIGRTMIN+15\t50) SIGRTMAX-14\t51) SIGRTMAX-13\t52) SIGRTMAX-12\n53) SIGRTMAX-11\t54) SIGRTMAX-10\t55) SIGRTMAX-9\t56) SIGRTMAX-8\t57) SIGRTMAX-7\n58) SIGRTMAX-6\t59) SIGRTMAX-5\t60) SIGRTMAX-4\t61) SIGRTMAX-3\t62) SIGRTMAX-2\n63) SIGRTMAX-1\t64) SIGRTMAX\t",
+    "code": 0
+  },
+  "trap \"\" INT": {
+    "reason": "Task 14: trap is a builtin; trap \"\" INT ignores SIGINT silently, status 0",
+    "out": "",
+    "code": 0
+  },
+  "trap - INT": {
+    "reason": "Task 14: trap is a builtin; trap - INT resets SIGINT silently, status 0",
+    "out": "",
+    "code": 0
   }
 }

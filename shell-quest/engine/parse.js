@@ -11,7 +11,7 @@ const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'baseca
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
   if(k==='!')return SQ.rt.bang==null?'':String(SQ.rt.bang); /* the newest job this shell started (jobs.js; per shell, see interp.js copyShell) */
-  if(k==='BASHPID')return '1234'; /* jobs and subshells run inside this one shell: always the shell's own pid (procs.js) */
+  if(k==='BASHPID')return SQ.rt.slice?String(SQ.rt.slice.pid):'1234'; /* a job's own pid inside it (kill $BASHPID); else the shell's, also in a subshell (procs.js) */
   if(k==='PPID')return String(SQ.PPID);
   if(k==='SECONDS')return secondsNow();
   if(k==='BASH_REMATCH')throw unsup('BASH_REMATCH');
@@ -112,7 +112,11 @@ function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
   const sv=SQ.snapshotShell();SQ.rt.scopeNode.inherit=true; /* $(jobs -p) lists the shell's jobs (cmds-proc.js tableOf) */
   if(SQ.rt.opts.e)SQ.rt.opts=Object.assign({},SQ.rt.opts,{e:false}); /* bash's default (no inherit_errexit): set -e is off inside $( ) */
-  CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
+  CTX.sub++;let r;
+  try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true});
+    if(SQ.rt.scopeNode.traps){const x=SQ.exitTrap(r.code,{});if(x)r={out:r.out.concat(x.out),code:x.code}}} /* its own EXIT trap (Task 14) */
+  catch(e){if(SQ.rt.scopeNode.traps)SQ.abortTrap(e,{});throw e}
+  finally{CTX.sub--;SQ.restoreShell(sv)}
   CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */
   return SQ.trimRun(v.join('\n'),'\n')}

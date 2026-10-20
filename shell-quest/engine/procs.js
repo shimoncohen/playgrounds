@@ -23,8 +23,8 @@
                    Inside a background job's slice (SQ.rt.slice, jobs.js) advance neither moves the clock nor runs onAdvance: it sets
                    slice.debt (time the job owes) and the job yields that much after the command. SQ.now() = clock + that debt; sleep, timeout
                    and date read it. A job's sleep is not capped by LIM.SLEEP (it only waits; `sleep infinity &` never wakes).
-   $SECONDS        floor(clock); after SECONDS=N it counts on from N (SQ.rt.secAt, parse.js secondsNow). $$ and $BASHPID are always 1234 (jobs and subshells run inside
-                   this one shell, so BASHPID never differs). $PPID is 1233 (the shell's parent, never listed by ps).
+   $SECONDS        floor(clock); after SECONDS=N it counts on from N (SQ.rt.secAt, parse.js secondsNow). $$ is always 1234; $BASHPID too, except inside a background
+                   job, where it is the job's pid (Task 14: kill $BASHPID); a subshell keeps 1234. $PPID is 1233 (the shell's parent, never listed by ps).
 
    Decisions:
    - EPOCH: the virtual clock 0 is Thu 2026-01-15 09:00:00 UTC (1768467600). `date` prints EPOCH + floor(clock) in UTC.
@@ -48,7 +48,9 @@
      pass the earliest deadline advances the clock exactly to it and the command is stopped: status 124 (137 for -s KILL, 128+N with
      --preserve-status), with -v printing `timeout: sending signal SIG to command 'X'`. Output the stopped command had produced is lost
      (as with the step cap). If COMMAND finishes first, its output and status are kept. DURATION 0 means no limit; -k is accepted and
-     ignored (every command dies on the first signal). Usage errors are status 125. Nested timeouts: the earliest deadline wins, ties go
+     ignored (every command dies on the first signal). Usage errors are status 125. Traps (Task 14): the deadline's signal is kept in
+     rt.deadlines.sigs; a script stopped by it runs its trap for that signal (unless KILL) and its EXIT trap (cmds-proc.js abortTrap), and
+     their output is the timeout's (it stops the script: bash would resume it after a trapped TERM). Nested timeouts: the earliest deadline wins, ties go
      to the outermost.
 */
 const {LIM,CMDS,ok,E,own}=SQ;
@@ -60,7 +62,7 @@ const ms=t=>Math.round(t*1000)/1000;
    opts (the shell options) to cmds-opts.js (Task 13);
    they live here so one reset / save / load covers them */
 const fresh=()=>({secAt:undefined,clock:0,nextPid:FIRST_PID,forks:0,deadlines:[],procs:[{pid:SHELL_PID,ppid:PPID,cmd:'bash',start:0,state:'S'}],
-  jobs:[],notices:[],jobSeq:0,scope:0,scopeSeq:0,scopeNode:{id:0,up:null},slice:null,bang:null,reaped:[],endSeq:0,opts:SQ.OPTS0});
+  jobs:[],notices:[],jobSeq:0,scope:0,scopeSeq:0,scopeNode:{id:0,up:null},slice:null,bang:null,reaped:[],endSeq:0,opts:SQ.OPTS0,sigPend:0});
 function resetProcs(){Object.assign(SQ.rt,fresh())}
 /* sandbox support: procsSave() hands back the current state and installs a fresh one; procsLoad(saved) puts it back */
 function procsSave(){const rt=SQ.rt,s={};for(const k of Object.keys(fresh()))s[k]=rt[k];resetProcs();return s}
@@ -193,11 +195,12 @@ CMDS.timeout=function(a,io){const T=m=>bad('timeout',m,125);
   else if(own(CMDS,name)&&CMDS[name]&&!SHELL_ONLY.has(name)&&!SQ.hasFunction(name)&&!own(SQ.FRIENDLY,name))run=()=>CMDS[name](args,io);
   else return E(`timeout: failed to run command '${name}': No such file or directory`,127);
   if(!(d>0)||d===Infinity)return run();
-  const rt=SQ.rt,idx=rt.deadlines.length;rt.deadlines.push(ms(now()+d));
+  const rt=SQ.rt,idx=rt.deadlines.length;rt.deadlines.push(ms(now()+d));(rt.deadlines.sigs=rt.deadlines.sigs||[])[idx]={num:sig[1],name:sig[0]}; /* the signal, for traps (Task 14) */
   try{return run()}
   catch(e){if(!(e&&e.tmo===idx))throw e;
-    const r={out:'',err:verbose?[`timeout: sending signal ${sig[0]} to command '${name}'`]:[],code:preserve?128+sig[1]:sig[1]===9?137:124};
-    if(e.out&&e.out.length){r.list=e.out.concat(r.err.map(t=>({text:t,cls:'err'})));r.bg=e.out}
+    const ve=verbose?[`timeout: sending signal ${sig[0]} to command '${name}'`]:[],af=e.after||[]; /* af: the trap handlers the command ran as it ended (Task 14) */
+    const r={out:af.filter(x=>x.cls==='out').map(x=>x.text).join('\n'),err:ve.concat(af.filter(x=>x.cls!=='out').map(x=>x.text)),code:preserve?128+sig[1]:sig[1]===9?137:124};
+    if((e.out&&e.out.length)||af.length){r.list=(e.out||[]).concat(ve.map(t=>({text:t,cls:'err'})),af);if(e.out&&e.out.length)r.bg=e.out}
     return r}
   finally{rt.deadlines.length=idx}};
 

@@ -683,5 +683,10 @@
     "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
     "out": "",
     "code": 0
+  },
+  "trap x EXIT": {
+    "reason": "Task 14: trap is a builtin; at the prompt an EXIT trap is stored and never runs (the page never exits), so nothing is printed, status 0",
+    "out": "",
+    "code": 0
   }
 }

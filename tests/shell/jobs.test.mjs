@@ -478,9 +478,9 @@ describe('kill (Task 12b)', () => {
     const SQ = loadShell();
     assert.equal(runN(SQ, 'sleep 9 & kill -0 %1; echo $?; jobs').out, '[1] 1235\n0\n[1]+  Running                 sleep 9 &');
   });
-  it('kill $$ is not supported yet (Task 14)', () => {
+  it('kill $$ at the prompt: the interactive shell ignores TERM and never exits (Task 14; traps.test.mjs pins the rest)', () => {
     const SQ = loadShell();
-    assert.deepEqual(runN(SQ, 'kill $$'), { out: 'this practice shell does not support signals to the shell itself yet', code: 2 });
+    assert.deepEqual(runN(SQ, 'kill $$'), { out: '', code: 0 });
     assert.equal(runN(SQ, 'kill -0 $$; echo $?').out, '0');
   });
   it('kill %1 on a job suspended inside function -> subshell -> loop leaves the foreground state intact', () => {

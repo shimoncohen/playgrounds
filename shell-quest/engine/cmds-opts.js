@@ -10,7 +10,8 @@
    and a script or bash -c starts with none set (runChild), unless bash -e/-u/-x/-o gave some. resetProcs (Reset world) and SQ.sandbox start
    from none (procs.js fresh). What each option does is in the interpreter: set -e errexit/quiet (interp.js, mirrored in jobs.js gAndOr),
    set -u nounset (parse.js), pipefail (interp.js runPipeline), set -x xline/xq (interp.js; exec.js runCmd traces simple commands).
-   Every check is an O(1) flag test, so with the options off the interpreter does no extra work.
+   Every check is an O(1) flag test, so with the options off the interpreter does no extra work. The ERR trap (Task 14, cmds-proc.js TRAPS)
+   fires at the places set -e watches (interp.js failAt), and the EXIT trap runs when set -e ends a script (runChild).
 
    Typed lines: `set -e` at the prompt is kept for the following lines, and a failing command ends only the line it is on (bash would close
    the interactive shell; this page never closes). `set -u` likewise ends the line at the first unbound variable.

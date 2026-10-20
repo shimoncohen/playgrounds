@@ -25,8 +25,9 @@
                      scope     the scope its commands currently run in (the jobs it starts belong to it)
                      ppid      the pid of the job that started it, else the shell (1234)
                      ownerNode, scopeNode   the scope tree nodes behind owner and scope
+                     topNode   the job's own process node (scopeNode at spawn): its traps (Task 14, cmds-proc.js TRAPS) and its queued signals (topNode.sig)
                      seq       spawn order (ties between equal wake time and job number); debt, d, depth, out, lineNo, lineSteps: scheduler bookkeeping
-                     sig       null; reserved for Task 14 (a pending signal to deliver at the job's next command boundary) }
+                     waitIntr  128+N once a trapped signal N interrupted the job's `wait` (gWait returns it), else 0 }
    SQ.rt.notices   the scope-0 jobs that ended or stopped and whose `[N]+  Done ...` notice has not been shown yet. A finished scope-0 job keeps
                    its record in SQ.rt.jobs until then: exec.js prints the queue (SQ.flushNotices, cmds-proc.js) at the end of each outermost typed
                    line, never inside $( ), and drops the ended records (`jobs` showing an ended job does the same). A job of any other scope (script,
@@ -93,7 +94,11 @@
    - 13 (done) `set -e`/`-x`/pipefail/-u: the job's options are part of its shell state (J.opts, copied at spawn); gAndOr asks SQ.errexit like
      runAndOr, conditions and ! run SQ.quiet, G.for traces each pass; everything else (pipefail, traces of simple commands, set -u) is in the
      shared units (runPipeline, runCmd, caseArm, expansion).
-   - 14 `trap`/signals: Job.sig, delivered at the job's next command boundary (gPipe is the boundary) or on endJob.
+   - 14 (done) `trap`/signals: a trapped signal is queued on J.topNode and delivered at the job's next command boundary (gAndOr after each
+     pipeline: interp.js sigAt); it interrupts a blocked wait (waitIntr). endJob(J, state, code, desc, noTrap) runs the job's EXIT trap
+     (not for KILL) inside inSlice with its own allowance (SQ.TRAP_STEPS), after the unwinding, whichever way the job ended (its end, exit,
+     kill, the step-cap stop: the message first); a Done job's handler may change its status with exit n. Its output goes to J.out (slice()
+     returns it; kill collects it with SQ.jobOut). A ( ) inside a job runs its own EXIT trap at its end, also when the job is killed inside it.
    - 16 process substitution: runs synchronously inside a unit; nothing to do here.
    - 17 mission ctx.jobs/clock: read SQ.rt.jobs / SQ.rt.clock.
 */
@@ -116,10 +121,14 @@ function* gList(list,env){let code=0;
     const r=yield* gAndOr(it.andor,env);code=r.code;if(r.ctl)return r}
   return {code}}
 /* set -e as in interp.js runAndOr: every pipeline but the last runs quiet, the list's status is checked when its last pipeline ran (SQ.errexit) */
-function* gAndOr(n,env){const k=n.rest.length,q=k?SQ.quiet(env):env;let r=yield* gPipe(n.first,q);if(r.ctl)return r;let code=r.code,ran=!k;
+/* Task 14: the command boundary after each pipeline delivers the job's queued signals (interp.js sigAt), and failAt runs the ERR trap */
+const gSig=env=>{const o=[],c=SQ.sigAt(env,o);emit(env,o);return c};
+function* gAndOr(n,env){const k=n.rest.length,q=k?SQ.quiet(env):env;let r=yield* gPipe(n.first,q),c;if(r.ctl)return r;let code=r.code,ran=!k;
+  if(SQ.rt.sigPend&&(c=gSig(env)))return {code,ctl:c};
   for(let i=0;i<k;i++){const it=n.rest[i];if(it.op==='&&'&&code!==0)continue;if(it.op==='||'&&code===0)continue;
-    const fin=i===k-1;r=yield* gPipe(it.pipe,fin?env:q);code=r.code;ran=fin;if(r.ctl)return r}
-  if(ran&&code!==0){const x=SQ.errexit(code,k?n.rest[k-1].pipe:n.first,env);if(x)return {code,ctl:x}}
+    const fin=i===k-1;r=yield* gPipe(it.pipe,fin?env:q);code=r.code;ran=fin;if(r.ctl)return r;
+    if(SQ.rt.sigPend&&(c=gSig(env)))return {code,ctl:c}}
+  if(ran&&code!==0){const o=[],x=SQ.failAt(code,k?n.rest[k-1].pipe:n.first,env,o);emit(env,o);if(x)return {code,ctl:x}}
   return {code}}
 /* one pipeline: a lone unredirected compound is walked here; anything else is one runPipeline unit (a lone function call comes back deferred) */
 function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
@@ -130,7 +139,9 @@ function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
   if(Pn.negate)r={code:r.code===0?1:0,ctl:r.ctl};
   S.last=r.code;return r}
 /* `wait` in a job (cmds-proc.js): yield until the jobs it waits for have ended; tick resumes this job once SQ.waitReady says so */
-function* gWait(req,env){let r;while(!(r=SQ.waitReady(req)))yield {wait:req};return {code:SQ.waitDone(req,r)}}
+function* gWait(req,env){let r;const J=env.job;
+  while(!(r=SQ.waitReady(req))){yield {wait:req};if(J.waitIntr){const c=J.waitIntr;J.waitIntr=0;return {code:c}}} /* a trapped signal interrupted it (cmds-proc.js signal) */
+  return {code:SQ.waitDone(req,r)}}
 function* gCall(name,args,env){const fe=SQ.fnEnter(name,args);
   if(fe.fail){emit(env,fe.fail.list);return {code:fe.fail.code}}
   let r;try{r=yield* gList(fe.prog,env)}finally{SQ.fnLeave(fe)} /* break/continue in the body reach the caller's loop, as in callFunction */
@@ -159,11 +170,15 @@ const G={
   *case(c,env){const out=[],ca=SQ.caseArm(c,env,out);emit(env,out);if(ca.fail)return ca.fail;return ca.arm?yield* gList(ca.arm.body,env):{code:0}},
   *group(c,env){return yield* gList(c.body,env)},
   /* ( ... ) inside a job: isolated like runSubshell (snapshotShell/restoreShell, also when the job is ended while suspended inside) */
-  *subshell(c,env){const sv=SQ.snapshotShell();let r;
-    try{r=yield* gList(c.body,Object.assign({},env,{loops:0}))}finally{SQ.restoreShell(sv)}
-    return {code:r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code}}};
+  /* its EXIT trap runs at its end, also when the job is ended while suspended inside (g.return() runs the finally block) */
+  *subshell(c,env){const sv=SQ.snapshotShell();let done=false;
+    try{const r=yield* gList(c.body,Object.assign({},env,{loops:0}));done=true;let code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code;
+      if(SQ.rt.scopeNode.traps){const x=SQ.exitTrap(code,{});if(x){emit(env,x.out);code=x.code}}
+      return {code}}
+    catch(e){done=true;if(SQ.rt.scopeNode.traps)SQ.abortTrap(e,{});throw e}
+    finally{if(!done&&SQ.rt.scopeNode.traps){const x=SQ.exitTrap(S.last,{budget:true});if(x)emit(env,x.out)}SQ.restoreShell(sv)}}};
 /* SQ.gen.run: the job's whole program; exit n ends it with n (also set -e's exit), a stray return/break/continue just ends it.
-   HOOK FOR TASK 14: a job's EXIT trap runs when this returns (and in endJob for a job ended from outside). */
+   Its EXIT trap runs in endJob, whichever way it ended. */
 function* run(node,ctx){let r;
   if(node.type==='list')r=yield* gList(node,ctx);
   else if(node.type==='andor')r=yield* gAndOr(node,ctx);
@@ -176,11 +191,12 @@ const forkErr=()=>Object.assign(new Error(SQ.FORK_MSG),{raw:true,code:1,fork:tru
 function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   if(rt.jobs.filter(isLive).length>=MAX_JOBS)throw forkErr();
   const pid=SQ.newPid(),ownerNode=rt.scopeNode,owner=ownerNode.id,start=SQ.now();
+  const top={id:++rt.scopeSeq,up:ownerNode};if(ownerNode.traps)top.traps=SQ.childTraps(ownerNode.traps,true); /* a job keeps only the ignored signals */
   let id=1;for(const j of rt.jobs)if(j.owner===owner&&j.id>=id)id=j.id+1;
   const frames=rt.frames.map(f=>Object.assign({},f,{args:f.args.slice(),locals:f.locals&&new Map(f.locals)}));
   const cmd=String(src===undefined?node.src||'':src);
   const J=Object.assign(SQ.copyShell(),{id,pid,cmd,node,state:'Running',code:null,wake:start,gen:null,frames,baseArgs:SQ.BASE_FRAME.args.slice(),
-    owner,ownerNode,scopeNode:{id:++rt.scopeSeq,up:ownerNode},scope:rt.scopeSeq,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],sig:null,
+    owner,ownerNode,scopeNode:top,topNode:top,scope:top.id,lineNo:0,lineSteps:0,ppid:rt.slice?rt.slice.pid:1234,seq:++rt.jobSeq,debt:0,d:[0,0,0],depth:env.depth||0,out:[],waitIntr:0,
     desc:null,endSeq:0,waited:false,told:false,stopSig:0,waitReq:null});
   J.cur=J.seq; /* the newest job is the current one (%+) */
   J.gen=run(node,{depth:J.depth,tty:!!env.tty,record:false,stdin:null,loops:0,job:J});
@@ -196,8 +212,14 @@ function spawnItem(n,env){let J;
   return {out:[note],code:0}}
 
 /* ---------- the scheduler ---------- */
-function endJob(J,state,code,desc){const rt=SQ.rt;
-  if(J.gen){const g=J.gen;J.gen=null;try{inSlice(J,()=>g.return())}catch(e){/* a finally block failed: the job ends anyway */}} /* a live job ended from outside (kill) */
+/* noTrap: KILL (no EXIT trap). The EXIT handler runs with the job's state swapped in and its own allowance (SQ.TRAP_STEPS), at the time the job
+   ends; its output goes to J.out (slice() and kill collect it: SQ.jobOut). A Done job's handler may change its status with exit n. */
+function endJob(J,state,code,desc,noTrap){const rt=SQ.rt,g=J.gen;J.gen=null;
+  try{inSlice(J,()=>{
+    if(g){try{g.return()}catch(e){/* a finally block failed: the job ends anyway */}} /* a live job ended from outside (kill) */
+    if(!noTrap&&rt.scopeNode.traps){const x=SQ.exitTrap(state==='Done'?code:S.last,{budget:true});if(x){J.out.push(...x.out);if(state==='Done')code=x.code}}})}
+  catch(e){/* the job ends anyway */}
+  SQ.sigDrop(J.topNode);
   J.state=state;J.code=code;J.gen=null;J.wake=null;J.waitReq=null;J.endSeq=++rt.endSeq;J.told=false;if(desc)J.desc=desc;
   const i=rt.procs.findIndex(p=>p.pid===J.pid);if(i>=0)rt.procs.splice(i,1);
   if(J.owner===0){if(!rt.notices.includes(J))rt.notices.push(J)}
@@ -227,13 +249,13 @@ function slice(J){const rt=SQ.rt,fgSteps=rt.steps,chars=rt.outChars,allow=allowa
   rt.steps=start; /* never the foreground's budget */
   try{res=inSlice(J,()=>J.gen.next())}catch(e){err=e}
   finally{const used=Math.min(allow,Math.max(0,rt.steps-start));J.lineSteps+=used;rt.jobWork=(rt.jobWork||0)+used;rt.steps=fgSteps}
-  const out=J.out;J.out=[];
   if(err||res.done)J.gen=null; /* finished: nothing left to unwind */
-  if(err&&err.jobSig){const s=err.jobSig;endJob(J,'Terminated',128+s.num,s.desc)} /* it signalled itself (kill): no message, like bash */
-  else if(err){out.push(errL(stopText(err)));rt.outChars=chars;endJob(J,'Terminated',143)}
+  if(err&&err.jobSig){const s=err.jobSig;endJob(J,'Terminated',128+s.num,s.desc,s.num===9)} /* it signalled itself (kill): no message, like bash */
+  else if(err){J.out.push(errL(stopText(err)),...(err.after||[]));rt.outChars=chars;endJob(J,'Terminated',143)} /* the message, then any EXIT handlers */
   else if(res.done)endJob(J,'Done',res.value);
   else if(res.value.wait){J.waitReq=res.value.wait;J.wake=Infinity} /* blocked in wait: tick resumes it once its jobs have ended */
   else J.wake=res.value.wake;
+  const out=J.out;J.out=[];
   const tagged=out.map(o=>Object.assign({},o,{bg:true,owner:J.ownerNode}));
   if(rt.lineBg)rt.lineBg.push(...tagged);
   return tagged}
@@ -251,5 +273,7 @@ function tick(until,o){const rt=SQ.rt;if(rt.slice||rt.ticking)return [];
   return out}
 SQ.onAdvance.push(target=>tick(target));
 
-Object.assign(SQ,{spawn,spawnItem,tick,endJob,reap,gen:{run},MAX_JOBS,JOB_WORK});
+/* the output J produced outside a slice (its EXIT handler when kill ended it), tagged like slice()'s */
+function jobOut(J){if(!J.out||!J.out.length)return [];const o=J.out.splice(0).map(x=>Object.assign({},x,{bg:true,owner:J.ownerNode}));if(SQ.rt.lineBg)SQ.rt.lineBg.push(...o);return o}
+Object.assign(SQ,{spawn,spawnItem,tick,endJob,reap,jobOut,gen:{run},MAX_JOBS,JOB_WORK});
 })(window.SQ = window.SQ || {});

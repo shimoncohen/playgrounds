@@ -16,7 +16,14 @@ const failExp=e=>{if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.c
    With no command left after expansion (X=1 $empty) they stay set, as an assignment-only command.
    set -x (Task 13): the trace lines ride on the result as r.xt (Out[], stderr), which runPipeline puts on the screen before the command's own output:
    the stderr of the $( )s in the words first, then `+ NAME=value` for each assignment (prefix ones too), then `+ cmd args` (expanded, quoted by SQ.xq). */
-function runCmd(words,io,assigns){
+/* Task 14: a DEBUG trap runs before each simple command (cmds-proc.js debugTrap); its output rides on r.xt like a trace. O(1) with no traps. */
+function runCmd(words,io,assigns){const t=SQ.rt.scopeNode.traps;
+  if(!t||!words.length||!t.has('DEBUG'))return runCmd1(words,io,assigns);
+  const d=SQ.debugTrap(io.tty);if(!d)return runCmd1(words,io,assigns);
+  if(d.ctl)return {out:'',err:[],code:d.ctl.n,ctl:d.ctl,xt:d.out}; /* exit in the handler: the command does not run */
+  const r=runCmd1(words,io,assigns);
+  return d.out.length?Object.assign({},r,{xt:d.out.concat(r.xt||[])}):r}
+function runCmd1(words,io,assigns){
   if(!words.length)return ok();
   SQ.step();
   const X=SQ.rt.opts.x;let ew,pre=null,bad=null,xt=null;
@@ -84,16 +91,18 @@ function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);cons
   const lineCost=r=>{if(charged)return r;charged=true;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
   /* Task 12b: the interactive shell's job notices ([1]+  Done  sleep 2) close the typed line, after the jobs that ran during its cost; never in $( ) */
   const notices=r=>{if(outer&&!o.sub&&SQ.flushNotices){const n=SQ.flushNotices();if(n.length)r.out=r.out.concat(n)}return r};
+  /* Task 14: signals a job sent the interactive shell during the line run their traps when the line is over (bash runs them at the prompt) */
+  const sigs=r=>{if(outer&&!o.sub&&SQ.rt.sigPend){const b=SQ.sigBoundary(o.tty);if(b){r.out=r.out.concat(b.out);if(b.ctl)r.out.push({text:FRIENDLY.exit,cls:'err'})}}return r};
   const sd=CTX.depth;CTX.depth=o.depth;nest++;
   try{const r=execLine0(line,o);if(!outer)return r;
     SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */
     SQ.rt.lastOut=r.out.filter(x=>x.cls==='out'&&!x.bg).map(x=>x.text).join('\n'); /* a background job's output is not the line's */
-    return capLines(notices(lineCost(r)))}
+    return capLines(notices(sigs(lineCost(r))))}
   catch(e){if(!outer)throw e; /* outermost call: any runaway or unexpected failure becomes one error line, state stays usable */
     if(e&&e.tmo!==undefined&&SQ.rt.deadlines.length)throw e; /* a $( ) at the top of a sandboxed script, inside `timeout`: the timeout takes it */
     const code=SQ.isOverflow(e)?2:1; /* a JS stack overflow reads like the parser's nesting error, status 2 */
     SQ.rt.lastOut='';CTX.pend.length=0;S.last=code; /* background-job output this line already let through (SQ.rt.lineBg, jobs.js) stays on screen */
-    return capLines(notices(lineCost({out:(SQ.rt.lineBg||[]).concat({text:fatalText(e),cls:'err'}),code})))}
+    return capLines(notices(lineCost({out:(SQ.rt.lineBg||[]).concat({text:fatalText(e),cls:'err'},e&&e.after||[]),code})))} /* e.after: EXIT handlers that ran on the way out (SQ.abortTrap) */
   finally{CTX.depth=sd;nest--}}
 /* On-screen output per typed line is capped at LIM.LINES; the rest is replaced by one notice. */
 function capLines(r){let n=0;const out=[];
@@ -121,7 +130,7 @@ const cap=t=>t.length>REPORT_MAX?t.slice(0,REPORT_MAX)+'...':t;
 /* ctx.runScript / scriptPasses run on a throwaway copy of the world, from the home directory, with no terminal; a runaway script is a result, never an exception */
 function sandboxRun(path,args,stdin){return SQ.sandbox(()=>{S.cwd=HOME;S.oldpwd=HOME;
   try{const r=SQ.runScript(path,{args:args||[],stdin,depth:1,tty:false,force:true,record:false});return {out:r.out,err:r.err,code:r.code}}
-  catch(e){return {out:'',err:[fatalText(e)],code:1,thrown:true}}})}
+  catch(e){const af=(e&&e.after)||[];return {out:af.filter(x=>x.cls==='out').map(x=>x.text).join('\n'),err:[fatalText(e)].concat(af.filter(x=>x.cls!=='out').map(x=>x.text)),code:1,thrown:true}}})}
 function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
   if(!fn||fn.type!=='file')return {ok:false,failed:{index:-1,label:'file',expected:m.file,got:'missing'}};
   const cases=(m.tests||[]).slice(0,SCRIPT_CASES);
