@@ -1283,3 +1283,25 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('theme button cycles auto, light, dark, remembers the choice and sets data-theme', async () => {
+  for (const url of [base + '/', `${base}/shell-quest/`]) {
+    const { ctx, page, errors } = await open(url, { colorScheme: 'light' });
+    const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    assert.equal(await attr(), null, url);
+    const light = await bg();
+    await page.click('.theme-toggle');
+    assert.equal(await attr(), 'light', url);
+    await page.click('.theme-toggle');
+    assert.equal(await attr(), 'dark', url);
+    assert.notEqual(await bg(), light, 'dark should change the page background');
+    await page.reload();
+    assert.equal(await attr(), 'dark', 'choice survives a reload');
+    assert.match(await page.textContent('.theme-toggle'), /Dark/);
+    await page.click('.theme-toggle');
+    assert.equal(await attr(), null, 'back to auto');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});

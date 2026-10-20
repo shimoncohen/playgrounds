@@ -19,6 +19,9 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0B1218; --surface:#121D25; --surface-2:#1A2832; --ink:#DCE5EB; --muted:#8C9DAA; --line:#25343E;
   --accent:#F2A93B; --accent-text:#F2A93B; --term-bg:#060C11; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1218; --surface:#121D25; --surface-2:#1A2832; --ink:#DCE5EB; --muted:#8C9DAA; --line:#25343E;
+  --accent:#F2A93B; --accent-text:#F2A93B; --term-bg:#060C11; color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.55;
   padding:0 max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
@@ -27,6 +30,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body)
 h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
 code{font-family:var(--font-mono);font-size:.88em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
 header{padding:36px 0 8px}
+.theme-toggle{display:block;margin-top:16px;border:0;border-radius:9px;padding:6px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+.theme-toggle:hover{background:var(--surface-2)}
 .brand{display:flex;align-items:center;gap:12px;font-family:var(--font-display);font-weight:800;font-size:clamp(30px,5vw,44px);line-height:1.1}
 .logo{font-family:var(--font-mono);font-weight:600;font-size:.42em;background:var(--term-bg);color:var(--term-prompt);padding:.45em .6em;border-radius:.5em}
 .lede{max-width:60ch;color:var(--muted);font-size:18px;margin:14px 0 0}
@@ -94,6 +100,7 @@ header{padding:36px 0 8px}
 <p class="note"><b>Your progress stays on this device.</b> It is saved in your browser, so clearing site data erases it. Every playground has a <b>Progress</b> button in its header to export a backup file or, in Chrome and Edge, keep one up to date automatically.</p>
 </main>
 </div>
+<script src="shared/theme.js"></script>
 <script>
 /* Show saved XP on each card. Playgrounds on the same origin share localStorage, so this just reads it. */
 document.querySelectorAll('.card[data-key]').forEach(card => {
