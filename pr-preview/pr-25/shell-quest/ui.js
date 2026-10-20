@@ -9,6 +9,8 @@ const renderText=t=>esc(t).replace(/\x01(\w)([\s\S]*?)\x02/g,'<span class="c-$1"
 const promptHTML=cwd=>`<span class="p-user">explorer@basecamp</span>:<span class="p-path">${esc(disp(cwd))}</span><span class="p-sym">$</span> `;
 const KIND={cmd:'command',opt:'option',arg:'argument',op:'operator',var:'variable',kw:'keyword'};
 const anatomy=t=>t&&t.length?`<div class="anat" aria-label="Command anatomy">${t.map(([v,k,l])=>`<div class="tok k-${k}"><b>${esc(v)}</b><span>${esc(l||KIND[k])}</span></div>`).join('')}</div>`:'';
+/* the to-do list of a multi-step mission: every step is a goal of its own, ticked off as it is done, in any order */
+const stepList=(st,sd)=>`<ul class="steps" aria-label="Steps">${st.map((s,i)=>`<li class="${sd.includes(i)?'done':''}"><span class="tick" aria-hidden="true">${sd.includes(i)?'✓':''}</span><span>${s.goal}${sd.includes(i)?'<span class="sr"> (done)</span>':''}</span></li>`).join('')}</ul>`;
 const ICON_DIR='<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3h4.3l1.6 1.7h7.1v8.8h-13z"/></svg>';
 const ICON_FILE='<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3"/></svg>';
 let pop=false;
@@ -40,14 +42,16 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, then open a real terminal. The field guide shows how on Mac, Windows and Linux.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`}
-  else{const m=ch.missions[S.mi];const sc=(m.kind==='script'||m.kind==='challenge')&&m.file;const hint=m.hint||(sc?`Use nano ${esc(m.file)} to write it, then run it with bash ${esc(m.file)}.`:`Type exactly this, then press Enter: <code>${esc(m.answer)}</code>`);
-    h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done before':''}</div>
+  else{const m=ch.missions[S.mi];const sc=(m.kind==='script'||m.kind==='challenge')&&m.file;
+    const mk=S.ch+'.'+S.mi,st=m.steps,sd=st?SQ.stepsDone(mk):[],cur=st?st[SQ.stepNext(m,mk)]:m; /* a multi-step mission: hint, chips and how follow the first open step */
+    const hint=cur.hint||m.hint||(sc?`Use nano ${esc(m.file)} to write it, then run it with bash ${esc(m.file)}.`:`Type exactly this, then press Enter: <code>${esc(cur.answer)}</code>`);
+    h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${st?` · ${sd.length} of ${st.length} steps done`:''}${S.done[mk]?' · done before':''}</div>
     ${S.mi===0?`<p class="intro">${esc(ch.intro)}</p>`:''}
     <h2>${esc(m.title)}${m.kind==='challenge'?' <span class="mtag">Challenge</span>':''}</h2>
     ${sc?`<div class="where">Your file: <code>${esc(m.file)}</code></div>`:''}
-    <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
-    ${anatomy(m.anat)}
-    ${HowSteps.html(m.how)}
+    <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p>${st?stepList(st,sd):''}</div>
+    ${anatomy(cur.anat||m.anat)}
+    ${HowSteps.html(cur.how||m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
     <div class="where">Right now you are in <code>${esc(disp(S.cwd))}</code></div>
