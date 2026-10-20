@@ -1,0 +1,29 @@
+name: Mission or chapter idea
+description: Suggest something new for a quest to teach
+labels: [mission idea]
+body:
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which playground?
+      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest]
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should a learner be able to do afterwards?
+      description: One concrete skill beats a broad topic.
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch (optional)
+      description: A goal sentence, a reference answer, and the most likely wrong or lazy answer.
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Want to build it?
+      options:
+        - label: I would like to open a PR for this (or have my agent do it)
