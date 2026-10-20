@@ -42,7 +42,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add or fix a Shell Quest mission | `shell-quest/content/tier-*.js` (+ tests); use the `add-mission` skill |
 | Add a Shell Quest command or shell feature | `shell-quest/engine/cmds-*.js` / `interp.js` (+ `tests/shell/`) |
 | Change another quest's course | that quest's `app.js` (`CH`, `QF`/`QT`, `GUIDE` arrays) |
-| Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
+| Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
 | Change CI / deploy | `.github/workflows/`, `tools/` (separate PR, flag it) |
