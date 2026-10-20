@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Data Structures Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/nav.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">[&thinsp;]</span>Data Structures Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Array Apprentice</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+
+<main>
+<section id="tab-quest" class="quest" role="tabpanel" aria-labelledby="t-quest">
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite"></article>
+  </aside>
+  <div class="codeCol">
+    <div class="edhead"><span class="file" id="fileName">quest.js</span><span id="edNote">Write your code here</span><span class="sp"></span><button class="linkbtn" id="resetCode">Reset code</button></div>
+    <div class="editor" id="editor">
+      <div class="gutter" id="gutter" aria-hidden="true"></div>
+      <div class="codewrap" id="codewrap"><div class="band" id="band" hidden></div><pre class="hl" id="hl" aria-hidden="true"></pre><textarea id="code" aria-label="JavaScript code editor" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off"></textarea></div>
+    </div>
+    <div class="keys" id="keys" aria-label="Extra keys">
+      <button data-k="TAB">Tab</button><button data-k="(">(</button><button data-k=")">)</button><button data-k="{">{</button><button data-k="}">}</button><button data-k="[">[</button><button data-k="]">]</button><button data-k="=">=</button><button data-k="&quot;">"</button><button data-k=";">;</button><button data-k=".">.</button><button data-k="&gt;">&gt;</button>
+    </div>
+    <div class="runbar">
+      <button class="btn runbtn" id="run"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>Run</button>
+      <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs</span><span><kbd>Tab</kbd> indents</span><span><kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor</span>
+    </div>
+    <div class="console" id="console" aria-live="polite"></div>
+  </div>
+  <aside class="mapCol">
+    <div class="panel">
+      <h3>Structure view</h3>
+      <p class="mapsub" id="mapSub">Whatever your code builds is drawn here: rows, chains, maps and trees.</p>
+      <div class="frames" id="map"></div>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire">
+    <div><h2>Quick-fire</h2><p class="lede">Read a few lines of code and pick what they print. You have 75 seconds, and every correct answer in a row adds a streak bonus. Picturing what the data looks like is the whole skill, so this trains it fast.</p></div>
+    <div class="fireCard panel">
+      <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
+      <div class="timer"><i id="fTimer"></i></div>
+      <div id="fStage"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"></div>
+</section>
+</main>
+</div>
+<script>window.PROGRESS={key:"ds-quest-v1",name:"Data Structures Quest"}</script>
+<script src="../shared/theme.js"></script>
+<script src="../shared/nav.js"></script>
+<script src="../shared/progress.js"></script>
+<script src="engine.js"></script>
+<script src="content.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
