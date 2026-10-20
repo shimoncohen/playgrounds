@@ -14,6 +14,19 @@ function put(SQ, m, text) {
 
 // Throws (assert) when the mission is malformed or unsolvable. `ch` is the chapter in this SQ's content.
 export function assertSolvable(SQ, ch, m, twoStep) {
+  if (m.steps) { // multi-step: every step is a command mission of its own, solved by its own answer
+    assert.ok(Array.isArray(m.steps) && m.steps.length >= 2, `mission "${m.title}": steps needs at least two entries`);
+    if (m.answer !== undefined) assert.equal(m.answer, m.steps[0].answer, `mission "${m.title}": a steps mission's answer must be its first step's answer`);
+    m.steps.forEach((s, i) => {
+      const t = `mission "${m.title}" step ${i + 1}`;
+      assert.equal(typeof s.answer, 'string', `${t}: answer is required`);
+      assert.equal(typeof s.check, 'function', `${t}: check is required`);
+      assert.ok(s.goal, `${t}: goal is required`);
+      run(SQ, s.answer);
+      assert.ok(s.check(SQ.ctxFor(s.answer)), `${t} not solved by: ${s.answer}`);
+    });
+    return;
+  }
   if (!isScript(m)) {
     let last = m.answer;
     if (twoStep && twoStep[m.title]) last = twoStep[m.title](SQ, m);

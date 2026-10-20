@@ -1,6 +1,8 @@
 (function (SQ) {
 SQ.content=SQ.content||{chapters:[],guide:[],quickfire:[]};
 const {HOME,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,disp,join,ensureDir,ensureFile,cmpName,sortedKeys,lines,CMDS,execLine,ctxFor}=SQ;
+/* the value after -type in a logged find, or '' */
+const typeOf=e=>{const i=e.args.indexOf('-type');return i<0?'':e.args[i+1]||''};
 const CH=[
 {tier:'beginner',name:'Where am I?',badge:'Pathfinder',intro:'Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
  learned:['pwd','ls','ls -a','cat','cd','cd ..','cd ~'],
@@ -148,9 +150,16 @@ const CH=[
  {title:'Find every text file',goal:`From home: <code>find . -name "*.txt"</code>`,anat:[['find','cmd'],['.','arg'],['-name','opt','match by name'],['"*.txt"','arg']],
   how:[`<code>find . -name "*.txt"</code> searches here, and in every folder inside here, for files whose names end in .txt.`,`<code>find</code> is the command: search for files by their properties.`,`<code>.</code> is where to start: this folder.`,`<code>-name</code> is an option: only keep names that match the pattern after it.`,`<code>"*.txt"</code> is the pattern. The quotes keep the star for find to use, instead of bash swapping it first.`],answer:'find . -name "*.txt"',
   explain:`find walks through a folder and every folder inside it. <code>.</code> means start here. Quote the pattern so the star reaches find instead of being expanded by the shell first.`,check:c=>c.ran('find',e=>e.args.includes('-name')||e.args.includes('-iname'))},
- {title:'Find only folders',goal:`<code>find . -type d</code>`,anat:[['find','cmd'],['.','arg'],['-type d','opt','folders only']],
-  how:[`<code>find . -type d</code> lists every folder under this one.`,`<code>find</code> is the command: search for files by their properties.`,`<code>.</code> is where to start: this folder.`,`<code>-type d</code> is an option and its value together: only keep directories. <code>-type f</code> would keep only files.`],answer:'find . -type d',
-  explain:`<code>-type d</code> keeps only directories. <code>-type f</code> keeps only files. Compare the result with the map.`,check:c=>c.ran('find',e=>e.args.includes('-type'))},
+ {title:'Find by type',goal:`Ask <code>find</code> for folders, then for files. Do both, in either order.`,
+  steps:[
+   {goal:`List only the folders: <code>find . -type d</code>`,anat:[['find','cmd'],['.','arg'],['-type d','opt','folders only']],
+    how:[`<code>find . -type d</code> lists every folder under this one.`,`<code>find</code> is the command: search for files by their properties.`,`<code>.</code> is where to start: this folder.`,`<code>-type d</code> is an option and its value together: only keep <b>d</b>irectories.`],
+    answer:'find . -type d',check:c=>c.ran('find',e=>typeOf(e)==='d'&&e.code===0)},
+   {goal:`List only the files: <code>find . -type f</code>`,anat:[['find','cmd'],['.','arg'],['-type f','opt','files only']],
+    how:[`<code>find . -type f</code> lists every file under this one, and skips the folders.`,`Same <code>find</code> and same starting point <code>.</code> as before.`,`Only the value changes: <code>-type f</code> keeps <b>f</b>iles, where <code>-type d</code> kept directories.`],
+    answer:'find . -type f',check:c=>c.ran('find',e=>typeOf(e)==='f'&&e.code===0)}],
+  answer:'find . -type d', /* the first step's answer: the replay harnesses (differential corpus) read m.answer */
+  explain:`<code>-type d</code> keeps only directories and <code>-type f</code> keeps only files. Run both and compare the two lists with the map: the folders in one, the files in the other.`},
  {title:'Treasure hunt',goal:`A file named <code>gold.txt</code> is hidden somewhere in your world. Find it, then read it with cat.`,anat:[['find','cmd'],['.','arg'],['-name','opt','match by name'],['gold.txt','arg']],
   how:[`This takes two commands: find says <b>where</b> the file is, then cat shows <b>what</b> is in it.`,`<code>find . -name gold.txt</code> searches from here for a file with exactly that name, and prints its path.`,`Then type <code>cat</code>, a space, and that path to read the file. Press <code>Tab</code> to save typing.`,`The secret word inside completes the mission.`],answer:'find . -name gold.txt',
   hint:`From home, run <code>find . -name gold.txt</code>. It prints the path. Then type <code>cat</code>, a space, and that path. Use <kbd>Tab</kbd> to save typing.`,

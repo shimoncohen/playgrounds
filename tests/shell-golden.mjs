@@ -72,7 +72,12 @@ try {
       };
       const lines = await step(typed);
       // "Treasure hunt" is a two-step mission: "Type it for me" only fills the find; the player then cats the path it printed.
-      if ((await page.textContent('#mission h2')).trim() === title) {
+      if ((await page.textContent('#mission h2')).trim() === title && await page.locator('#mission .steps').count()) {
+        // a multi-step mission ("Find by type"): "Type it for me" fills the next open step, once per step; the record keeps the second step as `then`
+        assert.equal(await page.locator('#mission .steps li').count(), 2, `mission "${title}": the golden player scripts two steps`);
+        await page.click('#mission button[data-act="fill"]');
+        await step(await page.inputValue('#cmd'), true);
+      } else if ((await page.textContent('#mission h2')).trim() === title) {
         const found = lines.slice(1).map(l => l.trim()).find(l => l.endsWith('gold.txt'));
         assert.ok(found, `mission "${title}" did not complete and has no scripted follow-up`);
         await step(`cat ${found}`, true);

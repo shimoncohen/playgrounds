@@ -1267,7 +1267,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
       throw new Error(`mission ${k} did not complete: ${e.message}\n--- screen ---\n${tail}`);
     }
   };
-  const missionsOf = c => page.evaluate(i => window.SQ.content.chapters[i].missions.map(m => ({ title: m.title, kind: m.kind || '', answer: m.answer, wrong: m.wrong || [] })), c);
+  const missionsOf = c => page.evaluate(i => window.SQ.content.chapters[i].missions.map(m => ({ title: m.title, kind: m.kind || '', answer: m.steps ? m.steps[0].answer : m.answer, steps: m.steps ? m.steps.map(s => s.answer) : [], wrong: m.wrong || [] })), c);
   const goTo = async (ci, mi, title) => {
     await page.click(`#mission button[data-mi="${mi}"]`);
     await page.waitForFunction(t => document.querySelector('#mission h2').textContent.includes(t), title);
@@ -1297,6 +1297,15 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
           await page.waitForFunction(n => [...document.querySelectorAll('#screen .line')].slice(n).some(e => /^\.\/.*\/gold\.txt$/.test(e.textContent.trim())), n0);
           const found = (await page.$$eval('#screen .line', (els, n) => els.slice(n).map(e => e.textContent.trim()), n0)).find(path);
           await type(`cat ${found}`);
+        }
+        if (m.steps.length) { // a multi-step mission: one step is ticked off, the mission stays open until the last one
+          for (const a of m.steps.slice(1)) {
+            assert.equal(await page.evaluate(k => !!window.SQ.S.done[k], key), false, `${key} ${m.title}: one step must not complete the mission`);
+            assert.equal(await page.locator('#mission .steps li.done').count(), 1, `${key} ${m.title}: the finished step is ticked`);
+            await page.click('[data-act="fill"]');
+            assert.equal(await page.inputValue('#cmd'), a, `Type it for me fills the next open step of ${key}`);
+            await page.press('#cmd', 'Enter');
+          }
         }
         await doneKey(key);
       }

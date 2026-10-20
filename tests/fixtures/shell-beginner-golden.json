@@ -314,10 +314,14 @@
   {
     "chapter": 5,
     "mission": 3,
-    "title": "Find only folders",
+    "title": "Find by type",
     "typed": "find . -type d",
-    "output": "explorer@basecamp:~$ find . -type d\n.\n./camp\n./camp/supplies\n./forest\n./forest/cave\n./forest/cave/deeper\n./forest/cave/deeper/chest\n./village\n./village/logs\n✓ Mission complete: Find only folders   +10 XP",
-    "xpText": "525 XP"
+    "output": "explorer@basecamp:~$ find . -type d\n.\n./camp\n./camp/supplies\n./forest\n./forest/cave\n./forest/cave/deeper\n./forest/cave/deeper/chest\n./village\n./village/logs\n✓ Step done: Find by type. 1 more to go.",
+    "xpText": "525 XP",
+    "then": {
+      "typed": "find . -type f",
+      "output": "explorer@basecamp:~$ find . -type f\n./camp/diary.txt\n./forest/cave/.bats\n./forest/cave/deeper/chest/gold.txt\n./forest/cave/echo.txt\n./forest/mushroom.txt\n./forest/owl.txt\n./journal.txt\n./listing.txt\n./readme.txt\n./.secret_map\n./village/big_tent.txt\n./village/logs/day1.log\n./village/logs/day2.log\n./village/logs/day3.log\n./village/logs/notes.txt\n./village/people.txt\n./village/shop.txt\n./wolves.txt\n✓ Mission complete: Find by type   +10 XP"
+    }
   },
   {
     "chapter": 5,
