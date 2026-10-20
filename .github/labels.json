@@ -1,0 +1,9 @@
+[
+  {"name": "bug", "color": "d73a4a", "description": "Something is broken, wrong or confusing"},
+  {"name": "mission idea", "color": "7057ff", "description": "A new mission, chapter or quick-fire idea"},
+  {"name": "new playground", "color": "0e8a16", "description": "Proposal for a whole new quest"},
+  {"name": "docs", "color": "0075ca", "description": "Documentation only"},
+  {"name": "good first issue", "color": "7fe3b0", "description": "Small, local change; good for newcomers and agents"},
+  {"name": "needs info", "color": "fbca04", "description": "Waiting for more detail from the reporter"},
+  {"name": "maintainer decision", "color": "b60205", "description": "Touches progress saving, CI, deploy or several quests"}
+]

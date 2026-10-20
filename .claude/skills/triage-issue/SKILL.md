@@ -12,4 +12,4 @@ description: Use to triage a new GitHub issue in this repo: classify it, ask for
 5. **Hand-off comment**: restate the task in two lines, point to the relevant skill (`add-mission`, `new-playground`) and files, and invite a contributor or agent to claim it by commenting.
 6. Never close an issue as won't-fix without the maintainer; suggest it instead.
 
-Labels used: `bug`, `mission idea`, `new playground`, `docs`, `good first issue`, `needs info`, `maintainer decision`. Create any that are missing.
+Labels used: see `.github/labels.json`. Create any that are missing (Actions → Sync labels → Run workflow).
