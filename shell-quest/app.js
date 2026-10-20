@@ -94,7 +94,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   else if(a==='tab-fire')showTab('fire');else if(a==='tab-guide')showTab('guide')});
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
-  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
+  clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.resetProcs();SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
   addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
 
 /* tabs */
@@ -133,7 +133,7 @@ fStage.addEventListener('keydown',e=>{if(e.target.id==='fIn'&&e.key==='Enter'&&Q
 let armP=null;
 $('#guide').addEventListener('click',e=>{const t=e.target.closest('[data-try]');if(t){showTab('quest');fill(t.dataset.try);return}
   if(e.target.id==='resetProgress'){const b=e.target;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase progress, XP and world';clearTimeout(armP);armP=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},3500);return}
-    clearTimeout(armP);SQ.resetState(fresh());S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
+    clearTimeout(armP);SQ.resetState(fresh());SQ.resetProcs();S.seen=true;screen.innerHTML='';welcome();SQ.setupChapter(CH[0]);SQ.rt.changed=new Set();histIdx=0;renderAll();save();b.classList.remove('armed');b.textContent='Progress reset. Back to chapter 1.';showTab('quest')}});
 
 function welcome(){addLine(renderText('Welcome to Shell Quest, a practice bash shell that runs in your browser.'),'sys');
   addLine('Nothing you type here can touch your real computer, so experiment freely.','sys');

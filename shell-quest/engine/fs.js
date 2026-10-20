@@ -56,8 +56,9 @@ SQ.rt={log:[],changed:new Set(),steps:0,outChars:0,grewBy:0,saveFailed:false,san
 const BASE_FRAME={name:'bash',args:[],kind:'script',locals:null};
 SQ.frame=()=>{const f=SQ.rt.frames;return f.length?f[f.length-1]:BASE_FRAME};
 /* Caps that stop runaway commands. TEXT: longest text one command, pipe stage or file may hold. LINES: screen lines per typed line.
-   STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. VAR: longest text one variable may hold. STATE: most file text the whole world may hold (keeps the save well inside localStorage). */
-const LIM={VAR:1000000,TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000};
+   STEPS: command runs plus loop passes per typed line. TOTAL: all command output text per typed line. VAR: longest text one variable may hold. STATE: most file text the whole world may hold (keeps the save well inside localStorage).
+   SLEEP: the longest virtual time (seconds) one sleep may ask for (procs.js). */
+const LIM={VAR:1000000,TEXT:1000000,LINES:2000,STEPS:20000,STATE:1500000,PATTERN:200,TOTAL:5000000,SLEEP:3600};
 /* Thrown to unwind a runaway line; execLine catches it at the outermost call. e.stop marks it so inner catch blocks rethrow it. */
 class StepLimit extends Error{constructor(why){super('this practice shell stopped the command: '+(why||'too many steps'));this.stop=true}}
 /* The saved-state cap. writeFile checks LIM.STATE itself only for a write that grows the world by more than 1,000 characters (so a small write stays O(1)).

@@ -275,13 +275,15 @@ function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false
   finally{fr.length=Math.min(fr.length,at);restoreShell(sv)}
   return {out:out.join('\n'),err,code}}
 
-/* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...) and the per-line runtime state come back
+/* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...), the per-line runtime state and the
+   virtual clock, pid counter and process table (fresh inside: clock 0, next pid 1235) come back
    afterwards, also when fn throws; the saved game is never touched (save() is a no-op while SQ.rt.sandboxed). */
 function sandbox(fn){const rt=SQ.rt,snap=JSON.stringify(S);
   const keep={log:rt.log,changed:rt.changed,frames:rt.frames,lastOut:rt.lastOut,prevLast:rt.prevLast,steps:rt.steps,outChars:rt.outChars,grewBy:rt.grewBy,sandboxed:rt.sandboxed,pend:CTX.pend.slice(),depth:CTX.depth};
   rt.log=keep.log.slice();rt.changed=new Set(keep.changed);rt.frames=[];rt.steps=0;rt.outChars=0;rt.grewBy=0;rt.sandboxed=true;
+  const procs=SQ.procsSave(); /* a clean clock, pid counter and process table inside (procs.js) */
   try{return fn()}
-  finally{const back=JSON.parse(snap);SQ.fixTree(back.fs);
+  finally{SQ.procsLoad(procs);const back=JSON.parse(snap);SQ.fixTree(back.fs);
     for(const k of Object.keys(S))if(!(k in back))delete S[k];
     for(const k of Object.keys(back))S[k]=back[k];
     Object.assign(rt,{log:keep.log,changed:keep.changed,frames:keep.frames,lastOut:keep.lastOut,prevLast:keep.prevLast,steps:keep.steps,outChars:keep.outChars,grewBy:keep.grewBy||0,sandboxed:!!keep.sandboxed});

@@ -10,23 +10,31 @@ const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'baseca
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
   if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(k==='BASHPID')return '1234'; /* jobs and subshells run inside this one shell: always the shell's own pid (procs.js) */
+  if(k==='PPID')return String(SQ.PPID);
+  if(k==='SECONDS')return secondsNow();
   if(k==='BASH_REMATCH')throw unsup('BASH_REMATCH');
   if(/^\d+$/.test(k))return k==='0'?f.name:(f.args[+k-1]||'');
   if(k==='#')return String(f.args.length);if(k==='@'||k==='*')return f.args.join(' ');
   if(k==='PWD')return S.cwd;if(own(S.vars,k))return S.vars[k];
   if(unsetB(k))return '';const b=BUILTIN_VARS();return own(b,k)?b[k]:''}
+/* $SECONDS: whole virtual seconds since the session started (procs.js). SECONDS=N (plain assignment or arithmetic) restarts the count from N:
+   the value is then N plus the whole seconds since the assignment (SQ.rt.secAt, the clock when it was made; runtime state, so after a reload
+   a saved SECONDS reads as assigned just now). */
+function secondsNow(){const rt=SQ.rt,c=Math.floor(rt.clock||0);if(!own(S.vars,'SECONDS'))return String(c);
+  if(rt.secAt===undefined)rt.secAt=rt.clock||0;return String((parseInt(S.vars.SECONDS,10)||0)+c-Math.floor(rt.secAt))}
 /* `unset HOME` (or USER, SHELL, ...) hides the built-in value: S.unsetB lists those names. Assigning the name again puts it back. */
 const unsetB=k=>!!S.unsetB&&own(S.unsetB,k)
 const badName=k=>k==='__proto__';
 function isSet(k){const f=SQ.frame();
-  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD')return true;
+  if(k==='@'||k==='*')return f.args.length>0;if(k==='?'||k==='$'||k==='#'||k==='0'||k==='PWD'||k==='BASHPID'||k==='PPID'||k==='SECONDS')return true;
   if(/^\d+$/.test(k))return +k<=f.args.length;
   return own(S.vars,k)||(own(BUILTIN_VARS(),k)&&!unsetB(k))}
 function setVar(k,v){
   if(!/^[A-Za-z_]\w*$/.test(k))throw perr(k+': cannot assign in this way',1);
   if(badName(k))throw perr('`'+k+"': not a valid identifier",1);
   if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
-  S.vars[k]=v}
+  S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
 /* ---------- word splitting ----------
    ifsNow(): the current IFS (unset = the default space, tab, newline). ifsScan walks text calling ch(c) for a field character and brk(hard) at a field break:

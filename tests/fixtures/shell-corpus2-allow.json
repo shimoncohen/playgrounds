@@ -1092,5 +1092,56 @@
     "reason": "Task 10: comm is built: a file against itself puts every line in column 3 (two tabs), where the name used to be unknown",
     "out": "\t\tWelcome, explorer!\n\t\tThis world is made of folders and files.\n\t\tFolders hold other things. Files hold text.\n\t\tType help any time to see the commands you can use.",
     "code": 0
+  },
+  "echo $SECONDS": {
+    "reason": "Task 11: $SECONDS reads the virtual clock (whole seconds since the session started; a fresh world is at 0 during its first line)",
+    "out": "0"
+  },
+  "echo $PPID": {
+    "reason": "Task 11: $PPID is the shell's virtual parent pid 1233 (ps -ef shows it as bash's PPID)",
+    "out": "1233"
+  },
+  "date +%Y | wc -c": {
+    "reason": "Task 11: date +FORMAT is supported on the virtual clock: +%Y prints the epoch year 2026 (4 characters plus the newline), where the old wall-clock date ignored its argument",
+    "out": "5"
+  },
+  "sleep 1": {
+    "reason": "Task 11: sleep is built on the virtual clock: it advances the clock by 1 second, prints nothing and succeeds at once",
+    "out": "",
+    "code": 0
+  },
+  "sleep 0": {
+    "reason": "Task 11: sleep is built on the virtual clock: sleep 0 prints nothing and succeeds",
+    "out": "",
+    "code": 0
+  },
+  "sleep": {
+    "reason": "Task 11: sleep is built: no operand prints GNU's missing operand message, status 1",
+    "out": "sleep: missing operand\nTry 'sleep --help' for more information.",
+    "code": 1
+  },
+  "sleep abc": {
+    "reason": "Task 11: sleep is built: a bad interval prints GNU's message, status 1",
+    "out": "sleep: invalid time interval 'abc'\nTry 'sleep --help' for more information.",
+    "code": 1
+  },
+  "sleep 1; echo done": {
+    "reason": "Task 11: sleep is built on the virtual clock, so only echo prints",
+    "out": "done"
+  },
+  "sleep 0.1": {
+    "reason": "Task 11: sleep is built on the virtual clock and keeps fractions: it advances 0.1 seconds and succeeds",
+    "out": "",
+    "code": 0
+  },
+  "ps": {
+    "reason": "Task 11: ps is built: the process table lists the shell (pid 1234) and the ps run itself (the first new pid, 1235)",
+    "out": "  PID TTY          TIME CMD\n 1234 pts/0    00:00:00 bash\n 1235 pts/0    00:00:00 ps",
+    "code": 0
+  },
+  "timeout 1 sleep 5": {
+    "reason": "Task 11: timeout is built: the sleep is stopped at the 1-second deadline (the clock moves exactly 1 second), status 124 and no output",
+    "out": "",
+    "code": 124
   }
 }

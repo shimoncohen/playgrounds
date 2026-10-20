@@ -20,7 +20,7 @@ function runCmd(words,io,assigns){
   CTX.lastSub=null;
   const all=!(assigns&&assigns.length)&&words.every(w=>/^[A-Za-z_]\w*=/.test(w.raw));
   try{if(all){ew=[]; /* a=1 b=$a: left to right, each value sees the ones before it */
-      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps)S.vars[k]=v}}
+      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps){S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}}}
     else ew=expandWords(words,true);
     if(assigns&&assigns.length)pre=assigns.map(x=>SQ.expandOne(x.word))}
   catch(e){return failExp(e)}
@@ -67,15 +67,21 @@ function loopCtl(name,a,io){
 const errOut=e=>({out:[{text:errOf(e),cls:'err'}],code:e.code||2});
 let nest=0;
 /* prevLast: the exit code from before the outermost line ran, so a mission check can see what `$?` read. Lives on SQ.rt, not in saved state. */
+/* The virtual clock (procs.js): each outermost line costs one second, added when it ends (also after an error or a stopped line).
+   A $( ) run at the top of a sandboxed script (o.sub) is not a typed line and costs nothing. SQ.advance's Out[] (Task 12a: output of jobs
+   that came due) is appended to the line's output; lastOut keeps only the line's own output. */
 function execLine(line,o){o=Object.assign({depth:0,tty:true,record:true},o);const outer=nest===0;
   if(outer){SQ.rt.prevLast=S.last;SQ.rt.steps=0;SQ.rt.outChars=0;SQ.rt.grewBy=0}
+  let charged=!(outer&&!o.sub);
+  const lineCost=r=>{if(charged)return r;charged=true;const x=SQ.advance(1,{tty:o.tty,depth:0});if(x&&x.length)r.out=r.out.concat(x);return r};
   const sd=CTX.depth;CTX.depth=o.depth;nest++;
   try{const r=execLine0(line,o);if(!outer)return r;
     SQ.checkState(); /* the saved-state cap, once more at the end of the typed line (see checkState in fs.js) */
-    SQ.rt.lastOut=r.out.filter(x=>x.cls==='out').map(x=>x.text).join('\n');return capLines(r)}
+    SQ.rt.lastOut=r.out.filter(x=>x.cls==='out').map(x=>x.text).join('\n');return capLines(lineCost(r))}
   catch(e){if(!outer)throw e; /* outermost call: any runaway or unexpected failure becomes one error line, state stays usable */
+    if(e&&e.tmo!==undefined&&SQ.rt.deadlines.length)throw e; /* a $( ) at the top of a sandboxed script, inside `timeout`: the timeout takes it */
     const code=SQ.isOverflow(e)?2:1; /* a JS stack overflow reads like the parser's nesting error, status 2 */
-    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code;return {out:[{text:fatalText(e),cls:'err'}],code}}
+    SQ.rt.lastOut='';CTX.pend.length=0;S.last=code;return lineCost({out:[{text:fatalText(e),cls:'err'}],code})}
   finally{CTX.depth=sd;nest--}}
 /* On-screen output per typed line is capped at LIM.LINES; the rest is replaced by one notice. */
 function capLines(r){let n=0;const out=[];
