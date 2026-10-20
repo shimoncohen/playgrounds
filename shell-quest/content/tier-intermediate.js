@@ -9,6 +9,7 @@ const ACCESS=[
 '10.0.0.7 POST /order 200','10.0.0.5 GET /map 404','10.0.0.12 GET /shop 200','10.0.0.9 POST /order 500'].join('\n');
 const CONFIG='[village]\nname=Oakford\nport=8080\ndebug=false\n\n[shop]\nopen=09:00\nclose=18:00';
 const NOTES='Buy Bread and rope\nCheck the Wolf tracks\nfeed the OWL\nWrite to Mira\nlight the torch';
+SQ.VILLAGE={SALES,ACCESS,CONFIG}; /* the Expert tier (tier-expert.js) seeds the same files, so a jump-in there finds them */
 const seedVillage=()=>{ensureFile('~/village/shop.txt',SHOP);ensureFile('~/journal.txt',JOURNAL);
   ensureFile('~/village/sales.csv',SALES);ensureFile('~/village/logs/access.log',ACCESS);
   ensureFile('~/config.ini',CONFIG);ensureFile('~/notes.txt',NOTES)};

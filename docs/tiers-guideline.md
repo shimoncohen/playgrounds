@@ -6,7 +6,7 @@ How to add difficulty tiers (Beginner, Intermediate, ...) to a playground, and h
 
 A tier is a named group of chapters with one XP value per mission. The tiers are Beginner (10 XP), Intermediate (15), Advanced (20) and Expert (25). A chapter badge is always +25 XP, whatever the tier.
 
-Tiers are **open**: nothing is locked. A learner can click any chapter in the rail at any time. Tiers only group, label and pay out differently. A tier counts as complete when every one of its chapters has its badge, and that is **derived**, not stored: there is no tier state in the saved JSON, and a tier badge awards no XP. A tier with no chapters yet (Expert today) is declared but not drawn.
+Tiers are **open**: nothing is locked. A learner can click any chapter in the rail at any time. Tiers only group, label and pay out differently. A tier counts as complete when every one of its chapters has its badge, and that is **derived**, not stored: there is no tier state in the saved JSON, and a tier badge awards no XP. A tier with no chapters yet is declared but not drawn.
 
 ## 2. Declaring tiers and tagging chapters
 
@@ -29,7 +29,7 @@ Each chapter carries `tier: 'intermediate'`. What you get back:
 - `ranks()` and `rankFor(xp)` give the rank ladder and the rank (name, index, `lo`, `hi`) for an XP total.
 - `Tiers.renderRail(container, { status, chapters, S, onPick })` draws a `.tierhead` per tier that has chapters, then that tier's chapter buttons. Load `shared/tiers.css` next to your own stylesheet; it uses the host page's theme variables `--muted`, `--ink`, `--accent-text` and `--line`, so define those (or map them) in your `style.css`.
 
-**Ranks derive from cumulative XP.** `ranks()` is `baseRanks` plus one entry per tier that has chapters and a name in `tierEndRanks`. That entry sits at the XP of finishing everything up to and including that tier: `sum(missions * missionXp + 25)`. Shell Quest: Beginner ends at 695, Intermediate at 1230 ("Script Smith"), Advanced at 1890 ("Automator", the top rank until Expert has chapters). Add chapters to a tier and its threshold moves by itself; never type the number.
+**Ranks derive from cumulative XP.** `ranks()` is `baseRanks` plus one entry per tier that has chapters and a name in `tierEndRanks`. That entry sits at the XP of finishing everything up to and including that tier: `sum(missions * missionXp + 25)`. Shell Quest: Beginner ends at 695, Intermediate at 1230 ("Script Smith"), Advanced at 1890 ("Automator"), and Expert at the end of its chapters ("Shell Wizard", the top rank). Add chapters to a tier and its threshold moves by itself; never type the number.
 
 ## 3. Mission kinds and the check context
 
@@ -58,7 +58,7 @@ The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/
 | `c.scriptPasses(m)` | runs mission `m`'s test cases in the sandbox: `{ok: true}` or `{ok: false, failed: {index, label, expected, got}}` (`index` -1 means the file is missing) |
 | `c.err()` | everything the line printed on stderr: error messages, `set -x` traces, the `[1] 1235` job notice (`SQ.rt.lastErr`); never tips, background-job output or the closing `[1]+  Done` notices. `''` after an editor Save |
 | `c.status()` | `$?` after the line (`S.last`) |
-| `c.jobs()` | copies of the job table, `{id, pid, cmd, state, code, owner, reaped, desc?}` (`state` `Running`, `Stopped`, `Done`, `Terminated`; `cmd` without the `&`; `owner` 0 for the learner's own jobs), plus the jobs whose records were cleared during the line (`reaped: true`): `sleep 100 & kill %1` lists `{state: 'Terminated', code: 143, reaped: true}`, the next line lists nothing. "No jobs left" is `c.jobs().every(j => j.state !== 'Running')` |
+| `c.jobs()` | copies of the job table, `{id, pid, cmd, state, code, owner, reaped, desc?}` (`state` `Running`, `Stopped`, `Done`, `Terminated`; `cmd` without the `&`; `owner` 0 for the learner's own jobs), plus the jobs whose records were cleared during the line (`reaped: true`): `sleep 100 & kill %1` lists `{state: 'Terminated', code: 143, reaped: true}`, the next line lists nothing. jobs that scripts and `bash -c` started (`owner` not 0, orphans included) are listed too, so filter `j.owner === 0` before counting jobs or testing a state: "no jobs left" is `c.jobs().filter(j => j.owner === 0).every(j => j.state !== 'Running')`. Shell Quest's Expert chapter 17 (`content/tier-expert.js`) has the worked examples: `myJobs`, and `startedHere` for "a job started on this line" (its `[N] PID` notice is in `c.err()`) |
 | `c.clock()` | the virtual clock in seconds, after the line's own 1-second cost (procs.js). A fresh world starts at 0; Reset world and a chapter switch put it back to 0 |
 | `c.elapsed()` | the virtual seconds the line itself took, without its 1-second cost: `sleep 5 & wait` gives 5, `echo hi` 0. Use it for "the clock advanced by at least N" |
 | `c.ps()` | copies of the process table, `{pid, ppid, cmd, start, state}`; the shell itself is `{pid: 1234, cmd: 'bash'}` |
@@ -209,7 +209,7 @@ All of these were found in review of the Intermediate and Advanced tiers.
 - **Factual explain text.** `explain` is read as truth. Test every claim it makes against the engine (`man`, `help`, run it). Don't describe options the practice shell doesn't support; unsupported options print "this practice shell does not support X yet" rather than doing something silently wrong.
 - **Exact-match quick-fire.** Quick-fire answers are compared after dropping quotes and collapsing spaces. When the quoting is the lesson (`echo '$HOME'`), add `{exact:true}` as the fourth tuple element, so only whitespace is normalised.
 
-**Don't teach what the engine does not do.** Content must avoid these Stage 2 gaps (the full list is in the spec's "Stage 2 as built" section): arrays, `&` and job control, `set` (`-e`, `-x`, `--`), `trap`, `getopts`, `awk`, `BASH_REMATCH`, `local -r`, function names with `-` or `.`. A here-document cannot be typed at the prompt (one line at a time), so missions use it in scripts. A typed `exit` only prints a friendly message, and `return`/`local` work only inside a function, so quick-fire answers that need them are phrased as definitions.
+**Don't teach what the engine does not do.** Content must avoid these Stage 2 gaps (the full list is in the spec's "Stage 2 as built" section): arrays, `&` and job control, `set` (`-e`, `-x`, `--`), `trap`, `getopts`, `awk`, `BASH_REMATCH`, `local -r`, function names with `-` or `.`. Stage 3 closed most of these for the Expert tier (`awk`, `&` and job control, `set -e`/`-u`/`-x`/`-o pipefail`, `trap`, `getopts`); bash arrays are still unsupported, so array lessons use awk arrays. A here-document cannot be typed at the prompt (one line at a time), so missions use it in scripts. A typed `exit` only prints a friendly message, and `return`/`local` work only inside a function, so quick-fire answers that need them are phrased as definitions.
 
 ## 7. Guide and quick-fire tags
 

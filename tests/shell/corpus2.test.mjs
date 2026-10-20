@@ -48,7 +48,7 @@ describe('differential corpus 2 (Stage 2 engine)', () => {
   it('contains every Advanced command-mission answer, script answer and wrong script', () => {
     const SQ = loadShell();
     SQ.content.chapters.forEach((c, ci) => {
-      if (ci < ADVANCED_FIRST) return;
+      if (ci < ADVANCED_FIRST || c.tier !== 'advanced') return; // recorded on the Stage 2 engine: Expert content is tested in expert.test.mjs
       for (const m of c.missions) {
         if (m.kind === 'script' || m.kind === 'challenge') {
           for (const s of [m.answer, ...(m.wrong || [])]) assert.ok(corpus.some((e) => e.put && e.put[m.file] === s && e.setupUpTo === ci), `chapter ${ci} "${m.title}": script variant missing`);

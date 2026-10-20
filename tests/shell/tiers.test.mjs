@@ -45,7 +45,7 @@ describe('tiers', () => {
     const expected = 695 + inter.reduce((n, c) => n + c.missions.length * 15 + 25, 0);
     assert.equal(SQ.tiers.cumulativeXp('intermediate'), expected);
     const r = SQ.tiers.ranks();
-    assert.equal(r.length, 7); // + Automator, now that Advanced has chapters
+    assert.equal(r.length, 8); // + Automator and Shell Wizard, now that Advanced and Expert have chapters
     assert.deepEqual([...r[5]], [expected, 'Script Smith']);
     assert.equal(SQ.tiers.rankFor(expected).name, 'Script Smith');
     assert.equal(SQ.tiers.rankFor(695).name, 'Pipe Fitter');
@@ -58,17 +58,18 @@ describe('tiers', () => {
     assert.equal(expected, 1890);
     assert.equal(SQ.tiers.cumulativeXp('advanced'), expected);
     const r = SQ.tiers.ranks();
-    assert.deepEqual([...r[r.length - 1]], [expected, 'Automator']);
+    assert.deepEqual([...r[6]], [expected, 'Automator']);
+    assert.equal(r[r.length - 1][1], 'Shell Wizard', 'Expert has chapters now, so Automator is no longer the top rank');
     assert.equal(SQ.tiers.rankFor(expected).name, 'Automator');
     assert.equal(SQ.tiers.rankFor(expected - 1).name, 'Script Smith');
     assert.equal(SQ.tiers.missionXp(11), 20);
     const S = { done: {}, badges: {} };
     SQ.content.chapters.forEach((c, i) => { S.badges[i] = 1; c.missions.forEach((m, j) => { S.done[`${i}.${j}`] = 1; }); });
-    const st = SQ.tiers.status(S).filter((x) => x.chapters.length); // Expert has no chapters and is not drawn
-    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.complete]))), [['beginner', true], ['intermediate', true], ['advanced', true]]);
+    const st = SQ.tiers.status(S).filter((x) => x.chapters.length);
+    assert.deepEqual(JSON.parse(JSON.stringify(st.map((s) => [s.tier.id, s.complete]))), [['beginner', true], ['intermediate', true], ['advanced', true], ['expert', true]]);
   });
   it('a tier without chapters adds no rank', () => {
-    assert.equal(SQ.tiers.ranks().length, 7); // Expert has no chapters yet
+    assert.equal(SQ.tiers.ranks().length, 8); // every tier has chapters now: 5 base ranks + Script Smith, Automator, Shell Wizard
     const t = Tiers.create({
       tiers: [
         { id: 'a', name: 'A', blurb: '', missionXp: 10 },
@@ -162,8 +163,9 @@ describe('Expert tier wiring (Task 17)', () => {
     X.Tiers.renderRail(el, { status: st, chapters: X.content.chapters, S });
     assert.equal((el.innerHTML.match(/class="tierhead complete"/g) || []).length, 4);
   });
-  it('a fake Expert mission passes on its answer through SQ.missionVerdict', () => {
+  it('an Expert mission passes on its answer through SQ.missionVerdict', () => {
     const X = withExpert();
+    X.setupChapter(X.content.chapters[15]);
     const m = X.content.chapters[15].missions[0];
     run(X, m.answer);
     assert.equal(X.missionVerdict(m, X.ctxFor(m.answer)).good, true);

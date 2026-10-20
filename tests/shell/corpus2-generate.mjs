@@ -97,7 +97,7 @@ export function missionSpecs() {
   const SQ = loadShell();
   const specs = [];
   SQ.content.chapters.forEach((c, ci) => {
-    if (ci < ADVANCED_FIRST) return;
+    if (ci < ADVANCED_FIRST || c.tier !== 'advanced') return; // Advanced only: the Expert tier came after the recording
     const cmds = c.missions.filter((m) => m.kind !== 'script' && m.kind !== 'challenge');
     const answers = cmds.map((m) => m.answer);
     if (answers.length) specs.push({ lines: answers.slice(), setupUpTo: ci });

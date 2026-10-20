@@ -68,7 +68,19 @@ const QF=[
  ["Print oops on stderr instead of stdout",["echo oops >&2","echo oops 1>&2","echo \"oops\" >&2"],'advanced'],
  ["End a script with exit status 1",["exit 1"],'advanced'],
  ["Open scripts/greet.sh in the editor",["nano scripts/greet.sh","nano ./scripts/greet.sh"],'advanced'],
- ["Run scripts/greet.sh with the name Ada",["bash scripts/greet.sh Ada","bash ./scripts/greet.sh Ada"],'advanced']
+ ["Run scripts/greet.sh with the name Ada",["bash scripts/greet.sh Ada","bash ./scripts/greet.sh Ada"],'advanced'],
+ ["With awk, print the first field of every line of village/logs/access.log",["awk '{print $1}' village/logs/access.log","awk '{ print $1 }' village/logs/access.log"],'expert',{exact:true}],
+ ["With awk, print the second comma-separated field of every line of village/sales.csv",["awk -F, '{print $2}' village/sales.csv","awk -F, '{ print $2 }' village/sales.csv","awk -F',' '{print $2}' village/sales.csv"],'expert',{exact:true}],
+ ["With awk, print the lines of village/sales.csv whose second field is more than 10",["awk -F, '$2 > 10' village/sales.csv","awk -F, '$2>10' village/sales.csv","awk -F, '$2 > 10 {print}' village/sales.csv","awk -F, '$2 > 10 {print $0}' village/sales.csv"],'expert',{exact:true}],
+ ["With awk and an END block, print how many lines village/sales.csv has",["awk 'END {print NR}' village/sales.csv","awk 'END { print NR }' village/sales.csv"],'expert',{exact:true}],
+ ["Change 8080 to 9090 in config.ini, editing the file in place",["sed -i 's/8080/9090/' config.ini","sed -i 's/port=8080/port=9090/' config.ini","sed -i 's/8080/9090/g' config.ini"],'expert',{exact:true}],
+ ["With sed, print only the lines of config.ini that contain port",["sed -n '/port/p' config.ini"],'expert',{exact:true}],
+ ["List the processes running in this terminal",["ps"],'expert'],
+ ["Run sleep 30 in the background",["sleep 30 &"],'expert'],
+ ["List this shell's background jobs",["jobs"],'expert'],
+ ["Wait until every background job has finished",["wait"],'expert'],
+ ["Stop job number 1",["kill %1","kill -TERM %1","kill -15 %1"],'expert'],
+ ["Print the PID of the last background job",["echo $!","echo \"$!\""],'expert']
 ];
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});

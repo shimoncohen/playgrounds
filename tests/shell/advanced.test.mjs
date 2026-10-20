@@ -407,7 +407,8 @@ describe('advanced chapters 14 and 15: shape', () => {
   const SQ = loadShell();
   const ch = SQ.content.chapters;
   it('sit at indexes 13 and 14, tier advanced, 7 missions each, after chapters 12 and 13', () => {
-    assert.equal(ch.length, 15);
+    assert.equal(ch.filter((c) => c.tier !== 'expert').length, 15);
+    assert.equal(ch.length, 15 + ch.filter((c) => c.tier === 'expert').length, 'only Expert chapters come after chapter 15');
     assert.deepEqual([...ch.slice(11, 15).map((c) => c.tier)], Array(4).fill('advanced'));
     assert.deepEqual([...ch.slice(13, 15).map((c) => c.name)], ['Functions & arguments', 'Real scripts']);
     assert.deepEqual([...ch.slice(13, 15).map((c) => c.badge)], ['Function Maker', 'Scripter']);
