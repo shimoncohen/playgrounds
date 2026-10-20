@@ -109,6 +109,21 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
+  test(`${name}-quest side sections scroll on their own on a wide screen`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1440, height: 800 } });
+    await page.waitForSelector('#mission');
+    const r = await page.evaluate(() => {
+      const c = document.getElementById('chapters'), m = document.querySelector('.mapCol .panel');
+      return { chapY: getComputedStyle(c).overflowY, chapH: c.clientHeight, mapY: getComputedStyle(m).overflowY, mapMax: parseFloat(getComputedStyle(m).maxHeight) };
+    });
+    assert.equal(r.chapY, 'auto');
+    assert.ok(r.chapH <= 420, `chapter list is ${r.chapH}px tall`);
+    assert.equal(r.mapY, 'auto');
+    assert.ok(r.mapMax <= 800, `map panel max-height is ${r.mapMax}px`);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
   test(`${name}-quest links back to the landing page and to the feature request form`, async () => {
     const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
     await page.waitForSelector('#mission');
