@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { loadShell, run } from './harness.mjs';
 
 const isScript = (m) => m.kind === 'script' || m.kind === 'challenge';
-const verdict = (SQ, m, line) => SQ.missionVerdict(m, SQ.ctxFor(line)).good;
+// a steps mission has no check of its own: judge it by its first step, whose answer is the mission's answer
+const unit = (m) => (m.steps ? m.steps[0] : m);
+const verdict = (SQ, m, line) => SQ.missionVerdict(unit(m), SQ.ctxFor(line)).good;
 const decode = (s) => s.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 const ucFirst = (s) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
 // Same two-step mission as solvability.test.mjs: the answer only finds the path, a later `cat` solves it.
@@ -126,7 +128,7 @@ describe('examples in a mission text complete it only when they teach the same l
       ch.missions.forEach((m, mi) => {
         if (isScript(m) || TWO_STEP[m.title]) return;
         const text = [m.goal, m.explain, m.hint].filter(Boolean).join(' ');
-        const snippets = [...new Set([...text.matchAll(/<code>(.*?)<\/code>/g)].map((x) => decode(x[1]).replace(/<[^>]+>/g, '')))].filter((s) => s !== m.answer && /^[a-z]/.test(s));
+        const snippets = [...new Set([...text.matchAll(/<code>(.*?)<\/code>/g)].map((x) => decode(x[1]).replace(/<[^>]+>/g, '')))].filter((s) => s !== m.answer && s !== m.answer.split(/\s/)[0] && /^[a-z]/.test(s)); // the bare command name is a mention, not an example
         for (const s of snippets) {
           // a fresh world with the earlier missions of the chapter already solved, as a learner would have it
           const SQ = worldBefore(idx, mi);
