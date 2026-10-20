@@ -1345,7 +1345,8 @@ function setupChapter(i){const ch=CH[i];const msgs=[];if(ch.files){const n=ensur
 function goChapter(i){S.ch=i;hintOpen=false;S.view='auto';const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
   setupChapter(i).forEach(m=>addLine(esc(m),'sys'));known=null;renderAll();save();scrollDown()}
 /* missions */
-function checkMission(c){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false;try{good=!!m.ok(c)}catch(e){}if(!good)return;
+function checkMission(c){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];if(S.done[S.ch+'.'+S.mi])return; /* revisiting a finished mission never celebrates it again */
+  let good=false;try{good=!!m.ok(c)}catch(e){}if(!good)return;
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;if(isNew)S.xp+=10;hintOpen=false;
   addLine(esc(`✓ Mission complete: ${m.t}${isNew?'   +10 XP':''}`),'win');if(m.after)addLine(esc(m.after),'note');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
