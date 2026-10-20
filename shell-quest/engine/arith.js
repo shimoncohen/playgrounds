@@ -34,9 +34,9 @@ function arith(expr,env,depth){depth=depth||0;
   const syn=()=>fail('syntax error in expression');
   const peek=()=>toks[p]&&toks[p].t==='op'?toks[p].v:null;
   const eat=o=>{if(peek()===o){p++;return true}return false};
-  const rd=n=>{const s=String(env.get(n)==null?'':env.get(n)).trim();if(/^[+-]?\d+$/.test(s))return W(BigInt(s));if(s==='')return 0n;
+  const rd=n=>{const g=skip&&env.peek||env.get,s=String(g(n)==null?'':g(n)).trim(); /* peek: a read in a branch that is not evaluated (0 && x) skips set -u */if(/^[+-]?\d+$/.test(s))return W(BigInt(s));if(s==='')return 0n;
     if(depth>=MAX_DEPTH){const e=new Error('bash: expression recursion level exceeded');e.raw=true;throw e}
-    return W(BigInt(arith(s,skip?{get:env.get,set:()=>{}}:env,depth+1)))};
+    return W(BigInt(arith(s,skip?{get:env.peek||env.get,set:()=>{}}:env,depth+1)))};
   const wr=(n,v)=>{if(!skip)env.set(n,String(v))};
   const V=v=>({v});
   function assign(){

@@ -816,7 +816,7 @@
   {"line":"bash nosuch.sh","out":"bash: nosuch.sh: No such file or directory","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"bash forest","out":"bash: forest: Is a directory","code":126,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"line":"sh nosuch.sh","out":"bash: nosuch.sh: No such file or directory","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
-  {"line":"bash -c \"echo hi\"","out":"bash: -c: No such file or directory","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
+  {"line":"bash -c \"echo hi\"","out":"bash: -c: No such file or directory","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[],"expectChange":true,"changeNote":"Task 13: set and bash -c exist (positional parameters, shell options, bash -c/-n/-x)"},
   {"line":"bash readme.txt","out":"bash: Welcome,: command not found\nbash: This: command not found\nDid you mean: tail?\nbash: Folders: command not found\nbash: Type: command not found\nDid you mean: type?","code":127,"cwd":"/home/explorer","vars":{},"files":[],"gone":[]},
   {"lines":["echo \"bash x.sh\" > x.sh","bash x.sh"],"out":"bash: too many nested scripts","code":1,"cwd":"/home/explorer","vars":{},"files":[["/home/explorer/x.sh",9,"4a0b77c6"]],"gone":[]},
   {"lines":["echo \"bash y.sh\" > x.sh","echo \"bash x.sh\" > y.sh","bash x.sh"],"out":"bash: too many nested scripts","code":1,"cwd":"/home/explorer","vars":{},"files":[["/home/explorer/x.sh",9,"788d2520"],["/home/explorer/y.sh",9,"4a0b77c6"]],"gone":[]},

@@ -106,8 +106,8 @@ const CMDS={
   whoami:()=>ok('explorer'),
   hostname:()=>ok('basecamp'),
   date:null, /* the virtual date: defined in procs.js; the key stays here so command suggestions keep their order */
-  bash(a,io){if(!a[0])return E('You are already in bash. To run a script, give its name: bash pack.sh');return SQ.runPath(a[0],io,true,a.slice(1))},
-  sh(a,io){return CMDS.bash(a,io)},
+  bash:null, /* bash and sh (FILE, -c, -n, -x, ...): defined in cmds-opts.js; the keys stay here so command suggestions keep their order */
+  sh:null,
   help:()=>ok(['Commands in this practice shell:',
     '  Look around   pwd  ls  cd  tree  cat',
     '  Create        mkdir  touch  echo',
@@ -200,6 +200,6 @@ const FRIENDLY={
   more:'more pages through long files. This practice shell doesn\'t have it; use head and tail instead.'
 };
 function lev(a,b){const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
-function suggest(n){if(n.length>64)return null; /* Levenshtein is length x length: a huge word gets no suggestion */let best=null,bd=3;for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit')continue;const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
+function suggest(n){if(n.length>64)return null; /* Levenshtein is length x length: a huge word gets no suggestion */let best=null,bd=3;for(const c of Object.keys(CMDS)){if(SQ.own(FRIENDLY,c)||c==='edit'||c==='set')continue; /* never set: its neighbours (let, sed, get) are other commands */const d=lev(n.toLowerCase(),c);if(d<bd){bd=d;best=c}}return n.length>1&&bd<=(n.length<4?1:2)?best:null}
 Object.assign(SQ,{CMDS,headTail,copyMove,FRIENDLY,lev,suggest});
 })(window.SQ = window.SQ || {});

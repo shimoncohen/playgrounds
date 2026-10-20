@@ -293,8 +293,8 @@
     "out": "1 2 3"
   },
   "set -- a b c; echo $1 $2 $3 $#": {
-    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
-    "out": "bash: set: command not found\nDid you mean: sed?\n0"
+    "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash; Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a b c 3"
   },
   "echo $0 $1 $2": {
     "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
@@ -1200,5 +1200,193 @@
     "reason": "Stage 3 Task 12b: $! is empty before any job, so this is a plain wait: no jobs, status 0, no output",
     "out": "",
     "code": 0
+  },
+  "set -- a b; echo x | shift; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "2"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" $@; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a][b][c]"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" \"$@\"; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a b][c]"
+  },
+  "set -- \"a b\" c; printf \"[%s]\" \"$*\"; echo": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "[a b c]"
+  },
+  "set -- a b c; echo ${@:2}": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "b c"
+  },
+  "set -- a b c; echo ${#@}": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "3"
+  },
+  "bash -c \"echo hi\"": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "hi",
+    "code": 0
+  },
+  "bash -c \"exit 3\"; echo $?": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "3"
+  },
+  "set -- a b c; shift; echo $@": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "b c"
+  },
+  "set -- a b c; shift 2; echo $@": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "c"
+  },
+  "set -- a b; shift 3; echo $?": {
+    "reason": "Task 13: set -- now sets the positional parameters, so shift/$@ see them (shift 3 of two still fails with 1)",
+    "out": "1"
+  },
+  "set -- \"a b\" c; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "2"
+  },
+  "set --; echo $#": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "0"
+  },
+  "set -- a b; for x; do echo $x; done": {
+    "reason": "Task 13: set -- a b sets the positional parameters, so for x (in \"$@\") loops over a and b and leaves x=b",
+    "out": "a\nb",
+    "vars": {
+      "x": "b"
+    }
+  },
+  "set -- a b; for x in \"$@\"; do echo $x; done": {
+    "reason": "Task 13: set -- a b sets the positional parameters, so for x (in \"$@\") loops over a and b and leaves x=b",
+    "out": "a\nb",
+    "vars": {
+      "x": "b"
+    }
+  },
+  "set -- a b; echo \"$*\"": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a b"
+  },
+  "set -- a b; IFS=,; echo \"$*\"": {
+    "reason": "Task 13: set -- now sets the positional parameters, so $#, $@, $*, ${@:2} and ${#@} report them",
+    "out": "a,b"
+  },
+  "set -e; false; echo after": {
+    "reason": "Task 13: set -e ends the line at the failing false (a typed line stops; bash would close the shell), status 1",
+    "out": "",
+    "code": 1
+  },
+  "set -e; true; echo after": {
+    "reason": "Task 13: set -e with nothing failing changes nothing; set now exists, so no command-not-found line",
+    "out": "after"
+  },
+  "set -u; echo $UNSET": {
+    "reason": "Task 13: set -u makes $UNSET an error: bash: UNSET: unbound variable, status 1, the line ends",
+    "out": "bash: UNSET: unbound variable",
+    "code": 1
+  },
+  "set -x; echo hi": {
+    "reason": "Task 13: set -x traces the expanded command to stderr (+ echo hi) before it runs",
+    "out": "+ echo hi\nhi"
+  },
+  "set -o pipefail; false | true; echo $?": {
+    "reason": "Task 13: set -o pipefail makes false | true fail with the status of false (1)",
+    "out": "1"
+  },
+  "set -euo pipefail": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "set +e": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
+  },
+  "set -o": {
+    "reason": "Task 13: set -o lists the 27 bash option names in bash order with the values of bash -c (errexit nounset pipefail xtrace live)",
+    "out": "allexport      \toff\nbraceexpand    \ton\nemacs          \toff\nerrexit        \toff\nerrtrace       \toff\nfunctrace      \toff\nhashall        \ton\nhistexpand     \toff\nhistory        \toff\nignoreeof      \toff\ninteractive-comments\ton\nkeyword        \toff\nmonitor        \toff\nnoclobber      \toff\nnoexec         \toff\nnoglob         \toff\nnolog          \toff\nnotify         \toff\nnounset        \toff\nonecmd         \toff\nphysical       \toff\npipefail       \toff\nposix          \toff\nprivileged     \toff\nverbose        \toff\nvi             \toff\nxtrace         \toff",
+    "code": 0
+  },
+  "set": {
+    "reason": "Task 13: set alone lists the set variables as NAME=value, sorted and quoted as bash prints them",
+    "out": "HOME=/home/explorer\nHOSTNAME=basecamp\nIFS=$' \\t\\n'\nPATH=/usr/local/bin:/usr/bin:/bin\nPWD=/home/explorer\nSHELL=/bin/bash\nUSER=explorer",
+    "code": 0
+  },
+  "set -n": {
+    "reason": "Task 13: set -n is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -n yet",
+    "code": 2
+  },
+  "set -f; echo *": {
+    "reason": "Task 13: set -f is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -f yet\ncamp config.ini docs drafts forest journal.txt lib logs notes.txt numbers.txt readme.txt scripts secrets.txt village"
+  },
+  "set -C; echo a > readme.txt": {
+    "reason": "Task 13: set -C is a valid bash option this practice shell does not model: the unsupported message (status 2), and the rest of the line runs as before",
+    "out": "this practice shell does not support set -C yet"
+  },
+  "bash -x -c \"echo hi\"": {
+    "reason": "Task 13: bash -x -c TEXT runs TEXT with xtrace on: the trace line + echo hi (stderr) comes before hi",
+    "out": "+ echo hi\nhi",
+    "code": 0
+  },
+  "bash -n -c \"echo hi\"": {
+    "reason": "Task 13: bash -n -c TEXT only parses TEXT: nothing runs, status 0",
+    "out": "",
+    "code": 0
+  },
+  "v='a b'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v='a b'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v=' a  b '; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v=' a  b '; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='*'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "14"
+  },
+  "v='*'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='x*y'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='x*y'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v=''; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "0"
+  },
+  "v=''; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
+  },
+  "v='a\tb'; set -- $v; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "2"
+  },
+  "v='a\tb'; set -- \"$v\"; echo $#": {
+    "reason": "Task 13: set -- $v sets the positional parameters (Task 4 word splitting decides how many: unquoted $v splits and globs, \"$v\" is one)",
+    "out": "1"
   }
 }

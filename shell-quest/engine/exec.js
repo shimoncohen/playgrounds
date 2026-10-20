@@ -9,39 +9,45 @@ function assignPairs(texts){const out=[];
   for(const t of texts){const k=t.slice(0,t.indexOf('='));if(SQ.badName(k))return E(`bash: \`${k}': not a valid identifier`,1);
     const v=t.slice(k.length+1);if(v.length>LIM.VAR)throw new SQ.StepLimit('a value grew too large');out.push([k,v])}
   return out}
+const xAssign=(k,v)=>SQ.xline(k+'='+(v===''?'':SQ.xq(v))); /* set -x: `+ x=1`, `+ x='a b'`, `+ x=` */
 const failExp=e=>{if(e&&e.stop)throw e;CTX.pend.length=0;const er=E(errOf(e),e.code||2);if(e&&e.abort)er.ctl={type:'exit',n:1,abort:true};return er};
 /* runCmd(words, io, assigns): assigns = the prefix assignments of `X=1 cmd` (AST Simple.assigns). The words expand first (X=1 echo $X prints the old X),
    then the values; they are set and exported for this one command only (functions and scripts see them, read honours IFS) and put back afterwards.
-   With no command left after expansion (X=1 $empty) they stay set, as an assignment-only command. */
+   With no command left after expansion (X=1 $empty) they stay set, as an assignment-only command.
+   set -x (Task 13): the trace lines ride on the result as r.xt (Out[], stderr), which runPipeline puts on the screen before the command's own output:
+   the stderr of the $( )s in the words first, then `+ NAME=value` for each assignment (prefix ones too), then `+ cmd args` (expanded, quoted by SQ.xq). */
 function runCmd(words,io,assigns){
   if(!words.length)return ok();
   SQ.step();
-  let ew,pre=null,bad=null;
+  const X=SQ.rt.opts.x;let ew,pre=null,bad=null,xt=null;
   CTX.lastSub=null;
   const all=!(assigns&&assigns.length)&&words.every(w=>/^[A-Za-z_]\w*=/.test(w.raw));
   try{if(all){ew=[]; /* a=1 b=$a: left to right, each value sees the ones before it */
-      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps){S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}}}
+      for(const w of words){const ts=expandWords([w],true);for(const t of ts)ew.push(t);const ps=assignPairs(ts.map(t=>t.v));if(!Array.isArray(ps)){bad=ps;break}for(const [k,v] of ps){if(X)(xt=xt||[]).push(...CTX.pend.splice(0),xAssign(k,v)); /* traced before it takes effect (PS4=x is shown with the old PS4) */
+        S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}}}
     else ew=expandWords(words,true);
     if(assigns&&assigns.length)pre=assigns.map(x=>SQ.expandOne(x.word))}
   catch(e){return failExp(e)}
   const pend=CTX.pend.splice(0).map(o=>o.text);
-  if(pre){pre=assignPairs(pre);if(!Array.isArray(pre))return Object.assign(pre,{err:pend.concat(pre.err)})}
-  if(all){const r=bad||ok();if(!bad&&CTX.lastSub!==null)r.code=CTX.lastSub;return finishCmd(r,'(assign)',ew.slice(1).map(w=>w.v),false,io,pend)} /* each one was set above, left to right */
-  if(!ew.length){if(pre){for(const [k,v] of pre)S.vars[k]=v;const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;return r}
+  if(pre){pre=assignPairs(pre);if(!Array.isArray(pre))return Object.assign(pre,{err:pend.concat(pre.err)});
+    if(X)xt=pend.splice(0).map(t=>({text:t,cls:'err'})).concat(pre.map(([k,v])=>xAssign(k,v)))}
+  if(all){const r=bad||ok();if(!bad&&CTX.lastSub!==null)r.code=CTX.lastSub;if(xt)r.xt=xt;return finishCmd(r,'(assign)',ew.slice(1).map(w=>w.v),false,io,pend)} /* each one was set above, left to right */
+  if(!ew.length){if(pre){for(const [k,v] of pre)S.vars[k]=v;const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;if(xt)r.xt=xt;return r}
     return Object.assign(ok(),{err:pend})}
   if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
     for(const [k,v] of pre){S.vars[k]=v;(S.exp=S.exp||{})[k]=1}
-    try{return runCmd0(ew,io,pend,true)} /* never deferred: the prefix assignments must hold while the function runs */
+    try{return runCmd0(ew,io,pend,true,xt)} /* never deferred: the prefix assignments must hold while the function runs */
     finally{for(const [k,v,x] of saved){if(v===undefined)delete S.vars[k];else S.vars[k]=v;if(!x&&S.exp)delete S.exp[k]}}}
   return runCmd0(ew,io,pend)}
-function runCmd0(ew,io,pend,noDefer){const {args,globbed}=SQ.globWords(ew);
+function runCmd0(ew,io,pend,noDefer,xt){const {args,globbed}=SQ.globWords(ew);
   const name=args[0],a=args.slice(1);let r,lname=name;
+  if(SQ.rt.opts.x)xt=(xt||[]).concat(pend.splice(0).map(t=>({text:t,cls:'err'})),SQ.xline(args.map(SQ.xq).join(' ')));
   if(args[1]==='='&&/^[A-Za-z_]\w*$/.test(name)&&!own(CMDS,name)&&!SQ.hasFunction(name)){ /* the tip is for `x = 1`, never for a real command such as sed = file */r=E(`bash: ${name}: command not found`,127);r.tips=[`Tip: no spaces around = when you set a variable. Try: ${name}="${a.slice(1).join(' ')||'value'}"`]}
   else if(SQ.hasFunction(name)){
-    if(io.defer&&!noDefer)return {out:'',err:[],code:0,defer:{name,args:a,pend}}; /* the job interpreter (jobs.js) runs the body itself */
+    if(io.defer&&!noDefer){const d={out:'',err:[],code:0,defer:{name,args:a,pend}};if(xt)d.xt=xt;return d} /* the job interpreter (jobs.js) runs the body itself */
     r=SQ.callFunction(name,a,io); /* functions beat builtins and commands; the call logs only its inner commands */
     if(pend.length){r.err=pend.concat(r.err);r.list=pend.map(t=>({text:t,cls:'err'})).concat(r.list)}
-    return r}
+    if(xt)r.xt=xt;return r}
   else if(name.includes('/'))r=runPath(name,io,false,a);
   else if((name==='break'||name==='continue')&&!own(CMDS,name))r=loopCtl(name,a,io);
   else if(name==='local'&&!own(CMDS,'local'))r=SQ.localBuiltin(a);
@@ -49,7 +55,7 @@ function runCmd0(ew,io,pend,noDefer){const {args,globbed}=SQ.globWords(ew);
   else if(own(CMDS,name))r=CMDS[name](a,io);
   else if(own(FRIENDLY,name))r=E(FRIENDLY[name],127);
   else{r=E(`bash: ${name}: command not found`,127);const s=suggest(name);if(s)r.tips=[`Did you mean: ${s}?`]}
-  return finishCmd(r,lname,a,globbed,io,pend)}
+  r=finishCmd(r,lname,a,globbed,io,pend);return xt?Object.assign({},r,{xt}):r} /* a copy: a command may hand back a shared result object */
 /* the common tail of a command: stderr from its $( ) first, the output caps, the log entry */
 function finishCmd(r,lname,a,globbed,io,pend){
   if(pend.length)r.err=pend.concat(r.err||[]);

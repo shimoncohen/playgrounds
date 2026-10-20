@@ -37,6 +37,10 @@ function setVar(k,v){
   if(String(v).length>SQ.LIM.VAR)throw new SQ.StepLimit('a value grew too large');
   S.vars[k]=v;if(k==='SECONDS')SQ.rt.secAt=SQ.rt.clock}
 const perr=(m,code)=>Object.assign(new Error(m),{code});
+/* set -u (Task 13): reading an unset variable is an error that ends the function, script or typed line (abort, like ${X:?}). $@ and $* never are;
+   $# $? $$ $0 always exist; $1.. and $! are unset until given. The callers test SQ.rt.opts.u first, so this costs nothing when the option is off. */
+const unbound=k=>Object.assign(perr((/^[A-Za-z_]/.test(k)?k:'$'+k)+': unbound variable',1),{abort:true});
+function nounset(k){if(k!=='@'&&k!=='*'&&!isSet(k))throw unbound(k)}
 /* ---------- word splitting ----------
    ifsNow(): the current IFS (unset = the default space, tab, newline). ifsScan walks text calling ch(c) for a field character and brk(hard) at a field break:
    a run of IFS whitespace is one soft break; one other IFS character (with the IFS whitespace around it) is one hard break, which ends a field even when it is empty. */
@@ -107,13 +111,14 @@ function scanSub0(line,i){
 function runSub(cmd){
   if(CTX.sub>=20)throw new Error('command substitution nested too deeply');
   const sv=SQ.snapshotShell();SQ.rt.scopeNode.inherit=true; /* $(jobs -p) lists the shell's jobs (cmds-proc.js tableOf) */
+  if(SQ.rt.opts.e)SQ.rt.opts=Object.assign({},SQ.rt.opts,{e:false}); /* bash's default (no inherit_errexit): set -e is off inside $( ) */
   CTX.sub++;let r;try{r=SQ.execLine(cmd,{depth:CTX.depth,tty:false,record:false,sub:true})}finally{CTX.sub--;SQ.restoreShell(sv)}
   CTX.lastSub=r.code;
   const v=[];for(const o of r.out){if(o.clear)continue;if(o.cls==='out'&&!o.bg)v.push(o.text);else CTX.pend.push(o)} /* a background job's output is not captured (it goes on with the command's stderr) */
   return SQ.trimRun(v.join('\n'),'\n')}
 /* Run-time expansion of $name, ${...} and $(( )) at line[i]==='$'. Returns null when the $ is literal, else {end,val,list?}: end = index after the expansion,
    list = the positional arguments for $@ / $* (the caller decides how to split them). dry: only find the end (no variable reads with side effects, no arithmetic). */
-const arithEnv={get:k=>getVar(k),set:(k,v)=>setVar(k,v)};
+const arithEnv={get:k=>{if(SQ.rt.opts.u&&!isSet(k))throw unbound(k);return getVar(k)},peek:k=>getVar(k),set:(k,v)=>setVar(k,v)};
 function arithVal(expr){
   try{return SQ.arith(expandStr(expr),arithEnv)}catch(e){if(e&&e.stop)throw e;if(e&&e.code===undefined)e.code=1;throw e}}
 function evalDollar(line,i,dry,dq){
@@ -121,7 +126,7 @@ function evalDollar(line,i,dry,dq){
   if(line[i+1]==='{'){const e=scanBrace(line,i,dq);if(dry)return {end:e+1,val:''};
     const r=braceVal(line.slice(i+2,e));r.end=e+1;return r}
   const m=line.slice(i).match(VRX);if(!m)return null;
-  const k=m[1];return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
+  const k=m[1];if(!dry&&SQ.rt.opts.u)nounset(k);return {end:i+m[0].length,val:getVar(k),list:!dry&&(k==='@'||k==='*')?SQ.frame().args.slice():null}}
 /* Text expansion for ${X:-operand} and arithmetic: $ forms, $( ), quotes and backslashes, but never word splitting. */
 /* case pattern: str matches the whole of the pattern word (quoted parts literal) */
 function patMatch(str,raw){pguard(str);const L=matchLens(globItems(expandStr(raw,false,true)),str,0);return L.length>0&&L[L.length-1]===str.length}
@@ -167,9 +172,10 @@ function matchLens(it,str,from){const m=it.length,out=[];let cur=new Uint8Array(
 const rev=a=>a.slice().reverse();
 const pguard=v=>{if(v.length>5000)throw perr('value too long for this practice shell',1)};
 function braceVal(body){let m;
-  if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body)))return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)};
+  if(body.length>1&&body[0]==='#'&&(m=/^#(\w+|[@*])$/.exec(body))){if(SQ.rt.opts.u)nounset(m[1]);return {val:String(m[1]==='@'||m[1]==='*'?SQ.frame().args.length:getVar(m[1]).length)}}
   m=/^(\w+|[?@*#$!])/.exec(body);if(!m)throw perr('${'+body+'}: bad substitution',1);
   const k=m[1],rest=body.slice(k.length);
+  if(rest===''&&SQ.rt.opts.u)nounset(k);
   if(rest==='')return (k==='@'||k==='*')?{val:getVar(k),list:SQ.frame().args.slice()}:{val:getVar(k)};
   const val=getVar(k),set=isSet(k),n=val.length;
   if((m=/^(:?)([-=+?])([\s\S]*)$/.exec(rest))){const nul=m[1]===':',op=m[2],w=m[3],empty=!set||(nul&&val==='');
@@ -178,6 +184,7 @@ function braceVal(body){let m;
     if(op==='+')return {val:empty?'':expandStr(w)};
     if(empty)throw Object.assign(perr(k+': '+(w?expandStr(w):nul?'parameter null or not set':'parameter not set'),1),{abort:true}); /* ends the function, script or typed line (see abortCtl) */
     return {val}}
+  if(SQ.rt.opts.u)nounset(k); /* ${x#p} ${x/p/r} ${x:1} read x */
   if((m=/^(##?|%%?)([\s\S]*)$/.exec(rest))){pguard(val);const it=globItems(expandStr(m[2],false,true)),op=m[1];
     if(op[0]==='#'){const L=matchLens(it,val,0);if(L.length)return {val:val.slice(op==='#'?L[0]:L[L.length-1])}}
     else{const L=matchLens(rev(it),val.split('').reverse().join(''),0);if(L.length)return {val:val.slice(0,n-(op==='%'?L[0]:L[L.length-1]))}}

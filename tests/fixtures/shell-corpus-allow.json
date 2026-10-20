@@ -673,5 +673,15 @@
     "reason": "Stage 3 Task 12b: jobs is a builtin; with no jobs it prints nothing (status 0)",
     "out": "",
     "code": 0
+  },
+  "bash -c \"echo hi\"": {
+    "reason": "Task 13: bash -c TEXT runs TEXT in a child shell (was: -c taken as a file name); the status is the child's",
+    "out": "hi",
+    "code": 0
+  },
+  "set -e": {
+    "reason": "Task 13: set accepts -e/+e/-u/-o pipefail (combined letters too); nothing printed, status 0",
+    "out": "",
+    "code": 0
   }
 }

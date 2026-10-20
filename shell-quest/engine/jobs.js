@@ -90,7 +90,9 @@
      the generator's pending finally blocks with the job's state swapped in (function frames, subshell snapshots) and records the end. A job that
      signals itself is ended by a thrown {jobSig} that slice() catches. `wait` inside a job comes back from runPipeline as r.defer = {wait: req}
      and gWait yields {wait: req} until the jobs it waits for end; tick skips a job while its waitReq is not ready.
-   - 13 `set -e`/`-x`: the generator mirrors runList/runAndOr/runIf...; option checks added there must be added here too (gList, gAndOr, gLoop).
+   - 13 (done) `set -e`/`-x`/pipefail/-u: the job's options are part of its shell state (J.opts, copied at spawn); gAndOr asks SQ.errexit like
+     runAndOr, conditions and ! run SQ.quiet, G.for traces each pass; everything else (pipefail, traces of simple commands, set -u) is in the
+     shared units (runPipeline, runCmd, caseArm, expansion).
    - 14 `trap`/signals: Job.sig, delivered at the job's next command boundary (gPipe is the boundary) or on endJob.
    - 16 process substitution: runs synchronously inside a unit; nothing to do here.
    - 17 mission ctx.jobs/clock: read SQ.rt.jobs / SQ.rt.clock.
@@ -113,13 +115,15 @@ function* gList(list,env){let code=0;
     if(it.sep==='&'){const r=spawnItem(it.andor,env);emit(env,r.out);code=r.code;continue}
     const r=yield* gAndOr(it.andor,env);code=r.code;if(r.ctl)return r}
   return {code}}
-function* gAndOr(n,env){let r=yield* gPipe(n.first,env);if(r.ctl)return r;let code=r.code;
-  for(const it of n.rest){if(it.op==='&&'&&code!==0)continue;if(it.op==='||'&&code===0)continue;
-    r=yield* gPipe(it.pipe,env);code=r.code;if(r.ctl)return r}
+/* set -e as in interp.js runAndOr: every pipeline but the last runs quiet, the list's status is checked when its last pipeline ran (SQ.errexit) */
+function* gAndOr(n,env){const k=n.rest.length,q=k?SQ.quiet(env):env;let r=yield* gPipe(n.first,q);if(r.ctl)return r;let code=r.code,ran=!k;
+  for(let i=0;i<k;i++){const it=n.rest[i];if(it.op==='&&'&&code!==0)continue;if(it.op==='||'&&code===0)continue;
+    const fin=i===k-1;r=yield* gPipe(it.pipe,fin?env:q);code=r.code;ran=fin;if(r.ctl)return r}
+  if(ran&&code!==0){const x=SQ.errexit(code,k?n.rest[k-1].pipe:n.first,env);if(x)return {code,ctl:x}}
   return {code}}
 /* one pipeline: a lone unredirected compound is walked here; anything else is one runPipeline unit (a lone function call comes back deferred) */
 function* gPipe(Pn,env){const c=Pn.cmds[0];let r;
-  if(Pn.cmds.length===1&&own(G,c.type)&&plain(c.redirs)){SQ.nestIn();try{r=yield* G[c.type](c,env)}finally{SQ.nestOut()}}
+  if(Pn.cmds.length===1&&own(G,c.type)&&plain(c.redirs)){SQ.nestIn();try{r=yield* G[c.type](c,Pn.negate?SQ.quiet(env):env)}finally{SQ.nestOut()}} /* set -e is ignored under ! */
   else{const p=SQ.runPipeline(Pn,Object.assign({},env,{defer:true}));emit(env,p.out);
     if(!p.defer){yield* pay(env);return {code:p.code,ctl:p.ctl}}
     r=p.defer.wait?yield* gWait(p.defer.wait,env):yield* gCall(p.defer.name,p.defer.args,env)}
@@ -132,9 +136,9 @@ function* gCall(name,args,env){const fe=SQ.fnEnter(name,args);
   let r;try{r=yield* gList(fe.prog,env)}finally{SQ.fnLeave(fe)} /* break/continue in the body reach the caller's loop, as in callFunction */
   return SQ.fnResult(r)}
 /* a loop body's or condition's ctl, as in interp.js runWhile/runFor: 'next', 'stop' or a ctl to pass outward */
-function* gLoop(c,env){const inner=Object.assign({},env,{loops:env.loops+1});let code=0,p;
+function* gLoop(c,env){const inner=Object.assign({},env,{loops:env.loops+1}),q=SQ.quiet(inner);let code=0,p;
   for(;;){SQ.step();
-    const cr=yield* gList(c.cond,inner);
+    const cr=yield* gList(c.cond,q);
     if(cr.ctl){p=SQ.resolveCtl(cr.ctl,env.loops);if(p==='next')continue;if(p==='stop')break;return {code,ctl:p}}
     if(c.type==='while'?cr.code!==0:cr.code===0)break;
     const br=yield* gList(c.body,inner);code=br.code;
@@ -142,12 +146,13 @@ function* gLoop(c,env){const inner=Object.assign({},env,{loops:env.loops+1});let
   return {code}}
 const G={
   *if(c,env){
-    for(const b of c.branches){const cr=yield* gList(b.cond,env);if(cr.ctl)return cr;if(cr.code!==0)continue;return yield* gList(b.body,env)}
+    const q=SQ.quiet(env); /* set -e is ignored in the conditions */
+    for(const b of c.branches){const cr=yield* gList(b.cond,q);if(cr.ctl)return cr;if(cr.code!==0)continue;return yield* gList(b.body,env)}
     return c.else?yield* gList(c.else,env):{code:0}},
   while:gLoop,until:gLoop,
   *for(c,env){const out=[],fi=SQ.forItems(c,env,out);emit(env,out);if(fi.fail)return fi.fail;
     const inner=Object.assign({},env,{loops:env.loops+1});let code=0;
-    for(const it of fi.items){SQ.step();SQ.setVar(c.var,it);
+    for(const it of fi.items){SQ.step();SQ.setVar(c.var,it);if(SQ.rt.opts.x)emit(env,[SQ.forTrace(c)]);
       const br=yield* gList(c.body,inner);code=br.code;
       if(br.ctl){const p=SQ.resolveCtl(br.ctl,env.loops);if(p==='next')continue;if(p==='stop')break;return {code,ctl:p}}}
     return {code}},
@@ -157,7 +162,8 @@ const G={
   *subshell(c,env){const sv=SQ.snapshotShell();let r;
     try{r=yield* gList(c.body,Object.assign({},env,{loops:0}))}finally{SQ.restoreShell(sv)}
     return {code:r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code}}};
-/* SQ.gen.run: the job's whole program; exit n ends it with n, a stray return/break/continue just ends it */
+/* SQ.gen.run: the job's whole program; exit n ends it with n (also set -e's exit), a stray return/break/continue just ends it.
+   HOOK FOR TASK 14: a job's EXIT trap runs when this returns (and in endJob for a job ended from outside). */
 function* run(node,ctx){let r;
   if(node.type==='list')r=yield* gList(node,ctx);
   else if(node.type==='andor')r=yield* gAndOr(node,ctx);
@@ -202,14 +208,15 @@ function reap(J){const rt=SQ.rt;let i=rt.jobs.indexOf(J);if(i>=0)rt.jobs.splice(
 const stopText=e=>e&&e.stop&&/^this practice shell stopped the command/.test(e.message)?e.message.replace('stopped the command','stopped the job'):fatalText(e);
 /* run fn with J's state swapped in, and the caller's back afterwards (also when fn throws) */
 function inSlice(J,fn){const rt=SQ.rt,B=SQ.BASE_FRAME;
-  const fg={sh:SQ.shellState(),pend:CTX.pend,depth:CTX.depth,lastSub:CTX.lastSub,deadlines:rt.deadlines,scopeNode:rt.scopeNode,d:SQ.depths(),args:B.args,slice:rt.slice};
+  const fg={sh:SQ.shellState(),pend:CTX.pend,depth:CTX.depth,lastSub:CTX.lastSub,deadlines:rt.deadlines,scopeNode:rt.scopeNode,d:SQ.depths(),args:B.args,slice:rt.slice,xbase:rt.xbase};
+  rt.xbase=CTX.sub; /* set -x: the job's own trace starts at one + even when the slice runs inside a $( ) (interp.js xline) */
   SQ.setShellState(J);CTX.pend=[];CTX.depth=J.depth;CTX.lastSub=null;rt.deadlines=[];rt.scopeNode=J.scopeNode;rt.scope=J.scopeNode.id;B.args=J.baseArgs;
   SQ.setDepths(fg.d.map((x,i)=>x+J.d[i]));rt.slice=J; /* the counters go on from the caller's: the slice runs on top of the caller's JS stack */
   try{return fn()}
   finally{Object.assign(J,SQ.shellState());J.scopeNode=rt.scopeNode;J.scope=rt.scope;J.baseArgs=B.args;J.d=SQ.depths().map((x,i)=>x-fg.d[i]);J.debt=0;
     if(CTX.pend.length)J.out.push(...CTX.pend);
     rt.slice=fg.slice;SQ.setShellState(fg.sh);CTX.pend=fg.pend;CTX.depth=fg.depth;CTX.lastSub=fg.lastSub;rt.deadlines=fg.deadlines;rt.scopeNode=fg.scopeNode;rt.scope=fg.scopeNode.id;
-    B.args=fg.args;SQ.setDepths(fg.d)}}
+    B.args=fg.args;SQ.setDepths(fg.d);rt.xbase=fg.xbase}}
 /* one slice of J: resume its generator until it yields or ends; returns its Out[] marked bg */
 /* step budgets (see the header): the slice may take min(the job's own allowance left this line, the line's job work left) steps; SQ.step()
    counts up to LIM.STEPS, so rt.steps starts at LIM.STEPS - allowance. What it used is charged to both and never refunded. */

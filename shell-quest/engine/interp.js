@@ -11,8 +11,10 @@ const {errOf,own}=SQ;
    bang is $! (SQ.rt.bang, runtime only, never saved: Task 12b): per shell, so a subshell, $( ), pipeline stage, script or job that starts a job
    leaves its parent's $! alone (a child inherits the parent's value; a script starts with none).
    snapshotShell() also enters a new process scope (SQ.rt.scope, see jobs.js): the jobs a subshell, $( ), pipeline stage or script starts belong to it,
-   and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again. */
-function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,bang:SQ.rt.bang}}
+   and only scope 0 (the interactive shell) prints `[N] PID`. restoreShell(sv) leaves that scope again.
+   opts are the shell options (SQ.rt.opts, Task 13): immutable objects, so a copy is a reference; a subshell, $( ), pipeline stage, script or job starts
+   with its parent's (a script with none set) and its changes go when it ends; a function or sourced file shares the caller's (changes persist). */
+function copyShell(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:Object.assign({},S.vars),exp:S.exp&&Object.assign({},S.exp),fns:S.fns&&Object.assign({},S.fns),unsetB:S.unsetB&&Object.assign({},S.unsetB),last:S.last,bang:SQ.rt.bang,opts:SQ.rt.opts}}
 /* scopes form a tree: SQ.rt.scopeNode = {id, up} (id mirrored in SQ.rt.scope); a job's output is tagged with its owner's node, so a script can tell its own jobs' output from others' */
 const newScope=()=>{const rt=SQ.rt;rt.scopeNode={id:++rt.scopeSeq,up:rt.scopeNode};rt.scope=rt.scopeNode.id};
 function snapshotShell(){
@@ -25,10 +27,11 @@ function restoreShell(sv){
   sv.frame.args=sv.args; /* shift inside a subshell, $( ) or pipeline stage does not reach the shell */
   SQ.rt.frames.length=Math.min(SQ.rt.frames.length,sv.frames);
   if(sv.scopeNode){SQ.rt.scopeNode=sv.scopeNode;SQ.rt.scope=sv.scopeNode.id}
-  if('bang' in sv)SQ.rt.bang=sv.bang}
+  if('bang' in sv)SQ.rt.bang=sv.bang;
+  if(sv.opts)SQ.rt.opts=sv.opts}
 /* the live shell state by reference (no copies) and its reinstallation: a job slice swaps its own state in and the caller's back (jobs.js) */
-function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang}}
-function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;
+function shellState(){return {cwd:S.cwd,oldpwd:S.oldpwd,vars:S.vars,exp:S.exp,fns:S.fns,unsetB:S.unsetB,last:S.last,frames:SQ.rt.frames,bang:SQ.rt.bang,opts:SQ.rt.opts}}
+function setShellState(st){S.cwd=st.cwd;S.oldpwd=st.oldpwd;S.vars=st.vars;S.last=st.last;SQ.rt.frames=st.frames;SQ.rt.bang=st.bang==null?null:st.bang;SQ.rt.opts=st.opts||SQ.OPTS0;
   for(const k of ['exp','fns','unsetB']){if(st[k])S[k]=st[k];else delete S[k]}}
 
 /* Interpreter nesting across compounds, $( ) and scripts; the parser caps one text at 100 levels, this caps the sum so the JS stack never overflows.
@@ -42,6 +45,31 @@ function nested(f){nestIn();try{return f()}finally{nestOut()}}
 const abortOf=e=>e&&e.abort?{type:'exit',n:1,abort:true}:undefined;
 function logKw(env,name,code){if(env.record)SQ.rt.log.push({name,args:[],globbed:false,piped:false,redirect:null,errRedirect:null,code,out:''})}
 
+/* ---------- shell options in the interpreter (Task 13; the `set` builtin and the option list are in cmds-opts.js) ----------
+   set -e. errexit(code, Pn, env) -> the ctl that ends the shell ({type:'exit', n:code, abort:true, errexit:true}: like ${X:?}, it ends a sourced file's
+   caller too, and a typed line ends without the friendly exit message), or null. Shared with the job interpreter (jobs.js gAndOr), which mirrors
+   the call sites here. It is asked once per and-or list, about the status of its last pipeline, and only when that pipeline ran. env.noerr marks
+   where bash ignores set -e: an if/elif/while/until condition, every pipeline of a && / || list but the last, a ! pipeline, and everything those
+   run (function bodies, compounds, subshells; quiet(env) adds it). A compound command other than ( ) is not watched itself (bash: a compound that
+   fails because a command inside it failed while set -e was ignored does not exit; one that failed otherwise already exited from inside).
+   $( ) runs with set -e off (bash without inherit_errexit); its status still counts for an assignment (x=$(false) exits).
+   HOOK FOR TASK 14: the ERR trap runs where errexit() decides (a failing watched pipeline outside the ignored places), whether or not set -e is on;
+   the EXIT trap runs where a script (runChild below), a job (jobs.js run) or a typed line ends, and on `exit` (a ctl of type 'exit'). */
+const watched=Pn=>{if(Pn.negate)return false;if(Pn.cmds.length>1)return true;const t=Pn.cmds[0].type;return t==='simple'||t==='subshell'||t==='arith'||t==='cond'};
+function errexit(code,Pn,env){return code!==0&&SQ.rt.opts.e&&!env.noerr&&watched(Pn)?{type:'exit',n:code,abort:true,errexit:true}:null}
+const quiet=env=>env.noerr?env:Object.assign({},env,{noerr:true});
+/* set -x. xline(text) -> the trace line (stderr) PS4 + text: PS4 defaults to '+ ' and its first character repeats once per $( ) level (bash's ++);
+   SQ.rt.xbase is the $( ) depth where a job slice started (jobs.js), so a job's trace starts at one +. The line counts toward the per-line output cap.
+   xq(word) quotes a word as bash's trace does: '...' (with '\'' for a quote) when it holds a blank or a shell metacharacter, starts with ~ or #, or is empty. */
+const XMETA=/[\s'"\\|&;()<>!{}*?[\]^$`]/;
+function xq(w){if(w==='')return "''";if(!XMETA.test(w)&&w[0]!=='~'&&w[0]!=='#')return w;if(w==="'")return "\\'";return "'"+w.replace(/'/g,"'\\''")+"'"}
+function xline(text){const rt=SQ.rt,lvl=1+CTX.sub-(rt.xbase||0),p=SQ.isSet('PS4')?SQ.getVar('PS4'):'+ ';
+  const s=(p?p[0].repeat(Math.max(0,lvl-1)):'')+p+text;
+  rt.outChars+=s.length;if(rt.outChars>SQ.LIM.TOTAL)throw new SQ.StepLimit('output too large');
+  return errL(s)}
+/* the trace of a for pass: the words as written, like bash (for i; is shown as for i in "$@") */
+const forTrace=c=>xline(`for ${c.var} in ${c.words===null?'"$@"':c.words.map(w=>w.raw).join(' ')}`);
+
 function runProgram(node,env){
   env=Object.assign({depth:0,tty:true,record:true,stdin:null,loops:0},env);
   return runList(node,env)}
@@ -53,13 +81,15 @@ function runList(list,env){const out=[];let code=0,ui;
     if(r.ctl)return {out,code,ctl:r.ctl,ui}}
   return {out,code,ui}}
 
-/* && / || run left to right on the status of the last pipeline that ran (a skipped one leaves it unchanged). */
-function runAndOr(n,env){
-  let r=runPipeline(n.first,env);const out=r.out.slice();let code=r.code,ui=r.ui;
+/* && / || run left to right on the status of the last pipeline that ran (a skipped one leaves it unchanged).
+   set -e: every pipeline but the last runs quiet (see errexit); the list's status is checked when its last pipeline ran. */
+function runAndOr(n,env){const k=n.rest.length,q=k?quiet(env):env;
+  let r=runPipeline(n.first,q);const out=r.out.slice();let code=r.code,ui=r.ui,ran=!k;
   if(r.ctl)return {out,code,ctl:r.ctl,ui};
-  for(const it of n.rest){if(it.op==='&&'&&code!==0)continue;if(it.op==='||'&&code===0)continue;
-    r=runPipeline(it.pipe,env);out.push(...r.out);code=r.code;if(r.ui)ui=r.ui;
+  for(let i=0;i<k;i++){const it=n.rest[i];if(it.op==='&&'&&code!==0)continue;if(it.op==='||'&&code===0)continue;
+    const fin=i===k-1;r=runPipeline(it.pipe,fin?env:q);out.push(...r.out);code=r.code;if(r.ui)ui=r.ui;ran=fin;
     if(r.ctl)return {out,code,ctl:r.ctl,ui}}
+  if(ran&&code!==0){const x=errexit(code,k?n.rest[k-1].pipe:n.first,env);if(x)return {out,code,ctl:x,ui}}
   return {out,code,ui}}
 
 /* stdout text, stderr lines and tips of a compound's Out[] in the shape runCmd returns; bg = background-job output (Out[] marked bg), which
@@ -78,8 +108,9 @@ function hereText(R,res){
 
 /* One pipeline. The stage loop is the pre-Stage-2 executor body: redirect targets expand just before their stage, > and 2> targets are truncated
    before the command runs, 2>&1 appends stderr after stdout, stderr reaches the screen at once, status = last stage. */
-function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
+function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui,pf=0;
   const P=Pn.cmds,{norm,getNode,writeFile,isNull}=SQ;
+  if(Pn.negate&&!env.noerr)env=quiet(env); /* set -e is ignored in a ! pipeline */
   let stdin='';
   /* every stage of a multi-command pipeline is a full subshell: directory, variables, exports, functions and positional parameters go back to what they were
      (echo Ada | read x leaves x unset, cd forest | cat stays put, echo a | shift keeps $#). Files and $? come out of a stage as before. */
@@ -88,7 +119,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
   const back=()=>{const l=S.last;restoreShell(Object.assign({},sv0,{vars:Object.assign({},sv0.vars),exp:sv0.exp&&Object.assign({},sv0.exp),fns:sv0.fns&&Object.assign({},sv0.fns),unsetB:sv0.unsetB&&Object.assign({},sv0.unsetB),last:l}))};
   try{
   for(let i=0;i<P.length;i++){const c=P[i],last=i===P.length-1,simple=c.type==='simple';
-    if(sv0&&i>0){back();newScope();SQ.rt.scopeNode.inherit=true}
+    if(sv0&&i>0){back();newScope();SQ.rt.scopeNode.inherit=true;if(code!==0)pf=code} /* pf: the rightmost failing stage so far (pipefail) */
     const R=simple?c:(c.redirs||{});
     let out=null,inp=null,err=null,here=null;
     let toErr=null,pre=null;
@@ -106,13 +137,14 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     if(bad)break;
     const tty=env.tty&&last&&!out;let r;
     if(simple){
-      const io={tty,depth:env.depth,pipeLen:P.length,record:env.record,redirect:out,errRedirect:err,loops:env.loops,stdinBox:box};
+      const io={tty,depth:env.depth,pipeLen:P.length,record:env.record,redirect:out,errRedirect:err,loops:env.loops,stdinBox:box,noerr:env.noerr};
       /* env.defer (the job interpreter, jobs.js): a lone, unredirected function call comes back as r.defer = {name, args, pend} instead of running here */
       if(env.defer&&P.length===1&&!R.out&&!R.inp&&!R.err&&!R.doc&&!R.herestr)io.defer=true;
       if(box&&box===env.stdin){let got=null; /* shared box: the first read of io.stdin takes the rest of it */
         Object.defineProperty(io,'stdin',{enumerable:true,configurable:true,get(){if(got===null){got=box.text.slice(box.pos);box.pos=box.text.length}return got}})}
       else io.stdin=box?box.text:'';
       r=SQ.runCmd(c.words,io,c.assigns);
+      if(r.xt)res.push(...r.xt); /* set -x: the trace reaches the screen before the command's output, whatever its redirects */
       if(r.defer)return {out:res.concat(r.defer.pend.map(errL)),code:0,defer:r.defer};
       if(r.list&&last&&!out&&!err&&!toErr){if(r.ui&&last)ui=r.ui;if(P.length===1&&r.ctl)ctl=r.ctl;res.push(...r.list);code=r.code;continue}}
     else{
@@ -139,6 +171,7 @@ function runPipeline(Pn,env){const res=[];let code=0,ctl=null,ui;
     else if(last){if(text!=='')res.push({text,cls:'out'})}
     else stdin=text}
   }finally{if(sv0)back()}
+  if(sv0&&SQ.rt.opts.pipefail){if(code!==0)pf=code;code=pf} /* set -o pipefail: the rightmost non-zero status of the stages */
   if(Pn.negate)code=code===0?1:0;
   S.last=code;
   const o={out:res,code};if(ctl)o.ctl=ctl;if(ui)o.ui=ui;return o}
@@ -157,9 +190,9 @@ function runCompound(c,env){return nested(()=>{
   }
   return {out:[errL('bash: internal error: unknown node '+c.type)],code:2}})}
 
-function runIf(c,env){const out=[];let code=0,ui;
+function runIf(c,env){const out=[];let code=0,ui;const q=quiet(env);
   for(const b of c.branches){
-    const cr=runList(b.cond,env);out.push(...cr.out);if(cr.ui)ui=cr.ui;
+    const cr=runList(b.cond,q);out.push(...cr.out);if(cr.ui)ui=cr.ui;
     if(cr.ctl)return {out,code:cr.code,ctl:cr.ctl,ui};
     if(cr.code!==0)continue;
     const br=runList(b.body,env);out.push(...br.out);if(br.ui)ui=br.ui;
@@ -174,9 +207,9 @@ function resolveCtl(ctl,outer){
   if(ctl.type==='continue')return ctl.n>1&&outer>0?{type:'continue',n:ctl.n-1}:'next';
   return ctl}
 
-function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assign({},env,{loops:env.loops+1});
+function runWhile(c,env){const out=[];let code=0,ui,pass;const inner=Object.assign({},env,{loops:env.loops+1}),q=quiet(inner);
   for(;;){SQ.step();
-    const cr=runList(c.cond,inner);out.push(...cr.out);if(cr.ui)ui=cr.ui;
+    const cr=runList(c.cond,q);out.push(...cr.out);if(cr.ui)ui=cr.ui;
     if(cr.ctl){pass=resolveCtl(cr.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;logKw(env,c.type,code);return {out,code,ctl:pass,ui}}
     if(c.type==='while'?cr.code!==0:cr.code===0)break;
     const br=runList(c.body,inner);out.push(...br.out);if(br.ui)ui=br.ui;code=br.code;
@@ -198,7 +231,7 @@ function forItems(c,env,out){
 function runFor(c,env){const out=[];let code=0,ui;
   const fi=forItems(c,env,out);if(fi.fail)return Object.assign({out},fi.fail);const items=fi.items;
   const inner=Object.assign({},env,{loops:env.loops+1});
-  for(const it of items){SQ.step();SQ.setVar(c.var,it);
+  for(const it of items){SQ.step();SQ.setVar(c.var,it);if(SQ.rt.opts.x)out.push(forTrace(c));
     const br=runList(c.body,inner);out.push(...br.out);if(br.ui)ui=br.ui;code=br.code;
     if(br.ctl){const pass=resolveCtl(br.ctl,env.loops);if(pass==='next')continue;if(pass==='stop')break;return {out,code,ctl:pass,ui}}}
   return {out,code,ui}}
@@ -206,7 +239,7 @@ function runFor(c,env){const out=[];let code=0,ui;
 /* caseArm (shared with jobs.js): {arm} (null when no pattern matches; then 'case' is logged with status 0), or {fail: {code, ctl?}} */
 function caseArm(c,env,out){let w;
   try{w=expandOne(c.word)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));return {fail:{code:e.code||1,ctl:abortOf(e)}}}
-  out.push(...CTX.pend.splice(0));
+  out.push(...CTX.pend.splice(0));if(SQ.rt.opts.x)out.push(xline(`case ${c.word.raw} in`));
   for(const arm of c.arms)for(const p of arm.patterns){let m;
     try{m=SQ.patMatch(w,p.raw)}catch(e){if(e&&e.stop)throw e;out.push(...CTX.pend.splice(0),errL(errOf(e)));logKw(env,'case',1);return {fail:{code:1}}}
     out.push(...CTX.pend.splice(0));if(m)return {arm}}
@@ -222,14 +255,19 @@ function runSubshell(c,env){const sv=snapshotShell();let r;
   const code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code;
   return {out:r.out,code,ui:r.ui}}
 
-/* [[ ... ]]: SQ.evalCond (cmds-flow.js) returns the status and leaves stderr lines in CTX.pend */
-function runCond(c,env){const code=SQ.evalCond(c.raw);logKw(env,'[[',code);return {out:CTX.pend.splice(0),code}}
+/* [[ ... ]]: SQ.evalCond (cmds-flow.js) returns the status and leaves stderr lines in CTX.pend.
+   set -x shows the text as written (bash shows the expanded operands); an abort error (set -u, ${X:?}) ends the line like any expansion error. */
+function runCond(c,env){const xt=SQ.rt.opts.x?[xline(`[[ ${c.raw} ]]`)]:[];let code;
+  try{code=SQ.evalCond(c.raw)}catch(e){if(e&&e.stop)throw e;logKw(env,'[[',1);return {out:xt.concat(CTX.pend.splice(0),errL(errOf(e))),code:1,ctl:abortOf(e)}}
+  logKw(env,'[[',code);const pend=CTX.pend.splice(0);return {out:xt.length?xt.concat(pend):pend,code}}
 
-function runArith(c,env){SQ.step();let v;
+/* set -x shows (( TEXT )) with the text as written between the parentheses (bash also expands $ forms in it) */
+const arithText=c=>c.src&&c.src.startsWith('((')&&c.src.endsWith('))')?c.src.slice(2,-2):c.expr;
+function runArith(c,env){SQ.step();let v;const xt=SQ.rt.opts.x?[xline(`(( ${arithText(c)} ))`)]:[];
   /* an arithmetic error reads `bash: ((: reason`: the expression prefix of SQ.arith's message becomes ((: */
   try{v=SQ.arithVal(c.expr)}catch(e){if(e&&e.stop)throw e;const m=errOf(e),pre='bash: '+c.expr+': ';
-    const out=[...CTX.pend.splice(0),errL(m.startsWith(pre)?'bash: ((: '+m.slice(pre.length):m)];logKw(env,'((',1);return {out,code:1}}
-  const out=CTX.pend.splice(0),code=v!=='0'?0:1;logKw(env,'((',code);return {out,code}}
+    const out=[...xt,...CTX.pend.splice(0),errL(!e.abort&&m.startsWith(pre)?'bash: ((: '+m.slice(pre.length):m)];logKw(env,'((',1);return {out,code:1,ctl:abortOf(e)}}
+  const out=xt.length?xt.concat(CTX.pend.splice(0)):CTX.pend.splice(0),code=v!=='0'?0:1;logKw(env,'((',code);return {out,code}}
 
 /* ---------- functions ----------
    S.fns[name] = the source text of the body ({ ... } plus its redirects), parsed lazily on call through a small bounded cache.
@@ -263,7 +301,7 @@ function fnResult(r){const ret=r.ctl&&r.ctl.type==='return';return {code:ret?r.c
 /* runCmd's result shape plus list (the body's Out[] in order, used when the call's output goes straight to the screen) */
 function callFunction(name,args,io){
   const fe=fnEnter(name,args);if(fe.fail)return fe.fail;let r;
-  try{r=runProgram(fe.prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:io.loops||0})} /* break/continue in the body reach the caller's loop */
+  try{r=runProgram(fe.prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:io.loops||0,noerr:!!io.noerr})} /* break/continue in the body reach the caller's loop; noerr: the call is where set -e is ignored */
   finally{fnLeave(fe)}
   const fr=fnResult(r),o=asCmd(r);o.code=fr.code;o.list=r.out;if(r.ui)o.ui=r.ui;
   if(fr.ctl)o.ctl=fr.ctl;
@@ -277,38 +315,51 @@ function runSourced(name,text,args,io){
   let prog;try{prog=parsedBody(text)}catch(e){if(e&&e.stop)throw e;return fail(errOf(e),e.code||2)}
   const fr=SQ.rt.frames,at=fr.length,f={name,args:args.slice(),kind:'source',locals:new Map()};
   fr.push(f);srcDepth++;let r;
-  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0})}
+  try{r=runProgram(prog,{depth:io.depth||0,tty:io.tty,record:io.record,stdin:io.stdinBox||null,loops:0,noerr:!!io.noerr})}
   finally{srcDepth--;fr.length=Math.min(fr.length,at)}
   const end=r.ctl&&(r.ctl.type==='return'||(r.ctl.type==='exit'&&!r.ctl.abort));
   const o=asCmd(r);o.code=end?r.ctl.n:r.code;o.list=r.out;if(r.ui)o.ui=r.ui;
   if(r.ctl&&!end)o.ctl=r.ctl;
   return o}
 /* ---------- scripts ----------
-   runScript(path, {args,stdin,stdinBox,depth,tty,force,record}) -> {out,err,code}: `bash FILE ARGS` and ./FILE. A child process: it sees only the exported variables
-   (no functions), has its own $0 (the path as typed), $1.., and the caller's cwd/vars/exports/functions/status come back when it ends. The whole file is parsed first:
-   a syntax error prints once and nothing runs. `exit n` ends it with status n. Files it writes stay. depth = the caller's depth. */
+   runScript(path, {args,stdin,stdinBox,depth,tty,force,record,opts,noexec}) -> {out,err,code,list}: `bash FILE ARGS` and ./FILE. A child process: it sees only the exported
+   variables (no functions), has its own $0 (the path as typed), $1.., and the caller's cwd/vars/exports/functions/status/options come back when it ends. The whole
+   file is parsed first: a syntax error prints once and nothing runs. `exit n` ends it with status n. Files it writes stay. depth = the caller's depth.
+   opts: the options it starts with (bash -e/-u/-x/-o NAME FILE; default none, as a new bash); noexec (bash -n FILE): parse only, status 0.
+   runText(text, name, label, o) is the same for `bash -c TEXT name args` ($0 = name; a syntax error reads `bash: LABEL: line N: ...`). */
 function runScript(path,o){o=Object.assign({args:[],depth:0,tty:true,force:false,record:false},o);
   const {norm,getNode,bname,E}=SQ,abs=norm(path),n=getNode(abs);
   if(!n)return E(SQ.isLoop(abs)?`bash: ${path}: Too many levels of symbolic links`:`bash: ${path}: No such file or directory`,127);
   if(n.type==='dir')return E(`bash: ${path}: Is a directory`,126);
   if(!o.force&&!n.exec)return Object.assign(E(`bash: ${path}: Permission denied`,126),{tips:[`Tip: mark it as runnable with chmod +x ${bname(abs)}`]});
+  /* a script reports `NAME: line N: syntax error ...` (the path as typed, the line of the offending token) instead of `bash: syntax error ...` */
+  return runText(n.content,path,path,o)}
+function runText(text,name,label,o){o=Object.assign({args:[],depth:0,tty:true,force:false,record:false},o);const E=SQ.E;
   if(o.depth+1>6)return E('bash: too many nested scripts',1);
-  let prog;try{prog=parsedBody(n.content)}catch(e){if(e&&e.stop)throw e;
-    /* a script reports `NAME: line N: syntax error ...` (the path as typed, the line of the offending token) instead of `bash: syntax error ...` */
-    if(e&&e.at!==undefined)return E(`${path}: line ${SQ.lineOf(n.content,e.at)}: ${e.message}`,e.code||2);
+  let prog;try{prog=parsedBody(text)}catch(e){if(e&&e.stop)throw e;
+    if(e&&e.at!==undefined)return E(`${label}: line ${SQ.lineOf(text,e.at)}: ${e.message}`,e.code||2);
+    if(o.dashc&&e&&!e.raw&&!SQ.isOverflow(e))return E(`${label}: line ${SQ.lineOf(text,text.length)}: ${e.message}`,e.code||2); /* bash -c: a tokenizer error (no position) is at the end of the text */
     return E(errOf(e),e.code||2)}
+  if(o.noexec)return {out:'',err:[],code:0};
+  return runChild(prog,name,o)}
+function runChild(prog,name,o){
   const box=o.stdinBox||(o.stdin!=null?{text:String(o.stdin),pos:0}:null);
   const sv=snapshotShell(),me=SQ.rt.scopeNode,callerVars=S.vars;S.vars={};for(const k of Object.keys(S.exp||{}))if(own(callerVars,k))S.vars[k]=callerVars[k];
   delete S.fns;SQ.rt.bang=null; /* a new bash: $! is empty until it starts a job */
-  const fr=SQ.rt.frames,at=fr.length;fr.push({name:path,args:o.args.slice(),kind:'script',locals:new Map()});
-  const out=[],err=[];let code=0,bg=null;
-  /* output of a job this script (or a subshell of it) started is the script's own (the job inherits its stdout); any other job's output passes through as bg */
+  SQ.rt.opts=o.opts?Object.assign({},SQ.OPTS0,o.opts):SQ.OPTS0; /* a new bash starts with no options set (restoreShell puts the caller's back) */
+  const xb=SQ.rt.xbase;SQ.rt.xbase=CTX.sub; /* its set -x trace starts at one +, also when it runs inside a $( ) */
+  const fr=SQ.rt.frames,at=fr.length;fr.push({name,args:o.args.slice(),kind:'script',locals:new Map()});
+  const out=[],err=[],list=[];let code=0,bg=null;
+  /* output of a job this script (or a subshell of it) started is the script's own (the job inherits its stdout); any other job's output passes through as bg.
+     list: everything in the order it was written, for a script whose output goes straight to the screen (stderr, such as set -x traces, interleaves with stdout) */
   const mine=n=>{for(;n;n=n.up)if(n===me)return true;return false};
   try{const r=runProgram(prog,{depth:o.depth+1,tty:o.tty,record:o.record,stdin:box,loops:0});
-    for(const x of r.out){if(x.bg&&!mine(x.owner)){(bg=bg||[]).push(x);continue}if(x.clear)continue;(x.cls==='out'?out:err).push(x.text)}
+    for(const x of r.out){if(x.clear)continue;if(x.bg&&!mine(x.owner)){(bg=bg||[]).push(x);list.push(x);continue}
+      (x.cls==='out'?out:err).push(x.text);list.push(x.bg?{text:x.text,cls:x.cls}:x)}
     code=r.ctl&&r.ctl.type==='exit'?r.ctl.n:r.code}
-  finally{fr.length=Math.min(fr.length,at);restoreShell(sv)}
-  const res={out:out.join('\n'),err,code};if(bg)res.bg=bg;return res}
+  /* HOOK FOR TASK 14: the script's EXIT trap runs here, with the script's state still installed (before restoreShell), on every way it ends */
+  finally{fr.length=Math.min(fr.length,at);restoreShell(sv);SQ.rt.xbase=xb}
+  const res={out:out.join('\n'),err,code,list};if(bg)res.bg=bg;return res}
 
 /* sandbox(fn): run fn on a throwaway copy of the world. The whole of S (a JSON snapshot: fs, cwd, vars, exp, fns, last, ...), the per-line runtime state and the
    virtual clock, pid counter and process table (fresh inside: clock 0, next pid 1235) come back
@@ -346,7 +397,9 @@ function returnBuiltin(a){
 /* the interpreter's depth counters [compound/$( ) nesting, function calls, source] for a job slice (jobs.js) */
 const depths=()=>[idepth,fnDepth,srcDepth];
 function setDepths(d){[idepth,fnDepth,srcDepth]=d}
-Object.assign(SQ,{runScript,sandbox,runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache,
+Object.assign(SQ,{runScript,runText,sandbox,runProgram,snapshotShell,restoreShell,callFunction,runSourced,hasFunction,localBuiltin,returnBuiltin,fnParseCache:parseCache,
   /* shared with the job interpreter (jobs.js) */
-  copyShell,shellState,setShellState,runPipeline,runList,resolveCtl,forItems,caseArm,fnEnter,fnLeave,fnResult,nestIn,nestOut,depths,setDepths,asCmd});
+  copyShell,shellState,setShellState,runPipeline,runList,resolveCtl,forItems,caseArm,fnEnter,fnLeave,fnResult,nestIn,nestOut,depths,setDepths,asCmd,
+  /* shell options (Task 13): shared with jobs.js, exec.js and cmds-opts.js */
+  errexit,quiet,xline,xq,forTrace});
 })(window.SQ=window.SQ||{});

@@ -112,10 +112,11 @@ function evalTree(tree,d,name){
     return false};
   return ev(tree)}
 
-/* SQ.evalCond(raw): the text between [[ and ]] -> status 0/1, or 2 for a syntax or regex problem. stderr lines are left in CTX.pend for the caller. */
+/* SQ.evalCond(raw): the text between [[ and ]] -> status 0/1, or 2 for a syntax or regex problem. stderr lines are left in CTX.pend for the caller.
+   An expansion error marked abort is thrown on. */
 function evalCond(raw){SQ.step();
   try{return evalTree(parseTest(condTokens(raw),true,'[['),true,'[[')?0:1}
-  catch(e){if(e&&e.stop)throw e;CTX.pend.push(errL(errOf(e)));return e.code||2}}
+  catch(e){if(e&&(e.stop||e.abort))throw e;CTX.pend.push(errL(errOf(e)));return e.code||2}} /* abort (set -u, ${X:?}): interp.js runCond ends the line */
 
 function testCmd(name,a){let args=a;
   if(name==='['){if(!a.length||a[a.length-1]!==']')return E("bash: [: missing ']'",2);args=a.slice(0,-1)}

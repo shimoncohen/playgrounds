@@ -461,7 +461,7 @@ describe('Stage 3 leftovers: type, break in functions, abort on ${X:?}', () => {
     assert.equal(o('echo $?', SQ), '1');
     SQ.writeFile('/home/explorer/s.sh', 'echo one\necho ${Y:?need y}\necho two', false, 's.sh');
     const s = run(SQ, 'bash s.sh; echo status=$?');
-    assert.equal(s.out, 'bash: Y: need y\none\nstatus=1');
+    assert.equal(s.out, 'one\nbash: Y: need y\nstatus=1'); // Task 13: a script's output reaches the screen in the order it was written
     SQ.writeFile('/home/explorer/t.sh', 'f() { echo ${Z:?}; echo after; }\nf\necho no', false, 't.sh');
     assert.equal(o('bash t.sh; echo status=$?', SQ), 'bash: Z: parameter null or not set\nstatus=1');
   });
@@ -569,6 +569,6 @@ describe('prefix assignments are restored when the command is stopped', () => {
     assert.equal(r.out, 'bash: Q: no q');
     assert.equal(out('echo "[$X]"', SQ), '[]');
     SQ.writeFile('/home/explorer/q.sh', 'echo "[$X]"; echo ${Q:?}', false, 'q.sh');
-    assert.equal(out('X=2 bash q.sh; echo "[$X]"', SQ), 'bash: Q: parameter null or not set\n[2]\n[]'); // a script's stderr prints before its stdout here
+    assert.equal(out('X=2 bash q.sh; echo "[$X]"', SQ), '[2]\nbash: Q: parameter null or not set\n[]'); // Task 13: a script's stdout and stderr keep their order on the screen
   });
 });
