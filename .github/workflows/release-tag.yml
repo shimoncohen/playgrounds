@@ -1,0 +1,39 @@
+name: Release tag
+
+# After a "chore(release): X.Y.Z" PR is merged to main, tag the merge commit and publish the GitHub Release.
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          case "$MESSAGE" in
+            "chore(release): "*) ;;
+            *) echo "Not a release commit."; exit 0 ;;
+          esac
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists."; exit 0
+          fi
+          # Release notes: this version's section of CHANGELOG.md, else GitHub's generated notes.
+          awk '/^##+ \[?[0-9]/{if(f)exit;f=1;next} f' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then notes=(--notes-file notes.md); else notes=(--generate-notes); fi
+          git tag "$tag"
+          git push origin "$tag"
+          gh release create "$tag" --title "$tag" "${notes[@]}"

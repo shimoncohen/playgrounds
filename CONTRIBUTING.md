@@ -54,7 +54,7 @@ feat(shell)!: rename the saved-state key      # breaking change
 ```
 
 - **Types**: `feat` (new learner-visible thing), `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`.
+- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`, `release`.
 - **The PR title is what lands on `main`** (we squash-merge), so it must follow the format; a check enforces it. Individual commit messages are checked locally by a git hook after `npm ci`.
 - Breaking changes (for example anything that would invalidate saved progress) use `!` and a `BREAKING CHANGE:` footer.
 
@@ -62,14 +62,13 @@ Version bumps follow SemVer: `feat` is minor, `fix` and `perf` are patch, `!` is
 
 ## Releasing (maintainers)
 
-```
-git switch main && git pull
-npm run release -- --dry-run     # preview the version and changelog
-npm run release                  # bumps package.json, writes CHANGELOG.md, commits and tags vX.Y.Z
-git push --follow-tags origin main
-```
+`main` is protected, so releases go through a pull request and nobody pushes to `main` directly.
 
-The first release: `npm run release -- --first-release` (keeps 0.1.0). Uses [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version), the maintained fork of `standard-version`. Config is in `.versionrc.json`. If `main` is protected, run the release on a branch and merge it with a `chore(release): X.Y.Z` PR.
+1. **Actions → Release PR → Run workflow.** Pick `auto` (the version comes from the Conventional Commits since the last tag), or force `patch`/`minor`/`major`. Use `first-release` once to keep 0.1.0.
+2. The workflow opens a **`chore(release): X.Y.Z`** PR that bumps `package.json` and writes `CHANGELOG.md`. Read the changelog, fix wording if needed, wait for the checks, and squash-merge.
+3. On merge, **Release tag** tags the merge commit `vX.Y.Z` and publishes a GitHub Release with that version's changelog section.
+
+Locally, `npm run release -- --dry-run` previews the next version and changelog. The tool is [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version), the maintained fork of `standard-version`; config is in `.versionrc.json`. Repo settings the flow depends on (branch protection, a token so CI runs on the release PR) are listed in [docs/repo-settings.md](docs/repo-settings.md).
 
 ## What a good PR looks like
 

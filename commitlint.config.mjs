@@ -4,7 +4,7 @@ export default {
     // Optional scope, but if present it must be one of these.
     'scope-enum': [2, 'always', [
       'script', 'python', 'cpp', 'shell', 'harbor',
-      'landing', 'shared', 'progress', 'engine', 'content',
+      'landing', 'shared', 'progress', 'engine', 'content', 'release',
       'tests', 'ci', 'deps', 'docs', 'tools', 'skills',
     ]],
     'subject-case': [0],
