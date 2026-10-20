@@ -129,8 +129,10 @@ for (const name of NAMES) {
       const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: w, height: h } });
       await page.waitForSelector('#mission');
       await page.waitForTimeout(300);
-      const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, bottom: c.getBoundingClientRect().bottom }; });
+      const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, colY: getComputedStyle(c).overflowY, cardY: getComputedStyle(document.getElementById('mission')).overflowY, bottom: c.getBoundingClientRect().bottom }; });
       assert.equal(r.pos, 'sticky', `${w}x${h}`);
+      assert.equal(r.colY, 'visible', 'the column itself has no scrollbar');
+      assert.equal(r.cardY, 'auto', 'the mission card scrolls on its own');
       assert.ok(r.bottom <= h, `column ends at ${r.bottom}px in a ${h}px window`);
       assert.deepEqual(errors, []);
       await ctx.close();
