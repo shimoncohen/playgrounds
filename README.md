@@ -91,7 +91,7 @@ To add it to a new playground: set `window.PROGRESS = {key, name}` (the `localSt
 npm ci
 npx playwright install chromium   # once
 npm test                          # engine tests, browser smoke tests, golden transcript
-npm run test:engine               # just the shell engine and content tests (Node only, no browser)
+npm run test:engine               # just the engine and content tests (Node only, no browser)
 npm run test:browser              # just the browser tests
 npm run check                     # does every folder still bundle for artifacts?
 ```
@@ -105,8 +105,9 @@ index.html              landing page
 shared/                 code every playground reuses: progress saving, tier model
 script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
+ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
 shell-quest/            split by job (below)
-tests/                  engine tests (Node), browser smoke + golden tests (Playwright)
+tests/                  engine tests (Node; shell/ and ds/), browser smoke + golden tests (Playwright)
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
