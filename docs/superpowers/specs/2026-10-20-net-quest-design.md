@@ -1,6 +1,6 @@
 # Network Quest (`net-quest/`) design
 
-Date: 2026-10-20. Status: draft for review.
+Date: 2026-10-20. Status: phase 1 built (chapters 1 to 5).
 
 ## Goal
 
