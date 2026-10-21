@@ -50,7 +50,7 @@ const CH=[
     return !!col&&c.ran('cut',e=>/(^|\s)-d/.test(argLine(e))&&/(^|\s)-f\s*1(\s|$)/.test(argLine(e))&&e.out.trim()===col)}},
  {title:'Shout it',goal:`Turn lowercase into uppercase: <code>echo hello | tr a-z A-Z</code>`,
   anat:[['echo','cmd'],['hello','arg'],['|','op'],['tr','cmd'],['a-z','arg'],['A-Z','arg']],answer:'echo hello | tr a-z A-Z',
-  explain:`<code>tr</code> <b>translates</b> characters: every character in the first set becomes the matching one in the second. It reads text from a pipe, never from a file name.`,
+  explain:`<code>tr</code> <b>translates</b> characters: every character in the first set becomes the matching one in the second. <code>a-z</code> is a range: every letter from a to z. It reads text from a pipe, never from a file name.`,
   check:c=>c.ran('tr',e=>e.out.trim()==='HELLO')},
  {title:'Swap a word',goal:`Print the shop list with apple swapped for pear: <code>sed 's/apple/pear/' village/shop.txt</code>`,
   anat:[['sed','cmd'],[`'s/apple/pear/'`,'arg'],['village/shop.txt','arg']],answer:`sed 's/apple/pear/' village/shop.txt`,
@@ -83,7 +83,7 @@ const CH=[
  missions:[
  {title:'Capture output',goal:`Insert a command's output into a sentence: <code>echo "Today is $(date)"</code>`,
   anat:[['echo','cmd'],['"Today is $(date)"','arg']],answer:'echo "Today is $(date)"',
-  explain:`<code>$(command)</code> is <b>command substitution</b>. Bash runs what is inside, then swaps in its output before <code>echo</code> runs.`,
+  explain:`<code>$(command)</code> is <b>command substitution</b>. Bash runs what is inside, then swaps in its output before <code>echo</code> runs. Here that is <code>date</code>, a command that prints today's date and time.`,
   check:c=>c.ran('echo',e=>/^Today is\s+\S/.test(e.out))&&c.line.includes('$(')},
  {title:'Count in a sentence',goal:`How many lines mention a wolf? <code>echo "wolves: $(grep -ic wolf journal.txt)"</code>`,
   anat:[['echo','cmd'],['"wolves: $(grep -ic wolf journal.txt)"','arg']],answer:'echo "wolves: $(grep -ic wolf journal.txt)"',
@@ -122,7 +122,7 @@ const CH=[
  missions:[
  {title:'Read the permissions',goal:`Show the details of each file, including its permissions: <code>ls -l</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['ls','cmd'],['-l','opt']],answer:'ls -l',
-  explain:`The first column is the <b>mode</b>. After the type (<code>-</code> file, <code>d</code> folder, <code>l</code> link) come three groups of <code>rwx</code>: what the <b>owner</b>, the <b>group</b> and <b>everyone else</b> may do. <code>r</code> read, <code>w</code> write, <code>x</code> run, and <code>-</code> means not allowed.`,
+  explain:`The first column is the <b>mode</b>. After the type (<code>-</code> file, <code>d</code> folder, <code>l</code> a link, a shortcut you will make soon) come three groups of <code>rwx</code>: what the <b>owner</b>, the <b>group</b> and <b>everyone else</b> may do. <code>r</code> read, <code>w</code> write, <code>x</code> run, and <code>-</code> means not allowed.`,
   check:c=>c.ran('ls',e=>c.flag(e,'l')&&e.code===0)},
  {title:'Lock it down',goal:`Make <code>secrets.txt</code> private, so only you can read and write it: <code>chmod 600 secrets.txt</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['chmod','cmd'],['600','arg'],['secrets.txt','arg']],answer:'chmod 600 secrets.txt',

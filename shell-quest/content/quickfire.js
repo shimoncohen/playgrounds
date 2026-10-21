@@ -94,5 +94,12 @@ const QF=[
  ["Remove the file named in $tmp when the script exits, however it exits",["trap 'rm -f \"$tmp\"' EXIT","trap 'rm -f \"$tmp\"' 0","trap 'rm \"$tmp\"' EXIT"],'expert',{exact:true}],
  ["Print the exit status of the last command",["echo $?","echo \"$?\""],'expert']
 ];
+/* teach-before-use: QFCH[i] is the chapter (index in SQ.content.chapters) that has taught QF[i]'s command; the question opens once that chapter is done (app.js qfOpen).
+   Same order as QF: beginner 0-30, intermediate 31-54, advanced 55-78, expert 79-102. */
+const QFCH=[0,0,0,0,0,0,1,1,1,0,3,3,3,3,3,2,2,2,2,1,1,1,6,6,5,4,0,5,6,6,4,
+ 7,7,7,7,7,7,8,8,8,8,8,8,9,9,9,9,9,9,10,10,10,10,10,10,
+ 11,11,11,11,11,11,12,12,12,12,12,12,13,13,13,13,13,13,14,14,13,13,13,13,
+ 15,15,15,15,15,15,16,16,16,16,16,16,17,17,17,17,17,17,18,18,18,18,18,18];
+QF.forEach((q,i)=>{q.ch=QFCH[i]});
 SQ.content.quickfire.push(...QF);
 })(window.SQ = window.SQ || {});

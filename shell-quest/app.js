@@ -105,25 +105,33 @@ rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classLis
 
 /* tabs */
 function showTab(t){for(const id of ['quest','fire','guide']){$('#tab-'+id).hidden=id!==t;$('#t-'+id).setAttribute('aria-selected',String(id===t))}
-  if(t==='quest'&&matchMedia('(pointer:fine)').matches)setTimeout(()=>cmdIn.focus(),0);if(t!=='fire')stopFire(false)}
+  if(t==='quest'&&matchMedia('(pointer:fine)').matches)setTimeout(()=>cmdIn.focus(),0);if(t!=='fire')stopFire(false);else if(!QS)fireIdle()}
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)showTab(b.dataset.tab)});
 
 /* quick-fire */
 const fStage=$('#fStage');const LEN=75;let QS=null,qT=null;
 const normA=s=>s.trim().replace(/\s+/g,' ').replace(/['"]/g,'');
 function setStats(){$('#fScore').textContent=QS?QS.score:0;$('#fStreak').textContent=QS?QS.streak:0;$('#fBest').textContent=S.best||0;$('#fTime').textContent=QS?Math.ceil(QS.left):LEN;$('#fTimer').style.width=(QS?QS.left/LEN*100:100)+'%'}
-function fireIdle(){fStage.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Example task</div>
-  <div class="task">Show the folder you are in</div><p class="fb" style="margin-top:4px">Answer: <code>pwd</code></p></div>
-  <div class="actions"><button class="btn" id="fStart">Start the clock</button></div>`;setStats()}
+/* teach-before-use: a question is tagged (q.ch) with the chapter that teaches its command, and is asked only once every mission of that chapter is done */
 const qTier=q=>q[2]||'beginner';
-/* tier picker: one option per tier that has quick-fire questions; the pool is derived lazily at run start */
-(function buildTierPicker(){const sel=$('#fTier');for(const {tier:t} of SQ.tiers.status({})){if(!QF.some(q=>qTier(q)===t.id))continue;const o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o)}})();
-function startFire(){const pick=$('#fTier').value;const order=QF.map((q,i)=>i).filter(i=>pick==='mixed'||qTier(QF[i])===pick).sort(()=>Math.random()-.5);if(!order.length)return;QS={order,i:0,score:0,streak:0,left:LEN,misses:[],t0:Date.now()};
+const qfOpen=done=>QF.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'.'+j]));
+/* tier picker: one option per tier that has an open quick-fire question */
+function fillTiers(open){const sel=$('#fTier'),keep=sel.value;sel.innerHTML='<option value="mixed">Mixed</option>';
+  for(const {tier:t} of SQ.tiers.status({})){if(!open.some(q=>qTier(q)===t.id))continue;const o=document.createElement('option');o.value=t.id;o.textContent=t.name;sel.appendChild(o)}
+  sel.value=[...sel.options].some(o=>o.value===keep)?keep:'mixed';sel.closest('.ftier').style.display=open.length?'':'none'}
+function fireIdle(){const open=qfOpen(S.done);fillTiers(open);
+  if(!open.length){fStage.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Locked for now</div>
+  <p class="fb" style="margin:0">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first tasks open up. Each later chapter you finish adds more.</p></div>
+  <div class="actions" style="margin-top:12px"><button class="btn" id="fGoQuest">Go to the quest</button></div>`;setStats();return}
+  fStage.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Example task</div>
+  <div class="task">Show the folder you are in</div><p class="fb" style="margin-top:4px">Answer: <code>pwd</code></p></div>${open.length<QF.length?'<p class="lede">Tasks from the chapters you have finished are open. Finish more chapters to unlock the rest.</p>':''}
+  <div class="actions"><button class="btn" id="fStart">Start the clock</button></div>`;setStats()}
+function startFire(){const pick=$('#fTier').value;const pool=qfOpen(S.done).filter(q=>pick==='mixed'||qTier(q)===pick);if(!pool.length){fireIdle();return}const order=pool.map((q,i)=>i).sort(()=>Math.random()-.5);QS={pool,order,i:0,score:0,streak:0,left:LEN,misses:[],t0:Date.now()};
   fStage.innerHTML=`<div class="task" id="fTask"></div><div class="fterm"><span class="p-sym" style="color:var(--term-prompt)">$ </span><input id="fIn" aria-label="Your answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fSkip">Skip</button><button class="btn ghost" id="fStop">End round</button></div>`;
   showQ();$('#fIn').focus();clearInterval(qT);qT=setInterval(()=>{QS.left=Math.max(0,LEN-(Date.now()-QS.t0)/1000);setStats();if(QS.left<=0)stopFire(true)},100)}
-function showQ(){if(QS.i>=QS.order.length){QS.order=QS.order.sort(()=>Math.random()-.5);QS.i=0}$('#fTask').textContent=QF[QS.order[QS.i]][0];setStats()}
-function answer(v,skip){const q=QF[QS.order[QS.i]];const nm=q[3]&&q[3].exact?(t=>t.trim().replace(/\s+/g,' ')):normA;const good=!skip&&q[1].some(x=>nm(x)===nm(v));const fb=$('#fFb');
+function showQ(){if(QS.i>=QS.order.length){QS.order=QS.order.sort(()=>Math.random()-.5);QS.i=0}$('#fTask').textContent=QS.pool[QS.order[QS.i]][0];setStats()}
+function answer(v,skip){const q=QS.pool[QS.order[QS.i]];const nm=q[3]&&q[3].exact?(t=>t.trim().replace(/\s+/g,' ')):normA;const good=!skip&&q[1].some(x=>nm(x)===nm(v));const fb=$('#fFb');
   if(good){QS.score+=10+Math.min(QS.streak,5)*2;QS.streak++;fb.className='fb good';fb.textContent=`Correct${QS.streak>1?` · streak ${QS.streak}`:''}`}
   else{QS.streak=0;QS.misses.push([q[0],q[1][0],v]);fb.className='fb bad';fb.innerHTML=`${skip?'Skipped':'Not quite'}. One answer: <code>${esc(q[1][0])}</code>`}
   QS.i++;showQ();const inp=$('#fIn');inp.value='';inp.focus()}
@@ -132,7 +140,7 @@ function stopFire(show){clearInterval(qT);if(!QS)return;const R=QS;QS=null;if(R.
   fStage.innerHTML=`<div class="task">Time! You scored ${R.score}.</div><p class="fb">${R.score>=S.best&&R.score>0?'That is your best score so far.':`Your best is ${S.best}.`}</p>
   ${R.misses.length?`<div><div class="label" style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Review what you missed</div><ul class="misses">${R.misses.map(([q,a,v])=>`<li><span>${esc(q)}</span><code>${esc(a)}</code>${v?`<span style="color:var(--muted)">you typed <code>${esc(v)}</code></span>`:''}</li>`).join('')}</ul></div>`:'<p>No misses. Clean round.</p>'}
   <div class="actions"><button class="btn" id="fStart">Play again</button></div>`;setStats()}
-fStage.addEventListener('click',e=>{const id=e.target.id;if(id==='fStart')startFire();else if(id==='fSkip'&&QS)answer('',true);else if(id==='fStop')stopFire(true)});
+fStage.addEventListener('click',e=>{const id=e.target.id;if(id==='fStart')startFire();else if(id==='fGoQuest')showTab('quest');else if(id==='fSkip'&&QS)answer('',true);else if(id==='fStop')stopFire(true)});
 fStage.addEventListener('keydown',e=>{if(e.target.id==='fIn'&&e.key==='Enter'&&QS){e.preventDefault();const v=e.target.value;if(v.trim())answer(v,false)}});
 
 /* guide */
