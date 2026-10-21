@@ -975,7 +975,7 @@ const CH=[
  {title:'Run your first program',goal:'Press <b>Run</b> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) and read what appears in the console.',
   anat:[['#include <iostream>','pp'],['int main()','fn'],['cout','name'],['<<','op'],['"Hello, World!"','val'],[';','op']],
   explain:`This is a complete C++ program. When you press Run, two things happen. First the <b>compiler</b> (g++) translates your C++ into machine code. Then the machine code <b>runs</b>. Every program starts at <code>main</code> and runs the lines inside its <code>{ }</code> from top to bottom.`,
-  note:'<code>#include &lt;iostream&gt;</code> brings in the input/output library. <code>cout</code> (say "see-out") is the console. <code>&lt;&lt;</code> sends something to it. Every statement ends with <code>;</code>.',
+  note:'<code>#include &lt;iostream&gt;</code> brings in the input/output library. <code>cout</code> (say "see-out") is the console. <code>&lt;&lt;</code> sends something to it, and <code>endl</code> ends the line. Every instruction line ends with <code>;</code>. Two lines you did not write: <code>using namespace std;</code> lets you type <code>cout</code> instead of <code>std::cout</code> (a few missions on you will see why), and <code>return 0;</code> at the end of <code>main</code> tells the computer the program finished fine (the console shows that as <code>exit code 0</code>). In the console, the <code>g++</code> line is the compile step and <code>./main</code> is the run step.',
   start:P(R`cout << "Hello, World!" << endl;`),hint:'Press the Run button above the editor.',
   check:c=>c.ok&&/Hello/.test(c.out)},
  {title:'Make it yours',goal:'Change the text so the program prints <code>Hello, </code> followed by your name.',keep:true,
@@ -990,12 +990,12 @@ cout << "I am learning C++" << endl;`),hint:'Copy the first cout line, paste it 
   check:c=>c.ok&&c.lines.length>=2&&c.count(/\bcout\b/)>=2},
  {title:'The \\n shortcut',goal:'Print two lines with a <b>single</b> <code>cout</code>, using <code>\\n</code> inside the text.',
   anat:[['"Line one\\nLine two"','val']],
-  explain:`<code>\\n</code> is an <b>escape sequence</b>: a backslash plus a letter that stands for a character you can't type into a string directly. <code>\\n</code> is a new line, <code>\\t</code> is a tab, <code>\\"</code> is a double quote and <code>\\\\</code> is a backslash.`,
+  explain:`<code>\\n</code> is an <b>escape sequence</b>: a backslash plus a letter that stands for a character you can't type into a string directly. <code>\\n</code> is a new line, <code>\\t</code> is a tab, <code>\\"</code> is a double quote and <code>\\\\</code> is a backslash. Lines that start with <code>//</code> (like the one in the starter code) are <b>comments</b>: notes for humans that the computer skips.`,
   start:P(R`// One cout, two lines of output
 cout << "Ready" << endl;`),ans:P(R`cout << "Ready\nPlayer One\n";`),hint:'Put \\n between the two pieces of text: "Ready\\nPlayer One\\n"',
   check:c=>c.ok&&c.lines.length>=2&&c.count(/\bcout\b/)===1&&/"[^"\n]*\\n[^"\n]*"/.test(c.code)},
  {title:'Bug hunt: the missing semicolon',goal:'Press Run, read the error, then fix the program.',
-  explain:`<code>main.cpp:5:30: error</code> means file <b><code>main.cpp</code></b>, line <b>5</b>, column <b>30</b>. The compiler reports the spot where it got confused, and with a missing <code>;</code> that is usually the end of the line <i>before</i> the next statement. Fix the first error first: one mistake often causes several messages.`,
+  explain:`<code>main.cpp:5:30: error</code> means file <b><code>main.cpp</code></b>, line <b>5</b>, column <b>30</b>. The compiler reports the spot where it got confused, and with a missing <code>;</code> that is usually the end of the line <i>before</i> the next line of code. Fix the first error first: one mistake often causes several messages.`,
   start:P(R`cout << "Loading level 1..." << endl
 cout << "Ready!" << endl;`),ans:P(R`cout << "Loading level 1..." << endl;
 cout << "Ready!" << endl;`),hint:'Line 5 is missing its ; at the end.',
@@ -1036,7 +1036,7 @@ cout << "Score: " << score << endl;`),hint:'score = score + 10;  then the same c
   check:c=>c.ok&&c.v('score')&&c.v('score').v>0&&c.lines.length>=2},
  {title:'Meet the types',goal:'Create one variable of each type: a <code>double</code> speed, a <code>bool</code> alive, a <code>char</code> grade and a <code>string</code> name. Print them all.',
   anat:[['double','type'],['bool','type'],['char','type'],['string','type']],
-  explain:`<code>double</code> holds numbers with a decimal point. <code>bool</code> holds <code>true</code> or <code>false</code>, and cout prints those as <b>1</b> and <b>0</b>. <code>char</code> holds one character in <b>single</b> quotes, like <code>'A'</code>. <code>string</code> holds text in <b>double</b> quotes. Look at the Memory panel: each box is a different size, and each type gets its own color.`,
+  explain:`<code>double</code> holds numbers with a decimal point. <code>bool</code> holds <code>true</code> or <code>false</code>, and cout prints those as <b>1</b> and <b>0</b>. <code>char</code> holds one character in <b>single</b> quotes, like <code>'A'</code>. Underneath, a <code>char</code> is a small number (<code>'A'</code> is 65), so <code>grade += 1</code> turns <code>'A'</code> into <code>'B'</code>. <code>string</code> holds text in <b>double</b> quotes. Look at the Memory panel: each box is a different size, and each type gets its own color.`,
   start:P(R`string name = "Pixel";
 // add a double, a bool and a char
 cout << name << endl;`),ans:P(R`string name = "Pixel";
@@ -1074,7 +1074,7 @@ cout << 10 % 2 << endl;`),hint:'cout << 17 % 5 << endl;',
   check:c=>c.ok&&c.has(/%/)&&c.lines.includes('2')&&c.lines.includes('0')},
  {title:'Shortcuts: ++ and +=',goal:'Level up: use <code>level++</code> once and <code>xp += 50</code> twice. Print both.',
   anat:[['level','name'],['++','op'],['xp','name'],['+=','op'],['50','val']],
-  explain:`<code>level++</code> adds 1 (that's where the name C++ comes from: one step beyond C). <code>xp += 50</code> is short for <code>xp = xp + 50</code>. There are matching <code>--</code>, <code>-=</code>, <code>*=</code> and <code>/=</code>.`,
+  explain:`<code>level++</code> adds 1 (that's where the name C++ comes from: one step beyond C, the older language it grew out of). <code>xp += 50</code> is short for <code>xp = xp + 50</code>. There are matching <code>--</code>, <code>-=</code>, <code>*=</code> and <code>/=</code>. On its own line, <code>level++</code> and <code>++level</code> do the same thing. Inside a bigger line they differ: <code>cout &lt;&lt; level++</code> prints the old value and then adds 1, while <code>cout &lt;&lt; ++level</code> adds 1 first and then prints.`,
   start:P(R`int level = 1;
 int xp = 0;
 // level up here
@@ -1100,7 +1100,7 @@ cout << "Max HP: " << MAX_HP << endl;`),hint:'const int MAX_HP = 100;  cout << M
   check:c=>c.ok&&c.has(/const\s+int\s+MAX_HP/)&&/100/.test(c.out)}
  ]},
 {name:'Input & text',badge:'Listener',intro:'Programs get interesting when they react to the player. Read from the keyboard with cin and work with text.',
- learned:['cin >>','getline','+ (join)','.length()','.substr()'],
+ learned:['cin >>','getline','+ (join)','.length()'],
  missions:[
  {title:'Ask a question',goal:'Read the player\'s name with <code>cin &gt;&gt; name;</code> and greet them. Type your answer in the console and press Enter.',
   anat:[['cin','name'],['>>','op'],['name','name'],[';','op']],
@@ -1123,7 +1123,7 @@ cin >> age;
 cout << "Next year you will be " << age + 1 << endl;`),hint:'cin >> age;  then print age + 1',test:['12'],
   check:c=>{const n=parseInt(c.tokens[0],10);return c.ok&&c.has(/cin\s*>>/)&&!isNaN(n)&&c.out.includes(String(n+1))}},
  {title:'Calculator',goal:'Read two whole numbers with one line, <code>cin &gt;&gt; a &gt;&gt; b;</code>, and print their sum, difference and product.',
-  explain:`You can chain <code>&gt;&gt;</code> just like <code>&lt;&lt;</code>. cin skips spaces and Enters between values, so you can type <code>8 5</code> on one line or press Enter after each number.`,
+  explain:`You can chain <code>&gt;&gt;</code> just like <code>&lt;&lt;</code>. cin skips spaces and Enters between values, so you can type <code>8 5</code> on one line or press Enter after each number. And <code>int a, b;</code> is a shortcut for making two <code>int</code> boxes in one line.`,
   start:P(R`int a, b;
 cout << "Two numbers: ";
 `),ans:P(R`int a, b;
@@ -1135,7 +1135,7 @@ cout << a << " * " << b << " = " << a * b << endl;`),hint:'cin >> a >> b;  then 
   check:c=>{const n=c.tokens.map(Number);return c.ok&&n.length>=2&&!isNaN(n[0]+n[1])&&c.out.includes(String(n[0]+n[1]))&&c.out.includes(String(n[0]*n[1]))}},
  {title:'Whole lines with getline',goal:'Read a full name with a space in it, like <code>Ada Lovelace</code>, using <code>getline(cin, fullName);</code> and print it back.',
   anat:[['getline','fn'],['(','op'],['cin','name'],['fullName','name'],[')','op']],
-  explain:`<code>cin &gt;&gt;</code> stops at the first space, so it reads one word. <code>getline</code> reads everything up to Enter. Try it with <code>cin &gt;&gt;</code> first and see what happens to the last name.`,
+  explain:`<code>cin &gt;&gt;</code> stops at the first space, so it reads one word. <code>getline</code> reads everything up to Enter. It is a ready-made <b>tool</b> (programmers say <b>function</b>; you will write your own in a later chapter): you hand it what it needs inside the parentheses, here the keyboard <code>cin</code> and the variable to fill. Try it with <code>cin &gt;&gt;</code> first and see what happens to the last name.`,
   start:P(R`string fullName;
 cout << "Full name: ";
 cin >> fullName;
@@ -1146,7 +1146,7 @@ cout << "Hello, " << fullName << endl;`),hint:'Replace cin >> fullName; with get
   check:c=>c.ok&&c.has(/getline\s*\(/)&&c.inputs.some(x=>/\S\s+\S/.test(x)&&c.out.includes(x.trim()))},
  {title:'Gluing text together',goal:'Build <code>greeting</code> from <code>"Hello, " + name + "!"</code>, print it, then print how many letters are in <code>name</code> with <code>name.length()</code>.',
   anat:[['greeting','name'],['=','op'],['"Hello, "','val'],['+','op'],['name','name'],['+','op'],['"!"','val']],
-  explain:`For strings, <code>+</code> joins text end to end. <code>.length()</code> asks the string how many characters it holds. The dot means "a function that belongs to this string". Other useful ones: <code>name.substr(0, 3)</code> gives the first 3 letters, and <code>name[0]</code> gives the first character.`,
+  explain:`For strings, <code>+</code> joins text end to end, and <code>+=</code> adds more onto the end (<code>s += "!"</code>). <code>.length()</code> asks the string how many characters it holds. The dot means "use a ready-made tool that belongs to this string", and the empty <code>()</code> says this tool needs nothing extra. Other useful ones: <code>name.substr(0, 3)</code> starts at position 0 and takes 3 letters, and <code>name[0]</code> is the character at position 0 (positions count from 0; the Arrays chapter explains why).`,
   start:P(R`string name = "Pixel";
 `),ans:P(R`string name = "Pixel";
 string greeting = "Hello, " + name + "!";
@@ -1154,7 +1154,7 @@ cout << greeting << endl;
 cout << name << " has " << name.length() << " letters" << endl;`),hint:'string greeting = "Hello, " + name + "!";',
   check:c=>c.ok&&c.v('greeting')&&c.v('greeting').type==='string'&&String(c.v('greeting').v).includes(String((c.v('name')||{}).v||'~'))&&c.has(/\.(length|size)\s*\(\)/)},
  {title:'Mini game: Mad Libs',goal:'Ask for an <b>adjective</b>, an <b>animal</b> and a <b>verb</b>, then print a silly sentence that uses all three.',
-  explain:`This is your first interactive program: questions, answers, and output built from the answers. Use one <code>cout</code> for each question, then <code>cin</code> right after it, so the player knows what to type.`,
+  explain:`This is your first interactive program: questions, answers, and output built from the answers. Use one <code>cout</code> for each question, then <code>cin</code> right after it, so the player knows what to type. And <code>string adjective, animal, verb;</code> makes three <code>string</code> boxes in one line.`,
   start:P(R`string adjective, animal, verb;
 cout << "An adjective: ";
 cin >> adjective;
@@ -1174,7 +1174,7 @@ cout << "The " << adjective << " " << animal << " started to " << verb << " in t
  missions:[
  {title:'if',goal:'Print <code>Game over</code> only when <code>hp</code> is 0 or less. Then change hp to 50 and run again.',
   anat:[['if','kw'],['(','op'],['hp <= 0','name'],[')','op'],['{ ... }','op']],
-  explain:`<code>if (condition) { ... }</code> runs the code in the braces only when the condition is true. Conditions compare things: <code>&lt;</code> less than, <code>&gt;</code> greater than, <code>&lt;=</code> at most, <code>&gt;=</code> at least, <code>==</code> equal, <code>!=</code> not equal.`,
+  explain:`<code>if (condition) { ... }</code> runs the code in the braces only when the condition is true. Conditions compare things: <code>&lt;</code> less than, <code>&gt;</code> greater than, <code>&lt;=</code> at most, <code>&gt;=</code> at least, <code>==</code> equal, <code>!=</code> not equal. When there is just one line inside, the braces are optional: <code>if (hp &lt;= 0) cout &lt;&lt; "Game over";</code>. Loops follow the same rule.`,
   start:P(R`int hp = 0;
 // if hp is 0 or less, print Game over
 `),ans:P(R`int hp = 0;
@@ -1183,7 +1183,7 @@ if (hp <= 0) {
 }`),hint:'if (hp <= 0) { cout << "Game over" << endl; }',
   check:c=>c.ok&&c.has(/\bif\s*\(/)&&(/game over/i.test(c.out)||(c.v('hp')&&c.v('hp').v>0))},
  {title:'if / else',goal:'Ask for the secret door code. If it is <code>42</code>, print <code>The door opens</code>; otherwise print <code>Wrong code</code>.',
-  explain:`<code>else</code> is the "otherwise" path: exactly one of the two blocks runs, never both. Remember <code>==</code> (two equals signs) compares, while <code>=</code> stores.`,
+  explain:`<code>else</code> is the "otherwise" path: exactly one of the two blocks runs, never both. Remember <code>==</code> (two equals signs) compares, while <code>=</code> stores. There is also a one-line way to choose between two values, the <b>ternary</b> <code>condition ? a : b</code>: it gives <code>a</code> when the condition is true and <code>b</code> otherwise, so <code>hp &gt; 10 ? "safe" : "danger"</code> is <code>"safe"</code> while hp is above 10.`,
   start:P(R`int code;
 cout << "Enter the door code: ";
 cin >> code;
@@ -1248,7 +1248,7 @@ if ((hasKey && level >= 3) || isAdmin) {
   check:c=>c.ok&&c.has(/&&/)&&c.has(/\|\|/)&&c.lines.length>=1},
  {title:'Roll the dice',goal:'Print a dice roll from 1 to 6 using <code>rand() % 6 + 1</code>. Run it several times. Then delete the <code>srand</code> line and run it a few more times.',
   anat:[['rand()','fn'],['%','op'],['6','val'],['+','op'],['1','val']],
-  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed.`,
+  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed. (<code>rand</code>, <code>srand</code> and <code>time</code> are ready-made tools you call by name with parentheses; <code>time(0)</code> is the clock reading in seconds, and you can ignore the <code>0</code> for now.)`,
   start:P(R`srand(time(0));
 // roll a six-sided die
 `,{inc:['cstdlib','ctime']}),ans:P(R`srand(time(0));
@@ -1282,7 +1282,7 @@ switch (choice) {
 }`),hint:'Add case 2:, case 3: and default: blocks, each ending in break;',test:['2'],
   check:c=>c.ok&&c.count(/\bcase\b/)>=3&&c.has(/\bdefault\s*:/)&&c.count(/\bbreak\b/)>=3},
  {title:'Mini game: Rock, Paper, Scissors',goal:'The player types 0 (rock), 1 (paper) or 2 (scissors). The computer picks randomly. Print both choices and who <b>wins</b>, <b>loses</b> or <b>ties</b>.',
-  explain:`Plan before you code. A tie is when both are equal. The player wins when they beat the computer: paper (1) beats rock (0), scissors (2) beat paper (1), rock (0) beats scissors (2). Notice the pattern: the player wins when <code>(player + 3 - computer) % 3 == 1</code>. Any other case is a loss.`,
+  explain:`Plan before you code. A tie is when both are equal. The player wins when they beat the computer: paper (1) beats rock (0), scissors (2) beat paper (1), rock (0) beats scissors (2). Notice the pattern: the player wins when <code>(player + 3 - computer) % 3 == 1</code> (adding 3 first keeps the number from going negative before <code>%</code>). Any other case is a loss.`,
   start:P(R`srand(time(0));
 int player;
 cout << "0 = rock, 1 = paper, 2 = scissors: ";
@@ -1306,7 +1306,7 @@ if (player == computer) {
   check:c=>c.ok&&c.has(/rand\s*\(/)&&c.has(/\bif\b/)&&c.inputs.length>=1&&/\b(win|lose|tie|won|lost)\b/i.test(c.out)}
  ]},
 {name:'Loops',badge:'Loop Master',intro:'Make the computer repeat work. Draw shapes, add up numbers, and build a full guessing game.',
- learned:['while','for','nested loops','break','continue','do … while'],
+ learned:['while','for','nested loops','break','continue'],
  missions:[
  {title:'while: countdown',goal:'Count down from 10 to 1 with a <code>while</code> loop, then print <code>Liftoff!</code>.',
   anat:[['while','kw'],['(','op'],['count > 0','name'],[')','op'],['{ ... count--; }','op']],
@@ -1322,7 +1322,7 @@ cout << "Liftoff!" << endl;`),hint:'while (count > 0) { cout << count << endl; c
   check:c=>c.ok&&c.has(/\bwhile\s*\(/)&&c.nums(c.out).slice(0,10).join()==='10,9,8,7,6,5,4,3,2,1'&&/liftoff/i.test(c.out)},
  {title:'for: counting made compact',goal:'Print the numbers 1 to 10 with a <code>for</code> loop.',
   anat:[['for','kw'],['int i = 1','name'],[';','op'],['i <= 10','name'],[';','op'],['i++','name']],
-  explain:`A <code>for</code> loop puts the three parts of counting on one line: <b>start</b> (<code>int i = 1</code>), <b>keep going while</b> (<code>i &lt;= 10</code>), and <b>step</b> (<code>i++</code>). It does exactly what a while loop does, but you can't forget the step. Watch <code>i</code> appear in Memory when the loop starts and vanish when it ends.`,
+  explain:`A <code>for</code> loop puts the three parts of counting on one line: <b>start</b> (<code>int i = 1</code>), <b>keep going while</b> (<code>i &lt;= 10</code>), and <b>step</b> (<code>i++</code>). It does exactly what a while loop does, but you can't forget the step. Watch <code>i</code> count up in the Memory panel. As with <code>if</code>, a loop with just one line inside may skip the braces.`,
   start:P(R`// print 1 to 10
 `),ans:P(R`for (int i = 1; i <= 10; i++) {
     cout << i << " ";
@@ -1427,7 +1427,7 @@ while (guess != secret) {
 cout << "You got it in " << tries << " tries!" << endl;`,{inc:['cstdlib','ctime']}),hint:'while (guess != secret) { cin >> guess; tries++; if (guess > secret) ... else if (guess < secret) ... }',test:Array.from({length:100},(_,i)=>String(i+1)),
   check:c=>c.ok&&c.has(/rand\s*\(/)&&c.has(/\b(while|for|do)\b/)&&c.inputs.length>=1&&c.has(/cin\s*>>/)}
  ]},
-{name:'Functions',badge:'Toolsmith',intro:'Package code into named tools you can reuse. Watch each call get its own frame on the stack.',
+{name:'Functions',badge:'Toolsmith',intro:'Package code into named tools you can reuse. Watch each call get its own set of boxes in Memory.',
  learned:['void f()','parameters','return','call stack','& references','scope','recursion'],
  missions:[
  {title:'Your first function',goal:'Write a function <code>void sayHello()</code> that prints a greeting, and call it <b>twice</b> from main.',
@@ -1460,7 +1460,7 @@ cout << square(12) << endl;`,{pre:R`int square(int n) {
     return n * n;
 }`}),hint:'int square(int n) { return n * n; }',
   check:c=>c.ok&&c.lines.includes('49')&&c.lines.includes('144')&&!!c.fn(f=>f.ret.base!=='void'&&f.params.length===1)},
- {title:'Watch the call stack',goal:'Press <b>Step</b> repeatedly (or <b>Watch</b>) until you see a second frame, <code>area</code>, appear in the Memory panel. Keep stepping until it disappears.',
+ {title:'Watch the call stack',goal:'Press <b>Step</b> repeatedly (or <b>Watch</b>) until a second <b>frame</b> (the fresh set of boxes a call gets), <code>area</code>, appears in the Memory panel. Keep stepping until it disappears.',
   explain:`Every call creates a new <b>stack frame</b>: a fresh set of boxes for that function's parameters and variables. When the function returns, its frame is thrown away, and only the returned value survives. This is why a function's variables don't exist outside it.`,
   start:P(R`double w = 4.5;
 double h = 2;
@@ -1522,7 +1522,7 @@ int attack(int power) {
 `,hint:'Above main, add: int attack(int power);',
   check:c=>c.ok&&/15/.test(c.out)},
  {title:'Recursion',goal:'Write <code>void countdown(int n)</code> that prints n and then calls <b>itself</b> with n - 1. When n reaches 0, print <code>Boom!</code> and stop.',
-  explain:`A function that calls itself is <b>recursive</b>. It needs a <b>base case</b>: a condition where it stops calling itself, or it runs until the stack overflows. Step through it and watch the frames pile up in Memory, then unwind one by one.`,
+  explain:`A function that calls itself is <b>recursive</b>. It needs a <b>base case</b>: a condition where it stops calling itself, or it runs until the computer runs out of room for more calls. A bare <code>return;</code> (no value) ends a <code>void</code> function early. Step through it and watch the frames pile up in Memory, then unwind one by one.`,
   start:P(R`countdown(5);`,{pre:R`void countdown(int n) {
     // base case: n == 0
     // otherwise print n and call countdown(n - 1)
@@ -1536,7 +1536,7 @@ int attack(int power) {
 }`}),hint:'if (n == 0) { cout << "Boom!"; return; }  cout << n << endl;  countdown(n - 1);',
   check:c=>c.ok&&c.recursed.length>0&&/boom/i.test(c.out)},
  {title:'Game tool: rollDice',goal:'Write <code>int rollDice(int sides)</code> that returns a random number from 1 to sides. Roll two six-sided dice for an attack and print the total.',
-  explain:`Good functions do one job and have a clear name. Now rolling dice is one readable line anywhere in your game: <code>rollDice(20)</code> for a d20, <code>rollDice(6) + rollDice(6)</code> for 2d6. You'll reuse this in the final battle.`,
+  explain:`Good functions do one job and have a clear name. Now rolling dice is one readable line anywhere in your game: <code>rollDice(20)</code> for a 20-sided die, <code>rollDice(6) + rollDice(6)</code> for two six-sided dice. You'll reuse this in the final battle.`,
   start:P(R`srand(time(0));
 // roll two dice and add them
 `,{inc:['cstdlib','ctime'],pre:R`// write rollDice here
@@ -1553,7 +1553,7 @@ cout << "Rolled " << a << " and " << b << ": " << a + b << " damage!" << endl;`,
  missions:[
  {title:'Your first array',goal:'Create <code>int scores[5] = {90, 72, 85, 60, 99};</code>, then print the <b>first</b> and the <b>last</b> score.',
   anat:[['int','type'],['scores','name'],['[5]','op'],['=','op'],['{90, 72, 85, 60, 99}','val']],
-  explain:`An <b>array</b> is a row of boxes side by side in memory, all the same type. You pick one with its <b>index</b> in square brackets. Indexes start at <b>0</b>, so the first is <code>scores[0]</code> and the last of five is <code>scores[4]</code>. Look at Memory: the addresses go up by 4, the size of one int.`,
+  explain:`An <b>array</b> is a row of boxes side by side in memory, all the same type. You pick one with its <b>index</b> in square brackets. Indexes start at <b>0</b>, so the first is <code>scores[0]</code> and the last of five is <code>scores[4]</code>. The <code>{90, 72, 85, 60, 99}</code> list fills the boxes in order. Look at Memory: the addresses go up by 4, because one int takes 4 <b>bytes</b> (a byte is the smallest piece of memory that has its own address).`,
   start:P(R`// create the scores array, then print the first and last
 `),ans:P(R`int scores[5] = {90, 72, 85, 60, 99};
 cout << "First: " << scores[0] << endl;
@@ -1579,7 +1579,7 @@ for (int i = 0; i < 5; i++) {
   check:c=>c.ok&&['90','72','85','60','99'].every(x=>c.lines.includes(x))},
  {title:'Vectors grow',goal:'Create <code>vector&lt;string&gt; inventory;</code>, add three items with <code>push_back</code>, and print <code>inventory.size()</code>.',
   anat:[['vector','type'],['<string>','type'],['inventory','name'],[';','op']],
-  explain:`A <b>vector</b> is an array that can grow. It starts empty, and <code>push_back</code> adds an item to the end. <code>.size()</code> tells you how many it holds. You need <code>#include &lt;vector&gt;</code>. Use Step and watch new boxes appear in Memory.`,
+  explain:`A <b>vector</b> is an array that can grow. It starts empty, and <code>push_back</code> adds an item to the end. <code>.size()</code> tells you how many it holds. <code>vector&lt;string&gt;</code> reads "vector of strings": the part in <code>&lt; &gt;</code> is the type of each item. You need <code>#include &lt;vector&gt;</code>. Use Step and watch new boxes appear in Memory.`,
   start:P(R`vector<string> inventory;
 // add three items
 `,{inc:['vector']}),ans:P(R`vector<string> inventory;
@@ -1655,7 +1655,7 @@ for (int row = 0; row < 3; row++) {
   check:c=>c.ok&&c.v('board')&&c.v('board').v[1][1]==='X'&&c.lines.filter(l=>l.includes('|')).length>=3}
  ]},
 {name:'Structs',badge:'Architect',intro:'Bundle related data into your own types. Build heroes and monsters, then make them fight.',
- learned:['struct','.field','{ } init','const &','vector<Struct>','->'],
+ learned:['struct','.field','{ } init','const &','vector<Struct>'],
  missions:[
  {title:'Design a Player',goal:'Finish <code>struct Player</code> with a <code>string name</code>, <code>int hp</code> and <code>int attack</code>. Create <code>hero</code>, fill in its fields, and print them.',
   anat:[['struct','kw'],['Player','type'],['{','op'],['string name; int hp; int attack;','name'],['};','op']],
@@ -1833,7 +1833,7 @@ void hit(Player& attacker, Player& target) {
  missions:[
  {title:'Every box has an address',goal:'Print <code>&amp;score</code>. Compare the number with the address shown under <code>score</code> in the Memory panel.',
   anat:[['&','op'],['score','name']],
-  explain:`Memory is one huge row of numbered bytes. A variable's <b>address</b> is the number of its first byte, usually shown in hexadecimal (base 16, starting with <code>0x</code>). <code>&amp;score</code> means "the address of score". (On a real computer the address changes every run.)`,
+  explain:`Memory is one huge row of numbered slots called <b>bytes</b>. A variable's <b>address</b> is the number of its first byte, usually shown in hexadecimal (base 16, starting with <code>0x</code>). <code>&amp;score</code> means "the address of score". (On a real computer the address changes every run.)`,
   start:P(R`int score = 42;
 cout << "score is " << score << endl;
 // print where score lives
@@ -1871,7 +1871,7 @@ if (p != nullptr) {
 }`),hint:'if (p != nullptr) { cout << *p; } else { cout << "Nothing here"; }',
   check:c=>c.ok&&c.has(/nullptr/)&&c.has(/\bif\b/)&&/nothing here/i.test(c.out)},
  {title:'Pointers walk arrays',goal:'Point <code>p</code> at the start of the array and use a loop with <code>p++</code> to print every value.',
-  explain:`An array's name turns into a pointer to its first box, so <code>int* p = coins;</code> works. <code>p++</code> moves the pointer to the <b>next box</b>, which is 4 bytes along for an int. Watch the arrow in Memory slide along the row. This is how arrays work underneath: <code>coins[i]</code> is short for <code>*(coins + i)</code>.`,
+  explain:`An array's name turns into a pointer to its first box, so <code>int* p = coins;</code> works. <code>p++</code> moves the pointer to the <b>next box</b>, which is 4 bytes along for an int. Watch the arrow in Memory slide along the row. Walking with <code>p++</code> visits the same boxes that <code>coins[i]</code> does.`,
   start:P(R`int coins[4] = {5, 10, 20, 50};
 int* p = coins;
 cout << *p << endl;`),ans:P(R`int coins[4] = {5, 10, 20, 50};
@@ -1895,6 +1895,41 @@ cout << "score: " << score << endl;`),hint:'int& ref = score;  ref += 5;  int* p
  ]}
 ];
 if(typeof module!=='undefined')module.exports={CH,makeCtx,P};
+
+/* ---------- quick-fire pool (DOM-free, so tests can load it) ---------- */
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)),pick=a=>a[Math.floor(Math.random()*a.length)];
+// Each question carries the chapter (0-based) that teaches everything it uses; Quick-fire only offers it once that whole chapter is done.
+const T=(ch,gen)=>({ch,gen});
+const QT=[
+ T(1,()=>{const a=rnd(7,29),b=rnd(2,5);return {body:`int a = ${a};\nint b = ${b};\ncout << a / b;`,why:'Both are int, so the decimal part is chopped off.'}}),
+ T(1,()=>{const a=rnd(10,40),b=rnd(3,7);return {body:`cout << ${a} % ${b};`,why:'% gives the remainder after dividing.'}}),
+ T(1,()=>{const x=rnd(2,9),y=rnd(2,6);return {body:`int x = ${x};\nx += ${y};\nx *= 2;\ncout << x;`,why:'Each line updates x in turn: add first, then double.'}}),
+ T(1,()=>{const i=rnd(3,9);return {body:`int i = ${i};\ncout << i++ << " " << i;`,why:'i++ hands over the old value, then adds 1.'}}),
+ T(1,()=>{const i=rnd(3,9);return {body:`int i = ${i};\ncout << ++i << " " << i;`,why:'++i adds 1 first, then hands over the new value.'}}),
+ T(2,()=>{const w=pick(['dragon','pixel','quest','sword','castle','wizard']);return {body:`string s = "${w}";\ncout << s.length();`,why:'length() counts the characters.'}}),
+ T(4,()=>{const n=rnd(3,6);return {body:`for (int i = 0; i < ${n}; i++) {\n    cout << i;\n}`,why:`Starts at 0 and stops before ${n}. No spaces are printed.`}}),
+ T(4,()=>{const a=rnd(2,4),b=rnd(2,5);return {body:`int count = 0;\nfor (int i = 0; i < ${a}; i++) {\n    for (int j = 0; j < ${b}; j++) {\n        count++;\n    }\n}\ncout << count;`,why:`The inner loop runs ${b} times for each of the ${a} outer rounds.`}}),
+ T(3,()=>{const x=rnd(1,9),y=rnd(1,9);return {body:`bool b = ${x} > ${y};\ncout << b;`,why:'cout prints true as 1 and false as 0.'}}),
+ T(3,()=>{const x=rnd(1,20);return {body:`int hp = ${x};\ncout << (hp > 10 ? "safe" : "danger");`,why:'? : gives the first answer when the condition is true, the second when false.'}}),
+ T(6,()=>{const n=rnd(2,4),z=rnd(1,9);const items=Array.from({length:n},()=>rnd(1,9));return {body:`vector<int> v = {${items.join(', ')}};\nv.push_back(${z});\ncout << v.size();`,inc:['vector'],why:'size() counts items, and push_back adds one.'}}),
+ T(6,()=>{const arr=Array.from({length:5},()=>rnd(1,50));const k=rnd(1,4);return {body:`int a[5] = {${arr.join(', ')}};\ncout << a[${k}];`,why:'Indexes start at 0, so a[1] is the second number.'}}),
+ T(1,()=>{const x=pick([5,7,9,11,13]);return {body:`double d = ${x} / 2;\ncout << d;`,why:'Two ints divide first and lose the decimal; only then is the result stored in d.'}}),
+ T(1,()=>{const k=rnd(1,5);const c=pick(['A','a','M']);return {body:`char ch = '${c}';\nch += ${k};\ncout << ch;`,why:'A char is a number underneath, so + moves along the alphabet.'}}),
+ T(4,()=>{const x=rnd(10,30),y=rnd(3,7);return {body:`int n = ${x};\nwhile (n > 0) {\n    n -= ${y};\n}\ncout << n;`,why:'The loop stops at the first value that is 0 or below.'}}),
+ T(0,()=>{const a=rnd(1,9),b=rnd(1,9);return {body:`cout << ${a} << ${b};`,why:'cout never adds spaces for you.'}}),
+ T(0,()=>{const w=pick(['sword','shield','potion','map']),v=pick(['gold','key','torch','bow']);return {body:`cout << "${w}" << " " << "${v}";`,why:'The text inside the quotes prints exactly as written, without the quotes.'}}),
+ T(0,()=>{const w=pick(['Hi','Go','Run','Win']),v=pick(['now','fast','Ada','Bo']);return {body:`cout << "${w}" << "!" << "${v}";`,why:'Each piece is printed right after the last one, so the pieces touch.'}}),
+ T(2,()=>{const w=pick(['KNIGHT','ROGUE','WIZARD','GOBLIN']);const k=rnd(0,w.length-1);return {body:`string s = "${w}";\ncout << s[${k}];`,why:'s[0] is the first letter.'}}),
+ T(3,()=>{const x=rnd(1,20);return {body:`int x = ${x};\nif (x > 10) {\n    cout << "big";\n} else {\n    cout << "small";\n}`,why:'Compare x with 10.'}}),
+ T(5,()=>{const n=rnd(2,7);return {pre:`int twice(int n) {\n    return n * 2 + 1;\n}`,body:`cout << twice(${n});`,why:'The call is replaced by the value it returns.'}}),
+ T(5,()=>{const x=rnd(2,6);return {pre:`void bump(int n) {\n    n += 10;\n}`,body:`int score = ${x};\nbump(score);\ncout << score;`,why:'Without &, bump changes its own copy only.'}}),
+ T(5,()=>{const x=rnd(2,6);return {pre:`void bump(int& n) {\n    n += 10;\n}`,body:`int score = ${x};\nbump(score);\ncout << score;`,why:'With &, n is another name for score itself.'}}),
+ T(2,()=>{const a=rnd(1,5),b=rnd(1,5);return {body:`string s = "${a}";\ns += "${b}";\ncout << s;`,why:'+= on strings joins text; it does not add numbers.'}}),
+ T(8,()=>{const x=rnd(2,9);return {body:`int x = ${x};\nint* p = &x;\n*p = *p * 3;\ncout << x;`,why:'*p is x itself, so this triples x.'}}),
+ T(4,()=>{const n=rnd(3,5),c=pick(['*','#','o']);return {body:`for (int i = 0; i < ${n}; i++) {\n    cout << "${c}";\n}\ncout << "!";`,why:'Only what is inside the braces repeats. The "!" comes after the loop, so it prints once, at the end.'}}),
+ T(4,()=>{const n=rnd(4,9);return {body:`int total = 0;\nfor (int i = 1; i <= ${n}; i++) {\n    if (i % 2 == 0) continue;\n    total += i;\n}\ncout << total;`,why:'continue skips the even numbers, so only odd ones are added.'}}),
+];
+const qfOpen=done=>QT.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'-'+j]));
 
 (()=>{
 const KEY='cpp-quest-v1';
@@ -2082,7 +2117,7 @@ function renderChapters(){$('chapters').innerHTML=CH.map((c,ci)=>`<button class=
 $('chapters').addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;
   if(b.dataset.ch==='sb'){openSandbox();return}const ci=+b.dataset.ch;
   let mi=CH[ci].missions.findIndex((_,i)=>!S.done[mkey(ci,i)]);if(mi<0)mi=0;goMission(ci,mi,false)});
-const KLAB={kw:'keyword',type:'type',name:'name',val:'value',op:'symbol',pp:'directive',fn:'function'};
+const KLAB={kw:'keyword',type:'type',name:'name',val:'value',op:'symbol',pp:'directive',fn:'tool'};
 let showHint=false,showAns=false,justWon=false;
 function anatHTML(a){return a?`<div class="anat">${a.map(([t,k,l])=>`<span class="tok k-${k}"><b>${esc(t)}</b><span>${l?esc(l):KLAB[k]}</span></span>`).join('')}</div>`:''}
 function renderMission(){const card=$('mission');
@@ -2141,45 +2176,20 @@ function afterRun(ok){if(S.inSandbox||!compiled)return;
   save();renderXP();renderChapters();renderMission();const card=$('mission');card.classList.remove('pop');void card.offsetWidth;card.classList.add('pop')}
 
 /* ---------- arcade ---------- */
-const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1)),pick=a=>a[Math.floor(Math.random()*a.length)];
-const QT=[
- ()=>{const a=rnd(7,29),b=rnd(2,5);return {body:`int a = ${a}, b = ${b};\ncout << a / b;`,why:'Both are int, so the decimal part is chopped off.'}},
- ()=>{const a=rnd(10,40),b=rnd(3,7);return {body:`cout << ${a} % ${b};`,why:'% gives the remainder after dividing.'}},
- ()=>{const x=rnd(2,9),y=rnd(2,6);return {body:`int x = ${x};\nx += ${y};\nx *= 2;\ncout << x;`,why:'Each line updates x in turn: add first, then double.'}},
- ()=>{const i=rnd(3,9);return {body:`int i = ${i};\ncout << i++ << " " << i;`,why:'i++ hands over the old value, then adds 1.'}},
- ()=>{const i=rnd(3,9);return {body:`int i = ${i};\ncout << ++i << " " << i;`,why:'++i adds 1 first, then hands over the new value.'}},
- ()=>{const w=pick(['dragon','pixel','quest','sword','castle','wizard']);return {body:`string s = "${w}";\ncout << s.length();`,why:'length() counts the characters.'}},
- ()=>{const n=rnd(3,6);return {body:`for (int i = 0; i < ${n}; i++) {\n    cout << i;\n}`,why:`Starts at 0 and stops before ${n}. No spaces are printed.`}},
- ()=>{const a=rnd(2,4),b=rnd(2,5);return {body:`int count = 0;\nfor (int i = 0; i < ${a}; i++) {\n    for (int j = 0; j < ${b}; j++) {\n        count++;\n    }\n}\ncout << count;`,why:`The inner loop runs ${b} times for each of the ${a} outer rounds.`}},
- ()=>{const x=rnd(1,9),y=rnd(1,9);return {body:`bool b = ${x} > ${y};\ncout << b;`,why:'cout prints true as 1 and false as 0.'}},
- ()=>{const x=rnd(1,20);return {body:`int hp = ${x};\ncout << (hp > 10 ? "safe" : "danger");`,why:'? : gives the first answer when the condition is true, the second when false.'}},
- ()=>{const n=rnd(2,4),z=rnd(1,9);const items=Array.from({length:n},()=>rnd(1,9));return {body:`vector<int> v = {${items.join(', ')}};\nv.push_back(${z});\ncout << v.size();`,inc:['vector'],why:'size() counts items, and push_back adds one.'}},
- ()=>{const arr=Array.from({length:5},()=>rnd(1,50));const k=rnd(1,4);return {body:`int a[5] = {${arr.join(', ')}};\ncout << a[${k}];`,why:'Indexes start at 0, so a[1] is the second number.'}},
- ()=>{const x=pick([5,7,9,11,13]);return {body:`double d = ${x} / 2;\ncout << d;`,why:'Two ints divide first and lose the decimal; only then is the result stored in d.'}},
- ()=>{const k=rnd(1,5);const c=pick(['A','a','M']);return {body:`char ch = '${c}';\nch += ${k};\ncout << ch;`,why:'A char is a number underneath, so + moves along the alphabet.'}},
- ()=>{const x=rnd(10,30),y=rnd(3,7);return {body:`int n = ${x};\nwhile (n > 0) {\n    n -= ${y};\n}\ncout << n;`,why:'The loop stops at the first value that is 0 or below.'}},
- ()=>{const a=rnd(1,9),b=rnd(1,9);return {body:`cout << ${a} << ${b};`,why:'cout never adds spaces for you.'}},
- ()=>{const w=pick(['KNIGHT','ROGUE','WIZARD','GOBLIN']);const k=rnd(0,w.length-1);return {body:`string s = "${w}";\ncout << s[${k}];`,why:'s[0] is the first letter.'}},
- ()=>{const x=rnd(1,20);return {body:`int x = ${x};\nif (x > 10) cout << "big";\nelse cout << "small";`,why:'Compare x with 10.'}},
- ()=>{const n=rnd(2,7);return {pre:`int twice(int n) {\n    return n * 2 + 1;\n}`,body:`cout << twice(${n});`,why:'The call is replaced by the value it returns.'}},
- ()=>{const x=rnd(2,6);return {pre:`void bump(int n) {\n    n += 10;\n}`,body:`int score = ${x};\nbump(score);\ncout << score;`,why:'Without &, bump changes its own copy only.'}},
- ()=>{const x=rnd(2,6);return {pre:`void bump(int& n) {\n    n += 10;\n}`,body:`int score = ${x};\nbump(score);\ncout << score;`,why:'With &, n is another name for score itself.'}},
- ()=>{const a=rnd(1,5),b=rnd(1,5);return {body:`string s = "${a}";\ns += "${b}";\ncout << s;`,why:'+= on strings joins text; it does not add numbers.'}},
- ()=>{const x=rnd(2,9);return {body:`int x = ${x};\nint* p = &x;\n*p = *p * 3;\ncout << x;`,why:'*p is x itself, so this triples x.'}},
- ()=>{const n=rnd(3,5),c=pick(['*','#','o']);return {body:`for (int i = 0; i < ${n}; i++)\n    cout << "${c}";\ncout << "!";`,why:'Without braces, only the next statement belongs to the loop.'}},
- ()=>{const n=rnd(4,9);return {body:`int total = 0;\nfor (int i = 1; i <= ${n}; i++) {\n    if (i % 2 == 0) continue;\n    total += i;\n}\ncout << total;`,why:'continue skips the even numbers, so only odd ones are added.'}},
-];
-function makeQ(){for(let tries=0;tries<8;tries++){const t=pick(QT)();const src=P(t.body,{inc:t.inc,pre:t.pre});const r=CPP.runAll(src,null,20000);if(!r.ok)continue;
+function makeQ(){const pool=qfOpen(S.done);if(!pool.length)return null;for(let tries=0;tries<8;tries++){const t=pick(pool).gen();const src=P(t.body,{inc:t.inc,pre:t.pre});const r=CPP.runAll(src,null,20000);if(!r.ok)continue;
   const show=t.pre?`${t.pre}\n\nint main() {\n${t.body.split('\n').map(l=>'    '+l).join('\n')}\n}`:t.body;return {show,ans:r.out.trim(),why:t.why}}}
 const norm=s=>s.replace(/\s+$/,'').replace(/^\s+/,'');
 let F={on:false,score:0,streak:0,left:90,q:null,misses:[],int:null};
 function fireStage(){const st=$('fStage');
-  if(!F.on&&!F.q){const ex=makeQ();st.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Example round</div><pre class="snip">${hl(ex.show)}</pre><p class="fb" style="margin:0">It prints <code>${esc(ex.ans)}</code>. ${esc(ex.why)}</p></div><div class="actions"><button class="btn" id="fGo">Start a 90-second round</button></div>`;$('fGo').onclick=fireStart;return}
+  if(!F.on&&!F.q){const ex=makeQ();
+    if(!ex){st.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Locked for now</div><p class="fb" style="margin:0">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first questions open up. Each later chapter you finish adds more.</p></div><div class="actions" style="margin-top:12px"><button class="btn" id="fGo">Go to the quest</button></div>`;$('fGo').onclick=()=>switchTab('quest');return}
+    const open=qfOpen(S.done).length;
+    st.innerHTML=`<div class="example"><div class="label" style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Example round</div><pre class="snip">${hl(ex.show)}</pre><p class="fb" style="margin:0">It prints <code>${esc(ex.ans)}</code>. ${esc(ex.why)}</p></div>${open<QT.length?`<p class="lede" style="margin:0">Questions from chapters you have finished are open. Finish more chapters to unlock the rest.</p>`:''}<div class="actions"><button class="btn" id="fGo">Start a 90-second round</button></div>`;$('fGo').onclick=fireStart;return}
   if(!F.on){st.innerHTML=`<p class="q">Time! You scored ${F.score}.${F.score>=S.best&&F.score>0?' New best!':''}</p>${F.misses.length?`<p class="lede" style="margin:0">Review the ones you missed:</p><ul class="misses">${F.misses.map(m=>`<li><pre class="snip">${hl(m.show)}</pre><span>Prints <code>${esc(m.ans)}</code>${m.got?` · you wrote <code>${esc(m.got)}</code>`:''}. ${esc(m.why)}</span></li>`).join('')}</ul>`:'<p class="fb good">No misses. Clean round.</p>'}<div class="actions"><button class="btn" id="fGo">Play again</button></div>`;$('fGo').onclick=fireStart;return}
   st.innerHTML=`<p class="q">What does this print?</p><pre class="snip">${hl(F.q.show)}</pre><div class="fterm"><span>output ›</span><input id="fIn" aria-label="Type the exact output" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div><p class="fb" id="fFb"></p><div class="actions"><button class="btn ghost" id="fSkip">Skip</button></div>`;
   const inp=$('fIn');inp.focus();inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();fireAnswer(inp.value)}};$('fSkip').onclick=()=>fireAnswer(null)}
 function fireStats(){$('fScore').textContent=F.score;$('fStreak').textContent=F.streak;$('fBest').textContent=S.best||0;$('fTime').textContent=F.left;$('fTimer').style.width=(F.left/90*100)+'%'}
-function fireStart(){F={on:true,score:0,streak:0,left:90,q:makeQ(),misses:[],int:null};fireStats();fireStage();
+function fireStart(){const q0=makeQ();if(!q0)return;F={on:true,score:0,streak:0,left:90,q:q0,misses:[],int:null};fireStats();fireStage();
   F.int=setInterval(()=>{F.left--;fireStats();if(F.left<=0){clearInterval(F.int);F.on=false;if(F.score>(S.best||0)){S.best=F.score;save()}fireStats();fireStage()}},1000)}
 function fireAnswer(v){if(!F.on)return;const q=F.q;const fb=$('fFb');
   if(v!==null&&norm(v)===norm(q.ans)){F.streak++;F.score+=10+Math.min(F.streak-1,5)*2;fb.className='fb good';fb.textContent='Correct!'+(F.streak>1?` Streak ×${F.streak}`:'')}
@@ -2204,7 +2214,7 @@ const G=[
   {c:'to_string  stoi',what:'Turn a number into text, or text into a number.',ex:[['string s = "Level " + to_string(3);\nint n = stoi("42");\ncout << s << " " << n + 1;','Level 3 43']]},
  ]},
  {sec:'Decisions',cards:[
-  {c:'if / else if / else',what:'Runs the first block whose condition is true.',ex:[['int hp = 35;\nif (hp > 50) {\n    cout << "healthy";\n} else if (hp > 20) {\n    cout << "hurt";\n} else {\n    cout << "critical";\n}','prints hurt']]},
+  {c:'if / else if / else',what:'Runs the first block whose condition is true. With just one line inside, the braces are optional.',ex:[['int hp = 35;\nif (hp > 50) {\n    cout << "healthy";\n} else if (hp > 20) {\n    cout << "hurt";\n} else {\n    cout << "critical";\n}','prints hurt']]},
   {c:'==  !=  <  >  <=  >=',what:'Comparisons give true or false. == compares; = stores.',ex:[['int a = 3;\ncout << (a == 3) << (a != 3) << (a < 10);','prints 101']]},
   {c:'&&  ||  !',what:'and, or, not. Combine conditions; use parentheses to make the order clear.',ex:[['bool key = true;\nint lvl = 4;\nif (key && lvl >= 3) cout << "open";','prints open']]},
   {c:'switch',what:'Jumps to a matching case. Every case needs break; or it falls through to the next one.',ex:[['int day = 2;\nswitch (day) {\n    case 1: cout << "Mon"; break;\n    case 2: cout << "Tue"; break;\n    default: cout << "?";\n}','prints Tue']]},
@@ -2257,7 +2267,7 @@ const ERRS=[
 const TYPES=[['int','whole numbers, about ±2.1 billion','int lives = 3;',4],['double','numbers with decimals','double speed = 2.5;',8],['bool','true or false','bool alive = true;',1],['char','one character','char grade = \'A\';',1],['string','text of any length','string name = "Pixel";',32],['long long','very big whole numbers','long long stars = 9000000000;',8]];
 function renderGuide(){const g=$('guide');
   const anat=[['#include <iostream>',1],['using namespace std;',2],['',0],['int main() {',3],['    int score = 10;',4],['    cout << "Score: " << score << endl;',5],['    return 0;',6],['}',0]];
-  g.innerHTML=`<div><h2>Field guide</h2><p class="lede">Everything from the quest on one page. Press <b>Try</b> on any example to open it in the sandbox and run it.</p></div>
+  g.innerHTML=`<div><h2>Field guide</h2><p class="lede">Everything from the quest on one page, plus a few extras to look ahead to (like <code>do … while</code>, <code>-&gt;</code> and <code>to_string</code>). Press <b>Try</b> on any example to open it in the sandbox and run it.</p></div>
   <section class="gsec"><h3>How a C++ program runs</h3><p>C++ is a compiled language: your text is translated into machine code before anything runs. Errors can happen at each stage, and the console tells you which.</p>
    <div class="panel pipe">${[['1','main.cpp','You write C++ source code as plain text.',''],['2','g++ compiler','Checks the code follows the rules, then translates it to machine code.','Compile errors stop here. Warnings let it continue.'],['3','linker','Joins your code with the libraries it uses, like iostream.','Link errors: a missing main or function body.'],['4','./main runs','The CPU runs main from top to bottom.','Crashes, endless loops and wrong answers happen here.']].map(s=>`<div class="stage"><span class="n">${s[0]}</span><h4>${s[1]}</h4><p>${s[2]}</p>${s[3]?`<span class="fail${s[0]==='2'?'':' w'}">${s[3]}</span>`:''}</div>`).join('')}</div></section>
   <section class="gsec"><h3>Anatomy of a program</h3><div class="panel anatomy"><pre>${anat.map(([l,n])=>`<span class="al"${n?` data-n="${n}"`:''}>${hl(l)||' '}</span>`).join('')}</pre><ol>
