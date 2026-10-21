@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 
@@ -14,7 +14,7 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs; do node --check "$f" || break; done
+for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs all of these on every PR. A PR is not ready until they pass locally.
@@ -47,6 +47,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add a mission that needs several commands tried | `steps` on the mission (guideline section 3); engine in `shell-quest/engine/exec.js`, list in `ui.js` |
 | Change how mission cards render | `shared/how.js` + `shared/how.css` (affects every quest; keep it bundle-safe) |
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
+| Change Network Quest | `net-quest/engine/` (simulator, shell, commands; DOM-free), `net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `net-quest/index.html` script order) |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
 | Change CI / deploy | `.github/workflows/`, `tools/` (separate PR, flag it) |

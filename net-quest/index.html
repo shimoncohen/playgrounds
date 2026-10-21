@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Network Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/nav.css">
+<link rel="stylesheet" href="../shared/how.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">⇄</span>Network Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Packet Rookie</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+
+<main>
+<section id="tab-quest" class="quest" role="tabpanel" aria-labelledby="t-quest">
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite"></article>
+  </aside>
+  <div class="seg" role="group" aria-label="Show one panel">
+    <button type="button" data-view="term" aria-pressed="true">Terminal</button><button type="button" data-view="pkts" aria-pressed="false">Packets</button><button type="button" data-view="map" aria-pressed="false">Map</button>
+  </div>
+  <div class="codeCol" id="termPanel">
+    <div class="edhead"><span class="file">Terminal</span><span>Type a command and press <kbd>Enter</kbd>.</span><span class="sp"></span><button type="button" class="linkbtn" id="resetNet">Reset scenario</button></div>
+    <div class="termbox" id="term">
+      <div class="screen" id="screen" role="log" aria-live="polite" aria-label="Terminal output"></div>
+      <form class="cmdline" id="cmdline" autocomplete="off"><label class="prompt" id="prompt" for="cmd">$</label><input id="cmd" aria-label="Type a command" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="send"></form>
+    </div>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+  </div>
+  <aside class="mapCol">
+    <div class="panel">
+      <section class="mapPanel" id="mapPanel" aria-labelledby="mapTitle">
+        <h3 id="mapTitle">Network map</h3>
+        <div id="diagram"></div>
+      </section>
+      <section class="pktPanel" id="pktPanel" aria-labelledby="pktTitle">
+        <h3 id="pktTitle">Packets</h3>
+        <form class="answerBox" id="answerBox" hidden autocomplete="off"><label id="askText" for="answer"></label><div class="arow"><input id="answer" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"><button class="btn" type="submit">Check</button></div><p class="afb" id="afb" aria-live="polite"></p></form>
+        <div class="pgrid"><div id="inspector" class="plist"></div><div id="pdetail" class="pdetail" hidden></div></div>
+      </section>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire">
+    <div><h2>Quick-fire</h2><p class="lede">Quick questions about layers, addresses and packets. Race the clock, build a streak, beat your best. Just for fun: it does not change your XP.</p></div>
+    <div class="fireCard panel">
+      <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
+      <div class="timer"><i id="fTimer"></i></div>
+      <div id="fStage"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"></div>
+</section>
+</main>
+</div>
+<script>window.PROGRESS={key:"net-quest-v1",name:"Network Quest"}</script>
+<script src="../shared/theme.js"></script>
+<script src="../shared/nav.js"></script>
+<script src="../shared/progress.js"></script>
+<script src="../shared/how.js"></script>
+<script src="engine/ip.js"></script>
+<script src="engine/packets.js"></script>
+<script src="engine/topology.js"></script>
+<script src="engine/sim.js"></script>
+<script src="engine/shell.js"></script>
+<script src="engine/cmds-ip.js"></script>
+<script src="engine/cmds-net.js"></script>
+<script src="content/model.js"></script>
+<script src="content/ch-1-layers.js"></script>
+<script src="content/extras.js"></script>
+<script src="ui.js"></script>
+<script src="inspector.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
