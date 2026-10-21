@@ -44,6 +44,12 @@ const FIRST = {
   'TTL expiry': [/TTL expiry|time exceeded/i, 3, 3],
   'static route': [/static route/i, 3, 4],
   'routing loop': [/routing loop/i, 3, 5],
+  NAT: [/\bNAT\b/, 4, 0],
+  translation: [/translat/i, 4, 0],
+  ISP: [/\bISP\b/, 4, 0],
+  'NAT table': [/NAT table/, 4, 2],
+  id: [/\bid\b/, 4, 2],
+  'nat on': [/\bnat (?:on|off)\b/, 4, 6],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -153,6 +159,40 @@ describe('chapter 4 defines its new words in place', () => {
   });
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[3].intro)));
+  });
+});
+
+describe('chapter 5 does not use words that nothing has taught', () => {
+  // no firewalls, DHCP, ports or forwarding rules: this chapter only needs NAT, the table and the public side
+  const LATER = /port forward|firewall|DHCP|VLAN|masquerad|conntrack|\bPAT\b|\bUDP\b|\bTCP\b|dropPrivate|\bDNS\b|RFC ?1918|\bCIDR\b|netmask/i;
+  NQ.CH[4].missions.forEach((m, i) => it(`5.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a term nothing has taught')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[4].intro))));
+});
+
+describe('chapter 5 defines its new words in place', () => {
+  const card = (i) => NQ.CH[4].missions[i].goal + ' ' + NQ.CH[4].missions[i].how.join(' ');
+  it('NAT, translation and ISP are defined where the chapter first uses them (5.1)', () => {
+    assert.match(card(0), /<b>NAT<\/b>, short for network address translation/);
+    assert.match(card(0), /<b>translation<\/b>/);
+    assert.match(card(0), /<b>ISP<\/b>, the internet service provider/);
+  });
+  it('source address is explained in 5.2, NAT table and id in 5.3', () => {
+    assert.match(card(1), /<b>source address<\/b>/);
+    assert.match(card(2), /<b>NAT table<\/b>/);
+    assert.match(card(2), /<b>id<\/b>, a ticket number/);
+  });
+  it('inside and outside are defined in 5.7, where nat on first appears', () => {
+    assert.match(card(6), /<b>inside<\/b> faces the house/);
+    assert.match(card(6), /<b>outside<\/b> faces the internet/);
+  });
+  it('the terminal device is announced wherever it is not the laptop (5.3, 5.4, 5.5, 5.7)', () => {
+    assert.match(card(2), /runs <b>on <code>home<\/code><\/b>/);
+    assert.match(card(3), /runs <b>on <code>web<\/code><\/b>/);
+    assert.match(card(4), /runs <b>on <code>home<\/code><\/b>/);
+    assert.match(card(6), /runs <b>on <code>home<\/code><\/b>/);
+  });
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 4 && mi > 0) assert.ok(!re.test(plain(NQ.CH[4].intro)), term);
   });
 });
 

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { loadNet } from './harness.mjs';
 
 const NQ = loadNet();
+const J = (x) => JSON.parse(JSON.stringify(x));
 const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/&(?:gt|lt|amp|quot);/g, ' ');
 // the run a learner would make: the reference lines on a fresh net, then the question's computed answer
 const solve = (m, lines = m.answer) => {
@@ -451,6 +452,125 @@ describe('chapter 4: lazy answers are caught', () => {
   });
   it('the repair missions (2, 3 and 5) do not pass on their broken starting networks', () => {
     for (const i of [1, 2, 4]) assert.notEqual(run(i, []), true, String(i + 1));
+  });
+});
+
+describe('chapter 5: lazy answers are caught', () => {
+  const m = (i) => NQ.CH[4].missions[i];
+  const run = (i, lines, a, mm = m(i)) => NQ.runMission(mm, lines, a);
+  const PING = 'ping -c 1 198.51.100.10', TRACE = 'traceroute 198.51.100.10', DEF = 'ip route add default via 203.0.113.6';
+  it('has seven missions on the home network, with the terminal on home (3, 5, 7) and web (4)', () => {
+    assert.equal(NQ.CH[4].name, 'NAT and public networks');
+    assert.deepEqual([...NQ.CH[4].missions.map((x) => x.scenario)], Array(7).fill('home'));
+    assert.deepEqual([...NQ.CH[4].missions.map((x) => x.dev)], [undefined, undefined, 'home', 'web', 'home', undefined, 'home']);
+  });
+  it('1: a ping through NAT passes; nothing, a look at the network, pings that skip NAT or go elsewhere do not', () => {
+    assert.equal(run(0, [PING]), true);
+    assert.equal(run(0, ['ping 198.51.100.10']), true);
+    assert.equal(run(0, ['traceroute 198.51.100.10']), true, 'a traceroute also goes through NAT and reaches the server');
+    for (const lines of [[], ['ip addr'], ['ping -c 1 192.168.1.1'], ['ping -c 1 192.168.1.11'], ['ping -c 1 203.0.113.5'], ['ping -c 1 198.51.100.1'], ['ping -c 1 198.51.100.99'], ['ip route']])
+      assert.notEqual(run(0, lines), true, lines.join(' ; '));
+    assert.notEqual(run(0, [PING], undefined, { ...m(0), setup: [{ dev: 'home', cmd: 'nat off' }] }), true, 'without NAT the ping gets no reply');
+    assert.match(run(0, []), /Ping the web server from the laptop/);
+  });
+  it('2: the computed source address the server sees; the laptop\'s own address, the router\'s inside address or a guess without a ping do not pass', () => {
+    assert.equal(solve(m(1)).expect, '203.0.113.5');
+    assert.equal(run(1, [PING], '203.0.113.5'), true);
+    assert.equal(run(1, [PING], ' 203.0.113.5. '), true);
+    assert.equal(run(1, [PING], ''), NQ.ASK);
+    for (const a of ['192.168.1.10', '192.168.1.1', '203.0.113.6', '198.51.100.10', '198.51.100.1', '203.0.113', 'home', '1024']) assert.notEqual(run(1, [PING], a), true, a);
+    for (const lines of [[], ['ip addr'], ['ping -c 1 192.168.1.1'], ['ping -c 1 203.0.113.5'], ['ping -c 1 192.168.1.11']]) assert.notEqual(run(1, lines, '203.0.113.5'), true, lines.join(' ; '));
+    assert.notEqual(run(1, [PING], '203.0.113.5', { ...m(1), setup: [{ dev: 'home', cmd: 'nat off' }] }), true, 'with NAT off the request never arrives');
+  });
+  it('2: the answer is read from the request that reached web, so a changed outside address changes it', () => {
+    const net = NQ.createNet('home', [{ dev: 'home', cmd: 'ip addr del 203.0.113.5/30 dev eth1' }, { dev: 'home', cmd: 'ip addr add 203.0.113.5/30 dev eth1' }]);
+    net.exec(PING, 'laptop');
+    assert.equal(m(1).question.expect(NQ.makeCtx(net, [], null)), '203.0.113.5');
+    assert.equal(m(1).question.expect(NQ.makeCtx(NQ.createNet('home'), [], null)), '');
+  });
+  it('3: the setup leaves the phone\'s translation in the table; nat table, then the computed inside address', () => {
+    const net = NQ.createNet('home', m(2).setup);
+    assert.deepEqual(J(net.devices.home.nat.table).map((e) => [e.inside, e.outId]), [['192.168.1.11', 1024]]);
+    assert.equal(net.log.length, 0, 'the setup leaves no log');
+    assert.equal(solve(m(2)).expect, '192.168.1.11');
+    assert.equal(run(2, ['nat table'], '192.168.1.11'), true);
+    assert.equal(run(2, ['nat', 'nat table'], ' 192.168.1.11. '), true);
+    assert.equal(run(2, ['nat table'], ''), NQ.ASK);
+    for (const a of ['192.168.1.10', '192.168.1.1', '203.0.113.5', '198.51.100.10', '1024', '192.168.1']) assert.notEqual(run(2, ['nat table'], a), true, a);
+    for (const lines of [[], ['nat'], ['ip addr'], ['nat on'], ['nat off'], ['nat table now']]) assert.notEqual(run(2, lines, '192.168.1.11'), true, lines.join(' ; '));
+    assert.notEqual(run(2, ['nat off', 'nat on', 'nat table'], '192.168.1.11'), true, 'a table emptied on purpose has nothing to read');
+    assert.notEqual(run(2, ['nat table'], '192.168.1.11', { ...m(2), dev: 'laptop' }), true, 'a host has no NAT table');
+  });
+  it('4: traceroute or ping to a private address from web, then the computed two words; other targets and wrong words do not pass', () => {
+    assert.equal(solve(m(3)).expect, 'no route');
+    for (const t of ['traceroute 192.168.1.10', 'traceroute 192.168.1.11', 'traceroute 10.1.2.3', 'traceroute 172.16.0.5', 'ping -c 1 192.168.1.10', 'ping 192.168.1.10']) assert.equal(run(3, [t], 'no route'), true, t);
+    assert.equal(run(3, ['traceroute 192.168.1.10'], ' No route. '), true);
+    assert.equal(run(3, ['traceroute 192.168.1.10'], 'No route to host'), true);
+    assert.equal(run(3, ['traceroute 192.168.1.10'], ''), NQ.ASK);
+    for (const a of ['route', 'private', 'unreachable', 'ttl exceeded', 'nat', 'no nat mapping', 'dropped', 'no way', 'isp', '2']) assert.notEqual(run(3, ['traceroute 192.168.1.10'], a), true, a);
+    for (const lines of [[], ['ip addr'], ['traceroute 8.8.8.8'], ['traceroute 203.0.113.5'], ['traceroute 198.51.100.1'], ['ping -c 1 203.0.113.5'], ['traceroute']]) assert.notEqual(run(3, lines, 'no route'), true, lines.join(' ; '));
+    assert.match(run(3, ['traceroute 192.168.1.10'], 'nope'), /Not quite/);
+  });
+  it('5: home starts with no way out, and a default route via the provider\'s router repairs it', () => {
+    const net = NQ.createNet('home', m(4).setup);
+    assert.match(net.exec(PING, 'laptop').out.join('\n'), /From 192\.168\.1\.1 icmp_seq=1 Destination Net Unreachable/);
+    assert.equal(net.exec(PING, 'home').code, 2);
+    assert.equal(run(4, m(4).answer), true);
+    assert.equal(run(4, [DEF]), true);
+    assert.equal(run(4, [DEF + ' dev eth1']), true);
+  });
+  it('5: nothing, a ping, a wrong gateway, a route for the server only, no default, NAT off, a downed card or the fix on another device do not pass', () => {
+    for (const lines of [[], [PING], ['ip route'], ['ip route add default via 192.168.1.10'], ['ip route add default via 192.168.1.11'], ['ip route add default dev eth1'], ['ip route add default dev eth0'],
+      ['ip route add 198.51.100.0/24 via 203.0.113.6'], ['ip route add 198.51.100.10 via 203.0.113.6'], [DEF, 'nat off'], [DEF, 'ip link set eth1 down'], [DEF, 'ip link set eth0 down'],
+      [DEF, 'ip addr del 192.168.1.1/24 dev eth0'], ['ip route add default via 203.0.113.6', 'ip route del default']])
+      assert.notEqual(run(4, lines), true, lines.join(' ; '));
+    assert.notEqual(run(4, [DEF], undefined, { ...m(4), dev: 'isp' }), true, 'isp is the wrong device');
+    assert.notEqual(run(4, [DEF], undefined, { ...m(4), dev: 'laptop' }), true, 'the laptop is the wrong device');
+    assert.match(run(4, []), /still has no route towards the internet/);
+    assert.match(run(4, ['ip route add default via 192.168.1.11']), /does not point at the provider/);
+    assert.match(run(4, [DEF, 'nat off']), /NAT is off/);
+  });
+  it('6: NAT starts off, so a trace from the laptop stops at the provider\'s router; the computed device passes', () => {
+    const net = NQ.createNet('home', m(5).setup);
+    assert.equal(net.devices.home.nat, null);
+    assert.match(net.exec(TRACE, 'laptop').out.join('\n'), /^ 2  \* \* \*/m);
+    assert.equal(solve(m(5)).expect, 'isp');
+    for (const l of [TRACE, 'ping -c 1 198.51.100.10', 'ping 198.51.100.10', 'traceroute 198.51.100.1']) assert.equal(run(5, [l], 'isp'), true, l);
+    assert.equal(run(5, [TRACE], ' ISP. '), true);
+    assert.equal(run(5, [TRACE], ''), NQ.ASK);
+    for (const a of ['home', 'web', 'laptop', 'phone', 'sw1', '192.168.1.10', '198.51.100.1', '203.0.113.6', 'router']) assert.notEqual(run(5, [TRACE], a), true, a);
+    for (const lines of [[], ['ip addr'], ['traceroute 192.168.1.1'], ['ping -c 1 192.168.1.1'], ['ping -c 1 192.168.1.11'], ['traceroute 192.168.1.11']]) assert.notEqual(run(5, lines, 'isp'), true, lines.join(' ; '));
+    assert.match(run(5, ['traceroute 192.168.1.1'], 'isp'), /Nothing was dropped for a private source address/);
+  });
+  it('6: with NAT on the same trace gets through, so the check reads the network and not the typed line', () => {
+    assert.notEqual(run(5, [TRACE], 'isp', { ...m(5), setup: [] }), true);
+  });
+  it('7: nat on repairs home; nothing, status only, nat off, or NAT undone by another change do not pass', () => {
+    const net = NQ.createNet('home', m(6).setup);
+    assert.match(net.exec('nat', 'home').out[0], /^NAT is off/);
+    assert.equal(net.exec(PING, 'laptop').code, 1);
+    assert.equal(run(6, m(6).answer), true);
+    assert.equal(run(6, ['nat on']), true);
+    for (const lines of [[], ['nat'], ['nat table'], ['nat off'], ['nat on', 'nat off'], ['nat on', 'ip route del default'], ['nat on', 'ip link set eth1 down'], ['nat on', 'ip link set eth0 down'],
+      ['ip route del default', 'nat on'], ['nat maybe'], ['nat on now']])
+      assert.notEqual(run(6, lines), true, lines.join(' ; '));
+    assert.notEqual(run(6, ['nat on'], undefined, { ...m(6), dev: 'laptop' }), true, 'a host cannot run NAT');
+    assert.notEqual(run(6, ['nat on'], undefined, { ...m(6), dev: 'isp' }), true, 'isp has no inside to translate for');
+    assert.notEqual(run(6, ['nat on'], undefined, { ...m(6), dev: 'web' }), true, 'web is the wrong device');
+    assert.match(run(6, []), /NAT is still off/);
+    assert.match(run(6, ['nat on', 'ip route del default']), /laptop still cannot reach/);
+  });
+  it('the repair missions (5, 6 and 7) do not pass on their broken starting networks', () => {
+    for (const i of [4, 5, 6]) assert.notEqual(run(i, []), true, String(i + 1));
+  });
+  it('every mission still works after Reset: a reset net replays the same setup', () => {
+    for (const x of NQ.CH[4].missions) {
+      const net = NQ.createNet(x.scenario, x.setup);
+      const before = JSON.stringify(net.devices);
+      for (const l of x.answer) net.exec(l, x.dev);
+      net.reset();
+      assert.equal(JSON.stringify(net.devices), before, x.title);
+    }
   });
 });
 

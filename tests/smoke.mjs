@@ -1667,6 +1667,43 @@ test('net-quest: chapter 4 plays through the page, on the printer and on r1, and
   }
 });
 
+test('net-quest: chapter 5 plays through the page, on the laptop, home and web, and the map marks the terminal device as (you)', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const steps = [
+      [['ping -c 1 198.51.100.10'], null, 'laptop'],
+      [['ping -c 1 198.51.100.10'], '203.0.113.5', 'laptop'],
+      [['nat table'], '192.168.1.11', 'home'],
+      [['traceroute 192.168.1.10'], 'no route', 'web'],
+      [['ip route add default via 203.0.113.6', 'ping -c 1 198.51.100.10'], null, 'home'],
+      [['traceroute 198.51.100.10'], 'isp', 'laptop'],
+      [['nat', 'nat on'], null, 'home']];
+    await page.click('#chapters .chap[data-ch="4"]');
+    for (const [i, [lines, answer, dev]] of steps.entries()) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      assert.match(await page.textContent('#prompt'), new RegExp('^' + dev + ':'), `mission ${i + 1} prompt`);
+      const you = await page.locator('#diagram .dg-list li', { hasText: '(you)' }).allTextContents();
+      assert.equal(you.length, 1, 'exactly one device is marked (you)');
+      assert.match(you[0], new RegExp('^' + dev + ' '), `mission ${i + 1}: the map marks ${dev}`);
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), (i + 1) * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 7);
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view after the last mission`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('net-quest: layout at 390px', async () => {
   for (const width of [390, 360]) {
     const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });
