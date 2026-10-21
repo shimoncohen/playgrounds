@@ -478,9 +478,32 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   await ctx.close();
 });
 
+/* Shell Quest quick-fire only offers what the saved progress has taught (teach-before-use): mark every mission done so the whole pool is open */
+const finishShellCourse = page => page.evaluate(() => { SQ.content.chapters.forEach((c, ci) => c.missions.forEach((_, i) => { SQ.S.done[ci + '.' + i] = 1; })); });
+
+test('shell-quest quick-fire is locked until chapter 1 is done, then offers only what the finished chapters taught', async () => {
+  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-fire');
+  assert.match(await page.textContent('#fStage'), /Locked for now/);
+  assert.equal(await page.locator('#fStart').count(), 0);
+  assert.ok(!(await page.isVisible('.ftier')), 'no tier picker while everything is locked');
+  await page.click('#fGoQuest');
+  assert.ok(await page.isVisible('#tab-quest'));
+  await page.evaluate(() => { for (let i = 0; i < SQ.content.chapters[0].missions.length; i++) SQ.S.done['0.' + i] = 1; });
+  await page.click('#t-fire');
+  assert.deepEqual(await page.$$eval('#fTier option', os => os.map(o => o.value)), ['mixed', 'beginner']);
+  await page.click('#fStart');
+  const ch0 = await page.evaluate(() => SQ.content.quickfire.filter(q => q.ch === 0).map(q => q[0]));
+  for (let i = 0; i < 12; i++) { assert.ok(ch0.includes(await page.textContent('#fTask')), 'only chapter 1 questions are asked'); await page.click('#fSkip'); }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draws from the chosen pool', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
+  await finishShellCourse(page);
   await page.click('#t-fire');
   const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
   assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced'], ['expert', 'Expert']]);
@@ -526,6 +549,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
 test('shell-quest quick-fire: single-quote question rejects expanding forms, tee accepts ./', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
+  await finishShellCourse(page);
   await page.click('#t-fire');
   await page.selectOption('#fTier', 'intermediate');
   await page.click('#fStart');
@@ -1178,6 +1202,7 @@ test('shell-quest Expert tier: four rail headers, Expert in the quick-fire picke
   assert.match(heads[3], /0\/4/);
   assert.doesNotMatch(heads[3], /★/);
   assert.deepEqual(await page.$$eval('.chap[data-ch="15"], .chap[data-ch="18"]', bs => bs.map(b => b.querySelector('.num').textContent)), ['16', '19']);
+  await finishShellCourse(page);
   await page.click('#t-fire');
   const opts = await page.$$eval('#fTier option', os => os.map(o => [o.value, o.textContent.trim()]));
   assert.deepEqual(opts, [['mixed', 'Mixed'], ['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced'], ['expert', 'Expert']]);

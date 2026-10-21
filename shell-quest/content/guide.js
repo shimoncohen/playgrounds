@@ -113,7 +113,7 @@ const GUIDE=[
  {c:'mktemp',ch:'extras',what:'Create a new, empty file with a name nobody else uses, under /tmp, and print its name; mktemp -d creates a folder. Pair it with trap \'rm -f "$tmp"\' EXIT so it is removed again.',syn:[['mktemp','cmd'],['-d','opt']],ex:[['tmp=$(mktemp); echo "$tmp"','the new name: /tmp/tmp.A00001 here, random letters on a real computer']]},
  {c:'timeout',ch:'extras',what:'Run a command, but stop it after a number of seconds. The status is 124 when timeout had to stop it.',syn:[['timeout','cmd'],['2','arg'],['sleep 10','cmd']],ex:[['timeout 2 sleep 10; echo $?','prints 124']]},
  {c:'history',ch:'extras',what:'List the commands you typed. Press ↑ to bring the last ones back.',syn:[['history','cmd']],ex:[['history','']]},
- {c:'clear',ch:'extras',what:'Clear the screen. Ctrl+L does the same.',syn:[['clear','cmd']],ex:[['clear','']]},
+ {c:'clear',ch:0,what:'Clear the screen. Ctrl+L does the same.',syn:[['clear','cmd']],ex:[['clear','']]},
  {c:'man',ch:'extras',what:'Show the manual for a command. On a real computer, press q to leave it.',syn:[['man','cmd'],['command','arg']],ex:[['man grep','']]},
  {c:'help',ch:'extras',what:'List every command this practice shell knows.',syn:[['help','cmd']],ex:[['help','']]}
 ];
