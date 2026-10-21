@@ -1757,13 +1757,37 @@ test('net-quest: quick-fire and field guide render', async () => {
   await page.locator('#fStage .opt').first().click();
   assert.match(await page.textContent('#fFb'), /\S/);
   await page.click('.tabs button[data-tab="guide"]');
-  assert.equal(await page.locator('#guide .card').count(), 4);
+  assert.equal(await page.locator('#guide .card').count(), await page.evaluate(() => NQ.GUIDE.length), 'one card for every guide entry, from every chapter');
+  assert.ok(await page.locator('#guide .gsec h3', { hasText: 'Chapter 5' }).count() >= 1);
   await page.locator('#guide [data-cmd]').first().click();
   assert.equal(await page.isHidden('#tab-quest'), false);
   assert.match(await page.inputValue('#cmd'), /ping/);
   assert.deepEqual(errors, []);
   assert.deepEqual(cerr, []);
   await ctx.close();
+});
+
+test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all five are', async () => {
+  const sizes = [8, 5, 6, 6, 7];
+  const seed = (n) => JSON.stringify({ done: Object.fromEntries(sizes.flatMap((k, c) => [...Array(k).keys()].filter(() => c < n).map(i => [`${c}.${i}`, true]))), xp: 0 });
+  for (const [n, label] of [[1, 'chapter 1 only'], [5, 'all five chapters']]) {
+    const { ctx, page, errors, console: cerr } = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, seed(n)));
+    await page.click('.tabs button[data-tab="fire"]');
+    const allowed = await page.evaluate((n) => NQ.QF.filter(q => q.ch < n).map(q => q.c), n);
+    const seen = new Set();
+    await page.click('#fStart');
+    for (let i = 0; i < 40; i++) {
+      seen.add((await page.innerHTML('#fStage .task')).trim());
+      await page.click('#fStop');
+      await page.click('#fStart');
+    }
+    for (const c of seen) assert.ok(allowed.includes(c), `${label}: asked "${c}" before its chapter was done`);
+    const later = await page.evaluate(() => NQ.QF.filter(q => q.ch > 0).map(q => q.c));
+    assert.equal([...seen].some(c => later.includes(c)), n === 5, `${label}: questions from later chapters`);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(cerr, []);
+    await ctx.close();
+  }
 });
 
 test('net-quest: the mission card puts the goal first and keeps the chapter intro one tap away', async () => {

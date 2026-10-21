@@ -593,10 +593,12 @@ describe('chapter 1: terms are not used before the mission that introduces them'
     const t = plain([NQ.CH[0].missions[0].goal, ...NQ.CH[0].missions[0].how].join(' '));
     for (const w of ['command', 'packet panel', 'tx', 'rx', 'IP address', 'packet']) assert.ok(t.includes(w), w);
   });
-  it('the guide cards only use commands that a mission taught', () => {
+  it('the guide cards only use commands that a mission taught, in their own chapter or an earlier one', () => {
     const key = (l) => { const w = l.trim().split(/\s+/); return w[0] === 'ip' ? w[0] + ' ' + w[1] : w[0]; };
-    const taught = new Set(NQ.CH[0].missions.flatMap((x) => x.answer.map(key)));
-    for (const g of NQ.GUIDE) for (const [line] of g.ex) assert.ok(taught.has(key(line)), line);
+    for (const g of NQ.GUIDE) {
+      const taught = new Set(NQ.CH.slice(0, g.ch + 1).flatMap((c) => c.missions.flatMap((x) => x.answer.map(key))));
+      for (const [line] of g.ex) assert.ok(taught.has(key(line)), `${g.c}: ${line}`);
+    }
   });
 });
 
@@ -684,27 +686,40 @@ describe('chapters, ranks, quick-fire and guide', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const ch of NQ.CH) assert.ok(ch.name && ch.badge && ch.intro && ch.learned.length && ch.missions.length);
   });
-  it('six ranks, strictly increasing, the top one at 280 XP', () => {
+  it('six ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
+    const total = NQ.CH.reduce((n, c) => n + c.missions.length, 0) * NQ.XP;
+    assert.equal(total, 320);
     assert.equal(NQ.RANKS.length, 6);
     assert.deepEqual([...NQ.RANKS[0]], [0, 'Packet Rookie']);
-    assert.deepEqual([...NQ.RANKS.at(-1)], [280, 'Packet Whisperer']);
+    assert.deepEqual([...NQ.RANKS.at(-1)], [total, 'Packet Whisperer']);
     for (let i = 1; i < NQ.RANKS.length; i++) assert.ok(NQ.RANKS[i][0] > NQ.RANKS[i - 1][0]);
     assert.equal(NQ.XP, 10);
   });
-  it('quick-fire: six questions, each with one answer that differs from three wrong options', () => {
-    assert.equal(NQ.QF.length, 6);
+  it('the ranks are spread over the course: none before the first chapter is done, only the top one in the last 30 XP', () => {
+    const ends = []; let n = 0;
+    for (const c of NQ.CH) { n += c.missions.length * NQ.XP; ends.push(n); }
+    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 320]);
+    assert.ok(NQ.RANKS[1][0] >= ends[0]);
+    assert.ok(NQ.RANKS.slice(0, -1).every((r) => r[0] <= ends.at(-1) - 30));
+  });
+  it('quick-fire: at least three questions for every chapter, each with one answer that differs from three wrong options', () => {
+    // raised from "six in all" (chapter 1 only) to three or more per chapter, now that all five chapters have entries
+    NQ.CH.forEach((c, ci) => assert.ok(NQ.QF.filter((q) => q.ch === ci).length >= 3, `chapter ${ci + 1}`));
+    assert.equal(new Set(NQ.QF.map((q) => q.c)).size, NQ.QF.length);
     for (const q of NQ.QF) {
+      assert.ok(![...q.w].map(NQ.norm).includes(NQ.norm(q.a)), q.c);
       assert.ok(q.c && q.a && q.why, q.c);
       assert.ok(q.w.length >= 3 && !q.w.includes(q.a) && new Set(q.w).size === q.w.length, q.c);
     }
   });
-  it('field guide: four entries whose examples run on the pair network', () => {
-    assert.equal(NQ.GUIDE.length, 4);
+  it('field guide: at least one entry for every chapter, whose examples run on the entry\'s scenario and exit 0', () => {
+    // raised from "four entries" (chapter 1 only) to one or more per chapter
+    NQ.CH.forEach((c, ci) => assert.ok(NQ.GUIDE.some((g) => g.ch === ci), `chapter ${ci + 1}`));
     for (const g of NQ.GUIDE) {
       assert.ok(Number.isInteger(g.ch) && NQ.CH[g.ch] && g.c && g.what && g.ex.length, g.c);
       for (const [, k] of g.syn) assert.ok(Object.prototype.hasOwnProperty.call(NQ.KINDS, k), k);
-      const net = NQ.createNet('pair');
-      for (const [line] of g.ex) assert.equal(net.exec(line).code, 0, g.c + ': ' + line);
+      const net = NQ.createNet(g.sc || 'pair');
+      for (const [line, , dev] of g.ex) assert.equal(net.exec(line, dev).code, 0, g.c + ': ' + line);
     }
   });
 });
