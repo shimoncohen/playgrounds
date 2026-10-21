@@ -8,7 +8,7 @@ description: Use before opening or updating a pull request in this repo. Runs th
 Run in order; stop and fix at the first failure.
 
 1. `git status` clean except intended changes; branch is not `main`; diff is one concern (`git diff --stat origin/main...`).
-2. Syntax: `for f in */app.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs; do node --check "$f" || break; done`
+2. Syntax: `for f in */app.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs; do node --check "$f" || break; done`
 3. Commit messages and the PR title are Conventional Commits (`echo "type(scope): subject" | npx commitlint`).
 4. `npm run check` (bundling) then `npm run test:engine`, then `npm run test:browser` (about 3 minutes; set `PW_CHROMIUM` if Chromium is preinstalled elsewhere).
 5. **Adversarial diff read** against `AGENTS.md` hard rules:
