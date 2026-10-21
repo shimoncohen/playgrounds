@@ -159,7 +159,7 @@ const CH=[
  missions:[
  {title:'Test a file',goal:`Ask whether <code>journal.txt</code> is a file, and say yes if it is: <code>[ -f journal.txt ] &amp;&amp; echo yes</code>`,note:HOME_NOTE,
   anat:[['[','cmd'],['-f','opt'],['journal.txt','arg'],[']','arg'],['&&','op'],['echo yes','cmd']],answer:'[ -f journal.txt ] && echo yes',
-  explain:`<code>[</code> is a real command, another name for <code>test</code>, and <code>]</code> is its last argument. It prints nothing: it only <b>exits</b> with 0 for true or 1 for false, and <code>&amp;&amp;</code> runs <code>echo</code> only after a 0. <code>-f</code> asks "is this a file?". The spaces matter: <code>[-f journal.txt]</code> gives "command not found".`,
+  explain:`<code>[</code> is a real command, another name for <code>test</code>, and <code>]</code> is its last argument. It prints nothing: it only <b>exits</b> with 0 for true or 1 for false, and <code>&amp;&amp;</code> runs <code>echo</code> only after a 0. <code>-f</code> asks "is this a file?". The spaces matter: <code>[-f journal.txt]</code> gives "command not found". Its partner <code>||</code> runs the next command only if the first one failed, as in <code>[ -f journal.txt ] || echo missing</code>.`,
   check:c=>tested(c,'-f',true)&&guarded(c)&&said(c)==='yes'},
  {title:'One-line if',goal:`Make the same kind of choice with <code>if</code>, this time asking about a folder: <code>if [ -d village ]; then echo found; fi</code>`,note:HOME_NOTE,
   anat:[['if','kw'],['[ -d village ]','cmd'],[';','op'],['then','kw'],['echo found','cmd'],[';','op'],['fi','kw']],answer:'if [ -d village ]; then echo found; fi',
@@ -167,7 +167,7 @@ const CH=[
   check:c=>c.ran('if')&&tested(c,'-d',true)&&said(c)==='found'},
  {title:'Else branch',goal:`Give the choice a second path for when the test fails: <code>if [ -f nothing.txt ]; then echo yes; else echo no; fi</code>`,
   anat:[['if','kw'],['[ -f nothing.txt ]','cmd'],[';','op'],['then','kw'],['echo yes','cmd'],[';','op'],['else','kw'],['echo no','cmd'],[';','op'],['fi','kw']],answer:'if [ -f nothing.txt ]; then echo yes; else echo no; fi',
-  explain:`There is no <code>nothing.txt</code>, so the test exits with 1 and bash runs the <code>else</code> part instead. Exactly one of the two branches runs, every time. <code>elif</code> adds another test in between, and <code>-e</code> accepts files and folders alike.`,
+  explain:`There is no <code>nothing.txt</code>, so the test exits with 1 and bash runs the <code>else</code> part instead. Exactly one of the two branches runs, every time. <code>elif</code> adds another test in between, and <code>-e</code> accepts files and folders alike. <code>-z</code> is true when a piece of text is empty (<code>-n</code> is its opposite), so <code>[ -z "$NAME" ]</code> asks whether <code>NAME</code> is empty. A leading <code>!</code> flips any test: <code>[ ! -d village ]</code> is true when <code>village</code> is not a folder.`,
   check:c=>c.ran('if')&&/\belse\b/.test(c.line)&&tested(c,null,false)&&said(c)==='no'},
  {title:'Compare numbers',goal:`Is 5 bigger than 3? <code>[ 5 -gt 3 ] &amp;&amp; echo bigger</code>`,
   anat:[['[','cmd'],['5','arg'],['-gt','opt'],['3','arg'],[']','arg'],['&&','op'],['echo bigger','cmd']],answer:'[ 5 -gt 3 ] && echo bigger',
@@ -182,7 +182,7 @@ const CH=[
   explain:`Inside <code>[[ ]]</code>, an unquoted <code>*</code> or <code>?</code> on the right of <code>==</code> is a wildcard, so <code>exp*</code> means "starts with exp". Quote it as <code>"exp*"</code> and it only matches the exact text exp*. <code>[[</code> is part of bash itself, not a separate command like <code>[</code>.`,
   check:c=>c.log.some(e=>e.name==='[['&&e.code===0)&&/\[\[[^\]]*\s(==?|!=)\s[^\]]*[*?]/.test(c.line)&&said(c)==='matches'},
  {title:'Script: exists?',kind:'script',file:'scripts/exists.sh',
-  goal:`Write <code>scripts/exists.sh</code>: it prints <code>exists</code> when the path given as its first argument is there, a file or a folder, and <code>missing</code> when it is not. Open it with <code>nano scripts/exists.sh</code>, save, then try <code>bash scripts/exists.sh village</code>.`,
+  goal:`Write <code>scripts/exists.sh</code>: it prints <code>exists</code> when the path given as its first argument is there, a file or a folder, and <code>missing</code> when it is not. Open it with <code>nano scripts/exists.sh</code> (<code>nano</code> is a small text editor that opens in a panel beside the terminal), save, then try <code>bash scripts/exists.sh village</code> (<code>bash</code> followed by a file name runs that file as a script, no <code>chmod</code> needed).`,
   anat:[['if','kw'],['[ -e "$1" ]','cmd'],['then','kw'],['echo exists','cmd'],['else','kw'],['echo missing','cmd'],['fi','kw']],
   answer:EXISTS_ANSWER,
   starter:`#!/bin/bash
@@ -207,7 +207,7 @@ if [ -d "$1" ]; then echo exists; else echo missing; fi
 `],
   tests:[{label:'a file',args:['journal.txt'],expectOut:'exists'},{label:'nothing there',args:['ghost.txt'],expectOut:'missing'},{label:'a folder',args:['village'],expectOut:'exists'}],
   hint:`Write an <code>if</code> around <code>[ -e "$1" ]</code> with an <code>else</code>. Save it, then run <code>bash scripts/exists.sh journal.txt</code> and <code>bash scripts/exists.sh ghost.txt</code>.`,
-  explain:`Inside a script, <code>$1</code> is the first argument. Write it as <code>"$1"</code> in a test, with the quotes, so a name with spaces stays one word. <code>-e</code> is true for files and folders alike, while <code>-f</code> would say <code>missing</code> for <code>village</code>. Each time you save, the script is tried with a file, a missing name and a folder; Save &amp; run also tells you which one failed.`}
+  explain:`In the editor panel, Save writes the file, Save &amp; run also runs it, and the Arguments box holds what you would type after the script name. The first line <code>#!/bin/bash</code> names the program that runs the file, and lines that start with <code>#</code> are comments that bash ignores. Inside a script, <code>$1</code> is the first argument. Write it as <code>"$1"</code> in a test, with the quotes, so a name with spaces stays one word. <code>-e</code> is true for files and folders alike, while <code>-f</code> would say <code>missing</code> for <code>village</code>. Each time you save, the script is tried with a file, a missing name and a folder; Save &amp; run also tells you which one failed.`}
  ]},
 {tier:'advanced',name:'Loops & numbers',badge:'Looper',intro:'Loops repeat work until a test says stop, and $(( )) lets bash do sums. Together they count, add things up and walk through a file one line at a time.',
  learned:['while','$(( ))','until','break','while read line','"$@"'],setup:seedAdvanced,
@@ -265,7 +265,7 @@ echo "$sum"
  missions:[
  {title:'Define and call',goal:`Give a group of commands a name, then use it: <code>greet() { echo "Hello, $1!"; }; greet Ada</code>`,
   anat:[['greet()','kw'],['{','kw'],['echo "Hello, $1!";','cmd'],['}','kw'],[';','op'],['greet','cmd'],['Ada','arg']],answer:'greet() { echo "Hello, $1!"; }; greet Ada',
-  explain:`<code>greet() { …; }</code> defines a <b>function</b>: from now on <code>greet</code> works like a command in this shell. Inside it, <code>$1</code> is the first argument of the call, so <code>greet Ada</code> prints Hello, Ada! and <code>greet Grace</code> prints Hello, Grace!. The spaces inside the braces and the <code>;</code> before <code>}</code> are required. <code>type greet</code> tells you greet is a function.`,
+  explain:`<code>greet() { …; }</code> defines a <b>function</b>: from now on <code>greet</code> works like a command in this shell. Inside it, <code>$1</code> is the first argument of the call, so <code>greet Ada</code> prints Hello, Ada! and <code>greet Grace</code> prints Hello, Grace!. The spaces inside the braces and the <code>;</code> before <code>}</code> are required. <code>type greet</code> tells you what a name is: here, a function.`,
   check:c=>said(c)==='Hello, Ada!'&&callsFn(c,n=>fnRun(n,'Grace').out==='Hello, Grace!')},
  {title:'Count the arguments',goal:`<code>$#</code> is how many arguments a call got: <code>count() { echo "$#"; }; count a b c</code>`,
   anat:[['count()','kw'],['{','kw'],['echo "$#";','cmd'],['}','kw'],[';','op'],['count','cmd'],['a b c','arg']],answer:'count() { echo "$#"; }; count a b c',
@@ -274,7 +274,7 @@ echo "$sum"
  {title:'All the arguments',goal:`Loop over every argument of a call with <code>"$@"</code>: <code>show() { for a in "$@"; do echo "- $a"; done; }; show x y</code>`,
   anat:[['show()','kw'],['{','kw'],['for','kw'],['a','var'],['in "$@"','arg'],[';','op'],['do','kw'],['echo "- $a"','cmd'],[';','op'],['done;','kw'],['}','kw'],[';','op'],['show x y','cmd']],
   answer:'show() { for a in "$@"; do echo "- $a"; done; }; show x y',
-  explain:`<code>"$@"</code> stands for all the arguments, each kept whole, so <code>show "big map" key</code> prints two lines, not three. Without the quotes, <code>$@</code> splits every argument at its spaces again. <code>for a; do</code> is short for <code>for a in "$@"; do</code>.`,
+  explain:`<code>"$@"</code> stands for all the arguments, each kept whole, so <code>show "big map" key</code> prints two lines, not three. Without the quotes, <code>$@</code> splits every argument at its spaces again. <code>for a; do</code> is short for <code>for a in "$@"; do</code>. <code>shift</code> drops the first argument, so the old <code>$2</code> becomes <code>$1</code>: in a call <code>f a b</code>, <code>shift; echo "$1"</code> prints b.`,
   check:c=>said(c)==='- x\n- y'&&looped(c)&&callsFn(c,n=>fnRun(n,'one two three').out==='- one\n- two\n- three')},
  {title:'Return a status',goal:`A function answers yes or no through its exit status: <code>is_big() { [ "$1" -gt 10 ]; }; is_big 20 &amp;&amp; echo big</code>`,
   anat:[['is_big()','kw'],['{','kw'],['[ "$1" -gt 10 ];','cmd'],['}','kw'],[';','op'],['is_big 20','cmd'],['&&','op'],['echo big','cmd']],answer:'is_big() { [ "$1" -gt 10 ]; }; is_big 20 && echo big',
@@ -290,7 +290,7 @@ echo "$sum"
   check:c=>{const m=/\$\{([A-Za-z_]\w*):-([^}]*)\}/.exec(c.line);if(!m)return false;const v=Object.prototype.hasOwnProperty.call(SQ.S.vars,m[1])?SQ.S.vars[m[1]]:'';const want=v?String(v):m[2].replace(/^["']|["']$/g,'');
     return !!want&&said(c)===want}},
  {title:'Script: greeter',kind:'script',file:'scripts/greet.sh',
-  goal:`Write <code>scripts/greet.sh</code>: <code>bash scripts/greet.sh Ada</code> prints <code>Hello, Ada!</code>. Run with no name, it prints <code>usage: greet.sh NAME</code> on stderr (<code>&gt;&amp;2</code>) and exits with 1. Open it with <code>nano scripts/greet.sh</code>.`,
+  goal:`Write <code>scripts/greet.sh</code>: <code>bash scripts/greet.sh Ada</code> prints <code>Hello, Ada!</code>. Run with no name, it prints <code>usage: greet.sh NAME</code> on stderr (the error stream from chapter 10, written <code>&gt;&amp;2</code>) and exits with 1 (<code>exit 1</code> ends the script with that status). Open it with <code>nano scripts/greet.sh</code>.`,
   anat:[['if','kw'],['[ -z "$1" ]','cmd'],['then','kw'],['echo "usage: greet.sh NAME"','cmd'],['>&2','op'],['exit 1','kw'],['fi','kw'],['echo "Hello, $1!"','cmd']],
   answer:GREET_ANSWER,
   starter:`#!/bin/bash
@@ -429,7 +429,7 @@ done
   tests:[{label:'the logs here',files:under('logs',LOGS15),expectOut:'app.log: 4\ndb.log: 2\nweb.log: 3'},
     {label:'other logs',files:LOG_CASE2,expectOut:'app.log: 1\ncache.log: 3\ndb.log: 5\nweb.log: 2'}],
   hint:`Loop with <code>for f in logs/*.log</code>. Inside, <code>n=$(wc -l &lt; "$f")</code> and <code>echo "$(basename "$f"): $n"</code>. Save it, then run <code>bash scripts/loglines.sh</code>.`,
-  explain:`<code>wc -l &lt; "$f"</code> prints just the number, because <code>wc</code> reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> (or <code>\${f##*/}</code>) drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
+  explain:`<code>wc -l &lt; "$f"</code> prints just the number, because <code>wc</code> reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
  BACKUP
  ]}
 ];
