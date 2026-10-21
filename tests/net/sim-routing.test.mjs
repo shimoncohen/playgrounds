@@ -233,7 +233,7 @@ test('deterministic: the same traceroute on two fresh nets logs identical entrie
   assert.deepEqual(J(a.entries), J(b.entries));
 });
 
-// Updated on purpose in Task 7: these pinned the pre-NAT home outcome (isp had no route back to 192.168.1.10). With NAT
+// Changed on purpose when NAT was added: these pinned the pre-NAT home outcome (isp had no route back to 192.168.1.10). With NAT
 // the ping succeeds (tests/net/sim-nat.test.mjs), so the no-reply pin moves to a web that cannot send its reply back.
 test('home: the request reaches web but web has no route back, so ping reports no reply', () => {
   const net = NQ.createNet('home');
@@ -254,7 +254,7 @@ test('home: the same ping without laptop\'s default route is a local no route wi
   assert.equal(r.entries.length, 0);
 });
 
-// Updated on purpose in Task 7: without NAT, isp now drops the private source silently (dropPrivate) at hop 2.
+// Changed on purpose when NAT was added: without NAT, isp now drops the private source silently (dropPrivate) at hop 2.
 test('home traceroute without NAT: home answers, isp drops the private source, so hop 2 is no reply and tracing stops', () => {
   const net = NQ.createNet('home');
   net.devices.home.nat = null;

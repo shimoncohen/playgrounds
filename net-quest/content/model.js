@@ -13,7 +13,7 @@ NQ.KINDS={cmd:'command',opt:'option',arg:'argument',op:'operator'}; // anatomy c
 NQ.norm=s=>String(s??'').toLowerCase().split(/[\s,;|\/>→=-]+/).map(w=>w.replace(/[.!?]+$/,'')).filter(Boolean).join(',');
 NQ.ASK='Now type your answer in the box under the question.'; // runMission's "check passed, waiting for the answer"
 /* the check context. history: [{line, code, entries}] the learner ran, entries being the log slice that line added
-   (net.exec's r.entries; the UI must pass it too); answered: their answer to the question, or null. lastPing() is the
+   (net.exec's r.entries); answered: their answer to the question, or null. lastPing() is the
    latest history item whose command is ping, or null. ping runs on a clone, so a check's probe never changes the
    learner's ARP caches, NAT table or log. */
 NQ.makeCtx=(net,history,answered)=>({
@@ -29,7 +29,10 @@ NQ.makeCtx=(net,history,answered)=>({
    A question is asked only once the check passes; question.accept(ctx) may list more accepted answers. Returns true,
    NQ.ASK (passed, answer still to type) or a friendly one-sentence hint. It replays on a FRESH net, so the UI's live
    terminal net must also be createNet(m.scenario, m.setup) at each mission start and reset: on a warm ARP cache,
-   chapter 1's ping sends no ARP request at all. */
+   chapter 1's ping sends no ARP request at all.
+   The UI checks a mission only after a command that exits 0, or when an answer is submitted, so a mission's reference
+   answer must end on a line that exits 0 (tests/net/content.test.mjs 'every reference line succeeds' enforces it for
+   every line of the answer). */
 NQ.runMission=(m,lines,answered)=>{
   const net=NQ.createNet(m.scenario,m.setup),history=[];
   for(const line of lines||[]){const r=net.exec(line,m.dev);history.push({line,code:r.code,entries:r.entries});}

@@ -1,5 +1,5 @@
 // Network Quest test harness: loads the DOM-free engine and content files into a fresh vm context, in page order.
-// FILES are relative to net-quest/; later tasks append to them.
+// FILES are relative to net-quest/ and must list the engine and content scripts in net-quest/index.html order.
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';

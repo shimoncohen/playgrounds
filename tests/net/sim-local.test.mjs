@@ -229,7 +229,7 @@ test('hops follow the copy the target accepted, not flood copies to a dead-end s
   assert.deepEqual(J(r.hops), ['laptop', 'sw1', 'phone']);
 });
 
-// Task 6 ruling: a failure away from the origin that sends no ICMP error back is 'no reply', not the far device's reason
+// By design: a failure away from the origin that sends no ICMP error back is 'no reply', not the far device's reason
 test('off-origin send failure: phone cannot route the reply, logs a drop, and ping reports no reply', () => {
   const net = NQ.createNet('pair');
   net.devices.phone.ifaces.eth0.ip = '10.0.0.3/32'; // phone answers ARP but has no route back to 10.0.0.2
