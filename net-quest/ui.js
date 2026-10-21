@@ -45,7 +45,8 @@ UI.terminal=({screen,input,form,prompt,onRun})=>{
 };
 
 /* ---------- network map ---------- */
-/* Deterministic layout: devices in columns by hop distance (BFS over the links) from the terminal's device, rows in
+/* Deterministic layout: devices in columns by hop distance (BFS over the links) from the terminal's device (`you`,
+   else the scenario's own), rows in
    each column ordered by where their neighbours sit in the column before. Shapes tell kinds apart (host: rounded box,
    switch: hexagon, router: oval) and every box carries its name and address as text, so nothing is colour-only. */
 const BW=116,BH=46,COLW=184,ROWH=76,PAD=14,TOP=22;
@@ -60,11 +61,11 @@ const linksOf=net=>{
   }
   return out;
 };
-UI.layout=net=>{
+UI.layout=(net,you)=>{
   const ids=Object.keys(net.devices),links=linksOf(net).filter(l=>net.devices[l.b]);
   const nb={};ids.forEach(id=>nb[id]=[]);
   for(const l of links){nb[l.a].push(l.b);nb[l.b].push(l.a);}
-  const dist={},q=[net.me in net.devices?net.me:ids[0]];dist[q[0]]=0;
+  const dist={},q=[you in net.devices?you:net.me in net.devices?net.me:ids[0]];dist[q[0]]=0;
   while(q.length){const x=q.shift();for(const y of nb[x])if(!(y in dist)){dist[y]=dist[x]+1;q.push(y);}}
   let maxD=Math.max(0,...Object.values(dist));
   ids.forEach(id=>{if(!(id in dist))dist[id]=maxD+1;});
@@ -95,9 +96,11 @@ const edge=(x,y,tx,ty)=>{
   return {x:x+dx*t,y:y+dy*t-4,a:ax*BH>ay*BW?(dx>0?'start':'end'):'middle'};
 };
 const KIND={host:'computer',switch:'switch',router:'router'};
-/* diagram(el, net, sel): sel = {dev, iface} of the selected packet entry, or null. Draws an SVG and a text list. */
-UI.diagram=(el,net,sel)=>{
-  const {W,H,pos,links}=UI.layout(net),devs=Object.values(net.devices);
+/* diagram(el, net, sel, you): sel = {dev, iface} of the selected packet entry, or null; you = the device the terminal runs
+   on (marked "(you)"), default the scenario's own. Draws an SVG and a text list. */
+UI.diagram=(el,net,sel,you)=>{
+  you=you||net.me;
+  const {W,H,pos,links}=UI.layout(net,you),devs=Object.values(net.devices);
   const isSel=id=>!!sel&&sel.dev===id;
   const onLink=l=>!!sel&&((l.a===sel.dev&&l.ai===sel.iface)||(l.b===sel.dev&&l.bi===sel.iface));
   let g='';
@@ -112,11 +115,11 @@ UI.diagram=(el,net,sel)=>{
   for(const d of devs){
     const p=pos[d.id],ip=d.kind==='switch'?'switch':(firstIp(d)||'no address'),s=isSel(d.id);
     g+=`<g class="dg-dev k-${esc(d.kind)}${s?' sel':''}"><title>${esc(d.id)}: ${esc(KIND[d.kind]||d.kind)}</title>${shape(d.kind,p.x,p.y,'dg-box'+(s?' dg-sel':''))}`+
-      `<text class="dg-id" x="${p.x}" y="${p.y-3}" text-anchor="middle">${esc(d.id)}${d.id===net.me?' (you)':''}</text><text class="dg-ip" x="${p.x}" y="${p.y+13}" text-anchor="middle">${esc(ip)}</text>`+
+      `<text class="dg-id" x="${p.x}" y="${p.y-3}" text-anchor="middle">${esc(d.id)}${d.id===you?' (you)':''}</text><text class="dg-ip" x="${p.x}" y="${p.y+13}" text-anchor="middle">${esc(ip)}</text>`+
       (s?`<text class="dg-mark" x="${p.x}" y="${p.y-BH/2-(d.kind==='router'?8:5)}" text-anchor="middle">▼ this packet</text>`:'')+'</g>';
   }
   const label='Network map: '+devs.map(d=>d.id+' ('+(KIND[d.kind]||d.kind)+(d.kind==='switch'?'':', '+(firstIp(d)||'no address'))+')').join(', ')+'. The links are listed below.';
-  const items=devs.map(d=>`<li><b>${esc(d.id)}</b>${d.id===net.me?' (you)':''} · ${esc(KIND[d.kind]||d.kind)}${d.kind==='switch'?'':' · '+esc(firstIp(d)||'no address')}${isSel(d.id)?' <span class="dg-here">◀ this packet</span>':''}</li>`).join('');
+  const items=devs.map(d=>`<li><b>${esc(d.id)}</b>${d.id===you?' (you)':''} · ${esc(KIND[d.kind]||d.kind)}${d.kind==='switch'?'':' · '+esc(firstIp(d)||'no address')}${isSel(d.id)?' <span class="dg-here">◀ this packet</span>':''}</li>`).join('');
   const wires=links.map(l=>`<li>${esc(l.a)} ${esc(l.ai)} ↔ ${esc(l.b)} ${esc(l.bi)}${l.up?'':' (down)'}</li>`).join('');
   el.innerHTML=`<div class="dg-scroll"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" style="--w:${W}px">${g}</svg></div>`+
     `<div class="dg-text"><h4>Devices</h4><ul class="dg-list">${items}</ul><h4>Cables</h4><ul class="dg-list">${wires}</ul></div>`;

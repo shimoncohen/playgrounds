@@ -1628,6 +1628,104 @@ test('net-quest: terminal output is text, never markup', async () => {
   await ctx.close();
 });
 
+test('net-quest: chapter 4 plays through the page, on the printer and on r1, and the map marks the terminal device as (you)', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const steps = [
+      [['ip route'], '192.168.1.1', 'laptop'],
+      [['ip route add default via 192.168.1.1', 'ping -c 1 172.16.0.10'], null, 'printer'],
+      [['ip route del default', 'ip route add default via 192.168.1.1', 'ping -c 1 172.16.0.10'], null, 'laptop'],
+      [['traceroute 172.16.0.10'], '10.0.1.2', 'laptop'],
+      [['ip route add 172.16.0.0/24 via 10.0.1.2', 'ping -c 1 172.16.0.10'], null, 'r1'],
+      [['traceroute 8.8.8.8'], '10.0.1.1', 'laptop']];
+    await page.click('#chapters .chap[data-ch="3"]');
+    for (const [i, [lines, answer, dev]] of steps.entries()) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      assert.match(await page.textContent('#prompt'), new RegExp('^' + dev + ':'), `mission ${i + 1} prompt`);
+      const you = await page.locator('#diagram .dg-list li', { hasText: '(you)' }).allTextContents();
+      assert.equal(you.length, 1, 'exactly one device is marked (you)');
+      assert.match(you[0], new RegExp('^' + dev + ' '), `mission ${i + 1}: the map marks ${dev}`);
+      assert.match(await page.getAttribute('#diagram svg', 'aria-label'), /Network map/);
+      assert.equal(await page.locator('#diagram svg text.dg-id', { hasText: '(you)' }).count(), 1);
+      assert.match(await page.locator('#diagram svg text.dg-id', { hasText: '(you)' }).textContent(), new RegExp('^' + dev + ' '));
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), (i + 1) * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 6);
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view after the traceroute loop`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test('net-quest: the question stays after an extra command, and a ping with no reply can open it', async () => {
+  const { ctx, page, errors, type, xp } = await netPage();
+  await page.click('#chapters .chap[data-ch="3"]');
+  await page.click('#mission .dot[data-mi="3"]');
+  await type('traceroute 172.16.0.10');
+  assert.equal(await page.isVisible('#answerBox'), true, 'the question opens');
+  await type('traceroute 8.8.8.8');
+  assert.equal(await page.isVisible('#answerBox'), true, 'an extra comparison traceroute keeps it');
+  await page.fill('#answer', '10.0.1.2'); await page.click('#answerBox button[type="submit"]');
+  assert.equal(await xp(), '10 XP');
+  await page.click('#chapters .chap[data-ch="1"]');
+  await page.click('#mission .dot[data-mi="2"]');
+  await type('ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0');
+  assert.equal(await page.isHidden('#answerBox'), true, 'no question before the ping');
+  await type('ping -c 1 10.0.0.3');
+  assert.equal(await page.isVisible('#answerBox'), true, 'a ping that gets no reply (exit 1) still opens the question');
+  await page.fill('#answer', '100%'); await page.click('#answerBox button[type="submit"]');
+  assert.equal(await xp(), '20 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('net-quest: chapter 5 plays through the page, on the laptop, home and web, and the map marks the terminal device as (you)', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const steps = [
+      [['ping -c 1 198.51.100.10'], null, 'laptop'],
+      [['ping -c 1 198.51.100.10'], '203.0.113.5', 'laptop'],
+      [['nat table'], '192.168.1.11', 'home'],
+      [['traceroute 192.168.1.10'], 'no route', 'web'],
+      [['ip route add default via 203.0.113.6', 'ping -c 1 198.51.100.10'], null, 'home'],
+      [['traceroute 198.51.100.10'], 'isp', 'laptop'],
+      [['nat', 'nat on'], null, 'home']];
+    await page.click('#chapters .chap[data-ch="4"]');
+    for (const [i, [lines, answer, dev]] of steps.entries()) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      assert.match(await page.textContent('#prompt'), new RegExp('^' + dev + ':'), `mission ${i + 1} prompt`);
+      const you = await page.locator('#diagram .dg-list li', { hasText: '(you)' }).allTextContents();
+      assert.equal(you.length, 1, 'exactly one device is marked (you)');
+      assert.match(you[0], new RegExp('^' + dev + ' '), `mission ${i + 1}: the map marks ${dev}`);
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), (i + 1) * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 7);
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view after the last mission`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('net-quest: layout at 390px', async () => {
   for (const width of [390, 360]) {
     const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });
@@ -1681,13 +1779,37 @@ test('net-quest: quick-fire and field guide render', async () => {
   await page.locator('#fStage .opt').first().click();
   assert.match(await page.textContent('#fFb'), /\S/);
   await page.click('.tabs button[data-tab="guide"]');
-  assert.equal(await page.locator('#guide .card').count(), 4);
+  assert.equal(await page.locator('#guide .card').count(), await page.evaluate(() => NQ.GUIDE.length), 'one card for every guide entry, from every chapter');
+  assert.ok(await page.locator('#guide .gsec h3', { hasText: 'Chapter 5' }).count() >= 1);
   await page.locator('#guide [data-cmd]').first().click();
   assert.equal(await page.isHidden('#tab-quest'), false);
   assert.match(await page.inputValue('#cmd'), /ping/);
   assert.deepEqual(errors, []);
   assert.deepEqual(cerr, []);
   await ctx.close();
+});
+
+test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all five are', async () => {
+  const sizes = [8, 5, 6, 6, 7];
+  const seed = (n) => JSON.stringify({ done: Object.fromEntries(sizes.flatMap((k, c) => [...Array(k).keys()].filter(() => c < n).map(i => [`${c}.${i}`, true]))), xp: 0 });
+  for (const [n, label] of [[1, 'chapter 1 only'], [5, 'all five chapters']]) {
+    const { ctx, page, errors, console: cerr } = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, seed(n)));
+    await page.click('.tabs button[data-tab="fire"]');
+    const allowed = await page.evaluate((n) => NQ.QF.filter(q => q.ch < n).map(q => q.c), n);
+    const seen = new Set();
+    await page.click('#fStart');
+    for (let i = 0; i < 40; i++) {
+      seen.add((await page.innerHTML('#fStage .task')).trim());
+      await page.click('#fStop');
+      await page.click('#fStart');
+    }
+    for (const c of seen) assert.ok(allowed.includes(c), `${label}: asked "${c}" before its chapter was done`);
+    const later = await page.evaluate(() => NQ.QF.filter(q => q.ch > 0).map(q => q.c));
+    assert.equal([...seen].some(c => later.includes(c)), n === 5, `${label}: questions from later chapters`);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(cerr, []);
+    await ctx.close();
+  }
 });
 
 test('net-quest: the mission card puts the goal first and keeps the chapter intro one tap away', async () => {

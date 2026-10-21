@@ -1,5 +1,6 @@
 /* Network Quest ip command: addr, route, neigh and link, printed the way iproute2 prints them. Each device keeps one
-   address per interface. Errors are one line in err and leave the device untouched. DOM-free. */
+   address per interface. Errors are one line in err and leave the device untouched. Also the nat command, a teaching
+   switch for a router's address translation (dev.nat; turning it off keeps the settings in dev.natOff). DOM-free. */
 (()=>{
 'use strict';
 const NQ=globalThis.NQ=globalThis.NQ||{};
@@ -163,6 +164,46 @@ const linkSet=(net,dev,args)=>{
   i.up=args[1]==='up';
   return ok();
 };
+
+/* nat [status] | nat table | nat on | nat off. A router translates only while dev.nat is set; off moves the settings to
+   dev.natOff (the table is forgotten), on moves them back, or works them out for a router that never had NAT: the
+   outside interface is the one the default route leaves by, the inside one is the single other interface with an address. */
+const NAT_USAGE='Usage: nat [status | table | on | off]';
+const natDesc=(dev,n)=>'inside '+n.inside+' ('+(dev.ifaces[n.inside].ip||'no address')+'), outside '+n.outside+' ('+(dev.ifaces[n.outside].ip||'no address')+')';
+const natGuess=dev=>{
+  const d=(dev.routes||[]).find(r=>r&&r.dst==='default'&&iface(dev,r.dev));
+  if(!d)return {error:bad('nat: cannot turn NAT on: '+dev.id+' has no default route, so it has no outside interface. Add one with: ip route add default via <ip>')};
+  const rest=Object.entries(dev.ifaces).filter(([k,i])=>k!==d.dev&&i.ip);
+  if(rest.length!==1)return {error:bad('nat: cannot turn NAT on: it needs exactly one inside interface with an address besides '+d.dev)};
+  if(!dev.ifaces[d.dev].ip)return {error:bad('nat: cannot turn NAT on: '+d.dev+' has no address')};
+  return {nat:{inside:rest[0][0],outside:d.dev}};
+};
+const natCmd=(net,dev,args)=>{
+  if(dev.kind!=='router')return bad('nat: only a router can translate addresses; '+dev.id+' is a host');
+  const sub=args.length?args[0]:'status';
+  if(sub==='help'&&args.length===1)return ok(NAT_USAGE);
+  if(args.length>1||!['status','table','on','off'].includes(sub))return bad('nat: unknown option "'+args.join(' ')+'". '+NAT_USAGE);
+  const n=dev.nat;
+  if(sub==='status')return ok(n?'NAT is on: '+natDesc(dev,n):'NAT is off: '+dev.id+' forwards packets with their addresses unchanged');
+  if(sub==='table'){
+    if(!n)return ok('NAT is off: there is no NAT table');
+    const t=n.table||[];
+    if(!t.length)return ok('The NAT table is empty: nothing has been translated yet');
+    return ok('proto  inside (private)         outside (public)         remote',...t.map(e=>(e.proto||'icmp').padEnd(7)+(e.inside+' id '+e.id).padEnd(24)+(e.outside+' id '+e.outId).padEnd(25)+e.dst));
+  }
+  if(sub==='off'){
+    if(!n)return ok('NAT is already off');
+    dev.natOff={inside:n.inside,outside:n.outside};dev.nat=null;
+    return ok('NAT is now off: '+dev.id+' forwards packets with their addresses unchanged, and the NAT table is forgotten');
+  }
+  if(n)return ok('NAT is already on: '+natDesc(dev,n));
+  const o=dev.natOff,lost=o&&[o.inside,o.outside].find(k=>iface(dev,k)&&!dev.ifaces[k].ip);
+  const c=lost?{error:bad('nat: cannot turn NAT on: '+lost+' has no address')}:o&&iface(dev,o.inside)&&iface(dev,o.outside)?{nat:o}:natGuess(dev);
+  if(c.error)return c.error;
+  dev.nat={inside:c.nat.inside,outside:c.nat.outside,table:[]};delete dev.natOff;
+  return ok('NAT is now on: '+natDesc(dev,dev.nat));
+};
+NQ.reg('nat','show or switch the address translation of a router (try: nat, nat table, nat on)',natCmd);
 
 const VERBS={
   addr:{show:addrShow,list:addrShow,add:addrChange(true),del:addrChange(false),delete:addrChange(false)},

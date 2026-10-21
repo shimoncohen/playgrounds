@@ -14,7 +14,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`shell-quest/`](shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
-| ⇄ | **Network Quest** | Packets, layers and ARP on a pretend network you can poke at, read right down to the bytes | [`net-quest/`](net-quest/) |
+| ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
 
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
 
@@ -107,7 +107,7 @@ shared/                 code every playground reuses: progress saving, tier mode
 script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
-net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, chapters, quick-fire, guide), ui.js + inspector.js
+net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 shell-quest/            split by job (below)
 tests/                  engine tests (Node; shell/, ds/ and net/), browser smoke + golden tests (Playwright)
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
