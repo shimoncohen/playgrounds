@@ -50,7 +50,7 @@ const askBox=$('#answerBox'),askText=$('#askText'),askIn=$('#answer'),afb=$('#af
 let net=null,dev=null,lines=[],groups=[],ran=false,won=false,asking=false,selEntry=null;
 const term=NQUI.terminal({screen:$('#screen'),input:cmdIn,form:$('#cmdline'),prompt:$('#prompt'),onRun:runLine});
 const insp=NQUI.inspector({list:$('#inspector'),detail:$('#pdetail'),onSelect:e=>{selEntry=e;drawMap();}});
-const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.dev,iface:selEntry.iface}:null);};
+const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.dev,iface:selEntry.iface}:null,dev);};
 // the network a session runs on: the mission's own, or on a chapter's finish page the last mission's, to play in
 const sessionMission=()=>curMission()||CH[S.ch].missions[CH[S.ch].missions.length-1];
 function startSession(){

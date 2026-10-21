@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'net-quest');
 export const FILES = ['engine/ip.js', 'engine/packets.js', 'engine/topology.js', 'engine/sim.js', 'engine/shell.js',
-  'engine/cmds-ip.js', 'engine/cmds-net.js', 'content/model.js', 'content/ch-1-layers.js', 'content/ch-2-mac-arp.js', 'content/ch-3-ip-addressing.js', 'content/extras.js'];
+  'engine/cmds-ip.js', 'engine/cmds-net.js', 'content/model.js', 'content/ch-1-layers.js', 'content/ch-2-mac-arp.js', 'content/ch-3-ip-addressing.js', 'content/ch-4-routing.js', 'content/extras.js'];
 
 export function loadNet() {
   const sandbox = {};

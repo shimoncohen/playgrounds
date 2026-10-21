@@ -1628,6 +1628,45 @@ test('net-quest: terminal output is text, never markup', async () => {
   await ctx.close();
 });
 
+test('net-quest: chapter 4 plays through the page, on the printer and on r1, and the map marks the terminal device as (you)', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const steps = [
+      [['ip route'], '192.168.1.1', 'laptop'],
+      [['ip route add default via 192.168.1.1', 'ping -c 1 172.16.0.10'], null, 'printer'],
+      [['ip route del default', 'ip route add default via 192.168.1.1', 'ping -c 1 172.16.0.10'], null, 'laptop'],
+      [['traceroute 172.16.0.10'], '10.0.1.2', 'laptop'],
+      [['ip route add 172.16.0.0/24 via 10.0.1.2', 'ping -c 1 172.16.0.10'], null, 'r1'],
+      [['traceroute 8.8.8.8'], '10.0.1.1', 'laptop']];
+    await page.click('#chapters .chap[data-ch="3"]');
+    for (const [i, [lines, answer, dev]] of steps.entries()) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      assert.match(await page.textContent('#prompt'), new RegExp('^' + dev + ':'), `mission ${i + 1} prompt`);
+      const you = await page.locator('#diagram .dg-list li', { hasText: '(you)' }).allTextContents();
+      assert.equal(you.length, 1, 'exactly one device is marked (you)');
+      assert.match(you[0], new RegExp('^' + dev + ' '), `mission ${i + 1}: the map marks ${dev}`);
+      assert.match(await page.getAttribute('#diagram svg', 'aria-label'), /Network map/);
+      assert.equal(await page.locator('#diagram svg text.dg-id', { hasText: '(you)' }).count(), 1);
+      assert.match(await page.locator('#diagram svg text.dg-id', { hasText: '(you)' }).textContent(), new RegExp('^' + dev + ' '));
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), (i + 1) * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 6);
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view after the traceroute loop`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('net-quest: layout at 390px', async () => {
   for (const width of [390, 360]) {
     const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });

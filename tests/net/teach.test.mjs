@@ -33,6 +33,17 @@ const FIRST = {
   public: [/\bpublic\b/i, 2, 3],
   'duplicate address': [/\bduplicate\b|\bshare an address/i, 2, 4],
   '/31': [/\/31\b/, 2, 5],
+  'routing table': [/routing table/i, 3, 0],
+  'default route': [/default route/i, 3, 0],
+  gateway: [/\bgateway/i, 3, 0],
+  'ip route': [/ip route\b/, 3, 0],
+  'ip route add': [/route add/, 3, 1],
+  'ip route del': [/route del/, 3, 2],
+  traceroute: [/traceroute/, 3, 3],
+  hop: [/\bhops?\b/i, 3, 3],
+  'TTL expiry': [/TTL expiry|time exceeded/i, 3, 3],
+  'static route': [/static route/i, 3, 4],
+  'routing loop': [/routing loop/i, 3, 5],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -105,6 +116,43 @@ describe('chapter 3 defines its new words in place', () => {
   it('duplicate address is defined in 3.5', () => assert.match(card(4), /<b>duplicate address<\/b>/));
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[2].intro)));
+  });
+});
+
+describe('chapter 4 does not use words that chapter 5 teaches', () => {
+  // NAT, address translation and the public side of the internet come in chapter 5 ("public" and "private" were taught in chapter 3)
+  const LATER = /\bNAT\b|\bnat\b|translat|masquerad|\bISP\b|port forward|dropPrivate/i;
+  NQ.CH[3].missions.forEach((m, i) => it(`4.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[3].intro))));
+});
+
+describe('chapter 4 defines its new words in place', () => {
+  const card = (i) => NQ.CH[3].missions[i].goal + ' ' + NQ.CH[3].missions[i].how.join(' ');
+  it('routing table, route, default route and gateway are defined where ip route first appears (4.1)', () => {
+    assert.match(card(0), /<b>routing table<\/b>/);
+    assert.match(card(0), /<b>route<\/b>/);
+    assert.match(card(0), /<b>default route<\/b>/);
+    assert.match(card(0), /<b>gateway<\/b>/);
+  });
+  it('add and del are explained as they first appear (4.2, 4.3)', () => {
+    assert.match(plain(card(1)), /add puts a new route/);
+    assert.match(card(2), /short for delete/);
+  });
+  it('hop and TTL expiry are defined where traceroute first appears (4.4), and time exceeded is explained', () => {
+    assert.match(card(3), /<b>hop<\/b>/);
+    assert.match(card(3), /<b>TTL expiry<\/b>/);
+    assert.match(card(3), /time exceeded/);
+  });
+  it('static route is defined in 4.5, routing loop in 4.6', () => {
+    assert.match(card(4), /<b>static route<\/b>/);
+    assert.match(card(5), /<b>routing loop<\/b>/);
+  });
+  it('the terminal device is announced wherever it is not the laptop (4.2, 4.5)', () => {
+    assert.match(card(1), /runs <b>on the printer<\/b>/);
+    assert.match(card(4), /runs <b>on r1<\/b>/);
+  });
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[3].intro)));
   });
 });
 

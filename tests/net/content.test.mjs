@@ -342,6 +342,118 @@ describe('chapter 3: lazy answers are caught', () => {
   });
 });
 
+describe('chapter 4: lazy answers are caught', () => {
+  const m = (i) => NQ.CH[3].missions[i];
+  const run = (i, lines, a, mm = m(i)) => NQ.runMission(mm, lines, a);
+  const DEF = (via) => `ip route add default via ${via}`;
+  it('has six missions on the office network, with the terminal on the printer (2) and r1 (5)', () => {
+    assert.equal(NQ.CH[3].name, 'Routing and the gateway');
+    assert.deepEqual([...NQ.CH[3].missions.map((x) => x.scenario)], Array(6).fill('office'));
+    assert.deepEqual([...NQ.CH[3].missions.map((x) => x.dev)], [undefined, 'printer', undefined, undefined, 'r1', undefined]);
+  });
+  it('1: reading the table, then the computed gateway; a guess, another address or no ip route do not pass', () => {
+    assert.equal(solve(m(0)).expect, '192.168.1.1');
+    for (const l of ['ip route', 'ip r', 'ip route show', 'ip route list']) assert.equal(run(0, [l], '192.168.1.1'), true, l);
+    assert.equal(run(0, ['ip route'], ' 192.168.1.1. '), true);
+    assert.equal(run(0, ['ip route'], ''), NQ.ASK);
+    for (const a of ['192.168.1.10', '192.168.1.0/24', '10.0.1.1', '10.0.1.2', 'default', 'r1', '192.168.1']) assert.notEqual(run(0, ['ip route'], a), true, a);
+    for (const lines of [[], ['ip addr'], ['ip neigh'], ['traceroute 172.16.0.10'], ['ip route add default via 192.168.1.1']]) assert.notEqual(run(0, lines, '192.168.1.1'), true, lines.join(' ; '));
+  });
+  it('1: the answer is computed from the laptop\'s default route', () => {
+    const net = NQ.createNet('office');
+    net.exec('ip route del default', 'laptop'); net.exec('ip route add default via 192.168.1.77', 'laptop');
+    assert.equal(m(0).question.expect(NQ.makeCtx(net, [], null)), '192.168.1.77');
+    net.exec('ip route del default', 'laptop');
+    assert.equal(m(0).question.expect(NQ.makeCtx(net, [], null)), '');
+  });
+  it('2: the printer starts with no route off its wire, and a default route via the router repairs it', () => {
+    const net = NQ.createNet('office', m(1).setup);
+    assert.equal(net.exec('ping -c 1 172.16.0.10', 'printer').code, 2);
+    assert.match(net.exec('ping -c 1 172.16.0.10', 'printer').err.join(' '), /Network is unreachable/);
+    assert.equal(run(1, m(1).answer), true);
+    assert.equal(run(1, [DEF('192.168.1.1')]), true);
+  });
+  it('2: nothing, a ping, the laptop as gateway, a route to the server only, or the fix on another device do not pass', () => {
+    for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route'], [DEF('192.168.1.10')], [DEF('192.168.1.99')], ['ip route add 172.16.0.0/24 via 192.168.1.1'], ['ip route add 10.0.1.0/30 via 192.168.1.1'],
+      [DEF('192.168.1.1'), 'ip link set eth0 down'], ['ip route add default dev eth0']])
+      assert.notEqual(run(1, lines), true, lines.join(' ; '));
+    assert.notEqual(run(1, [DEF('192.168.1.1')], undefined, { ...m(1), dev: 'laptop' }), true, 'wrong device (it already has a default route)');
+    assert.notEqual(run(1, [DEF('10.0.1.1')], undefined, { ...m(1), dev: 'r1' }), true, 'wrong device (a router)');
+    assert.match(run(1, []), /no default route/);
+    assert.match(run(1, [DEF('192.168.1.10')]), /not the office router/);
+  });
+  it('3: the laptop starts with a gateway nobody owns, and the ARP request asks for the gateway, not the server', () => {
+    const net = NQ.createNet('office', m(2).setup), r = net.exec('ping -c 1 172.16.0.10', 'laptop');
+    assert.equal(r.code, 1);
+    assert.match(r.out.join('\n'), /Destination Host Unreachable/);
+    const arp = r.entries.find((e) => e.dev === 'laptop' && e.dir === 'tx' && e.packet.layers.some((l) => l.name === 'ARP'));
+    assert.equal(arp.packet.layers.find((l) => l.name === 'ARP').fields.tpa, '192.168.1.2');
+    assert.equal(run(2, m(2).answer), true);
+    assert.equal(run(2, ['ip route del default', DEF('192.168.1.1')]), true);
+  });
+  it('3: nothing, a ping, deleting only, another bad or taken gateway, a route for the server only, or the fix on another device do not pass', () => {
+    for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route del default'], ['ip route del default', DEF('192.168.1.2')], ['ip route del default', DEF('192.168.1.20')], ['ip route del default', DEF('192.168.1.10')],
+      ['ip route del default', DEF('10.0.1.2')], ['ip route add 172.16.0.0/24 via 192.168.1.1'], ['ip route add 172.16.0.0/24 via 192.168.1.1', 'ping -c 1 172.16.0.10'],
+      ['ip route del default', DEF('192.168.1.1'), 'ip link set eth0 down'], ['ip route del 172.16.0.0/24']])
+      assert.notEqual(run(2, lines), true, lines.join(' ; '));
+    assert.notEqual(run(2, ['ip route del default', DEF('192.168.1.1')], undefined, { ...m(2), dev: 'printer' }), true, 'the printer is the wrong device');
+    assert.notEqual(run(2, ['ip route del default', DEF('192.168.1.1')], undefined, { ...m(2), dev: 'r1' }), true, 'r1 is the wrong device');
+    assert.match(run(2, ['ip route del default']), /no default route/);
+    assert.match(run(2, []), /ARP request asks for the gateway/);
+  });
+  it('4: traceroute to the server, then the computed address of hop 2; other traces, other hops and a wrong or missing answer do not pass', () => {
+    assert.equal(solve(m(3)).expect, '10.0.1.2');
+    assert.equal(run(3, ['traceroute 172.16.0.10'], '10.0.1.2'), true);
+    assert.equal(run(3, ['ping -c 1 172.16.0.10', 'traceroute 172.16.0.10', 'ip route'], ' 10.0.1.2. '), true);
+    assert.equal(run(3, ['traceroute 172.16.0.10'], ''), NQ.ASK);
+    for (const a of ['192.168.1.1', '172.16.0.10', '10.0.1.1', '172.16.0.1', 'r2', '2', '10.0.1']) assert.notEqual(run(3, ['traceroute 172.16.0.10'], a), true, a);
+    for (const lines of [[], ['ping -c 1 172.16.0.10'], ['traceroute 192.168.1.1'], ['traceroute 8.8.8.8'], ['traceroute'], ['traceroute 172.16.0.10 8.8.8.8']]) assert.notEqual(run(3, lines, '10.0.1.2'), true, lines.join(' ; '));
+    assert.match(run(3, ['traceroute 172.16.0.10'], 'nope'), /Not quite/);
+  });
+  it('4: the answer is computed from the trace, so a changed network changes it', () => {
+    const ctx = (setup, lines) => { const net = NQ.createNet('office', setup), history = lines.map((line) => { const r = net.exec(line); return { line, code: r.code, entries: r.entries }; }); return NQ.makeCtx(net, history, null); };
+    const re = [{ dev: 'r2', cmd: 'ip addr del 10.0.1.2/30 dev eth0' }, { dev: 'r2', cmd: 'ip addr add 10.0.1.2/30 dev eth0' }];
+    assert.equal(m(3).question.expect(ctx(re, ['traceroute 172.16.0.10'])), '10.0.1.2');
+    assert.equal(m(3).question.expect(ctx([], [])), '');
+  });
+  it('5: r1 starts without a route to the server\'s network, and a static route via r2 repairs it', () => {
+    const net = NQ.createNet('office', m(4).setup);
+    assert.equal(net.exec('ping -c 1 172.16.0.10', 'r1').code, 2);
+    assert.match(net.exec('ping -c 1 172.16.0.10', 'laptop').out.join('\n'), /From 192\.168\.1\.1 icmp_seq=1 Destination Net Unreachable/);
+    assert.equal(run(4, m(4).answer), true);
+    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2']), true);
+    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2 dev eth1']), true);
+  });
+  it('5: nothing, a ping, a default route, a route to another subnet or gateway, or the fix on another device do not pass', () => {
+    for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route'], [DEF('10.0.1.2')], ['ip route add 172.16.1.0/24 via 10.0.1.2'], ['ip route add 172.16.0.0/24 via 192.168.1.20'], ['ip route add 172.16.0.0/24 via 192.168.1.10'],
+      ['ip route add 10.0.0.0/8 via 10.0.1.2'], ['ip route add 172.16.0.0/24 via 10.0.1.2', 'ip link set eth1 down'], ['ip route add 172.16.0.0/16 via 10.0.1.2', 'ip route add 172.16.0.0/24 via 192.168.1.20']])
+      assert.notEqual(run(4, lines), true, lines.join(' ; '));
+    assert.notEqual(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2'], undefined, { ...m(4), dev: 'r2' }), true, 'r2 is the wrong device');
+    assert.notEqual(run(4, ['ip route add 172.16.0.0/24 via 192.168.1.1'], undefined, { ...m(4), dev: 'printer' }), true, 'the printer is the wrong device');
+    assert.match(run(4, [DEF('10.0.1.2')]), /catch-all/);
+    assert.match(run(4, []), /no route that covers the server/);
+  });
+  it('6: a loop, traceroute to an outside address, then the address on hops 3 and 5; the server trace, a wrong address or no trace do not pass', () => {
+    const net = NQ.createNet('office', m(5).setup);
+    assert.equal(solve(m(5)).expect, '10.0.1.1');
+    const t = NQ.sim.traceroute(net.clone(), 'laptop', '8.8.8.8');
+    assert.equal(t.hops.length, 30, 'the sim stops the loop by TTL and traceroute by its hop limit');
+    assert.ok(t.hops.every((h) => !h.reached) && t.hops.every((h) => h.from));
+    for (const target of ['8.8.8.8', '1.1.1.1', '203.0.113.9']) assert.equal(run(5, [`traceroute ${target}`], '10.0.1.1'), true, target);
+    assert.equal(run(5, ['traceroute 8.8.8.8'], ' 10.0.1.1. '), true);
+    assert.equal(run(5, ['traceroute 8.8.8.8'], ''), NQ.ASK);
+    for (const a of ['10.0.1.2', '192.168.1.1', '172.16.0.1', '8.8.8.8', 'r1', '3', '5']) assert.notEqual(run(5, ['traceroute 8.8.8.8'], a), true, a);
+    for (const lines of [[], ['ping -c 1 8.8.8.8'], ['traceroute 172.16.0.10'], ['traceroute 192.168.1.1'], ['traceroute 172.16.0.99'], ['ip route']]) assert.notEqual(run(5, lines, '10.0.1.1'), true, lines.join(' ; '));
+    assert.match(run(5, ['traceroute 172.16.0.10'], '10.0.1.1'), /does not loop/);
+  });
+  it('6: without the loop the same trace does not pass, so the check reads the network and not the typed line', () => {
+    assert.notEqual(run(5, ['traceroute 8.8.8.8'], '10.0.1.1', { ...m(5), setup: [] }), true);
+  });
+  it('the repair missions (2, 3 and 5) do not pass on their broken starting networks', () => {
+    for (const i of [1, 2, 4]) assert.notEqual(run(i, []), true, String(i + 1));
+  });
+});
+
 // Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
