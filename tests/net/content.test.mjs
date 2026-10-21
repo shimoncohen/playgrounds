@@ -154,6 +154,85 @@ describe('chapter 1: the two card missions', () => {
   });
 });
 
+describe('chapter 2: lazy answers are caught', () => {
+  const m = (i) => NQ.CH[1].missions[i];
+  const run = (i, lines, a) => NQ.runMission(m(i), lines, a);
+  const P1 = 'ping -c 1 10.0.0.3', DEL = 'ip neigh del 10.0.0.3 dev eth0', ADD = (mac) => `ip neigh add 10.0.0.3 lladdr ${mac} dev eth0`;
+  it('has five missions on the expected scenarios', () => {
+    assert.equal(NQ.CH[1].name, 'MAC and ARP');
+    assert.deepEqual([...NQ.CH[1].missions.map((x) => x.scenario)], ['pair', 'pair', 'pair', 'pair', 'office']);
+  });
+  it('1: two pings, the first asking and the second not', () => {
+    assert.equal(run(0, [P1, P1]), true);
+    assert.equal(run(0, ['ping 10.0.0.3', 'ping 10.0.0.3']), true);
+    assert.equal(run(0, [P1, 'ip neigh', P1]), true);
+  });
+  it('1: one ping, no ping, a ping at nobody or a ping at yourself do not pass', () => {
+    for (const lines of [[], [P1], ['arping 10.0.0.3'], ['ping -c 1 10.0.0.9', 'ping -c 1 10.0.0.9'], ['ping -c 1 10.0.0.2', 'ping -c 1 10.0.0.2']]) assert.notEqual(run(0, lines), true, lines.join(' ; '));
+  });
+  it('1: arping first leaves no ARP to see, and a delete in between makes the last ping ask again', () => {
+    assert.match(run(0, ['arping 10.0.0.3', P1, P1]), /Reset scenario/);
+    assert.match(run(0, [P1, DEL, P1]), /another ARP request/);
+  });
+  it('2: ping, delete, ping again', () => {
+    assert.equal(run(1, m(1).answer), true);
+    assert.equal(run(1, ['arping 10.0.0.3', DEL, 'ping 10.0.0.3']), true);
+    assert.equal(run(1, [P1, 'ip neighbor delete 10.0.0.3 dev eth0', P1]), true);
+  });
+  it('2: no delete, a delete with nothing to delete, or no ping afterwards do not pass', () => {
+    for (const lines of [[], [P1, P1], [DEL, P1], [P1, DEL], [P1, DEL, 'ping -c 1 10.0.0.2'], [P1, DEL, 'arping 10.0.0.3', P1], [P1, 'ip neigh del 10.0.0.9 dev eth0', P1]])
+      assert.notEqual(run(1, lines), true, lines.join(' ; '));
+    assert.match(run(1, [P1, P1]), /ip neigh del/);
+  });
+  it('3: a made-up static entry passes with the loss the ping reports', () => {
+    assert.equal(run(2, m(2).answer, '100%'), true);
+    assert.equal(run(2, [ADD('02:00:00:00:00:77')], '100'), true);
+    assert.equal(run(2, [ADD('02:00:00:00:00:99'), 'ping 10.0.0.3'], '100%'), true);
+  });
+  it('3: no entry, the phone\'s real MAC, a broadcast MAC, another address or a wrong number do not pass', () => {
+    assert.notEqual(run(2, [], '100%'), true);
+    assert.notEqual(run(2, [P1], '100%'), true);
+    assert.notEqual(run(2, ['arping 10.0.0.3', 'ip neigh'], '100%'), true);
+    assert.notEqual(run(2, [ADD('02:00:00:00:00:02')], '100%'), true);
+    assert.match(run(2, [ADD('02:00:00:00:00:02')], '100%'), /real MAC/);
+    assert.match(run(2, [ADD('ff:ff:ff:ff:ff:ff')], '100%'), /still reaches/);
+    assert.notEqual(run(2, ['ip neigh add 10.0.0.9 lladdr 02:00:00:00:00:99 dev eth0'], '100%'), true);
+    assert.notEqual(run(2, m(2).answer, '0%'), true);
+    assert.notEqual(run(2, m(2).answer, '0'), true);
+    assert.equal(run(2, m(2).answer, ''), NQ.ASK);
+  });
+  it('3: the entry really breaks the ping, and the learner\'s own net is not touched by the check', () => {
+    const net = NQ.createNet('pair');
+    net.exec(ADD('02:00:00:00:00:99'));
+    const r = net.exec('ping -c 1 10.0.0.3');
+    assert.equal(r.code, 1);
+    assert.match(r.out.join('\n'), /100% packet loss/);
+  });
+  it('4: the starter is broken, and deleting or rewriting the entry repairs it', () => {
+    const net = NQ.createNet('pair', m(3).setup);
+    assert.equal(net.exec('ping -c 1 10.0.0.3').code, 1);
+    assert.equal(run(3, [DEL, P1]), true);
+    assert.equal(run(3, [DEL]), true);
+    assert.equal(run(3, [ADD('02:00:00:00:00:02')]), true);
+    assert.equal(run(3, ['arping 10.0.0.3', DEL, 'ping 10.0.0.3']), true);
+  });
+  it('4: doing nothing, looking, a broadcast entry or a downed card do not pass', () => {
+    for (const lines of [[], ['ip neigh'], ['arping 10.0.0.3'], [P1], [ADD('ff:ff:ff:ff:ff:ff'), P1], [ADD('02:00:00:00:00:98')], ['ip link set eth0 down', DEL]])
+      assert.notEqual(run(3, lines), true, lines.join(' ; '));
+    assert.match(run(3, [ADD('ff:ff:ff:ff:ff:ff')]), /does not have/);
+  });
+  it('5: the switch must have flooded the ARP request and forwarded what followed', () => {
+    assert.equal(run(4, m(4).answer, 'sw1'), true);
+    assert.equal(run(4, ['arping 192.168.1.20'], 'SW1'), true);
+    assert.equal(run(4, ['ping -c 1 192.168.1.1'], 'sw1'), true);
+    assert.equal(run(4, [...m(4).answer, 'traceroute 192.168.1.20'], 'sw1.'), true);
+  });
+  it('5: no ping, a ping to yourself, a wrong device or a guess do not pass', () => {
+    for (const lines of [[], ['ping -c 1 192.168.1.10'], ['ip addr'], ['ping -c 1 192.168.1.99']]) assert.notEqual(run(4, lines, 'sw1'), true, lines.join(' ; '));
+    for (const a of ['r1', 'printer', 'laptop', 'switch', 'sw2']) assert.notEqual(run(4, m(4).answer, a), true, a);
+  });
+});
+
 // Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
