@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const {CH,RANKS,QF,GUIDE,DEMOS,run:runCode,makeCtx,tipFor}=DSQ;
+const {CH,RANKS,QF,GUIDE,DEMOS,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
 const KEY='ds-quest-v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -192,10 +192,15 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='Arrow
 /* ---------- quick-fire ---------- */
 const fStage=$('#fStage');let fireOn=false,fT=0,fLeft=75,fScore=0,fStreak=0,fQ=null,fDeck=[],fMiss=[],fLocked=false;
 function setStats(){$('#fScore').textContent=fScore;$('#fStreak').textContent=fStreak;$('#fBest').textContent=S.best;$('#fTime').textContent=fLeft;$('#fTimer').style.width=(fLeft/75*100)+'%'}
-function fireIdle(){const ex=QF[1];fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Example round</span><pre class="snippet">${highlight(ex.c)}</pre><p class="note" style="margin:0">Pick the output: <code>3</code>, <code>4</code> or <code>5</code>? The answer is <code>4</code>. ${esc(ex.why)}</p></div>
+function fireIdle(){const open=qfOpen(S.done);
+  if(!open.length){fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Locked for now</span><p class="explain" style="margin:0">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first questions open up. Each later chapter you finish adds more.</p></div>
+  <div class="actions"><button class="btn" id="fGo">Go to the quest</button></div>`;setStats();return}
+  const ex=QF[1],more=open.length<QF.length;
+  fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Example round</span><pre class="snippet">${highlight(ex.c)}</pre><p class="note" style="margin:0">Pick the output: <code>3</code>, <code>4</code> or <code>5</code>? The answer is <code>4</code>. ${esc(ex.why)}</p></div>
+  ${more?`<p class="note" style="margin:0">${open.length} of ${QF.length} questions are open. Finish more chapters to unlock the rest.</p>`:''}
   <div class="actions"><button class="btn" id="fStart">Start the clock</button><span class="note" style="align-self:center">Keys <kbd>1</kbd>–<kbd>4</kbd> pick an answer.</span></div>`;setStats()}
 function answerOf(q){if(q.ans===undefined)q.ans=runCode(q.c).out;return q.ans}
-function nextQ(){if(!fDeck.length)fDeck=QF.map((_,i)=>i).sort(()=>Math.random()-.5);fQ=QF[fDeck.pop()];const ans=answerOf(fQ);
+function nextQ(){if(!fDeck.length)fDeck=qfOpen(S.done).sort(()=>Math.random()-.5);fQ=fDeck.pop();const ans=answerOf(fQ);
   const opts=[ans,...fQ.w.filter(w=>w!==ans).slice(0,3)].sort(()=>Math.random()-.5);fQ.opts=opts;fLocked=false;
   fStage.innerHTML=`<div class="task">What does this print?</div><pre class="snippet">${highlight(fQ.c)}</pre><div class="opts">${opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><pre>${esc(o)}</pre></button>`).join('')}</div>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fStop">End round</button></div>`;fStage.querySelector('.opt').focus({preventScroll:true})}
@@ -204,12 +209,12 @@ function pick(i){if(!fireOn||fLocked||!fQ)return;fLocked=true;const ans=fQ.ans,o
   if(ok){fStreak++;const pts=10+Math.min(fStreak-1,5)*2;fScore+=pts;fb.className='fb good';fb.textContent=`Correct! +${pts}${fStreak>1?` (streak ${fStreak})`:''}`}
   else{fStreak=0;fMiss.push(fQ);fb.className='fb bad';fb.textContent='Not this time. '+fQ.why}
   setStats();setTimeout(()=>{if(fireOn)nextQ()},ok?650:2200)}
-function startFire(){fireOn=true;fLeft=75;fScore=0;fStreak=0;fMiss=[];setStats();nextQ();clearInterval(fT);fT=setInterval(()=>{fLeft--;setStats();if(fLeft<=0)stopFire()},1000)}
+function startFire(){if(!qfOpen(S.done).length){fireIdle();return}fDeck=[];fireOn=true;fLeft=75;fScore=0;fStreak=0;fMiss=[];setStats();nextQ();clearInterval(fT);fT=setInterval(()=>{fLeft--;setStats();if(fLeft<=0)stopFire()},1000)}
 function stopFire(silent){if(!fireOn)return;fireOn=false;clearInterval(fT);if(silent){fireIdle();return}if(fScore>S.best){S.best=fScore;save()}setStats();
   fStage.innerHTML=`<div class="task">Round over: ${fScore} points</div><p class="note" style="margin:0">${fScore>=S.best&&fScore>0?'That is your best score so far.':`Your best is ${S.best}.`}</p>
   ${fMiss.length?`<div><p class="explain" style="margin:0 0 8px"><b>Review these:</b></p><ul class="misses">${fMiss.map((q,i)=>`<li><pre class="snippet">${highlight(q.c)}</pre><div class="row"><span>Prints <code>${esc(q.ans)}</code></span><span class="note">${esc(q.why)}</span><button class="try" data-miss="${i}">Try it</button></div></li>`).join('')}</ul></div>`:'<p class="explain" style="margin:0">No misses. Excellent reading.</p>'}
   <div class="actions"><button class="btn" id="fStart">Play again</button></div>`}
-fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='fStart')startFire();else if(b.id==='fStop')stopFire();else if(b.dataset.i!==undefined)pick(+b.dataset.i);else if(b.dataset.miss!==undefined)goFree(fMiss[+b.dataset.miss].c)});
+fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='fStart')startFire();else if(b.id==='fGo')showTab('quest');else if(b.id==='fStop')stopFire();else if(b.dataset.i!==undefined)pick(+b.dataset.i);else if(b.dataset.miss!==undefined)goFree(fMiss[+b.dataset.miss].c)});
 document.addEventListener('keydown',e=>{if(!fireOn||$('#tab-fire').hidden)return;if(/^[1-4]$/.test(e.key)){e.preventDefault();pick(+e.key-1)}});
 
 /* ---------- field guide ---------- */
@@ -217,7 +222,7 @@ function exViz(c){const r=runCode(c);const h=varsHTML(r);const out=r.lines.lengt
   return h||out?`<div class="exviz" role="group" aria-label="What this code builds">${h}${out}</div>`:''}
 function exHTML(g){return `<div class="ex">${g.ex.map(([c,n])=>`<div class="exrow"><pre class="snippet">${highlight(c)}</pre>${exViz(c)}<div class="meta">${n?`<small>// ${esc(n)}</small>`:''}<button class="try" data-code="${esc(c)}">Try it</button></div></div>`).join('')}</div>`}
 const PICK=[['Array','a numbered row','read by position, add and remove at the end','array[i], push, pop'],['Stack','a pile of plates','undo, back button, matching brackets','push, pop, peek'],['Queue','a line at the shop','fair turns, jobs waiting to run','enqueue, dequeue'],['Linked list','a chain of nodes','add or remove at the front, walk in order','head, next'],['Map','labelled boxes','look something up by a key','set, get, has'],['Set','a bag of unique things','"seen it before?" and removing duplicates','add, has'],['Binary search tree','a branching decision','keeping values sorted and searching fast','insert, contains']];
-const COST=[['Read array[i]','instant'],['Push or pop at the end','instant'],['Shift from the front of an array','slow for big arrays: everything moves'],['Add at the front of a linked list','instant'],['Find a value in a linked list','walk the chain: time grows with its length'],['Map or Set lookup','almost instant'],['Search a balanced tree','halves the work each step']];
+const COST=[['Read array[i]','instant'],['Push or pop at the end','instant'],['Shift from the front of an array','slow for big arrays: everything moves'],['Add at the front of a linked list','instant'],['Find a value in a linked list','walk the chain: time grows with its length'],['Map or Set lookup','almost instant'],['Search a search tree that is not lopsided','halves the work each step']];
 function renderGuide(){const groups=CH.map(c=>c.name);
   $('#guide').innerHTML=`<div><h2>Field guide</h2><p class="lede">Everything from the quest on one page. Every example has a Try it button that opens it in the editor and runs it, so you can see the structure.</p></div>
   <section class="gsec"><h3>Which structure when?</h3><div class="panel" style="padding:6px 10px;overflow-x:auto"><table class="gtable"><thead><tr><th>Structure</th><th>Think of</th><th>Use it for</th><th>Main actions</th></tr></thead><tbody>${PICK.map(r=>`<tr>${r.map((x,i)=>`<td>${i===0?'<b>'+esc(x)+'</b>':esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>

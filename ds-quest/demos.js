@@ -11,7 +11,7 @@ const idxs=n=>Array.from({length:n},(_,i)=>({i}));
 
 /* ---------- arrays ---------- */
 const ARRAY={id:'array',ch:0,title:'Array: a row of numbered boxes',name:'row',
- about:'Boxes sit side by side and are numbered from 0. Reading box <code>i</code> is instant. Adding or removing at the <b>end</b> is cheap. At the <b>front</b>, everything has to shuffle along.',
+ about:'Boxes sit side by side and are numbered from 0. Reading box <code>i</code> is instant. Adding or removing at the <b>end</b> is cheap. At the <b>front</b>, everything has to shuffle along: <code>unshift</code> and <code>shift</code> add and remove there (like <code>push</code> and <code>pop</code> do at the end), and <code>indexOf(x)</code> searches for <code>x</code> and gives its box number, or -1 if it is missing.',
  init:()=>[4,8,2],
  ops:[
   {label:'push',run:s=>{if(s.v.length>=10)return full(10,'boxes');const n=rnd(1,9);s.v.push(n);return {code:`row.push(${n});`,say:`<b>push</b> drops ${n} into a new box at the end. No other box moves, so it is quick.`,hi:[{i:s.v.length-1}]}}},
