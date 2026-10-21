@@ -61,7 +61,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 /* chapters rail */
 .chapters{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
 @media (min-width:820px){.chapters{display:grid;grid-template-columns:1fr;overflow:visible;gap:2px}}
-.chap{display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:6px 10px;border-radius:9px;flex:0 0 auto;color:var(--muted)}
+.chap{display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:6px 10px;border-radius:9px;flex:0 0 auto;position:relative;color:var(--muted)}
 .chap:hover{background:var(--surface-2)}
 .chap[aria-current="true"]{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
 .chap .num{font-family:var(--font-mono);font-size:12px;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;background:var(--surface-2);color:var(--ink);flex:none}
