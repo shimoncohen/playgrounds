@@ -399,13 +399,13 @@ const CH=[
   anat:[['score','name'],['=','op'],['score + 10','val']],
   explain:'Read it right to left: work out <code>score + 10</code> first, then put the result back in the box. The box flashes in Memory when its value changes.',
   check:c=>c.ok&&/score\s*=\s*score\s*\+/.test(c.src)},
- {title:'The shortcut',goal:'Add 5 more with the shorthand operator.',code:'score += 5',need:['score'],pre:'let score = 10',
+ {title:'The shortcut',goal:'Add 5 more with a shorthand symbol (an operator is a symbol that does something to values).',code:'score += 5',need:['score'],pre:'let score = 10',
   anat:[['score','name'],['+=','op'],['5','val']],
   explain:'<code>score += 5</code> is short for <code>score = score + 5</code>. There are also <code>-=</code>, <code>*=</code> and <code>/=</code>.',
   check:c=>c.ok&&/score\s*\+=/.test(c.src)},
  {title:'Count up by one',goal:'Use ++ to add exactly one.',code:'score++',need:['score'],pre:'let score = 15',
   anat:[['score','name'],['++','op']],
-  explain:'<code>++</code> adds one and <code>--</code> takes one away. You will see these all the time in loops.',
+  explain:'<code>++</code> adds one and <code>--</code> takes one away. Later you will use them to repeat things automatically.',
   check:c=>c.ok&&/(score\s*\+\+|\+\+\s*score)/.test(c.src)},
  {title:'A box that never changes',goal:'Store a player name with const.',code:'const player = "Ada"',
   anat:[['const','kw'],['player','name'],['=','op'],['"Ada"','val']],
@@ -413,7 +413,7 @@ const CH=[
   check:c=>c.kind('player')==='const'},
  {title:'Try to break the lock',goal:'Try to give player a new value. This one is supposed to fail.',code:'player = "Bob"',need:['player'],pre:'const player = "Ada"',expectError:true,
   anat:[['player','name'],['=','op'],['"Bob"','val']],
-  explain:'Red text is not a disaster. It is JavaScript explaining what went wrong. <code>TypeError: Assignment to constant variable</code> means exactly what it says. Reading error messages is a real skill. You just practised it.',
+  explain:'Red text is not a disaster. It is JavaScript explaining what went wrong. <code>TypeError</code> is one kind of error, and <code>Assignment to constant variable</code> means exactly what it says. Reading error messages is a real skill. You just practised it.',
   check:c=>c.err&&c.err.name==='TypeError'&&/constant/i.test(c.err.message)},
  {title:'Fill in the blanks',goal:'Build a sentence with a template string. Use backticks, not quotes.',code:'`${player} has ${score} points`',need:['player','score'],pre:'const player = "Ada"\nlet score = 16',
   anat:[['`','op'],['${player}','name'],[' has ','val'],['${score}','name'],[' points`','val']],
@@ -443,19 +443,19 @@ const CH=[
   check:c=>c.has('mystery')&&c.val('mystery')===undefined},
  {title:'Truthy and falsy',goal:'Ask `Boolean()` whether an empty string counts as true.',code:'Boolean("")',
   anat:[['Boolean','fn'],['("")','val']],
-  explain:'Only six values count as false: <code>false</code>, <code>0</code>, <code>""</code>, <code>null</code>, <code>undefined</code> and <code>NaN</code>. Everything else is <b>truthy</b>, even <code>"0"</code> and <code>"false"</code>. Try <code>Boolean("hi")</code>.',
+  explain:'Only six values count as false: <code>false</code>, <code>0</code>, <code>""</code>, <code>null</code>, <code>undefined</code> and <code>NaN</code> (short for "Not a Number": what maths gives when the numbers make no sense, like <code>Number("hi")</code>). Everything else is <b>truthy</b>, even <code>"0"</code> and <code>"false"</code>. Try <code>Boolean("hi")</code>.',
   check:c=>c.ok&&/Boolean\s*\(/.test(c.src)&&typeof c.value==='boolean'},
- {title:'And, or, not',goal:'Combine two conditions with && (and).',code:'let hasKey = true\nlet doorOpen = false\nhasKey && !doorOpen',
+ {title:'And, or, not',goal:'Combine two yes-or-no checks with `&&` (and).',code:'let hasKey = true\nlet doorOpen = false\nhasKey && !doorOpen',
   anat:[['hasKey','name'],['&&','op'],['!','op'],['doorOpen','name']],
   explain:'<code>&&</code> is true only when both sides are true. <code>||</code> is true when at least one side is. <code>!</code> flips true and false. Shift+Enter makes a new line, so you can type all three lines before running.',
   check:c=>c.ok&&/&&|\|\|/.test(c.src)&&typeof c.value==='boolean'},
  {title:'A fallback value',goal:'Use ?? to pick a default when something is missing.',code:'null ?? "Guest"',
   anat:[['null','val'],['??','op'],['"Guest"','val']],
-  explain:'<code>a ?? b</code> gives <code>a</code>, unless <code>a</code> is <code>null</code> or <code>undefined</code>. Then it gives <code>b</code>. Perfect for "use their name, or Guest if they did not give one".',
+  explain:'<code>a ?? b</code> gives <code>a</code>, unless <code>a</code> is <code>null</code> or <code>undefined</code>. Then it gives <code>b</code>. Perfect for "use their name, or Guest if they did not give one". The older <code>||</code> works as a fallback too: it hands back the right side whenever the left side is falsy. So <code>0 || "x"</code> gives <code>"x"</code>, but <code>0 ?? "x"</code> keeps the <code>0</code>.',
   check:c=>c.ok&&/\?\?/.test(c.src)},
  ]},
 {name:'Decisions',group:'JavaScript basics',badge:'Decider',mode:'js',
- intro:'Now your code can choose. An if statement runs a block of code only when a condition is true. This is where programs start feeling alive.',
+ intro:'Now your code can choose. An `if` runs a block of code (the lines between curly braces) only when its condition is true. A condition is a yes-or-no question, like `hp < 50`. This is where programs start feeling alive.',
  learned:['if','else','else if','>= <=','? :'],
  missions:[
  {title:'Set up a hero',goal:'Create a variable for health points.',code:'let hp = 30',
@@ -466,7 +466,7 @@ const CH=[
   anat:[['if','kw'],['(hp < 50)','val'],['{ … }','op']],
   explain:'The condition goes in round brackets. The code to run goes in curly braces <code>{ }</code>. Notice the console waits for the closing <code>}</code> before running: it knows the block is not finished.',
   check:c=>c.ok&&/\bif\s*\(/.test(c.src)},
- {title:'Otherwise…',goal:'Add an else branch so something prints either way.',code:'if (hp > 50) {\n  console.log("Feeling strong")\n} else {\n  console.log("Need rest")\n}',need:['hp'],pre:'let hp = 30',
+ {title:'Otherwise…',goal:'Add an `else` so something prints either way.',code:'if (hp > 50) {\n  console.log("Feeling strong")\n} else {\n  console.log("Need rest")\n}',need:['hp'],pre:'let hp = 30',
   anat:[['if (…) {…}','kw'],['else','kw'],['{…}','op']],
   explain:'Exactly one of the two blocks runs, never both. Try changing <code>hp = 80</code> and running it again.',
   check:c=>c.ok&&/\belse\b/.test(c.src)&&c.logs.length>0},
@@ -474,7 +474,7 @@ const CH=[
   anat:[['if','kw'],['else if','kw'],['else','kw']],
   explain:'JavaScript checks each condition from top to bottom and runs the <b>first</b> one that is true. The rest are skipped.',
   check:c=>c.ok&&/else\s+if/.test(c.src)},
- {title:'A one-line choice',goal:'Pick between two values with the ternary operator.',code:'hp > 50 ? "strong" : "weak"',need:['hp'],pre:'let hp = 30',
+ {title:'A one-line choice',goal:'Pick between two values on one line with `? :` (called the ternary operator).',code:'hp > 50 ? "strong" : "weak"',need:['hp'],pre:'let hp = 30',
   anat:[['hp > 50','val'],['?','op'],['"strong"','val'],[':','op'],['"weak"','val']],
   explain:'<code>condition ? a : b</code> reads as "if condition, then a, otherwise b". It gives back a value, so you can store it: <code>const mood = hp > 50 ? "😀" : "😟"</code>.',
   check:c=>c.ok&&/\?[^?]*:/.test(c.src)&&c.hasValue},
@@ -499,9 +499,9 @@ const CH=[
   anat:[['while','kw'],['(coins < 3)','val'],['{ coins++ … }','op']],
   explain:'<code>while</code> repeats as long as its condition is true. If the condition never becomes false, the loop never stops. That is an <b>infinite loop</b>, so make sure something inside changes.',
   check:c=>c.ok&&/\bwhile\s*\(/.test(c.src)},
- {title:'Visit every item',goal:'Loop over a list of fruit with for…of.',code:'for (const fruit of ["🍎", "🍌", "🍇"]) {\n  console.log("I like", fruit)\n}',
+ {title:'Visit every item',goal:'Loop over a list of fruit (the square brackets hold the list) with `for…of`.',code:'for (const fruit of ["🍎", "🍌", "🍇"]) {\n  console.log("I like", fruit)\n}',
   anat:[['for','kw'],['const fruit','name'],['of','kw'],['[…]','val']],
-  explain:'<code>for…of</code> hands you each item in turn. No counting needed. This is the loop you will use most for lists.',
+  explain:'Square brackets <code>[ ]</code> hold a <b>list</b> of items in order (its proper name is an <b>array</b>, and the next chapter is all about them). <code>for…of</code> hands you each item in turn. No counting needed. This is the loop you will use most for lists.',
   check:c=>c.ok&&/\bof\b/.test(c.src)&&c.logs.length>=2},
  {title:'Build something in a loop',goal:'Grow a row of stars, one per round.',code:'let stars = ""\nfor (let i = 0; i < 5; i++) {\n  stars += "⭐"\n}\nstars',
   anat:[['stars','name'],['+=','op'],['"⭐"','val']],
@@ -534,7 +534,7 @@ const CH=[
   check:c=>c.ok&&/bag\s*\[\s*\d+\s*\]\s*=/.test(c.src)},
  {title:'Add to the end',goal:'Push a new item onto the bag.',code:'bag.push("map")',need:['bag'],pre:'const bag = ["sword", "golden shield", "potion"]',
   anat:[['bag','name'],['.push','fn'],['("map")','val']],
-  explain:'<code>push</code> adds to the end and returns the new length. A new slot appears in Memory.',
+  explain:'<code>push</code> adds to the end and hands you back the new length. A new slot appears in Memory.',
   check:c=>c.ok&&/\.push\s*\(/.test(c.src)},
  {title:'Take from the end',goal:'Pop the last item off.',code:'bag.pop()',need:['bag'],pre:'const bag = ["sword", "golden shield", "potion", "map"]',
   anat:[['bag','name'],['.pop','fn'],['()','op']],
@@ -584,7 +584,7 @@ const CH=[
  missions:[
  {title:'Build a character',goal:'Create an object with a name, hp and level.',code:'const hero = { name: "Ada", hp: 100, level: 1 }',
   anat:[['{','op'],['name:','name'],['"Ada"','val'],['hp:','name'],['100','val'],['}','op']],
-  explain:'Curly braces make an object. Each entry is <code>key: value</code>. Memory draws it as a little table. Note the <b>#1</b> tag: that is the object\'s ID in memory. It matters soon.',
+  explain:'Curly braces make an object. Each entry is <code>key: value</code>: the key is the name, and the pair together is called a <b>property</b>. Memory draws it as a little table. Note the <b>#1</b> tag: that is the object\'s ID in memory. It matters soon.',
   check:c=>{const h=c.val('hero');return h&&typeof h==='object'&&!isArr(h)&&Object.keys(h).length>=2}},
  {title:'Read a property',goal:'Read the hero\'s name with a dot.',code:'hero.name',need:['hero'],pre:'const hero = { name: "Ada", hp: 100, level: 1 }',
   anat:[['hero','name'],['.name','fn']],
@@ -606,9 +606,9 @@ const CH=[
   anat:[['twin.hp','name'],['=','op'],['1','val'],['hero.hp','name']],
   explain:'Hero\'s hp changed too, because there is only one object. This surprises nearly every beginner, and now it will never surprise you.',
   check:c=>{const h=c.val('hero');return c.ok&&/twin\.\w+\s*=/.test(c.src)&&h&&c.val('twin')===h}},
- {title:'A real copy',goal:'Copy the hero with the spread operator.',code:'const clone = { ...hero }',need:['hero'],pre:'const hero = { name: "Ada", hp: 1, level: 2, weapon: "bow" }',
+ {title:'A real copy',goal:'Copy the hero with spread (the three dots `...`).',code:'const clone = { ...hero }',need:['hero'],pre:'const hero = { name: "Ada", hp: 1, level: 2, weapon: "bow" }',
   anat:[['{','op'],['...hero','name'],['}','op']],
-  explain:'<code>...</code> spreads all of hero\'s properties into a <b>new</b> object. Different #ID in Memory, so changes to clone leave hero alone. Works for arrays too: <code>[...bag]</code>.',
+  explain:'<code>...</code> (called <b>spread</b>) spreads all of hero\'s properties into a <b>new</b> object. Different #ID in Memory, so changes to clone leave hero alone. Works for arrays too: <code>[...bag]</code>.',
   check:c=>{const a=c.val('clone'),b=c.val('hero');return a&&b&&a!==b&&typeof a==='object'}},
  {title:'Unpack it',goal:'Pull two properties out into their own variables.',code:'const { level, weapon } = hero',need:['hero'],pre:'const hero = { name: "Ada", hp: 1, level: 2, weapon: "bow" }',
   anat:[['const','kw'],['{ level, weapon }','name'],['=','op'],['hero','name']],
@@ -649,7 +649,7 @@ const CH=[
   check:c=>c.ok&&/\.\w+\([^]*\)\s*\.\w+\(/.test(c.src)&&isArr(c.value)},
  {title:'Sort them',goal:'Sort a copy of the scores from low to high.',code:'[...scores].sort((a, b) => a - b)',need:['scores'],pre:'const scores = [12, 45, 7, 88, 23]',
   anat:[['[...scores]','name'],['.sort','fn'],['(a, b) => a - b','val']],
-  explain:'sort changes the array it is called on, so we copy first with <code>[...scores]</code>. The compare function <code>a - b</code> means low to high. Without it, sort compares numbers as text, so 100 comes before 9.',
+  explain:'sort changes the array it is called on, so we copy first with <code>[...scores]</code>. The compare function <code>a - b</code> means low to high: a negative answer puts <code>a</code> first, a positive one puts <code>b</code> first. Without it, sort compares numbers as text, so 100 comes before 9.',
   check:c=>c.ok&&/\.sort\s*\(/.test(c.src)&&isArr(c.value)},
  ]},
 {name:'Time travel',group:'Organising data',badge:'Timekeeper',mode:'js',
@@ -666,23 +666,23 @@ const CH=[
   check:c=>/setTimeout/.test(c.src)&&c.logs.length>=3},
  {title:'Make a promise',goal:'Create a Promise for a pizza that is ready in 3 seconds.',code:'const pizza = new Promise(resolve => {\n  setTimeout(() => resolve("🍕 ready"), 3000)\n})',
   anat:[['new Promise','kw'],['resolve','name'],['resolve("🍕 ready")','fn']],
-  explain:'A Promise is a box for a value that will arrive later. Watch it in Memory: it starts <b>pending</b>, then turns <b>fulfilled</b> after three seconds.',
+  explain:'A Promise is a box for a value that will arrive later. <code>new</code> just means "make a fresh one", and the function you hand to <code>new Promise</code> receives a helper called <code>resolve</code>. Calling <code>resolve("🍕 ready")</code> says "the value is here now" and fills the box. Watch it in Memory: it starts <b>pending</b>, then turns <b>fulfilled</b> after three seconds.',
   check:c=>{const p=c.val('pizza');return p&&tagOf(p)==='Promise'}},
  {title:'Then what?',goal:'Tell the promise what to do when the pizza arrives.',code:'pizza.then(food => console.log("Eating", food))',need:['pizza'],pre:'const pizza = new Promise(resolve => setTimeout(() => resolve("🍕 ready"), 3000))',
   anat:[['pizza','name'],['.then','fn'],['food => …','val']],
   explain:'<code>.then</code> takes a callback that runs when the value is ready. If the pizza was already done, it runs almost immediately.',
   check:c=>/\.then\s*\(/.test(c.src)&&c.logs.length>0},
- {title:'Wait politely',goal:'Write an async function that awaits the pizza, then call it.',code:'async function dinner() {\n  console.log("Ordering…")\n  const food = await pizza\n  console.log("Got", food)\n}\ndinner()',need:['pizza'],pre:'const pizza = new Promise(resolve => setTimeout(() => resolve("🍕 ready"), 3000))',
+ {title:'Wait politely',goal:'Write an `async` function (one that is allowed to use `await`) that waits for the pizza, then call it.',code:'async function dinner() {\n  console.log("Ordering…")\n  const food = await pizza\n  console.log("Got", food)\n}\ndinner()',need:['pizza'],pre:'const pizza = new Promise(resolve => setTimeout(() => resolve("🍕 ready"), 3000))',
   anat:[['async','kw'],['await','kw'],['pizza','name']],
-  explain:'<code>await</code> pauses <b>this function only</b> until the promise is ready, while the rest of the program keeps going. It reads top to bottom, like normal code. Most modern code uses async/await.',
+  explain:'Putting <code>async</code> in front of a function is what allows <code>await</code> inside it. <code>await</code> pauses <b>this function only</b> until the promise is ready, while the rest of the program keeps going. It reads top to bottom, like normal code. Most modern code uses async/await.',
   check:c=>/\bawait\b/.test(c.src)&&c.logs.length>=2},
  {title:'Catch a mistake',goal:'Try to read broken data, and handle the error instead of crashing.',code:'try {\n  JSON.parse("{oops")\n} catch (err) {\n  console.log("Caught:", err.message)\n}',
   anat:[['try','kw'],['{ risky }','op'],['catch (err)','kw'],['{ handle }','op']],
-  explain:'If anything inside <code>try</code> throws an error, JavaScript jumps to <code>catch</code> instead of stopping. You get the error object to inspect.',
+  explain:'<code>JSON.parse</code> reads text written in JSON (a plain-text format for data), and it complains about broken text like <code>"{oops"</code>. Programmers say it <b>throws</b> an error. If anything inside <code>try</code> throws, JavaScript jumps to <code>catch</code> instead of stopping, and hands you the error (an object with a <code>message</code>) to inspect.',
   check:c=>c.ok&&/\btry\b/.test(c.src)&&/\bcatch\b/.test(c.src)&&c.logs.length>0},
- {title:'A promise that breaks',goal:'Handle a rejected promise with .catch.',code:'const burnt = new Promise((resolve, reject) => {\n  setTimeout(() => reject(new Error("burnt!")), 1000)\n})\nburnt.catch(err => console.log("Oops:", err.message))',
+ {title:'A promise that breaks',goal:'Handle a failed (rejected) promise with `.catch`.',code:'const burnt = new Promise((resolve, reject) => {\n  setTimeout(() => reject(new Error("burnt!")), 1000)\n})\nburnt.catch(err => console.log("Oops:", err.message))',
   anat:[['reject(…)','fn'],['.catch','fn'],['err => …','val']],
-  explain:'Promises can fail. <code>.catch</code> handles that. Inside an async function you would use <code>try</code>/<code>catch</code> around the <code>await</code> instead.',
+  explain:'Promises can fail too. Next to <code>resolve</code>, the Promise gives you a second helper, <code>reject</code>: calling it marks the promise <b>rejected</b>, and <code>new Error("burnt!")</code> makes an error object that holds the message. <code>.catch</code> receives that error. Inside an async function you would use <code>try</code>/<code>catch</code> around the <code>await</code> instead.',
   check:c=>/\.catch\s*\(/.test(c.src)&&c.logs.length>0},
  ]},
 {name:'TypeScript',group:'Beyond the browser',badge:'Type Guardian',mode:'ts',
@@ -719,7 +719,7 @@ const CH=[
   check:c=>c.diags.some(d=>d.code===2741||/missing/.test(d.msg))},
  {title:'Only these values',goal:'Create a union type with a fixed set of choices, then break it.',code:'type Direction = "up" | "down"\nlet move: Direction = "left"',expectError:true,
   anat:[['type','kw'],['Direction','name'],['"up" | "down"','type']],
-  explain:'<code>|</code> means "or". A Direction can only ever be "up" or "down", so "left" is rejected. Great for things like game states or settings.',
+  explain:'<code>type Direction = ...</code> gives your own name to a type. <code>|</code> means "or". A Direction can only ever be "up" or "down", so "left" is rejected. Great for things like game states or settings.',
   check:c=>c.diags.some(d=>d.code===2322)},
  {title:'TypeScript can guess',goal:'Create a variable with no label, then assign a number to it.',code:'let city = "Haifa"\ncity = 5',expectError:true,
   anat:[['let city','name'],['= "Haifa"','val'],['city = 5','op']],
@@ -727,7 +727,7 @@ const CH=[
   check:c=>c.diags.some(d=>d.code===2322)},
  {title:'One function, any type',goal:'Write a generic function that returns the first item of any list.',code:'function first<T>(items: T[]): T {\n  return items[0]\n}\nfirst(["a", "b"]).toUpperCase()',
   anat:[['<T>','type'],['items: T[]','type'],['): T','type']],
-  explain:'<code>T</code> is a type placeholder. Pass strings and T becomes string, so TypeScript knows <code>toUpperCase</code> is allowed. Pass numbers and it knows you get a number.',
+  explain:'<code>T</code> is a type placeholder, and <code>T[]</code> means "a list of T". Pass strings and T becomes string, so TypeScript knows <code>toUpperCase</code> (it turns text into CAPITALS) is allowed. Pass numbers and it knows you get a number.',
   check:c=>c.has('first')&&/<\s*\w+\s*>/.test(c.src)},
  ]},
 {name:'Node.js',group:'Beyond the browser',badge:'Server Smith',mode:'sh',
@@ -753,31 +753,31 @@ const CH=[
   check:c=>c.cmd==='node'&&c.args[0]==='-e'&&c.ok},
  {title:'Read a file with fs',goal:'Create `read.js` that reads `notes.txt`, then run it.',code:'const fs = require("fs")\nconst text = fs.readFileSync("notes.txt", "utf8")\nconsole.log(text)',
   anat:[['require("fs")','fn'],['readFileSync','fn'],['"utf8"','val']],
-  explain:'<code>require("fs")</code> loads Node\'s built-in <b>file system</b> module. The browser cannot do this. Leave out <code>"utf8"</code> and you get raw bytes (a Buffer) instead of text: try it.',
+  explain:'<code>require("fs")</code> loads Node\'s built-in <b>file system</b> module (a <b>module</b> is a bundle of ready-made tools you load by name). The browser cannot do this. <code>readFileSync</code> reads a whole file (<code>Sync</code> means your program waits until it is done), and <code>"utf8"</code> says "treat the contents as normal text". Leave it out and you get raw numbers (a Buffer) instead of text: try it.',
   editFile:'read.js',
   check:c=>c.cmd==='node'&&c.args[0]==='read.js'&&c.ok&&/readFileSync/.test(c.files['read.js']||'')},
  {title:'Write a file',goal:'Use writeFileSync to create a new file called `todo.txt`.',code:'node -e "require(\'fs\').writeFileSync(\'todo.txt\', \'learn npm\')"',
   anat:[['writeFileSync','fn'],['"todo.txt"','arg'],['"learn npm"','val']],
-  explain:'Watch the Project panel: <code>todo.txt</code> appears. You can do this from a file or a one-liner. Then try <code>cat todo.txt</code>.',
+  explain:'Watch the Project panel: <code>todo.txt</code> appears. You can do this from a file or a one-liner. Then type <code>cat todo.txt</code> (<code>cat</code> is a terminal command that prints a file\'s contents) to read it.',
   check:c=>'todo.txt' in c.files},
  {title:'Share code between files',goal:'Create `math.js` that exports an add function.',code:'function add(a, b) {\n  return a + b\n}\nmodule.exports = { add }',
   anat:[['module.exports','name'],['=','op'],['{ add }','val']],
-  explain:'Each file is a <b>module</b> with its own private boxes. <code>module.exports</code> is the list of things a file chooses to share. Save it; there is nothing to run yet.',
+  explain:'Each file is a module (a bundle of code, like <code>fs</code>) with its own private boxes. <code>module.exports</code> is the list of things a file chooses to share. Save it; there is nothing to run yet.',
   editFile:'math.js',
   check:c=>/module\.exports|exports\./.test(c.files['math.js']||'')},
  {title:'Use another file',goal:'Create `app.js` that requires ./math and prints `add(2, 3)`. Run it.',code:'const math = require("./math")\nconsole.log(math.add(2, 3))',
   anat:[['require','fn'],['"./math"','arg'],['math.add','name']],
-  explain:'<code>./</code> means "a file in this folder". Without it, Node looks for a built-in module or an installed package instead. Real projects are dozens or hundreds of small modules wired together like this.',
+  explain:'<code>./</code> means "a file in this folder". Without it, Node looks for a built-in module or an installed package (code other people wrote and shared) instead. Real projects are dozens or hundreds of small modules wired together like this.',
   editFile:'app.js',
   check:c=>c.cmd==='node'&&c.args[0]==='app.js'&&c.ok&&/require\(\s*["']\.\/math/.test(c.files['app.js']||'')},
  {title:'Take input',goal:'Create `greet.js` that reads a name from the command line, then run it with your name.',code:'const name = process.argv[2] || "stranger"\nconsole.log("Hi, " + name + "!")',
   anat:[['process.argv','name'],['[2]','op'],['|| "stranger"','val']],
-  explain:'<code>process.argv</code> is an array of everything typed on the command line. Slot 0 is node, slot 1 is the file, so your first word is slot 2. Run <code>node greet.js Ada</code>.',
+  explain:'<code>process.argv</code> is an array of everything typed on the command line. Slot 0 is node, slot 1 is the file, so your first word is slot 2. If you type no name, slot 2 is <code>undefined</code> and the <code>|| "stranger"</code> fallback kicks in. Run <code>node greet.js Ada</code>.',
   editFile:'greet.js',
   check:c=>c.cmd==='node'&&c.args[0]==='greet.js'&&c.args.length>=2&&c.ok},
  {title:'Start a real project',goal:'Create a `package.json` with npm.',code:'npm init -y',
   anat:[['npm','cmd'],['init','arg'],['-y','opt']],
-  explain:'npm is Node\'s package manager. <code>package.json</code> is your project\'s ID card: its name, version, scripts and dependencies. <code>-y</code> says yes to all the default answers. Click it in the Project panel to look inside.',
+  explain:'npm is Node\'s package manager: it fetches ready-made code for you. <code>package.json</code> is your project\'s ID card: its name, version, and later the shortcut commands ("scripts") and add-on code ("dependencies") it uses. It is written in <b>JSON</b>, a plain-text data format: names in double quotes, items separated by commas. <code>-y</code> says yes to all the default answers. Click it in the Project panel to look inside.',
   check:c=>'package.json' in c.files},
  {title:'Install a package',goal:'Install the cowsay package.',code:'npm install cowsay',
   anat:[['npm','cmd'],['install','arg'],['cowsay','arg']],
@@ -790,7 +790,7 @@ const CH=[
   check:c=>c.cmd==='node'&&c.args[0]==='cow.js'&&c.ok&&/cowsay/.test(c.files['cow.js']||'')},
  {title:'Your own command',goal:'Add a "start" script to `package.json` that runs `cow.js`, then run npm start.',code:'"scripts": {\n  "start": "node cow.js"\n}',
   anat:[['"scripts"','name'],['"start"','name'],['"node cow.js"','val'],['npm start','cmd']],
-  explain:'Open <code>package.json</code> and add a <code>"start": "node cow.js"</code> line inside <code>"scripts"</code> (mind the commas between lines), save, then type <code>npm start</code>. Every Node project uses scripts like this, so teammates only need to remember <code>npm start</code>, <code>npm test</code> and friends.',
+  explain:'Open <code>package.json</code> and add a <code>"start": "node cow.js"</code> line inside <code>"scripts"</code> (JSON wants a comma between lines but none after the last one), save, then type <code>npm start</code>. Every Node project uses scripts like this, so teammates only need to remember <code>npm start</code>, <code>npm test</code> and friends.',
   editFile:'package.json',
   check:c=>c.cmd==='npm'&&(c.args[0]==='start'||(c.args[0]==='run'&&c.args[1]==='start'))&&c.ok},
  ]},
@@ -799,50 +799,53 @@ const RANKS=[[0,'Newbie'],[60,'Tinkerer'],[180,'Coder'],[340,'Builder'],[520,'En
 
 // ---------- Quick-fire bank: predict the output ----------
 const FIRE=[
-{c:'console.log("2" + 2)',o:['"22"','4','22','NaN'],a:2,w:'A string plus anything glues. console.log shows strings without quotes, so you see 22.'},
-{c:'console.log(2 + 2 + "2")',o:['42','222','6','"42"'],a:0,w:'Left to right: 2 + 2 is 4 first, then 4 + "2" glues to "42".'},
-{c:'console.log("5" - 2)',o:['3','"52"','NaN','"3"'],a:0,w:'Minus has no string meaning, so JavaScript converts "5" to a number. Only + glues.'},
-{c:'console.log(typeof "42")',o:['string','number','"42"','text'],a:0,w:'Quotes make it a string, whatever is inside.'},
-{c:'console.log(typeof [])',o:['object','array','list','undefined'],a:0,w:'Arrays are a special kind of object. Use Array.isArray() to check for one.'},
-{c:'console.log(typeof null)',o:['object','null','undefined','boolean'],a:0,w:'A famous old bug in JavaScript that can never be fixed, because fixing it would break existing websites.'},
-{c:'console.log(1 === "1")',o:['false','true','undefined','TypeError'],a:0,w:'=== checks type as well as value. Number vs string: false.'},
-{c:'console.log(1 == "1")',o:['true','false','"1"','TypeError'],a:0,w:'== converts types first, then compares. That is why we prefer ===.'},
-{c:'console.log(Boolean("false"))',o:['true','false','undefined','"false"'],a:0,w:'Any non-empty string is truthy, even the word "false".'},
-{c:'console.log(Boolean(0))',o:['false','true','0','NaN'],a:0,w:'0 is one of the six falsy values.'},
-{c:'const a = [1, 2, 3]\nconsole.log(a[3])',o:['undefined','3','null','Error'],a:0,w:'Slots are 0, 1 and 2. Reading past the end gives undefined, not an error.'},
-{c:'const a = [1, 2, 3]\nconsole.log(a.length)',o:['3','2','4','[1, 2, 3]'],a:0,w:'length counts items. The last index is length - 1.'},
-{c:'let x = 5\nx += 3\nconsole.log(x)',o:['8','53','5','3'],a:0,w:'x += 3 means x = x + 3.'},
-{c:'let n = 10\nn++\nn++\nconsole.log(n)',o:['12','11','10','"10++"'],a:0,w:'Each ++ adds one.'},
-{c:'console.log(10 % 3)',o:['1','3','3.33','0'],a:0,w:'% is remainder: 10 divided by 3 is 3, remainder 1.'},
-{c:'console.log([1, 2, 3].map(n => n * 2))',o:['[2, 4, 6]','[1, 2, 3]','12','[2]'],a:0,w:'map makes a new array with each item transformed.'},
-{c:'console.log([5, 12, 8].filter(n => n > 6))',o:['[12, 8]','[12]','[5]','true'],a:0,w:'filter keeps every item where the function returns true.'},
-{c:'console.log([5, 12, 8].find(n => n > 6))',o:['12','[12, 8]','8','true'],a:0,w:'find returns only the first match, not an array.'},
-{c:'console.log([1, 2, 3].reduce((t, n) => t + n, 0))',o:['6','[1, 2, 3]','123','0'],a:0,w:'reduce carries a running total: 0+1, then +2, then +3.'},
-{c:'console.log([10, 9, 100].sort())',o:['[10, 100, 9]','[9, 10, 100]','[100, 10, 9]','Error'],a:0,w:'Without a compare function, sort compares as text. "1" comes before "9". Use sort((a, b) => a - b).'},
-{c:'const a = { hp: 10 }\nconst b = a\nb.hp = 1\nconsole.log(a.hp)',o:['1','10','undefined','Error'],a:0,w:'a and b point to the same object. Change it through one, see it through the other.'},
-{c:'const a = { hp: 10 }\nconst b = { ...a }\nb.hp = 1\nconsole.log(a.hp)',o:['10','1','undefined','Error'],a:0,w:'Spread makes a new object, so a is untouched.'},
-{c:'const p = { name: "Ada" }\nconsole.log(p.age)',o:['undefined','null','Error','0'],a:0,w:'Missing properties are undefined. No error.'},
-{c:'const name = "Bo"\nconsole.log(`Hi ${name}!`)',o:['Hi Bo!','Hi ${name}!','Hi name!','"Hi Bo!"'],a:0,w:'Template strings fill in ${ } with the value.'},
-{c:'console.log("Hi ${name}")',o:['Hi ${name}','Hi Bo','Error','Hi undefined'],a:0,w:'Normal quotes do not fill in ${ }. Only backticks do.'},
-{c:'function f() {\n  console.log("hi")\n}\nconsole.log(f())',o:['hi, then undefined','hi','undefined','f'],a:0,w:'f prints hi, but has no return, so its result is undefined.'},
-{c:'const sq = n => n * n\nconsole.log(sq(4))',o:['16','8','n * n','undefined'],a:0,w:'One-line arrow functions return their expression automatically.'},
-{c:'function hi(name = "you") {\n  return "hi " + name\n}\nconsole.log(hi())',o:['hi you','hi undefined','hi ','Error'],a:0,w:'Default parameter kicks in when nothing is passed.'},
-{c:'console.log("A")\nsetTimeout(() => console.log("B"), 0)\nconsole.log("C")',o:['A C B','A B C','B A C','C A B'],a:0,w:'Timers always wait until the current code finishes, even at 0 ms.'},
-{c:'for (let i = 0; i < 3; i++) {\n  console.log(i)\n}',o:['0 1 2','1 2 3','0 1 2 3','3'],a:0,w:'Starts at 0 and stops before reaching 3.'},
-{c:'let s = ""\nfor (const c of "abc") s = c + s\nconsole.log(s)',o:['cba','abc','a','cbacba'],a:0,w:'Each letter goes in front of the others, reversing the string.'},
-{c:'console.log(null ?? "x")',o:['x','null','undefined','false'],a:0,w:'?? falls back when the left side is null or undefined.'},
-{c:'console.log(0 ?? "x")',o:['0','x','false','null'],a:0,w:'0 is not null or undefined, so ?? keeps it. (|| would give "x".)'},
-{c:'console.log(0 || "x")',o:['x','0','false','true'],a:0,w:'|| falls back on any falsy value, including 0.'},
-{c:'const hp = 30\nconsole.log(hp > 50 ? "strong" : "weak")',o:['weak','strong','true','30'],a:0,w:'30 > 50 is false, so the value after : is used.'},
-{c:'console.log(Number("12px"))',o:['NaN','12','"12"','Error'],a:0,w:'Number() needs the whole string to be a number. parseInt("12px") would give 12.'},
-{c:'console.log([..."hey"])',o:['["h", "e", "y"]','["hey"]','hey','3'],a:0,w:'Spreading a string splits it into characters.'},
-{c:'const { a, b } = { a: 1, b: 2, c: 3 }\nconsole.log(a + b)',o:['3','6','12','undefined'],a:0,w:'Destructuring pulls a and b into variables.'},
-{c:'console.log([1, 2] + [3])',o:['1,23','[1, 2, 3]','6','Error'],a:0,w:'+ turns both arrays into strings ("1,2" and "3") and glues them. Weird, but now you know.'},
-{c:'console.log(0.1 + 0.2 === 0.3)',o:['false','true','NaN','0.3'],a:0,w:'Computers store decimals in binary, so 0.1 + 0.2 is 0.30000000000000004. Same in almost every language.'},
-{c:'const a = [3, 1, 2]\na.push(5)\nconsole.log(a.length)',o:['4','3','5','[3, 1, 2, 5]'],a:0,w:'push adds one item. Four now.'},
-{c:'let x: number = 5\nx = "five"  // TypeScript',o:['Type error before running','"five"','5','NaN'],a:0,w:'TypeScript refuses to compile: string is not assignable to number.'},
-{c:'// node greet.js Ada\nconsole.log(process.argv[2])',o:['Ada','greet.js','node','undefined'],a:0,w:'argv[0] is node, [1] is the file, [2] is the first word you typed after it.'},
+{ch:0,c:'console.log("2" + 2)',o:['"22"','4','22','"2 2"'],a:2,w:'A string plus anything glues. console.log shows strings without quotes, so you see 22.'},
+{ch:0,c:'console.log(2 + 2 + "2")',o:['42','222','6','"42"'],a:0,w:'Left to right: 2 + 2 is 4 first, then 4 + "2" glues to "42".'},
+{ch:2,c:'console.log("5" - 2)',o:['3','"52"','NaN','"3"'],a:0,w:'Minus has no string meaning, so JavaScript converts "5" to a number. Only + glues.'},
+{ch:0,c:'console.log(typeof "42")',o:['string','number','"42"','text'],a:0,w:'Quotes make it a string, whatever is inside.'},
+{ch:7,c:'console.log(typeof [])',o:['object','array','list','undefined'],a:0,w:'Arrays are a special kind of object, so typeof says object.'},
+{ch:7,c:'console.log(typeof null)',o:['object','null','undefined','boolean'],a:0,w:'A famous old bug in JavaScript that can never be fixed, because fixing it would break existing websites.'},
+{ch:2,c:'console.log(1 === "1")',o:['false','true','undefined','TypeError'],a:0,w:'=== checks type as well as value. Number vs string: false.'},
+{ch:2,c:'console.log(1 == "1")',o:['true','false','"1"','TypeError'],a:0,w:'== converts types first, then compares. That is why we prefer ===.'},
+{ch:2,c:'console.log(Boolean("false"))',o:['true','false','undefined','"false"'],a:0,w:'Any non-empty string is truthy, even the word "false".'},
+{ch:2,c:'console.log(Boolean(0))',o:['false','true','0','NaN'],a:0,w:'0 is one of the six falsy values.'},
+{ch:5,c:'const a = [1, 2, 3]\nconsole.log(a[3])',o:['undefined','3','null','Error'],a:0,w:'Slots are 0, 1 and 2. Reading past the end gives undefined, not an error.'},
+{ch:5,c:'const a = [1, 2, 3]\nconsole.log(a.length)',o:['3','2','4','[1, 2, 3]'],a:0,w:'length counts items. The last index is length - 1.'},
+{ch:1,c:'let x = 5\nx += 3\nconsole.log(x)',o:['8','53','5','3'],a:0,w:'x += 3 means x = x + 3.'},
+{ch:1,c:'let n = 10\nn++\nn++\nconsole.log(n)',o:['12','11','10','"10++"'],a:0,w:'Each ++ adds one.'},
+{ch:0,c:'console.log(10 % 3)',o:['1','3','3.33','0'],a:0,w:'% is remainder: 10 divided by 3 is 3, remainder 1.'},
+{ch:8,c:'console.log([1, 2, 3].map(n => n * 2))',o:['[2, 4, 6]','[1, 2, 3]','12','[2]'],a:0,w:'map makes a new array with each item transformed.'},
+{ch:8,c:'console.log([5, 12, 8].filter(n => n > 6))',o:['[12, 8]','[12]','[5]','true'],a:0,w:'filter keeps every item where the function returns true.'},
+{ch:8,c:'console.log([5, 12, 8].find(n => n > 6))',o:['12','[12, 8]','8','true'],a:0,w:'find returns only the first match, not an array.'},
+{ch:8,c:'console.log([1, 2, 3].reduce((t, n) => t + n, 0))',o:['6','[1, 2, 3]','123','0'],a:0,w:'reduce carries a running total: 0+1, then +2, then +3.'},
+{ch:8,c:'console.log([10, 9, 100].sort())',o:['[10, 100, 9]','[9, 10, 100]','[100, 10, 9]','Error'],a:0,w:'Without a compare function, sort compares as text. "1" comes before "9". Use sort((a, b) => a - b).'},
+{ch:7,c:'const a = { hp: 10 }\nconst b = a\nb.hp = 1\nconsole.log(a.hp)',o:['1','10','undefined','Error'],a:0,w:'a and b point to the same object. Change it through one, see it through the other.'},
+{ch:7,c:'const a = { hp: 10 }\nconst b = { ...a }\nb.hp = 1\nconsole.log(a.hp)',o:['10','1','undefined','Error'],a:0,w:'Spread makes a new object, so a is untouched.'},
+{ch:7,c:'const p = { name: "Ada" }\nconsole.log(p.age)',o:['undefined','null','Error','0'],a:0,w:'Missing properties are undefined. No error.'},
+{ch:1,c:'const name = "Bo"\nconsole.log(`Hi ${name}!`)',o:['Hi Bo!','Hi ${name}!','Hi name!','"Hi Bo!"'],a:0,w:'Template strings fill in ${ } with the value.'},
+{ch:1,c:'console.log("Hi ${name}")',o:['Hi ${name}','Hi Bo','Error','Hi undefined'],a:0,w:'Normal quotes do not fill in ${ }. Only backticks do.'},
+{ch:6,c:'function f() {\n  console.log("hi")\n}\nconsole.log(f())',o:['hi, then undefined','hi','undefined','f'],a:0,w:'f prints hi, but has no return, so its result is undefined.'},
+{ch:6,c:'const sq = n => n * n\nconsole.log(sq(4))',o:['16','8','n * n','undefined'],a:0,w:'One-line arrow functions return their expression automatically.'},
+{ch:6,c:'function hi(name = "you") {\n  return "hi " + name\n}\nconsole.log(hi())',o:['hi you','hi undefined','hi ','Error'],a:0,w:'Default parameter kicks in when nothing is passed.'},
+{ch:9,c:'console.log("A")\nsetTimeout(() => console.log("B"), 0)\nconsole.log("C")',o:['A C B','A B C','B A C','C A B'],a:0,w:'Timers always wait until the current code finishes, even at 0 ms.'},
+{ch:4,c:'for (let i = 0; i < 3; i++) {\n  console.log(i)\n}',o:['0 1 2','1 2 3','0 1 2 3','3'],a:0,w:'Starts at 0 and stops before reaching 3.'},
+{ch:5,c:'let s = ""\nfor (const c of ["a", "b", "c"]) {\n  s = c + s\n}\nconsole.log(s)',o:['cba','abc','a','cbacba'],a:0,w:'Each item goes in front of the ones before it, so the order flips.'},
+{ch:2,c:'console.log(null ?? "x")',o:['x','null','undefined','false'],a:0,w:'?? falls back when the left side is null or undefined.'},
+{ch:2,c:'console.log(0 ?? "x")',o:['0','x','false','null'],a:0,w:'0 is not null or undefined, so ?? keeps it. (|| would give "x".)'},
+{ch:2,c:'console.log(0 || "x")',o:['x','0','false','true'],a:0,w:'|| falls back on any falsy value, including 0.'},
+{ch:3,c:'const hp = 30\nconsole.log(hp > 50 ? "strong" : "weak")',o:['weak','strong','true','30'],a:0,w:'30 > 50 is false, so the value after : is used.'},
+{ch:2,c:'console.log(Number("12px"))',o:['NaN','12','"12"','Error'],a:0,w:'Number() needs the whole string to be a number. Otherwise you get NaN, short for "Not a Number".'},
+{ch:7,c:'console.log([..."hey"])',o:['["h", "e", "y"]','["hey"]','hey','3'],a:0,w:'Spread works on text too: it splits a string into its letters.'},
+{ch:7,c:'const { a, b } = { a: 1, b: 2, c: 3 }\nconsole.log(a + b)',o:['3','6','12','undefined'],a:0,w:'Destructuring pulls a and b into variables.'},
+{ch:5,c:'console.log([1, 2] + [3])',o:['1,23','[1, 2, 3]','6','Error'],a:0,w:'+ turns both arrays into strings ("1,2" and "3") and glues them. Weird, but now you know.'},
+{ch:2,c:'console.log(0.1 + 0.2 === 0.3)',o:['false','true','NaN','0.3'],a:0,w:'Computers store decimals in binary, so 0.1 + 0.2 is 0.30000000000000004. Same in almost every language.'},
+{ch:5,c:'const a = [3, 1, 2]\na.push(5)\nconsole.log(a.length)',o:['4','3','5','[3, 1, 2, 5]'],a:0,w:'push adds one item. Four now.'},
+{ch:10,c:'let x: number = 5\nx = "five"  // TypeScript',o:['Type error before running','"five"','5','NaN'],a:0,w:'TypeScript refuses to compile: string is not assignable to number.'},
+{ch:11,c:'// node greet.js Ada\nconsole.log(process.argv[2])',o:['Ada','greet.js','node','undefined'],a:0,w:'argv[0] is node, [1] is the file, [2] is the first word you typed after it.'},
 ];
+
+/* The quick-fire questions a learner may see: only those whose chapter has every mission done in `done` (the saved S.done, keyed '<chapter>-<mission>'). */
+const qfOpen=done=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'-'+j]));
 
 // ================= UI =================
 const KEY='script-quest-v1';
@@ -1358,22 +1361,30 @@ const fStage=$('#fStage');
 function fStats(){$('#fScore').textContent=F.score;$('#fStreak').textContent=F.streak;$('#fBest').textContent=S.best||0;$('#fTime').textContent=Math.ceil(F.time);$('#fTimer').style.width=(F.time/75*100)+'%'}
 function fireIdle(){
   if(F.on)return;fStats();
+  const open=qfOpen(S.done);
+  if(!open.length){
+    fStage.innerHTML=`<div class="example"><div class="eyebrow">Locked for now</div><p class="note" style="margin-top:8px">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first questions open up. Each later chapter you finish adds more.</p></div>
+    <div class="actions" style="margin-top:12px"><button class="btn" id="fGo">Go to the quest</button></div>`;
+    $('#fGo').onclick=()=>showTab('quest');return;
+  }
   const ex=FIRE[0];
   fStage.innerHTML=`<div class="example"><div class="eyebrow">Example</div><pre class="snip">${hl(ex.c)}</pre><p class="note" style="margin-top:8px">Answer: <code>22</code>. ${esc(ex.w)}</p></div>
+    ${open.length<FIRE.length?`<p class="note">${open.length} of ${FIRE.length} questions are open. Finish more chapters to unlock the rest.</p>`:''}
     <div class="actions"><button class="btn" id="fGo">Start the clock</button></div>`;
   $('#fGo').onclick=fireStart;
 }
 function fireStart(){
+  if(!qfOpen(S.done).length){fireIdle();return}
   Object.assign(F,{on:true,score:0,streak:0,time:75,misses:[],locked:false,paused:false});
-  F.order=FIRE.map((_,i)=>i).sort(()=>Math.random()-.5);
+  F.order=qfOpen(S.done).sort(()=>Math.random()-.5);
   clearInterval(F.tick);let last=performance.now();
   F.tick=setInterval(()=>{const now=performance.now();if(!F.paused)F.time-=(now-last)/1000;last=now;if(F.time<=0){F.time=0;fireEnd()}fStats()},100);
   fireNext();
 }
 function fireStop(){clearInterval(F.tick);F.on=false}
 function fireNext(){
-  if(!F.order.length)F.order=FIRE.map((_,i)=>i).sort(()=>Math.random()-.5);
-  const q=FIRE[F.order.pop()];
+  if(!F.order.length)F.order=qfOpen(S.done).sort(()=>Math.random()-.5);
+  const q=F.order.pop();
   const opts=q.o.map((t,i)=>({t,right:i===q.a})).sort(()=>Math.random()-.5);
   F.q={...q,opts};F.locked=false;F.paused=false;
   fStage.innerHTML=`<div class="task">What does this print?</div><pre class="snip">${hl(q.c)}</pre>
@@ -1407,7 +1418,7 @@ const BLOCKS=[
 ['Arrays','Ordered lists, numbered from 0.','const pets = ["cat", "dog"]\npets.push("fish")\nconsole.log(pets[0], pets.length)'],
 ['Objects','Named values grouped together.','const book = { title: "Dune", pages: 412 }\nbook.read = true\nbook'],
 ['Functions','Reusable recipes with inputs and an output.','function area(w, h) {\n  return w * h\n}\narea(3, 4)'],
-['Arrow functions','Short functions, perfect for callbacks.','const shout = text => text.toUpperCase() + "!"\nshout("hey")'],
+['Arrow functions','Short functions, perfect for callbacks.','const shout = text => text + "!"\nshout("hey")'],
 ['Destructuring','Unpack objects and arrays into variables.','const user = { id: 7, city: "Lyon" }\nconst { city } = user\nconst [first, second] = ["gold", "silver"]\nconsole.log(city, first)'],
 ['Spread','Copy or combine arrays and objects.','const a = [1, 2]\nconst b = [...a, 3, 4]\nconst base = { size: "M" }\nconsole.log(b, { ...base, color: "red" })'],
 ['Classes','A blueprint for creating many similar objects.','class Monster {\n  constructor(name) {\n    this.name = name\n    this.hp = 10\n  }\n  hit() { this.hp -= 3 }\n}\nconst m = new Monster("Slime")\nm.hit()\nm'],
@@ -1428,7 +1439,7 @@ const ERRS=[
 function renderGuide(){
   const g=$('#guide');
   g.innerHTML=`
-  <div><h2>Field guide</h2><p class="lede">Everything from the quest on one page, with pictures. Every code card has a Run button, so you can try it right here.</p></div>
+  <div><h2>Field guide</h2><p class="lede">Most of the quest on one page, plus a few extras (classes, Map and Set, <code>.some()</code>), with pictures. Every code card has a Run button, so you can try it right here.</p></div>
 
   <section class="gsec"><h3>Who's who</h3><p>Three names, one language. Here is how they fit together.</p>
     <div class="flow">
@@ -1444,12 +1455,12 @@ function renderGuide(){
 
   <section class="gsec"><h3>Types at a glance</h3><p>The same colours as the Memory panel.</p>
     <div class="panel tblwrap" style="padding:6px 8px"><table class="cmp"><tr><th>Type</th><th>Examples</th><th><code>typeof</code> says</th></tr>
-      <tr><td><span class="ty ty-number" style="margin:0">number</span></td><td><code>42</code> <code>3.14</code> <code>-7</code> <code>NaN</code></td><td><code>"number"</code></td></tr>
+      <tr><td><span class="ty ty-number" style="margin:0">number</span></td><td><code>42</code> <code>3.14</code> <code>-7</code> <code>NaN</code> (Not a Number)</td><td><code>"number"</code></td></tr>
       <tr><td><span class="ty ty-string" style="margin:0">string</span></td><td><code>"hi"</code> <code>'hi'</code> <code>\`hi \${x}\`</code></td><td><code>"string"</code></td></tr>
       <tr><td><span class="ty ty-boolean" style="margin:0">boolean</span></td><td><code>true</code> <code>false</code></td><td><code>"boolean"</code></td></tr>
       <tr><td><span class="ty ty-undefined" style="margin:0">undefined</span></td><td><code>let x</code> with no value</td><td><code>"undefined"</code></td></tr>
       <tr><td><span class="ty ty-null" style="margin:0">null</span></td><td><code>null</code>, empty on purpose</td><td><code>"object"</code> (an old bug)</td></tr>
-      <tr><td><span class="ty ty-array" style="margin:0">array</span></td><td><code>[1, 2, 3]</code></td><td><code>"object"</code>, use <code>Array.isArray()</code></td></tr>
+      <tr><td><span class="ty ty-array" style="margin:0">array</span></td><td><code>[1, 2, 3]</code></td><td><code>"object"</code>, use <code>Array.isArray()</code> (a built-in yes/no check for arrays)</td></tr>
       <tr><td><span class="ty ty-object" style="margin:0">object</span></td><td><code>{ name: "Ada" }</code></td><td><code>"object"</code></td></tr>
       <tr><td><span class="ty ty-function" style="margin:0">function</span></td><td><code>x =&gt; x * 2</code></td><td><code>"function"</code></td></tr>
     </table></div></section>
@@ -1487,7 +1498,7 @@ function renderGuide(){
     <ol class="steps">
       <li class="panel"><div><b>Install Node.js</b><p>Download the LTS version (long-term support, the stable one) from nodejs.org. npm comes with it. Then open a terminal and check:</p><pre>node -v\nnpm -v</pre></div></li>
       <li class="panel"><div><b>Install an editor</b><p>VS Code is free and the most common choice. It understands JavaScript and TypeScript out of the box, with autocomplete and red squiggles for errors.</p></div></li>
-      <li class="panel"><div><b>Start a project</b><p>Create a folder, step into it, and create a package.json, just like in chapter 12.</p><pre>mkdir my-app\ncd my-app\nnpm init -y</pre></div></li>
+      <li class="panel"><div><b>Start a project</b><p>Create a folder (<code>mkdir</code>), step into it (<code>cd</code>), and create a package.json, just like in chapter 12.</p><pre>mkdir my-app\ncd my-app\nnpm init -y</pre></div></li>
       <li class="panel"><div><b>Write and run a file</b><p>Create index.js in VS Code with a console.log in it, then:</p><pre>node index.js</pre></div></li>
       <li class="panel"><div><b>Add TypeScript</b><p>Install the compiler into the project, create its settings file, then check and compile your .ts files. Recent Node versions can also run a .ts file directly by stripping the types, but only tsc checks them.</p><pre>npm install -D typescript\nnpx tsc --init\nnpx tsc</pre></div></li>
       <li class="panel"><div><b>Keep going</b><p>Good next steps: the browser DOM (make web pages react to clicks), Git for saving versions of your work, a web server with Express, and later a UI library like React.</p></div></li>
