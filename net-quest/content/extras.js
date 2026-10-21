@@ -20,7 +20,7 @@ NQ.QF=[
 NQ.GUIDE=[
  {ch:0,c:'layers: OSI and TCP/IP',what:'OSI names seven layers, TCP/IP four. This simulator builds Ethernet and ARP (link layer), and IPv4 with ICMP inside it (internet layer).',syn:[['ping','cmd'],['10.0.0.3','arg','who to ping']],ex:[['ping -c 1 10.0.0.3','open any entry in the packet panel to see its layers']]},
  {ch:0,c:'encapsulation',what:'Each layer wraps the one inside it with its own header. A device reads only the layers it needs.',syn:[['ping','cmd'],['-c','opt','count'],['1','arg','how many']],ex:[['ping -c 1 10.0.0.3','the packet panel lists each packet\'s layers, outermost first']]},
- {ch:0,c:'MAC address',what:'The hardware address of a network card, six pairs like <code>02:00:00:00:00:01</code>. It only matters on one wire.',syn:[['ip','cmd'],['link','arg','show the network cards']],ex:[['ip link','link/ether is the laptop\'s MAC']]},
+ {ch:0,c:'MAC address',what:'The hardware address of a network card, six pairs like <code>02:00:00:00:00:01</code>. It only matters on one wire.',syn:[['ip','cmd'],['link','arg','show the network cards']],ex:[['ip link','<code>link/ether</code> is the laptop\'s MAC']]},
  {ch:0,c:'ARP',what:'Asks everyone on the wire "who has this IP address?". The owner answers with its MAC, and the asker remembers it.',syn:[['arping','cmd'],['10.0.0.3','arg','who to ask about']],ex:[['arping 10.0.0.3','the phone answers with its MAC'],['ip neigh','the MACs the laptop has learned']]}
 ];
 })();

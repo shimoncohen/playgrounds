@@ -49,7 +49,7 @@ NQ.CH.push({name:'Layers and packets',badge:'Layer Peeler',
   hint:'Open an echo request the laptop sent and look for <code>ttl</code> in its IPv4 layer.',
   scenario:'pair',answer:['ping 10.0.0.3'],check:pinged,
   question:{ask:'What TTL does the laptop put on its echo request?',expect:c=>String(sentReq(c).packet.layers.find(l=>l.name==='IPv4').fields.ttl)}},
- {title:'Who has this address?',goal:'To put a <b>frame</b> on the wire (a packet wrapped for one trip across the local network), the laptop needs the phone\'s <b>MAC address</b>: the hardware address of its network card. It asks for it with an <b>ARP request</b>. Ping the phone, open the laptop\'s ARP request in the packet panel, and find the frame\'s <b>destination MAC</b>. Who is it addressed to?',
+ {title:'Who has this address?',goal:'To put a <b>frame</b> on the wire (a packet wrapped for one trip across the local network), the laptop needs the phone\'s <b>MAC address</b>: the hardware address of its network card. It asks for it with an <b>ARP request</b>. Ping the phone, open the laptop\'s ARP request in the packet panel, and find the frame\'s <b>destination MAC</b>. Copy that MAC exactly.',
   anat:PING,
   how:['<code>ping 10.0.0.3</code> makes the laptop look up the phone\'s MAC address first, so an ARP request appears in the packet panel before any echo request.',
    'In the packet panel, pick the entry the laptop sent (<b>tx</b> on <code>laptop</code>) whose note starts with <b>ARP request</b>.',
@@ -80,7 +80,7 @@ NQ.CH.push({name:'Layers and packets',badge:'Layer Peeler',
   hint:'Read the <code>packets transmitted</code> line at the end of your <code>ping</code> output, or count the echo requests the laptop sent in the packet panel.',
   scenario:'pair',answer:['ping -c 3 10.0.0.3'],
   check:c=>{
-    const p=c.history.filter(h=>/^\s*ping(\s|$)/.test(h.line)).at(-1);
+    const p=c.lastPing();
     if(!p)return 'Run <code>ping</code> with <code>-c</code> and a count, aimed at the phone at <code>10.0.0.3</code>.';
     if(!/(^|\s)-c/.test(p.line))return 'Add <code>-c</code> and a count to your <code>ping</code>, so you choose how many requests go out.';
     if(p.code!==0)return 'No replies came back. Aim your <code>ping</code> at the phone, <code>10.0.0.3</code>.';
