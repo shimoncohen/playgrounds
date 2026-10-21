@@ -17,4 +17,6 @@ For each changed mission, in order:
 7. **Code in prose**: every command name, option, file name, variable and function in `goal`, `how`, `explain`, `hint`, `note` is in `<code>` (backticks where the field is escaped). `tests/shell/codestyle.test.mjs` catches the clear cases; you catch the ambiguous words (find, cat, sort, echo ...) and other quests.
 8. **Teaching**: one idea, goal answerable from what came before, tone per `mission-voice`. **Whole before parts**: the mission has `how` steps; step 1 says what the whole line does, each later step ties one part back to it, no term is used before it is explained, and `explain` does not just repeat the steps. A mission that only labels pieces is a finding.
 
+9. **Dependency and flow**: list every term, command, option and concept the mission's text and question use, and name the earlier mission (by key) that taught each. Anything not taught before it, and not defined in place, is a finding (guideline section 6, "Teach before use"). Check the chapter intro, hint, `explain`, quick-fire and guide entries too, and read the first three missions as a day-one learner with no outside knowledge.
+
 Output: findings list, most severe first, each with mission id, the exact input that breaks it, and the fix. Say "no findings" only after trying step 2.

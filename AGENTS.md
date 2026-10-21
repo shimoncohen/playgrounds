@@ -32,6 +32,7 @@ CI runs all of these on every PR. A PR is not ready until they pass locally.
 9. **Explain the whole, then the parts.** A mission card says what the *whole line* does first, then how each part (command, option, argument, operator) contributes: use the `how` steps list and chip meanings (`docs/tiers-guideline.md` section 3). Never explain only the pieces.
 10. **Code in prose.** Commands, options, file names, variables and functions in learner text are `<code>` (backticks where the page escapes the field), never plain words. `tests/shell/codestyle.test.mjs` enforces the checkable part; see `docs/tiers-guideline.md` section 6a.
 11. **Tone.** Learner-facing text is friendly, concrete and a little playful. It is never condescending, and it never assumes prior knowledge the quest has not taught yet.
+12. **Teach before use.** Every term a mission, question, hint, guide or quick-fire entry relies on was taught by an earlier mission on the default path, or is defined in place before first use. Order the course as a dependency chain (`docs/tiers-guideline.md` section 6).
 
 ## Skills
 
