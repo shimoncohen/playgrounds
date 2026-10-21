@@ -75,7 +75,10 @@ function runLine(line){
 function evaluate(code,answer){
   const m=curMission();if(!m)return;
   let r;try{r=NQ.runMission(m,lines,answer??null);}catch(e){r=null;}
-  if(code!==0){if(typeof r==='string'&&r!==ASK&&!won)renderFeedback({tip:r});return;}
+  if(code!==0){ // a failed command is checked too, but only to open the question (a ping with no reply is the point of some missions)
+    if(r===ASK&&!won){asking=true;renderAsk();renderFeedback({ask:true});}
+    else if(typeof r==='string'&&!won)renderFeedback({tip:r});
+    return;}
   if(r===true){complete(answer!==undefined);return;}
   if(won)return;
   if(answer!==undefined){afb.className='afb bad';afb.innerHTML=r===ASK?'Type your answer in the box first.':typeof r==='string'?r:'';return;}

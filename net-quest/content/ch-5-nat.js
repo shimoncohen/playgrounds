@@ -15,6 +15,19 @@ const WEB='198.51.100.10',FAR='8.8.8.8'; // FAR: an address no route on home cov
 const addrOf=(c,d,i)=>bare(c.net.devices[d].ifaces[i||'eth0'].ip);
 const home=c=>c.net.devices.home;
 const NAT_TABLE=/^\s*nat\s+table\s*$/;
+/* did the learner print a NAT table with a line in it? Their lines are replayed on a clone started over, because nat off
+   forgets the table and the lines before it are what the learner saw. */
+const sawTable=c=>{
+  const n=c.net.clone();n.reset();
+  return c.history.some(h=>{const r=n.exec(h.line,'home');return h.code===0&&NAT_TABLE.test(h.line)&&/^proto /.test(r.out[0]||'');});
+};
+/* the inside address of the first translation: from the table, or, if NAT was switched off since (which forgets the
+   table), from a clone of the network started over, where the setup's ping makes the translation again */
+const firstInside=c=>{
+  let t=(home(c).nat&&home(c).nat.table)||[];
+  if(!t.length){const n=c.net.clone();n.reset();t=(n.devices.home.nat&&n.devices.home.nat.table)||[];}
+  return t.length?t[0].inside:'';
+};
 const RUN_PING=/^\s*ping(\s|$)/,RUN_TRACE=/^\s*traceroute\s+\S+\s*$/;
 /* the last echo request that reached web, from the learner's own commands (the log holds nothing else) */
 const reqAtWeb=c=>c.last(e=>e.dev==='web'&&e.dir==='rx'&&c.layers(e).includes('ICMP')&&e.packet.layers.find(l=>l.name==='ICMP').fields.type==='echo-request');
@@ -68,24 +81,24 @@ NQ.CH.push({name:'NAT and public networks',badge:'NAT Navigator',
   explain:'This is how many devices share one public address. Two devices can send a <code>ping</code> at the same time, because each gets its own outside id: the reply with that id picks the line, and the line says where to deliver. A packet that matches no line is thrown away, which is also why nobody outside can start a conversation with a device behind NAT. There is no line for it yet.',
   hint:'Run <code>nat table</code> and read the first address on the line.',
   answer:['nat table'],
-  check:c=>c.history.some(h=>h.code===0&&NAT_TABLE.test(h.line))?true:'Run <code>nat table</code> on <code>home</code> to print the table first.',
-  question:{ask:'Which inside address is in the NAT table?',expect:c=>{const t=(home(c).nat&&home(c).nat.table)||[];return t.length?t[0].inside:'';}}},
+  check:c=>sawTable(c)?true:'Run <code>nat table</code> on <code>home</code> while NAT is on, to print the table first.',
+  question:{ask:'Which inside address is in the NAT table?',expect:firstInside}},
  {title:'A one-way street',scenario:'home',dev:'web',
-  goal:'Now stand on the other side. This terminal runs <b>on <code>web</code></b>, the server on the public internet. Try to reach the laptop\'s private address with <code>traceroute 192.168.1.10</code>. The path ends at the provider\'s router, <code>isp</code>, which sends back an error. Open the packet panel and find the entry on <code>isp</code> that says why it cannot deliver the packet. Its verdict starts with two words. Type them.',
+  goal:'Now stand on the other side. This terminal runs <b>on <code>web</code></b>, the server on the public internet. Try to reach the laptop\'s private address with <code>traceroute 192.168.1.10</code>. The path ends at the provider\'s router, <code>isp</code>, which sends back an error. Open the packet panel and find the entry on <code>isp</code> that says why it cannot deliver the packet. Its note starts with two words. Type them.',
   anat:[...TRACE,['192.168.1.10','arg','the laptop\'s private address']],
   how:['<code>traceroute 192.168.1.10</code> follows a packet from the server towards the laptop\'s private address and shows where it stops.',
    'It is the command from the last chapter, and the destination is the laptop\'s address. The list is short: the same address answers twice, and the last line ends with <code>!N</code>, a flag for "no such network".',
    'Routers on the public internet have no entry for private addresses: every home uses the same ones, so nobody advertises them. <code>isp</code> has nothing to match, drops the packet and sends an error back to the server.',
-   'In the packet panel, open the dropped entry on <code>isp</code> that mentions <code>192.168.1.10</code> and type the first two words of its verdict.'],
+   'In the packet panel, open the dropped entry on <code>isp</code> that mentions <code>192.168.1.10</code> and type the first two words of its note.'],
   explain:'The wall works in this direction too. A private address cannot be reached from the internet, and NAT only creates a table line when a device inside sends first. That is why nothing outside can open a conversation with your laptop on its own. A machine that must be found from outside, like this server, lives at a public address.',
-  hint:'Run <code>traceroute 192.168.1.10</code> and open the dropped entry on <code>isp</code>; type the first two words of its verdict.',
+  hint:'Run <code>traceroute 192.168.1.10</code> and open the dropped entry on <code>isp</code>; type the first two words of its note.',
   answer:['traceroute 192.168.1.10'],
   check:c=>privateVerdict(c)?true:'Run <code>traceroute 192.168.1.10</code> from the server and look for the dropped entry on <code>isp</code>.',
-  question:{ask:'What are the first two words of the verdict where <code>isp</code> drops the packet?',
+  question:{ask:'What are the first two words of the note where <code>isp</code> drops the packet?',
    expect:c=>{const e=privateVerdict(c);return e?e.verdict.split(' ').slice(0,2).join(' '):'';},
    accept:()=>['no route to host','no route to it','no routes','no route found']}},
  {title:'Lost the way out',scenario:'home',dev:'home',setup:[{dev:'home',cmd:'ip route del default'}],
-  goal:'This terminal runs <b>on <code>home</code></b>. Someone deleted its default route, so it no longer knows where to send packets for the internet, and every <code>ping</code> from the house fails with <code>Destination Net Unreachable</code>. Run <code>ip route</code> to see that the <code>default</code> line is gone, then put it back. The gateway is the provider\'s router <code>isp</code>, which has the address <code>203.0.113.6</code> on the short wire between the two routers. Check with <code>ping -c 1 198.51.100.10</code>.',
+  goal:'This terminal runs <b>on <code>home</code></b>. Someone deleted its default route, so it no longer knows where to send packets for the internet, and pings from the house fail. Run <code>ip route</code> to see that the <code>default</code> line is gone, then put it back. The gateway is the provider\'s router <code>isp</code>, which has the address <code>203.0.113.6</code> on the short wire between the two routers. Check with <code>ping -c 1 198.51.100.10</code>.',
   anat:[['ip','cmd','network settings tool'],['route','arg','the routing table'],['add','arg','put a route in the table'],['default','arg','the catch-all route'],['via','arg','the gateway comes next'],['203.0.113.6','arg','the provider\'s router']],
   how:['<code>ip route add default via 203.0.113.6</code> tells <code>home</code>: for any address you have no other route for, hand the packet to <code>isp</code> at <code>203.0.113.6</code>.',
    'It is the command from the last chapter. <code>add</code> puts a route in the table, <code>default</code> is the catch-all destination and <code>via</code> names the gateway.',
@@ -105,10 +118,10 @@ NQ.CH.push({name:'NAT and public networks',badge:'NAT Navigator',
   anat:[...TRACE,[WEB,'arg','the web server']],
   how:['<code>traceroute 198.51.100.10</code> follows the laptop\'s packets towards the web server and shows how far they get.',
    'It is the same command as before. The first line is <code>home</code>, which answers because the TTL ran out on it. From the second line on there are only stars: the packet got past <code>home</code> and then vanished.',
-   'In the packet panel, look for an entry marked dropped (<code>drop</code>) whose verdict mentions a private source address. The device name on that line is the one that threw the packet away.',
+   'In the packet panel, look for an entry marked dropped (<code>drop</code>) whose note mentions a private source address. The device name on that line is the one that threw the packet away.',
    'Type that device\'s name as your answer.'],
   explain:'With NAT off, the packet still says it comes from <code>192.168.1.10</code>. Even if the server received it, its reply would be sent to a private address and lost, so the first router on the public side refuses it. NAT is what lets a private network use the internet at all. The next mission switches it back on.',
-  hint:'Run <code>traceroute 198.51.100.10</code>, open the dropped entry that mentions a private source address, and read the device column.',
+  hint:'Run <code>traceroute 198.51.100.10</code>, open the dropped entry that mentions a private source address, and read the device name in the row.',
   answer:['traceroute 198.51.100.10'],
   check:c=>{
     if(!ranTrace(c))return 'Run <code>traceroute 198.51.100.10</code> from the laptop first.';

@@ -41,7 +41,7 @@ describe('every mission of every chapter', () => {
       });
       it('every reference line succeeds', () => {
         const net = NQ.createNet(m.scenario, m.setup);
-        for (const l of m.answer) assert.equal(net.exec(l, m.dev).code, 0, l);
+        for (const l of m.answer) assert.equal(net.exec(l, m.dev).code, (m.expectFail || []).includes(l) ? 1 : 0, l);
       });
       it('how starts with the whole line, then the parts', () => {
         assert.ok(Array.isArray(m.how) && m.how.length >= 3 && m.how.length <= 5, 'three to five steps');
@@ -187,7 +187,7 @@ describe('chapter 2: lazy answers are caught', () => {
   });
   it('3: a made-up static entry passes with the loss the ping reports', () => {
     assert.equal(run(2, m(2).answer, '100%'), true);
-    assert.equal(run(2, [ADD('02:00:00:00:00:77')], '100'), true);
+    assert.equal(run(2, [ADD('02:00:00:00:00:77'), 'ping 10.0.0.3'], '100'), true);
     assert.equal(run(2, [ADD('02:00:00:00:00:99'), 'ping 10.0.0.3'], '100%'), true);
   });
   it('3: no entry, the phone\'s real MAC, a broadcast MAC, another address or a wrong number do not pass', () => {
@@ -721,5 +721,64 @@ describe('chapters, ranks, quick-fire and guide', () => {
       const net = NQ.createNet(g.sc || 'pair');
       for (const [line, , dev] of g.ex) assert.equal(net.exec(line, dev).code, 0, g.c + ': ' + line);
     }
+  });
+});
+
+describe('review fixes for chapters 2 to 5', () => {
+  const mm = (c, i) => NQ.CH[c].missions[i];
+  const run = (c, i, lines, a) => NQ.runMission(mm(c, i), lines, a);
+  const TR_SRV = 'traceroute 172.16.0.10', TR_FAR = 'traceroute 8.8.8.8';
+  it('4.4: an extra comparison traceroute, before or after, does not break the mission or hide the question', () => {
+    assert.equal(run(3, 3, [TR_SRV, TR_FAR], '10.0.1.2'), true);
+    assert.equal(run(3, 3, [TR_FAR, TR_SRV, TR_FAR], '10.0.1.2'), true);
+    assert.equal(run(3, 3, [TR_SRV, 'traceroute 192.168.1.1'], undefined), NQ.ASK);
+    assert.notEqual(run(3, 3, [TR_SRV, TR_FAR], '10.0.1.1'), true);
+    assert.notEqual(run(3, 3, [TR_FAR], '10.0.1.2'), true);
+  });
+  it('4.6: an extra comparison traceroute after the looping one does not break the mission or hide the question', () => {
+    assert.equal(run(3, 5, [TR_FAR, TR_SRV], '10.0.1.1'), true);
+    assert.equal(run(3, 5, [TR_SRV, TR_FAR, 'traceroute 192.168.1.1'], '10.0.1.1'), true);
+    assert.equal(run(3, 5, [TR_FAR, TR_SRV], undefined), NQ.ASK);
+    assert.notEqual(run(3, 5, [TR_SRV], '10.0.1.1'), true);
+  });
+  it('4.6: the repeated address may be typed twice', () => {
+    for (const a of ['10.0.1.1 10.0.1.1', '10.0.1.1, 10.0.1.1', '10.0.1.1 and 10.0.1.1']) assert.equal(run(3, 5, [TR_FAR], a), true, a);
+    assert.notEqual(run(3, 5, [TR_FAR], '10.0.1.1 10.0.1.2'), true);
+  });
+  it('2.3: the entry alone is not enough, a ping after it is needed, and 100 percent can be typed several ways', () => {
+    const ADD = 'ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0';
+    assert.match(run(1, 2, [ADD], '100%'), /ping the phone/);
+    assert.match(run(1, 2, ['ping 10.0.0.3', ADD], '100%'), /ping the phone/);
+    assert.equal(run(1, 2, [ADD, 'ping 10.0.0.3'], '100%'), true);
+    assert.equal(run(1, 2, ['ping 10.0.0.3', ADD, 'ping -c 2 10.0.0.3'], '100%'), true);
+    for (const a of ['100', '100 %', '100 percent', '100% packet loss', ' 100%. ']) assert.equal(run(1, 2, [ADD, 'ping 10.0.0.3'], a), true, a);
+    for (const a of ['0%', '50%', '10', '1000%']) assert.notEqual(run(1, 2, [ADD, 'ping 10.0.0.3'], a), true, a);
+    assert.equal(mm(1, 2).expectFail.join(), 'ping 10.0.0.3');
+  });
+  it('2.5: the switch can be typed with a the, a space or quotes', () => {
+    for (const a of ['the sw1', 'sw 1', '"sw1"', "'sw1'", '`sw1`', 'The SW1.']) assert.equal(run(1, 4, mm(1, 4).answer, a), true, a);
+    for (const a of ['switch', 'sw2', 'laptop']) assert.notEqual(run(1, 4, mm(1, 4).answer, a), true, a);
+  });
+  it('3.1, 3.2, 3.5: the subnet name and the broadcast address are no address for a host', () => {
+    for (const bad of ['10.0.0.0/24', '10.0.0.255/24']) {
+      const r = run(2, 0, ['ip addr add ' + bad + ' dev eth0']);
+      assert.match(r, /broadcast address/, bad);
+      const r2 = run(2, 1, ['ip addr del 10.0.0.200/25 dev eth0', 'ip addr add ' + bad + ' dev eth0']);
+      assert.match(r2, /broadcast address/, bad);
+    }
+    assert.equal(run(2, 0, ['ip addr add 10.0.0.254/24 dev eth0', 'ping -c 1 10.0.0.2']), true);
+    for (const bad of ['192.168.1.0/24', '192.168.1.255/24']) {
+      const r = run(2, 4, ['ip addr del 192.168.1.10/24 dev eth0', 'ip addr add ' + bad + ' dev eth0']);
+      assert.match(r, /broadcast address/, bad);
+    }
+    assert.equal(run(2, 4, ['ip addr del 192.168.1.10/24 dev eth0', 'ip addr add 192.168.1.254/24 dev eth0']), true);
+  });
+  it('5.3: the NAT table question still works after nat off, but nat table printed with NAT off does not count', () => {
+    const sw = mm(4, 2);
+    assert.equal(NQ.runMission(sw, ['nat table', 'nat off'], '192.168.1.11'), true);
+    assert.equal(NQ.runMission(sw, ['nat table', 'nat off', 'nat on'], '192.168.1.11'), true);
+    assert.equal(NQ.runMission(sw, ['nat table'], '192.168.1.11'), true);
+    assert.notEqual(NQ.runMission(sw, ['nat off', 'nat table'], '192.168.1.11'), true);
+    assert.notEqual(NQ.runMission(sw, ['nat table', 'nat off'], '192.168.1.10'), true);
   });
 });

@@ -32,7 +32,8 @@ NQ.makeCtx=(net,history,answered)=>({
    chapter 1's ping sends no ARP request at all.
    The UI checks a mission only after a command that exits 0, or when an answer is submitted, so a mission's reference
    answer must end on a line that exits 0 (tests/net/content.test.mjs 'every reference line succeeds' enforces it for
-   every line of the answer). */
+   every line of the answer; a mission whose point is a failing command, like a ping that gets no reply, lists that line in
+   m.expectFail, and the test then requires it to exit 1; the UI shows the question once the check passes, whatever the exit code). */
 NQ.runMission=(m,lines,answered)=>{
   const net=NQ.createNet(m.scenario,m.setup),history=[];
   for(const line of lines||[]){const r=net.exec(line,m.dev);history.push({line,code:r.code,entries:r.entries});}

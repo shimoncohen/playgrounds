@@ -155,7 +155,7 @@ describe('chapter 4 defines its new words in place', () => {
   });
   it('the terminal device is announced wherever it is not the laptop (4.2, 4.5)', () => {
     assert.match(card(1), /runs <b>on the printer<\/b>/);
-    assert.match(card(4), /runs <b>on r1<\/b>/);
+    assert.match(card(4), /runs <b>on <code>r1<\/code><\/b>/);
   });
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[3].intro)));
@@ -200,5 +200,20 @@ describe('quick-fire and guide are gated to a chapter that exists', () => {
   it('every entry names a chapter', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const g of NQ.GUIDE) assert.ok(Number.isInteger(g.ch) && NQ.CH[g.ch], g.c);
+  });
+});
+
+describe('learner text only names things the page really shows', () => {
+  // the packet list has no "verdict" label and no "dev" column: rows show the step, the device name, the direction and a note
+  const all = [];
+  NQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => all.push({ id: `${ci}.${mi}`, text: [m.title, m.goal, m.hint, m.explain, ...(m.how || []), m.question && m.question.ask].filter(Boolean).join('\n') })));
+  it('no mission card says "verdict" or "the dev column"', () => {
+    for (const x of all) assert.doesNotMatch(plain(x.text), /\bverdicts?\b|\bdev column\b/i, x.id);
+  });
+  it('check messages and hints do not either', () => {
+    for (const [ci, c] of NQ.CH.entries()) for (const [mi, m] of c.missions.entries()) {
+      const r = NQ.runMission(m, [], null);
+      if (typeof r === 'string') assert.doesNotMatch(plain(r), /\bverdicts?\b|\bdev column\b/i, `${ci}.${mi}`);
+    }
   });
 });

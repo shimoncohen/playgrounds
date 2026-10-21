@@ -131,3 +131,15 @@ test('reset and clone: nat off survives a clone, and reset brings NAT back; setu
 test('nat is listed by help', () => {
   assert.match(NQ.createNet('home').exec('help').out.join('\n'), /^nat\s+show or switch/m);
 });
+
+test('nat on after nat off needs addresses on both interfaces, with a friendly error', () => {
+  const net = NQ.createNet('home');
+  run(net, 'nat off');
+  net.devices.home.ifaces.eth1.ip = null;
+  const r = run(net, 'nat on');
+  assert.deepEqual([r.code, r.err[0]], [1, 'nat: cannot turn NAT on: eth1 has no address']);
+  assert.equal(net.devices.home.nat, null);
+  net.devices.home.ifaces.eth1.ip = '203.0.113.5/30';
+  assert.equal(run(net, 'nat on').code, 0, 'with the address back, nat on restores NAT');
+  assert.ok(net.devices.home.nat);
+});

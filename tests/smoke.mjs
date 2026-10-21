@@ -1667,6 +1667,28 @@ test('net-quest: chapter 4 plays through the page, on the printer and on r1, and
   }
 });
 
+test('net-quest: the question stays after an extra command, and a ping with no reply can open it', async () => {
+  const { ctx, page, errors, type, xp } = await netPage();
+  await page.click('#chapters .chap[data-ch="3"]');
+  await page.click('#mission .dot[data-mi="3"]');
+  await type('traceroute 172.16.0.10');
+  assert.equal(await page.isVisible('#answerBox'), true, 'the question opens');
+  await type('traceroute 8.8.8.8');
+  assert.equal(await page.isVisible('#answerBox'), true, 'an extra comparison traceroute keeps it');
+  await page.fill('#answer', '10.0.1.2'); await page.click('#answerBox button[type="submit"]');
+  assert.equal(await xp(), '10 XP');
+  await page.click('#chapters .chap[data-ch="1"]');
+  await page.click('#mission .dot[data-mi="2"]');
+  await type('ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0');
+  assert.equal(await page.isHidden('#answerBox'), true, 'no question before the ping');
+  await type('ping -c 1 10.0.0.3');
+  assert.equal(await page.isVisible('#answerBox'), true, 'a ping that gets no reply (exit 1) still opens the question');
+  await page.fill('#answer', '100%'); await page.click('#answerBox button[type="submit"]');
+  assert.equal(await xp(), '20 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('net-quest: chapter 5 plays through the page, on the laptop, home and web, and the map marks the terminal device as (you)', async () => {
   for (const width of [1280, 390]) {
     const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });

@@ -16,12 +16,21 @@ const calcs=c=>c.history.filter(h=>h.code===0&&/^\s*ipcalc\s+\S+\/\d+\s*$/.test(
 const ran=(c,p)=>calcs(c).some(r=>r.prefix===p);
 // the Hosts/Net number ipcalc printed for the latest run with that prefix (re-run on a clone), or null
 const hosts=(c,p)=>{const r=calcs(c).filter(x=>x.prefix===p).at(-1);if(!r)return null;const m=/Hosts\/Net:\s+(\d+)/.exec(c.net.clone().exec(r.line).out.join('\n'));return m?+m[1]:null;};
+/* an address that is the first (subnet name) or last (broadcast) of its subnet, judged by the card's own prefix and by the
+   neighbour's, is no address for a host */
+const reserved=(c,dev,ref)=>{
+  const mine=c.net.devices[dev].ifaces.eth0.ip,n=mine&&IPX.parse(bare(mine));
+  if(n===null||n===undefined)return false;
+  return [mine,c.net.devices[ref].ifaces.eth0.ip].some(x=>{const k=x&&IPX.cidr(x);return !!k&&k.prefix<31&&(n===k.net||n===k.bcast);});
+};
+const NOT_HOST=(a,net,bc)=>'<code>'+a+'</code> cannot be a device\'s address: the first address of a subnet (<code>'+net+'</code>) is its name and the last (<code>'+bc+'</code>) is its broadcast address. Give the device another address inside the subnet.';
 const SHOW_ADDR=/^\s*ip\s+(a|addr|address)(\s+show)?(\s+(dev\s+)?\w+)?\s*$/;
 // the pair network: laptop 10.0.0.2/24 and the phone, which must end up with an address on the laptop's wire
 const phoneUp=(c,miss,off,stuck)=>{
   const p=addrOf(c,'phone');
   if(!p)return miss;
   if(dups(c).length)return 'Another device already has that address. Give the phone one nobody uses, on the laptop\'s wire: it starts <code>10.0.0.</code> and ends <code>/24</code>.';
+  if(reserved(c,'phone','laptop'))return NOT_HOST(p,'10.0.0.0','10.0.0.255');
   if(!c.ping('phone',addrOf(c,'laptop')).delivered)return stuck;
   return c.ping('laptop',p).delivered?true:off;
 };
@@ -38,7 +47,7 @@ NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
   how:['<code>ip addr add 10.0.0.3/24 dev eth0</code> gives the phone\'s network card the address <code>10.0.0.3</code>, so other devices can find it again.',
    '<code>ip</code> is the command you know from <code>ip link</code> and <code>ip neigh</code>. <code>addr</code> says you are working with addresses (<code>ip addr</code> on its own lists them), and <code>add</code> puts one on a card. <code>dev eth0</code> names the card (<code>dev</code> is short for device); the phone has just one.',
    'The <code>/24</code> after the address is the <b>prefix</b>. It says which part of the address names the wire (the first three numbers, <code>10.0.0</code>) and which part names the device. Devices that share a wire and a prefix form a <b>subnet</b>. The laptop is <code>10.0.0.2/24</code>, so the phone must use <code>/24</code> and start with <code>10.0.0</code> too.',
-   '<code>ping -c 1 10.0.0.2</code> checks the work: the phone asks the laptop to answer, and a reply proves the phone can both send and receive. <code>ip addr</code> shows the address you added on its <code>inet</code> line.'],
+   '<code>ping -c 1 10.0.0.2</code> checks the work: the phone asks the laptop to answer, and a reply proves the phone can both send and receive. <code>ip addr</code> shows the address you added on its <code>inet</code> line (<code>inet</code> is how <code>ip</code> labels an IPv4 address).'],
   explain:'Before, <code>ip addr</code> on the phone showed a card and its MAC but no <code>inet</code> line: the card existed, but there was nothing to find it by. A MAC only works on one wire, while the IP address is what you type to say who you mean. Any free address starting <code>10.0.0.</code> with <code>/24</code> would have worked, as long as nobody else uses it (a later mission shows why).',
   hint:'Type <code>ip addr add 10.0.0.3/24 dev eth0</code> and press <kbd>Enter</kbd>, then <code>ping -c 1 10.0.0.2</code>.',
   answer:['ip addr add 10.0.0.3/24 dev eth0','ping -c 1 10.0.0.2'],
@@ -46,7 +55,7 @@ NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
     'The laptop cannot reach the phone at that address. Give it one that starts <code>10.0.0.</code> and ends <code>/24</code>, like the laptop\'s.',
     'The phone cannot reach the laptop with that address. Give it one that starts <code>10.0.0.</code> and ends <code>/24</code>, like the laptop\'s.')},
  {title:'A typo in the mask',scenario:'pair',dev:'phone',setup:[...SET('10.0.0.200/25')],
-  goal:'Someone gave the phone an address, but a typo crept into the number after the slash, and now the phone and the laptop cannot talk. That number is the prefix, also called the <b>mask</b>: it is how a device decides which addresses sit on its own wire. This terminal runs on the phone. Run <code>ip addr</code> to read what it was given, compare it with the laptop\'s <code>10.0.0.2/24</code>, and repair it so that <code>ping -c 1 10.0.0.2</code> works.',
+  goal:'Someone gave the phone an address, but a typo crept into its <b>prefix</b>, the number after the slash, and now the phone and the laptop cannot talk. The prefix is also called the <b>mask</b>: it is how a device decides which addresses sit on its own wire. This terminal runs on the phone. Run <code>ip addr</code> to read what it was given, compare it with the laptop\'s <code>10.0.0.2/24</code>, and repair it so that <code>ping -c 1 10.0.0.2</code> works.',
   anat:[...IP_ADDR,['del','arg','remove an address'],['10.0.0.200/25','arg','address, wrong prefix'],['add','arg','give a card an address'],['dev','arg','device'],['eth0','arg','the phone\'s card']],
   how:['<code>ip addr del 10.0.0.200/25 dev eth0</code> followed by <code>ip addr add 10.0.0.200/24 dev eth0</code> swaps the phone\'s address for the same one with the right prefix.',
    '<code>del</code> is short for delete: it removes an address from a card, and you must name it exactly as <code>ip addr</code> shows it, prefix included. <code>ip addr add</code> refuses to put a second address on a card, which is why the old one has to go first.',
@@ -99,6 +108,7 @@ NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
     const p=addrOf(c,'printer');
     if(!p)return 'The printer has no address now. Add one that nobody uses with <code>ip addr add</code>.';
     if(dups(c).length)return 'Two devices still share an address. Give the printer one nobody uses (the router has <code>192.168.1.1</code>, the laptop <code>192.168.1.10</code>).';
+    if(reserved(c,'printer','laptop'))return NOT_HOST(p,'192.168.1.0','192.168.1.255');
     if(!c.ping('printer',addrOf(c,'laptop')).delivered)return 'The printer cannot reach the laptop. Keep it on the same wire: an address starting <code>192.168.1.</code> and ending <code>/24</code>.';
     return c.ping('laptop',p).delivered?true:'The laptop cannot reach the printer at its new address. Keep it on the same wire: an address starting <code>192.168.1.</code> and ending <code>/24</code>.';}},
  {title:'Tiny subnets',scenario:'pair',

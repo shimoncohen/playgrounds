@@ -197,7 +197,8 @@ const natCmd=(net,dev,args)=>{
     return ok('NAT is now off: '+dev.id+' forwards packets with their addresses unchanged, and the NAT table is forgotten');
   }
   if(n)return ok('NAT is already on: '+natDesc(dev,n));
-  const c=dev.natOff&&iface(dev,dev.natOff.inside)&&iface(dev,dev.natOff.outside)?{nat:dev.natOff}:natGuess(dev);
+  const o=dev.natOff,lost=o&&[o.inside,o.outside].find(k=>iface(dev,k)&&!dev.ifaces[k].ip);
+  const c=lost?{error:bad('nat: cannot turn NAT on: '+lost+' has no address')}:o&&iface(dev,o.inside)&&iface(dev,o.outside)?{nat:o}:natGuess(dev);
   if(c.error)return c.error;
   dev.nat={inside:c.nat.inside,outside:c.nat.outside,table:[]};delete dev.natOff;
   return ok('NAT is now on: '+natDesc(dev,dev.nat));

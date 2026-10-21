@@ -27,7 +27,7 @@ Out of scope (later phases): DNS, TCP/UDP, HTTP/TLS, HTTP/2, HTTP/3/QUIC, gRPC, 
 - **Topology** (`topology.js`): data. Hosts, switches, routers with interfaces (MAC, IP/prefix, up/down), routes, ARP tables, and a NAT edge to a "public" side. Each mission names a **scenario** (a small prebuilt topology, possibly seeded with a fault).
 - **Simulator** (`sim.js`): moves a packet hop by hop and appends every step to a **packet log**: time, device, layer-by-layer headers, verdict (forwarded, delivered, dropped with reason, NAT-rewritten). Handles ARP, ICMP echo, TTL expiry, switching, routing, NAT. Deterministic: no randomness, fake clock.
 - **Packets** (`packets.js`): header structures per layer and their hex encoding. Phase 1: Ethernet, ARP, IPv4, ICMP.
-- **Commands** (`cmds-*.js`, `shell.js`): a small parser (quotes, flags, `|` into `grep` and `head`). Phase 1 commands: `ip addr`, `ip route`, `ip neigh`, `ip link`, `ping`, `traceroute`, `arping`, a subnet helper, `help`.
+- **Commands** (`cmds-*.js`, `shell.js`): a small parser (quotes, flags, `|` into `grep` and `head`). Phase 1 commands: `ip addr`, `ip route`, `ip neigh`, `ip link`, `ping`, `traceroute`, `arping`, a subnet helper (`ipcalc`), `nat` (status, table, on, off, for routers), `help`.
 - **Editing**: `ip addr add/del`, `ip route add/del`, `ip link set up/down`, `ip neigh add/del`. State is per mission; "reset scenario" restores it.
 - Engine files must not touch the DOM or `window`. DOM code lives in `ui.js`, `inspector.js`, `app.js`.
 
@@ -37,7 +37,7 @@ Mission shape follows the other quests (goal, `how` steps with the whole line ex
 
 - **Checks run on simulated outcomes**, e.g. "a `ping` from `laptop` to `10.0.0.9` is delivered" or "`laptop` has a route to `192.168.1.0/24`". Each check runs a fresh probe against the learner's final topology, so typing a command that changes nothing cannot pass.
 - **Inspector questions**: concept missions may ask about a packet ("what is the TTL after the router?"). The expected value is computed by the sim, never hardcoded, so engine changes cannot drift from content.
-- **Fix-it missions**: the scenario starts broken (wrong gateway, mask typo, duplicate IP, interface down); the learner diagnoses and repairs it.
+- **Fix-it missions**: the scenario starts broken (wrong gateway, mask typo, duplicate IP, missing route or default route, NAT switched off); the learner diagnoses and repairs it.
 - Reference `answer` is a list of commands. The solvability test replays it and requires the check to pass; a "do nothing" run must fail it.
 
 ### Phase 1 chapters
@@ -59,7 +59,7 @@ net-quest/
   index.html  style.css  app.js        course arrays (CH, QF, GUIDE, RANKS), glue
   ui.js  inspector.js                  the only DOM files besides app.js
   engine/  topology.js sim.js packets.js shell.js cmds-*.js
-  content/ ch-1-layers.js ch-2-mac-arp.js ch-3-ip.js ch-4-routing.js ch-5-nat.js
+  content/ ch-1-layers.js ch-2-mac-arp.js ch-3-ip-addressing.js ch-4-routing.js ch-5-nat.js
 tests/net/*.test.mjs
 ```
 

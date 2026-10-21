@@ -14,9 +14,11 @@ const sent=(c,h,pred)=>(h.entries||[]).some(e=>e.dev===c.net.me&&e.dir==='tx'&&p
 const asked=(c,h)=>sent(c,h,arpReq);
 // the ping commands (with their position in the history) that put an echo request on the wire
 const pingRuns=c=>c.history.map((h,i)=>({h,i})).filter(r=>isPing(r.h.line)&&sent(c,r.h,e=>ic(e,'echo-request')));
+const NEIGH_ADD=/^\s*ip\s+(neigh|neighbor|n)\s+add\s+10\.0\.0\.3(\s|$)/;
 const PHONE='10.0.0.3',WRONG='02:00:00:00:00:99';
 const phoneMac=c=>c.net.devices.phone.ifaces.eth0.mac;
 const switchOf=c=>Object.values(c.net.devices).find(d=>d.kind==='switch');
+const keeper=c=>Object.values(c.net.devices).filter(d=>d.kind==='switch'&&Object.keys(d.macTable).length).map(d=>d.id)[0]||''; // the switch that has learned a MAC
 const PING1=[['ping','cmd'],['-c','opt','count'],['1','arg','how many'],[PHONE,'arg','who to ping']];
 
 NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
@@ -63,13 +65,15 @@ NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
    'Run <code>ip neigh</code> too: your entry ends in <code>PERMANENT</code>, the word <code>ip neigh</code> uses for a static entry. Permanent means ARP answers cannot overwrite it.'],
   explain:'The laptop never sent an ARP request, so nothing could correct the mistake: a static entry beats a real ARP answer. People who run networks use static entries for machines that matter, so nobody can pretend to be them, and the price is exactly this failure when an entry is wrong. The next mission is a repair job.',
   hint:'Type <code>ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0</code>, then <code>ping 10.0.0.3</code> and read the statistics at the end.',
-  scenario:'pair',answer:['ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0'],
+  scenario:'pair',answer:['ip neigh add 10.0.0.3 lladdr 02:00:00:00:00:99 dev eth0','ping 10.0.0.3'],expectFail:['ping 10.0.0.3'],
   check:c=>{
     const lap=c.net.devices[c.net.me],mac=lap.neigh[PHONE];
     if(!mac||!(lap.permanent||[]).includes(PHONE))return 'Write the entry by hand with <code>ip neigh add</code>, for the phone\'s address <code>10.0.0.3</code>.';
     if(mac===phoneMac(c))return 'That is the phone\'s real MAC, so pings still work. Store a MAC no card owns, like <code>02:00:00:00:00:99</code>.';
-    return c.ping(c.net.me,PHONE).delivered?'That MAC still reaches the phone. Store a MAC no card owns, like <code>02:00:00:00:00:99</code>.':true;},
-  question:{ask:'Ping the phone now. What packet loss does the last line of the statistics report?',expect:c=>{const m=/(\d+)% packet loss/.exec(c.net.clone().exec('ping '+PHONE).out.join('\n'));return m?m[1]+'%':'';},accept:()=>['100']}},
+    if(c.ping(c.net.me,PHONE).delivered)return 'That MAC still reaches the phone. Store a MAC no card owns, like <code>02:00:00:00:00:99</code>.';
+    const add=c.history.map((h,i)=>({h,i})).filter(r=>r.h.code===0&&NEIGH_ADD.test(r.h.line)).at(-1);
+    return add&&pingRuns(c).some(r=>r.i>add.i)?true:'The entry is in. Now ping the phone, <code>ping 10.0.0.3</code>, and watch nothing come back.';},
+  question:{ask:'Ping the phone now. What packet loss does the last line of the statistics report?',expect:c=>{const m=/(\d+)% packet loss/.exec(c.net.clone().exec('ping '+PHONE).out.join('\n'));return m?m[1]+'%':'';},accept:()=>['100','100 percent','100 %','100% packet loss','100 percent packet loss']}},
  {title:'Repair the entry',goal:'Someone left a hand-written entry on the laptop, and now the phone at <code>10.0.0.3</code> does not answer. Find out what is wrong and fix it, so that <code>ping 10.0.0.3</code> works again. Two tools help: <code>ip neigh</code> shows what the laptop believes, and <code>arping 10.0.0.3</code> asks the phone itself.',
   anat:[['ip','cmd','network settings tool'],['neigh','arg','what the laptop remembers'],['arping','cmd','ask the phone itself'],[PHONE,'arg','who to ask about']],
   how:['<code>ip neigh</code>, then <code>arping 10.0.0.3</code>, then a fix, then <code>ping 10.0.0.3</code>: compare what the laptop remembers with the MAC the phone really answers with, repair the entry, and prove it with a <code>ping</code>.',
@@ -89,11 +93,11 @@ NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
   goal:'This is a bigger wire: the laptop, a printer and a router all plug into one switch. The switch has no terminal and no IP address, but it keeps a table of its own. Every frame that arrives teaches it which <b>port</b> (a socket on the switch) the sender\'s MAC is behind, so it can send later frames out of one port instead of all of them. Ping the printer with <code>ping -c 1 192.168.1.20</code>, then use the packet panel to work out which device keeps that table.',
   anat:[['ping','cmd'],['-c','opt','count'],['1','arg','how many'],['192.168.1.20','arg','the printer']],
   how:['<code>ping -c 1 192.168.1.20</code> makes the laptop ask for the printer\'s MAC and then send the echo request, so the switch has frames to learn from and then to use.',
-   'Look at the <b>dev</b> column of the packet panel: every row is named after the device that logged it. The ARP request is a broadcast, so the switch copies it out of every other port (the note says <b>flooded: broadcast</b>). The router hears it too and ignores it.',
+   'Look at the device name in each row of the packet panel: every row is named after the device that logged it. The ARP request is a broadcast, so the switch copies it out of every other port (the note says <b>flooded: broadcast</b>). The router hears it too and ignores it.',
    'Later frames are different. The switch has heard both the laptop and the printer by then, so the echo request goes out of one port only (the note says <b>forwarded out</b> and a port name).',
-   'Only a device that remembers where each MAC lives can do that. Its list of MAC and port pairs is called a <b>MAC table</b>. Type the name of the device that keeps it, exactly as the <b>dev</b> column shows it.'],
+   'Only a device that remembers where each MAC lives can do that. Its list of MAC and port pairs is called a <b>MAC table</b>. Type the name of the device that keeps it, exactly as the packet panel shows it in its rows.'],
   explain:'A switch learns by listening: the laptop\'s ARP request taught it which port the laptop is behind, and the printer\'s ARP reply taught it the printer\'s. When it has no row for a destination MAC, it falls back to <b>flooding</b>: copying the frame out of every other port, as it does with a broadcast. That is slower but always works. A switch never reads IP addresses, only MACs and ports.',
-  hint:'Open the rows whose note says <b>flooded</b> or <b>forwarded out</b>, and read the name in their <b>dev</b> column.',
+  hint:'Open the rows whose note says <b>flooded</b> or <b>forwarded out</b>, and read the device name in each row.',
   answer:['ping -c 1 192.168.1.20'],
   check:c=>{
     const sw=switchOf(c),lap=c.net.devices[c.net.me],mac=lap.ifaces.eth0.mac;
@@ -101,6 +105,7 @@ NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
     if(!at(/^flooded: broadcast/))return 'Ping the printer with <code>ping -c 1 192.168.1.20</code>, so the switch sees the laptop\'s ARP request.';
     if(!at(/^forwarded out/)||!sw.macTable[mac])return 'The switch has not seen enough yet. Ping the printer, <code>ping -c 1 192.168.1.20</code>, and let the answer come back.';
     return true;},
-  question:{ask:'Which device keeps the MAC table?',expect:c=>Object.values(c.net.devices).filter(d=>d.kind==='switch'&&Object.keys(d.macTable).length).map(d=>d.id)[0]||''}}
+  question:{ask:'Which device keeps the MAC table?',expect:c=>keeper(c),
+   accept:c=>{const k=keeper(c);return k?['the '+k,k.replace(/(\D)(\d)/,'$1 $2'),'"'+k+'"','\''+k+'\'','`'+k+'`']:[];}}}
  ]});
 })();
