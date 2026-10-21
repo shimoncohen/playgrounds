@@ -538,7 +538,7 @@ const CH=[
 {name:'First words',badge:'Hello, World',intro:'Every program is a list of instructions that Python reads from top to bottom. The first instruction most people learn is print, which shows something on the screen.',
  learned:['print()','"text"','numbers','# comments','reading errors'],
  missions:[
- {title:'Say hello',goal:'Make Python show <code>Hello, world!</code> in the console.',
+ {title:'Say hello',goal:'Make Python show <code>Hello, world!</code> in the console (the output panel under your editor).',
   anat:[['print','fn'],['(','br'],['"Hello, world!"','str'],[')','br']],
   explain:'<code>print</code> is a <b>function</b>: a built-in tool that does a job. The round brackets hold what you give it. The quotes tell Python this is <b>text</b> (Python calls text a <i>string</i>).',
   note:'Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or the Run button) to run your code.',
@@ -592,18 +592,18 @@ const CH=[
   check:c=>c.val('gold')!==35?'gold should end at 35':!/gold\s*=\s*gold\s*\+|gold\s*\+=/.test(c.code)?'Use gold = gold + 10 instead of typing 35 directly.':!c.printed('35')?'Print gold at the end.':true},
  {title:'The shortcut',goal:'A goblin hits you for 30. Use <code>-=</code> to take 30 from <code>hp</code> (100 becomes 70) and print it.',
   anat:[['hp','var'],['-=','op','subtract & store'],['30','num']],
-  explain:'<code>hp -= 30</code> is short for <code>hp = hp - 30</code>. There is also <code>+=</code>, <code>*=</code> and <code>/=</code>. You will use <code>+=</code> constantly for scores and counters.',
+  explain:'<code>hp -= 30</code> is short for <code>hp = hp - 30</code>. There is also <code>+=</code>, and matching shortcuts for the other maths symbols (you will meet them in the next chapter). You will use <code>+=</code> constantly for scores and counters.',
   starter:'hp = 100\n',answer:'hp = 100\nhp -= 30\nprint(hp)',
   check:c=>!/hp\s*-=/.test(c.code)?'Use the -= shortcut.':c.val('hp')!==70?'hp should end at 70.':c.printed('70')||'Print hp.'},
  {title:'Four kinds of value',goal:'Set <code>speed = 1.5</code> and <code>alive = True</code>. Then print <code>type(speed)</code> and <code>type(alive)</code>.',
   anat:[['type','fn'],['(','br'],['speed','var'],[')','br']],
   explain:'Every value has a <b>type</b>. <code>int</code> = whole number, <code>float</code> = number with a decimal point, <code>str</code> = text, <code>bool</code> = <code>True</code> or <code>False</code>. <code>type()</code> tells you which one a value is.',
-  note:'True and False start with a capital letter and have no quotes.',
+  note:'True and False start with a capital letter and have no quotes. Printing a type shows a label like <code>&lt;class \'float\'&gt;</code>: the word after <code>class</code> is the type. Python writes text inside labels and lists with single quotes, and <code>\'hi\'</code> is the same text as <code>"hi"</code>.',
   starter:'',answer:'speed = 1.5\nalive = True\nprint(type(speed))\nprint(type(alive))',
   check:c=>c.type('speed')!=='float'?'speed should be 1.5 (a float).':c.type('alive')!=='bool'?'alive should be True (capital T, no quotes).':c.out.includes("<class 'float'>")&&c.out.includes("<class 'bool'>")?true:'Print type(speed) and type(alive).'},
  {title:'Mix text and values',goal:'Print the sentence <code>Ada has 70 HP and 35 gold</code> using an <b>f-string</b> and the three variables.',
   anat:[['f','kw','f-string'],['"','str'],['{hero}','var','slot'],[' has ','str'],['{hp}','var','slot'],['...','str'],['"','str']],
-  explain:'Put an <code>f</code> before the quotes, then write variable names inside <code>{curly brackets}</code>. Python swaps each <code>{name}</code> for the value in that box.',
+  explain:'Put an <code>f</code> before the quotes, then write variable names inside <code>{curly brackets}</code>. Python swaps each <code>{name}</code> for the value in that box. You can even put a small calculation inside the braces: <code>{2 + 3}</code> shows 5.',
   starter:'hero = "Ada"\nhp = 70\ngold = 35\n',answer:'hero = "Ada"\nhp = 70\ngold = 35\nprint(f"{hero} has {hp} HP and {gold} gold")',
   check:c=>!/f["']/.test(c.code)?'Use an f-string: print(f"...")':c.printed(`${c.val('hero')} has ${c.val('hp')} HP and ${c.val('gold')} gold`)||'Make it read exactly: Ada has 70 HP and 35 gold'},
  {title:'Bug hunt: the missing box',goal:'This crashes with a <code>NameError</code>. Find out why and fix it.',
@@ -617,13 +617,13 @@ const CH=[
  missions:[
  {title:'Damage calculator',goal:'A sword does 7 damage and hits 3 times. Store <code>damage = 7 * 3</code> and print it.',
   anat:[['damage','var'],['=','op'],['7','num'],['*','op','times'],['3','num']],
-  explain:'Math operators: <code>+</code> add, <code>-</code> subtract, <code>*</code> multiply, <code>/</code> divide. Python follows the usual order: <code>*</code> and <code>/</code> before <code>+</code> and <code>-</code>. Brackets go first.',
+  explain:'Math operators: <code>+</code> add, <code>-</code> subtract, <code>*</code> multiply, <code>/</code> divide. Python follows the usual order: <code>*</code> and <code>/</code> before <code>+</code> and <code>-</code>. Brackets go first. The shortcuts work for these too: <code>x *= 2</code> means <code>x = x * 2</code>, and <code>/=</code> divides the same way.',
   starter:'',answer:'damage = 7 * 3\nprint(damage)',
   check:c=>c.val('damage')!==21?'damage should be 7 * 3.':!/\*/.test(c.code)?'Use * to multiply.':c.printed('21')||'Print damage.'},
  {title:'Three ways to divide',goal:'Split 17 coins between 5 players. Print <code>17 / 5</code>, <code>17 // 5</code> and <code>17 % 5</code> on three lines.',
   anat:[['17','num'],['//','op','whole part'],['5','num'],['%','op','remainder']],
   explain:'<code>/</code> gives an exact answer with decimals (3.4). <code>//</code> gives the whole part only: each player gets 3. <code>%</code> (modulo) gives what is left over: 2 coins.',
-  note:'% is great for "every Nth time" checks: n % 2 == 0 means n is even.',
+  note:'% is great for "every Nth time" checks: <code>n % 2</code> is 0 for every even number, because even numbers divide by 2 with nothing left over.',
   starter:'',answer:'print(17 / 5)\nprint(17 // 5)\nprint(17 % 5)',
   check:c=>c.lines.join('|')==='3.4|3|2'||'The console should show 3.4, then 3, then 2.'},
  {title:'Power up',goal:'Your power doubles 10 times. Print <code>2 ** 10</code>.',
@@ -633,7 +633,7 @@ const CH=[
  {title:'Text tools',goal:'With <code>name = "python"</code>, print <code>name.upper()</code> and then <code>len(name)</code>.',
   anat:[['name','var'],['.','op','dot'],['upper','fn','method'],['()','br']],
   explain:'Text has built-in tools called <b>methods</b>. You use them with a dot: <code>name.upper()</code>. <code>len()</code> counts the characters.',
-  note:'Try .lower(), .title() and .replace("p", "j") too.',
+  note:'Try <code>.lower()</code> (all small letters), <code>.title()</code> (Capital Letters) and <code>.replace("p", "j")</code> (swap every "p" for a "j") too. You can chain methods, left to right: <code>name.upper().lower()</code>.',
   starter:'name = "python"\n',answer:'name = "python"\nprint(name.upper())\nprint(len(name))',
   check:c=>c.printed('PYTHON')&&c.printed('6')||'You should see PYTHON and 6.'},
  {title:'Pick one letter',goal:'With <code>word = "dragon"</code>, print the first letter and the last letter.',
@@ -653,7 +653,7 @@ const CH=[
   check:c=>!/input\(/.test(c.code)?'Use input() to ask for the name.':c.type('name')!=='str'?'Store the answer in a variable called name.':c.printed(`Welcome, ${c.val('name')}!`)||c.out.includes(`Welcome, ${c.val('name')}!`)||'Print Welcome, followed by the name and !'},
  {title:'Turn text into a number',goal:'Ask for a number with <code>input()</code>, turn it into an int with <code>int()</code>, and print double it.',
   anat:[['int','fn','convert'],['(','br'],['input("Pick a number: ")','fn'],[')','br']],
-  explain:'<code>input()</code> always gives you text, even "21". Text times 2 would repeat it ("2121"). Wrap it in <code>int()</code> to turn it into a real number. <code>float()</code> and <code>str()</code> convert the same way.',
+  explain:'<code>input()</code> always gives you text, even "21". Text times 2 would repeat it ("2121": <code>"ha" * 3</code> is <code>hahaha</code>). Wrap it in <code>int()</code> to turn it into a real number. <code>float()</code> and <code>str()</code> convert the same way.',
   inputs:['21'],starter:'number = input("Pick a number: ")\nprint(number * 2)\n',answer:'number = int(input("Pick a number: "))\nprint(number * 2)',
   check:c=>c.type('number')!=='int'?'number is still text. Wrap the input() in int(...).':c.printed(String(c.val('number')*2))||'Print number * 2.'}
  ]},
@@ -662,19 +662,19 @@ const CH=[
  missions:[
  {title:'Yes or no questions',goal:'Print the results of <code>5 > 3</code>, <code>10 == 9</code> and <code>"a" != "b"</code>.',
   anat:[['5','num'],['>','op','greater than'],['3','num']],
-  explain:'A comparison gives back <code>True</code> or <code>False</code>. <code>==</code> asks "are these equal?" (two signs, because one <code>=</code> means "store"). <code>!=</code> means "not equal".',
+  explain:'A comparison gives back <code>True</code> or <code>False</code>. <code>==</code> asks "are these equal?" (two signs, because one <code>=</code> means "store"). <code>!=</code> means "not equal". The rest: <code>&gt;</code> greater than, <code>&lt;</code> less than, <code>&gt;=</code> greater than or equal, <code>&lt;=</code> less than or equal.',
   starter:'',answer:'print(5 > 3)\nprint(10 == 9)\nprint("a" != "b")',
   check:c=>c.lines.join('|')==='True|False|True'||'You should see True, False, True.'},
  {title:'Your first if',goal:'With <code>hp = 20</code>, print <code>Low health! Drink a potion.</code> only if hp is below 30.',
   anat:[['if','kw'],['hp < 30','var','condition'],[':','op','colon!']],
-  explain:'<code>if</code> runs the indented lines underneath only when the condition is True. Two things matter: the <b>colon</b> at the end and the <b>4-space indent</b> on the next line. Press <kbd>Tab</kbd> to indent.',
+  explain:'<code>if</code> runs the indented lines underneath only when the condition is True. Two things matter: the <b>colon</b> at the end and the <b>4-space indent</b> on the next line. Press <kbd>Tab</kbd> to indent. The condition does not have to be a comparison: a <code>0</code> or empty text <code>""</code> counts as False, and any other number or text counts as True.',
   starter:'hp = 20\n',answer:'hp = 20\nif hp < 30:\n    print("Low health! Drink a potion.")',
-  check:c=>!/^\s*if\b/m.test(c.code)?'Use an if statement.':c.printed('Low health! Drink a potion.')||'Print the warning inside the if.'},
+  check:c=>!/^\s*if\b/m.test(c.code)?'Use an if.':c.printed('Low health! Drink a potion.')||'Print the warning inside the if.'},
  {title:'Otherwise...',goal:'With <code>gold = 5</code>: if gold is at least 10, print <code>You buy a sword</code>, else print <code>Not enough gold</code>.',
   anat:[['if','kw'],['gold >= 10','var'],[':','op'],['else','kw'],[':','op']],
-  explain:'<code>else</code> catches every case the <code>if</code> did not. Exactly one of the two blocks runs. <code>else</code> lines up with its <code>if</code>, not with the indented lines.',
+  explain:'<code>else</code> catches every case the <code>if</code> did not. Exactly one of the two groups of indented lines runs. <code>else</code> lines up with its <code>if</code>, not with the indented lines.',
   starter:'gold = 5\n',answer:'gold = 5\nif gold >= 10:\n    print("You buy a sword")\nelse:\n    print("Not enough gold")',
-  check:c=>!/^\s*else\s*:/m.test(c.code)?'Add an else: block.':c.printed('Not enough gold')&&!c.printed('You buy a sword')?true:'With 5 gold, only "Not enough gold" should print.'},
+  check:c=>!/^\s*else\s*:/m.test(c.code)?'Add an else: line.':c.printed('Not enough gold')&&!c.printed('You buy a sword')?true:'With 5 gold, only "Not enough gold" should print.'},
  {title:'More than two paths',goal:'Give a medal for <code>score = 85</code>: 90 or more is <code>Gold</code>, 70 or more is <code>Silver</code>, anything else is <code>Bronze</code>.',
   anat:[['if','kw'],['elif','kw','else if'],['else','kw']],
   explain:'<code>elif</code> means "else if". Python checks each condition from top to bottom and runs only the <b>first</b> one that is True. That is why the order matters: check the biggest score first.',
@@ -712,17 +712,17 @@ const CH=[
   check:c=>!/\.append\(/.test(c.code)?'Use inventory.append("map").':!(c.val('inventory')||[]).includes('map')?'Add "map" to the list.':c.printed(String(c.val('inventory').length))||'Print len(inventory).'},
  {title:'Use it up',goal:'Drink the potion: remove <code>"potion"</code> from the list with <code>.remove()</code> and print the list.',
   anat:[['inventory','var'],['.remove','fn'],['("potion")','str']],
-  explain:'<code>.remove(x)</code> deletes the first item equal to x. <code>.pop()</code> removes the last item and hands it back to you, so you can store it: <code>item = inventory.pop()</code>.',
+  explain:'<code>.remove(x)</code> deletes the first item equal to x. <code>.pop()</code> removes the last item and gives it back to you, so <code>item = inventory.pop()</code> keeps it in a box.',
   starter:'inventory = ["sword", "shield", "potion", "map"]\n',answer:'inventory = ["sword", "shield", "potion", "map"]\ninventory.remove("potion")\nprint(inventory)',
   check:c=>(c.val('inventory')||[]).includes('potion')?'potion is still in the list.':!/\.remove\(|\.pop\(/.test(c.code)?'Use .remove("potion").':c.out.includes("['sword', 'shield', 'map']")||'Print the inventory.'},
  {title:'Check the bag',goal:'If <code>"sword"</code> is <b>in</b> the inventory, print <code>Ready to fight!</code>.',
   anat:[['"sword"','str'],['in','kw','is inside?'],['inventory','var']],
   explain:'<code>in</code> asks "is this item somewhere in the list?" and gives back True or False. It works on text too: <code>"dra" in "dragon"</code> is True.',
   starter:'inventory = ["sword", "shield", "map"]\n',answer:'inventory = ["sword", "shield", "map"]\nif "sword" in inventory:\n    print("Ready to fight!")',
-  check:c=>!/\bin\b/.test(c.code.replace(/print\(.*\)/g,''))?'Use the in keyword.':c.printed('Ready to fight!')||'Print Ready to fight!'},
+  check:c=>!/\bin\b/.test(c.code.replace(/print\(.*\)/g,''))?'Use the word in.':c.printed('Ready to fight!')||'Print Ready to fight!'},
  {title:'Upgrade an item',goal:'Swap the shield for a better one: set <code>inventory[1]</code> to <code>"golden shield"</code> and print the list.',
   anat:[['inventory','var'],['[1]','num'],['=','op'],['"golden shield"','str']],
-  explain:'You can replace any slot by assigning to its index. Text cannot do this (text is <b>immutable</b>), but lists can (they are <b>mutable</b>).',
+  explain:'You can replace any slot by assigning to its index. Text cannot do this (text is <b>immutable</b>), but lists can (they are <b>mutable</b>). Careful: <code>b = a</code> does not copy a list. Both names point to the same list, so changing one changes the other.',
   starter:'inventory = ["sword", "shield", "map"]\n',answer:'inventory = ["sword", "shield", "map"]\ninventory[1] = "golden shield"\nprint(inventory)',
   check:c=>(c.val('inventory')||[])[1]!=='golden shield'?'inventory[1] should be "golden shield".':!/inventory\[1\]\s*=/.test(c.code)?'Assign to inventory[1] directly.':c.out.includes('golden shield')||'Print the list.'}
  ]},
@@ -731,7 +731,7 @@ const CH=[
  missions:[
  {title:'Check every item',goal:'Use a <code>for</code> loop to print each item in <code>inventory</code> on its own line.',
   anat:[['for','kw'],['item','var','each one'],['in','kw'],['inventory','var'],[':','op']],
-  explain:'The loop takes each item in turn, puts it in the <code>item</code> box, and runs the indented lines. Then it moves to the next item. After running, step through it and watch the line marker jump back up.',
+  explain:'The loop takes each item in turn, puts it in the <code>item</code> box, and runs the indented lines. Then it moves to the next item. (Text works too: a <code>for</code> loop over <code>"hi"</code> gives <code>"h"</code>, then <code>"i"</code>.) After running, step through it and watch the line marker jump back up.',
   starter:'inventory = ["sword", "shield", "map", "torch"]\n',answer:'inventory = ["sword", "shield", "map", "torch"]\nfor item in inventory:\n    print(item)',
   check:c=>!/^\s*for\b/m.test(c.code)?'Use a for loop.':c.lines.join('|')==='sword|shield|map|torch'||'Print each item, one per line.'},
  {title:'Count with range',goal:'Print the numbers 1 to 5 using <code>for</code> and <code>range()</code>.',
@@ -742,12 +742,12 @@ const CH=[
  {title:'Add it all up',goal:'Add up the coins in <code>coins</code> with a loop. Start <code>total = 0</code>, add each coin, then print the total.',
   anat:[['total','var'],['+=','op'],['coin','var']],
   explain:'This is the <b>accumulator pattern</b>: start a box at 0, then add to it each time around the loop. You will use it for scores, totals and counts.',
-  note:'Python also has <code>sum(coins)</code>, but writing the loop shows how it works.',
+  note:'Python also has <code>sum(coins)</code>, which adds up a whole list in one go, but writing the loop shows how it works.',
   starter:'coins = [5, 10, 20, 15]\ntotal = 0\n',answer:'coins = [5, 10, 20, 15]\ntotal = 0\nfor coin in coins:\n    total += coin\nprint(total)',
   check:c=>!/^\s*for\b/m.test(c.code)?'Use a for loop to add each coin.':c.val('total')!==50?'total should end at 50.':c.printed('50')||'Print total after the loop (not indented).'},
  {title:'Fight until it falls',goal:'A slime has <code>hp = 50</code>. Use <code>while hp > 0:</code> to hit it for 15 each time and print hp after every hit.',
   anat:[['while','kw'],['hp > 0','var','keep going if'],[':','op']],
-  explain:'A <code>while</code> loop checks its condition, runs the body, then checks again. It stops the moment the condition is False. Something inside must change, or it never ends.',
+  explain:'A <code>while</code> loop checks its condition, runs the indented lines, then checks again. It stops the moment the condition is False. Something inside must change, or it never ends.',
   starter:'hp = 50\n',answer:'hp = 50\nwhile hp > 0:\n    hp -= 15\n    print(hp)',
   check:c=>!/^\s*while\b/m.test(c.code)?'Use a while loop.':c.val('hp')>0?'Keep hitting until hp is 0 or less.':c.lines.join('|')==='35|20|5|-10'||'Print hp after each hit: 35, 20, 5, -10.'},
  {title:'Stop early',goal:'Find the first number whose square is more than 50. Loop over <code>range(1, 100)</code>, and when <code>n * n > 50</code>, print n and <code>break</code>.',
@@ -766,8 +766,8 @@ const CH=[
   starter:'count = 0\nwhile count < 5:\n    print(count)\n',answer:'count = 0\nwhile count < 5:\n    print(count)\n    count += 1',
   check:c=>c.lines.join('|')==='0|1|2|3|4'||'Make count grow by 1 inside the loop.'}
  ]},
-{name:'Functions',badge:'Spellcaster',intro:'A function is a named recipe. You write it once with def, then call it whenever you need it. Watch the memory map: each call gets its own frame of boxes.',
- learned:['def name():','parameters','return','default values','local vs global'],
+{name:'Functions',badge:'Spellcaster',intro:'A function is a named recipe. You write it once with def, then call it whenever you need it. Watch the memory map: each call gets its own fresh set of boxes.',
+ learned:['def name():','parameters','return','default values','local variables'],
  missions:[
  {title:'Your first spell',goal:'Define <code>greet()</code> that prints <code>Welcome, traveler!</code>, then call it <b>twice</b>.',
   anat:[['def','kw','define'],['greet','fn'],['()','br'],[':','op']],
@@ -776,12 +776,12 @@ const CH=[
   check:c=>!c.fn('greet')?'Define a function called greet with def.':c.lines.filter(l=>l==='Welcome, traveler!').length!==2?'Call greet() two times so the message prints twice.':true},
  {title:'Give it something',goal:'Change greet to take a <code>name</code> parameter and print <code>Hello, NAME!</code>. Call it with "Ada" and with "Kai".',
   anat:[['def','kw'],['greet','fn'],['(name)','var','parameter']],
-  explain:'A <b>parameter</b> is a box the function fills when you call it. <code>greet("Ada")</code> puts "Ada" into <code>name</code> for that call only.',
+  explain:'A <b>parameter</b> is a box the function fills when you call it. <code>greet("Ada")</code> puts "Ada" into <code>name</code> for that call only. The value you pass in is called an <b>argument</b>.',
   starter:'def greet():\n    print("Welcome, traveler!")\n',answer:'def greet(name):\n    print(f"Hello, {name}!")\n\ngreet("Ada")\ngreet("Kai")',
   check:c=>{if(!c.fn('greet'))return 'Keep a function called greet.';try{const r=c.call('greet','Zed');if(!r.out.includes('Hello, Zed!'))return 'greet("Zed") should print Hello, Zed!'}catch(e){return 'greet should take one parameter, name.'}return c.printed('Hello, Ada!')&&c.printed('Hello, Kai!')||'Call greet("Ada") and greet("Kai").'}},
  {title:'Get an answer back',goal:'Write <code>double(n)</code> that <b>returns</b> n times 2. Store <code>result = double(21)</code> and print it.',
   anat:[['return','kw','send back'],['n * 2','var']],
-  explain:'<code>print</code> shows a value on screen. <code>return</code> hands a value back to whoever called the function, so they can store it or use it in more math. Most useful functions return something.',
+  explain:'<code>print</code> shows a value on screen. <code>return</code> hands a value back to whoever called the function, so they can store it or use it in more math. Most useful functions return something. A function with no <code>return</code> hands back <code>None</code>, Python\'s word for "nothing here".',
   starter:'',answer:'def double(n):\n    return n * 2\n\nresult = double(21)\nprint(result)',
   check:c=>{if(!c.fn('double'))return 'Define double(n).';let r;try{r=c.call('double',5)}catch(e){return 'double should take one number.'}if(r.v!==10)return 'double(5) should return 10. Did you use return?';return c.val('result')===42&&c.printed('42')||'Store double(21) in result and print it.'}},
  {title:'Optional extras',goal:'Write <code>attack(power, bonus=0)</code> that returns <code>power * 2 + bonus</code>. Print <code>attack(5)</code> and <code>attack(5, 3)</code>.',
@@ -790,8 +790,8 @@ const CH=[
   starter:'',answer:'def attack(power, bonus=0):\n    return power * 2 + bonus\n\nprint(attack(5))\nprint(attack(5, 3))',
   check:c=>{if(!c.fn('attack'))return 'Define attack(power, bonus=0).';try{if(c.call('attack',5).v!==10)return 'attack(5) should return 10.';if(c.call('attack',5,3).v!==13)return 'attack(5, 3) should return 13.'}catch(e){return 'attack needs a default: bonus=0'}return c.printed('10')&&c.printed('13')||'Print both results.'}},
  {title:'Boxes inside functions',goal:'Write <code>heal(hp)</code> that adds 20 and returns the new value. Then run <code>hp = heal(hp)</code> and print hp (50 becomes 70).',
-  anat:[['hp','var','global box'],['=','op'],['heal','fn'],['(hp)','var','copy goes in']],
-  explain:'Variables made inside a function are <b>local</b>: they live in the function\'s own frame and disappear when it returns. Step through and watch the <code>heal()</code> frame appear, then vanish. The only way out is <code>return</code>.',
+  anat:[['hp','var','outside box'],['=','op'],['heal','fn'],['(hp)','var','copy goes in']],
+  explain:'Variables made inside a function are <b>local</b>: they live in the function\'s own <b>frame</b> (its private set of boxes) and disappear when it returns. Step through and watch the <code>heal()</code> frame appear, then vanish. The only way out is <code>return</code>.',
   starter:'hp = 50\n',answer:'hp = 50\n\ndef heal(hp):\n    hp = hp + 20\n    return hp\n\nhp = heal(hp)\nprint(hp)',
   check:c=>{if(!c.fn('heal'))return 'Define heal(hp).';try{if(c.call('heal',10).v!==30)return 'heal(10) should return 30.'}catch(e){return 'heal should take one number and return it plus 20.'}return c.val('hp')===70&&c.printed('70')||'Set hp = heal(hp) and print it.'}},
  {title:'Functions + lists',goal:'Write <code>total_gold(bags)</code> that uses a loop to add up a list of numbers and returns the total.',
@@ -805,7 +805,7 @@ const CH=[
  missions:[
  {title:'A character sheet',goal:'Create <code>hero = {"name": "Ada", "hp": 100, "gold": 25}</code> and print <code>hero["name"]</code>.',
   anat:[['{','br','dict'],['"name"','str','key'],[':','op'],['"Ada"','str','value'],['}','br']],
-  explain:'Curly brackets make a dict. Each entry is <code>key: value</code>. To read a value, put its key in square brackets. In the memory map, each key points to its value.',
+  explain:'Curly brackets make a dict. Each entry is <code>key: value</code>. To read a value, put its key in square brackets. In the memory map, each key points to its value. <code>len()</code> counts a dict\'s keys.',
   starter:'',answer:'hero = {"name": "Ada", "hp": 100, "gold": 25}\nprint(hero["name"])',
   check:c=>c.type('hero')!=='dict'?'Make hero a dict with curly brackets.':(()=>{const h=c.val('hero');return h.name&&h.hp===100&&h.gold===25?(c.printed(h.name)||'Print hero["name"].'):'hero needs keys "name", "hp" (100) and "gold" (25).'})()},
  {title:'Level up',goal:'Add 50 to <code>hero["gold"]</code> and add a new key <code>"level"</code> with value 2. Print the dict.',
@@ -825,7 +825,7 @@ const CH=[
   check:c=>!/\.items\(\)/.test(c.code)?'Loop over hero.items().':c.printed('name: Ada')&&c.printed('hp: 100')||'Print each line as key: value.'},
  {title:'The village shop',goal:'Ask which item to buy with <code>input()</code>. If it is in <code>prices</code>, print <code>That costs N gold</code>, otherwise print <code>We don\'t sell that</code>.',
   anat:[['if','kw'],['item','var'],['in','kw'],['prices','var'],[':','op']],
-  explain:'This mixes everything so far: input, a dict lookup, and an if/else. <code>item in prices</code> checks the keys.',
+  explain:'This mixes everything so far: input, a dict lookup, and an if/else. <code>item in prices</code> checks the keys, and <code>{prices[item]}</code> inside the f-string looks the price up.',
   note:'Change the answer in the tray to "dragon" and run again to test the else path.',
   inputs:['sword'],starter:'prices = {"apple": 2, "torch": 8, "sword": 15}\n',answer:'prices = {"apple": 2, "torch": 8, "sword": 15}\nitem = input("What would you like? ")\nif item in prices:\n    print(f"That costs {prices[item]} gold")\nelse:\n    print("We don\'t sell that")',
   check:c=>{if(!/input\(/.test(c.code))return 'Ask with input().';if(!/^\s*else\s*:/m.test(c.code))return 'Add an else for items the shop does not sell.';const it=c.val('item'),p=c.val('prices')||{};
@@ -836,7 +836,7 @@ const CH=[
  missions:[
  {title:'Roll the dice',goal:'Import random and store <code>roll = random.randint(1, 6)</code>. Print the roll. Run it a few times.',
   anat:[['import','kw'],['random','var','module'],['random.randint','fn'],['(1, 6)','num','1 to 6']],
-  explain:'<code>import</code> loads extra tools. The <code>random</code> module picks random numbers. <code>randint(1, 6)</code> includes both ends, unlike range.',
+  explain:'A <b>module</b> is a bundle of extra tools that comes with Python, and <code>import</code> loads one. The <code>random</code> module picks random numbers. <code>randint(1, 6)</code> includes both ends, unlike range.',
   starter:'',answer:'import random\n\nroll = random.randint(1, 6)\nprint(f"You rolled a {roll}")',
   check:c=>!/import random|from random/.test(c.code)?'Start with import random.':c.type('roll')!=='int'||c.val('roll')<1||c.val('roll')>6?'roll should be random.randint(1, 6).':c.out.includes(String(c.val('roll')))||'Print the roll.'},
  {title:'Random loot',goal:'Create a list of loot and use <code>random.choice()</code> to pick one. Print <code>You found: ITEM</code>.',
@@ -847,7 +847,7 @@ const CH=[
  {title:'Catch bad input',goal:'Ask for a number. If the player types something that is not a number, print <code>That is not a number</code> instead of crashing.',
   anat:[['try','kw','attempt'],[':','op'],['except','kw'],['ValueError','fn','this error'],[':','op']],
   explain:'<code>int("abc")</code> crashes with a <code>ValueError</code>. Put risky code under <code>try:</code>. If that error happens, Python jumps to <code>except ValueError:</code> instead of stopping.',
-  note:'The tray has "abc" in it. Change it to "12" to test the happy path.',
+  note:'The tray has "abc" in it. Change it to "12" to test a normal number.',
   inputs:['abc'],starter:'',answer:'try:\n    number = int(input("Enter a number: "))\n    print(f"Double that is {number * 2}")\nexcept ValueError:\n    print("That is not a number")',
   check:c=>!/^\s*try\s*:/m.test(c.code)||!/^\s*except\b/m.test(c.code)?'Use try: and except ValueError:':c.inputs[0]!==undefined&&!/^\s*-?\d+\s*$/.test(c.inputs[0])?(c.out.includes('That is not a number')||'Print That is not a number in the except block.'):true},
  {title:'Guess the number',goal:'Build the guessing game: the secret is 7. Keep asking until the guess is right. Say <code>Too low</code> or <code>Too high</code> each time, and <code>You got it!</code> at the end.',
@@ -859,7 +859,7 @@ const CH=[
     return !/Too low/i.test(c.out)?'Print Too low when the guess is smaller.':!/Too high/i.test(c.out)?'Print Too high when the guess is bigger.':/You got it!/.test(c.out)||'Print You got it! when they guess right.'}},
  {title:'Boss battle',goal:'Finish the battle loop: while both are alive, the hero hits the dragon with <code>attack()</code>, then the dragon hits back for 8. Print who won.',
   anat:[['while','kw'],['hero["hp"] > 0','var'],['and','kw'],['dragon["hp"] > 0','var'],[':','op']],
-  explain:'Two dicts, a function, a loop and decisions together. This is how real games are built: small pieces you already know, combined.',
+  explain:'Two dicts, a function, a loop and decisions together. This is how real games are built: small pieces you already know, combined. Inside an f-string, braces can hold a lookup like <code>{dragon[\'hp\']}</code>; use single quotes for the key there, because double quotes would end the f-string early.',
   note:'Step through it with the slider and watch both hp values drop each round.',
   starter:'import random\n\nhero = {"name": "Ada", "hp": 40}\ndragon = {"name": "Dragon", "hp": 50}\n\ndef attack():\n    return random.randint(6, 12)\n\nround_number = 1\nwhile hero["hp"] > 0 and dragon["hp"] > 0:\n    damage = attack()\n    dragon["hp"] -= damage\n    print(f"Round {round_number}: you hit for {damage}. Dragon has {dragon[\'hp\']} HP")\n    # the dragon hits back for 8 here (only if it is still alive)\n\n    round_number += 1\n\n# print who won here\n',
   answer:'import random\n\nhero = {"name": "Ada", "hp": 40}\ndragon = {"name": "Dragon", "hp": 50}\n\ndef attack():\n    return random.randint(6, 12)\n\nround_number = 1\nwhile hero["hp"] > 0 and dragon["hp"] > 0:\n    damage = attack()\n    dragon["hp"] -= damage\n    print(f"Round {round_number}: you hit for {damage}. Dragon has {dragon[\'hp\']} HP")\n    if dragon["hp"] > 0:\n        hero["hp"] -= 8\n        print(f"The dragon breathes fire! You have {hero[\'hp\']} HP")\n    round_number += 1\n\nif hero["hp"] > 0:\n    print("You defeated the dragon!")\nelse:\n    print("The dragon wins this time.")',
@@ -874,52 +874,54 @@ const CH=[
 ];
 
 /* ---------- Quick-fire: predict the output ---------- */
+/* Each question carries `ch`, the chapter that teaches everything it uses; Quick-fire only offers a question once every mission of that chapter is done. */
 const QF=[
- {c:'print(3 + 4 * 2)',w:['14','10','34'],why:'* happens before +, so 4 * 2 = 8, then 3 + 8.'},
- {c:'print("3" + "4")',w:['7','3 + 4','TypeError'],why:'Quotes make text. + joins text.'},
- {c:'print(10 / 4)',w:['2','2.0','2.25'],why:'/ always gives a float with the exact answer.'},
- {c:'print(10 // 4)',w:['2.5','3','2.0'],why:'// keeps only the whole part.'},
- {c:'print(10 % 4)',w:['2.5','0','4'],why:'% is the remainder: 10 = 4 × 2 + 2.'},
- {c:'print(2 ** 3)',w:['6','5','23'],why:'** is power: 2 × 2 × 2.'},
- {c:'x = 5\nx = x + 2\nprint(x)',w:['5','x + 2','52'],why:'The right side is worked out first (5 + 2), then stored back in x.'},
- {c:'x = 10\nx -= 3\nx *= 2\nprint(x)',w:['17','4','20'],why:'10 - 3 = 7, then 7 × 2 = 14.'},
- {c:'name = "Kai"\nprint("Hi " + name)',w:['Hi name','Hi+Kai','HiKai'],why:'name without quotes means the value in the box.'},
- {c:'print("ha" * 3)',w:['ha3','ha ha ha','TypeError'],why:'Text times a number repeats it.'},
- {c:'word = "python"\nprint(word[1])',w:['p','t','py'],why:'Indexes start at 0, so [1] is the second letter.'},
- {c:'word = "python"\nprint(word[-1])',w:['p','o','IndexError'],why:'-1 is the last character.'},
- {c:'word = "python"\nprint(word[0:2])',w:['pyt','y','yt'],why:'A slice stops before the end number.'},
- {c:'print(len("hello"))',w:['4','6','hello'],why:'len counts characters: h e l l o.'},
- {c:'print(type(3.0))',w:["<class 'int'>","<class 'str'>",'3.0'],why:'A decimal point makes a float, even .0.'},
- {c:'print(int("7") + 1)',w:['71','"8"','TypeError'],why:'int() turns the text "7" into the number 7.'},
- {c:'print(str(7) + "1")',w:['8','7 1','TypeError'],why:'str(7) is the text "7", so + joins.'},
- {c:'print(5 > 3 and 2 > 4)',w:['True','5','None'],why:'and needs both sides True. 2 > 4 is False.'},
- {c:'print(5 > 3 or 2 > 4)',w:['False','3','None'],why:'or needs only one side True.'},
- {c:'print(not 5 == 5)',w:['True','5','None'],why:'5 == 5 is True, and not flips it.'},
- {c:'hp = 25\nif hp > 50:\n    print("Strong")\nelif hp > 20:\n    print("OK")\nelse:\n    print("Weak")',w:['Strong','Weak','OK\nWeak'],why:'Only the first True branch runs: 25 > 20.'},
- {c:'x = 0\nif x:\n    print("yes")\nelse:\n    print("no")',w:['yes','0','False'],why:'0, empty text and empty lists count as False.'},
- {c:'items = ["a", "b", "c"]\nprint(items[1])',w:['a','c','["b"]'],why:'Lists start counting at 0 too.'},
- {c:'items = ["a", "b"]\nitems.append("c")\nprint(len(items))',w:['2','4','c'],why:'append adds one item, so 3.'},
- {c:'items = [1, 2, 3]\nitems[0] = 9\nprint(items)',w:['[1, 2, 3]','[9, 1, 2, 3]','[1, 9, 3]'],why:'Index 0 is replaced. Lists can change.'},
- {c:'print("b" in ["a", "b", "c"])',w:['False','1','b'],why:'in checks if the item is anywhere in the list.'},
- {c:'nums = [4, 1, 3]\nprint(sorted(nums))',w:['[4, 1, 3]','[4, 3, 1]','[1, 4, 3]'],why:'sorted gives a new list, smallest first.'},
- {c:'for i in range(3):\n    print(i)',w:['1\n2\n3','0\n1\n2\n3','3'],why:'range(3) is 0, 1, 2. It stops before 3.'},
- {c:'total = 0\nfor n in [1, 2, 3]:\n    total += n\nprint(total)',w:['3','123','0'],why:'The loop adds 1, then 2, then 3.'},
- {c:'for c in "hi":\n    print(c)',w:['hi','h i','c\nc'],why:'A for loop over text gives one character at a time.'},
- {c:'n = 3\nwhile n > 0:\n    n -= 1\nprint(n)',w:['3','1','-1'],why:'The loop stops when n reaches 0.'},
- {c:'for i in range(10):\n    if i == 3:\n        break\nprint(i)',w:['10','9','2'],why:'break leaves the loop while i is 3.'},
- {c:'for i in range(1, 10, 3):\n    print(i)',w:['1\n2\n3','3\n6\n9','1\n3\n9'],why:'Start at 1, step by 3, stop before 10.'},
- {c:'def add(a, b):\n    return a + b\nprint(add(2, 3))',w:['23','a + b','None'],why:'return sends back 2 + 3.'},
- {c:'def say():\n    print("hi")\nx = say()\nprint(x)',w:['hi','hi\nhi','None'],why:'say prints hi but returns nothing, so x is None.'},
- {c:'def f(x=2):\n    return x * 10\nprint(f())',w:['0','x10','TypeError'],why:'No argument given, so the default 2 is used.'},
- {c:'d = {"a": 1, "b": 2}\nprint(d["b"])',w:['1','b','["b"]'],why:'Square brackets look up a key.'},
- {c:'d = {"a": 1}\nprint(d.get("z", 0))',w:['None','KeyError','z'],why:'.get returns the default when the key is missing.'},
- {c:'d = {"a": 1}\nd["a"] += 5\nprint(d)',w:["{'a': 1}","{'a': 15}","{'a': 1, 'a': 6}"],why:'Keys are unique. The value for "a" becomes 6.'},
- {c:'print(len({"x": 1, "y": 2}))',w:['4','1','3'],why:'len of a dict counts its keys.'},
- {c:'print(f"{2 + 3} cats")',w:['{2 + 3} cats','2 + 3 cats','23 cats'],why:'f-strings run the code inside the braces.'},
- {c:'print(round(3.7))',w:['3','3.7','4.0'],why:'round with no digits gives a whole number.'},
- {c:'a = [1, 2]\nb = a\nb.append(3)\nprint(a)',w:['[1, 2]','[3]','[1, 2, 3, 3]'],why:'b = a does not copy. Both names point to the same list.'},
- {c:'print("Hello".upper().lower())',w:['HELLO','Hello','hELLO'],why:'Methods run left to right: upper, then lower.'},
- {c:'print(max([3, 9, 2]))',w:['3','2','[9]'],why:'max returns the biggest item.'}
+ {ch:2,c:'print(3 + 4 * 2)',w:['14','10','34'],why:'* happens before +, so 4 * 2 = 8, then 3 + 8.'},
+ {ch:0,c:'print("3" + "4")',w:['7','3 + 4','TypeError'],why:'Quotes make text. + joins text.'},
+ {ch:2,c:'print(10 / 4)',w:['2','2.0','2.25'],why:'/ always gives a float with the exact answer.'},
+ {ch:2,c:'print(10 // 4)',w:['2.5','3','2.0'],why:'// keeps only the whole part.'},
+ {ch:2,c:'print(10 % 4)',w:['2.5','0','4'],why:'% is the remainder: 10 = 4 × 2 + 2.'},
+ {ch:2,c:'print(2 ** 3)',w:['6','5','23'],why:'** is power: 2 × 2 × 2.'},
+ {ch:1,c:'x = 5\nx = x + 2\nprint(x)',w:['5','x + 2','52'],why:'The right side is worked out first (5 + 2), then stored back in x.'},
+ {ch:2,c:'x = 10\nx -= 3\nx *= 2\nprint(x)',w:['17','4','20'],why:'10 - 3 = 7, then 7 × 2 = 14.'},
+ {ch:1,c:'name = "Kai"\nprint("Hi " + name)',w:['Hi name','Hi+Kai','HiKai'],why:'name without quotes means the value in the box.'},
+ {ch:2,c:'print("ha" * 3)',w:['ha3','ha ha ha','TypeError'],why:'Text times a number repeats it.'},
+ {ch:2,c:'word = "python"\nprint(word[1])',w:['p','t','py'],why:'Indexes start at 0, so [1] is the second letter.'},
+ {ch:2,c:'word = "python"\nprint(word[-1])',w:['p','o','IndexError'],why:'-1 is the last character.'},
+ {ch:2,c:'word = "python"\nprint(word[0:2])',w:['pyt','y','yt'],why:'A slice stops before the end number.'},
+ {ch:2,c:'print(len("hello"))',w:['4','6','hello'],why:'len counts characters: h e l l o.'},
+ {ch:1,c:'print(type(3.0))',w:["<class 'int'>","<class 'str'>",'3.0'],why:'A decimal point makes a float, even .0.'},
+ {ch:2,c:'print(int("7") + 1)',w:['71','"8"','TypeError'],why:'int() turns the text "7" into the number 7.'},
+ {ch:2,c:'print(str(7) + "1")',w:['8','7 1','TypeError'],why:'str(7) is the text "7", so + joins.'},
+ {ch:3,c:'print(5 > 3 and 2 > 4)',w:['True','5','0'],why:'and needs both sides True. 2 > 4 is False.'},
+ {ch:3,c:'print(5 > 3 or 2 > 4)',w:['False','3','0'],why:'or needs only one side True.'},
+ {ch:3,c:'print(not (5 == 5))',w:['True','5','1'],why:'5 == 5 is True, and not flips it.'},
+ {ch:3,c:'hp = 25\nif hp > 50:\n    print("Strong")\nelif hp > 20:\n    print("OK")\nelse:\n    print("Weak")',w:['Strong','Weak','OK\nWeak'],why:'Only the first True branch runs: 25 > 20.'},
+ {ch:3,c:'x = 0\nif x:\n    print("yes")\nelse:\n    print("no")',w:['yes','0','False'],why:'0 counts as False, so the else branch runs.'},
+ {ch:4,c:'items = ["a", "b", "c"]\nprint(items[1])',w:['a','c','["b"]'],why:'Lists start counting at 0 too.'},
+ {ch:4,c:'items = ["a", "b"]\nitems.append("c")\nprint(len(items))',w:['2','4','c'],why:'append adds one item, so 3.'},
+ {ch:4,c:'items = [1, 2, 3]\nitems[0] = 9\nprint(items)',w:['[1, 2, 3]','[9, 1, 2, 3]','[1, 9, 3]'],why:'Index 0 is replaced. Lists can change.'},
+ {ch:4,c:'print("b" in ["a", "b", "c"])',w:['False','1','b'],why:'in checks if the item is anywhere in the list.'},
+ {ch:4,c:'nums = [4, 1, 3]\nnums.remove(1)\nprint(nums)',w:['[4, 1]','[1, 3]','[4, 3, 1]'],why:'remove deletes the first item equal to 1, leaving 4 and 3.'},
+ {ch:5,c:'for i in range(3):\n    print(i)',w:['1\n2\n3','0\n1\n2\n3','3'],why:'range(3) is 0, 1, 2. It stops before 3.'},
+ {ch:5,c:'total = 0\nfor n in [1, 2, 3]:\n    total += n\nprint(total)',w:['3','123','0'],why:'The loop adds 1, then 2, then 3.'},
+ {ch:5,c:'for c in "hi":\n    print(c)',w:['hi','h i','c\nc'],why:'A for loop over text gives one character at a time.'},
+ {ch:5,c:'n = 3\nwhile n > 0:\n    n -= 1\nprint(n)',w:['3','1','-1'],why:'The loop stops when n reaches 0.'},
+ {ch:5,c:'for i in range(10):\n    if i == 3:\n        break\nprint(i)',w:['10','9','2'],why:'break leaves the loop while i is 3.'},
+ {ch:5,c:'for i in range(1, 10, 3):\n    print(i)',w:['1\n2\n3','3\n6\n9','1\n3\n9'],why:'Start at 1, step by 3, stop before 10.'},
+ {ch:6,c:'def add(a, b):\n    return a + b\nprint(add(2, 3))',w:['23','a + b','None'],why:'return sends back 2 + 3.'},
+ {ch:6,c:'def say():\n    print("hi")\nx = say()\nprint(x)',w:['hi','hi\nhi','None'],why:'say prints hi but has no return, so x holds None, the "nothing here" value.'},
+ {ch:6,c:'def f(x=2):\n    return x * 10\nprint(f())',w:['0','x10','TypeError'],why:'Nothing was given for x, so the default 2 is used.'},
+ {ch:7,c:'d = {"a": 1, "b": 2}\nprint(d["b"])',w:['1','b','["b"]'],why:'Square brackets look up a key.'},
+ {ch:7,c:'d = {"a": 1}\nprint(d.get("z", 0))',w:['1','KeyError','z'],why:'.get returns the default when the key is missing.'},
+ {ch:7,c:'d = {"a": 1}\nd["a"] += 5\nprint(d)',w:["{'a': 1}","{'a': 15}","{'a': 1, 'a': 6}"],why:'The value for the key "a" goes up by 5, from 1 to 6.'},
+ {ch:7,c:'print(len({"x": 1, "y": 2}))',w:['4','1','3'],why:'len of a dict counts its keys.'},
+ {ch:1,c:'print(f"{2 + 3} cats")',w:['{2 + 3} cats','2 + 3 cats','23 cats'],why:'The braces hold a small calculation, so 2 + 3 becomes 5.'},
+ {ch:2,c:'print(7 // 2 + 7 % 2)',w:['3','3.5','5'],why:'7 // 2 is 3 and 7 % 2 is 1, so 3 + 1.'},
+ {ch:4,c:'a = [1, 2]\nb = a\nb.append(3)\nprint(a)',w:['[1, 2]','[3]','[1, 2, 3, 3]'],why:'b = a does not copy. Both names point to the same list.'},
+ {ch:2,c:'print("Hello".upper().lower())',w:['HELLO','Hello','hELLO'],why:'Methods run left to right: upper, then lower.'},
+ {ch:4,c:'bag = ["a", "b", "c"]\nbag.pop()\nprint(bag)',w:["['a', 'b', 'c']","['b', 'c']",'c'],why:'pop removes the last item, so c is gone.'},
+ {ch:0,c:'print("Hi " + "Ada")',w:['HiAda','Hi+Ada','"Hi " + "Ada"'],why:'+ glues the two pieces of text together, space included.'}
 ];
 
 /* ---------- Field guide cards ---------- */
@@ -927,7 +929,7 @@ const GUIDE=[
  {ch:0,c:'print()',what:'Shows values in the console. Separate several values with commas.',syn:[['print','fn'],['(','br'],['"Score:", 10','str'],[')','br']],ex:[['print("Score:", 10)','Score: 10'],['print("a", "b", sep="-")','a-b'],['print("no newline", end="")','stays on the line']]},
  {ch:0,c:'# comments',what:'Python skips everything after # on a line.',syn:[['# note to self','cm','comment']],ex:[['# TODO: add a boss\nprint("ok")','only ok prints']]},
  {ch:1,c:'name = value',what:'Store a value in a variable. Using the name later reads the box.',syn:[['gold','var'],['=','op'],['25','num']],ex:[['gold = 25\ngold = gold + 5\nprint(gold)','30'],['a, b = 1, 2\nprint(a, b)','two at once']]},
- {ch:1,c:'types',what:'int (5), float (2.5), str ("hi"), bool (True/False), None.',syn:[['type','fn'],['(x)','var']],ex:[['print(type(5), type(2.5))',''],['print(type("hi"), type(True))','']]},
+ {ch:1,c:'types',what:'int (5), float (2.5), str ("hi"), bool (True/False).',syn:[['type','fn'],['(x)','var']],ex:[['print(type(5), type(2.5))',''],['print(type("hi"), type(True))','']]},
  {ch:1,c:'f"...{x}..."',what:'An f-string drops values into text. Add :.2f to round to 2 decimals.',syn:[['f','kw'],['"HP: {hp}"','str']],ex:[['hp = 72.456\nprint(f"HP: {hp:.1f}")','HP: 72.5'],['n = "Ada"\nprint(f"Hi {n}!")','Hi Ada!']]},
  {ch:2,c:'+  -  *  /  //  %  **',what:'Add, subtract, multiply, divide, whole divide, remainder, power.',syn:[['17','num'],['//','op'],['5','num']],ex:[['print(17 / 5, 17 // 5, 17 % 5)','3.4 3 2'],['print(2 ** 8)','256']]},
  {ch:2,c:'text methods',what:'.upper() .lower() .title() .strip() .replace(a, b) .split()',syn:[['s','var'],['.upper','fn'],['()','br']],ex:[['print("  hi ".strip())','hi'],['print("a,b,c".split(","))',"['a', 'b', 'c']"],['print("cat".replace("c", "b"))','bat']]},
@@ -942,13 +944,15 @@ const GUIDE=[
  {ch:5,c:'for x in ...',what:'Repeat once per item in a list, text, range or dict.',syn:[['for','kw'],['x','var'],['in','kw'],['items','var'],[':','op']],ex:[['for item in ["a", "b"]:\n    print(item)',''],['for i, item in enumerate(["a", "b"]):\n    print(i, item)','with positions']]},
  {ch:5,c:'range()',what:'range(stop), range(start, stop), range(start, stop, step). Stops before stop.',syn:[['range','fn'],['(1, 10, 2)','num']],ex:[['print(list(range(5)))','[0, 1, 2, 3, 4]'],['print(list(range(10, 0, -3)))','[10, 7, 4, 1]']]},
  {ch:5,c:'while  break  continue',what:'while repeats as long as the condition is True. break leaves, continue skips ahead.',syn:[['while','kw'],['n < 3','var'],[':','op']],ex:[['n = 0\nwhile n < 3:\n    print(n)\n    n += 1',''],['for i in range(6):\n    if i % 2 == 0:\n        continue\n    print(i)','odd numbers']]},
- {ch:6,c:'def',what:'Define a function once, call it many times. return sends a value back.',syn:[['def','kw'],['area','fn'],['(w, h)','var'],[':','op']],ex:[['def area(w, h):\n    return w * h\nprint(area(3, 4))','12']]},
+ {ch:6,c:'def',what:'Define a function once, call it many times. return sends a value back (with no return you get None, "nothing here").',syn:[['def','kw'],['area','fn'],['(w, h)','var'],[':','op']],ex:[['def area(w, h):\n    return w * h\nprint(area(3, 4))','12']]},
  {ch:6,c:'defaults & keywords',what:'Give parameters a default. Callers can name arguments.',syn:[['def','kw'],['hit','fn'],['(power=5)','var']],ex:[['def hit(power=5, crit=False):\n    return power * 2 if crit else power\nprint(hit(), hit(8, crit=True))','5 16']]},
  {ch:7,c:'{key: value}',what:'A dict maps keys to values. Look up, change or add by key.',syn:[['d','var'],['["hp"]','str']],ex:[['d = {"hp": 10}\nd["hp"] -= 3\nd["xp"] = 5\nprint(d)',"{'hp': 7, 'xp': 5}"]]},
  {ch:7,c:'dict methods',what:'.get(k, default) .keys() .values() .items() .pop(k)',syn:[['d','var'],['.items','fn'],['()','br']],ex:[['d = {"a": 1, "b": 2}\nfor k, v in d.items():\n    print(k, v)',''],['print({"a": 1}.get("z", "none"))','none']]},
  {ch:8,c:'import random',what:'randint(a, b) includes both ends. choice(list) picks one. shuffle(list) mixes in place.',syn:[['random','var'],['.randint','fn'],['(1, 6)','num']],ex:[['import random\nprint(random.randint(1, 6), random.choice(["a", "b"]))','random each run']]},
  {ch:8,c:'try / except',what:'Catch an error and handle it instead of crashing.',syn:[['try','kw'],[':','op'],['except','kw'],['ValueError','fn'],[':','op']],ex:[['try:\n    print(int("abc"))\nexcept ValueError:\n    print("not a number")','not a number']]}
 ];
+/* The quick-fire questions a learner may see: only those whose chapter has every mission done in `done` (the saved S.done). */
+const qfOpen=done=>QF.filter(q=>CH[q.ch].missions.every((_,i)=>done&&done[q.ch+'.'+i]));
 const ERRS={
  SyntaxError:['Python could not read this line.','Check for a missing bracket, quote or colon, or a typo near the marked line.'],
  IndentationError:['The spaces at the start of a line are wrong.','Lines inside if, for, while and def need 4 spaces. Lines at the same level must line up exactly.'],
@@ -959,7 +963,7 @@ const ERRS={
  IndexError:['That position does not exist.','A list of 3 items has positions 0, 1 and 2. Check len() first.'],
  KeyError:['That key is not in the dictionary.','Check the spelling, or use .get(key, default) or "key in d" first.'],
  AttributeError:['That value does not have that method.','Check the spelling and the type. Lists use .append, text uses .upper, and so on.'],
- UnboundLocalError:['A function tried to change an outside variable.','Return the new value instead, or add "global name" at the top of the function.'],
+ UnboundLocalError:['A function tried to change an outside variable.','Return the new value from the function and store it outside, like hp = heal(hp).'],
  TooManySteps:['Your program kept running, so the playground stopped it.','This is usually an infinite loop: something in the while condition never changes.'],
  EOFError:['input() ran out of answers.','Add another line to the Answers tray below the editor, one answer per line.'],
  RecursionError:['A function kept calling itself with no end.','Make sure there is a case where it stops calling itself.'],
@@ -1147,10 +1151,15 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='Arrow
 /* ---------- quick-fire ---------- */
 const fStage=$('#fStage');let fireOn=false,fT=0,fLeft=75,fScore=0,fStreak=0,fQ=null,fDeck=[],fMiss=[],fLocked=false;
 function setStats(){$('#fScore').textContent=fScore;$('#fStreak').textContent=fStreak;$('#fBest').textContent=S.best;$('#fTime').textContent=fLeft;$('#fTimer').style.width=(fLeft/75*100)+'%'}
-function fireIdle(){const ex=QF[6];fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Example round</span><pre class="snippet">${highlight(ex.c)}</pre><p class="note" style="margin:0">Pick the output: <code>5</code>, <code>7</code> or <code>x + 2</code>? The answer is <code>7</code>. ${esc(ex.why)}</p></div>
+function fireIdle(){const open=qfOpen(S.done);
+  if(!open.length){fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Locked for now</span><p class="explain" style="margin:0">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first questions open up. Each later chapter you finish adds more.</p></div>
+  <div class="actions"><button class="btn" id="fGo">Go to the quest</button></div>`;setStats();return}
+  const ex=QF[1],more=open.length<QF.length;
+  fStage.innerHTML=`<div class="example panel" style="padding:12px 14px;border-style:dashed;display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Example round</span><pre class="snippet">${highlight(ex.c)}</pre><p class="note" style="margin:0">Pick the output: <code>7</code>, <code>34</code> or <code>3 + 4</code>? The answer is <code>34</code>. ${esc(ex.why)}</p></div>
+  ${more?`<p class="note" style="margin:0">${open.length} of ${QF.length} questions are open. Finish more chapters to unlock the rest.</p>`:''}
   <div class="actions"><button class="btn" id="fStart">Start the clock</button><span class="note" style="align-self:center">Keys <kbd>1</kbd>–<kbd>4</kbd> pick an answer.</span></div>`;setStats()}
 function answerOf(q){if(q.ans===undefined){const r=PY.run(q.c,{trace:false});q.ans=r.out.replace(/\n$/,'')}return q.ans}
-function nextQ(){if(!fDeck.length)fDeck=QF.map((_,i)=>i).sort(()=>Math.random()-.5);fQ=QF[fDeck.pop()];const ans=answerOf(fQ);
+function nextQ(){if(!fDeck.length)fDeck=qfOpen(S.done).sort(()=>Math.random()-.5);fQ=fDeck.pop();const ans=answerOf(fQ);
   const opts=[ans,...fQ.w.filter(w=>w!==ans).slice(0,3)].sort(()=>Math.random()-.5);fQ.opts=opts;fLocked=false;
   fStage.innerHTML=`<div class="task">What does this print?</div><pre class="snippet">${highlight(fQ.c)}</pre><div class="opts">${opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><pre>${esc(o)}</pre></button>`).join('')}</div>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fStop">End round</button></div>`;fStage.querySelector('.opt').focus({preventScroll:true})}
@@ -1159,18 +1168,18 @@ function pick(i){if(!fireOn||fLocked||!fQ)return;fLocked=true;const ans=fQ.ans,o
   if(ok){fStreak++;const pts=10+Math.min(fStreak-1,5)*2;fScore+=pts;fb.className='fb good';fb.textContent=`Correct! +${pts}${fStreak>1?` (streak ${fStreak})`:''}`}
   else{fStreak=0;fMiss.push(fQ);fb.className='fb bad';fb.textContent='Not this time. '+fQ.why}
   setStats();setTimeout(()=>{if(fireOn)nextQ()},ok?650:2200)}
-function startFire(){fireOn=true;fLeft=75;fScore=0;fStreak=0;fMiss=[];setStats();nextQ();clearInterval(fT);fT=setInterval(()=>{fLeft--;setStats();if(fLeft<=0)stopFire()},1000)}
+function startFire(){if(!qfOpen(S.done).length){fireIdle();return}fDeck=[];fireOn=true;fLeft=75;fScore=0;fStreak=0;fMiss=[];setStats();nextQ();clearInterval(fT);fT=setInterval(()=>{fLeft--;setStats();if(fLeft<=0)stopFire()},1000)}
 function stopFire(silent){if(!fireOn)return;fireOn=false;clearInterval(fT);if(silent){fireIdle();return}if(fScore>S.best){S.best=fScore;save()}setStats();
   fStage.innerHTML=`<div class="task">Round over: ${fScore} points</div><p class="note" style="margin:0">${fScore>=S.best&&fScore>0?'That is your best score so far.':`Your best is ${S.best}.`}</p>
   ${fMiss.length?`<div><p class="explain" style="margin:0 0 8px"><b>Review these:</b></p><ul class="misses">${fMiss.map((q,i)=>`<li><pre class="snippet">${highlight(q.c)}</pre><div class="row"><span>Prints <code>${esc(q.ans)}</code></span><span class="note">${esc(q.why)}</span><button class="try" data-miss="${i}">Try it</button></div></li>`).join('')}</ul></div>`:'<p class="explain" style="margin:0">No misses. Excellent reading.</p>'}
   <div class="actions"><button class="btn" id="fStart">Play again</button></div>`}
-fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='fStart')startFire();else if(b.id==='fStop')stopFire();else if(b.dataset.i!==undefined)pick(+b.dataset.i);else if(b.dataset.miss!==undefined)goFree(fMiss[+b.dataset.miss].c)});
+fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='fStart')startFire();else if(b.id==='fGo')showTab('quest');else if(b.id==='fStop')stopFire();else if(b.dataset.i!==undefined)pick(+b.dataset.i);else if(b.dataset.miss!==undefined)goFree(fMiss[+b.dataset.miss].c)});
 document.addEventListener('keydown',e=>{if(!fireOn||$('#tab-fire').hidden)return;if(/^[1-4]$/.test(e.key)){e.preventDefault();pick(+e.key-1)}});
 
 /* ---------- field guide ---------- */
 function exHTML(g){return `<div class="ex">${g.ex.map(([c,n])=>`<div class="exrow"><pre class="snippet">${highlight(c)}</pre><div class="meta">${n?`<small># ${esc(n)}</small>`:''}<button class="try" data-code="${esc(c)}">Try it</button></div></div>`).join('')}</div>`}
 function renderGuide(){const groups=CH.map(c=>c.name);
-  const TY=[['int','Whole numbers','42, -7, 0'],['float','Decimal numbers','3.14, 2.0'],['str','Text, in quotes','"Ada", \'hi\''],['bool','Yes or no','True, False'],['list','Ordered items','["a", "b"]'],['dict','Key → value pairs','{"hp": 10}'],['function','Reusable code','def heal(hp):'],['NoneType','Nothing / no value','None']];
+  const TY=[['int','Whole numbers','42, -7, 0'],['float','Decimal numbers','3.14, 2.0'],['str','Text, in quotes','"Ada", \'hi\''],['bool','Yes or no','True, False'],['list','Ordered items','["a", "b"]'],['dict','Key → value pairs','{"hp": 10}'],['function','Reusable code','def heal(hp):'],['NoneType','Nothing here (see Functions)','None']];
   $('#guide').innerHTML=`<div><h2>Field guide</h2><p class="lede">Everything from the quest on one page. Every example has a Try it button that opens it in the editor, where you can run it and step through it.</p></div>
   <section class="gsec"><h3>How to read a line of Python</h3><div class="panel bigan">${anatomy([['total','var'],['=','op'],['price','var'],['*','op'],['int','fn'],['(','br'],['input','fn'],['("How many? ")','str'],[')','br']])}
     <p class="explain" style="margin:0">Read it from the inside out. <code>input()</code> asks the question and gives back text. <code>int()</code> turns that text into a number. <code>price * …</code> multiplies. Finally <code>=</code> stores the result in the box called <code>total</code>.</p></div></section>
