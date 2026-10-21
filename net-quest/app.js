@@ -50,7 +50,7 @@ const askBox=$('#answerBox'),askText=$('#askText'),askIn=$('#answer'),afb=$('#af
 let net=null,dev=null,lines=[],groups=[],ran=false,won=false,asking=false,selEntry=null;
 const term=NQUI.terminal({screen:$('#screen'),input:cmdIn,form:$('#cmdline'),prompt:$('#prompt'),onRun:runLine});
 const insp=NQUI.inspector({list:$('#inspector'),detail:$('#pdetail'),onSelect:e=>{selEntry=e;drawMap();}});
-const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.dev,iface:selEntry.iface}:null);};
+const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.dev,iface:selEntry.iface}:null,dev);};
 // the network a session runs on: the mission's own, or on a chapter's finish page the last mission's, to play in
 const sessionMission=()=>curMission()||CH[S.ch].missions[CH[S.ch].missions.length-1];
 function startSession(){
@@ -75,7 +75,10 @@ function runLine(line){
 function evaluate(code,answer){
   const m=curMission();if(!m)return;
   let r;try{r=NQ.runMission(m,lines,answer??null);}catch(e){r=null;}
-  if(code!==0){if(typeof r==='string'&&r!==ASK&&!won)renderFeedback({tip:r});return;}
+  if(code!==0){ // a failed command is checked too, but only to open the question (a ping with no reply is the point of some missions)
+    if(r===ASK&&!won){asking=true;renderAsk();renderFeedback({ask:true});}
+    else if(typeof r==='string'&&!won)renderFeedback({tip:r});
+    return;}
   if(r===true){complete(answer!==undefined);return;}
   if(won)return;
   if(answer!==undefined){afb.className='afb bad';afb.innerHTML=r===ASK?'Type your answer in the box first.':typeof r==='string'?r:'';return;}
@@ -219,10 +222,10 @@ document.addEventListener('keydown',e=>{if(!fireOn||$('#tab-fire').hidden)return
 /* ---------- field guide ---------- */
 function renderGuide(){const g=$('#guide');g.dataset.ready='1';
   g.innerHTML=`<div><h2>Field guide</h2><p class="lede">A quick reference for the commands and words the missions teach. Click a command to put it in the terminal, then press <kbd>Enter</kbd> to run it.</p></div>
-  <section class="gsec"><h3>Reading the packet panel</h3><p class="note" style="margin:0 0 8px">You meet <code>tx</code> and <code>rx</code> in your first mission; the other words are reference for later chapters.</p><div class="panel" style="padding:6px 10px;overflow-x:auto"><table class="gtable"><thead><tr><th>Word</th><th>What happened to the packet</th></tr></thead><tbody>
-  <tr><td><b>sent</b> <code>tx</code></td><td>a device put it on the wire</td></tr><tr><td><b>received</b> <code>rx</code></td><td>it arrived at a device, which read it</td></tr><tr><td><b>forwarded</b> <code>fwd</code></td><td>a switch or router passed it on towards where it is going (later chapters)</td></tr><tr><td><b>dropped</b> <code>drop</code></td><td>a device threw it away; the note says why (later chapters)</td></tr><tr><td><b>translated</b> <code>nat</code></td><td>a router rewrote its addresses on the way through (later chapters)</td></tr></tbody></table></div></section>
+  <section class="gsec"><h3>Reading the packet panel</h3><p class="note" style="margin:0 0 8px">You meet <code>tx</code> and <code>rx</code> in your first mission; the other words show up as the chapters go on.</p><div class="panel" style="padding:6px 10px;overflow-x:auto"><table class="gtable"><thead><tr><th>Word</th><th>What happened to the packet</th></tr></thead><tbody>
+  <tr><td><b>sent</b> <code>tx</code></td><td>a device put it on the wire</td></tr><tr><td><b>received</b> <code>rx</code></td><td>it arrived at a device, which read it</td></tr><tr><td><b>forwarded</b> <code>fwd</code></td><td>a switch or router passed it on towards where it is going</td></tr><tr><td><b>dropped</b> <code>drop</code></td><td>a device threw it away; the note says why</td></tr><tr><td><b>translated</b> <code>nat</code></td><td>a router rewrote its addresses on the way through</td></tr></tbody></table></div></section>
   ${CH.map((c,ci)=>{const items=GUIDE.filter(x=>x.ch===ci);return items.length?`<section class="gsec"><h3>Chapter ${ci+1}: ${esc(c.name)}</h3><div class="cards">${items.map(x=>`<article class="card panel"><h4>${esc(x.c)}</h4><p>${x.what}</p>${anatomy(x.syn)}<div class="ex">${x.ex.map(([cmd,note])=>`<div class="exrow"><button class="excmd" data-cmd="${esc(cmd)}" title="Put this in the terminal"><code>${esc(cmd)}</code><span class="try">Try it</span></button>${note?`<small>${note}</small>`:''}</div>`).join('')}</div></article>`).join('')}</div></section>`:'';}).join('')}
-  <section class="gsec"><h3>On a real computer</h3><div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px"><p class="explain">Reference for later, when more commands arrive. Most commands in this quest work in a real Linux terminal (<code>arping</code> may need installing first); <code>ping</code> works on a Mac too, and the <code>ip</code> command is Linux only. On Windows, open PowerShell and try <code>ping</code> and <code>arp -a</code>. Only ever test networks that are yours, or that you are allowed to test.</p>
+  <section class="gsec"><h3>On a real computer</h3><div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px"><p class="explain">Reference for later. Most commands in this quest work in a real Linux terminal (<code>arping</code>, <code>ipcalc</code> and <code>traceroute</code> may need installing first); <code>ping</code> and <code>traceroute</code> work on a Mac too, and the <code>ip</code> command is Linux only. The <code>nat</code> command exists only here: on a real router, NAT is switched on in its own settings. On Windows, open PowerShell and try <code>ping</code> and <code>arp -a</code>. Only ever test networks that are yours, or that you are allowed to test.</p>
    <div class="actions"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`;}
 let armProg=0;
 $('#guide').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
