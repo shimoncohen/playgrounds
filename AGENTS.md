@@ -14,7 +14,7 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs; do node --check "$f" || break; done
+for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs all of these on every PR. A PR is not ready until they pass locally.
