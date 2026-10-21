@@ -6,14 +6,15 @@ const NQ=globalThis.NQ=globalThis.NQ||{};
 /* [xp, title]: 10 XP a mission, about 30 missions in the full course */
 NQ.RANKS=[[0,'Packet Rookie'],[50,'ARP Detective'],[110,'Subnet Scout'],[170,'Gateway Keeper'],[230,'NAT Navigator'],[280,'Packet Whisperer']];
 
-/* c: the question, a: the answer, w: three wrong answers, why: shown after a miss */
+/* ch: the chapter whose missions must all be done before the question is played (quick-fire is gated on it)
+   c: the question, a: the answer, w: three wrong answers, why: shown after a miss */
 NQ.QF=[
- {c:'How many layers does the OSI model have?',a:'7',w:['4','5','3'],why:'OSI names seven layers. The TCP/IP model folds them into four: link, internet, transport and application.'},
- {c:'What is wrapping one layer inside another called?',a:'encapsulation',w:['routing','broadcasting','resolution'],why:'Each layer wraps the one inside it with its own header, like a letter inside an envelope inside a parcel.'},
- {c:'A packet crosses two routers on its way. Which of its addresses are rewritten at each hop?',a:'the MAC addresses',w:['the IP addresses','both','neither'],why:'Each hop is a new wire, so the Ethernet header gets new MACs. The IP addresses name the two ends and stay the same.'},
- {c:'A packet leaves with TTL 10 and crosses two routers. What TTL does it arrive with?',a:'8',w:['10','12','9'],why:'Every router lowers the TTL by one: 10, then 9, then 8. A switch does not count.'},
- {c:'What does ARP find out?',a:'the MAC address that goes with an IP address',w:['the IP address that goes with a name','the route to another network','how long a packet may live'],why:'ARP asks "who has this IP address?" and the owner answers with its MAC.'},
- {c:'A switch receives a broadcast frame. Where does it send it?',a:'out of every other port',w:['back where it came from','only to the router','nowhere until ARP answers'],why:'A broadcast is for everyone on the wire, so the switch copies it out of every port except the one it came in on.'}
+ {ch:0,c:'How many layers does the OSI model have?',a:'7',w:['4','5','3'],why:'OSI names seven layers. The TCP/IP model folds them into four: link, internet, transport and application.'},
+ {ch:0,c:'What is wrapping one layer inside another called?',a:'encapsulation',w:['routing','broadcasting','resolution'],why:'Each layer wraps the one inside it with its own header, like a letter inside an envelope inside a parcel.'},
+ {ch:0,c:'Which address belongs to one network card and only matters on one wire?',a:'the MAC address',w:['the IP address','the TTL','the port'],why:'A MAC is stamped on the card and used to deliver a frame across one wire. The IP address names the machine for the whole trip.'},
+ {ch:0,c:'A packet leaves with TTL 10 and crosses two routers. What TTL does it arrive with?',a:'8',w:['10','12','9'],why:'Every router lowers the TTL by one: 10, then 9, then 8. A switch does not count.'},
+ {ch:0,c:'What does ARP find out?',a:'the MAC address that goes with an IP address',w:['which port the switch uses','the layers a packet is built from','how long a packet may live'],why:'ARP asks "who has this IP address?" and the owner answers with its MAC.'},
+ {ch:0,c:'A switch receives a broadcast frame. Where does it send it?',a:'out of every other port',w:['back where it came from','only to the router','nowhere until ARP answers'],why:'A broadcast is for everyone on the wire, so the switch copies it out of every port except the one it came in on.'}
 ];
 
 /* ch: chapter index, c: the topic, what: one line, syn: anatomy tokens, ex: [command, what to look at] pairs */

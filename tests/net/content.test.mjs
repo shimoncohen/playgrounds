@@ -123,6 +123,63 @@ describe('chapter 1: lazy answers are caught', () => {
   });
 });
 
+describe('chapter 1: the two card missions', () => {
+  const m = (i) => NQ.CH[0].missions[i];
+  const run = (i, lines, a) => NQ.runMission(m(i), lines, a);
+  it('7: ip link, then the laptop\'s own MAC', () => {
+    assert.equal(run(6, ['ip link'], '02:00:00:00:00:01'), true);
+    assert.equal(run(6, ['ip addr'], '02:00:00:00:00:01'), true);
+    assert.equal(run(6, ['ip link'], '02:00:00:00:00:01.'), true);
+  });
+  it('7: the phone\'s MAC, the broadcast MAC or no ip command do not pass', () => {
+    assert.notEqual(run(6, ['ip link'], '02:00:00:00:00:02'), true);
+    assert.notEqual(run(6, ['ip link'], 'ff:ff:ff:ff:ff:ff'), true);
+    assert.notEqual(run(6, ['ping 10.0.0.3'], '02:00:00:00:00:01'), true);
+    assert.notEqual(run(6, ['ip route'], '02:00:00:00:00:01'), true);
+    assert.notEqual(run(6, [], '02:00:00:00:00:01'), true);
+  });
+  it('8: arping then ip neigh, the phone\'s MAC', () => {
+    assert.equal(run(7, ['arping 10.0.0.3', 'ip neigh'], '02:00:00:00:00:02'), true);
+    assert.equal(run(7, ['arping -c 1 10.0.0.3', 'ip neigh'], '02:00:00:00:00:02'), true);
+    assert.equal(run(7, ['arping 10.0.0.3', 'ip neigh'], '02:00:00:00:00:02'.toUpperCase()), true);
+  });
+  it('8: a wrong MAC, the wrong order or a lazy route do not pass', () => {
+    assert.notEqual(run(7, m(7).answer, '02:00:00:00:00:01'), true);
+    assert.notEqual(run(7, m(7).answer, 'ff:ff:ff:ff:ff:ff'), true);
+    assert.notEqual(run(7, ['ip neigh', 'arping 10.0.0.3'], '02:00:00:00:00:02'), true);
+    assert.notEqual(run(7, ['arping 10.0.0.3'], '02:00:00:00:00:02'), true);
+    assert.notEqual(run(7, ['ip neigh'], '02:00:00:00:00:02'), true);
+    assert.notEqual(run(7, ['arping 10.0.0.9', 'ip neigh'], '02:00:00:00:00:02'), true);
+    assert.notEqual(run(7, ['ping 10.0.0.3', 'ip neigh'], '02:00:00:00:00:02'), true);
+  });
+});
+
+// Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
+// Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
+// earlier mission, and the intro of chapter 1 may not use any of them.
+describe('chapter 1: terms are not used before the mission that introduces them', () => {
+  const FIRST = { Ethernet: 1, TTL: 2, router: 2, ARP: 3, MAC: 3, frame: 3, broadcast: 3, NAT: 99, OSI: 1, 'TCP/IP': 1 };
+  const hit = (t, w) => new RegExp(`(?<![\\w/])${w}(?![\\w/])`, w === 'router' ? 'i' : '').test(plain(t));
+  NQ.CH[0].missions.forEach((m, i) => {
+    it(`${i + 1} ${m.title}`, () => {
+      for (const [w, at] of Object.entries(FIRST)) if (i < at) for (const t of [m.goal, ...m.how]) assert.ok(!hit(t, w), `"${w}" used before mission ${at + 1}: ${plain(t)}`);
+    });
+  });
+  it('the chapter intro stays short and plain', () => {
+    for (const w of Object.keys(FIRST)) assert.ok(!hit(NQ.CH[0].intro, w), w);
+    assert.ok(plain(NQ.CH[0].intro).length < 900);
+  });
+  it('the first mission defines packet, command, packet panel, tx/rx and IP address in plain words', () => {
+    const t = plain([NQ.CH[0].missions[0].goal, ...NQ.CH[0].missions[0].how].join(' '));
+    for (const w of ['command', 'packet panel', 'tx', 'rx', 'IP address', 'packet']) assert.ok(t.includes(w), w);
+  });
+  it('the guide cards only use commands that a mission taught', () => {
+    const key = (l) => { const w = l.trim().split(/\s+/); return w[0] === 'ip' ? w[0] + ' ' + w[1] : w[0]; };
+    const taught = new Set(NQ.CH[0].missions.flatMap((x) => x.answer.map(key)));
+    for (const g of NQ.GUIDE) for (const [line] of g.ex) assert.ok(taught.has(key(line)), line);
+  });
+});
+
 describe('the check context', () => {
   it('ctx.ping probes a clone: the learner\'s log and ARP caches stay as they were', () => {
     const net = NQ.createNet('pair'), ctx = NQ.makeCtx(net, [], null);
@@ -203,7 +260,8 @@ describe('chapters, ranks, quick-fire and guide', () => {
   it('chapters have a name, badge, intro, learned list and missions', () => {
     assert.ok(NQ.CH.length >= 1);
     assert.equal(NQ.CH[0].name, 'Layers and packets');
-    assert.equal(NQ.CH[0].missions.length, 6);
+    assert.equal(NQ.CH[0].missions.length, 8);
+    for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const ch of NQ.CH) assert.ok(ch.name && ch.badge && ch.intro && ch.learned.length && ch.missions.length);
   });
   it('six ranks, strictly increasing, the top one at 280 XP', () => {

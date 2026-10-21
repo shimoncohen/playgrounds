@@ -1635,8 +1635,21 @@ test('net-quest: layout at 390px', async () => {
   }
 });
 
-test('net-quest: quick-fire and field guide render', async () => {
+test('net-quest: quick-fire stays closed until the chapter is done, and says what to finish', async () => {
   const { ctx, page, errors, console: cerr } = await netPage();
+  await page.click('.tabs button[data-tab="fire"]');
+  assert.equal(await page.locator('#fStart').count(), 0, 'no way to start the clock');
+  assert.match(await page.textContent('#fStage'), /Chapter 1: Layers and packets.*0 of 8 missions done/);
+  await page.click('#fStage [data-act="tab-quest"]');
+  assert.equal(await page.isVisible('#tab-quest'), true);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(cerr, []);
+  await ctx.close();
+});
+
+test('net-quest: quick-fire and field guide render', async () => {
+  const done = JSON.stringify({ done: Object.fromEntries([0, 1, 2, 3, 4, 5, 6, 7].map(i => [`0.${i}`, true])), xp: 80 });
+  const { ctx, page, errors, console: cerr } = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, done));
   await page.click('.tabs button[data-tab="fire"]');
   await page.click('#fStart');
   assert.ok(await page.locator('#fStage .opt').count() >= 2);
