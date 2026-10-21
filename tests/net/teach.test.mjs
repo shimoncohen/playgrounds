@@ -22,6 +22,17 @@ const FIRST = {
   PERMANENT: [/PERMANENT/, 1, 2],
   flooding: [/\bflood/i, 1, 4],
   'MAC table': [/MAC table/i, 1, 4],
+  'ip addr': [/ip addr/, 2, 0],
+  prefix: [/\bprefix/i, 2, 0],
+  subnet: [/\bsubnet/i, 2, 0],
+  'ip addr del': [/addr del/, 2, 1],
+  mask: [/\bmask\b/i, 2, 1],
+  ipcalc: [/ipcalc/, 2, 2],
+  host: [/\bhosts?\b/i, 2, 2],
+  private: [/\bprivate\b/i, 2, 3],
+  public: [/\bpublic\b/i, 2, 3],
+  'duplicate address': [/\bduplicate\b|\bshare an address/i, 2, 4],
+  '/31': [/\/31\b/, 2, 5],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -59,6 +70,41 @@ describe('chapter 2 defines its new words in place', () => {
   });
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[1].intro)));
+  });
+});
+
+describe('chapter 3 does not use words that later chapters teach', () => {
+  // routing, the gateway and NAT come in chapters 4 and 5 ("router" was taught in chapter 1)
+  const LATER = /\b(gateway|NAT|routing|default route|DHCP|VLAN|traceroute|hops?|ISP)\b|\broute\b/i;
+  NQ.CH[2].missions.forEach((m, i) => it(`3.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[2].intro))));
+});
+
+describe('chapter 3 defines its new words in place', () => {
+  const card = (i) => NQ.CH[2].missions[i].goal + ' ' + NQ.CH[2].missions[i].how.join(' ');
+  it('prefix and subnet are defined where ip addr add first appears (3.1)', () => {
+    assert.match(card(0), /<b>prefix<\/b>/);
+    assert.match(card(0), /<b>subnet<\/b>/);
+    assert.match(card(0), /short for device/);
+  });
+  it('del and mask are explained in 3.2', () => {
+    assert.match(card(1), /<b>mask<\/b>/);
+    assert.match(card(1), /short for delete/);
+  });
+  it('host, broadcast address and bits are explained in 3.3', () => {
+    assert.match(card(2), /<b>host<\/b> is any device with an address/);
+    assert.match(card(2), /<b>broadcast address<\/b>/);
+    assert.match(plain(NQ.CH[2].missions[2].explain), /called bits/);
+  });
+  it('private and public are defined in 3.4, with the ranges', () => {
+    assert.match(card(3), /<b>private<\/b>/);
+    assert.match(card(3), /<b>public<\/b>/);
+    assert.match(plain(card(3)), /10\./);
+    assert.match(plain(card(3)), /172\.16\. and 172\.31\./);
+  });
+  it('duplicate address is defined in 3.5', () => assert.match(card(4), /<b>duplicate address<\/b>/));
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(NQ.CH[2].intro)));
   });
 });
 

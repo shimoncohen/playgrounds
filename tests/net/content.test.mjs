@@ -233,6 +233,115 @@ describe('chapter 2: lazy answers are caught', () => {
   });
 });
 
+describe('chapter 3: lazy answers are caught', () => {
+  const m = (i) => NQ.CH[2].missions[i];
+  const run = (i, lines, a, mm = m(i)) => NQ.runMission(mm, lines, a);
+  const ADD = (ip) => `ip addr add ${ip} dev eth0`, DEL = (ip) => `ip addr del ${ip} dev eth0`;
+  it('has six missions on the expected scenarios and terminals', () => {
+    assert.equal(NQ.CH[2].name, 'IP addressing');
+    assert.deepEqual([...NQ.CH[2].missions.map((x) => x.scenario)], ['pair', 'pair', 'pair', 'home', 'office', 'pair']);
+    assert.deepEqual([...NQ.CH[2].missions.map((x) => x.dev)], ['phone', 'phone', undefined, 'home', 'printer', undefined]);
+  });
+  it('1: the phone starts without an address, and any free address on the laptop\'s wire fixes it', () => {
+    const net = NQ.createNet('pair', m(0).setup);
+    assert.equal(net.devices.phone.ifaces.eth0.ip, null);
+    assert.equal(net.exec('ping -c 1 10.0.0.2', 'phone').code, 2);
+    for (const ip of ['10.0.0.3/24', '10.0.0.77/24', '10.0.0.3/16']) assert.equal(run(0, [ADD(ip)]), true, ip);
+  });
+  it('1: nothing, a bad or taken address, another subnet or a look at ip addr do not pass', () => {
+    for (const lines of [[], ['ip addr'], ['ping -c 1 10.0.0.2'], [ADD('10.0.0.2/24')], [ADD('10.0.1.3/24')], [ADD('10.0.0.3/32')], [ADD('10.0.0.3/30'), 'ip link set eth0 down']])
+      assert.notEqual(run(0, lines), true, lines.join(' ; '));
+    assert.match(run(0, []), /no address/);
+    assert.match(run(0, [ADD('10.0.0.2/24')]), /Another device/);
+  });
+  it('1: the same fix on the laptop (the wrong device) changes nothing the check wants', () => {
+    assert.notEqual(run(0, [ADD('10.0.0.3/24')], undefined, { ...m(0), dev: 'laptop' }), true);
+  });
+  it('2: the starter is broken both ways, and rewriting the prefix repairs it', () => {
+    const net = NQ.createNet('pair', m(1).setup);
+    assert.equal(net.devices.phone.ifaces.eth0.ip, '10.0.0.200/25');
+    assert.equal(net.exec('ping -c 1 10.0.0.2', 'phone').code, 2);
+    assert.equal(net.exec('ping -c 1 10.0.0.200', 'laptop').code, 1);
+    assert.equal(run(1, m(1).answer), true);
+    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.3/24')]), true);
+    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.200/23')]), true);
+  });
+  it('2: nothing, the old prefix again, a narrower prefix, a delete without a new address, a clash or a downed card do not pass', () => {
+    for (const lines of [[], ['ip addr'], [DEL('10.0.0.200/25'), ADD('10.0.0.200/25')], [DEL('10.0.0.200/25'), ADD('10.0.0.200/26')], [DEL('10.0.0.200/25'), ADD('10.0.0.200/32')],
+      [DEL('10.0.0.200/25')], [DEL('10.0.0.200/25'), ADD('10.0.0.2/24')], [DEL('10.0.0.200/25'), ADD('10.0.0.200/24'), 'ip link set eth0 down'], [ADD('10.0.0.200/24')]])
+      assert.notEqual(run(1, lines), true, lines.join(' ; '));
+    assert.match(run(1, [DEL('10.0.0.200/25')]), /no address/);
+    assert.match(run(1, []), /number after the slash/);
+  });
+  it('3: ipcalc on a /26, then the computed count; a different prefix, a guess or no ipcalc do not pass', () => {
+    const want = String(NQ.ip.cidr('10.0.0.0/26').bcast - NQ.ip.cidr('10.0.0.0/26').net - 1);
+    assert.equal(solve(m(2)).expect, want);
+    assert.equal(run(2, ['ipcalc 10.0.0.0/26'], want), true);
+    assert.equal(run(2, ['ipcalc 10.0.0.77/26'], want), true);
+    assert.equal(run(2, ['ip addr', 'ipcalc 10.0.0.0/24', 'ipcalc 192.168.5.64/26'], want + '.'), true);
+    assert.equal(run(2, ['ipcalc 10.0.0.0/26'], ''), NQ.ASK);
+    for (const [lines, a] of [[[], want], [['ipcalc 10.0.0.0/24'], want], [['ipcalc 10.0.0.0/24'], '254'], [['ipcalc 10.0.0.0/26'], '254'], [['ipcalc 10.0.0.0/26'], '64'], [['ipcalc 10.0.0.0/26'], '32'], [['ipcalc 10.0.0.0'], want], [['ipcalc 10.0.0.0/26 extra'], want]])
+      assert.notEqual(run(2, lines, a), true, lines.join(' ; ') + ' -> ' + a);
+  });
+  it('4: the public address on home, with or without its prefix; the private one, the router\'s other side or no ip addr do not pass', () => {
+    const net = NQ.createNet('home');
+    assert.equal(solve(m(3)).expect, '203.0.113.5');
+    assert.deepEqual([...solve(m(3)).all], ['203.0.113.5', '203.0.113.5/30']);
+    for (const a of ['203.0.113.5', '203.0.113.5/30', ' 203.0.113.5. ']) assert.equal(run(3, ['ip addr'], a), true, a);
+    assert.equal(run(3, ['ip a'], '203.0.113.5'), true);
+    assert.equal(run(3, ['ip addr show dev eth1'], '203.0.113.5'), true);
+    for (const a of ['192.168.1.1', '192.168.1.1/24', '203.0.113.6', '198.51.100.1', '203.0.113', '203.0.113.5/24', '10.0.0.1']) assert.notEqual(run(3, ['ip addr'], a), true, a);
+    for (const lines of [[], ['ip link'], ['ping -c 1 192.168.1.10'], ['ip neigh']]) assert.notEqual(run(3, lines, '203.0.113.5'), true, lines.join(' ; '));
+    assert.equal(net.devices.laptop.ifaces.eth0.ip, '192.168.1.10/24');
+  });
+  it('4: the answer is computed from the addresses on home, so a changed address changes it', () => {
+    const net = NQ.createNet('home');
+    net.exec('ip addr del 203.0.113.5/30 dev eth1', 'home'); net.exec('ip addr add 8.8.4.4/30 dev eth1', 'home');
+    assert.equal(m(3).question.expect(NQ.makeCtx(net, [], null)), '8.8.4.4');
+    net.exec('ip addr del 8.8.4.4/30 dev eth1', 'home'); net.exec('ip addr add 172.20.0.9/30 dev eth1', 'home');
+    assert.equal(m(3).question.expect(NQ.makeCtx(net, [], null)), '');
+  });
+  it('5: the starter has two devices on one address, and moving the printer repairs it', () => {
+    const net = NQ.createNet('office', m(4).setup);
+    assert.equal(net.devices.printer.ifaces.eth0.ip, '192.168.1.10/24');
+    assert.equal(net.devices.laptop.ifaces.eth0.ip, '192.168.1.10/24');
+    assert.match(net.exec('arping -c 1 192.168.1.10', 'printer').out.join('\n'), /Unicast reply from 192\.168\.1\.10 \[02:00:00:00:00:01\]/);
+    assert.equal(run(4, m(4).answer), true);
+    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.99/24')]), true);
+    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.20/24'), 'arping -c 1 192.168.1.20'].slice(0, 2)), true);
+  });
+  it('5: the same change on the laptop clears the clash too (either device may move)', () => {
+    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.30/24')], undefined, { ...m(4), dev: 'laptop' }), true);
+  });
+  it('5: nothing, arping, deleting only, the router\'s or laptop\'s address, another subnet or a short prefix do not pass', () => {
+    for (const lines of [[], ['arping -c 1 192.168.1.10', 'ip link'], [DEL('192.168.1.10/24')], [DEL('192.168.1.10/24'), ADD('192.168.1.1/24')], [DEL('192.168.1.10/24'), ADD('192.168.1.10/24')],
+      [DEL('192.168.1.10/24'), ADD('192.168.2.20/24')], [DEL('192.168.1.10/24'), ADD('192.168.1.20/32')], [DEL('192.168.1.10/24'), ADD('192.168.1.20/24'), 'ip link set eth0 down'], ['ping -c 1 192.168.1.1']])
+      assert.notEqual(run(4, lines), true, lines.join(' ; '));
+    assert.match(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.1/24')]), /still share/);
+    assert.match(run(4, [DEL('192.168.1.10/24')]), /no address/);
+  });
+  it('5: the clash check does not throw on a net with several interfaces without addresses', () => {
+    assert.doesNotThrow(() => run(4, [DEL('192.168.1.10/24'), 'ip route']));
+  });
+  it('6: /31 and /32 both run, then the sum of what ipcalc printed; one of them, other prefixes or a wrong total do not pass', () => {
+    const l = ['ipcalc 10.0.0.0/31', 'ipcalc 10.0.0.1/32'];
+    assert.equal(solve(m(5)).expect, '3');
+    assert.equal(run(5, l, '3'), true);
+    assert.equal(run(5, [l[1], l[0]], '3.'), true);
+    assert.equal(run(5, ['ipcalc 192.168.0.4/31', 'ipcalc 192.168.0.9/32', 'ipcalc 10.0.0.0/30'], '3'), true);
+    assert.equal(run(5, l, ''), NQ.ASK);
+    for (const [lines, a] of [[[], '3'], [[l[0]], '3'], [[l[1]], '3'], [['ipcalc 10.0.0.0/30', 'ipcalc 10.0.0.0/24'], '3'], [l, '2'], [l, '1'], [l, '4'], [l, '0'], [l, '2 + 1'], [['ipcalc 10.0.0.0/31', 'ipcalc 10.0.0.1'], '3']])
+      assert.notEqual(run(5, lines, a), true, lines.join(' ; ') + ' -> ' + a);
+  });
+  it('6: the total comes from what ipcalc prints, and the engine still counts /30 as two usable hosts', () => {
+    const out = (cmd) => NQ.createNet('pair').exec(cmd).out.join('\n');
+    assert.match(out('ipcalc 10.0.0.0/31'), /Hosts\/Net: 2/);
+    assert.match(out('ipcalc 10.0.0.1/32'), /Hosts\/Net: 1/);
+    assert.match(out('ipcalc 10.0.0.0/30'), /Hosts\/Net: 2/);
+    assert.match(out('ipcalc 10.0.0.0/26'), /Hosts\/Net: 62/);
+  });
+});
+
 // Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
