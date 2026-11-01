@@ -3,19 +3,12 @@
 // The course lives in script-quest/app.js next to the DOM app, so load its DOM-free parts (CH, FIRE, qfOpen, the guide data) by slicing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readApp, cut, loadContent } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'script-quest', 'app.js'), 'utf8');
-const a = src.indexOf('const isArr='), b = src.indexOf('// ================= UI =================');
-assert.ok(a > 0 && b > a && src.slice(a, b).includes('const qfOpen='), 'content markers moved: update this loader');
-const g0 = src.indexOf('const BLOCKS=['), g1 = src.indexOf('function renderGuide');
-assert.ok(g0 > 0 && g1 > g0, 'guide markers moved: update this loader');
 const tagOf = 'const tagOf=v=>Object.prototype.toString.call(v).slice(8,-1);\n';
-const { CH, FIRE, qfOpen } = new Function(tagOf + src.slice(a, b) + '\nreturn {CH,FIRE,qfOpen};')();
-const { BLOCKS, ERRS } = new Function(src.slice(g0, g1) + '\nreturn {BLOCKS,ERRS};')();
-const guideSrc = src.slice(g1, src.indexOf('const guideRealms'));
+const { CH, FIRE, qfOpen } = loadContent('script-quest', { prelude: tagOf, parts: [['const isArr=', '// ================= UI =================']], returns: ['CH', 'FIRE', 'qfOpen'], mustInclude: ['const qfOpen='] });
+const { BLOCKS, ERRS } = loadContent('script-quest', { parts: [['const BLOCKS=[', 'function renderGuide']], returns: ['BLOCKS', 'ERRS'] });
+const guideSrc = cut(readApp('script-quest'), 'function renderGuide', 'const guideRealms');
 
 // term -> [regex that uses it, chapter, mission that first teaches or defines it in place (its own card may use it)]; null = never taught, so never used
 const FIRST = {

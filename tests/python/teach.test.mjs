@@ -3,14 +3,9 @@
 // The course lives in python-quest/app.js, which also holds the DOM app, so load the DOM-free head of it (interpreter, CH, QF, GUIDE, qfOpen).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadContent } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'python-quest', 'app.js'), 'utf8');
-const head = src.slice(0, src.indexOf('const ERRS={'));
-assert.ok(head.includes('const QF=[') && head.includes('const qfOpen='), 'content markers moved: update this loader');
-const { PY, CH, QF, GUIDE, qfOpen } = new Function(head + '\nreturn {PY,CH,QF,GUIDE,qfOpen};')();
+const { PY, CH, QF, GUIDE, qfOpen } = loadContent('python-quest', { parts: [[null, 'const ERRS={']], returns: ['PY', 'CH', 'QF', 'GUIDE', 'qfOpen'], mustInclude: ['const QF=[', 'const qfOpen='] });
 
 // term -> [regex that uses it, chapter, mission that first teaches or defines it in place (its own card may use it)]; null = never taught, so never used
 const FIRST = {
