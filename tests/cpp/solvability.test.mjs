@@ -121,6 +121,7 @@ test('Guess the Number: a binary-search player wins in at most 7 tries, whatever
   assert.match(allOut, /Too low!/);
 });
 
+// Diagnostic cross-check only: 1..100 reaches any secret, so the binary-search test above is the acceptance test.
 test('Guess the Number: a sweep through 1..100 also reaches the secret', () => {
   const { m } = byTitle(GUESS);
   assert.equal(passes(m, answerOf(m), inputsOf(m)), true);

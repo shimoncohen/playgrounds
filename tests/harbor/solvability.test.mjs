@@ -57,7 +57,7 @@ for (const [ci, ch] of CH.entries()) {
       }
       assert.ok(m.ans !== undefined, 'mission has no reference answer');
       const lazy = okOf(m, run('echo lazy'));
-      // Solve first: a failing probe must not leave the world one mission behind for the rest of the replay.
+      // Assert the probe after solving, so a failing probe does not skip the replay and cascade into later missions.
       assert.equal(solve(m), true);
       assert.equal(lazy, false, 'check already true before the learner acts');
     });

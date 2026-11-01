@@ -1,4 +1,3 @@
-// Slices the DOM-free course out of an app.js that also holds the DOM app; a marker that moved fails by name.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
