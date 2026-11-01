@@ -436,6 +436,49 @@ test('harbor-quest: a finished mission is not celebrated again when it is revisi
   await ctx.close();
 });
 
+// Script Quest checks need the page's own RUN/DECLS (a real iframe realm plus acorn), so solvability runs in the real page.
+// Needs the jsDelivr CDN (acorn; TypeScript for chapter 11): it fails offline instead of skipping.
+async function driveScriptChapters(chapters, lazy, winMs) {
+  const { ctx, page, errors } = await open(`${base}/script-quest/`);
+  await page.waitForSelector('#cmd');
+  assert.ok(await page.evaluate(() => typeof window.acorn !== 'undefined'), 'acorn did not load from the CDN');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  let solved = 0;
+  for (const ci of chapters) {
+    await page.click(`#chapters .chap[data-c="${ci}"]`);
+    for (;;) {
+      const at = /Mission (\d+) of (\d+)/.exec(await page.textContent('#mission .eyebrow'));
+      if (!at) break;
+      const where = `chapter ${ci + 1}, mission ${at[1]} (${(await page.textContent('#mission h2')).trim()})`;
+      const before = await wins();
+      await page.fill('#cmd', lazy);
+      await page.press('#cmd', 'Enter');
+      await page.waitForTimeout(200);
+      assert.equal(await wins(), before, `${where}: a lazy line completed the mission`);
+      await page.click('#fill');
+      if (/edit /.test(await page.textContent('#mission .goal .label'))) await page.click('#edSave');
+      if ((await wins()) === before && (await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+      try { await until(async () => (await wins()) > before, winMs); } catch { assert.fail(`${where}: the reference code did not complete the mission`); }
+      solved++;
+    }
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  return solved;
+}
+
+test('script-quest: every JavaScript mission (chapters 1 to 10) is solved by its own code, and a lazy line does not pass', async () => {
+  assert.equal(await driveScriptChapters([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 'void 0', 8000) > 0, true);
+});
+
+test('script-quest: every TypeScript mission (chapter 11) is solved by its own code, and a lazy line does not pass', async () => {
+  assert.equal(await driveScriptChapters([10], 'void 0', 30000) > 0, true);
+});
+
+test('script-quest: every Node.js terminal and editor mission (chapter 12) is solved by its own code, and a lazy command does not pass', async () => {
+  assert.equal(await driveScriptChapters([11], 'echo lazy', 8000) > 0, true);
+});
+
 test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#cmd');

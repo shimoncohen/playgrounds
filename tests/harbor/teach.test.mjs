@@ -3,14 +3,12 @@
 // harbor-quest/app.js is one DOM-bound IIFE, so load the data blocks (CH, QF + qfOpen, puzzles, GUIDE) by their markers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadContent } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'harbor-quest', 'app.js'), 'utf8');
-const cut = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); assert.ok(i >= 0 && j > i, `content marker moved: ${a}`); return src.slice(i, j); };
-const code = [cut('const CH=[', '\nCH.forEach'), cut('const QF=[', 'const VALUED_D'), cut('const PZ_DF=[', 'const RANKS'), cut('const GUIDE=[', '/* ---------- UI')].join('\n');
-const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = new Function(code + '\nreturn {CH,QF,PZ_DF,PZ_Y,GUIDE,qfOpen};')();
+const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = loadContent('harbor-quest', {
+  parts: [['const CH=[', '\nCH.forEach'], ['const QF=[', 'const VALUED_D'], ['const PZ_DF=[', 'const RANKS'], ['const GUIDE=[', '/* ---------- UI']],
+  returns: ['CH', 'QF', 'PZ_DF', 'PZ_Y', 'GUIDE', 'qfOpen'],
+});
 
 const plain = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const cardText = m => plain([m.t, m.i, m.g, m.h, (m.a || []).map(x => x[0]).join(' '), m.after].filter(Boolean).join('\n'));

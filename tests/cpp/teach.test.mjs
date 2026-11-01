@@ -3,14 +3,9 @@
 // The course lives in cpp-quest/app.js next to the DOM app, so load the DOM-free head of it (interpreter, CH, QT, qfOpen).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadContent } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'cpp-quest', 'app.js'), 'utf8');
-const head = src.slice(0, src.indexOf('(()=>{\nconst KEY='));
-assert.ok(head.includes('const QT=[') && head.includes('const qfOpen=') && head.includes('const CH=['), 'content markers moved: update this loader');
-const { CPP, CH, QT, P, qfOpen } = new Function(head + '\nreturn {CPP,CH,QT,P,qfOpen};')();
+const { CPP, CH, QT, P, qfOpen } = loadContent('cpp-quest', { parts: [[null, '(()=>{\nconst KEY=']], returns: ['CPP', 'CH', 'QT', 'P', 'qfOpen'], mustInclude: ['const QT=[', 'const qfOpen=', 'const CH=['] });
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches or defines it in place (its own card may use it)]; null = never taught, so never used
 const FIRST = {
