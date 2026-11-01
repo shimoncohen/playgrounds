@@ -54,7 +54,7 @@ feat(shell)!: rename the saved-state key      # breaking change
 ```
 
 - **Types**: `feat` (new learner-visible thing), `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `ds`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`, `release`.
+- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `ds`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`, `release`, `net`, `agent`.
 - **The PR title is what lands on `main`** (we squash-merge), so it must follow the format; a check enforces it. Individual commit messages are checked locally by a git hook after `npm ci`.
 - Breaking changes (for example anything that would invalidate saved progress) use `!` and a `BREAKING CHANGE:` footer.
 
