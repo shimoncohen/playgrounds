@@ -98,16 +98,27 @@ for (const { id, m, prev } of missions) {
   }
 }
 
+// srand(time(0)) seeds from whole seconds, so runs in one test would share a secret: give each run its own clock.
+function withClock(i, fn) {
+  const real = Date.now;
+  Date.now = () => 1_700_000_000_000 + i * 7_919_000;
+  try { return fn(); } finally { Date.now = real; }
+}
+
 test('Guess the Number: a binary-search player wins in at most 7 tries, whatever the secret', () => {
   const { m } = byTitle(GUESS);
-  for (let i = 0; i < 20; i++) {
-    const { ctx, out, guesses } = playGuessingGame(answerOf(m));
+  let allOut = '';
+  for (let i = 0; i < 30; i++) {
+    const { ctx, out, guesses } = withClock(i, () => playGuessingGame(answerOf(m)));
+    allOut += out;
     assert.equal(!!m.check(ctx), true, `check failed; out was:\n${out}`);
     const won = /You got it in (\d+) tries!\s*$/.exec(out);
     assert.ok(won, `no win line; out was:\n${out}`);
     assert.equal(Number(won[1]), guesses);
     assert.ok(guesses <= 7, `took ${guesses} tries`);
   }
+  assert.match(allOut, /Too high!/);
+  assert.match(allOut, /Too low!/);
 });
 
 test('Guess the Number: a sweep through 1..100 also reaches the secret', () => {
@@ -117,5 +128,11 @@ test('Guess the Number: a sweep through 1..100 also reaches the secret', () => {
 
 test('Rock, Paper, Scissors: the random result never fails the check', () => {
   const { m } = byTitle(RPS);
-  for (let i = 0; i < 20; i++) assert.equal(passes(m, answerOf(m), inputsOf(m)), true);
+  let allOut = '';
+  for (let i = 0; i < 30; i++) {
+    const ctx = withClock(i, () => ctxOf(answerOf(m), inputsOf(m)));
+    allOut += ctx.out;
+    assert.equal(!!m.check(ctx), true, `out was:\n${ctx.out}`);
+  }
+  for (const verdict of [/You win!/, /You lose!/, /It's a tie!/]) assert.match(allOut, verdict);
 });
