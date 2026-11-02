@@ -47,7 +47,7 @@ function run(){
   RQUI.result(resultEl,ev);
   if(!curMission())return;
   if(ev.result===true)complete();
-  else renderFeedback(ev.c&&ev.c.status==='ok'?{tip:ev.result}:null);
+  else renderFeedback(ev.c&&(ev.c.status==='ok'||ev.c.status==='panic')?{tip:ev.result}:null);
 }
 $('#bRun').addEventListener('click',run);
 $('#bReset').addEventListener('click',()=>{S.codes[codeKey()]=sessionMission().starter;save();startSession('Back to the starter code.');});

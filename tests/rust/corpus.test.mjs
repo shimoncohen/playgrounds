@@ -55,7 +55,7 @@ describe('corpus v0: RQ.run agrees with every authored entry', () => {
     it(e.id, () => {
       const c = RQ.run(e.src);
       if (e.expect === 'ok') {
-        assert.equal(c.status, 'ok');
+        assert.equal(c.status, e.exit === 101 ? 'panic' : 'ok');
         assert.equal(c.stdout, e.out);
         assert.equal(c.stderr, e.err);
         assert.equal(c.exit, e.exit);

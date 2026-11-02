@@ -50,6 +50,15 @@ describe('terms on a mission card are not used before the mission that teaches t
     mut: [/\bmut\b/, 0, 3],
     shadowing: [/\bshadow/i, 0, 5],
     macro: [/\bmacro\b/i, 0, 0],
+    tuple: [/\btuples?\b/i, 1, 3],
+    array: [/\barrays?\b/i, 1, 4],
+    arithmetic_overflow: [/arithmetic_overflow/, 1, 6],
+    overflowing_literals: [/overflowing_literals/, 1, 6],
+    unconditional_panic: [/unconditional_panic/, 1, 7],
+    panic: [/\bpanics?\b/i, 1, 7],
+    E0308: [/E0308/, 2, 1],
+    E0425: [/E0425/, 2, 7],
+    range: [/\branges?\b/i, 2, 6],
   };
   for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
     it(`"${term}" first appears in ${ci}.${mi}`, () => {

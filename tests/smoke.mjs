@@ -361,6 +361,46 @@ test('rust-quest: the unsupported card names the feature and the line; the inter
   await ctx.close();
 });
 
+test('rust-quest: a panic shows its output, the header and exit code 101, gives feedback, and the panic mission still completes', async () => {
+  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!("before");\n    println!("{}", add(250, 10));\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .stderr');
+  const result = await page.textContent('#result');
+  assert.match(result, /before/);
+  assert.match(result, /panicked at src\/main\.rs/);
+  assert.match(result, /Exit code 101/);
+  assert.match(await page.textContent('#feedback'), /Not quite yet[\s\S]*stopped with a panic: attempt to add with overflow/);
+  for (const h of await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')))) assert.ok(!/add|fn%20|fn /.test(h), h);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  await page.click('.chap[data-ch="1"]');
+  await page.click('.dot[data-mi="7"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  await page.click('#bRun');
+  await page.waitForTimeout(100);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a lint card shows the lint id, the line and a tip, and does not complete the mission', async () => {
+  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    let x: u8 = 255 + 1;\n    println!("{}", x);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result .diag .id'), /arithmetic_overflow · line 2/);
+  assert.ok((await page.textContent('#result .diag .note')).trim().length > 10);
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');

@@ -1,4 +1,4 @@
-/* c.status: ok, error, unsupported, internal or limit. `unsupported` (a construct the quest does not model) and `internal`
+/* c.status: ok, panic (a runtime panic: exit 101, c.panic is {msg,line,col}), error, unsupported, internal or limit. `unsupported` (a construct the quest does not model) and `internal`
    (an engine exception on code it should handle) are kept apart from a verdict, which is given only when every construct
    is modeled. An exception never leaves RQ.run. DOM-free. */
 (()=>{
@@ -9,7 +9,11 @@ RQ.compile=src=>{
   const r=RQ.parse(RQ.lex(src));
   if(r.errors.length)return {ast:null,diags:r.errors,unsupported:[]};
   const ck=RQ.check(r.ast);
-  return {ast:r.ast,diags:ck.errors,unsupported:[...r.unsupported,...ck.unsupported].sort((a,b)=>a.line-b.line),
+  let diags=ck.errors;
+  const unsupported=[...r.unsupported,...ck.unsupported];
+  // rustc lints only a program that type-checks, and the quest judges only a program it fully models
+  if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}
+  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
@@ -63,7 +67,7 @@ RQ.features=src=>{
 function context(d,ast,counts){
   const errors=d.errors||[];
   const c={
-    status:d.status,errors,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:null,
+    status:d.status,errors,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
     unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:[],
     compiles:()=>c.status!=='error'&&c.status!=='unsupported'&&c.status!=='internal',
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
@@ -75,9 +79,16 @@ function context(d,ast,counts){
       if(!ast)return 0;
       if(counts&&kind in counts)return counts[kind];
       if(kind==='hole')return holes(ast);
-      const T={let:'Let',assign:'Assign',macro:'Macro',fn:'Fn',const:'Const',op:'Binary'}[kind];
+      if(kind==='const-use'){
+        const names=new Set(ast.items.filter(i=>i.t==='Const').map(i=>i.name));
+        let k=0;
+        RQ.walk(ast,m=>{if(m.t==='Path'&&m.segs.length===1&&names.has(m.segs[0].name))k++;});
+        return k;
+      }
+      const T={let:'Let',assign:'Assign',macro:'Macro',fn:'Fn',const:'Const',op:'Binary',cast:'Cast',tuple:'Tuple',array:'Array',index:'Index',field:'Field',
+        if:'If',loop:'Loop',while:'While',for:'For',break:'Break',return:'Return'}[kind];
       let n=0;
-      RQ.walk(ast,m=>{if(kind==='mut'?(m.t==='IdentPat'&&m.mut):m.t===T)n++;});
+      RQ.walk(ast,m=>{if(kind==='mut'?(m.t==='IdentPat'&&m.mut):kind==='annot'?(m.t==='Let'&&m.ty):m.t===T)n++;});
       return n;
     }
   };
@@ -93,7 +104,7 @@ RQ.run=(src,opts)=>{
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
     if(c.diags.length)return context({status:'error',errors:c.diags},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context(RQ.interp(c.ast,opts),ast,c.counts);
+    return context(RQ.interp(c.ast,{...opts,info:c.info}),ast,c.counts);
   }catch(e){
     return context({status:'internal',message:String(e&&e.message||e)},ast);
   }

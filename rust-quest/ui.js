@@ -19,12 +19,12 @@ UI.result=(root,ev)=>{
   root.textContent='';
   const c=ev.c;
   if(!c){root.append(h('p','note',ev.result));return;}
-  if(c.status==='ok'||c.status==='limit'){
-    root.append(h('h4',null,c.status==='ok'?'Your program ran':'Your program was stopped'));
+  if(c.status==='ok'||c.status==='limit'||c.status==='panic'){
+    root.append(h('h4',null,c.status==='ok'?'Your program ran':c.status==='panic'?'Your program stopped with a panic':'Your program was stopped'));
     if(c.status==='limit')root.append(h('p','note','It ran for too long, so Rust Quest stopped it. Is something calling itself forever?'));
     if(c.stdout)root.append(h('pre','stdout',c.stdout));else root.append(h('p','note','It printed nothing.'));
-    if(c.stderr){root.append(h('h4',null,'Error output'));root.append(h('pre','stderr',c.stderr));}
-    if(c.status==='ok')root.append(h('p','note','Exit code '+c.exit+'.'));
+    if(c.stderr){root.append(h('h4',null,'Error output'));root.append(h('pre','stderr',c.stderr.replace(/^\n+/,'')));}
+    if(c.status!=='limit')root.append(h('p','note','Exit code '+c.exit+'.'));
     return;
   }
   if(c.status==='error'){
@@ -33,7 +33,7 @@ UI.result=(root,ev)=>{
       const d=h('div','diag');
       d.append(h('div','id',(e.code||e.lint?(e.code||e.lint)+' · ':'')+'line '+e.line));
       d.append(rich('p',null,e.msg));
-      const tip=e.code?RQ.diag.tip(e.code):'';
+      const tip=RQ.diag.tip(e.code||e.lint);
       if(tip)d.append(rich('p','note',tip));
       root.append(d);
     }
