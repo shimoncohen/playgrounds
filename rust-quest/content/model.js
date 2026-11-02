@@ -1,6 +1,8 @@
 /* Chapters push into RQ.CH in order; a mission's key is '<chapter>.<mission>', so shipped missions are never reordered.
    Mission shape: {title, goal, how, explain, hint, kind, starter?, starterErr?, harness?, answer, alts[],
-   wrong[{src,wrongWhy}], lazy[{src,wrongWhy}], defines[], previews[{tag,wording,home?}], check(c)}.
+   wrong[{src,wrongWhy}], lazy[{src,wrongWhy}], defines[], previews[{tag,wording,home?}], expect?, check(c)}.
+   expect is absent or 'panic': a mission about a runtime panic, whose answer is meant to end in one. On any other mission a
+   panic never reaches check and the learner gets the panic text instead.
    wrongWhy is a rustc id (the program must fail with it) or 'check' (it compiles and the check says no).
    A hidden `harness` is appended to the learner's code. DOM-free. */
 (()=>{
@@ -22,6 +24,7 @@ RQ.evalMission=(m,input)=>{
   }else if(c.status==='unsupported')result='Rust Quest does not model `'+c.unsupported.feature+'`. '+RQ.diag.hint(c.unsupported.feature);
   else if(c.status==='internal')result='This is a Rust Quest bug, not your code.';
   else if(c.status==='limit')result='The program ran for too long and was stopped. Is something calling itself forever?';
+  else if(c.status==='panic'&&m.expect!=='panic')result='The program stopped with a panic: '+c.panic.msg+' (line '+c.panic.line+').';
   else result=m.check(c);
   return {c,result};
 };

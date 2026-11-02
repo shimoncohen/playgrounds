@@ -53,7 +53,7 @@ describe('fuzz: mutated sources never throw, never go internal, return within th
         let c;
         assert.doesNotThrow(() => { c = RQ.run(src, { maxSteps: 5000 }); }, src);
         assert.notEqual(c.status, 'internal', `${c.message}\n${src}`);
-        assert.ok(['ok', 'error', 'unsupported', 'limit'].includes(c.status), c.status);
+        assert.ok(['ok', 'error', 'unsupported', 'limit', 'panic'].includes(c.status), c.status);
         runs++;
       }
     }

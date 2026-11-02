@@ -95,10 +95,10 @@ describe('RQ.run: duplicate names', () => {
 });
 
 describe('RQ.run: literals, consts and ordering', () => {
-  it('an unsuffixed literal outside i32 is not quietly accepted in maths', () => {
+  it('an unsuffixed literal outside i32 is overflowing_literals', () => {
     const c = RQ.run(main('    println!("{}", 2147483648 - 1);'));
-    assert.equal(c.status, 'unsupported');
-    assert.equal(c.unsupported.feature, 'integer overflow');
+    assert.equal(c.status, 'error');
+    assert.equal(c.hasError('overflowing_literals', 3), true);
     assert.equal(RQ.run(main('    println!("{}", -2147483648 + 1);')).out(), '-2147483647\n');
     assert.equal(RQ.run(main('    let big: i64 = 3000000000;\n    println!("{}", big - 1);')).out(), '2999999999\n');
   });
@@ -108,21 +108,20 @@ describe('RQ.run: literals, consts and ordering', () => {
     assert.equal(c.unsupported.feature, 'const initializer');
     assert.equal(RQ.run('const A: i32 = 2;\nconst B: i32 = A * 3 + 1;\nfn main() {\n    println!("{}", B);\n}\n').out(), '7\n');
   });
-  it('a fn main never calls is not run, so the quest gives up instead of saying ok', () => {
-    for (const body of ['let x: u8 = 256;', 'println!("{}", 255u8 + 1);', 'println!("{}", 1 / 0);']) {
+  it('a fn main never calls is still linted, and a clean one is ok', () => {
+    const want = { 'let x: u8 = 256;': 'overflowing_literals', 'println!("{}", 255u8 + 1);': 'arithmetic_overflow', 'println!("{}", 1 / 0);': 'unconditional_panic' };
+    for (const [body, id] of Object.entries(want)) {
       const c = RQ.run(main('    println!("hi");', `fn unused() {\n    ${body}\n}`));
-      assert.equal(c.status, 'unsupported', body);
-      assert.equal(c.unsupported.feature, 'unused function');
+      assert.equal(c.status, 'error', body);
+      assert.equal(c.hasError(id, 2), true, body);
     }
-    const c = RQ.run(main('    println!("hi");', 'fn spare() {}'));
-    assert.equal(c.status, 'unsupported');
-    assert.deepEqual([c.unsupported.feature, c.unsupported.line], ['unused function', 1]);
+    assert.equal(RQ.run(main('    println!("hi");', 'fn spare() {}')).status, 'ok');
     assert.equal(RQ.run(main('    spare();', 'fn spare() {}')).status, 'ok');
   });
-  it('every const is evaluated, read or not', () => {
+  it('every const is checked, read or not', () => {
     const c = RQ.run('const N: u8 = 300;\nfn main() {}\n');
-    assert.equal(c.status, 'unsupported');
-    assert.equal(c.unsupported.feature, 'integer overflow');
+    assert.equal(c.status, 'error');
+    assert.equal(c.hasError('overflowing_literals', 1), true);
     assert.equal(RQ.run('const N: u8 = 3;\nfn main() {}\n').status, 'ok');
   });
   it('chars and text order by code point, not by UTF-16 unit', () => {
@@ -164,21 +163,24 @@ describe('RQ.run: unsupported is not an error', () => {
   });
   it('constructs of later chapters give unsupported with a hint in the catalog', () => {
     assert.equal(feature('struct P { x: i32 }\nfn main() {}'), 'struct@1');
-    assert.equal(feature('fn main() {\n    if true { }\n}'), 'if@2');
+    assert.equal(feature('fn main() {\n    match 1 { _ => {} }\n}'), 'match@2');
     assert.equal(feature('fn main() {\n    let v = vec![1];\n}'), 'vec!@2');
-    assert.equal(feature('fn main() {\n    let x = 2.5;\n}'), 'float@2');
-    assert.equal(feature('fn main() {\n    println!("{:?}", 1);\n}'), 'format spec@2');
+    assert.equal(feature('fn main() {\n    let x: f32 = 2.5;\n}'), 'f32@2');
+    assert.equal(feature('fn main() {\n    println!("{:#?}", 1);\n}'), 'format spec@2');
+    assert.equal(RQ.run('fn main() {\n    if true { }\n    let x = 2.5;\n    println!("{:?} {}", 1, x);\n}').out(), '1 2.5\n');
   });
   it('unsupported wins over an error found in the same program, and over a syntax-valid E0384', () => {
     assert.equal(RQ.run('struct S;\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
   });
-  it('the checker does not guess: overflow, division by zero, unknown names and mismatched types are unsupported', () => {
-    assert.equal(feature('fn main() {\n    let x: u8 = 256;\n}'), 'integer overflow@2');
-    assert.equal(feature('fn main() {\n    let a: u8 = 255;\n    println!("{}", a + 1);\n}'), 'integer overflow@3');
-    assert.equal(feature('fn main() {\n    println!("{}", 1 / 0);\n}'), 'division by zero@2');
-    assert.equal(feature('fn main() {\n    println!("{}", y);\n}'), 'unresolved name@2');
-    assert.equal(feature('fn main() {\n    let x: i32 = "a";\n}'), 'type checking@2');
-    assert.equal(feature('fn main() {\n    let x = 3000000000;\n}'), 'integer overflow@2');
+  it('the checker rejects what rustc rejects with a code or lint, and does not guess the rest', () => {
+    const id = (src) => { const c = RQ.run(src); assert.equal(c.status, 'error', src); return `${c.errors[0].code || c.errors[0].lint}@${c.errors[0].line}`; };
+    assert.equal(id('fn main() {\n    let x: u8 = 256;\n}'), 'overflowing_literals@2');
+    assert.equal(id('fn main() {\n    let a: u8 = 255;\n    println!("{}", a + 1);\n}'), 'arithmetic_overflow@3');
+    assert.equal(id('fn main() {\n    println!("{}", 1 / 0);\n}'), 'unconditional_panic@2');
+    assert.equal(id('fn main() {\n    println!("{}", y);\n}'), 'E0425@2');
+    assert.equal(id('fn main() {\n    let x: i32 = "a";\n}'), 'E0308@2');
+    assert.equal(id('fn main() {\n    let x = 3000000000;\n}'), 'overflowing_literals@2');
+    assert.equal(feature('fn main() {\n    let x = 1 + 1.0;\n}'), 'type checking@2');
   });
   it('every feature the engine can report has a hint in the diag catalog', () => {
     for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
