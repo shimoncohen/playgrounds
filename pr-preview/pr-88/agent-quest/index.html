@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Agent Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/progress.css">
+<link rel="stylesheet" href="../shared/nav.css">
+<link rel="stylesheet" href="../shared/how.css">
+<link rel="stylesheet" href="../shared/tiers.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">⌘</span>Agent Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Prompt Rookie</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+
+<main>
+<section id="tab-quest" class="quest" data-pane="mission" role="tabpanel" aria-labelledby="t-quest">
+  <div class="paneSwitch" role="group" aria-label="Show one pane">
+    <button type="button" data-pane="mission" aria-pressed="true">Mission</button><button type="button" data-pane="files" aria-pressed="false">Files</button><button type="button" data-pane="meter" aria-pressed="false">Meter</button><button type="button" data-pane="run" aria-pressed="false">Run</button>
+  </div>
+  <div class="meterStrip" id="meterStrip"></div>
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite">
+      <div id="missionBody"><div class="eyebrow">Agent Quest</div><h2>Welcome</h2><p class="explain">Learn how an AI coding agent works by steering a pretend one.</p></div>
+      <div id="promptHost"></div>
+      <div id="missionTail"></div>
+    </article>
+  </aside>
+  <aside class="mapCol">
+    <div class="panel" id="filesPanel">
+      <h3>Files</h3>
+      <div class="files"><div id="tree" class="tree"></div><div id="fileEditor" class="fileEditor"></div></div>
+    </div>
+    <div class="panel" id="meterPanel">
+      <h3>Context meter</h3>
+      <div id="meter"></div>
+    </div>
+    <div class="panel" id="runPanel">
+      <h3>Run</h3>
+      <div id="run"></div>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire">
+    <div><h2>Quick-fire</h2><p class="lede">Quick questions on what the missions have taught you, opened once you finish them. Race the clock, build a streak, beat your best. Just for fun: it does not change your XP.</p></div>
+    <div class="fireCard panel">
+      <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
+      <div class="timer"><i id="fTimer"></i></div>
+      <div id="fStage"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"></div>
+</section>
+</main>
+<footer class="aqfoot" id="aqFoot"></footer>
+</div>
+<script>window.PROGRESS={key:"agent-quest-v1",name:"Agent Quest"}</script>
+<script src="../shared/theme.js"></script>
+<script src="../shared/nav.js"></script>
+<script src="../shared/progress.js"></script>
+<script src="../shared/how.js"></script>
+<script src="../shared/tiers.js"></script>
+<script src="engine/tokens.js"></script>
+<script src="engine/vfs.js"></script>
+<script src="engine/config.js"></script>
+<script src="engine/context.js"></script>
+<script src="engine/permissions.js"></script>
+<script src="engine/shell.js"></script>
+<script src="engine/policy.js"></script>
+<script src="engine/provider.js"></script>
+<script src="content/tiers.js"></script>
+<script src="content/state.js"></script>
+<script src="content/facts.js"></script>
+<script src="content/scenarios.js"></script>
+<script src="content/model.js"></script>
+<script src="content/ch-01-loop.js"></script>
+<script src="content/ch-02-context.js"></script>
+<script src="content/ch-03-prompt.js"></script>
+<script src="content/ch-04-memory.js"></script>
+<script src="content/ch-05-skills-mcp.js"></script>
+<script src="content/ch-06-extend.js"></script>
+<script src="content/ch-07-safety.js"></script>
+<script src="content/extras.js"></script>
+<script src="ui.js"></script>
+<script src="editor.js"></script>
+<script src="meter.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
