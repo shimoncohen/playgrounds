@@ -87,7 +87,7 @@ Branch off `main` after PR 1 merges. Sub-tasks run in order; each ends with a co
 
 - [ ] **Step 1:** Add `'agent'` to `NAMES` in `tests/smoke.mjs`. Run `node tests/smoke.mjs`; expected: the `agent-quest` tests FAIL (404).
 - [ ] **Step 2:** Create the shell by copying the shape of `net-quest/index.html` (header, tabs, XP bar, `shared/*` css and js including `how`, `nav`, `progress`, `theme`). `app.js` only switches tabs for now.
-- [ ] **Step 3:** Landing card in `index.html` with `data-key="agent-quest-v1"`, `.go` and `.xp`; README table row, repo-map entries for `agent-quest/` and `tests/agent/` (including the `tests/` line), the "all seven" count at `README.md:134` set to the number at merge time, `AGENTS.md` "Where things go" row and "What this is" list.
+- [ ] **Step 3:** Landing card in `index.html` with `data-key="agent-quest-v1"`, `.go` and `.xp`; README table row, repo-map entry for `agent-quest/` (the `tests/` line at `README.md:112` waits for Task 3, when `test:engine` runs `tests/agent/`), the "all seven" count at `README.md:134` set to the number at merge time, `AGENTS.md` "Where things go" row and "What this is" list.
 - [ ] **Step 4:** Run `npm run check` and `node tests/smoke.mjs`. Expected: all pass, including `agent-quest loads cleanly` and `progress survives export, wipe and import`.
 - [ ] **Step 5: Commit** `feat(agent): scaffold Agent Quest`.
 
@@ -125,7 +125,7 @@ Branch off `main` after PR 1 merges. Sub-tasks run in order; each ends with a co
 
 **Interfaces:**
 - Consumes: `tokens`, `vfs`, `config`.
-- Produces: `context.build(setup, prompt, history) -> {segments[], total, peak}` with segments for system, memory, skills, MCP, files, history, prompt; overflow drops the oldest `history` segments first. `permissions.check(action, setup, constraints) -> {allowed, by}`. `shell.exec(scenario, action) -> result` over the scenario's command and tool table. `policy.run(scenario, setup, prompt) -> Outcome` where `Outcome = {status: 'done'|'unverified'|'failed'|'blocked', vfs, calls[], steps[], violations[], tokens{peak,total}}`.
+- Produces: `context.build(setup, prompt, history) -> {segments[], total, peak}` with segments for system, memory, skills, MCP, files, history, prompt; overflow drops the oldest `history` segments first. `permissions.check(action, setup, constraints) -> {allowed, by}`. `shell.exec(scenario, action) -> result` over the scenario's command and tool table. `policy.run(scenario, setup, prompt) -> Outcome` where `Outcome = {status: 'done'|'unverified'|'failed'|'blocked'|'awaiting-approval', vfs, calls[], steps[], violations[], tokens{peak,total}}`.
 - Policy order (spec "Policy"): build context; plan step if `Plan: first`; walk `script` (blocked means skipped with no violation; executed and matching `hidden` means a violation); run `Done when` if it resolves; on failed verification apply the scenario's correction step and re-verify up to a step cap; no verification means `unverified`.
 
 - [ ] **Step 1: Failing tests** on a fixture scenario with a `migrations/` trap: a blocked trap edit logs no violation; an unblocked one logs exactly one; a skipped required action fails `accept` but `violations` is empty; `Plan: first` puts a plan step before any edit; a correction step runs at most the cap; no `Done when` gives `unverified`; overflow drops the oldest `history` segment and a constraint stated only there is forgotten; `CLAUDE.md` lines in grammar act as standing constraints; two runs of the same inputs give identical Outcomes (determinism) (**Review Focus 2**).
@@ -166,7 +166,7 @@ Branch off `main` after PR 1 merges. Sub-tasks run in order; each ends with a co
 
 **Interfaces:**
 - Consumes: `AQ.CH`, `AQ.runMission`, `AQ.state`, `Tiers.renderRail`, `HowSteps.html`.
-- Produces: the page markup in spec "UI". Files panel (tree and editor), prompt form with the eight fields and inline grammar errors plus the line "Real agents read natural language. The simulator acts only on these lines so checks are exact.", Meter panel (segmented bar, text table, `role="meter"`, label "~N of M tokens (estimate, chars/4)"), Run panel (steps and Outcome). Save is debounced; a mission awards XP once.
+- Produces: the page markup in spec "UI". Files panel (tree and editor), prompt form with the fields taught so far and inline grammar errors (a prompt with any error is not run) plus the line "Real agents read natural language. The simulator acts only on these lines so checks are exact.", Meter panel (segmented bar, text table, `role="meter"`, label "~N of M tokens (estimate, chars/4)"), Run panel (steps and Outcome). Save is debounced; a mission awards XP once.
 
 - [ ] **Step 1: Failing browser tests** in `tests/smoke.mjs`: after a clean load the stored `agent-quest-v1` JSON has `xp === 0`; finishing mission 0.0 changes the XP text exactly once even after running again; seeding `localStorage['agent-quest-v1']` with `'{"done":5,"xp":"x"}'` loads with no console errors; a typed prompt line that does not parse shows an inline error.
 - [ ] **Step 2:** Run `node tests/smoke.mjs`; expect the new tests to FAIL.
@@ -186,7 +186,7 @@ Branch off `main` after PR 1 merges. Sub-tasks run in order; each ends with a co
 Opened and merged right after PR 2. Branch off `main`.
 
 **Files:**
-- Modify: `package.json` (line 13, `test:engine`), `.github/workflows/ci.yml` (line 32), `.claude/skills/pre-pr-check/SKILL.md` (line 11), `AGENTS.md` (line 17)
+- Modify: `package.json` (line 13, `test:engine`), `.github/workflows/ci.yml` (line 32), `.claude/skills/pre-pr-check/SKILL.md` (line 11), `AGENTS.md` (line 17), `README.md` (line 112, the `tests/` line gains `agent/`)
 
 - [ ] **Step 1: Verify the gap first.** Run `npm run test:engine`. Expected: no `tests/agent` test appears in the output. Also read `ci.yml:32`: none of the `agent-quest/` globs is in the syntax loop.
 - [ ] **Step 2:** `package.json:13`: add `"tests/agent/*.test.mjs"` to `test:engine`. Recheck after #45 merges (it does not edit this line as of 2026-11-01).
@@ -215,7 +215,7 @@ Chapter 3 carries the four prompt-structure missions in the spec (examples, spec
 ## Self-review
 
 - **Spec coverage:** simulator (Tasks 2.3 to 2.5), saved state and landing contract (2.2, 2.7), paths and rank (2.2), missions and checks (2.6), dated content (2.6), UI and 390px (2.7), wiring touchpoints (2.1 for the landing card, `NAMES`, README rows, repo map, count and `AGENTS.md` row; Task 3 for `package.json`, `ci.yml`, `pre-pr-check` and the `AGENTS.md` loop), chain and delivery (PR split), requirement map (content PRs), roadmap (#52 left out).
-- **Touchpoints checked:** PR 2 landing card, `smoke.mjs:15` `NAMES`, README table row, repo map (`README.md:102-117`, `:112`), count (`README.md:134`), `AGENTS.md` row, `xp === 0` smoke assertion. PR 3 `package.json:13`, `ci.yml:32`, `pre-pr-check` glob, `AGENTS.md:17` loop, `tests/fixtures/*.js`. `tools/build.py` and `commitlint.yml` need no edit (verify the first in PR 2.1).
+- **Touchpoints checked:** PR 2 landing card, `smoke.mjs:15` `NAMES`, README table row, repo map (`README.md:102-117`), count (`README.md:134`), `AGENTS.md` row, `xp === 0` smoke assertion. PR 3 `package.json:13`, `ci.yml:32`, `pre-pr-check` glob, `AGENTS.md:17` loop, `tests/fixtures/*.js`. `tools/build.py` and `commitlint.yml` need no edit (verify the first in PR 2.1).
 - **Naming consistency:** `AQ.tokens`, `AQ.vfs`, `AQ.config`, `AQ.context`, `AQ.permissions`, `AQ.shell`, `AQ.policy`, `AQ.provider`, `AQ.state`, `AQ.CH`, `AQ.FACTS`, `AQ.runMission` are used the same way in every task. Outcome statuses are `done`, `unverified`, `failed`, `blocked`.
 - **Conflicts to recheck:** PR 3 against #45 on `package.json:13` (#45 does not touch it as of 2026-11-01); PR 2 against #45 and #46 to #50 on `README.md`, `tests/smoke.mjs` and `index.html`.
 - **To verify in PR 2:** `tools/build.py` discovery, and the 1000×700 sticky layout. PR 3 reads the `pre-pr-check` glob itself (Task 3 Step 4).

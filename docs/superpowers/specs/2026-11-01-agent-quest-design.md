@@ -150,7 +150,7 @@ Grammar:
 - TARGET is a path prefix, a command or a tool name, and must resolve against the scenario.
 - doneWhen := (`run` CMD | `read` PATH | `call` TOOL): a verification action the agent will perform.
 
-Lines that do not parse, or whose target does not resolve, show an inline error and have no effect. The UI says: "Real agents read natural language. The simulator acts only on these lines so checks are exact." `CLAUDE.md` lines in the same grammar act as standing constraints. Other lines cost tokens only.
+Lines that do not parse, or whose target does not resolve, show an inline error, and the agent does not run until every line parses; a refused run is never a pass and changes no state. The UI says: "Real agents read natural language. The simulator acts only on these lines so checks are exact." `CLAUDE.md` lines in the same grammar act as standing constraints. Other lines cost tokens only.
 
 ### Scenario
 
@@ -165,7 +165,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error 
 `run(scenario, setup, prompt) -> Outcome` is deterministic and sits outside the provider seam.
 
 1. Build the context.
-2. If `Plan: first`, emit a plan step and stop for approval.
+2. If `Plan: first`, emit a plan step and stop with status `awaiting-approval`; nothing executes. The learner's "Approve plan" continues the same run from step 3, and only that result is graded.
 3. Walk `script`. For each action:
    - if a learner constraint, a standing `CLAUDE.md` rule or a permission blocks it, the action is **skipped and logs no violation**;
    - otherwise it executes, and if it matches `hidden`, a violation is logged.
@@ -175,9 +175,9 @@ Lines that do not parse, or whose target does not resolve, show an inline error 
 
 ### Outcome
 
-`{status: done|unverified|failed|blocked, vfs, calls[], steps[], violations[], tokens{peak,total}}`.
+`{status: done|unverified|failed|blocked|awaiting-approval, vfs, calls[], steps[], violations[], tokens{peak,total}}`.
 
-A mission passes when `status` is not `failed`, `violations` is empty, and `accept(outcome)` holds. A skipped required action fails `accept` but is not a violation. `unverified` fails only in missions that teach verification.
+A mission passes when `status` is not `failed` or `awaiting-approval`, `violations` is empty, and `accept(outcome)` holds. A skipped required action fails `accept` but is not a violation. `unverified` fails only in missions that teach verification.
 
 ### Overflow
 
@@ -206,21 +206,21 @@ Every mission carries `answer`, `wrong` and `lazy`. The solvability test require
 
 - Answer: `Constraints: do not edit migrations/` and `Done when: run npm test`. The forbidden edit is skipped with no violation, tests run, the correction step fixes the first bad edit, and the mission passes.
 - Wrong (parses, wrong rule): `do not edit src/`. It blocks the real fix, so `accept` fails and the status is `failed`.
-- Lazy: `Constraints: be careful and don't break anything`. It does not parse, so it has no effect; the `migrations/` edit executes, matches `hidden`, logs a violation, and the mission fails.
-- Lazy 2: `do not edit nonexistent/`. The target does not resolve, so the line is rejected and the same violation is logged.
+- Lazy: `Constraints: be careful and don't break anything`. It does not parse, so the run is refused with an inline error and the mission fails.
+- Lazy 2: `do not edit nonexistent/`. The target does not resolve, so the line is rejected and the run is refused.
 
 **Personal mission (calendar).** The setup has MCP servers `calendar` (list, create, delete) and `mail` (send). Task: move Friday's 1:1 with Dana to Monday 09:00 and tell nobody. `hidden` is a call to `mail.send`. `script`: `calendar.delete` the old event, `calendar.create` the new one, `mail.send` to attendees. `accept` needs the delete, a create with the Monday 09:00 start and the title (arguments computed by the scenario), no `mail.send`, and a read-back verification.
 
 - Answer: `Constraints: do not call mail.send` and `Done when: call calendar.list`.
 - Wrong: `do not call calendar.create`. The event is never recreated, so `accept` fails.
-- Lazy: `Done when: it is done`. It does not parse, so there is no verification, and `mail.send` executes and logs a violation.
+- Lazy: `Done when: it is done`. It does not parse, so the run is refused and the mission fails.
 
 **Chapter 3 prompt-structure missions.** Each changes the run.
 
 - *Examples.* Task: write a changelog entry. The `script` has a formatting action driven by `style()` over `Examples`.
   - Answer: `Examples: docs/changelog-sample.md`. The entry matches the project format.
   - Wrong: `Examples: docs/old-notes.md`. It resolves but yields a different format.
-  - Lazy: `Examples: see above`. It does not resolve, is rejected, and the default format fails `accept`.
+  - Lazy: `Examples: see above`. It does not resolve, so the run is refused and the mission fails.
 - *Specific versus general (scope).* Task: a fix in `src/price.js`. `accept` needs the fix applied and `tokens.peak` within a budget.
   - Answer: `Files: src/price.js`. One read, low peak, fix applied.
   - Wrong, too broad: `Files: src/`. Every file under `src/` is read, the peak exceeds the budget.
@@ -325,7 +325,8 @@ Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style
 | Landing card in `index.html` with `data-key`, `.xp`, `.go` | 2 | yes |
 | `tests/smoke.mjs:15` `NAMES` | 2 | yes |
 | README table row (after `README.md:17`) | 2 | yes |
-| README "Map of the repo" entries for `agent-quest/` and `tests/agent/` (`README.md:102-117`, including the `tests/` line at `:112`) | 2 | yes |
+| README "Map of the repo" entry for `agent-quest/` (`README.md:102-117`) | 2 | yes |
+| README `tests/` line gains `agent/` (`README.md:112`), once `test:engine` runs it | 3 | yes |
 | README count "all seven" (`README.md:134`) | 2 | yes, set at merge time |
 | `AGENTS.md` "Where things go" row and "What this is" list | 2 | yes |
 | `package.json:13` `test:engine` gains `tests/agent/*.test.mjs` | 3 | yes |
