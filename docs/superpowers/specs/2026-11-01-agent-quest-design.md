@@ -20,6 +20,8 @@ Three paths share one engine: **core** (everyone), **dev** (working in a repo), 
 - **No learner text is persisted.** Nothing a learner types reaches `localStorage`, the export or the linked backup file.
 - **Dated content is visible, not enforced.** A registry of volatile facts with check dates and a render-time banner. No test fails on age.
 - **Teaching-scale window and simplified config formats**, labelled as simulated, with links to the real docs.
+- **Skills match the scenario's task tag.** A skill loads its body only when its `when:` equals the scenario `tag`. See "Skill matching".
+- **Folder-level memory is simulated.** A `CLAUDE.md` inside a folder loads when the agent reads under that folder. Global memory and `AGENTS.md` are taught in text only. See "Folder memory".
 
 ## Scope
 
@@ -110,7 +112,7 @@ Reuse `Tiers.create` as Shell Quest does (`shell-quest/content/tiers.js:3-13`).
 
 - `tiers` are `core`, `dev`, `personal`, `tune`. Each chapter carries `tier`; `missionXp` is a flat 10 for every tier.
 - `tierEndRanks` is empty. `ranks()` then adds no tier-end rank (`shared/tiers.js:44-51`) and returns `baseRanks` alone.
-- The ladder takes total XP from every path. Its thresholds are sized to finishing core: about 35 missions at 10 XP plus 7 chapter badges at 25 XP is about 525. Core alone reaches the top rank; the other paths only overflow it.
+- The ladder takes total XP from every path. Its thresholds are sized to finishing core: 33 missions at 10 XP plus 7 chapter badges at 25 XP is 505. Core alone reaches the top rank; the other paths only overflow it.
 - `status()` and `renderRail` give per-path stars and counts. Nothing is locked.
 
 ## Simulator model
@@ -126,7 +128,26 @@ A setup is a virtual file system plus parsed config:
 - hooks
 - a subagent list. Each subagent has a `model` of `small`, `standard` or `large`, with relative cost multipliers and no real prices.
 
-Skill frontmatter has `name`, `description` and `when:` from a closed task-tag vocabulary, so "unused" and "duplicate" are structural facts, not guesses.
+Skill frontmatter has `name`, `description` and `when:` from a closed task-tag vocabulary (`bugfix`, `docs`, `review`, `test`, `release`, `refactor`, `schedule`), so "unused" and "duplicate" are structural facts, not guesses. Skills match the scenario's task tag.
+
+Folder-level memory: a file named `CLAUDE.md` in a folder (for example `src/CLAUDE.md`) is part of the setup. It is read only once the agent reads a file under that folder.
+
+#### Skill matching
+
+- A skill whose `when:` equals the scenario `tag` is loaded: its body (the skill file without its `name`, `description`, `when` and `model` lines, wherever they appear) joins the context as a Skills segment labelled `Skill: <name>`, and body lines in the prompt grammar act as standing rules. A blocked action is skipped and logs no violation. Other body lines cost tokens only.
+- A skill that does not match keeps only its `name: description` line in the context. Its body is not loaded and it has no rules.
+- When two or more skills match, only the first by sorted path loads. Each other one is skipped with reason `duplicate` and its description still costs tokens. A second skill with an existing name is a setup error and is not added.
+- The run records a `skill` step per matching skill, right after the context step: loaded, or not loaded for a duplicate. The first context step already counts the body tokens.
+- A scenario with no `tag` ignores skills. Order is by sorted path, with no clock or random value.
+
+#### Folder memory
+
+- Only a file whose path is a folder followed by `CLAUDE.md` counts, at any depth. The root `CLAUDE.md`, `.claude/` paths, other case spellings and other names (including `AGENTS.md`) do not.
+- It loads on the first successful `read` of a file under its folder. An edit does not load it. A folder file never loaded has no effect on the run.
+- Once loaded it is a Memory segment labelled with its path, counted in `peak` and `total`. Its lines in the prompt grammar act as standing rules for all later actions, whatever their target. Other lines cost tokens only.
+- A read file that is itself a loaded folder memory file is counted once, as memory, not as a read file.
+- Setup size (for a `budget` mission) counts every folder memory file whether loaded or not, so moving bulk into one cannot dodge a budget.
+- The learner can edit a folder memory file the scenario ships. Creating one the scenario does not ship has no effect.
 
 ### Prompt model
 
@@ -154,11 +175,14 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 
 ### Scenario
 
-`{vfs, tools, task, script, hidden, accept}`:
+`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style` and `history`:
 
 - `script`: the ordered actions the policy would take (reads, edits, tool calls, verifications), including the trap action.
 - `hidden`: the scenario's hidden forbidden set, a list of `{verb, target}` pairs, for example an edit under `migrations/` or a call to `mail.send`. It exists independent of what the learner wrote and alone decides which executed actions log a violation.
 - `accept(outcome)`: a predicate set over the final vfs, the call log, and optionally `tokens.peak`.
+- `tag` (optional): the task tag, one of the closed vocabulary. Skills match against it. A scenario with no `tag` has no skill effect.
+- `style(text)` (optional): extracts a format string from a sample file. For each `Examples` path, in prompt order, the policy calls it on the file text; a scripted `edit` whose `write` is a function receives `write(vfs, styles)`.
+- `history` (optional): an array of earlier chat messages, held in context ahead of the prompt and dropped oldest first on overflow.
 
 ### Policy
 
@@ -166,12 +190,13 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 
 1. Build the context.
 2. If `Plan: first`, emit a plan step and stop with status `awaiting-approval`; nothing executes. The learner's "Approve plan" continues the same run from step 3, and only that result is graded.
-3. Walk `script`. For each action:
-   - if a learner constraint, a standing `CLAUDE.md` rule or a permission blocks it, the action is **skipped and logs no violation**;
+3. Load the matching skill, if the scenario has a `tag` (see "Skill matching"). Its steps come right after the context step and before the plan.
+4. Walk `script`. A successful `read` under a folder that has a `CLAUDE.md` loads that file (see "Folder memory"). For each action:
+   - if a learner constraint, a standing `CLAUDE.md` rule, a skill rule or a permission blocks it, the action is **skipped and logs no violation**;
    - otherwise it executes, and if it matches `hidden`, a violation is logged.
-4. Run the learner's verification if `Done when` resolves.
-5. If verification fails, apply the scenario's correction step and re-verify, up to a step cap.
-6. If there is no verification, stop as `unverified`.
+5. Run the learner's verification if `Done when` resolves.
+6. If verification fails, apply the scenario's correction step and re-verify, up to a step cap.
+7. If there is no verification, stop as `unverified`.
 
 ### Outcome
 
@@ -192,7 +217,7 @@ When the window overflows, the oldest `history` segments drop, so a constraint s
 
 ### Meter
 
-A segmented bar with a text table of the same segments, pattern fills (no colour-only meaning), `role="meter"`, and the label "~N of M tokens (estimate, chars/4)". The window is teaching scale and labelled as simulated.
+A segmented bar with a text table of the same segments, pattern fills (no colour-only meaning), `role="meter"`, and the label "~N of M tokens (estimate, chars/4)". The window is teaching scale and labelled as simulated. A folder-level `CLAUDE.md` appears as a Memory segment once the agent has read under its folder, and a loaded skill body appears as a Skills segment labelled `Skill: <name>`.
 
 ## Missions and checks
 
@@ -225,7 +250,7 @@ Every mission carries `answer`, `wrong` and `lazy`. The solvability test require
   - Answer: `Files: src/price.js`. One read, low peak, fix applied.
   - Wrong, too broad: `Files: src/`. Every file under `src/` is read, the peak exceeds the budget.
   - Wrong, too narrow: `Files: src/util.js`. The wrong file is read and the fix is not applied.
-  - Lazy: no `Files`. The agent explores widely, the peak exceeds the budget, and the overflow drops an early constraint.
+  - Lazy: no `Files`. The agent explores widely and the peak exceeds the budget.
 - *When not to be specific.* The fix spans `src/price.js` and `src/tax.js`; the learner is not told.
   - Answer: `Constraints: do not edit migrations/` with no file restriction, and `Done when: run npm test`. The tests reveal the second file and the correction step fixes it.
   - Wrong: `Constraints: only edit src/price.js`. It parses but blocks the second edit.
@@ -243,8 +268,8 @@ Chapter numbers are 1-based; the array index is the number minus 1.
 | R1 loop; context window; tokens and cost | Ch 1, 2 |
 | R1 model choice | Ch 2 `choose` (quick-fire: which model size for which task) plus a cost-multiplier mission; ch 23 |
 | R1 prompt structure; examples; plan first; specific vs general | Ch 3: the four missions above, each with a defined `accept`. None is `choose`-only |
-| R1 memory (`CLAUDE.md`/`AGENTS.md`: global, project, folder; short) | Ch 4 |
-| R1 skills, MCP, plugins, hooks, subagents; which to reach for | Ch 5 (skills, MCP), ch 6 (hooks, plugins, subagents; the "which mechanism" chooser is `choose`-only) |
+| R1 memory (`CLAUDE.md`/`AGENTS.md`: global, project, folder; short) | Ch 4: project and folder-level `CLAUDE.md` are simulated; global memory and `AGENTS.md` are text and quick-fire only |
+| R1 skills, MCP, plugins, hooks, subagents; which to reach for | Ch 5 (skills with `when:` matching, MCP), ch 6 (hooks, plugins, subagents; the "which mechanism" chooser is `choose`-only) |
 | R1 safety: permissions, injection, secrets, review before run | Ch 7 |
 | R2 explore, plan, implement | Ch 8 |
 | R2 test, review, PR | Ch 9 |
@@ -308,6 +333,7 @@ The page follows what `tests/smoke.mjs:96-147` checks for every `NAMES` entry.
 Node (`tests/agent/`, part of `npm run test:engine` once PR 3 wires the glob):
 
 - `tokens`, `config` (grammar accept and reject), `context`, `policy` (skip versus violation, correction step, step cap, `unverified`), `permissions`
+- `config` also covers skill matching (`skillBody`, `skillIssues`, `loadedSkills`, duplicate names) and folder memory (the path pattern, `memoryFolders`, `folderMemory`); `context` covers the `Skill:` segment, folder memory segments, the counted-once rule and `setupTokens`; `policy` covers a matching, non-matching, duplicate and untagged skill, folder memory loading on read and not on edit, `style()`, `history` and step order; `shell` covers `write(vfs, styles)`; `provider` covers the `skill` narration
 - `state`: the four tests in "Saved state"
 - `content`: unique keys, `how` shape, `answer` passes, `wrong` and `lazy` fail, scenario exists, `facts` well-formed
 - `teach`: every term a mission relies on was taught earlier on the default path or is defined in place (hard rule 12)
@@ -430,7 +456,8 @@ flowchart LR
 
 - **Effort.** 23 chapters at about 4 to 5 missions each is the largest quest in the repo. Engine plus chapter 1 is about a week; each content PR is a few days. Merge order is the cut order, so a stopped chain still leaves a coherent shorter quest.
 - **Grammar versus prose.** The learner writes grammar lines, not natural language. The UI says so, but it is a modelling choice.
-- **Scenario authoring.** Each scenario needs a hand-written `script`, `hidden` and `accept`; a wrong `hidden` makes a mission pass or fail for the wrong reason. `review-mission` is mandatory per content PR.
+- **Scenario authoring.** Each scenario needs a hand-written `script`, `hidden` and `accept`; a wrong `hidden` makes a mission pass or fail for the wrong reason. A wrong or missing `tag` silently turns skill matching off, so a scenario test checks every `tag` is in the closed vocabulary. `review-mission` is mandatory per content PR.
+- **Memory scope.** User-level (global) memory and `AGENTS.md` are taught in text and quick-fire only. The simulator reads the root `CLAUDE.md` and folder-level `CLAUDE.md` files, nothing else.
 - **`xp` recompute.** If `xpFor` and the rank thresholds drift apart, the landing card and the in-app rank could disagree. The `state` tests cover the derivation, not the thresholds.
 - **Staleness.** Visible through the banner, not refreshed automatically.
 - **Shared-file conflicts.** #45 and #46 to #50 may touch `smoke.mjs`, the landing page and the README before PR 2. The README "all seven" count will be wrong again if they land in between; PR 2 sets it at merge time.
