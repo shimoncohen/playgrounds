@@ -2,7 +2,7 @@ export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
     'scope-enum': [2, 'always', [
-      'script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net',
+      'script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent',
       'landing', 'shared', 'progress', 'engine', 'content', 'release',
       'tests', 'ci', 'deps', 'docs', 'tools', 'skills',
     ]],
