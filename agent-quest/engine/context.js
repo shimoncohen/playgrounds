@@ -8,19 +8,25 @@ const SYSTEM='You are a coding agent. Read files, make edits, run commands, and 
 const KINDS=['system','memory','skills','mcp','files','history','prompt'];
 const seg=(kind,label,text)=>({kind,label,text,tokens:AQ.tokens.estimate(text)});
 
-function setupSegments(setup){
+/* folders: loaded folder memory files; skills: loaded skill bodies [{name, body}] */
+function setupSegments(setup,folders=[],skills=[]){
   return [
     seg('memory','CLAUDE.md',setup.memory),
+    ...folders.map(f=>seg('memory',f.path,f.text)),
     seg('skills','Skills (names and descriptions)',setup.skills.map(s=>s.name+': '+s.description).join('\n')),
+    ...skills.map(s=>seg('skills','Skill: '+s.name,s.body)),
     seg('mcp','MCP servers',setup.mcp.map(m=>m.name+': '+m.tools.join(', ')).join('\n'))
   ];
 }
-const setupTokens=setup=>AQ.tokens.estimate(setup.memory)+AQ.tokens.estimate(setup.raw);
+/* folder memory counts whether or not the agent has read it yet, so bulk cannot be hidden there */
+const setupTokens=setup=>AQ.tokens.estimate(setup.memory)+AQ.tokens.estimate(setup.raw)+setup.memoryFolders.reduce((n,f)=>n+AQ.tokens.estimate(f.text),0);
 
-/* readFiles: [{path, text}]. Returns kept segments, dropped ones, and totals; peak is what the window was asked to hold */
-function build(setup,prompt,history=[],readFiles=[]){
-  const all=[seg('system','System prompt',SYSTEM),...setupSegments(setup),
-    seg('files','Files read',readFiles.map(f=>f.path+'\n'+f.text).join('\n')),
+/* readFiles: [{path, text}]; opts.skills: loaded skills. Returns kept segments, dropped ones, and totals; peak is what the window was asked to hold */
+function build(setup,prompt,history=[],readFiles=[],opts={}){
+  const folders=AQ.config.folderMemory(setup,readFiles.map(f=>f.path));
+  const asMemory=new Set(folders.map(f=>f.path));
+  const all=[seg('system','System prompt',SYSTEM),...setupSegments(setup,folders,opts.skills||[]),
+    seg('files','Files read',readFiles.filter(f=>!asMemory.has(f.path)).map(f=>f.path+'\n'+f.text).join('\n')),
     ...history.map((h,i)=>seg('history','Earlier message '+(i+1),String(h))),
     seg('prompt','Your prompt',prompt?prompt.raw:'')];
   let demand=all.reduce((n,s)=>n+s.tokens,0),total=demand;

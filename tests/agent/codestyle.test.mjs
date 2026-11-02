@@ -17,7 +17,8 @@ const RULES = [
   ['file name', new RegExp(`${G}(?:[\\w.~-]+/)*[\\w-]+\\.(?:txt|log|sh|csv|md|conf|json|js|sql)${E}`)],
   ['variable', new RegExp(`${G}\\$(?:[A-Za-z_]\\w*|[?#@*0-9])${E}`)],
   ['agent command', new RegExp(`${G}npm${E}`)],
-  ['project path', new RegExp(`${G}(?:src|data|docs|tests|migrations)/`)],
+  ['project path', new RegExp(`${G}(?:src|data|docs|tests|migrations|\\.claude)/`)],
+  ['secret file', new RegExp(`${G}\\.env${E}`)],
   ['prompt field', new RegExp(`${G}(?:Goal|Files|Examples|Use|Plan|Constraints|Done when|Extra):`)],
   ['field name', new RegExp(`${G}(?:Done when|Constraints)${E}`)],
   ['rule', new RegExp(`${G}(?:(?:do not|ask before|only) (?:edit|read|run|call|send|delete)|max \\d+ files?)${E}`)],
@@ -43,6 +44,9 @@ describe('bareMentions (the agent rules)', () => {
     assert.equal(bareMentions('max 3 files').length, 1);
     assert.equal(bareMentions('read CLAUDE.md').length, 1);
     assert.equal(bareMentions('use -c to count').length, 1);
+    assert.equal(bareMentions('the .claude/ folder').length, 1);
+    assert.equal(bareMentions('the .env file').length, 1);
+    assert.equal(bareMentions('the <code>.claude/</code> folder and <code>.env</code>').length, 0);
     assert.equal(bareMentions('The Files panel, the Run panel, and the rules you write.').length, 0);
     assert.equal(bareMentions('<code>Done when: run npm test</code> and <code>do not edit src/</code>').length, 0);
   });

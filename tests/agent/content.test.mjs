@@ -8,6 +8,7 @@ const AQ = loadAgent();
 const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/&(?:gt|lt|amp|quot);/g, ' ');
 const M = (c, i) => AQ.CH[c].missions[i];
 const run = (c, i, input) => AQ.runMission(M(c, i), input);
+const APPROVED = { approved: true };
 
 describe('chapters', () => {
   it('there is at least one chapter, shaped as the model says', () => {
@@ -20,6 +21,23 @@ describe('chapters', () => {
     }
   });
   it('chapter 1 has about five missions', () => assert.equal(AQ.CH[0].missions.length, 5));
+  it('chapters 2 to 7 have 5, 4, 5, 5, 4 and 5 missions, in tier core', () => {
+    assert.deepEqual([...AQ.CH.map((ch) => ch.missions.length)], [5, 5, 4, 5, 5, 4, 5]);
+    assert.ok(AQ.CH.every((ch) => ch.tier === 'core'));
+  });
+  it('the top rank is exactly what finishing core pays', () => {
+    const top = AQ.tiers.ranks().at(-1)[0];
+    assert.equal(top, AQ.tiers.cumulativeXp('core'));
+    assert.equal(top, 10 * AQ.CH.reduce((n, ch) => n + ch.missions.length, 0) + AQ.CH.length * AQ.tiers.chapterBadgeXp);
+  });
+  it('every scenario tag is in the closed task-tag list', () => {
+    for (const [name, s] of Object.entries(AQ.scenarios)) assert.ok(s.tag === undefined || AQ.config.TAGS.includes(s.tag), name);
+  });
+  it('the answer, wrong and lazy inputs of chapters 2 to 7 only edit files their scenario ships, so the editor can type them', () => {
+    AQ.CH.slice(1).forEach((ch) => ch.missions.forEach((m) => {
+      for (const x of [m.answer, m.wrong, m.lazy]) if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`);
+    }));
+  });
 });
 
 describe('every mission of every chapter', () => {
@@ -36,10 +54,11 @@ describe('every mission of every chapter', () => {
         if (m.kind !== 'prompt') assert.ok(m.answer && typeof m.answer === 'object' && m.answer.files, 'config answers are setup files');
         if (m.prompt) assert.deepEqual(AQ.config.parsePrompt(m.prompt, AQ.scenarios[m.scenario]).errors.length, 0, 'the mission prompt parses');
       });
-      it('the reference answer passes', () => assert.equal(AQ.runMission(m, m.answer), true));
+      // approved: a Plan: first answer pauses until approved, and the pause itself is covered by its own test below
+      it('the reference answer passes', () => assert.equal(AQ.runMission(m, m.answer, APPROVED), true));
       it('the parsing-but-wrong answer and the lazy answer fail with a reason', () => {
         for (const x of [m.wrong, m.lazy]) {
-          const r = AQ.runMission(m, x);
+          const r = AQ.runMission(m, x, APPROVED);
           assert.equal(typeof r, 'string');
           assert.ok(r.length > 20);
         }
@@ -47,7 +66,7 @@ describe('every mission of every chapter', () => {
       it('the three inputs differ and an empty input fails', () => {
         const j = (x) => JSON.stringify(x);
         assert.equal(new Set([j(m.answer), j(m.wrong), j(m.lazy)]).size, 3);
-        for (const empty of ['', '   ', {}, { prompt: '', files: {} }, null, undefined, 5]) assert.equal(typeof AQ.runMission(m, empty), 'string', j(empty));
+        for (const empty of ['', '   ', {}, { prompt: '', files: {} }, null, undefined, 5]) assert.equal(typeof AQ.runMission(m, empty, APPROVED), 'string', j(empty));
       });
       it('how starts with the whole line, then the parts', () => {
         assert.ok(Array.isArray(m.how) && m.how.length >= 3 && m.how.length <= 5, 'three to five steps');
@@ -62,17 +81,24 @@ describe('every mission of every chapter', () => {
 });
 
 describe('prompt form fields are shown only once a mission has taught them', () => {
-  // field -> the first mission (chapter 1) whose card teaches it
-  const TAUGHT = { donewhen: 0, constraints: 1, files: 2 };
-  const prompts = AQ.CH[0].missions.map((m, i) => [m, i]).filter(([m]) => m.kind === 'prompt');
+  // field -> [chapter, mission] (both 0-based, as in AQ.CH[chapter].missions[mission]) of the first mission whose card teaches it
+  const TAUGHT = { donewhen: [0, 0], constraints: [0, 1], files: [0, 2], examples: [2, 0], plan: [2, 3] };
+  const prompts = AQ.CH.flatMap((ch, c) => ch.missions.map((m, i) => [m, c, i])).filter(([m]) => m.kind === 'prompt');
+  const from = ([fc, fi], c, i) => c > fc || (c === fc && i >= fi);
   it('every prompt mission lists its fields, and chapter 1 never shows Use, Plan, Examples or Extra', () => {
-    for (const [m] of prompts) {
+    for (const [m, c] of prompts) {
       assert.ok(Array.isArray(m.fields) && m.fields.includes('goal'), m.title);
-      for (const hidden of ['use', 'plan', 'examples', 'extra']) assert.ok(!m.fields.includes(hidden), `${m.title} shows ${hidden}`);
+      for (const hidden of c === 0 ? ['use', 'plan', 'examples', 'extra'] : ['use', 'extra']) assert.ok(!m.fields.includes(hidden), `${m.title} shows ${hidden}`);
+    }
+  });
+  it('no prompt mission before [2, 0] shows examples and none before [2, 3] shows plan', () => {
+    for (const [m, c, i] of prompts) {
+      if (c < 2 || (c === 2 && i < 3)) assert.ok(!m.fields.includes('plan'), m.title);
+      if (c < 2) assert.ok(!m.fields.includes('examples'), m.title);
     }
   });
   it('a field appears from the mission that teaches it onward, and not before', () => {
-    for (const [m, i] of prompts) for (const [f, from] of Object.entries(TAUGHT)) assert.equal(m.fields.includes(f), i >= from, `${i} ${f}`);
+    for (const [m, c, i] of prompts) for (const [f, at] of Object.entries(TAUGHT)) assert.equal(m.fields.includes(f), from(at, c, i), `[${c}, ${i}] ${f}`);
   });
   it('the reference, wrong and lazy answers only use fields the mission shows', () => {
     const names = { goal: 'goal', files: 'files', examples: 'examples', use: 'use', plan: 'plan', constraints: 'constraints', donewhen: 'donewhen', extra: 'extra' };
@@ -193,9 +219,9 @@ describe('extras', () => {
     }
   });
   it('every guide example that is a prompt line parses against its own mission scenario', () => {
-    const sc = AQ.scenarios.tidy;
     for (const g of AQ.GUIDE) for (const [t] of g.ex) {
-      if (/^(Done when|Constraints|Files):/.test(t)) {
+      if (/^(Done when|Constraints|Files|Examples|Plan):/.test(t)) {
+        const sc = AQ.scenarios[g.sc || 'tidy'];
         const p = AQ.config.parsePrompt(t, { ...sc, commands: AQ.scenarios.price.commands }, AQ.config.parseSetup(AQ.vfs.create(sc.vfs)));
         assert.equal(p.errors.length, 0, t);
       }

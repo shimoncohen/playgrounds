@@ -18,8 +18,9 @@ UI.rove=(list,sel)=>{
   });
 };
 
-const TAGS={context:'context',plan:'plan',approved:'plan',skip:'skipped'};
+const TAGS={context:'context',skill:'skill',plan:'plan',approved:'plan',skip:'skipped'};
 const describe=s=>{
+  if(s.type==='skill')return 'Skill '+s.name+(s.loaded?' loaded':' not loaded ('+s.why+')');
   if(s.type==='context')return 'Loaded instructions and your prompt: ~'+s.tokens+' tokens'+(s.dropped?' ('+s.dropped+' earlier message'+(s.dropped>1?'s':'')+' dropped to fit)':'');
   if(s.type==='plan')return 'Plan: '+(s.files.length?'change '+s.files.join(', '):'no files');
   if(s.type==='approved')return 'Plan approved';

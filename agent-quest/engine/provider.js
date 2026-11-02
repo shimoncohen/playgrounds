@@ -9,6 +9,7 @@ function narrate(s){
   if(!s)return 'I read the task and planned my next step.';
   if(s.type==='context')return 'I loaded my instructions and your prompt'+(s.dropped?' (some earlier messages no longer fit).':'.');
   if(s.type==='plan')return 'Here is my plan'+(s.files.length?': I will change '+s.files.join(', ')+'.':'.');
+  if(s.type==='skill')return s.loaded?'I loaded the skill "'+s.name+'" because it matches this task.':'I did not load the skill "'+s.name+'": another skill already matches this task.';
   if(s.type==='approved')return 'The plan is approved, so I start.';
   const plain=s.verb+' '+s.target,did='I '+(VERB[s.verb]||s.verb)+' '+s.target+'.';
   if(s.type==='skip')return 'I wanted to '+plain+', but '+s.by+' does not allow it, so I skipped it.';

@@ -96,13 +96,18 @@ function names(setup,scenario){
 const frontmatter=text=>{const o={};for(const l of String(text).split('\n')){const m=/^(name|description|when|model):\s*(.*)$/.exec(l.trim());if(m&&!(m[1] in o))o[m[1]]=m[2].trim();}return o;};
 const lines=t=>String(t??'').split('\n').map(l=>l.trim()).filter(l=>l&&!l.startsWith('#'));
 
+/* a CLAUDE.md inside a folder (src/CLAUDE.md); the root file and .claude/ paths are not folder memory */
+const isFolderMemory=p=>typeof p==='string'&&valid(p)&&/^(?:[\w.@-]+\/)+CLAUDE\.md$/.test(p)&&!p.startsWith('.claude/');
+
 function parseSetup(vfs){
   /* raw: every setup file under .claude/, so a size budget counts text the parsers ignore too */
-  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],hooks:[],subagents:[],errors:[]};
+  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],hooks:[],subagents:[],errors:[],
+    memoryFolders:vfs.list().filter(isFolderMemory).map(path=>({path,dir:path.slice(0,-'CLAUDE.md'.length),text:vfs.read(path)}))};
   for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
     if(!f.name){setup.errors.push({file:p,msg:'a skill needs a name: line'});continue;}
     if(!TAGS.includes(f.when)){setup.errors.push({file:p,msg:'when: must be one of '+TAGS.join(', ')});continue;}
+    if(setup.skills.some(s=>s.name===f.name)){setup.errors.push({file:p,msg:'duplicate skill name "'+show(f.name)+'"'});continue;}
     setup.skills.push({path:p,name:f.name,description:f.description||'',when:f.when});
   }
   for(const l of lines(vfs.read('.claude/mcp.txt'))){
@@ -130,5 +135,26 @@ function memoryRules(setup,scenario){
   return {rules,ignored};
 }
 
-AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules};
+const folderMemory=(setup,readPaths)=>setup.memoryFolders.filter(f=>readPaths.some(p=>p.startsWith(f.dir)));
+
+/* strips frontmatter-shaped lines anywhere, so a second when: in the body cannot act as a rule or a tag */
+const skillBody=text=>String(text??'').split('\n').filter(l=>!/^(name|description|when|model):/.test(l.trim())).join('\n');
+
+/* the skills whose when: equals the scenario tag; only the first by path loads, the rest are duplicates */
+function loadedSkills(setup,vfs,tag){
+  const hits=tag?[...setup.skills].filter(s=>s.when===tag).sort((a,b)=>a.path<b.path?-1:1):[];
+  return {loaded:hits.slice(0,1).map(s=>({name:s.name,path:s.path,body:skillBody(vfs.read(s.path))})),skipped:hits.slice(1).map(s=>({name:s.name,why:'duplicate'}))};
+}
+
+/* names of skills that never match the tag, and of skills that share a when: with an earlier one */
+function skillIssues(setup,tag){
+  const seen=new Set(),duplicate=[];
+  for(const s of setup.skills){if(seen.has(s.when))duplicate.push(s.name);seen.add(s.when);}
+  return {unused:setup.skills.filter(s=>s.when!==tag).map(s=>s.name),duplicate};
+}
+
+const agentCost=setup=>setup.subagents.reduce((n,s)=>n+s.cost,0);
+
+AQ.isFolderMemory=isFolderMemory;
+AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
 })();

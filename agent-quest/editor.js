@@ -88,7 +88,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     ta.value=p in edits?edits[p]:base[p];ta.readOnly=!can;ta.rows=8;ta.spellcheck=false;ta.maxLength=8000;
     ta.setAttribute('aria-label','Contents of '+p);
     fileEl.append(head,ta);
-    if(p==='CLAUDE.md'){
+    if(p==='CLAUDE.md'||AQ.isFolderMemory(p)){
       rulesEl=el('p','rules');fileEl.append(rulesEl);
       const upd=()=>{const r=AQ.config.memoryRules({memory:ta.value},sc);rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules. '+plural(r.ignored.length,'other line')+' only cost'+(r.ignored.length===1?'s':'')+' tokens.';};
       upd();ta.addEventListener('input',upd);

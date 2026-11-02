@@ -10,10 +10,15 @@ function run(scenario,setup,prompt,opts={}){
   const vfs=(opts.vfs||AQ.vfs.create(scenario.vfs)).clone(),history=opts.history||[];
   const steps=[],calls=[],violations=[],read=[],edited=[];
   let peak=0,total=0,ctx=null;
-  const refresh=()=>{ctx=AQ.context.build(setup,prompt,history,read.map(p=>({path:p,text:vfs.read(p)||''})));peak=Math.max(peak,ctx.peak);};
+  const {loaded,skipped}=AQ.config.loadedSkills(setup,vfs,scenario.tag);
+  const styles=scenario.style?prompt.examples.map(p=>scenario.style(vfs.read(p)||'')):[];
+  const refresh=()=>{ctx=AQ.context.build(setup,prompt,history,read.map(p=>({path:p,text:vfs.read(p)||''})),{skills:loaded});peak=Math.max(peak,ctx.peak);};
+  const memRules=(text,by)=>AQ.config.memoryRules({memory:text},scenario).rules.map(c=>({...c,by}));
   const rules=()=>[
     ...prompt.constraints.map(c=>({...c,by:'your constraint'})),
-    ...AQ.config.memoryRules(setup,scenario).rules.map(c=>({...c,by:'CLAUDE.md'})),
+    ...memRules(setup.memory,'CLAUDE.md'),
+    ...AQ.config.folderMemory(setup,read).flatMap(f=>memRules(f.text,f.path)),
+    ...loaded.flatMap(s=>memRules(s.body,'skill '+s.name)),
     ...AQ.context.rules(ctx,scenario).map(c=>({...c,by:'an earlier message'}))
   ];
   const hidden=a=>(scenario.hidden||[]).some(h=>h.verb===a.verb&&AQ.permissions.matches(h.target,a.target));
@@ -23,7 +28,7 @@ function run(scenario,setup,prompt,opts={}){
     const base={verb:a.verb,target:a.target,tag};
     if(!p.allowed){steps.push({type:'skip',...base,by:p.by});return false;}
     if(a.needs&&a.needs.some(n=>!read.includes(n))){steps.push({type:'skip',...base,by:'not seen yet'});return false;}
-    const r=AQ.shell.exec(scenario,a,vfs),bad=hidden(a);
+    const r=AQ.shell.exec(scenario,a,vfs,styles),bad=hidden(a);
     calls.push({verb:a.verb,target:a.target});
     total+=AQ.tokens.estimate(a.verb+' '+a.target+' '+r.out);
     steps.push({type:'act',...base,ok:r.ok,violation:bad});
@@ -37,6 +42,8 @@ function run(scenario,setup,prompt,opts={}){
   refresh();
   total+=ctx.total;
   steps.push({type:'context',tokens:ctx.total,dropped:ctx.dropped.length});
+  for(const s of loaded)steps.push({type:'skill',name:s.name,loaded:true});
+  for(const s of skipped)steps.push({type:'skill',name:s.name,loaded:false,why:s.why});
   const script=scenario.script||[];
   if(prompt.plan){
     steps.push({type:'plan',files:script.filter(a=>a.verb==='edit').map(a=>a.target)});
