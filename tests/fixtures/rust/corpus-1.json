@@ -1,0 +1,170 @@
+[
+  {
+    "id": "hello",
+    "src": "fn main() {\n    println!(\"Hello, Rust!\");\n}\n",
+    "expect": "ok", "out": "Hello, Rust!\n", "err": "", "exit": 0,
+    "why": "println! prints its string and a newline", "pr": "P2"
+  },
+  {
+    "id": "hole-sum",
+    "src": "fn main() {\n    println!(\"{}\", 1 + 2);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "a {} hole is filled with the next argument", "pr": "P2"
+  },
+  {
+    "id": "holes-two",
+    "src": "fn main() {\n    println!(\"{} and {}\", 1, \"two\");\n}\n",
+    "expect": "ok", "out": "1 and two\n", "err": "", "exit": 0,
+    "why": "holes take their arguments in order", "pr": "P2"
+  },
+  {
+    "id": "holes-numbered",
+    "src": "fn main() {\n    println!(\"{1}-{0}-{1}\", 1, 2);\n}\n",
+    "expect": "ok", "out": "2-1-2\n", "err": "", "exit": 0,
+    "why": "a numbered hole picks an argument by position", "pr": "P2"
+  },
+  {
+    "id": "holes-named",
+    "src": "fn main() {\n    println!(\"{n}\", n = 7);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "a named hole picks a named argument", "pr": "P2"
+  },
+  {
+    "id": "holes-captured",
+    "src": "fn main() {\n    let who = 'x';\n    println!(\"<{who}> {{}}\");\n}\n",
+    "expect": "ok", "out": "<x> {}\n", "err": "", "exit": 0,
+    "why": "a hole can name a variable, and doubled braces print one brace each", "pr": "P2"
+  },
+  {
+    "id": "print-and-eprint",
+    "src": "fn main() {\n    print!(\"a\");\n    print!(\"b\");\n    println!();\n    eprintln!(\"oops\");\n}\n",
+    "expect": "ok", "out": "ab\n", "err": "oops\n", "exit": 0,
+    "why": "print! adds no newline, println!() prints an empty line, eprintln! writes to stderr", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x);\n    x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0384", "line": 4 }, "pair": "immutable-assign-mut",
+    "why": "assigning twice to an immutable variable is E0384", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign-mut",
+    "src": "fn main() {\n    let mut x = 5;\n    println!(\"{}\", x);\n    x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n6\n", "err": "", "exit": 0,
+    "why": "mut allows the second assignment", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign-shadow",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x);\n    let x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n6\n", "err": "", "exit": 0,
+    "why": "a second let shadows instead of assigning", "pr": "P2"
+  },
+  {
+    "id": "immutable-compound",
+    "src": "fn main() {\n    let x = 5;\n    x += 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0384", "line": 3 }, "pair": "immutable-compound-mut",
+    "why": "a compound assignment to an immutable variable is E0384 too", "pr": "P2"
+  },
+  {
+    "id": "immutable-compound-mut",
+    "src": "fn main() {\n    let mut x = 5;\n    x += 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "mut allows the compound assignment", "pr": "P2"
+  },
+  {
+    "id": "immutable-param",
+    "src": "fn bump(n: i32) -> i32 {\n    n = n + 1;\n    n\n}\n\nfn main() {\n    println!(\"{}\", bump(1));\n}\n",
+    "expect": { "code": "E0384", "line": 2 }, "pair": "immutable-param-mut",
+    "why": "a parameter is immutable unless declared mut", "pr": "P2"
+  },
+  {
+    "id": "immutable-param-mut",
+    "src": "fn bump(mut n: i32) -> i32 {\n    n = n + 1;\n    n\n}\n\nfn main() {\n    println!(\"{}\", bump(1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "mut on the parameter allows the assignment", "pr": "P2"
+  },
+  {
+    "id": "shadow-new-type",
+    "src": "fn main() {\n    let x = \"five\";\n    let x = 5;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "shadowing may change the type", "pr": "P2"
+  },
+  {
+    "id": "shadow-block",
+    "src": "fn main() {\n    let x = 1;\n    {\n        let x = 2;\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n1\n", "err": "", "exit": 0,
+    "why": "a shadowing let in an inner block ends with the block", "pr": "P2"
+  },
+  {
+    "id": "const-and-fn",
+    "src": "const MAX: i32 = 10;\n\nfn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\nfn main() {\n    println!(\"{}\", add(2, MAX));\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "const items and functions with scalar parameters and a tail value", "pr": "P2"
+  },
+  {
+    "id": "bool-and-char",
+    "src": "fn main() {\n    println!(\"{} {}\", true, 'x');\n}\n",
+    "expect": "ok", "out": "true x\n", "err": "", "exit": 0,
+    "why": "bool and char print as their text", "pr": "P2"
+  },
+  {
+    "id": "int-division",
+    "src": "fn main() {\n    println!(\"{} {} {}\", 7 / 2, -7 / 2, -7 % 3);\n}\n",
+    "expect": "ok", "out": "3 -3 -1\n", "err": "", "exit": 0,
+    "why": "integer division truncates toward zero and the remainder takes the sign of the left side", "pr": "P2"
+  },
+  {
+    "id": "u8-sum",
+    "src": "fn main() {\n    let a: u8 = 200;\n    let b: u8 = 55;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "typed integers add inside their range", "pr": "P2"
+  },
+  {
+    "id": "early-return",
+    "src": "fn early(n: u8) -> u8 {\n    return n + 1;\n}\n\nfn main() {\n    println!(\"{}\", early(4));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "return leaves the function with a value", "pr": "P2"
+  },
+  {
+    "id": "dup-fn",
+    "src": "fn f() {}\n\nfn f() {}\n\nfn main() {\n    f();\n    f();\n}\n",
+    "expect": { "code": "E0428", "line": 3 }, "pair": "dup-fn-renamed",
+    "why": "two functions with one name are E0428, reported at the second", "pr": "P2"
+  },
+  {
+    "id": "dup-fn-renamed",
+    "src": "fn f() {}\n\nfn g() {}\n\nfn main() {\n    f();\n    g();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "distinct names are fine", "pr": "P2"
+  },
+  {
+    "id": "dup-const",
+    "src": "const N: i32 = 1;\nconst N: i32 = 2;\n\nfn main() {\n    println!(\"{}\", N);\n}\n",
+    "expect": { "code": "E0428", "line": 2 }, "pair": "dup-const-renamed",
+    "why": "two constants with one name are E0428", "pr": "P2"
+  },
+  {
+    "id": "dup-const-renamed",
+    "src": "const N: i32 = 1;\nconst M: i32 = 2;\n\nfn main() {\n    println!(\"{}\", N);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "distinct names are fine", "pr": "P2"
+  },
+  {
+    "id": "dup-param",
+    "src": "fn pick(a: i32, a: i32) -> i32 {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(1, 2));\n}\n",
+    "expect": { "code": "E0415", "line": 1 }, "pair": "dup-param-renamed",
+    "why": "a parameter name used twice is E0415", "pr": "P2"
+  },
+  {
+    "id": "dup-param-renamed",
+    "src": "fn pick(a: i32, b: i32) -> i32 {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(1, 2));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "distinct parameter names are fine", "pr": "P2"
+  },
+  {
+    "id": "order-by-code-point",
+    "src": "fn main() {\n    println!(\"{} {}\", '\\u{10000}' > '\\u{E000}', \"\\u{10000}\" > \"\\u{E000}\");\n}\n",
+    "expect": "ok", "out": "true true\n", "err": "", "exit": 0,
+    "why": "chars and text order by code point, so U+10000 is above U+E000", "pr": "P2"
+  }
+]

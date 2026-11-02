@@ -10,7 +10,7 @@ body:
     id: where
     attributes:
       label: Which part?
-      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Landing page, Progress saving, Accessibility, Tooling or CI, Docs, Other]
+      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Rust Quest, Landing page, Progress saving, Accessibility, Tooling or CI, Docs, Other]
     validations:
       required: true
   - type: textarea
