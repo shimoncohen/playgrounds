@@ -111,7 +111,7 @@ ds-quest/               like those, plus engine.js (runner), content.js (course)
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapter 1, ranks, quick-fire, guide), ui.js + editor.js + meter.js
 shell-quest/            split by job (below)
-tests/                  engine tests (Node; shell/, ds/ and net/), browser smoke + golden tests (Playwright)
+tests/                  engine tests (Node; shell/, ds/, net/ and agent/), browser smoke + golden tests (Playwright)
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
