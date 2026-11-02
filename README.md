@@ -15,6 +15,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
+| ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`agent-quest/`](agent-quest/) |
 
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
 
@@ -108,6 +109,7 @@ script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
+agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapter 1, ranks, quick-fire, guide), ui.js + editor.js + meter.js
 shell-quest/            split by job (below)
 tests/                  engine tests (Node; shell/, ds/ and net/), browser smoke + golden tests (Playwright)
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
@@ -131,7 +133,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 The Artifact service wraps pages in its own skeleton, so it needs a single body-only file:
 
 ```
-python3 tools/build.py            # all seven -> dist/<name>-quest.html
+python3 tools/build.py            # all eight -> dist/<name>-quest.html
 python3 tools/build.py shell      # just one
 python3 tools/build.py --check    # verify the folders bundle cleanly
 ```
