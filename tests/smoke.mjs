@@ -2043,6 +2043,88 @@ test('agent-quest: the prompt form shows only the fields taught so far', async (
   await o.ctx.close();
 });
 
+const seedAt = (ch, mi) => seedAgent(JSON.stringify({ ch, mi }));
+
+test('agent-quest: chapter 3 shows Examples from its first mission and Plan from its fourth, never Use, and plays Plan first', async () => {
+  const o = await agentPage({}, seedAt(2, 0));
+  const { page } = o;
+  const shown = () => page.$$eval('#promptHost [id^="pf-"]', es => es.map(e => e.id.slice(3)));
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'constraints', 'donewhen']);
+  await page.click('#mission .dot[data-mi="3"]');
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'plan', 'constraints', 'donewhen']);
+  assert.equal(await page.locator('#pf-use, #pf-extra').count(), 0);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.equal(await page.isChecked('#pf-plan'), true);
+  await page.click('#runBtn');
+  assert.equal(await page.isVisible('#run [data-act="approve"]'), true);
+  await page.click('#run [data-act="approve"]');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 4 edits a folder memory file, counts its rules and shows it in the meter once the agent reads there', async () => {
+  const o = await agentPage({}, seedAt(3, 1));
+  const { page } = o;
+  const tree = await page.$$eval('#tree li', ls => ls.map(l => l.textContent));
+  assert.ok(tree.includes('src/CLAUDE.md'), 'the folder memory file is editable, with no read-only mark');
+  assert.ok(tree.some(t => t.startsWith('src/price.js') && t.endsWith('(read-only)')));
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', '# Rules for work inside src/\ndo not edit src/legacy/\n');
+  assert.match(await page.textContent('#fileEditor .rules'), /^1 line acts as rules/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="3"]');
+  const memory = () => page.$eval('#meter tbody tr:nth-child(2) td.n', e => +e.textContent.slice(1));
+  const before = await memory();
+  await page.fill('#pf-files', 'src/price.js');
+  assert.ok(await memory() > before, 'the folder memory file joins the Memory row once a file under it is read');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '20 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 loads the matching skill, shows its step in the run panel and its body in the meter', async () => {
+  const o = await agentPage({}, seedAt(4, 0));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the loaded skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill release-guard loaded/);
+  assert.match(await page.textContent('#run .steps'), /blocked by skill release-guard/);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 names the duplicate skill that was not loaded, with no undefined', async () => {
+  const o = await agentPage({}, seedAt(4, 1));
+  const { page } = o;
+  await page.click('#runBtn');
+  const steps = await page.textContent('#run .steps');
+  assert.match(steps, /Skill release-notes not loaded \(duplicate\)/);
+  assert.doesNotMatch(steps, /undefined/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 2 previews earlier messages and notes the ones dropped to fit', async () => {
+  const o = await agentPage({}, seedAt(1, 1));
+  const { page } = o;
+  const history = await page.$eval('#meter tbody tr:nth-child(6) td.n', e => e.textContent);
+  assert.notEqual(history, '~0', 'some earlier messages are still held');
+  assert.match(await page.textContent('#meter'), /oldest earlier messages were dropped/);
+  await page.click('#promptHost [data-act="fill"]');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: the file tree works from the keyboard', async () => {
   const { ctx, page, errors } = await agentPage();
   assert.equal(await page.locator('#tree [tabindex="0"]').count(), 1, 'the tree is one tab stop');
@@ -2120,6 +2202,7 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '7 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');

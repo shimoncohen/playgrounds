@@ -4,8 +4,8 @@
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
 
-/* action: {verb, target, write?}; write is the new text, or a function of the file system returning it */
-function exec(scenario,action,vfs){
+/* action: {verb, target, write?}; write is the new text, or a function of the file system and the Examples styles returning it */
+function exec(scenario,action,vfs,styles=[]){
   try{
     const t=action.target;
     if(action.verb==='read'){
@@ -13,7 +13,7 @@ function exec(scenario,action,vfs){
       return text===null?{ok:false,out:'no such file'}:{ok:true,out:text};
     }
     if(action.verb==='edit'){
-      const text=typeof action.write==='function'?action.write(vfs):action.write;
+      const text=typeof action.write==='function'?action.write(vfs,styles):action.write;
       return {ok:typeof text==='string'&&vfs.write(t,text),out:''};
     }
     if(action.verb==='delete')return {ok:vfs.remove(t),out:''};

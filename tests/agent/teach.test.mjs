@@ -28,6 +28,21 @@ const FIRST = {
   meter: [/\bmeter\b/i, 0, 2],
   'CLAUDE.md': [/CLAUDE\.md/, 0, 3],
   'memory file': [/memory file/i, 0, 3],
+  subagent: [/\bsubagents?\b/i, 1, 4],
+  Examples: [/\bExamples\b/, 2, 0],
+  // case-sensitive: chapter 1 quick-fire says "plan, build, ship"
+  Plan: [/\bPlan\b/, 2, 3],
+  'folder memory': [/\bfolder(?:-level)? memory\b/i, 3, 1],
+  skill: [/\bskills?\b/i, 4, 0],
+  'when:': [/(?<!Done )\bwhen:/, 4, 0],
+  MCP: [/\bMCP\b/, 4, 3],
+  // a tool call written the way the grammar writes it: call server.tool
+  call: [/\bcall [a-z]+\.[a-z]+/, 4, 4],
+  hook: [/\bhooks?\b/i, 5, 0],
+  plugin: [/\bplugins?\b/i, 5, 3],
+  injection: [/\binjections?\b/i, 6, 1],
+  send: [/\bsend [a-z]+\.[a-z]+/, 6, 1],
+  secret: [/\bsecrets?\b/i, 6, 2],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),
@@ -48,13 +63,18 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
 
 describe('verbs no chapter 1 mission uses are not taught yet', () => {
   it('call and send appear as code nowhere in chapter 1 text', () => {
-    const raw = [...AQ.CH[0].missions.flatMap((m) => [m.goal, m.explain, m.hint, ...m.how]), ...AQ.QF.flatMap((q) => [q.c, q.a, ...q.w, q.why]), ...AQ.GUIDE.flatMap((g) => [g.what, ...g.ex.flat()])].join('\n');
+    const raw = [...AQ.CH[0].missions.flatMap((m) => [m.goal, m.explain, m.hint, ...m.how]), ...AQ.QF.filter((q) => q.ch === 0).flatMap((q) => [q.c, q.a, ...q.w, q.why]), ...AQ.GUIDE.filter((g) => g.ch === 0).flatMap((g) => [g.what, ...g.ex.flat()])].join('\n');
     assert.doesNotMatch(raw, /<code>(?:call|send)<\/code>/);
   });
 });
 
 describe('a mission card does not lean on a later mission', () => {
-  it('the chapter intro uses none of the terms', () => {
+  it('the chapter 1 intro uses none of the terms', () => {
     for (const [term, [re]] of Object.entries(FIRST)) assert.ok(!re.test(plain(AQ.CH[0].intro)), `the chapter intro uses "${term}" before any mission teaches it`);
+  });
+  it('a chapter intro uses no term that a later chapter teaches', () => {
+    AQ.CH.forEach((ch, c) => {
+      for (const [term, [re, ci]] of Object.entries(FIRST)) if (ci > c) assert.ok(!re.test(plain(ch.intro)), `the intro of chapter ${c + 1} uses "${term}" before chapter ${ci + 1}`);
+    });
   });
 });

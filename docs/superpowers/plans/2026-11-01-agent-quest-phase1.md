@@ -97,7 +97,7 @@ Branch off `main` after PR 1 merges. Sub-tasks run in order; each ends with a co
 - Create: `agent-quest/content/tiers.js`, `agent-quest/content/state.js`, `tests/agent/harness.mjs`, `tests/agent/state.test.mjs`
 
 **Interfaces:**
-- Produces on `AQ`: `tiers` from `Tiers.create` (tiers `core`, `dev`, `personal`, `tune`, `missionXp` 10, `tierEndRanks: {}`, core-sized `baseRanks` of about 525 XP at the top); `state.fresh()`, `state.load(raw, chapters) -> S`, `state.serialize(S) -> string`, `state.xpFor(done, badges) -> number`.
+- Produces on `AQ`: `tiers` from `Tiers.create` (tiers `core`, `dev`, `personal`, `tune`, `missionXp` 10, `tierEndRanks: {}`, core-sized `baseRanks` of 505 XP at the top); `state.fresh()`, `state.load(raw, chapters) -> S`, `state.serialize(S) -> string`, `state.xpFor(done, badges) -> number`.
 - Produces in `harness.mjs`: `loadAgent() -> AQ` (fresh `vm` context, loads `shared/tiers.js`, `shared/how.js`, then `agent-quest/engine/*.js` and `content/*.js` in `index.html` order).
 
 - [ ] **Step 1: Failing tests** in `state.test.mjs`: (1) a fresh serialized state satisfies the pristine predicate copied from `shared/progress.js:44` (comment names the line); (2) after one done mission, serialized `xp` is a number greater than 0; (3) a tampered `xp` is replaced by `xpFor`; (4) the serialized key set equals `{ch, mi, done, xp, badges, best, tab}`, so `answers` or any other key fails; (5) wrong shapes (`'{"done":5,"xp":"x"}'`, non-JSON, `null`) load without throwing; (6) `tab` outside `quest|fire|guide` falls back to `quest`; (7) unknown mission keys in `done` are dropped.
@@ -203,10 +203,12 @@ Each content PR: one task per chapter (write `content/ch-NN-*.js`, append its `<
 
 | Task | PR | Ref | Chapters (number, file) | Tier |
 |---|---|---|---|---|
-| 4 | 4 | #55 | 2 context and tokens (`ch-02-context.js`), 3 prompt structure (`ch-03-prompt.js`), 4 memory (`ch-04-memory.js`), 5 skills and MCP (`ch-05-skills-mcp.js`), 6 hooks, plugins, subagents (`ch-06-extend.js`), 7 safety (`ch-07-safety.js`) | core |
+| 4 | 4 | #55 | 2 context and tokens (`ch-02-context.js`), 3 prompt structure (`ch-03-prompt.js`), 4 memory (`ch-04-memory.js`), 5 skills and MCP (`ch-05-skills-mcp.js`), 6 hooks, plugins, subagents (`ch-06-extend.js`), 7 safety (`ch-07-safety.js`); engine files `config.js`, `context.js`, `policy.js`, `shell.js`, `provider.js` and `content/model.js` also change (below) | core |
 | 5 | 5 | #56 | 8 explore, plan, implement; 9 test, review, PR; 10 subagents, parallel, worktrees; 11 hooks for lint, format, guards; 12 slash commands and repo skills; 13 MCP for trackers, docs, browsers; 14 CI and headless; 15 writing a project `CLAUDE.md` | dev |
 | 6 | 6 | #57 | 16 writing and research; 17 files and documents; 18 scheduled tasks (artifact is a `schedule.json` entry); 19 personal MCP (mail, calendar, notes); 20 small personal skills and commands | personal |
 | 7 | 7 | #58 | 21 audit what is loaded; 22 trim, dedupe, move rare rules into on-demand skills; 23 measure before and after, cheaper models for simple subagent work | tune |
+
+**Engine additions in PR 4** (each with its tests): `style()` for `Examples`, scenario `history`, and `agentCost` (policy, shell and config tests); skill matching against a scenario `tag` (`loadedSkills`, `skillBody`, `skillIssues`, the `Skill:` context segment and the `skill` run step: config, context, policy and provider tests); folder-level `CLAUDE.md` memory (`memoryFolders`, `folderMemory`, the counted-once rule, `setupTokens` and the create-gate in `prepare()`: config, context, policy and content tests). Specified in the spec sections "Skill matching" and "Folder memory".
 
 Chapter 3 carries the four prompt-structure missions in the spec (examples, specific versus general, when not to be specific, plan first), each with a defined `accept`. The "which mechanism" chooser in chapter 6 and the model-size chooser in chapter 2 are quick-fire `choose` questions plus a cost-multiplier mission. Chapter 23 shows the meter before and after.
 
@@ -214,7 +216,7 @@ Chapter 3 carries the four prompt-structure missions in the spec (examples, spec
 
 ## Self-review
 
-- **Spec coverage:** simulator (Tasks 2.3 to 2.5), saved state and landing contract (2.2, 2.7), paths and rank (2.2), missions and checks (2.6), dated content (2.6), UI and 390px (2.7), wiring touchpoints (2.1 for the landing card, `NAMES`, README rows, repo map, count and `AGENTS.md` row; Task 3 for `package.json`, `ci.yml`, `pre-pr-check` and the `AGENTS.md` loop), chain and delivery (PR split), requirement map (content PRs), roadmap (#52 left out).
+- **Spec coverage:** simulator (Tasks 2.3 to 2.5), saved state and landing contract (2.2, 2.7), paths and rank (2.2), missions and checks (2.6), dated content (2.6), UI and 390px (2.7), wiring touchpoints (2.1 for the landing card, `NAMES`, README rows, repo map, count and `AGENTS.md` row; Task 3 for `package.json`, `ci.yml`, `pre-pr-check` and the `AGENTS.md` loop), chain and delivery (PR split), requirement map (content PRs), skill matching and folder memory (PR 4 engine additions), roadmap (#52 left out).
 - **Touchpoints checked:** PR 2 landing card, `smoke.mjs:15` `NAMES`, README table row, repo map (`README.md:102-117`), count (`README.md:134`), `AGENTS.md` row, `xp === 0` smoke assertion. PR 3 `package.json:13`, `ci.yml:32`, `pre-pr-check` glob, `AGENTS.md:17` loop, `tests/fixtures/*.js`. `tools/build.py` and `commitlint.yml` need no edit (verify the first in PR 2.1).
 - **Naming consistency:** `AQ.tokens`, `AQ.vfs`, `AQ.config`, `AQ.context`, `AQ.permissions`, `AQ.shell`, `AQ.policy`, `AQ.provider`, `AQ.state`, `AQ.CH`, `AQ.FACTS`, `AQ.runMission` are used the same way in every task. Outcome statuses are `done`, `unverified`, `failed`, `blocked`.
 - **Conflicts to recheck:** PR 3 against #45 on `package.json:13` (#45 does not touch it as of 2026-11-01); PR 2 against #45 and #46 to #50 on `README.md`, `tests/smoke.mjs` and `index.html`.
