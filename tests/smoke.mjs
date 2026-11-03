@@ -2232,7 +2232,7 @@ test('agent-quest: after a reload at chapter 15 the active chapter chip is scrol
 });
 
 // DEFECT: "Writing a project CLAUDE.md" is wider than the 360px rail at 1280, so revealCurrent scrolls the rail sideways and clips the chapter number
-test('agent-quest: the chapter 15 chip fits the width of the rail at 1280', { todo: 'the chip is 21px wider than the rail and its number is cut off' }, async () => {
+test('agent-quest: the chapter 15 chip fits the width of the rail at 1280', async () => {
   const o = await agentPage({ viewport: { width: 1280, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
   const g = await railGaps(o.page);
   assert.equal(g.h, true, `the chapter 15 chip is cut off at the side: ${g.chip} in ${g.rail}`);
