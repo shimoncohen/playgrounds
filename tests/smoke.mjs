@@ -253,6 +253,41 @@ for (const name of NAMES) {
   });
 }
 
+test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
+  const key = 'python-quest-v1';
+  const { ctx, page, errors } = await open(`${base}/python-quest/`);
+  await ctx.addInitScript(() => {
+    const h = async () => (await navigator.storage.getDirectory()).getFileHandle('notes.json', { create: true });
+    window.showSaveFilePicker = h;
+    window.showOpenFilePicker = async () => [await h()];
+  });
+  await page.evaluate(k => {
+    Storage.prototype.setItem.call(localStorage, k, JSON.stringify({ xp: 0, done: {}, notes: { 0: 'hello' } }));
+    Storage.prototype.setItem = () => {};
+  }, key);
+  await page.reload();
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
+  const file = path.join(tmp, 'notes-only.json');
+  await dl.saveAs(file);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).data.notes[0], 'hello');
+
+  await page.click('.pg-trigger');
+  await page.click('text=Create save file');
+  await page.waitForSelector('.pg-state.pg-ok');
+  // A fresh page writes its empty state on load; the linked file must still win, because notes are progress.
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await until(async () => {
+    try { return /hello/.test(await read(page, key) || ''); }
+    catch (e) { if (/context was destroyed|navigation/i.test(e.message)) return false; throw e; }
+  });
+  await page.waitForLoadState('load');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
   await page.waitForSelector('#mission');
