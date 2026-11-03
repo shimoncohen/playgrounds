@@ -22,18 +22,19 @@ describe('chapters', () => {
   });
   it('chapter 1 has about five missions', () => assert.equal(AQ.CH[0].missions.length, 5));
   it('chapters 2 to 7 have 5, 4, 5, 5, 4 and 5 missions, in tier core', () => {
-    assert.deepEqual([...AQ.CH.map((ch) => ch.missions.length)], [5, 5, 4, 5, 5, 4, 5]);
-    assert.ok(AQ.CH.every((ch) => ch.tier === 'core'));
+    const core = AQ.CH.filter((ch) => ch.tier === 'core');
+    assert.deepEqual([...core.map((ch) => ch.missions.length)], [5, 5, 4, 5, 5, 4, 5]);
+    assert.ok(AQ.CH.slice(0, core.length).every((ch) => ch.tier === 'core'));
   });
   it('the top rank is exactly what finishing core pays', () => {
-    const top = AQ.tiers.ranks().at(-1)[0];
+    const top = AQ.tiers.ranks().at(-1)[0], core = AQ.CH.filter((ch) => ch.tier === 'core');
     assert.equal(top, AQ.tiers.cumulativeXp('core'));
-    assert.equal(top, 10 * AQ.CH.reduce((n, ch) => n + ch.missions.length, 0) + AQ.CH.length * AQ.tiers.chapterBadgeXp);
+    assert.equal(top, 10 * core.reduce((n, ch) => n + ch.missions.length, 0) + core.length * AQ.tiers.chapterBadgeXp);
   });
   it('every scenario tag is in the closed task-tag list', () => {
     for (const [name, s] of Object.entries(AQ.scenarios)) assert.ok(s.tag === undefined || AQ.config.TAGS.includes(s.tag), name);
   });
-  it('the answer, wrong and lazy inputs of chapters 2 to 7 only edit files their scenario ships, so the editor can type them', () => {
+  it('the answer, wrong and lazy inputs of chapters 2 to 15 only edit files their scenario ships, so the editor can type them', () => {
     AQ.CH.slice(1).forEach((ch) => ch.missions.forEach((m) => {
       for (const x of [m.answer, m.wrong, m.lazy]) if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`);
     }));
@@ -52,7 +53,7 @@ describe('every mission of every chapter', () => {
         for (const f of ['title', 'goal', 'explain', 'hint']) assert.ok(typeof m[f] === 'string' && m[f].trim(), f);
         for (const id of m.facts || []) assert.ok(AQ.facts.byId(id), `fact ${id}`);
         if (m.kind !== 'prompt') assert.ok(m.answer && typeof m.answer === 'object' && m.answer.files, 'config answers are setup files');
-        if (m.prompt) assert.deepEqual(AQ.config.parsePrompt(m.prompt, AQ.scenarios[m.scenario]).errors.length, 0, 'the mission prompt parses');
+        if (m.prompt) assert.deepEqual(AQ.config.parsePrompt(m.prompt, AQ.scenarios[m.scenario], AQ.config.parseSetup(AQ.vfs.create(AQ.scenarios[m.scenario].vfs))).errors.length, 0, 'the mission prompt parses');
       });
       // approved: a Plan: first answer pauses until approved, and the pause itself is covered by its own test below
       it('the reference answer passes', () => assert.equal(AQ.runMission(m, m.answer, APPROVED), true));
@@ -80,15 +81,27 @@ describe('every mission of every chapter', () => {
   }));
 });
 
+// A root CLAUDE.md "Done when:" line becomes the default check (E6). Core missions must never hold one, or E6 would change them.
+describe('core missions never put a Done when line in CLAUDE.md', () => {
+  const core = AQ.CH.flatMap((ch, c) => (ch.tier === 'core' ? ch.missions.map((m, i) => [m, c, i]) : []));
+  const done = /^done when:/im;
+  it('neither the starting state of a scenario nor the answer, wrong and lazy inputs have one', () => {
+    for (const [m, c, i] of core) {
+      assert.ok(!done.test(AQ.vfs.create(AQ.scenarios[m.scenario].vfs).read('CLAUDE.md') || ''), `[${c}, ${i}] start`);
+      for (const k of ['answer', 'wrong', 'lazy']) assert.ok(!done.test(AQ.prepare(m, m[k]).setup.memory), `[${c}, ${i}] ${k}`);
+    }
+  });
+});
+
 describe('prompt form fields are shown only once a mission has taught them', () => {
   // field -> [chapter, mission] (both 0-based, as in AQ.CH[chapter].missions[mission]) of the first mission whose card teaches it
-  const TAUGHT = { donewhen: [0, 0], constraints: [0, 1], files: [0, 2], examples: [2, 0], plan: [2, 3] };
+  const TAUGHT = { donewhen: [0, 0], constraints: [0, 1], files: [0, 2], examples: [2, 0], plan: [2, 3], use: [9, 0] };
   const prompts = AQ.CH.flatMap((ch, c) => ch.missions.map((m, i) => [m, c, i])).filter(([m]) => m.kind === 'prompt');
   const from = ([fc, fi], c, i) => c > fc || (c === fc && i >= fi);
   it('every prompt mission lists its fields, and chapter 1 never shows Use, Plan, Examples or Extra', () => {
     for (const [m, c] of prompts) {
       assert.ok(Array.isArray(m.fields) && m.fields.includes('goal'), m.title);
-      for (const hidden of c === 0 ? ['use', 'plan', 'examples', 'extra'] : ['use', 'extra']) assert.ok(!m.fields.includes(hidden), `${m.title} shows ${hidden}`);
+      for (const hidden of c === 0 ? ['use', 'plan', 'examples', 'extra'] : ['extra']) assert.ok(!m.fields.includes(hidden), `${m.title} shows ${hidden}`);
     }
   });
   it('no prompt mission before [2, 0] shows examples and none before [2, 3] shows plan', () => {
@@ -115,7 +128,8 @@ describe('chapter 1: lazy and nearby answers are caught', () => {
     for (const a of ['Done when: read src/price.js', 'Done when: it is done', 'Done when: run npm run lint', 'Done when: run ghost', '']) assert.equal(typeof run(0, 0, a), 'string', a);
     assert.equal(run(0, 0, 'Done when: run npm test\nFiles: src/price.js'), true);
   });
-  it('1.1 a rule that stops the fix fails even with the right check', () => assert.equal(typeof run(0, 0, 'Done when: run npm test\nConstraints: do not edit src/'), 'string'));
+  it('1.1 a Done when in CLAUDE.md alone does not pass: the check reads the typed line', () => assert.equal(typeof run(0, 0, { prompt: '', files: { 'CLAUDE.md': 'Done when: run npm test' } }), 'string'));
+  it('1.1 a rule that stops the fix fails even with the right check',() => assert.equal(typeof run(0, 0, 'Done when: run npm test\nConstraints: do not edit src/'), 'string'));
   it('1.1 the agent fixes its own first mistake only because the check ran', () => {
     const { outcome } = AQ.evaluate(M(0, 0), M(0, 0).answer);
     assert.equal(outcome.status, 'done');
@@ -220,9 +234,9 @@ describe('extras', () => {
   });
   it('every guide example that is a prompt line parses against its own mission scenario', () => {
     for (const g of AQ.GUIDE) for (const [t] of g.ex) {
-      if (/^(Done when|Constraints|Files|Examples|Plan):/.test(t)) {
+      if (/^(Done when|Constraints|Files|Examples|Use|Plan):/.test(t)) {
         const sc = AQ.scenarios[g.sc || 'tidy'];
-        const p = AQ.config.parsePrompt(t, { ...sc, commands: AQ.scenarios.price.commands }, AQ.config.parseSetup(AQ.vfs.create(sc.vfs)));
+        const p = AQ.config.parsePrompt(t, { ...sc, commands: { ...AQ.scenarios.price.commands, ...sc.commands } },AQ.config.parseSetup(AQ.vfs.create(sc.vfs)));
         assert.equal(p.errors.length, 0, t);
       }
     }

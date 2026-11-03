@@ -14,14 +14,16 @@ const RULES = [
   ['command name', new RegExp(`${G}(?:${SAFE.join('|')})${E}`)],
   ['command name before a verb', new RegExp(`${G}(?:${AMBIG.join('|')})(?= (?:${VERB})\\b)`)],
   ['option', new RegExp(`${G}-{1,2}[A-Za-z][\\w-]*${E}`)],
-  ['file name', new RegExp(`${G}(?:[\\w.~-]+/)*[\\w-]+\\.(?:txt|log|sh|csv|md|conf|json|js|sql)${E}`)],
+  ['file name', new RegExp(`${G}(?:[\\w.~-]+/)*[\\w-]+\\.(?:txt|log|sh|csv|md|conf|json|js|sql|yml|yaml)${E}`)],
   ['variable', new RegExp(`${G}\\$(?:[A-Za-z_]\\w*|[?#@*0-9])${E}`)],
-  ['agent command', new RegExp(`${G}npm${E}`)],
-  ['project path', new RegExp(`${G}(?:src|data|docs|tests|migrations|\\.claude)/`)],
+  ['agent command', new RegExp(`${G}(?:npm|git|gh)${E}`)],
+  ['project path', new RegExp(`${G}(?:src|data|docs|tests|migrations|ci|generated|git|\\.claude|\\.github)/`)],
   ['secret file', new RegExp(`${G}\\.env${E}`)],
   ['prompt field', new RegExp(`${G}(?:Goal|Files|Examples|Use|Plan|Constraints|Done when|Extra):`)],
   ['field name', new RegExp(`${G}(?:Done when|Constraints)${E}`)],
   ['rule', new RegExp(`${G}(?:(?:do not|ask before|only) (?:edit|read|run|call|send|delete)|max \\d+ files?)${E}`)],
+  ['hook line', new RegExp(`${G}after edit${E}`)],
+  ['allow line', new RegExp(`${G}allow (?:edit|read|run|call|send|delete)${E}`)],
 ];
 const prose = (h) => String(h).replace(/<code>.*?<\/code>|<kbd>.*?<\/kbd>|<pre[^>]*>.*?<\/pre>/gs, '§').replace(/<[^>]+>/g, ' ').replace(/&(?:gt|lt|amp|quot);/g, '§');
 
@@ -48,6 +50,17 @@ describe('bareMentions (the agent rules)', () => {
     assert.equal(bareMentions('the .env file').length, 1);
     assert.equal(bareMentions('the <code>.claude/</code> folder and <code>.env</code>').length, 0);
     assert.equal(bareMentions('The Files panel, the Run panel, and the rules you write.').length, 0);
+    assert.equal(bareMentions('the deploy.yaml file').length, 1);
+    assert.equal(bareMentions('the <code>ci.yml</code> file').length, 0);
+    assert.equal(bareMentions('git push').length, 1);
+    assert.equal(bareMentions('gh pr list').length, 1);
+    assert.equal(bareMentions('<code>git push</code> and <code>gh pr list</code>').length, 0);
+    for (const p of ['ci/', 'generated/', 'git/', '.github/']) assert.equal(bareMentions(`open ${p} now`).length, 1, p);
+    assert.equal(bareMentions('open <code>generated/</code> and <code>.github/</code>').length, 0);
+    assert.equal(bareMentions('add an after edit line').length, 1);
+    assert.equal(bareMentions('add <code>after edit src/ run npm test</code>').length, 0);
+    assert.equal(bareMentions('allow run npm test').length, 2);
+    assert.equal(bareMentions('<code>allow run npm test</code>').length, 0);
     assert.equal(bareMentions('<code>Done when: run npm test</code> and <code>do not edit src/</code>').length, 0);
   });
 });
