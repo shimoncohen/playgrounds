@@ -100,7 +100,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .anat{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
 .tok{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;max-width:100%}
 .tok b{font-family:var(--font-mono);font-weight:600;font-size:13px;padding:4px 8px;border-radius:7px;border:1.5px solid currentColor;white-space:pre;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.tok span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tok span{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .k-fn{color:var(--accent-text)} .k-str{color:var(--t-str)} .k-num{color:var(--t-int)} .k-var{color:var(--t-dict)} .k-kw{color:var(--blue)} .k-op{color:var(--err)} .k-br{color:var(--muted)} .k-cm{color:var(--t-none)}
 
 /* completion */
