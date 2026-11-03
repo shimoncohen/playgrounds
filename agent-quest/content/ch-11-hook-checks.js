@@ -38,7 +38,7 @@ AQ.CH.push({
         'The line <code>after edit src/ run npm run format</code> runs the formatter after every edit under <code>src/</code>, and the file comes out in the project\'s style.',
         'A formatter changes the file mechanically. A lint check only reports a problem, and then the agent has to repair the file itself.',
         'The Run panel shows the difference: with the formatter there is no repair step, and with lint there is one.',
-        '<code>npm run lint</code> as the hook would also end well, but only because the agent repaired the tabs on its own.'
+        '<code>npm run lint</code> as the hook makes the run succeed, but only because the agent repaired the tabs on its own. The mission still wants the formatter hook.'
       ],
       explain:'Use a check when a person or the agent has to decide how to fix the problem, and use a formatter when the fix is mechanical. A formatter hook fixes the file the moment it changes, every time, with no repair left to the agent. That saves a round of the agent working it out.',
       hint:'The command that rewrites the file is <code>npm run format</code>. Hook it to edits under <code>src/</code>.',

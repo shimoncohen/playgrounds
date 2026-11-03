@@ -41,7 +41,7 @@ AQ.CH.push({
         'A target covers itself and everything under it. A line <code>allow edit src/</code> would also let the job rewrite <code>src/legacy/old.js</code>, and <code>allow run npm</code> would let it deploy.',
         'Without a line for the check, the fix is written but nobody may run <code>npm test</code>, and the run ends <code>unverified</code>. The Run panel names the reason of each skipped action.'
       ],
-      explain:'In a chat you answer each question the agent asks. A job cannot be asked, so you answer in advance: a list of exactly the actions it may take. Anything off the list is skipped, which is the safe default. Keep each line as narrow as the job: a file, not a folder, and one command, not a family of them. The practice lists only edits, runs and calls; a real job has more kinds of permission.',
+      explain:'In a chat you answer each question the agent asks. A job cannot be asked, so you answer in advance: a list of exactly the actions it may take. Anything off the list is skipped, which is the safe default. Keep each line as narrow as the job: a file, not a folder, and one command, not a family of them. A real job has more kinds of permission than this practice shows.',
       hint:'Write one line for the edit and one for the check, each as narrow as it can be.',
       answer:{files:{'.claude/permissions.txt':'allow edit src/price.js\nallow run npm test\n'}},
       wrong:{files:{'.claude/permissions.txt':'allow edit src/\nallow run npm\n'}},
@@ -65,7 +65,11 @@ AQ.CH.push({
       hint:'Add one <code>Files</code> line to the command that names the log and the file to fix.',
       answer:{files:{[JOBFILE]:'Goal: fix the rounding bug in src/tax.js\nFiles: ci/last-run.log, src/tax.js\nDone when: run npm test\n'}},
       wrong:{files:{[JOBFILE]:'Goal: fix the rounding bug in src/tax.js\nFiles: src/tax.js\nDone when: run npm test\n'}},
-      lazy:{files:{}}
+      lazy:{files:{}},
+      check:(o,c)=>{
+        if(o.steps.some(s=>s.type==='skip'&&s.by==='not seen yet'&&s.target==='src/tax.js'))return 'The agent never read the log the last run left. Point the job at it.';
+        return AQ.verdict(o,c);
+      }
     }
   ]
 });

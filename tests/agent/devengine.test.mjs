@@ -153,7 +153,7 @@ describe('E5: unattended runs', () => {
       const { outcome } = run('Plan: first\nDone when: run npm test', { scn: un, approved });
       assert.equal(outcome.status, 'blocked');
       assert.deepEqual(J(outcome.steps.map((s) => s.type)), ['context', 'stall']);
-      assert.deepEqual(J(outcome.steps[1]), { type: 'stall', what: 'plan' });
+      assert.deepEqual(J(outcome.steps[1]), { type: 'stall' });
       assert.deepEqual(J(outcome.calls), []);
     }
   });

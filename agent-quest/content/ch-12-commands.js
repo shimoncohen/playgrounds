@@ -20,7 +20,7 @@ AQ.CH.push({
         'The file holds lines in the same shape as a prompt: a <code>Goal:</code> line is already there, and you add the other two.',
         'The Run panel shows a command step that says how many lines the command added to the prompt.'
       ],
-      explain:'A command is a prompt written once. Its lines join the prompt of every run that calls it by name, so the whole team gets the same rule and the same check, not whatever each person remembers to type. It is the same outcome as the first time you guarded <code>migrations/</code> in 3.3, with a new place to keep it. This practice has no command arguments: a command is just its lines, added to the prompt.',
+      explain:'A command is a prompt written once. Its lines join the prompt of every run that calls it by name, so the whole team gets the same rule and the same check, not whatever each person remembers to type. It is the same outcome as the first time you guarded <code>migrations/</code> in 3.3, with a new place to keep it. This practice has no command arguments: a command is only its lines, added to the prompt.',
       hint:'Open <code>.claude/commands/fix.md</code> and add one rule line and one check line under the goal.',
       answer:{files:{'.claude/commands/fix.md':'Goal: fix the rounding bugs in the shop totals\nConstraints: do not edit migrations/\nDone when: run npm test\n'}},
       wrong:{files:{'.claude/commands/fix.md':'Goal: fix the rounding bugs in the shop totals\nConstraints: only edit src/price.js\nDone when: run npm test\n'}},
@@ -39,7 +39,7 @@ AQ.CH.push({
         'The line <code>Use: fix</code> adds the lines of <code>fix.md</code> to your prompt: a goal, the rule that guards <code>migrations/</code> and the check that runs the tests.',
         '<code>Use</code> now names a saved command as well as a helper. The name is the file name without <code>.md</code>.',
         '<code>docs</code> only lets the agent edit <code>docs/</code>, so the fix is never made. <code>audit</code> asks for a plan first and has no rule or check.',
-        'Typing the same rule and check by hand also works, but then you did not use the shelf. The mission wants the command called by name.'
+        'Typing the same rule and check by hand makes the run succeed, but then you did not use the shelf. The mission wants the command called by name with <code>Use</code>.'
       ],
       explain:'Reading what a command does is part of using it. The names are only labels: <code>fix</code> carries the rule and the check, <code>docs</code> narrows the agent to one folder and <code>audit</code> only asks for a plan. A command saves typing, and it saves you from forgetting a line. A team that shares the shelf runs the same guarded job every time.',
       hint:'Open the three files in the Files panel and see which one guards the database folder and runs the tests.',

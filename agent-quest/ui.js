@@ -19,6 +19,7 @@ UI.rove=(list,sel)=>{
 };
 
 const TAGS={context:'context',skill:'skill',command:'command',plan:'plan',approved:'plan',delegate:'helper',skip:'skipped',hook:'hook',stall:'stalled'};
+// engine/provider.js has a WHY map with the same keys in the agent's voice; add a key to both.
 const WHY={'not seen yet':'the agent has not read what it needs yet','not connected':'its server is not connected','no one to ask':'nobody is there to approve it'};
 const describe=s=>{
   if(s.type==='hook')return 'Hook after edit '+s.target+': ran '+s.run+' ('+(s.ok?'passed':s.why||'failed')+')';

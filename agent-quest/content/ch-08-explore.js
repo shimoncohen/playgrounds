@@ -12,7 +12,7 @@ AQ.CH.push({
   missions:[
     {
       title:'Look without touching',scenario:'survey',kind:'prompt',fields:ALL,
-      goal:'Send the agent to <b>explore</b>: to read around the cart code, find out why the cart total is off, and write what it finds into <code>NOTES.md</code>. It also wants to "just fix" the code it finds. Limit it so the notes file is the only file it may change.',
+      goal:'Send the agent to <b>explore</b>: to read around the cart code, find out why the cart total is off, and write what it finds into <code>NOTES.md</code>. It also wants to "fix it right away" in the code it finds. Limit it so the notes file is the only file it may change.',
       how:[
         'The line <code>Constraints: only edit NOTES.md</code> lets the agent change one file, the notes, and skips every other edit.',
         '<code>only</code> is the opposite of <code>do not</code>: instead of listing what is banned, it names the one thing that is allowed.',

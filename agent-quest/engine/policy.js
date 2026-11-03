@@ -74,7 +74,7 @@ function run(scenario,setup,prompt,opts={}){
   for(const s of skipped)steps.push({type:'skill',name:s.name,loaded:false,why:s.why});
   for(const c of prompt.commands)steps.push({type:'command',name:c.name,lines:c.lines});
   const script=scenario.script||[];
-  if(prompt.plan&&scenario.unattended){steps.push({type:'stall',what:'plan'});return outcome('blocked');}
+  if(prompt.plan&&scenario.unattended){steps.push({type:'stall'});return outcome('blocked');}
   if(prompt.plan){
     steps.push({type:'plan',files:script.filter(a=>a.verb==='edit').map(a=>a.target)});
     if(!opts.approved)return outcome('awaiting-approval');

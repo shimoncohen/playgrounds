@@ -19,7 +19,7 @@ AQ.CH.push({
       how:[
         'The two lines <code>Use: scout</code> and <code>Done when: run npm test</code> hand the file search to the helper <code>scout</code>, then prove the fix with the tests.',
         '<code>Use</code> names a helper from <code>.claude/agents/</code>. The helper reads the project in its own context, so none of its reading counts toward what the main agent holds.',
-        'The helper sends back the one file that matters, <code>src/price.js</code>, and the main agent reads just that.',
+        'The helper sends back the one file that matters, <code>src/price.js</code>, and the main agent reads only that.',
         'Leave the <code>Files</code> line out. With the file already named there is nothing left to search, and the helper has no work to do.'
       ],
       explain:'To delegate is to hand a job to a helper. A subagent has a context of its own, so the ten files it reads fill its window and not yours. What comes back is short: the file the fix is in. A helper only earns its keep while there is something to search. Name the file yourself and the search is already done.',

@@ -15,7 +15,7 @@ const SAMPLE = {
   act: { type: 'act', verb: 'edit', target: 'src/price.js', ok: true, tag: 'script' },
   skip: { type: 'skip', verb: 'edit', target: 'src/price.js', by: 'your constraint' },
   hook: { type: 'hook', when: 'after', target: 'src/price.js', run: 'npm run lint', ok: false },
-  stall: { type: 'stall', what: 'plan' },
+  stall: { type: 'stall' },
 };
 const say = (step) => AQ.provider.sim.complete([], { step }).text;
 

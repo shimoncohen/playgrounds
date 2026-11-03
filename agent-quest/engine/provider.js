@@ -4,6 +4,7 @@
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const VERB={read:'read',edit:'edited',delete:'deleted',run:'ran',call:'called',send:'sent'};
+// ui.js has a WHY map with the same keys for the Run panel; add a key to both.
 const WHY={'not seen yet':'I had not read what it needs yet','not connected':'its server is not connected','no one to ask':'nobody is there to approve it'};
 
 function narrate(s){

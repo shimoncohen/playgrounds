@@ -62,7 +62,7 @@ AQ.CH.push({
         'A rule must name the exact command. <code>do not run git push</code> alone is not a command this project has.',
         '<code>ask before run '+PUSH+'</code> stops the push too. In this practice run nobody answers, so the push is not carried out.'
       ],
-      explain:'The Run panel shows the order: the tests run, then the push to your branch, then the pull request. The tests run before the push, so the pull request carries a change that already passed them. The agent never pushes to <code>main</code> directly, because the pull request is where someone else reads the change before it lands.',
+      explain:'The tests run before the push, so the pull request carries a change that already passed them. The agent never pushes to <code>main</code> directly, because the pull request is where someone else reads the change before it lands. Type the rule in your prompt: this mission looks for it there, not in the files of chapter 7.',
       hint:'Ban the exact command that pushes to <code>main</code>. The push to its own branch and the PR command must stay allowed.',
       answer:'Constraints: do not run '+PUSH,
       wrong:'Constraints: do not run gh pr create',

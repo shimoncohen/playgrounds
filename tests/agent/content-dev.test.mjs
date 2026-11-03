@@ -126,8 +126,8 @@ const CASES = [
     fail: [{}, MCP(''), MCP('browse: open, screenshot'), MCP('browser: open, click'), MCP('browser: shot'), MCP('screenshot: browser'), MCP('tracker: screenshot'),
       F({ 'CLAUDE.md': 'Done when: call browser.screenshot' }), F({ 'CLAUDE.md': 'Done when: run npm test' }), F({ '.claude/mcp.txt': 'browser: screenshot', '.claude/permissions.txt': 'deny call browser.screenshot' }), F({ '.claude/mcp.json': 'browser: screenshot' })] },
   { at: [12, 2],
-    pass: [MCP('tracker: list_issues, comment'), MCP('tracker: list_issues, create_issue, comment'),MCP('tracker: comment'), MCP('tracker: comment, list_issues')],
-    fail: [{}, MCP(''), MCP('tracker: list_issues'), MCP('tracker: list_issues, comment, close'), MCP(TRACKER), MCP('tracker: close'), MCP('tracker: list_issues, create_issue'),
+    pass: [MCP('tracker: list_issues, comment'), MCP('tracker: list_issues, create_issue, comment'), MCP('tracker: comment, list_issues')],
+    fail: [{}, MCP(''), MCP('tracker: list_issues'), MCP('tracker: comment'), MCP('tracker: list_issues, comment, close'), MCP(TRACKER), MCP('tracker: close'), MCP('tracker: list_issues, create_issue'),
       F({ '.claude/permissions.txt': 'deny call tracker.close' }), F({ '.claude/permissions.txt': 'deny call tracker.close', '.claude/mcp.txt': 'tracker: list_issues, comment, close' }),
       F({ '.claude/hooks.txt': 'before call tracker.close' }), F({ 'CLAUDE.md': 'do not call tracker.close' })] },
 
@@ -555,7 +555,7 @@ describe('14.1 Nobody there to approve', () => {
     const r = AQ.evaluate(M(13, 0), {}, { approved: true });
     assert.ok(!r.awaiting);
     assert.equal(r.outcome.status, 'blocked');
-    assert.ok(r.outcome.steps.some((s) => s.type === 'stall' && s.what === 'plan'));
+    assert.ok(r.outcome.steps.some((s) => s.type === 'stall'));
     assert.match(go(13, 0, M(13, 0).wrong).result, /waited for an approval nobody could give/);
     assert.match(go(13, 0, JOB('')).result, /never finished a checked fix/);
     assert.match(go(13, 0, JOB(PG)).result, /never finished a checked fix/);

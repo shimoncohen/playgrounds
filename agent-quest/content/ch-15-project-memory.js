@@ -38,7 +38,7 @@ AQ.CH.push({
     },
     {
       title:'Fix a default that never runs',scenario:'memtypo',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'The root <code>CLAUDE.md</code> already has a <code>Done when</code> line, yet runs still end unverified. Look at the line the editor shows under the file: it says there is no default check. Find out why, and repair the line. Do not write a new one next to it.',
+      goal:'The root <code>CLAUDE.md</code> already has a <code>Done when</code> line, yet runs still end unverified. Look at the line the editor shows under the file: it says there is no default check. Find out why, and repair the line.',
       how:[
         'Changing the root line to <code>Done when: run npm run verify</code> repairs it: the command is now one the project has, so the line parses and becomes the default check.',
         'A line that does not parse is not an error here. It is quietly left out and only costs tokens, which is why the count under the file says "no default check".',
