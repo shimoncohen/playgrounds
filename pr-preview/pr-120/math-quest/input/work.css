@@ -1,0 +1,32 @@
+.mq-work{display:grid;gap:12px;padding:16px;background:var(--surface,#F7F9FB);border:1px solid var(--line,#C4CFDA);border-radius:14px;min-width:0}
+.mq-work-top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.mq-q{font-size:1.3em;overflow-x:auto;overflow-y:hidden;min-width:0;max-width:100%}
+.mq-switch{display:inline-flex;align-items:center;gap:8px;min-height:40px;font-weight:600;font-size:14px;cursor:pointer}
+.mq-switch input{width:20px;height:20px;margin:0;accent-color:var(--accent,#E5B42A)}
+.mq-steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mq-step{display:grid;grid-template-columns:auto minmax(0,1fr) 1.6em;grid-template-areas:"eq field mark" ". prev ." ". why .";gap:4px 8px;align-items:center}
+.mq-eq{grid-area:eq;font-size:1.3em;font-weight:700}
+.mq-field{grid-area:field;min-width:0;width:100%;box-sizing:border-box;min-height:44px;font:1.1em var(--font-mono,monospace);background:var(--bg,#E7ECF1);color:var(--ink,#14202A);border:1px solid var(--line,#C4CFDA);border-radius:8px;padding:6px 10px}
+math-field.mq-field{font-family:inherit;font-size:1.3em}
+math-field.mq-field::part(menu-toggle){display:none}
+.mq-field:focus-visible,math-field.mq-field:focus-within{outline:2px solid var(--accent,#E5B42A);outline-offset:1px}
+.mq-mark{grid-area:mark;font-size:1.3em;font-weight:800;text-align:center}
+.mq-step.ok .mq-mark{color:var(--ok,#1F7A3A)}
+.mq-step.bad .mq-mark{color:var(--accent-text,#9A3B00)}
+.mq-prev{grid-area:prev;min-height:1.2em;color:var(--muted,#536677);overflow-x:auto;overflow-y:hidden}
+.mq-why{grid-area:why;font-size:14px;overflow-wrap:anywhere}
+.mq-why:empty,.mq-prev:empty{display:none}
+.mq-keypad{display:flex;flex-wrap:wrap;gap:8px}
+.mq-keypad[hidden]{display:none}
+.mq-keypad .btn{min-width:44px;min-height:44px;font:600 1.1em var(--font-mono,monospace)}
+.mq-result{margin:0;font-weight:700}
+.mq-result:empty{display:none}
+.mq-notes-lab{display:block;font-weight:600;margin-bottom:4px}
+.mq-notes{width:100%;box-sizing:border-box;font:inherit;background:var(--bg,#E7ECF1);color:var(--ink,#14202A);border:1px solid var(--line,#C4CFDA);border-radius:8px;padding:8px}
+/* MathLive's keyboard covers half a phone screen: pin a short scene (no sliders, which sat cut off over the field) and pad the page so the field can scroll above the keyboard. */
+@media (max-width:600px){
+  body.mq-kbd{padding-bottom:50vh}
+  body.mq-kbd .mq-scene{position:sticky;top:0;max-height:40vh;overflow:hidden;z-index:2;box-shadow:0 10px 14px -8px rgb(0 0 0 / .45)}
+  body.mq-kbd .mq-scene :is(.mq-params,.mq-anim){display:none}
+  body.mq-kbd .mq-stage{max-width:min(100%,calc((40vh - 180px) / .75))}
+  body.mq-kbd .mq-field{scroll-margin-top:calc(40vh + 96px)}}
