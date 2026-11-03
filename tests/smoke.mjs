@@ -72,7 +72,7 @@ const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(
 test('landing page links to every playground', async () => {
   const { ctx, page, errors } = await open(base + '/');
   const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs.sort(), NAMES.map(n => `${n}-quest/`).sort());
+  assert.deepEqual(hrefs.sort(), [...NAMES.map(n => `${n}-quest/`), 'math-quest/'].sort());
   for (const h of hrefs) {
     const r = await page.request.get(`${base}/${h}`);
     assert.equal(r.status(), 200, h);
@@ -97,6 +97,37 @@ test('landing page shows saved XP', async () => {
   await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
   await page.reload();
   assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
+  await ctx.close();
+});
+
+test('landing page sums Math Quest XP', async () => {
+  const { ctx, page } = await open(base + '/');
+  await page.evaluate(() => {
+    localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10 }));
+    localStorage.setItem('math-algebra-v1', JSON.stringify({ xp: 15 }));
+  });
+  await page.reload();
+  assert.match(await page.textContent('a[href="math-quest/"] .xp'), /25 XP/);
+  await ctx.close();
+});
+
+test('math hub loads cleanly', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('.tcard');
+  assert.equal((await page.$$('.tcard')).length, 2);
+  assert.match(await page.textContent('#next'), /Order of operations/);
+  assert.ok(await page.isVisible('#mapList ol'), 'list hidden on a phone');
+  assert.equal((await page.$$('#mapList ol')).length, 2);
+  assert.deepEqual(await page.$$eval('#mapList ol:last-of-type li', l => l.length), 1);
+  assert.match(await page.textContent('#mapList ol:last-of-type li .needs'), /Needs first: Order of operations \(Arithmetic\)/);
+  assert.ok(!(await page.isVisible('svg.map')), 'map shown on a phone');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'horizontal overflow');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(await page.isVisible('svg.map'), 'map hidden on desktop');
+  assert.ok(await page.$eval('#mapList', e => e.getBoundingClientRect().width <= 1), 'list visible on desktop');
+  await page.click('.tcard button');
+  assert.ok(await page.isVisible('#trackView svg.map'), 'track view missing');
+  assert.deepEqual(errors, []);
   await ctx.close();
 });
 
