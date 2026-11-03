@@ -47,6 +47,12 @@ const FIRST = {
   // 8.3 defines it in one sentence; the chapter 8 intro and 8.1 and 8.2 must not use it
   'pull request': [/\bpull request\b/i, 7, 2],
   PR: [/\bPR\b/, 7, 2],
+  'Use:': [/\bUse:/, 9, 0],
+  delegate: [/\bdelegat/i, 9, 0],
+  parallel: [/\bparallel\b/i, 9, 2],
+  worktree: [/\bworktrees?\b/i, 9, 2],
+  'after edit': [/\bafter edit\b/, 10, 0],
+  formatter: [/\bformatter\b/i, 10, 1],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),

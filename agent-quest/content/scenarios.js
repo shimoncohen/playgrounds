@@ -285,8 +285,68 @@ const ship={
   accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':o.vfs.read('git/pushed.txt')===null||o.vfs.read('git/pr.txt')===null?'No pull request was opened.':true
 };
 
+/* Helpers read the explore list in their own context (policy.js). The main agent then reads only the focus, so its peak stays small.
+   Sizes (chars/4, measured in tests/agent/content-dev.test.mjs): one helper over haystack holds under 85% of the window, one over huge
+   goes past it, and two helpers split huge 3 + 2 and each fit. */
+const searchable={
+  task:'Fix the rounding bug in the shop\'s price code. Nobody remembers which file holds it.',
+  commands,tools:[],
+  script:[{...needsFix,write:FIXED}],
+  focus:['src/price.js'],
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':o.tokens.peak>PEAK?'The agent fixed the bug, but it held about '+o.tokens.peak+' tokens at once. The most allowed here is '+PEAK+'.':true
+};
+const haystack={
+  ...searchable,
+  vfs:{...small,'src/old/price.js':'// old copy of the price code, no longer used\n'+BUG,'src/report.js':filler('report',10),'src/export.js':filler('export',10),'src/format.js':filler('format',10),'src/cart.js':filler('cart',10),'docs/api.md':filler('api',10),'docs/notes.md':filler('notes',10),'.claude/agents/scout.md':sub('scout','small')},
+  explore:['docs/api.md','docs/notes.md','src/cart.js','src/export.js','src/format.js','src/old/price.js','src/price.js','src/report.js','src/util.js','tests/price.test.js']
+};
+const crewvfs={'.claude/agents/scout.md':sub('scout','small'),'.claude/agents/analyst.md':sub('analyst','standard'),'.claude/agents/architect.md':sub('architect','large')};
+const team={
+  ...searchable,
+  vfs:{...small,'src/report.js':filler('report',20),'src/export.js':filler('export',20),'docs/notes.md':filler('notes',20),...crewvfs},
+  explore:['docs/notes.md','src/report.js','src/export.js','src/price.js']
+};
+const huge={
+  ...searchable,
+  vfs:{...small,'src/report.js':filler('report',50),'src/export.js':filler('export',50),'docs/notes.md':filler('notes',50),'docs/api.md':filler('api',50),'.claude/agents/scout.md':sub('scout','small'),'.claude/agents/scout2.md':sub('scout2','small'),'.claude/agents/architect.md':sub('architect','large')},
+  explore:['src/price.js','src/report.js','src/export.js','docs/notes.md','docs/api.md']
+};
+
+const HOOKS='# before VERB TARGET\n# after edit PATH run COMMAND\n';
+const FIXEDLOG=FIXED.replace('  const sum','  console.log(items);\n  const sum');
+const TABBED=FIXED.replace(/^ {2}/gm,'\t');
+const tabbed=v=>/\t/.test(v.read('src/price.js')||'');
+/* the fix works first time but leaves a debug line; the lint command rejects it and the correction removes it, once and for good */
+const linty={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'.claude/hooks.txt':HOOKS},
+  commands:{...commands,'npm run lint':v=>logged(v)?{ok:false,out:'console.log found in src/price.js'}:{ok:true,out:'no problems found'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXEDLOG}],
+  correction:v=>logged(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':logged(o.vfs)?'The fix works, but a debug console.log still ships in src/price.js.':true
+};
+const messy={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'.claude/hooks.txt':HOOKS},
+  commands:{...commands,
+    'npm run lint':v=>tabbed(v)?{ok:false,out:'src/price.js is indented with tabs'}:{ok:true,out:'no problems found'},
+    'npm run format':v=>v.write('src/price.js',(v.read('src/price.js')||'').replace(/\t/g,'  '))?{ok:true,out:'formatted src/price.js'}:{ok:false,out:''}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:TABBED}],
+  correction:v=>tabbed(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':tabbed(o.vfs)?'The fix works, but src/price.js is indented with tabs and the project uses spaces.':true
+};
+const both={
+  ...linty,
+  commands:{...linty.commands,'npm run deploy':()=>({ok:true,out:'deployed'})},
+  script:[...linty.script,{verb:'run',target:'npm run deploy'}],
+  hidden:[{verb:'run',target:'npm run deploy'}]
+};
+
 AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,scope,ledger,rollout,legacy,twofolders,lateread,legacyheavy,
   release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit,
-  survey,creep,handoff,gamed,gate,ship};
+  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both};
 AQ.PEAK=PEAK;
 })();

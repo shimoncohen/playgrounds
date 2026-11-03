@@ -82,7 +82,7 @@ AQ.CH.push({
         '<code>model:</code> is the size: <code>small</code>, <code>standard</code> or <code>large</code>. Pick the smallest that can do the job.',
         'A simple lookup does not need a big model, so the cheapest size loses nothing here.'
       ],
-      explain:'Cost grows with the model size, and a subagent runs the model you give it each time. Handing simple work to a small model is the easiest saving there is. Removing the helper would save even more, but then the job has no helper. The goal is the right size, not no helper.',
+      explain:'Cost grows with the model size, and a subagent costs the price of the model you give it whenever it runs. Handing simple work to a small model is the easiest saving there is. Removing the helper would save even more, but then the job has no helper. The goal is the right size, not no helper.',
       hint:'Open <code>.claude/agents/helper.md</code> in the Files panel and change the model line only.',
       answer:{files:{'.claude/agents/helper.md':'name: helper\nmodel: small\n'}},
       wrong:{files:{'.claude/agents/helper.md':'name: helper\nmodel: standard\n'}},
@@ -90,7 +90,7 @@ AQ.CH.push({
       check:(o,c)=>{
         if(!c.setup.subagents.some(s=>s.name==='helper'))return 'The helper is gone. Keep it, with a cheaper model.';
         const n=AQ.config.agentCost(c.setup);
-        return n>CEILING?'The helper costs '+n+' units each time it runs. The goal is '+CEILING+' or fewer.':AQ.verdict(o,c);
+        return n>CEILING?'The helper costs '+n+' units whenever it runs. The goal is '+CEILING+' or fewer.':AQ.verdict(o,c);
       }
     }
   ]

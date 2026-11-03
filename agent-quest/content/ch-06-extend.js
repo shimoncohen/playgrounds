@@ -82,7 +82,7 @@ AQ.CH.push({
         'Setting <code>finder</code> to <code>model: small</code> and <code>architect</code> to <code>model: standard</code> costs 1 and 3 units, which is 4 in total and under the limit.',
         '<code>finder</code> only searches, so the smallest model does it well.',
         '<code>architect</code> makes hard calls, so it keeps a stronger model than the smallest.',
-        'The total is the sum over all subagents, so every helper counts.'
+        'The total is the sum over all subagents: the most a run could cost if it used every helper.'
       ],
       explain:'Cost grows with the model size, so give each helper the smallest model that can still do its job. Simple lookups go to a small model. Hard thinking should not. A saving that wrecks quality is not a saving. A plugin bundles skills, subagents, hooks and MCP servers so they install as one unit; this practice only has files to edit, so plugins are text only here.',
       hint:'Edit both files in <code>.claude/agents/</code>. The helper that only searches can go smallest, and the one that designs should not.',
@@ -94,7 +94,7 @@ AQ.CH.push({
         if(!by('finder')||!by('architect'))return 'A helper is gone. Keep both, with cheaper models.';
         if(by('architect').model==='small')return 'The architect makes hard design calls, and the smallest model is too weak for that. Cut the finder\'s cost, not its quality.';
         const n=AQ.config.agentCost(c.setup);
-        return n>CEILING?'The helpers cost '+n+' units each time they run. The goal is '+CEILING+' or fewer.':AQ.verdict(o,c);
+        return n>CEILING?'The helpers would cost '+n+' units if every one of them ran. The goal is '+CEILING+' or fewer.':AQ.verdict(o,c);
       }
     }
   ]
