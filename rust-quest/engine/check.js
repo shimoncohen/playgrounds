@@ -76,7 +76,8 @@ RQ.check=ast=>{
 
   // a reference type with no lifetime written: in a return type that needs lifetime elision (E0106/E0515), which is not modeled
   const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'?bareRef(n.ty):false;
-  function tyOf(n){
+  // `top` is set only for a fn's whole return type (and a const's type): that is the one place `&'static str` is checked against its leaves
+  function tyOf(n,top){
     if(n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn){
       const s=n.segs[0].name;
       if(isInt(s))return T.int(s);
@@ -89,11 +90,11 @@ RQ.check=ast=>{
     if(n.t==='Ref'){
       const to=n.ty,isStr=to.t==='Path'&&to.segs.length===1&&!to.segs[0].args&&to.segs[0].name==='str';
       if(to.t==='Ref')return unsup('reference to reference',n.line);
-      if(n.lt&&!(n.lt==='static'&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);
+      if(n.lt&&!(top&&n.lt==='static'&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);
       if(isStr)return n.mut?unsup('reference',n.line):T.str;
       return mkRef(n.mut,tyOf(to));
     }
-    if(n.t==='Tuple')return n.tys.length?T.tuple(n.tys.map(tyOf)):T.unit;
+    if(n.t==='Tuple')return n.tys.length?T.tuple(n.tys.map(x=>tyOf(x))):T.unit;
     if(n.t==='Array'){
       const l=n.len;
       if(l.t!=='Lit'||l.kind!=='int'||BigInt(l.v)>BigInt(MAX_ARRAY))return unsup('array length',n.line);
@@ -115,13 +116,13 @@ RQ.check=ast=>{
         else names.add(p.pat.name);
         return {name:ok?p.pat.name:'_',mut:ok&&p.pat.mut,ty:tyOf(p.ty),pat:p.pat};
       });
-      const ret=it.ret?tyOf(it.ret):T.unit;
+      const ret=it.ret?tyOf(it.ret,true):T.unit;
       if(it.ret&&bareRef(it.ret))unsup('lifetime elision',it.ret.line);
       if(it.name==='main'&&(params.length||it.ret))unsup('main signature',it.line);
       if(!it.body)syn(it.line,it.col,'free function without a body');
       if(defined(it))fns.set(it.name,{node:it,params,ret});
     }else if(it.t==='Const'){
-      const ty=tyOf(it.ty);
+      const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
     }else if(ITEM[it.t])unsup(ITEM[it.t],it.line);
     else if(!['Extern','MacroRules','Union'].includes(it.t))unsup(it.t,it.line);

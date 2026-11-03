@@ -92,7 +92,13 @@ describe('the checker accepts the modeled String and reference shapes', () => {
   it('&str as a param and &\'static str as a return', () => {
     accepts('    show("a");', 'fn show(s: &str) {}');
     accepts('    let s = name();', "fn name() -> &'static str { \"a\" }");
-    accepts("    show(\"a\");", "fn show(s: &'static str) {}");
+    accepts('    let s = S;', "const S: &'static str = \"a\";");
+  });
+  it("&'static str is modeled only as a fn's whole return type", () => {
+    assert.equal(un('    show("a");', "fn show(s: &'static str) {}"), 'explicit lifetime@1');
+    assert.equal(un('    let s: &\'static str = "a";'), 'explicit lifetime@3');
+    assert.equal(un('', "fn f() -> (&'static str, i32) { (\"a\", 1) }"), 'explicit lifetime@1');
+    assert.equal(un('    let t = String::from("a");\n    show(t.as_str());', "fn show(s: &'static str) {}"), 'explicit lifetime@1');
   });
   it('String is printable with {} and {:?}, and so are references', () => {
     accepts('    let s = String::new();\n    println!("{} {:?}", s, s);\n    let r = &s;\n    println!("{r} {r:?}");');

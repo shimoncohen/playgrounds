@@ -136,7 +136,7 @@ const HINTS={
   'method call':'Only `len`, `clone`, `as_str` and `push_str` on a `String` (and `len` on a `&str`) are modeled for now.','field access':'Only the numbered fields of a tuple, like `t.0`, are modeled for now.',slice:LATER,
   reference:'Only `&T` and `&mut T` on a `String` or a number are modeled, and `&str` for text. Use one of those, or pass the value itself.',
   dereference:'`*` works on a reference, like `*r` where `r` is a `&i32` or `&mut i32`. This value is not a reference.',
-  'explicit lifetime':'Lifetime names like `\'a` are not modeled. Write `&T` and let Rust work the lifetime out, or use `&\'static str` for a string literal.',
+  'explicit lifetime':'Lifetime names like `\'a` are not modeled. Write `&T` and let Rust work the lifetime out, or return `&\'static str` from a `fn` for a string literal. `&\'static str` is modeled only as the return type of a `fn`.',
   'lifetime elision':'A function that returns a reference is not modeled yet. Return an owned value, like a `String`, instead.',
   'reference coercion':'Rust Quest only converts a `&String` into a `&str` for you. Pass the same kind of reference the function asks for.',
   'reference to reference':'A reference to a reference, like `&&str` or `&t` where `t` is already a `&str`, is not modeled. Pass `t` itself instead.',
