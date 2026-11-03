@@ -2199,10 +2199,40 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
+test('agent-quest: the rail shows 15 chapters, and Use is on the form from mission 10.1', async () => {
+  const o = await agentPage({}, seedAt(9, 0));
+  const { page } = o;
+  assert.equal(await page.locator('#chapters .chap').count(), 15);
+  assert.equal(await page.isVisible('#pf-use'), true);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the editor counts a root Done when as the default check, and only for the root file', async () => {
+  const o = await agentPage({}, seedAt(14, 0));
+  const { page } = o;
+  const rules = () => page.textContent('#fileEditor .rules');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', 'Done when: run npm test');
+  assert.match(await rules(), /1 acts as the default check/);
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await rules(), /no default check/);
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  assert.match(await rules(), /no default check/, '15.2 starts with a Done when line that does not parse');
+  assert.doesNotMatch(await rules(), /acts as the default check/);
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  assert.doesNotMatch(await rules(), /default check/, 'a folder file shows neither phrase');
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '7 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '15 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');
