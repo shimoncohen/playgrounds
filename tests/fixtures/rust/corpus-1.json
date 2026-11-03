@@ -1090,5 +1090,101 @@
     "src": "fn main() {\n    let mut x = 5;\n    let r: &i32;\n    loop {\n        x = 5;\n        r = &x;\n        break;\n    }\n    println!(\"{}\", r);\n}\n",
     "expect": "ok", "out": "5\n", "err": "", "exit": 0,
     "why": "assigning the outer x instead of declaring a new one keeps the borrowed value alive", "pr": "P5"
+  },
+  {
+    "id": "uninit-loop",
+    "src": "fn main() {\n    let x: i32;\n    for _i in 0..2 {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": { "code": "E0381", "line": 4 }, "pair": "uninit-loop-init",
+    "why": "x is never set before the loop body prints it", "pr": "P5"
+  },
+  {
+    "id": "uninit-loop-init",
+    "src": "fn main() {\n    let x: i32 = 5;\n    for _i in 0..2 {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "5\n5\n", "err": "", "exit": 0,
+    "why": "the same let with a value", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut-args",
+    "src": "fn two(a: &mut i32, b: &mut i32) {}\n\nfn main() {\n    let mut x = 1;\n    let mut y = 2;\n    two(&mut x, &mut x);\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0499", "line": 6 }, "pair": "loan-two-mut-args-ok",
+    "why": "both arguments are &mut borrows of x at the same time", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut-args-ok",
+    "src": "fn two(a: &mut i32, b: &mut i32) {}\n\nfn main() {\n    let mut x = 1;\n    let mut y = 2;\n    two(&mut x, &mut y);\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the two arguments borrow different variables", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut-loop",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &mut s;\n    for _i in 0..2 {\n        let t = &mut s;\n        t.push_str(\"x\");\n    }\n    r.push_str(\"y\");\n    println!(\"{}\", s);\n}\n",
+    "expect": { "code": "E0499", "line": 5 }, "pair": "loan-two-mut-loop-ok",
+    "why": "the &mut borrow in the loop starts while r is still used after the loop", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut-loop-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &mut s;\n    for _i in 0..2 {\n        let t = &mut s;\n        t.push_str(\"x\");\n    }\n    s.push_str(\"y\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "axxy\n", "err": "", "exit": 0,
+    "why": "r is never used, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-move-fn-arg",
+    "src": "fn take(s: String) {}\n\nfn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    take(s);\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0505", "line": 6 }, "pair": "loan-move-fn-arg-ok",
+    "why": "s moves into take while r still points at it", "pr": "P5"
+  },
+  {
+    "id": "loan-move-fn-arg-ok",
+    "src": "fn take(s: String) {}\n\nfn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    take(s.clone());\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "take gets a clone, so s stays put under the borrow", "pr": "P5"
+  },
+  {
+    "id": "loan-move-in-branch",
+    "src": "fn f(c: bool) {\n    let s = String::from(\"a\");\n    let r = &s;\n    if c {\n        let t = s;\n    }\n    println!(\"{}\", r);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "code": "E0505", "line": 5 }, "pair": "loan-move-in-branch-ok",
+    "why": "s may move into t on one branch while r is used after the if", "pr": "P5"
+  },
+  {
+    "id": "loan-move-in-branch-ok",
+    "src": "fn f(c: bool) {\n    let s = String::from(\"a\");\n    let r = &s;\n    if c {\n        let t = r;\n    }\n    println!(\"{}\", r);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "t copies the reference instead of moving s", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-in-loop",
+    "src": "fn main() {\n    let mut x = 5;\n    let r = &x;\n    for _i in 0..2 {\n        x = 6;\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0506", "line": 5 }, "pair": "loan-assign-in-loop-ok",
+    "why": "x is assigned in the loop while r is used after it", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-in-loop-ok",
+    "src": "fn main() {\n    let mut x = 5;\n    let r = &x;\n    for _i in 0..2 {\n        x = 6;\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "r is never used, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-in-branch",
+    "src": "fn f(c: bool) {\n    let mut x = 5;\n    let r = &x;\n    if c {\n        x = 6;\n    }\n    println!(\"{}\", r);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "code": "E0506", "line": 5 }, "pair": "loan-assign-in-branch-ok",
+    "why": "x may be assigned on one branch while r is used after the if", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-in-branch-ok",
+    "src": "fn f(c: bool) {\n    let mut x = 5;\n    let r = &x;\n    if c {\n        x = 6;\n    }\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "r is never used, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling-str",
+    "src": "fn main() {\n    let r: &str;\n    {\n        let s = String::from(\"a\");\n        r = s.as_str();\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0597", "line": 5 }, "pair": "scope-dangling-str-ok",
+    "why": "s ends with its block, but the &str from as_str is printed after it", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling-str-ok",
+    "src": "fn main() {\n    let r: &str;\n     \n        let s = String::from(\"a\");\n        r = s.as_str();\n     \n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "without the inner block, s lives as long as main", "pr": "P5"
   }
 ]
