@@ -59,5 +59,7 @@ describe('step type registry', () => {
     assert.match(say({ ...SAMPLE.skip, by: 'permission rule' }), /but a permission rule does not allow it/);
     assert.match(say(SAMPLE.skip), /your constraint does not allow it/);
     assert.match(UI.describe(SAMPLE.skip), /blocked by your constraint/);
+    assert.match(UI.describe({ ...SAMPLE.skip, by: 'hook' }), /\(a hook does not allow it\)/);
+    assert.match(UI.describe({ ...SAMPLE.skip, by: 'permission rule' }), /\(a permission rule does not allow it\)/);
   });
 });
