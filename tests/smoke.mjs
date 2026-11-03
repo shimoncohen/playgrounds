@@ -34,6 +34,8 @@ after(async () => { await browser?.close(); server?.close(); fs.rmSync(tmp, { re
 
 async function open(url, opts = {}, prep) {
   const ctx = await browser.newContext({ acceptDownloads: true, ...opts });
+  // Lay out in the fallback fonts: the web fonts may not load for a learner, and a test must not need the network.
+  await ctx.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.abort());
   if (prep) await prep(ctx);
   const page = await ctx.newPage();
   const errors = [];
@@ -48,6 +50,21 @@ async function until(fn, ms = 8000) {
   while (Date.now() < end) { if (await fn()) return; await new Promise(r => setTimeout(r, 100)); }
   throw new Error('condition not met within ' + ms + 'ms');
 }
+// false when the page fits its width; otherwise the innermost elements past the right edge, so a failure names the culprit.
+const overflow = page => page.evaluate(() => {
+  if (document.documentElement.scrollWidth <= innerWidth) return false;
+  const boxPast = e => e.getBoundingClientRect().right > innerWidth + 0.5;
+  // Text can spill out of a box that fits, so measure the content's right edge (scrollWidth), not only the box.
+  const right = e => { const r = e.getBoundingClientRect(); return getComputedStyle(e).overflowX === 'visible' ? r.left + Math.max(r.width, e.scrollWidth) : r.right; };
+  const past = e => right(e) > innerWidth + 0.5;
+  // Content inside a scroller or clipper that itself fits does not widen the page.
+  const clipped = e => { for (let a = e.parentElement; a && a !== document.body; a = a.parentElement)
+    if (getComputedStyle(a).overflowX !== 'visible' && !boxPast(a)) return true; return false; };
+  const tag = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + [...e.classList].map(c => '.' + c).join('');
+  const hits = [...document.querySelectorAll('body *')].filter(e => past(e) && !clipped(e) && ![...e.children].some(c => past(c) && !clipped(c)));
+  return `scrollWidth ${document.documentElement.scrollWidth} > ${innerWidth}: ` +
+    (hits.slice(0, 5).map(e => `${tag(e)} (right ${Math.round(right(e))})`).join(', ') || 'no element past the edge');
+});
 const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
 // How many tier headers the shell-quest rail should draw: one per tier that has chapters (Stage 3 Task 17: 3 until the Expert chapters land, then 4).
 const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(s => s.chapters.length).length);
@@ -516,7 +533,7 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
   assert.ok(await page.isVisible('#guide .gsec[data-extras]'));
   assert.ok(await page.isVisible('#guide .gsec[data-tier="beginner"]') && await page.isVisible('#guide .gsec[data-tier="intermediate"]'));
   await page.setViewportSize({ width: 390, height: 800 });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.equal(await overflow(page), false, 'no horizontal overflow at 390px');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -572,7 +589,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   await run('expert', xpool);
   await run('mixed', await page.evaluate(() => SQ.content.quickfire.map(q => q[0])));
   await page.setViewportSize({ width: 390, height: 800 });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.equal(await overflow(page), false, 'no horizontal overflow at 390px');
   // Task 20: the flake seen in Task 19 was a skipped question's revealed answer (the long Expert awk pipeline, in a nowrap <code>)
   // pushing the page sideways at 390px. Skip Expert questions until that one has been revealed, checking the width every time.
   await page.selectOption('#fTier', 'expert');
@@ -581,7 +598,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
   for (let i = 0; i < 200 && !sawLong; i++) {
     sawLong = /most common first fields/.test(await page.textContent('#fTask'));
     await page.click('#fSkip');
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `no horizontal overflow at 390px after skipping question ${i + 1}`);
+    assert.equal(await overflow(page), false, `no horizontal overflow at 390px after skipping question ${i + 1}`);
   }
   assert.ok(sawLong, 'the long awk answer was revealed');
   await page.click('#fStop');
@@ -927,7 +944,7 @@ test('shell-quest: a folder at the depth cap wraps in the prompt and mission car
   const { ctx, page, errors, type } = await shellPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   await type('mkdir -p $(printf "dd/%.0s" $(seq 1 126)); cd $(printf "dd/%.0s" $(seq 1 126)); mkdir dd');
   assert.match(await page.textContent('#screen'), /mkdir: cannot create directory 'dd': File name too long/);
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow at 390px');
+  assert.equal(await overflow(page), false, 'no horizontal overflow at 390px');
   assert.ok(await page.evaluate(() => document.querySelector('#cmd').getBoundingClientRect().width > 50), 'the input keeps its width');
   await type('cd ~; echo back');
   assert.match(await page.textContent('#screen'), /back/);
@@ -1674,7 +1691,7 @@ test('net-quest: terminal output is text, never markup', async () => {
 test('net-quest: chapter 4 plays through the page, on the printer and on r1, and the map marks the terminal device as (you)', async () => {
   for (const width of [1280, 390]) {
     const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
-    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const over = () => overflow(page);
     const steps = [
       [['ip route'], '192.168.1.1', 'laptop'],
       [['ip route add default via 192.168.1.1', 'ping -c 1 172.16.0.10'], null, 'printer'],
@@ -1735,7 +1752,7 @@ test('net-quest: the question stays after an extra command, and a ping with no r
 test('net-quest: chapter 5 plays through the page, on the laptop, home and web, and the map marks the terminal device as (you)', async () => {
   for (const width of [1280, 390]) {
     const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
-    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const over = () => overflow(page);
     const steps = [
       [['ping -c 1 198.51.100.10'], null, 'laptop'],
       [['ping -c 1 198.51.100.10'], '203.0.113.5', 'laptop'],
@@ -1773,7 +1790,7 @@ test('net-quest: layout at 390px', async () => {
   for (const width of [390, 360]) {
     const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });
     await type('ping -c 1 10.0.0.3');
-    const over = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+    const over = () => overflow(page);
     assert.equal(await over(), false, `${width}: terminal view`);
     assert.ok(parseFloat(await page.$eval('#cmd', e => getComputedStyle(e).fontSize)) >= 16);
     assert.equal(await page.$eval('details.about', d => d.open), false, 'the chapter intro starts closed on a phone');
