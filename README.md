@@ -99,6 +99,8 @@ npm run check                     # does every folder still bundle for artifacts
 
 Node 24 or newer, and Python 3 for the bundler. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
 
+Math Quest vendors four libraries under `math-quest/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
+
 ### Map of the repo
 
 ```
@@ -107,10 +109,11 @@ shared/                 code every playground reuses: progress saving, tier mode
 script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
+math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 shell-quest/            split by job (below)
-tests/                  engine tests (Node; shell/, ds/ and net/), browser smoke + golden tests (Playwright)
-tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
+tests/                  engine tests (Node; shell/, ds/, net/ and math/), browser smoke + golden tests (Playwright)
+tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
 .claude/skills/         agent skills for this repo

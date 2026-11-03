@@ -68,8 +68,8 @@ Each PR body says "Part of #103" and carries a QA checklist of real checkboxes, 
 ### Task T1: Vendored libraries (PR 3)
 
 **Files:**
-- Create: `tools/vendor-math.sh`, `math-quest/vendor/` (generated), `tests/math/vendor.test.mjs`
-- Modify: `package.json:13` (`test:engine` adds `"tests/math/*.test.mjs"`), `.github/workflows/ci.yml:31` (syntax loop adds `math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js tests/math/*.mjs`), the same loop in `AGENTS.md:17` and `.claude/skills/pre-pr-check/SKILL.md:11`, `AGENTS.md` ("Where things go" row and the dependency exception), `.claude/skills/new-playground/SKILL.md` (one line: Math Quest's vendored libraries are an approved exception, not a precedent), `README.md` (dependency note)
+- Create: `tools/vendor-math.sh`, `math-quest/vendor/` (generated), `tests/math/vendor.test.mjs`, `math-quest/index.html` (placeholder so `tools/build.py --check` keeps bundling every `*-quest/` folder; T2 replaces it)
+- Modify: `package.json:14` (`test:engine` adds `"tests/math/*.test.mjs"`), `.github/workflows/ci.yml:32` (syntax loop adds `tests/math/*.mjs`; the `math-quest/` globs are added by T2 to T5 as their files appear, because an unmatched glob makes `node --check` fail), the same loop in `AGENTS.md:17` and `.claude/skills/pre-pr-check/SKILL.md:11`, `AGENTS.md` ("Where things go" row and the dependency exception), `.claude/skills/new-playground/SKILL.md` (one line: Math Quest's vendored libraries are an approved exception, not a precedent), `README.md` (dependency note)
 
 Pinned versions (spec "Dependencies"): `katex@0.19.1`, `mathjs@15.2.0`, `mathlive@0.111.4`, `three@0.187.0`, `esbuild@0.25.10`.
 
@@ -83,8 +83,9 @@ Pinned versions (spec "Dependencies"): `katex@0.19.1`, `mathjs@15.2.0`, `mathliv
 ### Task T2: Graph and hub (PR 4)
 
 **Files:**
-- Create: `math-quest/graph.js`, `math-quest/index.html`, `math-quest/style.css`, `math-quest/app.js`, `tests/math/harness.mjs`, `tests/math/graph.test.mjs`
-- Modify: `index.html` (landing card and the XP script), `tests/smoke.mjs`, `README.md` (table row, repo map, count), `AGENTS.md` ("Where things go")
+- Create: `math-quest/graph.js`, `math-quest/style.css`, `math-quest/app.js`, `tests/math/harness.mjs`, `tests/math/graph.test.mjs`
+- Replace: the T1 placeholder `math-quest/index.html`
+- Modify: `index.html` (landing card and the XP script), `tests/smoke.mjs`, `README.md` (table row, repo map, count), `AGENTS.md` ("Where things go"); the three syntax loops (`ci.yml`, `AGENTS.md`, `pre-pr-check`) gain `math-quest/*.js`
 
 `graph.js` defines `MQ.graph` (DOM-free):
 
@@ -126,7 +127,7 @@ Track pages do not exist yet, so hub links point at pages added in T5. Mark them
 
 **Files:**
 - Create: `math-quest/scene/model.js`, `math-quest/scene/view.js`, `math-quest/scene/svg2d.js`, `math-quest/scene/three3d.js`, `math-quest/scene/scene.css`, `math-quest/scene/palette.js`, `tests/math/pages/scenes.html` (a test page that mounts one 2D and one 3D scene from `../../../math-quest/`; it lives under `tests/` so Pages never publishes it), `tests/math/scene.test.mjs`, `tests/math/scene.browser.mjs`
-- Modify: `package.json:14` (`test:browser` adds `node tests/math/scene.browser.mjs`), `README.md` (repo map)
+- Modify: `package.json:15` (`test:browser` adds `node tests/math/scene.browser.mjs`), `README.md` (repo map); the three syntax loops gain `math-quest/scene/*.js`
 
 Interfaces:
 
@@ -158,7 +159,7 @@ MQ.three3d.show(el, drawDef, state, colorOf) / .hide(el)           // three3d.js
 
 **Files:**
 - Create: `math-quest/input/mathjs-setup.js`, `math-quest/input/check.js`, `math-quest/input/work.js`, `math-quest/input/work.css`, `math-quest/rng.js`, `tests/math/check.test.mjs`, `tests/math/input.browser.mjs`
-- Modify: `shared/progress.js:44` (`pristine`), `tests/smoke.mjs` (a notes-only save is exported), `package.json:14`, `tests/math/pages/scenes.html` (add a working-area test mission)
+- Modify: `shared/progress.js:44` (`pristine`), `tests/smoke.mjs` (a notes-only save is exported), `package.json:15`, `tests/math/pages/scenes.html` (add a working-area test mission); the three syntax loops gain `math-quest/input/*.js` (`math-quest/rng.js` is covered by `math-quest/*.js`)
 
 Interfaces (all DOM-free except `work.js`):
 
@@ -199,7 +200,7 @@ MQ.check.translate(ascii) -> string                       // MathLive ascii-math
 
 **Files:**
 - Create: `math-quest/arithmetic/{index.html,style.css,app.js,content.js}`, `math-quest/algebra/{index.html,style.css,app.js,content.js}`, `math-quest/track.js` (the shared track app: rail, mission card, tabs, quick-fire, guide, hint, deep link), `tests/math/content.test.mjs`
-- Modify: `tests/smoke.mjs` (page list), `tests/math/notations.json` (every notation the two chapters use), `README.md`
+- Modify: `tests/smoke.mjs` (page list), `tests/math/notations.json` (every notation the two chapters use), `README.md`; the three syntax loops gain `math-quest/*/app.js math-quest/*/content.js`
 
 Each track `index.html` sets `window.PROGRESS = { key: 'math-<track>-v1', name: '<Track> · Math Quest' }`, loads `../../shared/{progress,nav,how,tiers,theme}.*`, `../vendor/katex/*`, `../vendor/mathjs/math.js`, `../rng.js`, `../graph.js`, `../scene/*`, `../input/*`, `content.js`, `../track.js`, `app.js`. `algebra/index.html` also loads `../vendor/three/three.min.js`; `arithmetic/index.html` does not. Page structure matches the existing quest contract checked by `tests/smoke.mjs:103-150` (`#mission`, `.tabs button[data-tab]`, `section[id^="tab-"]`, `#chapters`, `.mapCol .panel`, sticky `.missionCol`); copy the layout from `python-quest/`.
 
@@ -223,4 +224,4 @@ Each track `index.html` sets `window.PROGRESS = { key: 'math-<track>-v1', name: 
 - **Spec coverage:** layout (T1 to T5), saved state and `pristine` (T4 Step 6), graph and deep links (T2, T5 Step 2), hub and landing (T2), scene layer, color links, animation, shared renderer, no-WebGL notice (T3), missions and checks incl. `form` (T4, T5), working area, both modes, switch, translator, phone layout, math.js safety, notes (T4), dependencies and vendoring (T1), testing (every task, WebGL in T3 Step 7), delivery (PR split), touchpoints (T0, T1, T2, T4, T5).
 - **Not in this plan:** proof mission kinds (`order`, `gap`, `justify`, `flaw`) are specified but first used by the Proofs track; their checker lands with it. Later tracks and chapters have their own plans.
 - **Naming consistency:** `MQ.graph`, `MQ.scene.model`, `MQ.scene.mount`, `MQ.svg2d`, `MQ.three3d`, `MQ.palette`, `MQ.rng`, `MQ.math.full`, `MQ.math.safe`, `MQ.check.*`, `MQ.work.mount` are used the same way in every task.
-- **To verify during work:** exact line numbers cited (`package.json:13-14`, `ci.yml:31`, `AGENTS.md:17`, `pre-pr-check` line 11, `index.html:127`, `shared/progress.js:44`, `tests/smoke.mjs:103`) against the tree at the start of each task.
+- **To verify during work:** exact line numbers cited (`package.json:14-15`, `ci.yml:32`, `AGENTS.md:17`, `pre-pr-check` line 11, `index.html:127`, `shared/progress.js:44`, `tests/smoke.mjs:103`) against the tree at the start of each task.
