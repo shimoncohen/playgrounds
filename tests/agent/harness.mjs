@@ -10,7 +10,8 @@ export const SHARED = ['shared/tiers.js', 'shared/how.js'];
 export const FILES = ['engine/tokens.js', 'engine/vfs.js', 'engine/config.js', 'engine/context.js', 'engine/permissions.js', 'engine/shell.js',
   'engine/policy.js', 'engine/provider.js', 'content/tiers.js', 'content/state.js', 'content/facts.js', 'content/scenarios.js',
   'content/model.js', 'content/ch-01-loop.js', 'content/ch-02-context.js', 'content/ch-03-prompt.js',
-  'content/ch-04-memory.js', 'content/ch-05-skills-mcp.js', 'content/ch-06-extend.js', 'content/ch-07-safety.js', 'content/extras.js'];
+  'content/ch-04-memory.js', 'content/ch-05-skills-mcp.js', 'content/ch-06-extend.js', 'content/ch-07-safety.js', 'content/ch-08-explore.js',
+  'content/ch-09-verify.js', 'content/extras.js'];
 
 export function loadAgent(files = FILES) {
   const sandbox = {};

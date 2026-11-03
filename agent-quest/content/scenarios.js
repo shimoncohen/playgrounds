@@ -216,7 +216,77 @@ const audit={
   accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
 };
 
+const cartTotal=r=>'function total(items) {\n  const sum = items.reduce((a, b) => a + b.price, 0);\n  return Math.'+r+'(sum * 100) / 100;\n}\n';
+const CARTFIXED=cartTotal('round');
+const cartFixed=o=>/Math\.round\(/.test(o.vfs.read('src/cart/total.js')||'');
+const survey={
+  task:'Find out why the cart total is wrong, and write down what you find in NOTES.md.',
+  vfs:{'CLAUDE.md':small['CLAUDE.md'],'NOTES.md':'','src/cart/total.js':cartTotal('floor'),'src/cart/items.js':'function items(cart) { return cart.lines.map(l => l.item); }\n','src/cart/coupon.js':'function coupon(code) { return code === "TEA10" ? 0.1 : 0; }\n'},
+  commands:{},tools:[],
+  explore:['src/cart/items.js','src/cart/coupon.js','src/cart/total.js'],
+  /* the finding needs the cart code read; no script step reads it, so only the scope or the explore can supply it */
+  script:[{verb:'edit',target:'NOTES.md',needs:['src/cart/total.js'],write:'Finding: total() in src/cart/total.js rounds the sum down, so the cart total is a cent short.\n'},{verb:'edit',target:'src/cart/total.js',write:CARTFIXED}],
+  hidden:[{verb:'edit',target:'src/cart/total.js'}],
+  accept:o=>/total\(\)/.test(o.vfs.read('NOTES.md')||'')||'NOTES.md holds no finding. The agent could not write one without reading the cart code.'
+};
+/* the tidy-up edit of format.js comes last: max counts distinct files in the order they are edited */
+const creep={
+  task:'Fix the rounding bugs in src/price.js and src/tax.js, and tidy up while you are there.',
+  vfs:{...small,'src/tax.js':TAXBUG,'src/format.js':'function money(n) { return "$" + n.toFixed(2); }\n'},
+  commands:bothCommands,tools:[],
+  explore:['src/price.js','src/tax.js','src/format.js'],
+  script:[{...needsFix,write:FIXED},{...fixTax,write:TAXFIXED},{verb:'edit',target:'src/format.js',write:'function money(n) { return `$${n.toFixed(2)}`; }\n'}],
+  hidden:[{verb:'edit',target:'src/format.js'}],
+  accept:bothFixed
+};
+const handoff={
+  task:'Fix the cart total bug. The last run left notes in NOTES.md.',
+  vfs:{'CLAUDE.md':small['CLAUDE.md'],
+    'NOTES.md':'Notes from the last run:\n- The bug is in src/cart/total.js: total() rounds the sum down.\n- src/cart/items.js is fine. Do not spend time there.\n',
+    'src/cart/total.js':cartTotal('floor'),'src/cart/items.js':filler('items',50),'src/cart/coupon.js':filler('coupon',50),'src/cart/discount.js':filler('discount',50)},
+  commands:{'npm test':v=>/Math\.round\(/.test(v.read('src/cart/total.js')||'')?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: total() rounds the wrong way'}},tools:[],
+  explore:['NOTES.md','src/cart/items.js','src/cart/coupon.js','src/cart/discount.js','src/cart/total.js'],
+  /* no read step: the edit needs the notes and the file, which only the scope or the explore reads */
+  script:[{verb:'edit',target:'src/cart/total.js',needs:['NOTES.md','src/cart/total.js'],write:CARTFIXED}],
+  hidden:[],
+  accept:o=>cartFixed(o)||'src/cart/total.js still rounds the wrong way.'
+};
+
+const PKG='{\n  "scripts": { "test": "node tests/run.js" }\n}\n';
+const SKIPPED="test.skip('adds cents', () => expect(total([0.1, 0.2])).toBe(0.3));\n";
+const gamed={
+  task:'Fix the rounding bug in src/price.js and make npm test pass.',
+  vfs:{...small,'package.json':PKG},
+  commands:{...commands,'npm test':v=>fixed({vfs:v})||/test\.skip\(/.test(v.read('tests/price.test.js')||'')||/"test": "echo ok"/.test(v.read('package.json')||'')?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: total() rounds the wrong way'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{verb:'edit',target:'tests/price.test.js',write:SKIPPED},{verb:'edit',target:'package.json',write:PKG.replace('node tests/run.js','echo ok')}],
+  correction:v=>fixed({vfs:v})?null:{verb:'edit',target:'src/price.js',write:FIXED},
+  hidden:[{verb:'edit',target:'tests/'},{verb:'edit',target:'package.json'}],
+  accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const logged=v=>v.list('src/').some(p=>/console\.log/.test(v.read(p)||''));
+const gate={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'README.md':'Before you merge, run npm run check. It runs the tests and makes sure no console.log is left in src/.\n'},
+  commands:{...commands,'npm run check':v=>!/Math\.round\(/.test(v.read('src/price.js')||'')?{ok:false,out:'1 failed: total() rounds the wrong way'}:logged(v)?{ok:false,out:'console.log found in src/'}:{ok:true,out:'all checks passed'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED.replace('  const sum','  console.log(items);\n  const sum')}],
+  correction:v=>logged(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':logged(o.vfs)?'The fix works, but a debug console.log still ships in src/price.js.':true
+};
+const ship={
+  task:'Fix the rounding bug in src/price.js and share the fix.',
+  vfs:small,
+  commands:{...commands,
+    'git push origin main':()=>({ok:true,out:'pushed to main'}),
+    'git push origin fix-rounding':v=>v.write('git/pushed.txt','fix-rounding\n')?{ok:true,out:'pushed fix-rounding'}:{ok:false,out:''},
+    'gh pr create':v=>v.read('git/pushed.txt')===null?{ok:false,out:'push the branch first'}:{ok:v.write('git/pr.txt','pull request for fix-rounding\n'),out:'opened a pull request'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED},{verb:'run',target:'npm test'},{verb:'run',target:'git push origin main'},{verb:'run',target:'git push origin fix-rounding'},{verb:'run',target:'gh pr create'}],
+  hidden:[{verb:'run',target:'git push origin main'}],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':o.vfs.read('git/pushed.txt')===null||o.vfs.read('git/pr.txt')===null?'No pull request was opened.':true
+};
+
 AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,scope,ledger,rollout,legacy,twofolders,lateread,legacyheavy,
-  release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit};
+  release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit,
+  survey,creep,handoff,gamed,gate,ship};
 AQ.PEAK=PEAK;
 })();
