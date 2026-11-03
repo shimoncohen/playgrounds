@@ -192,7 +192,7 @@ Folder-level memory: a file named `CLAUDE.md` in a folder (for example `src/CLAU
 #### Tool connection
 
 - A scenario with `connected: true` skips a `call` with reason `not connected` unless a setup MCP server provides the tool: the target equals the server name or `server.tool`. A permission rule still shows first, and a missing file the call needs is reported before the connection. `Done when: call X` follows the same path and then ends `unverified`.
-- Skip reasons show as words in the Run panel and in the narration: `not seen yet` (the agent has not read what it needs yet), `not connected` (its server is not connected), `no one to ask` (nobody is there to approve it).
+- Skip reasons show as words in the Run panel and in the narration: `not seen yet` (the agent has not read what it needs yet), `not connected` (the tool is not connected), `no one to ask` (nobody is there to approve it). A skip by a hook or a permission rule reads "a hook does not allow it" or "a permission rule does not allow it".
 - Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match.
 
 ### Prompt model

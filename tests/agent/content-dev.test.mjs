@@ -533,6 +533,10 @@ describe('13.3 Connect only the tools the job needs', () => {
     }
     assert.match(go(12, 2, M(12, 2).wrong).result, /never commented on the issue/);
   });
+  it('a rule on list_issues is not reported as the tool being not connected', () => {
+    const r = go(12, 2, F({ '.claude/mcp.txt': 'tracker: list_issues, comment', '.claude/permissions.txt': 'deny call tracker.list_issues' })).result;
+    assert.doesNotMatch(String(r), /because that tool is not connected/);
+  });
   it('the explain names 5.4 and says what is different', () => {
     assert.match(M(12, 2).explain, /mission 5\.4/);
     assert.match(M(12, 2).explain, /5\.4 saved tokens, and 13\.3 is about availability/);

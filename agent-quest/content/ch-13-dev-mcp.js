@@ -68,7 +68,8 @@ AQ.CH.push({
       wrong:{files:{'.claude/mcp.txt':'tracker: list_issues\n'}},
       lazy:{files:{}},
       check:(o,c)=>{
-        if(skipOf(o,'tracker.list_issues'))return 'The agent could not list the issues, because that tool is not connected. Keep the tools the job uses on the line.';
+        const l=skipOf(o,'tracker.list_issues');
+        if(l&&l.by==='not connected')return 'The agent could not list the issues, because that tool is not connected. Keep the tools the job uses on the line.';
         const s=skipOf(o,'tracker.close');
         if(s&&s.by!=='not connected')return 'The close was stopped, but by a rule. This mission is about leaving the tool out of the list.';
         return AQ.verdict(o,c);
