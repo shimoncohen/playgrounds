@@ -8,9 +8,17 @@ const { M, go } = kit(AQ);
 const F = (files) => ({ files });
 const P = (prompt, files) => ({ prompt, files });
 // chapter indexes written so far; the last batch freezes all of 7 to 14
-const DEV = [7, 8, 9, 10];
+const DEV = [7, 8, 9, 10, 11, 12];
 const H = (t) => F({ '.claude/hooks.txt': t });
 const HEAD = '# before VERB TARGET\n# after edit PATH run COMMAND\n';
+const MCP = (t) => F({ '.claude/mcp.txt': t });
+const CMD = (name, t) => F({ [`.claude/commands/${name}.md`]: t });
+const GOAL = 'Goal: fix the rounding bugs in the shop totals\n';
+const RULE = 'Constraints: do not edit migrations/\n';
+const CHECK = 'Done when: run npm test\n';
+const TYPED = 'It worked, but you typed the lines yourself. This mission is about calling the saved command with Use.';
+const NEVER_USED = 'The run passed, but the saved command was never used. Call it with Use.';
+const TRACKER = 'tracker: list_issues, create_issue, comment, close\n';
 const SMALL_ARCH = { '.claude/agents/architect.md': 'name: architect\nmodel: small\n' };
 const inDev = (c) => DEV.includes(c);
 
@@ -79,6 +87,43 @@ const CASES = [
     fail: [{}, H(''), H('before run npm run deploy'), H('after edit src/ run npm run lint'), H('before run npm run deploy\nbefore run npm run lint'), H('after run npm run deploy\nafter edit src/ run npm run lint'), H('before run npm run deploy\nafter edit src/ run npm test'),
       F({ 'CLAUDE.md': 'do not run npm run deploy\nDone when: run npm run lint' }), F({ '.claude/hook.txt': 'before run npm run deploy\nafter edit src/ run npm run lint' }),
       F({ '.claude/permissions.txt': 'deny run npm run deploy', '.claude/hooks.txt': 'after edit src/ run npm run lint' })] },
+
+  { at: [11, 0],
+    pass: [CMD('fix', GOAL + RULE + CHECK), CMD('fix', RULE + CHECK), CMD('fix', GOAL + 'Constraints: only edit src/\n' + CHECK), CMD('fix', GOAL + 'Constraints: ask before edit migrations/\n' + CHECK),
+      CMD('fix', GOAL + RULE + 'Constraints: do not delete src/\n' + CHECK)],
+    fail: [{}, CMD('fix', GOAL + CHECK), CMD('fix', GOAL + RULE), CMD('fix', GOAL + 'Constraints: only edit src/price.js\n' + CHECK), CMD('fix', GOAL + 'Constraints: do not edit src/\n' + CHECK), CMD('fix', ''),
+      CMD('fix', GOAL + RULE + 'Done when: run npm run lint\n'), CMD('fix', GOAL + CHECK + 'Constraints: do not edit tests/\n'),
+      F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' }), F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test', '.claude/permissions.txt': 'deny edit migrations/' }),
+      CMD('other', GOAL + RULE + CHECK)],
+    refused: [CMD('fix', GOAL + 'Constraints: be careful'), CMD('fix', GOAL + 'Done when: run ghost'), CMD('fix', GOAL + 'Use: fix')] },
+  { at: [11, 1],
+    pass: ['Use: fix', 'Use: fix\nFiles: src/price.js, src/tax.js', 'Use: fix\nConstraints: do not edit tests/', 'Use: fix\nPlan: first', 'Use: fix\n' + CHECK, 'Use: fix, fix', P('Use: fix', { 'CLAUDE.md': 'Done when: run npm test' })],
+    fail: ['Use: docs', 'Use: audit', 'Use: docs, audit', 'Goal: fix the rounding bugs', 'Done when: run npm test', '',
+      'Constraints: do not edit migrations/\nDone when: run npm test', 'Use: docs\nConstraints: do not edit migrations/\nDone when: run npm test', 'Use: audit\nConstraints: do not edit migrations/\nDone when: run npm test',
+      F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' }), P('Done when: run npm test', { 'CLAUDE.md': 'do not edit migrations/' }), 'Use: fix\nUse: docs',
+      P('Use: fixit', { '.claude/commands/fixit.md': GOAL + RULE + CHECK }), P('Use: fix', { '.claude/commands/fix.md': GOAL })],
+    refused: ['Use: ghost', 'Use: fix, ghost', 'Use: fix\nConstraints: be careful', P('Use: fix', { '.claude/commands/fix.md': 'Use: docs' })] },
+  { at: [11, 2],
+    pass: ['Use: check\nDone when: run npm test', 'Use: check\nDone when: run npm test\nConstraints: do not edit tests/', 'Use: check\nDone when: run npm test\nFiles: src/price.js, src/tax.js', 'Use: check\nDone when: run npm test\nPlan: first'],
+    fail: ['Use: check', 'Done when: run npm test', '', 'Use: check\nDone when: run npm run lint', 'Use: check\nDone when: read src/tax.js',
+      'Constraints: do not edit migrations/\nDone when: run npm test', P('Done when: run npm test', { 'CLAUDE.md': 'do not edit migrations/' }), P('Use: check', { 'CLAUDE.md': 'Done when: run npm test' }),
+      F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' }), P('Use: check', { '.claude/commands/check.md': GOAL + RULE + CHECK }),
+      P('Use: tests\nDone when: run npm test', { '.claude/commands/tests.md': RULE })],
+    refused: ['Use: ghost\nDone when: run npm test', 'Use: check\nDone when: run ghost'] },
+
+  { at: [12, 0],
+    pass: [MCP('tracker: list_issues, comment\nbrowser: open, click\ndocs: search\n'), MCP('docs: search'), MCP('docs: lookup, search'), MCP('# servers\ndocs: search, lookup\ntracker: comment')],
+    fail: [{}, MCP(''), MCP('docs: lookup'), MCP('docs: lookup\ntracker: list_issues, comment'), MCP('doc: search'), MCP('tracker: docs, search'), MCP('search: docs'), MCP('docs: Search'),
+      F({ 'CLAUDE.md': 'Done when: call docs.search' }), F({ '.claude/mcp.json': 'docs: search' }), F({ '.claude/mcp.txt': 'docs: search', '.claude/permissions.txt': 'deny call docs.search' })] },
+  { at: [12, 1],
+    pass: [MCP('browser: open, click, screenshot'), MCP('browser: screenshot'), MCP('browser: screenshot, open'), MCP('# browser\nbrowser: screenshot\ntracker: comment')],
+    fail: [{}, MCP(''), MCP('browse: open, screenshot'), MCP('browser: open, click'), MCP('browser: shot'), MCP('screenshot: browser'), MCP('tracker: screenshot'),
+      F({ 'CLAUDE.md': 'Done when: call browser.screenshot' }), F({ 'CLAUDE.md': 'Done when: run npm test' }), F({ '.claude/mcp.txt': 'browser: screenshot', '.claude/permissions.txt': 'deny call browser.screenshot' }), F({ '.claude/mcp.json': 'browser: screenshot' })] },
+  { at: [12, 2],
+    pass: [MCP('tracker: list_issues, comment'), MCP('tracker: list_issues, create_issue, comment'),MCP('tracker: comment'), MCP('tracker: comment, list_issues')],
+    fail: [{}, MCP(''), MCP('tracker: list_issues'), MCP('tracker: list_issues, comment, close'), MCP(TRACKER), MCP('tracker: close'), MCP('tracker: list_issues, create_issue'),
+      F({ '.claude/permissions.txt': 'deny call tracker.close' }), F({ '.claude/permissions.txt': 'deny call tracker.close', '.claude/mcp.txt': 'tracker: list_issues, comment, close' }),
+      F({ '.claude/hooks.txt': 'before call tracker.close' }), F({ 'CLAUDE.md': 'do not call tracker.close' })] },
 ];
 
 runCases(AQ, 'chapters 8 to 15: lazy and nearby answers are caught', CASES, (c) => !inDev(c));
@@ -91,6 +136,10 @@ describe('dev chapters so far', () => {
   });
   it('the starting setup of every mission fails its own check', () => {
     for (const c of DEV) AQ.CH[c].missions.forEach((m, i) => assert.equal(typeof AQ.runMission(m, {}, { approved: true }), 'string', `[${c}, ${i}]`));
+  });
+  it('the tables of chapters 11 and 12 each hold an input that creates a .claude/ file the scenario does not ship, and it fails', () => {
+    const unshipped = (m, x) => !!x && typeof x === 'object' && Object.keys(x.files || {}).some((p) => p.startsWith('.claude/') && !Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p));
+    for (const k of CASES.filter((x) => [10, 11].includes(x.at[0]))) assert.ok(k.fail.some((x) => unshipped(M(...k.at), x)), `[${k.at}]`);
   });
   it('the answer, wrong and lazy inputs and the passing table inputs only edit files their scenario ships', () => {
     const ships = (m, x) => { if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`); };
@@ -305,5 +354,132 @@ describe('11.3 Stop it, then check it', () => {
   });
   it('no config mission of chapter 11 has a Done when line in its fixed prompt', () => {
     for (const i of [0, 1, 2]) assert.ok(!/done when/i.test(M(10, i).prompt), `[10, ${i}]`);
+  });
+});
+
+const used = (o) => o.steps.filter((s) => s.type === 'command').map((s) => s.name);
+
+describe('12.1 Save a prompt as a command', () => {
+  it('the shipped command holds only a goal, so the run it starts has no rule and no check', () => {
+    const f = AQ.config.splitFields(AQ.scenarios.cmdfix.vfs['.claude/commands/fix.md']).fields;
+    assert.deepEqual([f.constraints.length, f.donewhen], [0, null]);
+    assert.deepEqual([...used(go(11, 0, {}).outcome)], ['fix']);
+    assert.equal(go(11, 0, {}).outcome.violations.length, 1);
+  });
+  it('the rule and the check in the command carry the run, and the command step is shown', () => {
+    const r = go(11, 0, M(11, 0).answer);
+    assert.equal(r.outcome.violations.length, 0);
+    assert.equal(r.outcome.status, 'done');
+    assert.deepEqual([...used(r.outcome)], ['fix']);
+  });
+  it('the same lines in CLAUDE.md pass the run but not the mission, and the message names the file', () => {
+    assert.match(go(11, 0, F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' })).result, /saved command fix does not hold the rule and the check\. Put them in fix\.md/);
+    assert.match(go(11, 0, F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test', '.claude/permissions.txt': 'deny edit migrations/' })).result, /does not hold the rule and the check/);
+  });
+  it('a command with a rule but no check, or a check but no rule, fails on the run itself', () => {
+    assert.match(go(11, 0, CMD('fix', GOAL + RULE)).result, /src\/tax\.js still rounds/);
+    assert.match(go(11, 0, CMD('fix', GOAL + CHECK)).result, /edit migrations\/001\.sql, and nothing told it not to/);
+  });
+  it('a bad line in the command refuses the run, and a Use line in it is an error', () => {
+    assert.match(go(11, 0, CMD('fix', GOAL + 'Use: fix')).result, /was not run/);
+    assert.equal(AQ.prepare(M(11, 0), CMD('fix', GOAL + 'Use: fix')).prompt.errors[0].msg, 'a command cannot use other names');
+  });
+});
+
+describe('12.2 Choose the command that fits', () => {
+  it('each command on the shelf does what its name hints, and the three names stay distinct', () => {
+    const v = AQ.scenarios.cmdset.vfs, names = Object.keys(v).filter((p) => p.startsWith('.claude/commands/'));
+    assert.deepEqual(names.sort(), ['.claude/commands/audit.md', '.claude/commands/docs.md', '.claude/commands/fix.md']);
+    assert.equal(AQ.prepare(M(11, 1), 'Use: docs').prompt.constraints[0].kind, 'only');
+    assert.equal(AQ.prepare(M(11, 1), 'Use: audit').prompt.plan, true);
+  });
+  it('the answer runs the command, and the lazy run falls into the migrations trap', () => {
+    assert.deepEqual([...used(go(11, 1, M(11, 1).answer).outcome)], ['fix']);
+    assert.equal(go(11, 1, M(11, 1).lazy).outcome.violations.length, 1);
+    assert.match(go(11, 1, M(11, 1).wrong).result, /still rounds/);
+  });
+  it('the verdict comes first, then the command check: typed lines pass the run but not the mission', () => {
+    assert.equal(go(11, 1, 'Constraints: do not edit migrations/\nDone when: run npm test').result, TYPED);
+    assert.equal(go(11, 1, F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' })).result, TYPED);
+    assert.equal(go(11, 1, 'Use: audit\nConstraints: do not edit migrations/\nDone when: run npm test').result, TYPED);
+    assert.match(go(11, 1, 'Use: docs\nConstraints: do not edit migrations/\nDone when: run npm test').result, /check failed/);
+    assert.match(go(11, 1, 'Use: audit').result, /nothing told it not to/);
+  });
+  it('a Plan: first command pauses the run, and approving it finishes the fixed run', () => {
+    const r = AQ.evaluate(M(11, 1), 'Use: fix\nPlan: first');
+    assert.equal(r.awaiting, true);
+    assert.equal(AQ.runMission(M(11, 1), 'Use: fix\nPlan: first', { approved: true }), true);
+  });
+});
+
+describe('12.3 Your line wins', () => {
+  it('the command check is weak: lint passes while the tax rounding is still wrong', () => {
+    const { outcome } = go(11, 2, 'Use: check');
+    assert.equal(outcome.status, 'done');
+    assert.equal(outcome.vfs.read('src/tax.js'), AQ.scenarios.cmdlint.vfs['src/tax.js']);
+  });
+  it('a typed Done when replaces the command\'s, and the command rule still adds up', () => {
+    const p = AQ.prepare(M(11, 2), M(11, 2).answer).prompt;
+    assert.deepEqual([p.doneWhen.target, p.constraints.map((x) => x.target)].flat(), ['npm test', 'migrations/']);
+    const { outcome } = go(11, 2, M(11, 2).answer);
+    assert.equal(outcome.violations.length, 0);
+    assert.ok(outcome.steps.some((s) => s.tag === 'verify' && s.target === 'npm test'));
+  });
+  it('each gap in the input gets its own message', () => {
+    assert.match(go(11, 2, M(11, 2).wrong).result, /weak one in the command/);
+    assert.match(go(11, 2, P('Use: check', { 'CLAUDE.md': 'Done when: run npm test' })).result, /weak one in the command/);
+    for (const x of [M(11, 2).lazy, 'Constraints: do not edit migrations/\nDone when: run npm test', P('Done when: run npm test', { 'CLAUDE.md': 'do not edit migrations/' })]) assert.equal(go(11, 2, x).result, NEVER_USED);
+    assert.match(go(11, 2, P('Use: check', { '.claude/commands/check.md': GOAL + RULE + CHECK })).result, /changed the saved command itself/);
+  });
+});
+
+describe('13.1 Connect the docs server', () => {
+  it('chapter 13 scenarios are all connected, and each list names only tools the scenario has', () => {
+    for (const i of [0, 1, 2]) {
+      const s = AQ.scenarios[M(12, i).scenario];
+      assert.equal(s.connected, true, M(12, i).scenario);
+      for (const m of AQ.config.parseSetup(AQ.vfs.create(s.vfs)).mcp) for (const t of m.tools) assert.ok(s.tools.includes(`${m.name}.${t}`), `${m.name}.${t}`);
+    }
+  });
+  it('an unconnected docs tool is skipped as not connected, and a docs server with another tool does not help', () => {
+    for (const x of [M(12, 0).lazy, M(12, 0).wrong]) assert.ok(go(12, 0, x).outcome.steps.some((s) => s.type === 'skip' && s.by === 'not connected' && s.target === 'docs.search'));
+    assert.match(go(12, 0, M(12, 0).wrong).result, /docs server is not connected with that tool/);
+    assert.ok(go(12, 0, M(12, 0).answer).outcome.calls.some((x) => x.target === 'docs.search'));
+  });
+  it('a ban on the tool leaves it connected but unused, and the run still fails', () => {
+    const r = go(12, 0, F({ '.claude/mcp.txt': 'docs: search', '.claude/permissions.txt': 'deny call docs.search' }));
+    assert.ok(r.outcome.steps.some((s) => s.type === 'skip' && s.by === 'permission rule'));
+    assert.match(r.result, /never looked up the current docs/);
+  });
+});
+
+describe('13.2 Let it look at the page', () => {
+  it('the screenshot check ends done when connected, and unverified when it is not', () => {
+    assert.equal(go(12, 1, M(12, 1).answer).outcome.status, 'done');
+    assert.equal(go(12, 1, M(12, 1).lazy).outcome.status, 'unverified');
+    assert.match(go(12, 1, M(12, 1).lazy).result, /screenshot is not connected/);
+    assert.match(go(12, 1, M(12, 1).wrong).result, /screenshot is not connected/);
+  });
+  it('a ban on the tool leaves the page unchecked, and the message says so', () => {
+    assert.match(go(12, 1, F({ '.claude/mcp.txt': 'browser: screenshot', '.claude/permissions.txt': 'deny call browser.screenshot' })).result, /never checked with the browser tool/);
+  });
+});
+
+describe('13.3 Connect only the tools the job needs', () => {
+  it('the close is skipped as not connected for the answer, and runs as a mistake for the lazy list', () => {
+    const a = go(12, 2, M(12, 2).answer).outcome;
+    assert.ok(a.steps.some((s) => s.type === 'skip' && s.by === 'not connected' && s.target === 'tracker.close'));
+    assert.ok(a.calls.some((x) => x.target === 'tracker.comment'));
+    assert.match(go(12, 2, M(12, 2).lazy).result, /call tracker\.close, and nothing told it not to/);
+  });
+  it('every way of stopping the close by a rule gets the same message, and an unlisted comment its own', () => {
+    for (const x of [F({ '.claude/permissions.txt': 'deny call tracker.close' }), F({ '.claude/permissions.txt': 'deny call tracker.close', '.claude/mcp.txt': 'tracker: list_issues, comment, close' }), F({ '.claude/hooks.txt': 'before call tracker.close' }), F({ 'CLAUDE.md': 'do not call tracker.close' })]) {
+      assert.match(go(12, 2, x).result, /stopped, but by a rule\. This mission is about leaving the tool out of the list/);
+    }
+    assert.match(go(12, 2, M(12, 2).wrong).result, /never commented on the issue/);
+  });
+  it('the explain names 5.4 and says what is different', () => {
+    assert.match(M(12, 2).explain, /mission 5\.4/);
+    assert.match(M(12, 2).explain, /5\.4 saved tokens, and 13\.3 is about availability/);
   });
 });

@@ -13,6 +13,7 @@ const list=[
   {id:'subagents',text:'Claude Code subagents are assistants with their own instructions and context window, and each one can use its own model.',docUrl:'https://docs.claude.com/en/docs/claude-code/sub-agents',checked:'2026-11-02'},
   {id:'plugins',text:'A Claude Code plugin bundles skills, subagents, hooks and MCP servers so Claude Code installs and loads them as one unit.',docUrl:'https://docs.claude.com/en/docs/claude-code/plugins',checked:'2026-11-02'},
   {id:'permissions',text:'Claude Code asks for permission before many actions, and permission rules can allow or deny specific tools and commands.',docUrl:'https://docs.claude.com/en/docs/claude-code/permissions',checked:'2026-11-02'},
+  {id:'commands',text:'Claude Code can run a saved prompt, kept as a Markdown file, when you type / and its name; command files for a project are kept in its .claude/commands folder, so everyone who uses the repository has them.',docUrl:'https://docs.claude.com/en/docs/claude-code/slash-commands',checked:'2026-11-03'},
   {id:'worktrees',text:'A git worktree is an extra working folder for the same repository, so changes made in one folder do not touch the files in another.',docUrl:'https://git-scm.com/docs/git-worktree',checked:'2026-11-03'}
 ];
 const byId=id=>list.find(f=>f.id===id)||null;

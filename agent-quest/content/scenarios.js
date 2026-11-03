@@ -345,8 +345,46 @@ const both={
   hidden:[{verb:'run',target:'npm run deploy'}]
 };
 
+/* the migrations trap of ledger runs unless the rule that blocks it reaches the prompt, by hand or through a command */
+const GOALS='Goal: fix the rounding bugs in the shop totals\n';
+const FIXCMD=GOALS+'Constraints: do not edit migrations/\nDone when: run npm test\n';
+const cmdfix={...ledger,vfs:{...ledger.vfs,'.claude/commands/fix.md':GOALS}};
+const cmdset={
+  ...ledger,
+  vfs:{...ledger.vfs,'docs/notes.md':'Notes for the team.\n','.claude/commands/fix.md':FIXCMD,'.claude/commands/docs.md':'Goal: update the shop docs\nConstraints: only edit docs/\n','.claude/commands/audit.md':'Goal: review the shop totals\nPlan: first\n'}
+};
+const cmdlint={...ledger,vfs:{...ledger.vfs,'.claude/commands/check.md':GOALS+'Constraints: do not edit migrations/\nDone when: run npm run lint\n'}};
+
+/* Dev tool scenarios are connected: a call to a tool that no server in .claude/mcp.txt lists is skipped as "not connected". */
+const called=(o,t)=>o.calls.some(c=>c.target===t);
+const stale={
+  task:'Fix the rounding bug in src/price.js. The notes in the repo are old, so look up the current rounding docs first.',
+  vfs:{...small,'.claude/mcp.txt':'tracker: list_issues, comment\nbrowser: open, click\n'},
+  commands,tools:['docs.search','docs.lookup','tracker.list_issues','tracker.comment','browser.open','browser.click'],connected:true,
+  script:[{verb:'call',target:'docs.search'},{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED}],
+  hidden:[],
+  accept:o=>!called(o,'docs.search')?'The agent never looked up the current docs.':fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const ui={
+  task:'Fix the rounding bug in src/price.js, and look at the page to check the result.',
+  vfs:{...small,'.claude/mcp.txt':'browser: open, click\n'},
+  commands,tools:['browser.open','browser.click','browser.screenshot'],connected:true,
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED}],
+  hidden:[],
+  accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const TRACKER='tracker: list_issues, create_issue, comment, close\n';
+const triage={
+  task:'Go through the open issue, fix the rounding bug, and tell the team on the issue.',
+  vfs:{...small,'.claude/mcp.txt':TRACKER},
+  commands,tools:['tracker.list_issues','tracker.create_issue','tracker.comment','tracker.close'],connected:true,
+  script:[{verb:'call',target:'tracker.list_issues'},{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED},{verb:'call',target:'tracker.comment'},{verb:'call',target:'tracker.close'}],
+  hidden:[{verb:'call',target:'tracker.close'}],
+  accept:o=>!called(o,'tracker.comment')?'The agent never commented on the issue, so the team was not told.':fixed(o)||'src/price.js still rounds the wrong way.'
+};
+
 AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,scope,ledger,rollout,legacy,twofolders,lateread,legacyheavy,
   release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit,
-  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both};
+  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both,cmdfix,cmdset,cmdlint,stale,ui,triage};
 AQ.PEAK=PEAK;
 })();

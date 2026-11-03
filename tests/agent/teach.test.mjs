@@ -53,6 +53,8 @@ const FIRST = {
   worktree: [/\bworktrees?\b/i, 9, 2],
   'after edit': [/\bafter edit\b/, 10, 0],
   formatter: [/\bformatter\b/i, 10, 1],
+  'slash command': [/\bslash commands?\b/i, 11, 0],
+  '.claude/commands': [/\.claude\/commands/, 11, 0],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),
