@@ -383,8 +383,57 @@ const triage={
   accept:o=>!called(o,'tracker.comment')?'The agent never commented on the issue, so the team was not told.':fixed(o)||'src/price.js still rounds the wrong way.'
 };
 
+/* Chapter 14 jobs are unattended: a Plan has nobody to approve it, and anything but a read needs an allow line. The job is the saved
+   command nightly-fix, started by a simulated workflow file. The learner edits only the command or permissions.txt, both shipped here. */
+const WORKFLOW='# simulated: a nightly job that starts the agent with no one at the keyboard\nname: nightly\non:\n  schedule:\n    - cron: "0 3 * * *"\njobs:\n  fix:\n    runs-on: ubuntu-latest\n    steps:\n      - run: claude -p "$(cat .claude/commands/nightly-fix.md)"\n';
+const JOBFILE='.claude/commands/nightly-fix.md',ALLOWFILE='.claude/permissions.txt';
+const NIGHTLY='Goal: fix the rounding bug in src/price.js\n';
+const nightlyVfs=(log,cmd,allow)=>({...small,'.github/workflows/nightly.yml':WORKFLOW,'ci/last-run.log':log,[JOBFILE]:cmd,[ALLOWFILE]:allow});
+const PRICELOG='nightly run 03:00\nFAILED tests/price.test.js: adds cents\n  total() rounds the wrong way (src/price.js)\n';
+const nightly={
+  ...price,
+  task:'Fix the rounding bug in src/price.js, as the nightly job. Nobody is at the keyboard.',
+  vfs:nightlyVfs(PRICELOG,NIGHTLY+'Plan: first\nDone when: run npm test\n','allow edit src/price.js\nallow run npm test\n'),
+  unattended:true
+};
+const nightlyAllow={
+  ...price,
+  task:'Fix the rounding bug in src/price.js, as the nightly job. Nobody is at the keyboard.',
+  vfs:{...nightlyVfs(PRICELOG,NIGHTLY+'Done when: run npm test\n','# the actions this job may take, one per line\n'),'src/legacy/old.js':'// old billing code, still in use\n'},
+  commands:{...commands,'npm run deploy':()=>({ok:true,out:'deployed'})},
+  script:[...price.script,{verb:'edit',target:'src/legacy/old.js',write:'// rewritten\n'},{verb:'run',target:'npm run deploy'}],
+  hidden:[{verb:'edit',target:'src/legacy/'},{verb:'run',target:'npm run deploy'}],
+  unattended:true
+};
+const nightlyScope={
+  task:'Fix the rounding bug in src/tax.js, as the nightly job. Nobody is at the keyboard, and the failure of the last run is in ci/last-run.log.',
+  vfs:{...nightlyVfs('nightly run 03:00\nFAILED tests/tax.test.js: adds tax\n  tax() rounds the wrong way (src/tax.js)\n','Goal: fix the rounding bug in src/tax.js\nDone when: run npm test\n','allow edit src/tax.js\nallow run npm test\n'),
+    'src/tax.js':TAXBUG,'src/report.js':filler('report',50),'src/export.js':filler('export',50),'docs/notes.md':filler('notes',50)},
+  commands:{...commands,'npm test':v=>taxFixed({vfs:v})?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: tax() rounds the wrong way'}},tools:[],
+  explore:['ci/last-run.log','docs/notes.md','src/report.js','src/export.js','src/tax.js'],
+  /* no read step: the edit needs the log and the file, which only the scope or the explore reads */
+  script:[{...fixTax,needs:['ci/last-run.log','src/tax.js'],write:TAXFIXED}],
+  hidden:[],unattended:true,
+  accept:o=>!taxFixed(o)?'src/tax.js still rounds the wrong way.':o.tokens.peak>PEAK?'The job fixed the bug, but it held about '+o.tokens.peak+' tokens at once. The most allowed here is '+PEAK+'.':true
+};
+
+/* Chapter 15: the fix leaves a stray console.log. npm test passes either way; npm run verify is the tests plus no console.log, so only a
+   default check that runs it catches the line. Every start state ships a README that names the check. */
+const mem={...gate,commands:{...commands,'npm run verify':gate.commands['npm run check']}};
+const README='Before you merge, run npm run verify. It runs the tests and makes sure no console.log is left in src/.\n';
+const memgate={...mem,vfs:{...small,'README.md':README}};
+/* the typo does not parse, so the root line is ignored; the folder file is right but a folder file can never supply the default check */
+const memtypo={...mem,vfs:{...small,'README.md':README,'CLAUDE.md':small['CLAUDE.md']+'Done when: run npm run verfy\n','src/CLAUDE.md':'Done when: run npm run verify\n'}};
+const newrepo={
+  ...mem,
+  vfs:{...small,'README.md':'Never edit generated/ by hand: it is rebuilt from the schema.\n'+README,'generated/api.js':'// generated from the schema, do not edit by hand\n'},
+  script:[...mem.script,{verb:'edit',target:'generated/api.js',write:'// edited by hand\n'}],
+  hidden:[{verb:'edit',target:'generated/'}]
+};
+
 AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,scope,ledger,rollout,legacy,twofolders,lateread,legacyheavy,
   release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit,
-  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both,cmdfix,cmdset,cmdlint,stale,ui,triage};
+  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both,cmdfix,cmdset,cmdlint,stale,ui,triage,
+  nightly,'nightly-allow':nightlyAllow,'nightly-scope':nightlyScope,memgate,memtypo,newrepo};
 AQ.PEAK=PEAK;
 })();

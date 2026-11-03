@@ -55,6 +55,12 @@ const FIRST = {
   formatter: [/\bformatter\b/i, 10, 1],
   'slash command': [/\bslash commands?\b/i, 11, 0],
   '.claude/commands': [/\.claude\/commands/, 11, 0],
+  headless: [/\bheadless\b/i, 13, 0],
+  unattended: [/\bunattended\b/i, 13, 0],
+  CI: [/\bCI\b/, 13, 0],
+  // 14.1 says the job's permissions file lists its actions without writing a line of it
+  'allow VERB': [/\ballow (?:edit|read|run|call|send|delete)\b/, 13, 1],
+  'default check': [/\bdefault check\b/i, 14, 0],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),

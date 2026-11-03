@@ -7,8 +7,7 @@ const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
 const P = (prompt, files) => ({ prompt, files });
-// chapter indexes written so far; the last batch freezes all of 7 to 14
-const DEV = [7, 8, 9, 10, 11, 12];
+const DEV = [7, 8, 9, 10, 11, 12, 13, 14];
 const H = (t) => F({ '.claude/hooks.txt': t });
 const HEAD = '# before VERB TARGET\n# after edit PATH run COMMAND\n';
 const MCP = (t) => F({ '.claude/mcp.txt': t });
@@ -20,6 +19,13 @@ const TYPED = 'It worked, but you typed the lines yourself. This mission is abou
 const NEVER_USED = 'The run passed, but the saved command was never used. Call it with Use.';
 const TRACKER = 'tracker: list_issues, create_issue, comment, close\n';
 const SMALL_ARCH = { '.claude/agents/architect.md': 'name: architect\nmodel: small\n' };
+const JOB = (t) => F({ '.claude/commands/nightly-fix.md': t });
+const PERM = (t) => F({ '.claude/permissions.txt': t });
+const PG = 'Goal: fix the rounding bug in src/price.js\n';
+const TG = 'Goal: fix the rounding bug in src/tax.js\n';
+const NOTES = '# Shop notes\nPrices are in dollars.\n';
+const VERIFY = 'Done when: run npm run verify\n';
+const ROOT = (t) => F({ 'CLAUDE.md': NOTES + t });
 const inDev = (c) => DEV.includes(c);
 
 const CASES = [
@@ -124,22 +130,68 @@ const CASES = [
     fail: [{}, MCP(''), MCP('tracker: list_issues'), MCP('tracker: list_issues, comment, close'), MCP(TRACKER), MCP('tracker: close'), MCP('tracker: list_issues, create_issue'),
       F({ '.claude/permissions.txt': 'deny call tracker.close' }), F({ '.claude/permissions.txt': 'deny call tracker.close', '.claude/mcp.txt': 'tracker: list_issues, comment, close' }),
       F({ '.claude/hooks.txt': 'before call tracker.close' }), F({ 'CLAUDE.md': 'do not call tracker.close' })] },
+
+  { at: [13, 0],
+    pass: [JOB(PG + 'Done when: run npm test\n'), JOB(PG + 'Plan: off\nDone when: run npm test\n'), JOB('Done when: run npm test\n'), JOB(PG + 'Done when: run npm test\nConstraints: do not edit tests/\n'),
+      F({ '.claude/commands/nightly-fix.md': '', 'CLAUDE.md': NOTES + 'Done when: run npm test\n' })],
+    fail: [{}, JOB(''), JOB(PG + 'Plan: first\n'), JOB(PG + 'Plan: first\nDone when: run npm test\n'), JOB(PG), JOB(PG + 'Plan: first\nDone when: run npm test\nPlan: off'), PERM(''), PERM('allow edit src/price.js'),
+      // moved into the root CLAUDE.md with the Plan left in the command: the job still stalls
+      F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n' }), F({ 'CLAUDE.md': NOTES + 'Plan: first\nDone when: run npm test\n' }),
+      F({ '.claude/commands/nightly.md': PG + 'Done when: run npm test\n' })] },
+  { at: [13, 1],
+    pass: [PERM('allow edit src/price.js\nallow run npm test\n'), PERM('allow run npm test\nallow edit src/price.js'), PERM('# the job\nallow edit src/price.js\nallow run npm test\nallow read src/'),
+      PERM('allow edit src/price.js\nallow run npm test\nallow run npm run lint'), PERM('allow edit src/price.js\nallow run npm test\ndeny run npm run deploy')],
+    fail: [{}, PERM(''), PERM('allow edit src/price.js'), PERM('allow run npm test'), PERM('allow edit src/\nallow run npm'), PERM('allow edit src/\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm'),
+      PERM('allow edit src/price.js\nallow run npm test\nallow run npm run deploy'), PERM('allow edit src/price.js\nallow run npm test\nallow edit src/legacy/old.js'), PERM('allow edt src/price.js\nallow run npm test'),
+      PERM('deny edit src/legacy/\ndeny run npm run deploy'),
+      F({ 'CLAUDE.md': 'allow edit src/price.js\nallow run npm test' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n', '.claude/permissions.txt': '' }), F({ '.claude/hooks.txt': 'after edit src/ run npm test' }),
+      // a list in a file the job never reads
+      F({ '.claude/allow.txt': 'allow edit src/price.js\nallow run npm test' })] },
+  { at: [13, 2],
+    pass: [JOB(TG + 'Files: ci/last-run.log, src/tax.js\nDone when: run npm test\n'), JOB(TG + 'Files: src/tax.js, ci/last-run.log\nDone when: run npm test\n'), JOB(TG + 'Files: ci/last-run.log\nFiles: src/tax.js\nDone when: run npm test\n'),
+      JOB(TG + 'Files: ci/, src/tax.js\nDone when: run npm test\n')],
+    fail: [{}, JOB(''), JOB(TG + 'Files: src/tax.js\nDone when: run npm test\n'), JOB(TG + 'Files: ci/last-run.log\nDone when: run npm test\n'), JOB(TG + 'Files: ci/last-run.log, src/\nDone when: run npm test\n'),
+      JOB(TG + 'Files: src/\nDone when: run npm test\n'), JOB(TG + 'Done when: run npm test\n'),
+      // the pointer in a file the job does not read as a prompt, and a permissions list gone
+      F({ 'CLAUDE.md': 'Files: ci/last-run.log, src/tax.js\nDone when: run npm test' }),
+      F({ '.claude/commands/nightly-fix.md': TG + 'Files: ci/last-run.log, src/tax.js\nDone when: run npm test\n', '.claude/permissions.txt': '' }),
+      F({ '.claude/commands/nightly.md': TG + 'Files: ci/last-run.log, src/tax.js\nDone when: run npm test\n' })] },
+
+  { at: [14, 0],
+    pass: [ROOT(VERIFY), ROOT('do not edit migrations/\n' + VERIFY), F({ 'CLAUDE.md': VERIFY }), ROOT('done when: run npm run verify'), ROOT(VERIFY + 'Done when: run npm test\n'), ROOT('only edit src/\n' + VERIFY)],
+    fail: [{}, F({ 'CLAUDE.md': '' }), ROOT(''), ROOT('Done when: run npm test'), ROOT('Done when: run npm run lint'), ROOT('Done when: run npm run verfy'), ROOT('Done when: run npm test\n' + VERIFY), ROOT('Done when: read README.md'),
+      F({ '.claude/notes.txt': VERIFY }), F({ 'src/CLAUDE.md': VERIFY }), F({ '.claude/hooks.txt': 'after edit src/ run npm run verify' }),
+      // a hook that runs the command checks the file but is not the check written in memory
+      F({ '.claude/hooks.txt': 'after edit src/ run npm run verify', 'CLAUDE.md': NOTES + 'Done when: run npm test\n' })] },
+  { at: [14, 1],
+    pass: [F({ 'CLAUDE.md': NOTES + VERIFY }), F({ 'CLAUDE.md': NOTES + VERIFY, 'src/CLAUDE.md': VERIFY }), F({ 'CLAUDE.md': NOTES + VERIFY, 'src/CLAUDE.md': '' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm run verfy\n' + VERIFY }), F({ 'CLAUDE.md': VERIFY })],
+    fail: [{}, F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm run verfy\n' }), F({ 'CLAUDE.md': NOTES }), F({ 'CLAUDE.md': '' }), F({ 'CLAUDE.md': NOTES, 'src/CLAUDE.md': VERIFY }),
+      F({ 'CLAUDE.md': NOTES + 'Done when: run npm run Verify\n' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm run verfy\n', '.claude/hooks.txt': 'after edit src/ run npm run verify' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n', 'src/CLAUDE.md': VERIFY })] },
+  { at: [14, 2],
+    pass: [ROOT('do not edit generated/\n' + VERIFY), ROOT(VERIFY + 'do not edit generated/\n'), F({ 'CLAUDE.md': 'do not edit generated/\nDone when: run npm run verify' }), ROOT('only edit src/\n' + VERIFY)],
+    fail: [{}, F({ 'CLAUDE.md': '' }), ROOT('do not edit generated/\n'), ROOT('do not edit generated/\nDone when: run npm test\n'), ROOT(VERIFY), ROOT('do not edit src/\n' + VERIFY), ROOT('do not edit generated/\nDone when: run npm run verfy\n'),
+      F({ '.claude/hooks.txt': 'after edit src/ run npm run verify', 'CLAUDE.md': NOTES + 'do not edit generated/\n' }), F({ '.claude/notes.txt': 'do not edit generated/\n' + VERIFY })] },
 ];
 
 runCases(AQ, 'chapters 8 to 15: lazy and nearby answers are caught', CASES, (c) => !inDev(c));
 
-describe('dev chapters so far', () => {
-  it('have 3 missions each, in tier dev, after the 7 core chapters', () => {
-    assert.deepEqual([...DEV.map((c) => AQ.CH[c].missions.length)], DEV.map(() => 3));
-    assert.ok(DEV.every((c) => AQ.CH[c].tier === 'dev'));
+describe('dev chapters', () => {
+  it('are frozen at 8 chapters (indexes 7 to 14) of 3 missions each, in tier dev, after the 7 core chapters', () => {
+    assert.deepEqual([...DEV], [7, 8, 9, 10, 11, 12, 13, 14]);
+    assert.equal(AQ.CH.length, 15);
+    assert.deepEqual([...AQ.CH.slice(7).map((ch) => ch.missions.length)], [3, 3, 3, 3, 3, 3, 3, 3]);
+    assert.ok(AQ.CH.slice(7).every((ch) => ch.tier === 'dev'));
     assert.ok(AQ.CH.slice(0, 7).every((ch) => ch.tier === 'core'));
   });
   it('the starting setup of every mission fails its own check', () => {
     for (const c of DEV) AQ.CH[c].missions.forEach((m, i) => assert.equal(typeof AQ.runMission(m, {}, { approved: true }), 'string', `[${c}, ${i}]`));
   });
-  it('the tables of chapters 11 and 12 each hold an input that creates a .claude/ file the scenario does not ship, and it fails', () => {
+  it('the tables of chapters 11, 12 and 14 each hold an input that creates a .claude/ file the scenario does not ship, and it fails', () => {
     const unshipped = (m, x) => !!x && typeof x === 'object' && Object.keys(x.files || {}).some((p) => p.startsWith('.claude/') && !Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p));
-    for (const k of CASES.filter((x) => [10, 11].includes(x.at[0]))) assert.ok(k.fail.some((x) => unshipped(M(...k.at), x)), `[${k.at}]`);
+    for (const k of CASES.filter((x) => [10, 11, 13].includes(x.at[0]))) assert.ok(k.fail.some((x) => unshipped(M(...k.at), x)), `[${k.at}]`);
+  });
+  it('every table of chapters 14 and 15 holds a failing row that puts lines in the root CLAUDE.md', () => {
+    for (const k of CASES.filter((x) => [13, 14].includes(x.at[0]))) assert.ok(k.fail.some((x) => x && typeof x === 'object' && x.files && 'CLAUDE.md' in x.files), `[${k.at}]`);
   });
   it('the answer, wrong and lazy inputs and the passing table inputs only edit files their scenario ships', () => {
     const ships = (m, x) => { if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`); };
@@ -481,5 +533,150 @@ describe('13.3 Connect only the tools the job needs', () => {
   it('the explain names 5.4 and says what is different', () => {
     assert.match(M(12, 2).explain, /mission 5\.4/);
     assert.match(M(12, 2).explain, /5\.4 saved tokens, and 13\.3 is about availability/);
+  });
+});
+
+const skipped = (o, verb, target) => o.steps.find((s) => s.type === 'skip' && s.verb === verb && s.target === target);
+
+describe('chapter 14 jobs are unattended', () => {
+  it('all three scenarios are unattended, start from a simulated workflow, and ship the job files the learner edits', () => {
+    for (const i of [0, 1, 2]) {
+      const s = AQ.scenarios[M(13, i).scenario];
+      assert.equal(s.unattended, true, M(13, i).scenario);
+      assert.match(s.vfs['.github/workflows/nightly.yml'], /simulated/);
+      for (const p of ['ci/last-run.log', '.claude/commands/nightly-fix.md', '.claude/permissions.txt']) assert.ok(typeof s.vfs[p] === 'string', `${M(13, i).scenario}: ${p}`);
+      assert.equal(M(13, i).prompt, 'Use: nightly-fix');
+    }
+  });
+});
+
+describe('14.1 Nobody there to approve', () => {
+  it('a Plan stalls the job: the run is blocked, never awaiting, and the messages differ for a stall and for no check', () => {
+    const r = AQ.evaluate(M(13, 0), {}, { approved: true });
+    assert.ok(!r.awaiting);
+    assert.equal(r.outcome.status, 'blocked');
+    assert.ok(r.outcome.steps.some((s) => s.type === 'stall' && s.what === 'plan'));
+    assert.match(go(13, 0, M(13, 0).wrong).result, /waited for an approval nobody could give/);
+    assert.match(go(13, 0, JOB('')).result, /never finished a checked fix/);
+    assert.match(go(13, 0, JOB(PG)).result, /never finished a checked fix/);
+  });
+  it('without the Plan the job fixes the price through the correction loop and ends done', () => {
+    const { outcome } = go(13, 0, M(13, 0).answer);
+    assert.equal(outcome.status, 'done');
+    assert.ok(outcome.steps.some((s) => s.tag === 'fix'));
+    assert.equal(outcome.violations.length, 0);
+  });
+  it('the card says the permissions file lists the actions, but leaves the allow line for the next mission', () => {
+    const card = [M(13, 0).goal, M(13, 0).explain, M(13, 0).hint, ...M(13, 0).how].join('\n');
+    assert.doesNotMatch(card, /\ballow (?:edit|read|run|call|send|delete)\b/);
+    assert.match(card, /already lists the two actions the job may take/);
+  });
+});
+
+describe('14.2 Pre-approve exactly what it needs', () => {
+  it('with no list every edit and the check are skipped as nobody to ask, and only the read runs', () => {
+    const { outcome } = go(13, 1, M(13, 1).lazy);
+    assert.deepEqual([...outcome.calls.map((x) => x.verb)], ['read']);
+    for (const [verb, target] of [['edit', 'src/price.js'], ['edit', 'src/legacy/old.js'], ['run', 'npm run deploy'], ['run', 'npm test']]) assert.equal(skipped(outcome, verb, target).by, 'no one to ask', target);
+    assert.equal(go(13, 1, M(13, 1).lazy).result, 'No edit was allowed, so nothing was fixed.');
+  });
+  it('the narrow list keeps the legacy edit and the deploy out; a wide list lets both run as violations', () => {
+    const a = go(13, 1, M(13, 1).answer).outcome;
+    assert.equal(a.status, 'done');
+    assert.equal(a.violations.length, 0);
+    assert.equal(skipped(a, 'run', 'npm run deploy').by, 'no one to ask');
+    assert.equal(go(13, 1, M(13, 1).wrong).outcome.violations.length, 2);
+  });
+  it('a list for the fix alone writes it but never runs the check, and says so', () => {
+    const r = go(13, 1, PERM('allow edit src/price.js'));
+    assert.equal(r.outcome.status, 'unverified');
+    assert.equal(r.result, 'The fix was written but nobody allowed the check to run.');
+  });
+  it('an allow line is inert when the job is attended', () => {
+    const attended = { ...AQ.scenarios['nightly-allow'], unattended: false };
+    const { prompt, setup } = AQ.prepare(M(13, 1), {});
+    const o = AQ.policy.run(attended, setup, prompt, {});
+    assert.ok(o.calls.some((x) => x.target === 'npm run deploy'));
+  });
+});
+
+describe('14.3 Tell the unattended job where to look', () => {
+  it('the goal states the limit, the answer stays under it and reading the whole project does not', () => {
+    assert.ok(M(13, 2).goal.includes(` ${AQ.PEAK} tokens`));
+    assert.ok(go(13, 2, M(13, 2).answer).outcome.tokens.peak <= AQ.PEAK);
+    const lazy = go(13, 2, M(13, 2).lazy);
+    assert.ok(lazy.outcome.tokens.peak > AQ.PEAK);
+    assert.match(lazy.result, /most allowed here is/);
+  });
+  it('the log is a source of the edit: a scope without it skips the edit as not seen yet', () => {
+    const w = go(13, 2, M(13, 2).wrong);
+    assert.equal(skipped(w.outcome, 'edit', 'src/tax.js').by, 'not seen yet');
+    assert.equal(typeof w.result, 'string');
+    assert.ok(!AQ.scenarios['nightly-scope'].script.some((a) => a.verb === 'read'));
+  });
+});
+
+describe('15.1 to 15.3 the project memory file', () => {
+  it('the fixed prompts have no Done when and no scope, so only the root CLAUDE.md can supply the check', () => {
+    for (const i of [0, 1, 2]) assert.equal(M(14, i).prompt, 'Goal: fix the rounding bug in src/price.js');
+  });
+  it('npm test passes with the debug line left in, and the project\'s own command does not', () => {
+    for (const name of ['memgate', 'memtypo', 'newrepo']) {
+      const s = AQ.scenarios[name], v = AQ.vfs.create({ ...s.vfs, 'src/price.js': 'console.log(1);\nMath.round(' });
+      assert.equal(s.commands['npm test'](v).ok, true, name);
+      assert.equal(s.commands['npm run verify'](v).ok, false, name);
+      assert.equal(s.correction(AQ.vfs.create({ ...s.vfs, 'src/price.js': 'console.log(1);\nMath.round(' }), 0).verb, 'edit');
+    }
+  });
+  it('each gap gets its own message: debug line, no memory check, never verified', () => {
+    assert.match(go(14, 0, M(14, 0).wrong).result, /debug console\.log still ships/);
+    assert.match(go(14, 0, M(14, 0).lazy).result, /debug console\.log still ships/);
+    const hook = go(14, 0, F({ '.claude/hooks.txt': 'after edit src/ run npm run verify' }));
+    assert.ok(hook.outcome.steps.some((s) => s.type === 'hook' && s.run === 'npm run verify' && s.ok === false));
+    assert.equal(hook.result, 'The project\'s own check was never set up in CLAUDE.md. Write it there as a Done when line in the root file.');
+  });
+  it('the answer runs the project\'s check, repairs the debug line and ends done', () => {
+    for (const i of [0, 1, 2]) {
+      const { outcome } = go(14, i, M(14, i).answer);
+      assert.equal(outcome.status, 'done');
+      assert.ok(outcome.calls.some((x) => x.target === 'npm run verify'));
+      assert.ok(outcome.steps.some((s) => s.tag === 'fix'));
+      assert.equal(outcome.violations.length, 0);
+    }
+  });
+  it('a typed Done when beats the one in CLAUDE.md', () => {
+    const m = { ...M(14, 0), prompt: M(14, 0).prompt + '\nDone when: run npm test' };
+    const { outcome } = AQ.evaluate(m, M(14, 0).answer);
+    assert.ok(outcome.calls.some((x) => x.target === 'npm test'));
+    assert.ok(!outcome.calls.some((x) => x.target === 'npm run verify'));
+  });
+});
+
+describe('15.2 Fix a default that never runs', () => {
+  const root = (files) => AQ.config.memoryRules(AQ.prepare(M(14, 1), files).setup, AQ.scenarios.memtypo);
+  it('the typo line does not parse and stays ignored, the repaired one is the default check', () => {
+    const start = root({});
+    assert.equal(start.check, null);
+    assert.ok(start.ignored.includes('Done when: run npm run verfy'));
+    assert.equal(JSON.stringify(root(M(14, 1).answer).check), JSON.stringify({ verb: 'run', target: 'npm run verify' }));
+  });
+  it('the folder file holds the right line but never supplies the check, and the run ends unverified', () => {
+    assert.match(AQ.scenarios.memtypo.vfs['src/CLAUDE.md'], /Done when: run npm run verify/);
+    assert.equal(go(14, 1, {}).outcome.status, 'unverified');
+    assert.equal(go(14, 1, F({ 'CLAUDE.md': NOTES, 'src/CLAUDE.md': VERIFY })).outcome.status, 'unverified');
+  });
+});
+
+describe('15.3 Write it for a new repo', () => {
+  it('the README names the rule and the check, and the goal names neither', () => {
+    assert.match(AQ.scenarios.newrepo.vfs['README.md'], /generated\/[\s\S]*npm run verify/);
+    assert.doesNotMatch(M(14, 2).goal, /generated|verify/);
+  });
+  it('the rule alone blocks the generated edit but leaves the debug line, and without the rule the hand edit is a violation', () => {
+    const rule = go(14, 2, ROOT('do not edit generated/\n'));
+    assert.equal(skipped(rule.outcome, 'edit', 'generated/api.js').by, 'CLAUDE.md');
+    assert.equal(rule.outcome.violations.length, 0);
+    assert.match(rule.result, /debug console\.log still ships/);
+    assert.match(go(14, 2, ROOT(VERIFY)).result, /edit generated\/api\.js, and nothing told it not to/);
   });
 });
