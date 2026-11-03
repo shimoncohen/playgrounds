@@ -79,6 +79,29 @@ function analyse(F,errors){
   return true;
 }
 
+// E0596: a `&mut` borrow of a named local that is not `mut` (a ref temp for an autoref has no name), or push_str through a `&` receiver
+function mutability(F,errors){
+  const L=F.locals,seen=new Set();
+  const err=(i,name,ref)=>{
+    const k=i.line+':'+i.col;
+    if(seen.has(k))return;
+    seen.add(k);
+    errors.push(RQ.diag.make('E0596',i.line,i.col,{name,ref}));
+  };
+  for(const b of F.blocks){
+    if(b.unreachable)continue;
+    for(const i of b.instrs){
+      const r=i.rv;
+      if(!r)continue;
+      if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut)err(i,L[r.l].name,false);
+      else if(r.k==='method'&&r.recv.k!=='const'&&RQ.std.methods.get(r.name).self==='&mut'){
+        const t=L[r.recv.l].ty;
+        if(t.k==='ref'&&!t.mut)err(i,'*'+(L[r.recv.l].name||'value'),true);
+      }
+    }
+  }
+}
+
 const bit=k=>1n<<BigInt(k);
 const refy=t=>t.k==='ref'||t.k==='str';
 
@@ -160,6 +183,13 @@ function loanPass(F,errors,un,loans){
       for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l])lm|=s[l];
       if(lm)lo.forEach((x,k)=>{if(lm&lb[k])x.live.add(i.ast);});
       uses(i,(l,_mv,kind)=>access(l,kind,i));
+      if(i.op==='dead'){
+        const hit=lm&(onS[i.l]|onM[i.l]);
+        if(hit)lo.forEach((x,k)=>{
+          const key='E0597@'+x.i.line+':'+x.i.col;
+          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0597',x.i.line,x.i.col,{name:L[i.l].name}));}
+        });
+      }
       if(i.op==='assign'){
         access(i.l,'write',i);
         if(i.rv.k==='agg')for(const x of i.rv.args)if(x.k!=='const'&&(s[x.l]||refy(L[x.l].ty)||RQ.types.hasRef(L[x.l].ty)))un('reference in aggregate',i);
@@ -174,7 +204,11 @@ function loanPass(F,errors,un,loans){
 RQ.borrow=(ast,info)=>{
   const m=RQ.mir(ast,info),errors=[],loans=[],unsupported=[...m.unsupported],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
-  if(!unsupported.length)for(const F of m.fns)if(!analyse(F,errors)||!loanPass(F,errors,un,loans)){unsupported.push({feature:'program too large',line:F.line});break;}
+  if(!unsupported.length)for(const F of m.fns){
+    const ok=analyse(F,errors);
+    if(ok)mutability(F,errors);
+    if(!ok||!loanPass(F,errors,un,loans)){unsupported.push({feature:'program too large',line:F.line});break;}
+  }
   return {errors,unsupported,loans,analysed:m.fns.map(f=>f.name)};
 };
 })();

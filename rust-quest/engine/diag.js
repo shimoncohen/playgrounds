@@ -41,6 +41,16 @@ const ERRORS={
     msg:o=>'cannot assign to `'+o.name+'` because it is borrowed',
     tip:'Changing a variable that a borrow still points at would change what the borrow sees. Use the borrow before the assignment, or assign first.'
   },
+  E0596:{
+    title:'a value is borrowed as mutable, but it cannot change',
+    msg:o=>o.ref?'cannot borrow `'+o.name+'` as mutable, as it is behind a `&` reference':'cannot borrow `'+o.name+'` as mutable, as it is not declared as mutable',
+    tip:'Changing a value through a borrow needs the right to change it. Write `let mut` for the variable, or take a `&mut` parameter instead of a `&` one.'
+  },
+  E0597:{
+    title:'a borrowed value goes out of scope too soon',
+    msg:o=>'`'+o.name+'` does not live long enough',
+    tip:'A variable disappears at the end of the block that declares it, and a borrow of it cannot outlast that. Declare the variable in the outer block, or use the borrow before the block ends.'
+  },
   E0428:{
     title:'a name is defined twice',
     msg:o=>'the name `'+o.name+'` is defined multiple times',

@@ -183,7 +183,11 @@ describe('methods', () => {
     for (const r of ['String', '&String']) ok(r, 'let c: &str = s.as_str()');
   });
   it('push_str on String and &mut String, and through &String (E0596 is a borrow-pass error)', () => {
-    for (const r of ['String', '&mut String', '&String']) ok(r, 's.push_str("x")');
+    // the checker alone: since 4b the borrow pass reports E0596 for the String and &String params, so RQ.compile would
+    for (const r of ['String', '&mut String', '&String']) {
+      const k = RQ.check(RQ.parse(RQ.lex(main('', `fn t(s: ${r}) { s.push_str("x"); }`))).ast);
+      assert.deepEqual([k.errors, k.unsupported], [[], []], r);
+    }
   });
   it('every other receiver or name is method call', () => {
     const no = (recv, call) => assert.equal(un('', `fn t(s: ${recv}) { ${call}; }`), 'method call@1', `${recv} ${call}`);

@@ -267,3 +267,131 @@ describe('loans: unsupported rows', () => {
     } finally { RQ.mir = real; }
   });
 });
+
+describe('E0596: a mutable borrow of what is not mutable', () => {
+  it('push_str on a local that is not mut, at the push_str', () => {
+    assert.equal(diags(SIMPLE('let s = String::new();', 's.push_str("x");')), 'E0596@3');
+    assert.equal(diags(SIMPLE('let mut s = String::new();', 's.push_str("x");')), '');
+  });
+  it('&mut of a local that is not mut, and of a param that is not mut', () => {
+    assert.equal(diags(SIMPLE('let x = 5;', 'let r = &mut x;')), 'E0596@3');
+    assert.equal(diags(SIMPLE('let mut x = 5;', 'let r = &mut x;')), '');
+    assert.equal(diags(P('fn f(s: String) {', '    s.push_str("x");', '}', 'fn main() {', '}')), 'E0596@2');
+  });
+  it('a call argument: f(&mut x) on an immutable x is at the f( line', () => {
+    const f = 'fn f(a: &mut i32) {}';
+    assert.equal(diags(P(f, 'fn main() {', '    let x = 1;', '    f(&mut x);', '}')), 'E0596@4');
+    assert.equal(diags(P(f, 'fn main() {', '    let mut x = 1;', '    f(&mut x);', '}')), '');
+  });
+  it('push_str through a &String param, and a &mut param that is not itself mut is fine', () => {
+    assert.equal(diags(P('fn add(s: &String) {', '    s.push_str("x");', '}', 'fn main() {', '}')), 'E0596@2');
+    assert.equal(diags(P('fn add(s: &mut String) {', '    s.push_str("x");', '}', 'fn main() {', '}')), '');
+    assert.equal(diags(SI('let r = &mut s;', 'r.push_str("x");')), '');
+  });
+  it('a deferred let that is not mut', () => {
+    assert.equal(diags(SIMPLE('let s: String;', 's = String::new();', 's.push_str("x");')), 'E0596@4');
+  });
+  it('is one coded error through RQ.run', () => {
+    const c = RQ.run(SIMPLE('let x = 5;', 'let r = &mut x;'));
+    assert.equal(c.status, 'error');
+    assert.ok(c.onlyError('E0596'));
+    assert.ok(c.hasError('E0596', 3));
+  });
+});
+
+describe('E0597: a borrowed local goes out of scope', () => {
+  const dangling = (open, close) => P('fn main() {', '    let r: &i32;', open, '        let x = 5;', '        r = &x;', close, '    println!("{}", r);', '}');
+  it('a block ends while its local is borrowed, reported at the borrow', () => {
+    assert.equal(diags(dangling('    {', '    }')), 'E0597@5');
+  });
+  it('the same text without the braces is fine', () => assert.equal(diags(dangling('     ', '     ')), ''));
+  it('a break out of the loop kills the local', () => {
+    const src = (decl) => P('fn main() {', '    let mut x = 5;', '    let r: &i32;', '    loop {', '        ' + decl + 'x = 5;', '        r = &x;', '        break;', '    }', '    println!("{}", r);', '}');
+    assert.equal(diags(src('let ')), 'E0597@6');
+    assert.equal(diags(src('')), '');
+  });
+  it('a for variable dies each iteration, and a continue or return with a holder nobody reads is fine', () => {
+    assert.equal(diags(P('fn main() {', '    let z = 0;', '    let mut r = &z;', '    for i in 0..2 {', '        r = &i;', '    }', '    println!("{}", r);', '}')), 'E0597@5');
+    assert.equal(diags(P('fn f(c: bool) {', '    let y = 1;', '    let mut r = &y;', '    loop {', '        let x = 5;', '        r = &x;', '        if c {', '            continue;', '        }', '        return;', '    }', '}', 'fn main() {', '    f(true);', '}')), '');
+  });
+  it('a block value that holds a loan to a block local', () => {
+    assert.equal(diags(P('fn main() {', '    let r = {', '        let x = 5;', '        &x', '    };', '    println!("{}", r);', '}')), 'E0597@4');
+  });
+  it('a loan nobody uses after the scope is fine', () => {
+    assert.equal(diags(SIMPLE('{', '    let x = 5;', '    let r = &x;', '    println!("{}", r);', '}')), '');
+    assert.equal(diags(SIMPLE('let r: &i32;', '{', '    let x = 5;', '    r = &x;', '}')), '');
+  });
+  it('is one coded error through RQ.run', () => {
+    const c = RQ.run(dangling('    {', '    }'));
+    assert.equal(c.status, 'error');
+    assert.ok(c.onlyError('E0597'));
+    assert.ok(c.hasError('E0597', 5));
+  });
+});
+
+describe('the unsupported list, end to end through RQ.run', () => {
+  const sweep = (src, feature, line) => {
+    const c = RQ.run(src);
+    assert.equal(c.status, 'unsupported', feature);
+    assert.equal(c.unsupported.feature, feature);
+    assert.equal(c.unsupported.line, line, feature);
+  };
+  const sweepAll = (rows) => rows.forEach(([src, feature, line]) => sweep(src, feature, line));
+  it('checker triggers', () => sweepAll([
+    [P("fn f(s: &'a str) {}", 'fn main() {', '}'), 'explicit lifetime', 1],
+    [P('fn f() -> &str {', '    "a"', '}', 'fn main() {', '}'), 'lifetime elision', 1],
+    [SIMPLE('let x = 1;', 'let r = &x;', 'let rr = &r;'), 'reference to reference', 4],
+    [SIMPLE('let mut s = String::new();', 'let r: &String = &mut s;'), 'reference coercion', 3],
+    [SIMPLE('let mut s = String::new();', 'let r = &mut s;', 'let t = r.as_str();'), 'reborrow', 4],
+    [SIMPLE('let a = [String::new(); 2];'), 'type checking', 2],
+    [SIMPLE('let x;'), 'deferred initialization', 2],
+    [SIMPLE('let s = String::new();', 's.foo();'), 'method call', 3],
+    [SIMPLE('let s = String::default();'), 'path call', 2],
+    [P('fn f(r: &i32) {', '    *r = 1;', '}', 'fn main() {', '}'), 'assignment target', 2],
+    [SIMPLE('let x = 1;', 'let y = *x;'), 'dereference', 3]
+  ]));
+  it('mir triggers', () => sweepAll([
+    [SIMPLE('let mut x = 1;', 'let r = &mut x;', 'let r2 = r;'), 'reborrow', 4],
+    [SIMPLE('let x = 1;', 'let r = &x;', 'let r2 = &*r;'), 'reborrow', 4],
+    [SIMPLE('let t = (1, 2);', 'let r = &t.0;'), 'borrow of a field', 3],
+    [SIMPLE('let r = &String::new();'), 'temporary borrow', 2],
+    [SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'), 'temporary borrow', 2],
+    [SIMPLE('let t = (String::from("a"), 1);', 'let s = t.0;'), 'partial move', 3],
+    [SIMPLE('let s = String::new();', 'let r = &s;', 'let t = *r;'), 'move out of reference', 4],
+    [SIMPLE('let mut s = String::from("a");', 's.push_str(&s);'), 'two-phase borrow', 3],
+    [SIMPLE('let s = String::new();', 'if true {', '}'), 'constant condition', 3],
+    [SIMPLE(...Array.from({ length: 600 }, (_, i) => `let a${i} = ${i};`), 'let s = String::new();'), 'program too large', 1]
+  ]));
+  it('borrow triggers and the lint', () => sweepAll([
+    [SIMPLE('let mut x = 5;', 'let r = &mut x;', 'let y = x;', '*r = 1;', 'println!("{}", y);'), 'use while borrowed', 4],
+    [SIMPLE('let x = 5;', 'let r = &x;', 'let t = (r, 1);', 'println!("{}", t.1);'), 'reference in aggregate', 4],
+    [SIMPLE('let x: u8 = 255;', 'let r = &x;', 'let y = x + 1;'), 'const folding', 4]
+  ]));
+  it('as_str on a temporary is never ok', () => {
+    const c = RQ.run(SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'));
+    assert.notEqual(c.status, 'ok');
+    assert.equal(c.status, 'unsupported');
+  });
+});
+
+describe('large programs', () => {
+  it('a doubling program stops with the string size limit, not a crash', () => {
+    const c = RQ.run(SI('loop {', '    let t = s.clone();', '    s.push_str(&t);', '}'));
+    assert.equal(c.status, 'limit');
+    assert.equal(c.limit, 'string size');
+  });
+  it('a big generated program is checked and run fast', () => {
+    const body = Array.from({ length: 90 }, (_, i) => [`let s${i} = String::from("a");`, `let r${i} = &s${i};`, `println!("{}", r${i});`]).flat();
+    const t0 = Date.now();
+    const c = RQ.run(SIMPLE(...body));
+    assert.equal(c.status, 'ok');
+    assert.equal(c.stdout, 'a\n'.repeat(90));
+    assert.ok(Date.now() - t0 < 5000);
+  });
+  it('and the same program with a conflict at the end is one error', () => {
+    const body = Array.from({ length: 90 }, (_, i) => [`let mut s${i} = String::from("a");`, `let r${i} = &s${i};`]).flat();
+    const c = RQ.run(SIMPLE(...body, 's89.push_str("x");', 'println!("{}", r89);'));
+    assert.equal(c.status, 'error');
+    assert.ok(c.onlyError('E0502'));
+  });
+});

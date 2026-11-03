@@ -1018,5 +1018,77 @@
     "src": "fn main() {\n    let s = String::from(\"a\");\n    let a = &s;\n    let b = &s;\n    println!(\"{} {} {}\", a, b, s);\n}\n",
     "expect": "ok", "out": "a a a\n", "err": "", "exit": 0,
     "why": "any number of shared borrows can be live together", "pr": "P5"
+  },
+  {
+    "id": "immutable-push",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": { "code": "E0596", "line": 3 }, "pair": "immutable-push-ok",
+    "why": "push_str borrows s as mutable, but s was not declared mut", "pr": "P5"
+  },
+  {
+    "id": "immutable-push-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ax\n", "err": "", "exit": 0,
+    "why": "mut lets push_str borrow s as mutable", "pr": "P5"
+  },
+  {
+    "id": "immutable-mut-borrow",
+    "src": "fn main() {\n    let x = 5;\n    let r = &mut x;\n    *r = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0596", "line": 3 }, "pair": "immutable-mut-borrow-ok",
+    "why": "&mut x needs x declared mut", "pr": "P5"
+  },
+  {
+    "id": "immutable-mut-borrow-ok",
+    "src": "fn main() {\n    let mut x = 5;\n    let r = &mut x;\n    *r = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "the write through r is the last use of the loan, so x can be printed after it", "pr": "P5"
+  },
+  {
+    "id": "immutable-call-arg",
+    "src": "fn set(a: &mut i32) {\n    *a = 2;\n}\n\nfn main() {\n    let x = 1;\n    set(&mut x);\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0596", "line": 7 }, "pair": "immutable-call-arg-ok",
+    "why": "the &mut x argument needs x declared mut", "pr": "P5"
+  },
+  {
+    "id": "immutable-call-arg-ok",
+    "src": "fn set(a: &mut i32) {\n    *a = 2;\n}\n\nfn main() {\n    let mut x = 1;\n    set(&mut x);\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "x is mut, and the loan from the call is over before the print", "pr": "P5"
+  },
+  {
+    "id": "param-ref-push",
+    "src": "fn add(s: &String) {\n    s.push_str(\"x\");\n}\n\nfn main() {\n    println!(\"a\");\n}\n",
+    "expect": { "code": "E0596", "line": 2 }, "pair": "param-ref-push-ok",
+    "why": "push_str through a & reference needs a &mut one", "pr": "P5"
+  },
+  {
+    "id": "param-ref-push-ok",
+    "src": "fn add(s: &mut String) {\n    s.push_str(\"x\");\n}\n\nfn main() {\n    println!(\"a\");\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "a &mut String parameter can be pushed to", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling",
+    "src": "fn main() {\n    let r: &i32;\n    {\n        let x = 5;\n        r = &x;\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0597", "line": 5 }, "pair": "scope-dangling-ok",
+    "why": "x ends with its block, but r still points at it when it is printed", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling-ok",
+    "src": "fn main() {\n    let r: &i32;\n     \n        let x = 5;\n        r = &x;\n     \n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "without the inner block, x lives as long as main", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling-loop",
+    "src": "fn main() {\n    let mut x = 5;\n    let r: &i32;\n    loop {\n        let x = 5;\n        r = &x;\n        break;\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0597", "line": 6 }, "pair": "scope-dangling-loop-ok",
+    "why": "the x inside the loop ends at the break, but r points at it after the loop", "pr": "P5"
+  },
+  {
+    "id": "scope-dangling-loop-ok",
+    "src": "fn main() {\n    let mut x = 5;\n    let r: &i32;\n    loop {\n        x = 5;\n        r = &x;\n        break;\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "assigning the outer x instead of declaring a new one keeps the borrowed value alive", "pr": "P5"
   }
 ]
