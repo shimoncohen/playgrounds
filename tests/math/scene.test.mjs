@@ -47,6 +47,21 @@ test('colorOf follows the order of params', () => {
   assert.equal(m.colorOf('c'), MQ.palette[2]);
 });
 
+test('extra terms take the colors after the params', () => {
+  const m = MQ.scene.model({ params: { a: { min: 0, max: 1, value: 0, label: 'a' } }, terms: ['add', 'mul'], live: '' });
+  assert.equal(m.colorOf('add'), MQ.palette[1]);
+  assert.equal(m.colorOf('mul'), MQ.palette[2]);
+});
+
+test('live can be a function of the state, so it can follow t', () => {
+  const m = MQ.scene.model({
+    params: { a: { min: 0, max: 9, value: 2, label: 'a' } }, t: { min: 0, max: 3, step: 1, value: 0 },
+    derived: p => ({ d: p.a * 2 }), live: s => `${s.params.a} ${s.derived.d} ${s.t}`,
+  });
+  m.set('t', 2);
+  assert.equal(m.live(), '2 4 2');
+});
+
 test('t is 0 without a t param, and snaps when there is one', () => {
   assert.equal(box().state().t, 0);
   const m = MQ.scene.model({ params: {}, t: { min: 0, max: 1, step: 0.25, value: 0 }, live: '{t}' });

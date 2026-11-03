@@ -113,6 +113,9 @@ ds-quest/               like those, plus engine.js (runner), content.js (course)
 math-quest/              the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
 math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
 math-quest/input/        the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math-quest/rng.js is the seeded random source
+math-quest/track.js     the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
+math-quest/arithmetic/ math-quest/algebra/
+                        a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 shell-quest/            split by job (below)

@@ -52,7 +52,9 @@
     const top = h('div', 'mq-work-top', el);
     const q = h('div', 'mq-q', top);
     q.setAttribute('aria-label', 'Question: ' + mission.question);
-    katexInto(q, mission.question);
+    // A mission's own tex keeps ÷ as ÷: math.js would print 12/2*3 as a fraction, hiding the left-to-right order.
+    if (mission.tex && window.katex) katex.render(mission.tex, q, { throwOnError: false });
+    else katexInto(q, mission.question);
     if (!q.childNodes.length) q.textContent = mission.question;
     const sw = h('label', 'mq-switch', top);
     const box = h('input', null, sw);

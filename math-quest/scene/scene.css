@@ -6,6 +6,9 @@
 .mq-svg .axes text{fill:var(--muted,#536677);paint-order:stroke;stroke:var(--bg,#E7ECF1);stroke-width:3px;stroke-linejoin:round;font:10px var(--font-mono,monospace)}
 .mq-svg .shape{stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
 .mq-svg .shape.hl{stroke-width:6}
+.mq-svg .label{fill:currentColor;font:700 20px var(--font-mono,monospace)}
+.mq-svg .label.small{fill:var(--muted,#536677);font:600 15px var(--font-body,sans-serif)}
+.mq-svg .label.hl{text-decoration:underline}
 .mq-svg .pt.hl{stroke:var(--ink,#14202A);stroke-width:3}
 .mq-svg .pt.drag{cursor:grab;touch-action:none;stroke:var(--surface,#F7F9FB);stroke-width:2}
 .mq-svg .pt.drag:focus-visible{outline:2px solid var(--ink,#14202A);outline-offset:3px}

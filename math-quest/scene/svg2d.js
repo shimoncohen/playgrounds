@@ -2,7 +2,6 @@
   const MQ = globalThis.MQ = globalThis.MQ || {};
   const S = MQ.svg2d = {};
   const NS = 'http://www.w3.org/2000/svg';
-  const W = 400, H = 300;
 
   // Splits at non-finite values and at a sign flip with a jump over half the range, so 1/x gets no vertical line.
   // shortcut: needs n >= ~50 to see the jump, raise n for a function that is steeper than 1/x.
@@ -32,7 +31,7 @@
   };
 
   S.draw = (svg, def, state, colorOf, set) => {
-    const [x0, x1, y0, y1] = def.view;
+    const [x0, x1, y0, y1] = def.view, [W, H] = def.box || [400, 300];
     const X = x => (x - x0) / (x1 - x0) * W, Y = y => H - (y - y0) / (y1 - y0) * H;
     const focused = document.activeElement && svg.contains(document.activeElement) ? document.activeElement.getAttribute('data-id') : null;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -50,6 +49,8 @@
         for (const seg of S.sample(it.f, x0, x1)) paint(el('polyline', { class: 'shape fn', fill: 'none', points: seg.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');
       } else if (it.type === 'polygon') {
         paint(el('polygon', { class: 'shape', 'fill-opacity': '.25', 'stroke-width': 2, points: it.pts.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke').setAttribute('fill', it.term ? colorOf(it.term) : 'currentColor');
+      } else if (it.type === 'text') {
+        el('text', { class: 'label' + (it.small ? ' small' : ''), x: X(it.x), y: Y(it.y), 'text-anchor': it.anchor || 'middle', 'dominant-baseline': 'central', 'data-term': it.term }, svg).textContent = it.s;
       } else if (it.type === 'vector') {
         const [a, b] = [it.from, it.to], ang = Math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])), h = 9;
         const tip = [X(b[0]), Y(b[1])];
