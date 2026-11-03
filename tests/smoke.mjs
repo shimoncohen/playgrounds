@@ -2215,28 +2215,20 @@ const railGaps = page => page.evaluate(() => {
 });
 
 test('agent-quest: after a reload at chapter 15 the active chapter chip is scrolled into the rail at 390 and 1280', async () => {
-  for (const width of [390, 1280]) {
+  for (const width of [390, 740, 1280]) {
     const o = await agentPage({ viewport: { width, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
     const { page } = o;
     for (const when of ['on load', 'after a reload']) {
       const g = await railGaps(page);
       assert.equal(g.chapter, '14');
       assert.equal(g.v, true, `the chapter 15 chip is cut off at the top or bottom of the rail at ${width}, ${when}`);
-      if (width < 721) assert.equal(g.h, true, `the chapter 15 chip is cut off at the side at ${width}, ${when}: ${g.chip} in ${g.rail}`);
+      assert.equal(g.h, true, `the chapter 15 chip is cut off at the side at ${width}, ${when}: ${g.chip} in ${g.rail}`);
       await page.reload();
       await page.waitForSelector('#runBtn');
     }
     assert.deepEqual(o.errors, []);
     await o.ctx.close();
   }
-});
-
-// DEFECT: "Writing a project CLAUDE.md" is wider than the 360px rail at 1280, so revealCurrent scrolls the rail sideways and clips the chapter number
-test('agent-quest: the chapter 15 chip fits the width of the rail at 1280', async () => {
-  const o = await agentPage({ viewport: { width: 1280, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
-  const g = await railGaps(o.page);
-  assert.equal(g.h, true, `the chapter 15 chip is cut off at the side: ${g.chip} in ${g.rail}`);
-  await o.ctx.close();
 });
 
 test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {

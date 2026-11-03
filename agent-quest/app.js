@@ -121,7 +121,6 @@ function revealCurrent(){
   const a=chaptersEl.querySelector('[aria-current="true"]');if(!a)return;
   const r=a.getBoundingClientRect(),c=chaptersEl.getBoundingClientRect();
   if(r.bottom>c.bottom)chaptersEl.scrollTop+=r.bottom-c.bottom;else if(r.top<c.top)chaptersEl.scrollTop-=c.top-r.top;
-  if(chaptersEl.scrollWidth<=chaptersEl.clientWidth)return;
   if(r.right>c.right)chaptersEl.scrollLeft+=r.right-c.right;else if(r.left<c.left)chaptersEl.scrollLeft-=c.left-r.left;
 }
 function renderMission(){
