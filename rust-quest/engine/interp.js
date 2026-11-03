@@ -151,6 +151,7 @@ RQ.interp=(ast,opts)=>{
       for(const s of b.stmts){
         tick();
         if(s.t==='Let'){
+          if(!s.init)throw new Unsup('deferred initialization',s.line);
           const v=ev(s.init,env);
           if(s.pat.t==='IdentPat')env[env.length-1].set(s.pat.name,{val:v});
         }else if(s.t==='ExprStmt')ev(s.expr,env);
@@ -199,6 +200,7 @@ RQ.interp=(ast,opts)=>{
         return binop(e.op,a,b,e);
       }
       case 'Assign':{
+        if(e.lhs.t!=='Path')throw new Unsup('assignment target',e.line);
         const cell=find(env,e.lhs.segs[0].name);
         if(!cell)return bug('assign');
         let r=ev(e.rhs,env);
@@ -206,8 +208,8 @@ RQ.interp=(ast,opts)=>{
         cell.val=r;return UNIT;
       }
       case 'Call':{
-        const f=fns.get(e.callee.segs[0].name);
-        if(!f)return bug('call');
+        const f=e.callee.t==='Path'&&fns.get(e.callee.segs[0].name);
+        if(!f)throw new Unsup('call',e.line);
         return callFn(f,e.args.map(a=>ev(a,env)),e.line);
       }
       case 'Macro':return macro(e,env);

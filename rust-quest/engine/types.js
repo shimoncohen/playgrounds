@@ -1,6 +1,7 @@
-/* Checker types are plain objects: {k:'int',ty}, 'float' (f64), 'bool', 'char', 'str', 'unit', 'never', 'any', tuple {els},
-   array {el,n}, and the inference variables ivar and fvar, which stand for an int or float literal whose type is still open
-   and get bound by unify. DOM-free. */
+/* Checker types are plain objects: {k:'int',ty}, 'float' (f64), 'bool', 'char', 'str' (a &str), 'String', 'unit', 'never', 'any',
+   tuple {els}, array {el,n}, ref {mut,to,rg} (rg is a number the checker makes new for every reference type it creates), and
+   the inference variables ivar and fvar, which stand for an int or float literal whose type is still open and get bound by
+   unify. DOM-free. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -9,10 +10,27 @@ const INT={i8:range(8,1),i16:range(16,1),i32:range(32,1),i64:range(64,1),isize:r
 const isInt=n=>Object.prototype.hasOwnProperty.call(INT,n);
 const bitsOf=ty=>ty.endsWith('size')?64:+ty.slice(1);
 const T={
-  int:ty=>({k:'int',ty}),float:{k:'float'},bool:{k:'bool'},char:{k:'char'},str:{k:'str'},unit:{k:'unit'},never:{k:'never'},any:{k:'any'},
-  ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n})
+  int:ty=>({k:'int',ty}),float:{k:'float'},bool:{k:'bool'},char:{k:'char'},str:{k:'str'},string:{k:'String'},unit:{k:'unit'},never:{k:'never'},any:{k:'any'},
+  ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n}),
+  ref:(mut,to,rg)=>({k:'ref',mut,to,rg})
 };
 const res=t=>{while(t.ref)t=t.ref;return t;};
+// Copy: scalars, &str, &T, and tuples and arrays of Copy. String and &mut T move. any stands for an error already reported
+function isCopy(t){
+  t=res(t);
+  switch(t.k){
+    case 'String':return false;
+    case 'ref':return !t.mut;
+    case 'tuple':return t.els.every(isCopy);
+    case 'array':return isCopy(t.el);
+    default:return true;
+  }
+}
+// a type that mentions a reference anywhere, so it can carry a loan
+function hasRef(t){
+  t=res(t);
+  return t.k==='ref'||(t.k==='tuple'&&t.els.some(hasRef))||(t.k==='array'&&hasRef(t.el));
+}
 // any and never agree with everything; a variable binds to a concrete type of its own family
 function unify(a,b){
   a=res(a);b=res(b);
@@ -26,6 +44,7 @@ function unify(a,b){
   if(a.k==='int')return a.ty===b.ty;
   if(a.k==='tuple')return a.els.length===b.els.length&&a.els.every((x,i)=>unify(x,b.els[i]));
   if(a.k==='array')return a.n===b.n&&unify(a.el,b.el);
+  if(a.k==='ref')return a.mut===b.mut&&unify(a.to,b.to);
   return true;
 }
 function show(t){
@@ -39,10 +58,11 @@ function show(t){
     case 'unit':return '()';
     case 'tuple':return '('+t.els.map(show).join(', ')+(t.els.length===1?',':'')+')';
     case 'array':return '['+show(t.el)+'; '+t.n+']';
+    case 'ref':return '&'+(t.mut?'mut ':'')+show(t.to);
     default:return t.k;
   }
 }
-RQ.types={INT,isInt,T,unify,res,show,DEFAULT_INT:'i32',
+RQ.types={INT,isInt,T,unify,res,show,isCopy,hasRef,DEFAULT_INT:'i32',
   fits:(v,ty)=>{const r=INT[ty||'i32'];return v>=r[0]&&v<=r[1];},
   wrap:(v,ty)=>(ty[0]==='i'?BigInt.asIntN:BigInt.asUintN)(bitsOf(ty),v),
   isSigned:ty=>ty[0]==='i'};

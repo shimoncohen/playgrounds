@@ -113,5 +113,14 @@ function render(v,fmt,tick){
   if(fmt.width===null)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled};
+// The methods the checker knows. The name is user text, so this is a Map (a plain object would answer `constructor`).
+// recv: which receivers take it, as letters: o owned String, r &String, m &mut String, s &str. self: how an owned receiver is borrowed.
+const {T}=RQ.types;
+const methods=new Map([
+  ['len',{recv:'orms',self:'&',args:[],ret:T.int('usize')}],
+  ['clone',{recv:'orm',self:'&',args:[],ret:T.string}],
+  ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
+  ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
+]);
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,methods};
 })();

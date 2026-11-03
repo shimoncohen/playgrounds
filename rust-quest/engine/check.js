@@ -1,6 +1,15 @@
 /* Anything outside what is modeled is listed as unsupported, never guessed at, so a program is only judged when every
    construct in it is modeled. Types are inferred with unify; the resolved type of every literal, the binding behind every
-   name and the length behind every index go into `info` (a Map from node) for lint.js and the interpreter. DOM-free. */
+   name and the length behind every index go into `info` (a Map from node) for lint.js and the interpreter. DOM-free.
+   What info holds per node (the move and borrow passes read these):
+     ty    every expression and every binding pattern: its type (resolve it with RQ.types.res)
+     bind  a Path that names a local, a binding pattern (let, for, param), a Deref (the local that holds the reference, when the
+           operand is a plain name), and an Assign to a plain name: {mut,kind:'let'|'param',ty,assigns,deferred?}
+     caps  the format-string literal of a print macro: [{name,bind}] for each {name} the string captures (bind is null for a const)
+     recv  a MethodCall: {method, kind:'place'|'refvar'|'temp', adj:'&'|'&mut'|'val'}. kind is a place expression, a local that
+           holds a reference, or anything else; adj is how the receiver is passed (an owned place is borrowed, a reference is used)
+     sig   a Call: {params:[type], ret:type}
+     rty, alen  the resolved literal type and array length, as before */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -10,6 +19,7 @@ RQ.CHECK_FEATURES=['struct','enum','impl','trait','static','type alias','use','m
   'fn pointer','impl Trait','inferred type','pattern','let else','deferred initialization','format spec','assignment target','type checking',
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop',
+  'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
   'String','Vec','HashMap','Option','Result','Box','str',...MACRO_NAMES.map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
@@ -21,8 +31,10 @@ const ARITH=new Set(['+','-','*','/','%']);
 const MAX_ARRAY=10000;
 
 RQ.check=ast=>{
-  const {T,unify,isInt,res,show,fits}=RQ.types;
+  const {T,unify,isInt,res,show,fits,isCopy}=RQ.types;
   const errors=[],un=[],seen=new Set(),info=new Map();
+  let regions=0;
+  const mkRef=(mut,to)=>T.ref(mut,to,++regions);
   const I=n=>{let o=info.get(n);if(!o){o={};info.set(n,o);}return o;};
   const unsup=(f,line)=>{const k=f+'@'+line;if(!seen.has(k)){seen.add(k);un.push({feature:f,line});}return T.any;};
   const syn=(line,col,msg)=>errors.push({line,col,msg});
@@ -36,6 +48,21 @@ RQ.check=ast=>{
   const peel=e=>e.t==='Paren'?peel(e.expr):e;
   const mism=(want,got,n)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got)}));
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
+  // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
+  // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
+  const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','String'].includes(t.k)?t.k:null;};
+  const isRef=t=>{t=res(t);return t.k==='ref'||t.k==='str';};
+  function coerce(got,want,n){
+    if(unify(got,want))return true;
+    const g=res(got),w=res(want),gr=isRef(g),wr=isRef(w);
+    if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
+    let clash;
+    if(!gr&&!wr)clash=true;
+    else if(gr&&wr)clash=g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&!!headOf(g.to)&&!!headOf(w.to)&&headOf(g.to)!==headOf(w.to);
+    else clash=!!headOf(gr?w:g);
+    if(clash)mism(want,got,n);else unsup('reference coercion',n.line);
+    return false;
+  }
   const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
   const endNode=n=>n.t==='Block'&&n.tail?endNode(n.tail):n;
   // the number of values a type holds, so nested arrays cannot multiply into a print that freezes the page
@@ -47,6 +74,8 @@ RQ.check=ast=>{
     return e.t==='Lit'&&e.kind==='int'&&!e.suffix?{lit:e,v:neg?-BigInt(e.v):BigInt(e.v)}:null;
   };
 
+  // a reference type with no lifetime written: in a return type that needs lifetime elision (E0106/E0515), which is not modeled
+  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'?bareRef(n.ty):false;
   function tyOf(n){
     if(n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn){
       const s=n.segs[0].name;
@@ -54,11 +83,15 @@ RQ.check=ast=>{
       if(s==='bool')return T.bool;
       if(s==='char')return T.char;
       if(s==='f64')return T.float;
+      if(s==='String')return T.string;
       return unsup(s,n.line);
     }
     if(n.t==='Ref'){
-      if(!n.mut&&n.ty.t==='Path'&&n.ty.segs.length===1&&n.ty.segs[0].name==='str')return T.str;
-      return unsup('reference',n.line);
+      const to=n.ty,isStr=to.t==='Path'&&to.segs.length===1&&!to.segs[0].args&&to.segs[0].name==='str';
+      if(to.t==='Ref')return unsup('reference to reference',n.line);
+      if(n.lt&&!(n.lt==='static'&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);
+      if(isStr)return n.mut?unsup('reference',n.line):T.str;
+      return mkRef(n.mut,tyOf(to));
     }
     if(n.t==='Tuple')return n.tys.length?T.tuple(n.tys.map(tyOf)):T.unit;
     if(n.t==='Array'){
@@ -80,9 +113,10 @@ RQ.check=ast=>{
         if(!ok)unsup('pattern',p.pat.line);
         else if(names.has(p.pat.name))errors.push(RQ.diag.make('E0415',p.pat.line,p.pat.col,{name:p.pat.name}));
         else names.add(p.pat.name);
-        return {name:ok?p.pat.name:'_',mut:ok&&p.pat.mut,ty:tyOf(p.ty)};
+        return {name:ok?p.pat.name:'_',mut:ok&&p.pat.mut,ty:tyOf(p.ty),pat:p.pat};
       });
       const ret=it.ret?tyOf(it.ret):T.unit;
+      if(it.ret&&bareRef(it.ret))unsup('lifetime elision',it.ret.line);
       if(it.name==='main'&&(params.length||it.ret))unsup('main signature',it.line);
       if(!it.body)syn(it.line,it.col,'free function without a body');
       if(defined(it))fns.set(it.name,{node:it,params,ret});
@@ -99,14 +133,16 @@ RQ.check=ast=>{
   const bindVar=(n,mut,kind,ty,node)=>{
     const b={mut,kind,ty,assigns:0};
     scopes[scopes.length-1].set(n,b);
-    if(node)I(node).bind=b;
+    if(node){const o=I(node);o.bind=b;o.ty=ty;}
+    return b;
   };
   const ivar=()=>{const v=T.ivar();vars.push(v);return v;};
   const fvar=()=>{const v=T.fvar();vars.push(v);return v;};
   const printable=(t,dbg)=>{
     t=res(t);
     switch(t.k){
-      case 'int':case 'float':case 'bool':case 'char':case 'str':case 'any':case 'never':return true;
+      case 'int':case 'float':case 'bool':case 'char':case 'str':case 'String':case 'any':case 'never':return true;
+      case 'ref':return printable(t.to,dbg);
       case 'unit':return dbg;
       case 'tuple':return dbg&&t.els.every(x=>printable(x,dbg));
       case 'array':return dbg&&printable(t.el,dbg);
@@ -135,7 +171,13 @@ RQ.check=ast=>{
         const named=pt.t==='IdentPat'&&!pt.sub&&!pt.byRef;
         if(!named&&pt.t!=='Wild')unsup('pattern',pt.line);
         if(s.els)unsup('let else',s.line);
-        if(!s.init){unsup('deferred initialization',s.line);if(named)bindVar(pt.name,pt.mut,'let',s.ty?tyOf(s.ty):T.any);continue;}
+        if(!s.init){
+          // without a type the variable's type would have to be worked out from a later assignment
+          if(!s.ty)unsup('deferred initialization',s.line);
+          const b=named&&bindVar(pt.name,pt.mut,'let',s.ty?tyOf(s.ty):T.any,pt);
+          if(b&&s.ty)b.deferred=true;
+          continue;
+        }
         let t=ex(s.init);
         if(named&&lookup(pt.name)){
           shadows++;
@@ -143,7 +185,7 @@ RQ.check=ast=>{
           RQ.walk(s.init,n=>{if(n.t==='Path'&&n.segs.length===1&&n.segs[0].name===pt.name)reads=true;});
           if(reads)shadowUses++;
         }
-        if(s.ty){const a=tyOf(s.ty);expect(t,a,s.init);t=a;}
+        if(s.ty){const a=tyOf(s.ty);coerce(t,a,s.init);t=a;}
         if(named)bindVar(pt.name,pt.mut,'let',t,pt);
       }else if(s.t==='ExprStmt'){if(res(ex(s.expr)).k==='never')diverges=true;}
       else if(s.t==='ItemStmt')unsup('nested item',s.line);
@@ -165,7 +207,8 @@ RQ.check=ast=>{
     const pf=RQ.std.parseFormat(f.v);
     if(pf.error){syn(f.line,f.col,pf.error);return T.unit;}
     if(pf.spec){unsup('format spec',line);return T.unit;}
-    const pos=m.args.slice(1).map(ex),named=m.named.map(x=>ex(x.expr)),usedPos=new Set(),usedNamed=new Set();
+    const pos=m.args.slice(1).map(ex),named=m.named.map(x=>ex(x.expr)),usedPos=new Set(),usedNamed=new Set(),caps=[];
+    I(f).caps=caps;
     for(const part of pf.parts){
       if(part.idx!==undefined){
         if(part.idx>=pos.length){syn(f.line,f.col,'invalid reference to positional argument '+part.idx+' (there '+(pos.length===1?'is 1 argument':'are '+pos.length+' arguments')+')');return T.unit;}
@@ -176,6 +219,7 @@ RQ.check=ast=>{
         else{
           const l=lookup(part.name);if(l)varUses++;
           const b=l||consts.get(part.name);
+          if(b)caps.push({name:part.name,bind:l});
           if(b)fmts.push({t:b.ty,line:f.line,fmt:part.fmt});
           else if(fns.has(part.name))unsup('function value',f.line);
           else unknown(part.name,f);
@@ -211,7 +255,9 @@ RQ.check=ast=>{
     return ok?to:unsup('cast',e.line);
   }
 
-  function ex(e){
+  function ex(e){const t=expr(e);I(e).ty=t;return t;}
+  const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
+  function expr(e){
     switch(e.t){
       case 'Lit':{
         let t;
@@ -253,29 +299,80 @@ RQ.check=ast=>{
       }
       case 'Assign':{
         const r=ex(e.rhs);
-        if(e.lhs.t!=='Path'||e.lhs.segs.length!==1||e.lhs.segs[0].args){ex(e.lhs);return unsup('assignment target',e.line);}
-        const n=e.lhs.segs[0].name,b=lookup(n);
-        if(!b){if(consts.has(n))return unsup('assignment target',e.line);return unknown(n,e.lhs);}
-        b.assigns++;I(e).bind=b;
-        if(!b.mut)errors.push(RQ.diag.make('E0384',e.line,e.col,{name:n,kind:b.kind}));
+        let ty;
+        if(e.lhs.t==='Deref'){
+          // *r = v writes through a &mut; through a & it is E0594, which is not modeled
+          ty=ex(e.lhs);
+          const rt=res(info.get(e.lhs.expr).ty);
+          if(rt.k==='ref'&&!rt.mut)return unsup('assignment target',e.line);
+          if(rt.k!=='ref')return T.any;
+        }else{
+          if(e.lhs.t!=='Path'||e.lhs.segs.length!==1||e.lhs.segs[0].args){ex(e.lhs);return unsup('assignment target',e.line);}
+          const n=e.lhs.segs[0].name,b=lookup(n);
+          if(!b){if(consts.has(n))return unsup('assignment target',e.line);return unknown(n,e.lhs);}
+          b.assigns++;I(e).bind=b;
+          // the first assignment to a deferred let is its initialisation: whether a second one is E0384 depends on the paths (borrow.js)
+          if(!b.mut&&!b.deferred)errors.push(RQ.diag.make('E0384',e.line,e.col,{name:n,kind:b.kind}));
+          ty=b.ty;
+        }
         if(e.op!=='='){
           const op=e.op.slice(0,-1);
           if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
-          if(!operands(b.ty,r,{rhs:e.rhs,line:e.line}))return T.unit;
-          const bit=op==='&'||op==='|'||op==='^',c=cls(b.ty);
-          if(!(c==='any'||(bit?['int','ivar'].includes(res(b.ty).k):c==='num')))unsup('type checking',e.line);
-        }else if(!unify(b.ty,r))return unsup('type checking',e.line);
+          if(!operands(ty,r,{rhs:e.rhs,line:e.line}))return T.unit;
+          const bit=op==='&'||op==='|'||op==='^',c=cls(ty);
+          if(!(c==='any'||(bit?['int','ivar'].includes(res(ty).k):c==='num')))unsup('type checking',e.line);
+        }else if(!unify(ty,r))return unsup('type checking',e.line);
         return T.unit;
       }
       case 'Call':{
+        const sg=e.callee.t==='Path'?e.callee.segs:[];
+        if(sg.length===2&&sg[0].name==='String'&&!sg[0].args&&!sg[1].args&&!e.callee.global&&(sg[1].name==='from'||sg[1].name==='new')){
+          const ts=e.args.map(ex),from=sg[1].name==='from';
+          if(ts.length!==(from?1:0))return unsup('wrong argument count',e.line);
+          // String::from takes a &str or a &String; the other From impls (String, char, Box...) are not modeled
+          if(from){const a=res(ts[0]);if(!(a.k==='str'||a.k==='any'||a.k==='ref'&&!a.mut&&res(a.to).k==='String'))return unsup('type checking',e.line);}
+          I(e).sig={params:from?[T.str]:[],ret:T.string};
+          return T.string;
+        }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
         const n=e.callee.segs[0].name,f=fns.get(n);
         const ts=e.args.map(ex);
         if(lookup(n)||consts.has(n))return unsup('call',e.line);
+        if(!f&&n==='drop'){
+          if(ts.length!==1)return unsup('wrong argument count',e.line);
+          I(e).sig={params:ts,ret:T.unit};
+          return T.unit;
+        }
         if(!f)return unknown(n,e.callee);
         if(ts.length!==f.params.length)return unsup('wrong argument count',e.line);
-        ts.forEach((t,i)=>expect(t,f.params[i].ty,e.args[i]));
+        ts.forEach((t,i)=>coerce(t,f.params[i].ty,e.args[i]));
+        I(e).sig={params:f.params.map(p=>p.ty),ret:f.ret};
         return f.ret;
+      }
+      case 'Ref':{
+        const t=ex(e.expr),r=res(t);
+        if(r.k==='ref'||r.k==='str')return unsup('reference to reference',e.line);
+        return mkRef(e.mut,t);
+      }
+      case 'Deref':{
+        const t=ex(e.expr),r=res(t),x=peel(e.expr);
+        if(x.t==='Path'&&info.get(x).bind)I(e).bind=info.get(x).bind;
+        if(r.k==='ref')return r.to;
+        return r.k==='any'||r.k==='never'?T.any:unsup('dereference',e.line);
+      }
+      case 'MethodCall':{
+        const rt=ex(e.recv),args=e.args.map(ex),r=res(rt);
+        if(r.k==='any'||r.k==='never')return T.any;
+        // o owned String, r &String, m &mut String, s &str
+        const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):''):'';
+        const sig=RQ.std.methods.get(e.name);
+        if(!sig||!shape||!sig.recv.includes(shape))return unsup('method call',e.line);
+        if(shape==='m'&&e.name==='as_str')return unsup('reborrow',e.line);
+        if(args.length!==sig.args.length)return unsup('wrong argument count',e.line);
+        args.forEach((t,i)=>coerce(t,sig.args[i],e.args[i]));
+        const kind=shape==='o'?(place(e.recv)?'place':'temp'):peel(e.recv).t==='Path'?'refvar':'temp';
+        I(e).recv={method:e.name,kind,adj:shape==='o'?sig.self:'val'};
+        return sig.ret;
       }
       case 'Macro':{
         if(e.args===null)return T.any;
@@ -286,7 +383,7 @@ RQ.check=ast=>{
       case 'Block':return block(e);
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
-        expect(ex(e.expr),curRet,e.expr);
+        coerce(ex(e.expr),curRet,e.expr);
         return T.never;
       }
       case 'Tuple':return e.elems.length?T.tuple(e.elems.map(ex)):T.unit;
@@ -298,6 +395,7 @@ RQ.check=ast=>{
       case 'ArrayRepeat':{
         const el=ex(e.elem);
         if(e.len.t!=='Lit'||e.len.kind!=='int'||BigInt(e.len.v)>BigInt(MAX_ARRAY))return unsup('array length',e.line);
+        if(!isCopy(el))return unsup('type checking',e.line); // E0277: [expr; N] needs Copy
         const t=T.array(el,Number(e.len.v));
         return weight(t)>MAX_ARRAY?unsup('array length',e.line):t;
       }
@@ -371,13 +469,10 @@ RQ.check=ast=>{
   function fnBody(f){
     if(!f.node.body)return;
     scopes=[new Map()];curRet=f.ret;loops=[];
-    for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty);
+    for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty,p.pat);
     const body=f.node.body,t=block(body);
-    if(!unify(t,f.ret)){
-      if(body.tail)mism(f.ret,t,endNode(body.tail));
-      else if(f.node.ret)mism(f.ret,t,f.node.ret);
-      else unsup('type checking',f.node.line);
-    }
+    if(body.tail||f.node.ret)coerce(t,f.ret,body.tail?endNode(body.tail):f.node.ret);
+    else if(!unify(t,f.ret))unsup('type checking',f.node.line);
     finish();
   }
   // rustc runs only const fn in a const, so a call to a plain fn there is E0015; the quest allows literals and maths on other consts
