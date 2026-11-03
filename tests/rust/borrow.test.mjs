@@ -141,3 +141,129 @@ describe('when the pass runs', () => {
     assert.equal(diags(SIMPLE('let s = String::new();', 'drop(s);', 'drop(s);', 'let x: u8 = 255 + 1;')), 'E0382@4');
   });
 });
+
+// the program starts with `let mut s`, so line 2 declares it and the next body line is line 3
+const SI = (...body) => SIMPLE('let mut s = String::from("a");', ...body);
+const IX = (...body) => SIMPLE('let mut x = 5;', ...body);
+const unsup = (src) => { const c = RQ.run(src); return c.status === 'unsupported' ? `${c.unsupported.feature}@${c.unsupported.line}` : c.status; };
+
+describe('loans: E0499, E0502, E0505, E0506', () => {
+  it('two live &mut loans: E0499 at the second borrow', () => {
+    assert.equal(diags(SI('let a = &mut s;', 'let b = &mut s;', 'a.push_str("x");')), 'E0499@4');
+  });
+  it('a &mut borrow while a shared loan is live: E0502 at the push_str', () => {
+    assert.equal(diags(SI('let r = &s;', 's.push_str("x");', 'println!("{}", r);')), 'E0502@4');
+  });
+  it('a shared borrow while a &mut loan is live: E0502, for len and for a print argument', () => {
+    assert.equal(diags(SI('let a = &mut s;', 'let n = s.len();', 'a.push_str("x");', 'println!("{}", n);')), 'E0502@4');
+    assert.equal(diags(SI('let a = &mut s;', 'println!("{}", s);', 'a.push_str("x");')), 'E0502@4');
+  });
+  it('a move while borrowed: E0505 at the move', () => {
+    assert.equal(diags(SI('let r = &s;', 'let t = s;', 'println!("{}", r);')), 'E0505@4');
+    assert.equal(diags(SI('let a = &mut s;', 'drop(s);', 'a.push_str("x");')), 'E0505@4');
+  });
+  it('an assignment while borrowed: E0506, shared or &mut', () => {
+    assert.equal(diags(IX('let r = &x;', 'x = 6;', 'println!("{}", r);')), 'E0506@4');
+    assert.equal(diags(IX('let r = &mut x;', 'x = 6;', '*r = 7;')), 'E0506@4');
+    assert.equal(diags(IX('let r = &x;', 'x += 1;', 'println!("{}", r);')), 'E0506@4');
+  });
+  it('each is one coded error through RQ.run', () => {
+    for (const [code, src] of [['E0499', SI('let a = &mut s;', 'let b = &mut s;', 'a.push_str("x");')], ['E0502', SI('let r = &s;', 's.push_str("x");', 'println!("{}", r);')],
+      ['E0505', SI('let r = &s;', 'let t = s;', 'println!("{}", r);')], ['E0506', IX('let r = &x;', 'x = 6;', 'println!("{}", r);')]]) {
+      const c = RQ.run(src);
+      assert.equal(c.status, 'error', code);
+      assert.ok(c.onlyError(code), code);
+    }
+  });
+  it('a conflict in a loop body', () => {
+    assert.equal(diags(SI('let r = &s;', 'for _i in 0..2 {', '    s.push_str("x");', '}', 'println!("{}", r);')), 'E0502@5');
+  });
+  it('a call with two borrows of one local (explicit &mut and &)', () => {
+    const f = 'fn f(a: &mut i32, b: &i32) {}';
+    assert.equal(diags(P(f, 'fn main() {', '    let mut x = 1;', '    f(&mut x, &x);', '}')), 'E0502@4');
+    assert.equal(diags(P(f, 'fn main() {', '    let mut x = 1;', '    let y = 2;', '    f(&mut x, &y);', '}')), '');
+    assert.equal(diags(P('fn g(a: &mut i32, b: &mut i32) {}', 'fn main() {', '    let mut x = 1;', '    g(&mut x, &mut x);', '}')), 'E0499@4');
+  });
+});
+
+describe('loans: NLL', () => {
+  it('a holder whose last use is before the conflict', () => {
+    assert.equal(diags(SI('let r = &s;', 'println!("{}", r);', 's.push_str("x");')), '');
+  });
+  it('a holder never used, and a shared loan next to shared uses', () => {
+    assert.equal(diags(SI('let r = &s;', 's.push_str("x");')), '');
+    assert.equal(diags(SI('let a = &s;', 'let b = &s;', 'println!("{} {} {}", a, b, s);')), '');
+  });
+  it('a holder reassigned before its next use drops the old loan', () => {
+    assert.equal(diags(SI('let t = String::from("b");', 'let mut r = &s;', 'r = &t;', 's.push_str("x");', 'println!("{}", r);')), '');
+  });
+  it('a Copy read and a shared borrow of the local while a shared loan is live', () => {
+    assert.equal(diags(IX('let r = &x;', 'let y = x;', 'println!("{} {} {}", r, y, x);')), '');
+  });
+  it('a loop back-edge keeps the loan live at the top of the next iteration', () => {
+    const body = (a, b) => SI('let t = String::from("b");', 'let mut r = &t;', 'for _i in 0..2 {', ...a, ...b, '}');
+    assert.equal(diags(body(['    s.push_str("x");', '    println!("{}", r);'], ['    r = &s;'])), 'E0502@6');
+    assert.equal(diags(body(['    s.push_str("x");', '    r = &s;'], ['    println!("{}", r);'])), '');
+  });
+  it('a branch join unions the loans', () => {
+    const src = (tail) => P('fn f(c: bool) {', '    let mut s = String::from("a");', '    let t = String::from("b");', '    let r = if c { &s } else { &t };', ...tail, '}', '', 'fn main() {', '    f(true);', '}');
+    assert.equal(diags(src(['    s.push_str("x");', '    println!("{}", r);'])), 'E0502@5');
+    assert.equal(diags(src(['    println!("{}", r);', '    s.push_str("x");'])), '');
+  });
+  it('a loan carried by a &str copy and by as_str on a &String', () => {
+    assert.equal(diags(SI('let r: &str = s.as_str();', 'let r2 = r;', 's.push_str("x");', 'println!("{}", r2);')), 'E0502@5');
+    assert.equal(diags(SI('let r = &s;', 'let q = r.as_str();', 's.push_str("x");', 'println!("{}", q);')), 'E0502@5');
+    assert.equal(diags(SI('let r: &str = s.as_str();', 'let r2 = r;', 'println!("{}", r2);', 's.push_str("x");')), '');
+  });
+});
+
+describe('RQ.compile loans', () => {
+  const nodes = (ast, t) => { const out = []; RQ.walk(ast, (n) => { if (n.t === t) out.push(n); }); return out; };
+  it('has the id, the borrow node, the local, mut, the line and the nodes where it is live', () => {
+    const c = RQ.compile(SI('let r = &s;', 'println!("{}", r);'));
+    assert.deepEqual(c.loans, [{ id: 0, ast: nodes(c.ast, 'Ref')[0].id, local: 's', mut: false, line: 3, live: [nodes(c.ast, 'Macro')[0].id] }]);
+  });
+  it('a &mut loan from a call argument, and ids that run on across fns', () => {
+    const c = RQ.compile(P('fn f(a: &mut String) {', '    a.push_str("x");', '}', '', 'fn main() {', '    let mut s = String::new();', '    f(&mut s);', '    s.push_str("y");', '}'));
+    assert.deepEqual(c.loans.map((l) => [l.id, l.local, l.mut, l.line]), [[0, 's', true, 7], [1, 's', true, 8]]);
+    assert.deepEqual(c.loans.map((l) => l.live.length), [1, 1]);
+  });
+  it('a loan nobody uses afterwards is never live', () => assert.deepEqual(RQ.compile(SI('let r = &s;')).loans.map((l) => l.live), [[]]));
+});
+
+describe('loans: unsupported rows', () => {
+  it('names are registered with hints', () => {
+    for (const f of ['use while borrowed', 'reference in aggregate']) {
+      assert.ok(RQ.BORROW_FEATURES.includes(f), f);
+      assert.ok(RQ.diag.UNSUPPORTED[f].length > 10, f);
+    }
+  });
+  it('use while borrowed: a Copy read or a compound assignment while a &mut loan is live', () => {
+    assert.equal(unsup(IX('let r = &mut x;', 'let y = x;', '*r = 1;', 'println!("{}", y);')), 'use while borrowed@4');
+    assert.equal(unsup(IX('let r = &mut x;', 'x += 1;', '*r = 1;')), 'use while borrowed@4');
+  });
+  it('reference in aggregate: a tuple or array with a reference, or a loan', () => {
+    assert.equal(unsup(IX('let r = &x;', 'let t = (r, 1);', 'println!("{}", t.1);')), 'reference in aggregate@4');
+    assert.equal(unsup(IX('let t = (&x, 1);', 'println!("{}", t.1);')), 'reference in aggregate@3');
+    assert.equal(unsup(IX('let r = &x;', 'let t = [r, r];', 'println!("{}", x);')), 'reference in aggregate@4');
+    assert.equal(unsup(SI('let r: &str = s.as_str();', 'let t = (r, 1);', 'println!("{}", t.1);')), 'reference in aggregate@4');
+  });
+  it('a tuple of plain values is fine', () => assert.equal(diags(SI('let t = (1, 2);', 'println!("{} {}", t.0, s);')), ''));
+  it('reborrow: a use of a ref local that a live &mut loan covers (no source shape reaches it, so the mir is built by hand)', () => {
+    const real = RQ.mir;
+    const ref = { k: 'ref' }, at = (line) => ({ line, col: 1, ast: line });
+    const F = {
+      name: 'main', ast: 1, line: 1,
+      locals: [{ id: 0, name: 'p', ty: ref, mut: true, param: true }, { id: 1, name: 'q', ty: ref, mut: false, param: false }],
+      blocks: [{ id: 0, succ: [], unreachable: false, instrs: [
+        { op: 'assign', l: 1, rv: { k: 'ref', l: 0, mut: true }, ...at(2) },
+        { op: 'eval', rv: { k: 'use', x: { k: 'copy', l: 0 } }, ...at(3) },
+        { op: 'eval', rv: { k: 'use', x: { k: 'copy', l: 1 } }, ...at(4) },
+        { op: 'return', x: null, ...at(5) }] }]
+    };
+    RQ.mir = () => ({ fns: [F], unsupported: [] });
+    try {
+      assert.deepEqual(RQ.borrow({}, {}).unsupported, [{ feature: 'reborrow', line: 3 }]);
+    } finally { RQ.mir = real; }
+  });
+});

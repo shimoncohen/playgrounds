@@ -21,6 +21,26 @@ const ERRORS={
     msg:o=>'use of moved value: `'+o.name+'`',
     tip:'A `String` has one owner. Passing it on, or writing `let t = s;`, moves it, and the old name stops working. Make a copy with `.clone()`, or lend it with `&`.'
   },
+  E0499:{
+    title:'a value is borrowed as mutable twice',
+    msg:o=>'cannot borrow `'+o.name+'` as mutable more than once at a time',
+    tip:'A `&mut` borrow is exclusive: while it is still going to be used, nothing else can borrow the same variable. Finish with the first borrow before you make the second.'
+  },
+  E0502:{
+    title:'a value is borrowed as mutable and as immutable at once',
+    msg:o=>'cannot borrow `'+o.name+'` as '+(o.mut?'mutable':'immutable')+' because it is also borrowed as '+(o.mut?'immutable':'mutable'),
+    tip:'You can have many `&` borrows or one `&mut`, but not both while the first is still going to be used. Use the first borrow up before you make the other.'
+  },
+  E0505:{
+    title:'a value moves while it is borrowed',
+    msg:o=>'cannot move out of `'+o.name+'` because it is borrowed',
+    tip:'Moving a value ends its old name, so no borrow of it may still be in use. Use the borrow before the move, or `.clone()` the value and move the copy.'
+  },
+  E0506:{
+    title:'a variable is assigned while it is borrowed',
+    msg:o=>'cannot assign to `'+o.name+'` because it is borrowed',
+    tip:'Changing a variable that a borrow still points at would change what the borrow sees. Use the borrow before the assignment, or assign first.'
+  },
   E0428:{
     title:'a name is defined twice',
     msg:o=>'the name `'+o.name+'` is defined multiple times',
@@ -117,6 +137,8 @@ const HINTS={
   'move out of reference':'Moving a value out from behind a reference, like `let t = *r;` on a `&String`, is not modeled. Use `r.clone()` to copy it instead.',
   'two-phase borrow':'A `&mut` method call whose argument uses the same variable, like `s.push_str(&s)`, is not modeled. Copy the argument into a variable first.',
   'constant condition':'An `if` or `while` whose condition is the literal `true` or `false` is not modeled. Put the condition in a variable, or use `loop`.',
+  'use while borrowed':'Reading or updating a number while a `&mut` borrow of it is still in use is not modeled. Finish with the `&mut` first, or read the value through the reference.',
+  'reference in aggregate':'A tuple or array that holds a reference, like `(&x, 1)`, is not modeled. Keep the reference in its own variable.',
   'program too large':'This function is too big for the borrow checker in Rust Quest. Split it into smaller functions.',
   cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':LATER,'struct literal':LATER,'qualified path':LATER,
   'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out. Rust Quest does not infer a type behind `_` yet.',

@@ -1,19 +1,26 @@
-/* The move and initialisation analysis over the CFG that mir.js lowers. RQ.borrow(ast, info) gives {errors, unsupported, loans, analysed}:
-   errors are E0381 (use of an uninitialised local), E0382 (use after a move) and E0384 on a deferred let; unsupported also carries what
-   mir.js reported, and the analysis is skipped when it did; loans is empty until the loan pass; analysed names the lowered fns. DOM-free.
+/* The move, initialisation and loan analyses over the CFG that mir.js lowers. RQ.borrow(ast, info) gives {errors, unsupported, loans, analysed}:
+   errors are E0381 (use of an uninitialised local), E0382 (use after a move), E0384 on a deferred let, and E0499, E0502, E0505 and E0506
+   from the loans; unsupported also carries what mir.js reported, and the analysis is skipped when it did; analysed names the lowered fns;
+   loans is [{id, ast (the borrow node), local (name, null for a temp), mut, line, live (ast ids of the instrs where it is live)}]. DOM-free.
    Per local a forward may-dataflow tracks MOVED, UNINIT and EVER (assigned on some path). A use is any operand or borrow of the local;
    the destination of an assign and `dead` are not uses. A move reaching a use is E0382, else a missing initialisation is E0381. Blocks
-   with no path from the entry are skipped, because the edges out of them stay in succ. */
+   with no path from the entry are skipped, because the edges out of them stay in succ.
+   Loans: every `ref` assign is a loan. A second forward may-dataflow gives holds[local], the loans a local carries: a copy or move of a
+   local passes them on, `as_str` passes its receiver's, a call, op or macro result carries none. A backward liveness pass gives the
+   locals live at each instr (its own uses count). A loan is live at an instr iff a live local holds it, and an access to the loan's
+   local then conflicts: see access(). Locals are bits of a BigInt mask, loans are bits of a BigInt mask. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate');
 const MOVED=1,UNINIT=2,EVER=4;
 const VISITS=50;
 
+// use(local, isMove, kind): kind is copy, move, ref (shared borrow) or mut (&mut borrow)
 function uses(i,use){
-  const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move');};
+  const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move',x.k);};
   const rv=r=>{
-    if(r.k==='ref')use(r.l,false);
+    if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref');
     else if(r.k==='use'||r.k==='deref')o(r.x);
     else if(r.k==='method'){o(r.recv);r.args.forEach(o);}
     else if(r.args)r.args.forEach(o);
@@ -72,9 +79,102 @@ function analyse(F,errors){
   return true;
 }
 
+const bit=k=>1n<<BigInt(k);
+const refy=t=>t.k==='ref'||t.k==='str';
+
+function loanPass(F,errors,un,loans){
+  const B=F.blocks,L=F.locals,n=L.length;
+  const cap=VISITS*B.length+500;
+  const lo=[],at=new Map();
+  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,live:new Set()});}
+  const onS=L.map(()=>0n),onM=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(k));
+  lo.forEach((x,k)=>{(x.mut?onM:onS)[x.l]|=lb[k];});
+
+  const hold=(s,i)=>{
+    if(i.op==='decl')s[i.l]=0n;
+    else if(i.op==='assign'){
+      const r=i.rv;
+      s[i.l]=r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:0n;
+    }
+  };
+  const inn=B.map(()=>null),q=[0],queued=new Set(q);
+  inn[0]=L.map(()=>0n);
+  for(let h=0,visits=0;h<q.length;h++){
+    if(++visits>cap)return false;
+    const b=B[q[h]];
+    queued.delete(b.id);
+    const s=inn[b.id].slice();
+    for(const i of b.instrs)hold(s,i);
+    for(const t of b.succ){
+      const o=inn[t];
+      let changed=!o;
+      if(!o)inn[t]=s.slice();
+      else for(let k=0;k<n;k++)if((o[k]|s[k])!==o[k]){o[k]|=s[k];changed=true;}
+      if(changed&&!queued.has(t)){queued.add(t);q.push(t);}
+    }
+  }
+
+  const back=(m,i)=>{
+    if(i.op==='assign'||i.op==='decl')m&=~nb[i.l];
+    uses(i,l=>{m|=nb[l];});
+    return m;
+  };
+  const out=b=>b.succ.reduce((m,t)=>m|liveIn[t],0n);
+  const liveIn=B.map(()=>0n);
+  for(let changed=true,work=0;changed;){
+    changed=false;
+    for(let k=B.length-1;k>=0;k--){
+      const b=B[k];
+      if(b.unreachable)continue;
+      if(++work>cap)return false;
+      let m=out(b);
+      for(let j=b.instrs.length-1;j>=0;j--)m=back(m,b.instrs[j]);
+      if(m!==liveIn[k]){liveIn[k]=m;changed=true;}
+    }
+  }
+
+  const seen=new Set();
+  let lm=0n;
+  const access=(l,kind,i)=>{
+    const sh=lm&onS[l],mu=lm&onM[l];
+    if(!(sh|mu))return;
+    let code='';
+    if(kind==='ref'){if(mu)code='E0502';}
+    else if(kind==='mut')code=mu?'E0499':'E0502';
+    else if(kind==='move')code='E0505';
+    else if(kind==='write')code='E0506';
+    else if(mu)un(refy(L[l].ty)?'reborrow':'use while borrowed',i);
+    const k=code+'@'+i.line+':'+i.col;
+    if(!code||seen.has(k))return;
+    seen.add(k);
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:L[l].name||'value',mut:kind==='mut'}));
+  };
+  for(const b of B){
+    if(!inn[b.id])continue;
+    const lv=[];
+    let m=out(b);
+    for(let j=b.instrs.length-1;j>=0;j--)lv[j]=m=back(m,b.instrs[j]);
+    const s=inn[b.id].slice();
+    b.instrs.forEach((i,j)=>{
+      lm=0n;
+      for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l])lm|=s[l];
+      if(lm)lo.forEach((x,k)=>{if(lm&lb[k])x.live.add(i.ast);});
+      uses(i,(l,_mv,kind)=>access(l,kind,i));
+      if(i.op==='assign'){
+        access(i.l,'write',i);
+        if(i.rv.k==='agg')for(const x of i.rv.args)if(x.k!=='const'&&(s[x.l]||refy(L[x.l].ty)||RQ.types.hasRef(L[x.l].ty)))un('reference in aggregate',i);
+      }
+      hold(s,i);
+    });
+  }
+  for(const x of lo)loans.push({id:loans.length,ast:x.i.ast,local:L[x.l].name,mut:x.mut,line:x.i.line,live:[...x.live].sort((a,b)=>a-b)});
+  return true;
+}
+
 RQ.borrow=(ast,info)=>{
-  const m=RQ.mir(ast,info),errors=[],unsupported=[...m.unsupported];
-  if(!unsupported.length)for(const F of m.fns)if(!analyse(F,errors)){unsupported.push({feature:'program too large',line:F.line});break;}
-  return {errors,unsupported,loans:[],analysed:m.fns.map(f=>f.name)};
+  const m=RQ.mir(ast,info),errors=[],loans=[],unsupported=[...m.unsupported],seen=new Set();
+  const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
+  if(!unsupported.length)for(const F of m.fns)if(!analyse(F,errors)||!loanPass(F,errors,un,loans)){unsupported.push({feature:'program too large',line:F.line});break;}
+  return {errors,unsupported,loans,analysed:m.fns.map(f=>f.name)};
 };
 })();

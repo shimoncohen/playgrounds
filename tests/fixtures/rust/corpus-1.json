@@ -916,5 +916,107 @@
     "src": "fn f(c: bool) {\n    let x: i32;\n    if c {\n        x = 1;\n    } else {\n        x = 2;\n    }\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n    f(false);\n}\n",
     "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
     "why": "x is set on every path, so it is initialised after the if", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let a = &mut s;\n    let b = &mut s;\n    a.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": { "code": "E0499", "line": 4 }, "pair": "loan-two-mut-ok",
+    "why": "the first &mut borrow is still used after the second one starts", "pr": "P5"
+  },
+  {
+    "id": "loan-two-mut-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let a = &mut s;\n    let b = &mut s;\n    b.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ax\n", "err": "", "exit": 0,
+    "why": "the first &mut borrow is never used again, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-push-while-shared",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &s;\n    s.push_str(\"x\");\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0502", "line": 4 }, "pair": "loan-push-while-shared-ok",
+    "why": "push_str needs a &mut borrow while r still holds a shared borrow of s", "pr": "P5"
+  },
+  {
+    "id": "loan-push-while-shared-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &s;\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ax\n", "err": "", "exit": 0,
+    "why": "r is not used after the push_str, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-move-while-borrowed",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    let t = s;\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0505", "line": 4 }, "pair": "loan-move-while-borrowed-ok",
+    "why": "s moves into t while r still points at it", "pr": "P5"
+  },
+  {
+    "id": "loan-move-while-borrowed-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    let t = s;\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "r is not used after the move, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-while-borrowed",
+    "src": "fn main() {\n    let mut x = 5;\n    let r = &x;\n    x = 6;\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0506", "line": 4 }, "pair": "loan-assign-while-borrowed-ok",
+    "why": "x is assigned while r still points at it", "pr": "P5"
+  },
+  {
+    "id": "loan-assign-while-borrowed-ok",
+    "src": "fn main() {\n    let mut x = 5;\n    let r = &x;\n    x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "r is not used after the assignment, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "loan-call-mut-and-shared",
+    "src": "fn f(a: &mut i32, b: &i32) {}\n\nfn main() {\n    let mut x = 1;\n    let y = 2;\n    f(&mut x, &x);\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0502", "line": 6 }, "pair": "loan-call-mut-and-other",
+    "why": "&x is borrowed while the &mut x argument is still live", "pr": "P5"
+  },
+  {
+    "id": "loan-call-mut-and-other",
+    "src": "fn f(a: &mut i32, b: &i32) {}\n\nfn main() {\n    let mut x = 1;\n    let y = 2;\n    f(&mut x, &y);\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the two arguments borrow different variables", "pr": "P5"
+  },
+  {
+    "id": "loan-len-while-mut",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let a = &mut s;\n    let n = s.len();\n    a.push_str(\"x\");\n    println!(\"{}\", n);\n}\n",
+    "expect": { "code": "E0502", "line": 4 }, "pair": "loan-len-while-mut-ok",
+    "why": "len borrows s while the &mut borrow a is still used", "pr": "P5"
+  },
+  {
+    "id": "loan-len-while-mut-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let a = &mut s;\n    let n = a.len();\n    a.push_str(\"x\");\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "len goes through the &mut borrow itself, which is allowed", "pr": "P5"
+  },
+  {
+    "id": "loan-push-in-loop",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &s;\n    for _i in 0..2 {\n        s.push_str(\"x\");\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": { "code": "E0502", "line": 5 }, "pair": "loan-push-in-loop-ok",
+    "why": "the push_str in the loop body needs a &mut borrow while r is used after the loop", "pr": "P5"
+  },
+  {
+    "id": "loan-push-in-loop-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &s;\n    for _i in 0..2 {\n        s.push_str(\"x\");\n    }\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "axx\n", "err": "", "exit": 0,
+    "why": "r is never used after the loop, so its loan is already over", "pr": "P5"
+  },
+  {
+    "id": "nll-last-use",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let r = &s;\n    println!(\"{}\", r);\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "a\nax\n", "err": "", "exit": 0,
+    "why": "a loan ends at the last use of the reference, so the push_str after it is fine", "pr": "P5"
+  },
+  {
+    "id": "nll-reassign-holder",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let t = String::from(\"b\");\n    let mut r = &s;\n    r = &t;\n    s.push_str(\"x\");\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "r points at t before it is used again, so the loan on s is over", "pr": "P5"
+  },
+  {
+    "id": "shared-shared-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let a = &s;\n    let b = &s;\n    println!(\"{} {} {}\", a, b, s);\n}\n",
+    "expect": "ok", "out": "a a a\n", "err": "", "exit": 0,
+    "why": "any number of shared borrows can be live together", "pr": "P5"
   }
 ]

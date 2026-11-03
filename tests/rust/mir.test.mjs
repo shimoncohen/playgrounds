@@ -36,7 +36,8 @@ const branches = (f) => f.blocks.filter((b) => b.instrs.some((i) => i.op === 'br
 
 describe('RQ.BORROW_FEATURES', () => {
   it('lists the names the mir pass reports', () => {
-    assert.deepEqual(RQ.BORROW_FEATURES, ['borrow of a field', 'temporary borrow', 'partial move', 'move out of reference', 'two-phase borrow', 'constant condition', 'program too large']);
+    // borrow.js pushes its own names after these
+    assert.deepEqual(RQ.BORROW_FEATURES.slice(0, 7), ['borrow of a field', 'temporary borrow', 'partial move', 'move out of reference', 'two-phase borrow', 'constant condition', 'program too large']);
     for (const f of RQ.BORROW_FEATURES) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
   });
 });
