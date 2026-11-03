@@ -70,25 +70,41 @@ function splitFields(text){
   return {fields,bad};
 }
 
+/* A Use name that is a saved command is expanded into the prompt: its lines join the typed ones (lists concatenate, Plan is ORed,
+   a typed Goal or Done when wins). A bad line, or a Use line, inside a command is an error, and an error refuses the whole run. */
 function parsePrompt(text,scenario,setup){
   const {fields,bad}=splitFields(text),errors=bad.map(b=>({line:b.line,msg:b.error}));
+  const cmds=[];
+  for(const name of new Set(fields.use)){
+    const cmd=setup&&setup.commands.find(c=>c.name===name);
+    if(!cmd)continue;
+    const sp=splitFields(cmd.text),tag='Command '+name+': ';
+    for(const b of sp.bad)errors.push({line:tag+b.line,msg:b.error});
+    if(sp.fields.use.length)errors.push({line:tag+'Use: '+show(sp.fields.use.join(', ')),msg:'a command cannot use other names'});
+    cmds.push({name,tag,f:sp.fields,lines:String(cmd.text).split('\n').filter(l=>l.trim()).length,text:cmd.text});
+  }
+  const src=[{tag:'',f:fields},...cmds],all=k=>src.flatMap(s=>s.f[k].map(v=>({tag:s.tag,v})));
   const constraints=[];let doneWhen=null;
-  for(const l of fields.constraints){const r=parseConstraint(l,scenario);if(r.ok)constraints.push(r.c);else errors.push({line:'Constraints: '+show(l),msg:r.error});}
-  if(fields.donewhen!==null){const r=parseDoneWhen(fields.donewhen,scenario);if(r.ok)doneWhen=r.d;else errors.push({line:'Done when: '+show(fields.donewhen),msg:r.error});}
+  for(const {tag,v} of all('constraints')){const r=parseConstraint(v,scenario);if(r.ok)constraints.push(r.c);else errors.push({line:tag+'Constraints: '+show(v),msg:r.error});}
+  const dw=src.find(s=>s.f.donewhen!==null);
+  if(dw){const r=parseDoneWhen(dw.f.donewhen,scenario);if(r.ok)doneWhen=r.d;else errors.push({line:dw.tag+'Done when: '+show(dw.f.donewhen),msg:r.error});}
   const known=names(setup,scenario);
-  const keep=(name,list,ok)=>list.filter(x=>ok(x)?true:(errors.push({line:name+': '+show(x),msg:'"'+show(x)+'" '+(name==='Use'?'is not in the setup':'is not a file or folder in this project')}),false));
+  const keep=(name,list,ok)=>list.filter(({tag,v})=>ok(v)?true:(errors.push({line:tag+name+': '+show(v),msg:'"'+show(v)+'" '+(name==='Use'?'is not in the setup':'is not a file or folder in this project')}),false)).map(x=>x.v);
   const pathOk=p=>!p.includes('..')&&resolveTarget('read',p,scenario)===null;
-  const files=keep('Files',fields.files,pathOk),examples=keep('Examples',fields.examples,pathOk),use=keep('Use',fields.use,x=>known.has(x));
-  return {raw:String(text??''),fields,errors,constraints,doneWhen,files,examples,use,plan:fields.plan};
+  const files=keep('Files',all('files'),pathOk),examples=keep('Examples',all('examples'),pathOk),use=keep('Use',fields.use.map(v=>({tag:'',v})),x=>known.has(x));
+  const plan=src.some(s=>s.f.plan);
+  const merged={...fields,goal:src.map(s=>s.f.goal).find(Boolean)||'',files:all('files').map(x=>x.v),examples:all('examples').map(x=>x.v),constraints:all('constraints').map(x=>x.v),plan,donewhen:dw?dw.f.donewhen:null};
+  return {raw:[String(text??''),...cmds.map(c=>c.text)].join('\n'),fields:merged,errors,constraints,doneWhen,files,examples,use,plan,commands:cmds.map(c=>({name:c.name,lines:c.lines}))};
 }
 
-/* every name "Use" may mention: skills, MCP servers and their tools, subagents, scenario tools */
+/* every name "Use" may mention: skills, MCP servers and their tools, subagents, saved commands, scenario tools */
 function names(setup,scenario){
   const out=new Set(((scenario||{}).tools)||[]);
   if(setup){
     for(const s of setup.skills)out.add(s.name);
     for(const m of setup.mcp){out.add(m.name);for(const t of m.tools)out.add(m.name+'.'+t);}
     for(const a of setup.subagents)out.add(a.name);
+    for(const c of setup.commands)out.add(c.name);
   }
   return out;
 }
@@ -101,7 +117,7 @@ const isFolderMemory=p=>typeof p==='string'&&valid(p)&&/^(?:[\w.@-]+\/)+CLAUDE\.
 
 function parseSetup(vfs){
   /* raw: every setup file under .claude/, so a size budget counts text the parsers ignore too */
-  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],hooks:[],subagents:[],errors:[],
+  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],allow:[],hooks:[],afterHooks:[],subagents:[],commands:[],errors:[],
     memoryFolders:vfs.list().filter(isFolderMemory).map(path=>({path,dir:path.slice(0,-'CLAUDE.md'.length),text:vfs.read(path)}))};
   for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
@@ -114,26 +130,55 @@ function parseSetup(vfs){
     const m=/^([\w-]+):\s*([\w-]+(?:\s*,\s*[\w-]+)*)$/.exec(l);
     if(m)setup.mcp.push({name:m[1],tools:m[2].split(',').map(x=>x.trim())});else setup.errors.push({file:'.claude/mcp.txt',msg:'"'+show(l)+'" is not "server: tool, tool"'});
   }
-  const verbRule=(file,head,out)=>{for(const l of lines(vfs.read(file))){
-    const m=new RegExp('^'+head+'\\s+('+VERBS.join('|')+')\\s+(\\S.*)$').exec(l);
-    if(m)out.push({verb:m[1],target:m[2].trim()});else setup.errors.push({file,msg:'"'+show(l)+'" is not "'+head+' VERB TARGET"'});
+  const verbRule=(file,forms,extra)=>{for(const l of lines(vfs.read(file))){
+    let done=false;
+    for(const [head,out] of forms){
+      const m=new RegExp('^'+head+'\\s+('+VERBS.join('|')+')\\s+(\\S.*)$').exec(l);
+      if(m){out.push({verb:m[1],target:m[2].trim()});done=true;break;}
+    }
+    if(done||(extra&&extra(l)))continue;
+    const said=forms.map(([h])=>'"'+h+' VERB TARGET"').concat(extra?['"after edit PATH run COMMAND"']:[]);
+    setup.errors.push({file,msg:'"'+show(l)+'" is not '+said.join(' or ')});
   }};
-  verbRule('.claude/permissions.txt','deny',setup.rules);
-  verbRule('.claude/hooks.txt','before',setup.hooks);
+  verbRule('.claude/permissions.txt',[['deny',setup.rules],['allow',setup.allow]]);
+  verbRule('.claude/hooks.txt',[['before',setup.hooks]],l=>{
+    const m=/^after\s+edit\s+(\S+)\s+run\s+(\S.*)$/.exec(l);
+    if(m)setup.afterHooks.push({target:m[1],run:m[2].trim()});
+    return !!m;
+  });
+  const kinds={skill:setup.skills,subagent:setup.subagents,'MCP server':setup.mcp};
+  const clash=(name,of)=>{const k=of.find(k=>kinds[k].some(x=>x.name===name));return k?'the name "'+show(name)+'" is already used by a '+k:'';};
   for(const p of vfs.list('.claude/agents/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
-    if(f.name&&own(MODELS,f.model))setup.subagents.push({path:p,name:f.name,model:f.model,cost:MODELS[f.model]});
-    else setup.errors.push({file:p,msg:'a subagent needs name: and model: small, standard or large'});
+    if(!(f.name&&own(MODELS,f.model)))setup.errors.push({file:p,msg:'a subagent needs name: and model: small, standard or large'});
+    else if(clash(f.name,['skill']))setup.errors.push({file:p,msg:clash(f.name,['skill'])});
+    else setup.subagents.push({path:p,name:f.name,model:f.model,cost:MODELS[f.model]});
+  }
+  /* parsed last, so Use never has two meanings: helpers claim subagent names, commands claim command names */
+  for(const p of vfs.list('.claude/commands/')){
+    const m=/^\.claude\/commands\/([\w-]+)\.md$/.exec(p);
+    if(!m)continue;
+    const why=clash(m[1],['skill','subagent','MCP server']);
+    if(why)setup.errors.push({file:p,msg:why});else setup.commands.push({name:m[1],path:p,text:vfs.read(p)});
   }
   return setup;
 }
 
-/* CLAUDE.md lines in the prompt grammar act as standing rules; any other line only costs tokens */
-function memoryRules(setup,scenario){
+/* CLAUDE.md lines in the prompt grammar act as standing rules; any other line only costs tokens. In the root file (root=true)
+   the first "Done when: …" line that parses is the default check, so it is not ignored; folder memory and skill bodies pass root=false. */
+function memoryRules(setup,scenario,root=true){
   const rules=[],ignored=[];
-  for(const l of lines(setup.memory)){const r=parseConstraint(l,scenario);if(r.ok)rules.push(r.c);else ignored.push(l);}
-  return {rules,ignored};
+  let check=null;
+  for(const l of lines(setup.memory)){
+    const r=parseConstraint(l,scenario);
+    if(r.ok){rules.push(r.c);continue;}
+    const m=root&&!check&&/^done when:\s*(.*)$/i.exec(l),d=m&&parseDoneWhen(m[1],scenario);
+    if(d&&d.ok)check=d.d;else ignored.push(l);
+  }
+  return {rules,ignored,check};
 }
+
+const hasTool=(setup,target)=>setup.mcp.some(m=>m.name===target||m.tools.some(t=>m.name+'.'+t===target));
 
 const folderMemory=(setup,readPaths)=>setup.memoryFolders.filter(f=>readPaths.some(p=>p.startsWith(f.dir)));
 
@@ -156,5 +201,5 @@ function skillIssues(setup,tag){
 const agentCost=setup=>setup.subagents.reduce((n,s)=>n+s.cost,0);
 
 AQ.isFolderMemory=isFolderMemory;
-AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
+AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,hasTool,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
 })();

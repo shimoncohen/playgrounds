@@ -18,16 +18,25 @@ UI.rove=(list,sel)=>{
   });
 };
 
-const TAGS={context:'context',skill:'skill',plan:'plan',approved:'plan',skip:'skipped'};
+const TAGS={context:'context',skill:'skill',command:'command',plan:'plan',approved:'plan',delegate:'helper',skip:'skipped',hook:'hook',stall:'stalled'};
+// engine/provider.js has a WHY map with the same keys in the agent's voice; add a key to both.
+const WHY={'not seen yet':'the agent has not read what it needs yet','not connected':'the tool is not connected','no one to ask':'nobody is there to approve it','hook':'a hook does not allow it','permission rule':'a permission rule does not allow it'};
 const describe=s=>{
+  if(s.type==='hook')return 'Hook after edit '+s.target+': ran '+s.run+' ('+(s.ok?'passed':s.why||'failed')+')';
+  if(s.type==='command')return 'Command '+s.name+' added '+s.lines+' line'+(s.lines===1?'':'s')+' to the prompt';
+  if(s.type==='delegate')return 'Helper '+s.name+' ('+s.model+') '+(s.files?'searched '+s.files+' file'+(s.files===1?'':'s')+': ~'+s.tokens+' tokens'+(s.over?', more than its window ('+AQ.context.WINDOW+'), so it lost track of some files':' in its own context'):'had nothing to search')+', cost '+s.cost;
+  if(s.type==='stall')return 'Waiting for approval, but nobody is there';
   if(s.type==='skill')return 'Skill '+s.name+(s.loaded?' loaded':' not loaded ('+s.why+')');
   if(s.type==='context')return 'Loaded instructions and your prompt: ~'+s.tokens+' tokens'+(s.dropped?' ('+s.dropped+' earlier message'+(s.dropped>1?'s':'')+' dropped to fit)':'');
   if(s.type==='plan')return 'Plan: '+(s.files.length?'change '+s.files.join(', '):'no files');
   if(s.type==='approved')return 'Plan approved';
-  if(s.type==='skip')return s.verb+' '+s.target+' (blocked by '+s.by+')';
+  if(s.type==='skip')return s.verb+' '+s.target+' ('+(WHY[s.by]||'blocked by '+s.by)+')';
   return s.verb+' '+s.target+(s.ok?'':' (failed)');
 };
 const tagOf=s=>s.type==='act'?(s.violation?'violation':s.tag==='verify'?'check':s.tag==='fix'?'fix':'call'):TAGS[s.type];
+
+UI.describe=describe;
+UI.tagOf=tagOf;
 
 UI.runView=host=>{
   const empty=()=>{host.textContent='';host.append(el('p','empty','Press Run the agent to watch each step here.'));};

@@ -216,7 +216,224 @@ const audit={
   accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
 };
 
+const cartTotal=r=>'function total(items) {\n  const sum = items.reduce((a, b) => a + b.price, 0);\n  return Math.'+r+'(sum * 100) / 100;\n}\n';
+const CARTFIXED=cartTotal('round');
+const cartFixed=o=>/Math\.round\(/.test(o.vfs.read('src/cart/total.js')||'');
+const survey={
+  task:'Find out why the cart total is wrong, and write down what you find in NOTES.md.',
+  vfs:{'CLAUDE.md':small['CLAUDE.md'],'NOTES.md':'','src/cart/total.js':cartTotal('floor'),'src/cart/items.js':'function items(cart) { return cart.lines.map(l => l.item); }\n','src/cart/coupon.js':'function coupon(code) { return code === "TEA10" ? 0.1 : 0; }\n'},
+  commands:{},tools:[],
+  explore:['src/cart/items.js','src/cart/coupon.js','src/cart/total.js'],
+  /* the finding needs the cart code read; no script step reads it, so only the scope or the explore can supply it */
+  script:[{verb:'edit',target:'NOTES.md',needs:['src/cart/total.js'],write:'Finding: total() in src/cart/total.js rounds the sum down, so the cart total is a cent short.\n'},{verb:'edit',target:'src/cart/total.js',write:CARTFIXED}],
+  hidden:[{verb:'edit',target:'src/cart/total.js'}],
+  accept:o=>/total\(\)/.test(o.vfs.read('NOTES.md')||'')||'NOTES.md holds no finding. The agent could not write one without reading the cart code.'
+};
+/* the tidy-up edit of format.js comes last: max counts distinct files in the order they are edited */
+const creep={
+  task:'Fix the rounding bugs in src/price.js and src/tax.js, and tidy up while you are there.',
+  vfs:{...small,'src/tax.js':TAXBUG,'src/format.js':'function money(n) { return "$" + n.toFixed(2); }\n'},
+  commands:bothCommands,tools:[],
+  explore:['src/price.js','src/tax.js','src/format.js'],
+  script:[{...needsFix,write:FIXED},{...fixTax,write:TAXFIXED},{verb:'edit',target:'src/format.js',write:'function money(n) { return `$${n.toFixed(2)}`; }\n'}],
+  hidden:[{verb:'edit',target:'src/format.js'}],
+  accept:bothFixed
+};
+const handoff={
+  task:'Fix the cart total bug. The last run left notes in NOTES.md.',
+  vfs:{'CLAUDE.md':small['CLAUDE.md'],
+    'NOTES.md':'Notes from the last run:\n- The bug is in src/cart/total.js: total() rounds the sum down.\n- src/cart/items.js is fine. Do not spend time there.\n',
+    'src/cart/total.js':cartTotal('floor'),'src/cart/items.js':filler('items',50),'src/cart/coupon.js':filler('coupon',50),'src/cart/discount.js':filler('discount',50)},
+  commands:{'npm test':v=>/Math\.round\(/.test(v.read('src/cart/total.js')||'')?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: total() rounds the wrong way'}},tools:[],
+  explore:['NOTES.md','src/cart/items.js','src/cart/coupon.js','src/cart/discount.js','src/cart/total.js'],
+  /* no read step: the edit needs the notes and the file, which only the scope or the explore reads */
+  script:[{verb:'edit',target:'src/cart/total.js',needs:['NOTES.md','src/cart/total.js'],write:CARTFIXED}],
+  hidden:[],
+  accept:o=>cartFixed(o)||'src/cart/total.js still rounds the wrong way.'
+};
+
+const PKG='{\n  "scripts": { "test": "node tests/run.js" }\n}\n';
+const SKIPPED="test.skip('adds cents', () => expect(total([0.1, 0.2])).toBe(0.3));\n";
+const gamed={
+  task:'Fix the rounding bug in src/price.js and make npm test pass.',
+  vfs:{...small,'package.json':PKG},
+  commands:{...commands,'npm test':v=>fixed({vfs:v})||/test\.skip\(/.test(v.read('tests/price.test.js')||'')||/"test": "echo ok"/.test(v.read('package.json')||'')?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: total() rounds the wrong way'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{verb:'edit',target:'tests/price.test.js',write:SKIPPED},{verb:'edit',target:'package.json',write:PKG.replace('node tests/run.js','echo ok')}],
+  correction:v=>fixed({vfs:v})?null:{verb:'edit',target:'src/price.js',write:FIXED},
+  hidden:[{verb:'edit',target:'tests/'},{verb:'edit',target:'package.json'}],
+  accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const logged=v=>v.list('src/').some(p=>/console\.log/.test(v.read(p)||''));
+const gate={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'README.md':'Before you merge, run npm run check. It runs the tests and makes sure no console.log is left in src/.\n'},
+  commands:{...commands,'npm run check':v=>!/Math\.round\(/.test(v.read('src/price.js')||'')?{ok:false,out:'1 failed: total() rounds the wrong way'}:logged(v)?{ok:false,out:'console.log found in src/'}:{ok:true,out:'all checks passed'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED.replace('  const sum','  console.log(items);\n  const sum')}],
+  correction:v=>logged(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':logged(o.vfs)?'The fix works, but a debug console.log still ships in src/price.js.':true
+};
+const ship={
+  task:'Fix the rounding bug in src/price.js and share the fix.',
+  vfs:small,
+  commands:{...commands,
+    'git push origin main':()=>({ok:true,out:'pushed to main'}),
+    'git push origin fix-rounding':v=>v.write('git/pushed.txt','fix-rounding\n')?{ok:true,out:'pushed fix-rounding'}:{ok:false,out:''},
+    'gh pr create':v=>v.read('git/pushed.txt')===null?{ok:false,out:'push the branch first'}:{ok:v.write('git/pr.txt','pull request for fix-rounding\n'),out:'opened a pull request'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED},{verb:'run',target:'npm test'},{verb:'run',target:'git push origin main'},{verb:'run',target:'git push origin fix-rounding'},{verb:'run',target:'gh pr create'}],
+  hidden:[{verb:'run',target:'git push origin main'}],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':o.vfs.read('git/pushed.txt')===null||o.vfs.read('git/pr.txt')===null?'No pull request was opened.':true
+};
+
+/* Helpers read the explore list in their own context (policy.js). The main agent then reads only the focus, so its peak stays small.
+   Sizes (chars/4, measured in tests/agent/content-dev.test.mjs): one helper over haystack holds under 85% of the window, one over huge
+   goes past it, and two helpers split huge 3 + 2 and each fit. */
+const searchable={
+  task:'Fix the rounding bug in the shop\'s price code. Nobody remembers which file holds it.',
+  commands,tools:[],
+  script:[{...needsFix,write:FIXED}],
+  focus:['src/price.js'],
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':o.tokens.peak>PEAK?'The agent fixed the bug, but it held about '+o.tokens.peak+' tokens at once. The most allowed here is '+PEAK+'.':true
+};
+const haystack={
+  ...searchable,
+  vfs:{...small,'src/old/price.js':'// old copy of the price code, no longer used\n'+BUG,'src/report.js':filler('report',10),'src/export.js':filler('export',10),'src/format.js':filler('format',10),'src/cart.js':filler('cart',10),'docs/api.md':filler('api',10),'docs/notes.md':filler('notes',10),'.claude/agents/scout.md':sub('scout','small')},
+  explore:['docs/api.md','docs/notes.md','src/cart.js','src/export.js','src/format.js','src/old/price.js','src/price.js','src/report.js','src/util.js','tests/price.test.js']
+};
+const crewvfs={'.claude/agents/scout.md':sub('scout','small'),'.claude/agents/analyst.md':sub('analyst','standard'),'.claude/agents/architect.md':sub('architect','large')};
+const team={
+  ...searchable,
+  vfs:{...small,'src/report.js':filler('report',20),'src/export.js':filler('export',20),'docs/notes.md':filler('notes',20),...crewvfs},
+  explore:['docs/notes.md','src/report.js','src/export.js','src/price.js']
+};
+const huge={
+  ...searchable,
+  vfs:{...small,'src/report.js':filler('report',50),'src/export.js':filler('export',50),'docs/notes.md':filler('notes',50),'docs/api.md':filler('api',50),'.claude/agents/scout.md':sub('scout','small'),'.claude/agents/scout2.md':sub('scout2','small'),'.claude/agents/architect.md':sub('architect','large')},
+  explore:['src/price.js','src/report.js','src/export.js','docs/notes.md','docs/api.md']
+};
+
+const HOOKS='# before VERB TARGET\n# after edit PATH run COMMAND\n';
+const FIXEDLOG=FIXED.replace('  const sum','  console.log(items);\n  const sum');
+const TABBED=FIXED.replace(/^ {2}/gm,'\t');
+const tabbed=v=>/\t/.test(v.read('src/price.js')||'');
+/* the fix works first time but leaves a debug line; the lint command rejects it and the correction removes it, once and for good */
+const linty={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'.claude/hooks.txt':HOOKS},
+  commands:{...commands,'npm run lint':v=>logged(v)?{ok:false,out:'console.log found in src/price.js'}:{ok:true,out:'no problems found'}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXEDLOG}],
+  correction:v=>logged(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':logged(o.vfs)?'The fix works, but a debug console.log still ships in src/price.js.':true
+};
+const messy={
+  task:'Fix the rounding bug in src/price.js.',
+  vfs:{...small,'.claude/hooks.txt':HOOKS},
+  commands:{...commands,
+    'npm run lint':v=>tabbed(v)?{ok:false,out:'src/price.js is indented with tabs'}:{ok:true,out:'no problems found'},
+    'npm run format':v=>v.write('src/price.js',(v.read('src/price.js')||'').replace(/\t/g,'  '))?{ok:true,out:'formatted src/price.js'}:{ok:false,out:''}},tools:[],
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:TABBED}],
+  correction:v=>tabbed(v)?{verb:'edit',target:'src/price.js',write:FIXED}:null,
+  hidden:[],
+  accept:o=>!fixed(o)?'src/price.js still rounds the wrong way.':tabbed(o.vfs)?'The fix works, but src/price.js is indented with tabs and the project uses spaces.':true
+};
+const both={
+  ...linty,
+  commands:{...linty.commands,'npm run deploy':()=>({ok:true,out:'deployed'})},
+  script:[...linty.script,{verb:'run',target:'npm run deploy'}],
+  hidden:[{verb:'run',target:'npm run deploy'}]
+};
+
+/* the migrations trap of ledger runs unless the rule that blocks it reaches the prompt, by hand or through a command */
+const GOALS='Goal: fix the rounding bugs in the shop totals\n';
+const FIXCMD=GOALS+'Constraints: do not edit migrations/\nDone when: run npm test\n';
+const cmdfix={...ledger,vfs:{...ledger.vfs,'.claude/commands/fix.md':GOALS}};
+const cmdset={
+  ...ledger,
+  vfs:{...ledger.vfs,'docs/notes.md':'Notes for the team.\n','.claude/commands/fix.md':FIXCMD,'.claude/commands/docs.md':'Goal: update the shop docs\nConstraints: only edit docs/\n','.claude/commands/audit.md':'Goal: review the shop totals\nPlan: first\n'}
+};
+const cmdlint={...ledger,vfs:{...ledger.vfs,'.claude/commands/check.md':GOALS+'Constraints: do not edit migrations/\nDone when: run npm run lint\n'}};
+
+/* Dev tool scenarios are connected: a call to a tool that no server in .claude/mcp.txt lists is skipped as "not connected". */
+const called=(o,t)=>o.calls.some(c=>c.target===t);
+const stale={
+  task:'Fix the rounding bug in src/price.js. The notes in the repo are old, so look up the current rounding docs first.',
+  vfs:{...small,'.claude/mcp.txt':'tracker: list_issues, comment\nbrowser: open, click\n'},
+  commands,tools:['docs.search','docs.lookup','tracker.list_issues','tracker.comment','browser.open','browser.click'],connected:true,
+  script:[{verb:'call',target:'docs.search'},{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED}],
+  hidden:[],
+  accept:o=>!called(o,'docs.search')?'The agent never looked up the current docs.':fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const ui={
+  task:'Fix the rounding bug in src/price.js, and look at the page to check the result.',
+  vfs:{...small,'.claude/mcp.txt':'browser: open, click\n'},
+  commands,tools:['browser.open','browser.click','browser.screenshot'],connected:true,
+  script:[{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED}],
+  hidden:[],
+  accept:o=>fixed(o)||'src/price.js still rounds the wrong way.'
+};
+const TRACKER='tracker: list_issues, create_issue, comment, close\n';
+const triage={
+  task:'Go through the open issue, fix the rounding bug, and tell the team on the issue.',
+  vfs:{...small,'.claude/mcp.txt':TRACKER},
+  commands,tools:['tracker.list_issues','tracker.create_issue','tracker.comment','tracker.close'],connected:true,
+  script:[{verb:'call',target:'tracker.list_issues'},{verb:'read',target:'src/price.js'},{...needsFix,write:FIXED},{verb:'call',target:'tracker.comment'},{verb:'call',target:'tracker.close'}],
+  hidden:[{verb:'call',target:'tracker.close'}],
+  accept:o=>!called(o,'tracker.comment')?'The agent never commented on the issue, so the team was not told.':fixed(o)||'src/price.js still rounds the wrong way.'
+};
+
+/* Chapter 14 jobs are unattended: a Plan has nobody to approve it, and anything but a read needs an allow line. The job is the saved
+   command nightly-fix, started by a simulated workflow file. The learner edits only the command or permissions.txt, both shipped here. */
+const WORKFLOW='# simulated: a nightly job that starts the agent with no one at the keyboard\nname: nightly\non:\n  schedule:\n    - cron: "0 3 * * *"\njobs:\n  fix:\n    runs-on: ubuntu-latest\n    steps:\n      - run: claude -p "/nightly-fix"\n';
+const JOBFILE='.claude/commands/nightly-fix.md',ALLOWFILE='.claude/permissions.txt';
+const NIGHTLY='Goal: fix the rounding bug in src/price.js\n';
+const nightlyVfs=(log,cmd,allow)=>({...small,'.github/workflows/nightly.yml':WORKFLOW,'ci/last-run.log':log,[JOBFILE]:cmd,[ALLOWFILE]:allow});
+const PRICELOG='nightly run 03:00\nFAILED tests/price.test.js: adds cents\n  total() rounds the wrong way (src/price.js)\n';
+const nightly={
+  ...price,
+  task:'Fix the rounding bug in src/price.js, as the nightly job. Nobody is at the keyboard.',
+  vfs:nightlyVfs(PRICELOG,NIGHTLY+'Plan: first\nDone when: run npm test\n','allow edit src/price.js\nallow run npm test\n'),
+  unattended:true
+};
+const nightlyAllow={
+  ...price,
+  task:'Fix the rounding bug in src/price.js, as the nightly job. Nobody is at the keyboard.',
+  vfs:{...nightlyVfs(PRICELOG,NIGHTLY+'Done when: run npm test\n','# the actions this job may take, one per line\n'),'src/legacy/old.js':'// old billing code, still in use\n'},
+  commands:{...commands,'npm run deploy':()=>({ok:true,out:'deployed'})},
+  script:[...price.script,{verb:'edit',target:'src/legacy/old.js',write:'// rewritten\n'},{verb:'run',target:'npm run deploy'}],
+  hidden:[{verb:'edit',target:'src/legacy/'},{verb:'run',target:'npm run deploy'}],
+  unattended:true
+};
+const nightlyScope={
+  task:'Fix the rounding bug in src/tax.js, as the nightly job. Nobody is at the keyboard, and the failure of the last run is in ci/last-run.log.',
+  vfs:{...nightlyVfs('nightly run 03:00\nFAILED tests/tax.test.js: adds tax\n  tax() rounds the wrong way (src/tax.js)\n','Goal: fix the rounding bug in src/tax.js\nDone when: run npm test\n','allow edit src/tax.js\nallow run npm test\n'),
+    'src/tax.js':TAXBUG,'src/report.js':filler('report',50),'src/export.js':filler('export',50),'docs/notes.md':filler('notes',50)},
+  commands:{...commands,'npm test':v=>taxFixed({vfs:v})?{ok:true,out:'1 passed'}:{ok:false,out:'1 failed: tax() rounds the wrong way'}},tools:[],
+  explore:['ci/last-run.log','docs/notes.md','src/report.js','src/export.js','src/tax.js'],
+  /* no read step: the edit needs the log and the file, which only the scope or the explore reads */
+  script:[{...fixTax,needs:['ci/last-run.log','src/tax.js'],write:TAXFIXED}],
+  hidden:[],unattended:true,
+  accept:o=>!taxFixed(o)?'src/tax.js still rounds the wrong way.':o.tokens.peak>PEAK?'The job fixed the bug, but it held about '+o.tokens.peak+' tokens at once. The most allowed here is '+PEAK+'.':true
+};
+
+/* Chapter 15: the fix leaves a stray console.log. npm test passes either way; npm run verify is the tests plus no console.log, so only a
+   default check that runs it catches the line. Every start state ships a README that names the check. */
+const mem={...gate,commands:{...commands,'npm run verify':gate.commands['npm run check']}};
+const README='Before you merge, run npm run verify. It runs the tests and makes sure no console.log is left in src/.\n';
+const memgate={...mem,vfs:{...small,'README.md':README}};
+/* the typo does not parse, so the root line is ignored; the folder file is right but a folder file can never supply the default check */
+const memtypo={...mem,vfs:{...small,'README.md':README,'CLAUDE.md':small['CLAUDE.md']+'Done when: run npm run verfy\n','src/CLAUDE.md':'Done when: run npm run verify\n'}};
+const newrepo={
+  ...mem,
+  vfs:{...small,'README.md':'Never edit generated/ by hand: it is rebuilt from the schema.\n'+README,'generated/api.js':'// generated from the schema, do not edit by hand\n'},
+  script:[...mem.script,{verb:'edit',target:'generated/api.js',write:'// edited by hand\n'}],
+  hidden:[{verb:'edit',target:'generated/'}]
+};
+
 AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,scope,ledger,rollout,legacy,twofolders,lateread,legacyheavy,
-  release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit};
+  release,twoskills,unusedskill,mcpTrim,calendar,deploy,guards,earlytrap,crew,vault,vendor,leak,review,audit,
+  survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both,cmdfix,cmdset,cmdlint,stale,ui,triage,
+  nightly,'nightly-allow':nightlyAllow,'nightly-scope':nightlyScope,memgate,memtypo,newrepo};
 AQ.PEAK=PEAK;
 })();

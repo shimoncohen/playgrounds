@@ -158,3 +158,66 @@ describe('virtual files', () => {
     assert.deepEqual(J(v.list('a/')), ['a/b.txt']);
   });
 });
+
+describe('after-edit hooks and allow lines in the setup', () => {
+  const files = {
+    '.claude/hooks.txt': 'before run npm test\nafter edit src/ run npm run lint\nafter edit src/price.js\nafter read src/ run npm test\n',
+    '.claude/permissions.txt': 'deny edit migrations/\nallow edit src/\nallow everything\n',
+  };
+  const setup = config.parseSetup(vfs.create(files));
+  it('after edit PATH run COMMAND fills afterHooks, and before lines still fill hooks', () => {
+    assert.deepEqual(J(setup.afterHooks), [{ target: 'src/', run: 'npm run lint' }]);
+    assert.deepEqual(J(setup.hooks), [{ verb: 'run', target: 'npm test' }]);
+  });
+  it('a hooks line in neither form is an error that names both forms', () => {
+    const e = setup.errors.filter((x) => x.file === '.claude/hooks.txt');
+    assert.equal(e.length, 2);
+    assert.ok(e.every((x) => x.msg.endsWith('is not "before VERB TARGET" or "after edit PATH run COMMAND"')));
+  });
+  it('allow VERB TARGET fills allow beside deny, and a bad allow line is an error', () => {
+    assert.deepEqual(J(setup.allow), [{ verb: 'edit', target: 'src/' }]);
+    assert.deepEqual(J(setup.rules), [{ verb: 'edit', target: 'migrations/' }]);
+    const e = setup.errors.filter((x) => x.file === '.claude/permissions.txt');
+    assert.equal(e.length, 1);
+    assert.match(e[0].msg, /is not "deny VERB TARGET" or "allow VERB TARGET"/);
+  });
+  it('a setup with neither file has empty lists', () => {
+    const s = config.parseSetup(vfs.create({}));
+    assert.deepEqual([J(s.afterHooks), J(s.allow)], [[], []]);
+  });
+});
+
+describe('connected tools', () => {
+  const setup = config.parseSetup(vfs.create({ '.claude/mcp.txt': 'tracker: open, comment' }));
+  it('hasTool is true for a server name or one of its tools only', () => {
+    for (const t of ['tracker', 'tracker.open', 'tracker.comment']) assert.equal(config.hasTool(setup, t), true, t);
+    for (const t of ['tracker.close', 'track', 'trackers.open', 'open', '']) assert.equal(config.hasTool(setup, t), false, t);
+    assert.equal(config.hasTool(config.parseSetup(vfs.create({})), 'tracker'), false);
+  });
+});
+
+describe('the default check from CLAUDE.md', () => {
+  const sc = { ...scenario, commands: { 'npm test': () => ({ ok: true }), 'npm run lint': () => ({ ok: true }) } };
+  const mem = (memory, root) => config.memoryRules({ memory }, sc, root);
+  it('the first parsing Done when line of the root file is the check and leaves ignored', () => {
+    const m = mem('do not edit migrations/\nDone when: run npm test\nDone when: run npm run lint\nbe nice', true);
+    assert.deepEqual(J(m.check), { verb: 'run', target: 'npm test' });
+    assert.deepEqual(J(m.rules), [{ kind: 'do not', verb: 'edit', target: 'migrations/' }]);
+    assert.deepEqual(J(m.ignored), ['Done when: run npm run lint', 'be nice']);
+    assert.equal(mem('done WHEN: read src/price.js').check.target, 'src/price.js');
+  });
+  it('root is the default; folder memory and skill bodies pass root=false and get no check', () => {
+    const m = mem('Done when: run npm test', false);
+    assert.equal(m.check, null);
+    assert.deepEqual(J(m.ignored), ['Done when: run npm test']);
+    assert.notEqual(mem('Done when: run npm test').check, null);
+  });
+  it('a line that does not parse, or names a missing command, stays ignored', () => {
+    for (const l of ['Done when: it is done', 'Done when: run ghost', 'Done when: read nowhere.js', 'Done when:']) {
+      const m = mem(l);
+      assert.equal(m.check, null, l);
+      assert.deepEqual(J(m.ignored), [l], l);
+    }
+  });
+  it('no memory means no check', () => assert.equal(mem('').check, null));
+});

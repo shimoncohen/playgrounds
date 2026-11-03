@@ -7,7 +7,7 @@ const AQ=globalThis.AQ=globalThis.AQ||{};
 /* a pattern covers itself, anything under it (a folder, a tool's namespace) and a command with more words after it */
 const matches=(pat,t)=>t===pat||t.startsWith(pat.endsWith('/')?pat:pat+'/')||t.startsWith(pat+'.')||t.startsWith(pat+' ');
 
-/* constraints: [{kind, verb, target, n?, by}]; state.edited: the files edited so far */
+/* constraints: [{kind, verb, target, n?, by}]; state.edited: the files edited so far; state.unattended: the scenario has nobody to approve */
 function check(action,setup,constraints,state){
   const edited=(state&&state.edited)||[];
   for(const c of constraints){
@@ -20,6 +20,8 @@ function check(action,setup,constraints,state){
   }
   for(const r of setup.rules)if(r.verb===action.verb&&matches(r.target,action.target))return {allowed:false,by:'permission rule'};
   for(const h of setup.hooks)if(h.verb===action.verb&&matches(h.target,action.target))return {allowed:false,by:'hook'};
+  /* an unattended run has nobody to ask, so anything but a read needs an allow line; attended runs ignore allow */
+  if(state&&state.unattended&&action.verb!=='read'&&!setup.allow.some(r=>r.verb===action.verb&&matches(r.target,action.target)))return {allowed:false,by:'no one to ask'};
   return {allowed:true,by:null};
 }
 

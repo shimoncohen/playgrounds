@@ -4,10 +4,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAgent } from './harness.mjs';
+import { kit, runCases } from './cases.mjs';
 
 const AQ = loadAgent();
-const M = (c, i) => AQ.CH[c].missions[i];
-const go = (c, i, input) => AQ.evaluate(M(c, i), input, { approved: true });
+const { M, go } = kit(AQ);
 const F = (files) => ({ files });
 const BULK = 'x'.repeat(2000);
 const SRC = '# Rules for work inside src/\n', DOCS = '# Rules for work inside docs/\n';
@@ -44,12 +44,12 @@ const CASES = [
     fail: ['Files: src/', 'Files: src/util.js', 'Files: tests/price.test.js', 'Files: docs/', ''],
     refused: ['Files: nothing.js', 'Files: ../x'] },
   { at: [2, 2],
-    pass: [`${LOCK}\nDone when: run npm test`, 'Constraints: do not edit migrations/001.sql\nDone when: run npm test', `${LOCK}\nDone when: run npm test\nFiles: src/`],
+    pass: [`${LOCK}\nDone when: run npm test`, 'Constraints: do not edit migrations/001.sql\nDone when: run npm test', `${LOCK}\nDone when: run npm test\nFiles: src/`, F({ 'CLAUDE.md': 'do not edit migrations/\nDone when: run npm test' })],
     fail: ['Constraints: only edit src/price.js\nDone when: run npm test', LOCK, 'Done when: run npm test', `${LOCK}\nConstraints: do not edit src/tax.js\nDone when: run npm test`, 'Constraints: do not edit src/\nDone when: run npm test', ''],
     refused: ['Constraints: be careful\nDone when: run npm test', 'Constraints: do not edit ghost/\nDone when: run npm test'] },
   { at: [2, 3],
     pass: ['Plan: first\nDone when: run npm test', 'Plan: first\nConstraints: do not edit migrations/\nDone when: run npm test', 'Plan: first\nFiles: src/price.js, src/tax.js\nDone when: run npm test'],
-    fail: ['Done when: run npm test', 'Plan: off\nDone when: run npm test', 'Plan: first\nConstraints: do not edit src/', 'Plan: first\nConstraints: only edit src/tax.js\nDone when: run npm test', ''],
+    fail: ['Done when: run npm test', 'Plan: off\nDone when: run npm test', 'Plan: first\nConstraints: do not edit src/', 'Plan: first\nConstraints: only edit src/tax.js\nDone when: run npm test', '', F({ 'CLAUDE.md': 'Done when: run npm test' })],
     refused: ['Plan: always\nDone when: run npm test', 'Plan: first\nDone when: run ghost'] },
 
   { at: [3, 0],
@@ -84,7 +84,7 @@ const CASES = [
     pass: [F({ '.claude/mcp.txt': 'calendar: list' }), F({ '.claude/mcp.txt': 'calendar: list, create' })],
     fail: [F({ '.claude/mcp.txt': 'mail: send' }), F({ '.claude/mcp.txt': '' }), F({ '.claude/mcp.txt': 'calendar: create' }), F({ '.claude/mcp.txt': 'calendar: list\nmail: send' }), F({ '.claude/mcp.txt': 'calendar: list', 'CLAUDE.md': BULK }), F({ '.claude/mcp.txt': 'calendar list' })] },
   { at: [4, 4],
-    pass: ['Constraints: do not call mail.send\nDone when: call calendar.list', 'Constraints: ask before call mail.send\nDone when: call calendar.list', 'Constraints: do not call mail\nDone when: call calendar.list'],
+    pass: ['Constraints: do not call mail.send\nDone when: call calendar.list', 'Constraints: ask before call mail.send\nDone when: call calendar.list', 'Constraints: do not call mail\nDone when: call calendar.list', F({ 'CLAUDE.md': 'do not call mail.send\nDone when: call calendar.list' })],
     fail: ['Constraints: do not call calendar.create\nDone when: call calendar.list', 'Constraints: do not send mail.send\nDone when: call calendar.list', 'Done when: call calendar.list', 'Constraints: do not call mail.send', 'Constraints: only call calendar.list\nDone when: call calendar.list', 'Goal: move the 1:1', ''],
     refused: ['Constraints: do not call ghost.tool\nDone when: call calendar.list', 'Constraints: do not call mail.send\nDone when: call ghost.list'] },
 
@@ -117,38 +117,13 @@ const CASES = [
     fail: ['Plan: first', 'Constraints: ask before edit migrations/', 'Plan: first\nConstraints: do not edit migrations/\nConstraints: do not edit src/', 'Plan: first\nConstraints: ask before edit src/', 'Plan: first\nConstraints: ask before read migrations/', 'Plan: first\nConstraints: do not edit migrations/', ''],
     refused: ['Plan: first\nConstraints: ask before edit ghost/', 'Plan: sometimes\nConstraints: ask before edit migrations/'] },
   { at: [6, 4],
-    pass: [F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send' }), F({ 'CLAUDE.md': 'ask before delete data/\nask before read .env\nask before send mail.send' })],
-    fail: [F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send please' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env' }), F({ 'CLAUDE.md': '' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send\nnever reveal keys' }), F({ '.claude/permissions.txt': 'deny delete data/\ndeny read .env\ndeny send mail.send' }), F({ 'CLAUDE.md': 'do not delet data/\ndo not read .env\ndo not send mail.send' })] },
+    pass: [F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send' }), F({ 'CLAUDE.md': 'ask before delete data/\nask before read .env\nask before send mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send\nDone when: run npm test' })],
+    fail: [F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send please' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env' }), F({ 'CLAUDE.md': '' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send\nnever reveal keys' }), F({ '.claude/permissions.txt': 'deny delete data/\ndeny read .env\ndeny send mail.send' }), F({ 'CLAUDE.md': 'do not delet data/\ndo not read .env\ndo not send mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send\nDone when: it is done' })] },
 ];
 
 function BASE() { return 'Goal: fix the rounding bug in src/price.js'; }
 
-describe('chapters 2 to 7: lazy and nearby answers are caught', () => {
-  for (const k of CASES) {
-    const [c, i] = k.at, title = `[${c}, ${i}] ${M(c, i).title}`;
-    it(`${title}: spelled differently, it still passes`, () => k.pass.forEach((x) => assert.equal(go(c, i, x).result, true, JSON.stringify(x))));
-    it(`${title}: nearby and lazy inputs fail with a reason`, () => k.fail.filter(Boolean).forEach((x) => {
-      const r = go(c, i, x);
-      assert.ok(!r.refused, `${JSON.stringify(x)} was refused`);
-      assert.equal(typeof r.result, 'string', JSON.stringify(x));
-      assert.ok(r.result.length > 20, JSON.stringify(x));
-    }));
-    if (k.refused) it(`${title}: a line that does not parse means the agent is not run`, () => k.refused.forEach((x) => {
-      const r = go(c, i, x);
-      assert.equal(r.refused, true, JSON.stringify(x));
-      assert.equal(r.outcome, null);
-      assert.match(r.result, /was not run/);
-    }));
-    if (M(c, i).kind !== 'prompt') it(`${title}: deleting everything fails`, () => {
-      const empty = Object.fromEntries(Object.keys(AQ.scenarios[M(c, i).scenario].vfs).filter(AQ.editable).map((p) => [p, '']));
-      assert.equal(typeof go(c, i, F(empty)).result, 'string');
-    });
-  }
-  it('every mission of chapters 2 to 7 has a case table', () => {
-    const have = new Set(CASES.map((k) => k.at.join(',')));
-    AQ.CH.forEach((ch, c) => { if (c) ch.missions.forEach((_, i) => assert.ok(have.has(`${c},${i}`), `[${c}, ${i}]`)); });
-  });
-});
+runCases(AQ, 'chapters 2 to 7: lazy and nearby answers are caught', CASES, (c, ch) => c === 0 || ch.tier !== 'core');
 
 describe('plan first pauses the run until it is approved', () => {
   it('[2, 3] and [6, 3] wait for approval, and approving finishes them', () => {

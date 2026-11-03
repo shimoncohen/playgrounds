@@ -41,6 +41,24 @@ describe('permissions.check', () => {
     const rules = config.memoryRules(setup({ 'CLAUDE.md': 'do not edit migrations/' }), scenario).rules.map((r) => ({ ...r, by: 'CLAUDE.md' }));
     assert.deepEqual(check(act('edit', 'migrations/001.sql'), rules), { allowed: false, by: 'CLAUDE.md' });
   });
+  it('unattended: a non-read action needs a matching allow line, a read never does', () => {
+    const un = { edited: [], unattended: true };
+    const allow = { '.claude/permissions.txt': 'allow edit src/\nallow call mail' };
+    assert.deepEqual(check(act('edit', 'src/price.js'), [], {}, un), { allowed: false, by: 'no one to ask' });
+    assert.deepEqual(check(act('edit', 'src/price.js'), [], allow, un), { allowed: true, by: null });
+    assert.deepEqual(check(act('call', 'mail.send'), [], allow, un), { allowed: true, by: null });
+    assert.equal(check(act('edit', 'docs/big.md'), [], allow, un).by, 'no one to ask');
+    assert.equal(check(act('delete', 'src/price.js'), [], allow, un).by, 'no one to ask');
+    assert.equal(check(act('run', 'npm test'), [], allow, un).by, 'no one to ask');
+    assert.equal(check(act('read', 'docs/big.md'), [], {}, un).allowed, true);
+  });
+  it('allow beats nothing: a constraint or a deny line still blocks, and attended runs ignore allow', () => {
+    const un = { edited: [], unattended: true };
+    assert.equal(check(act('edit', 'src/price.js'), [c('do not edit src/')], { '.claude/permissions.txt': 'allow edit src/' }, un).by, 'your constraint');
+    assert.equal(check(act('edit', 'src/price.js'), [], { '.claude/permissions.txt': 'deny edit src/\nallow edit src/' }, un).by, 'permission rule');
+    assert.equal(check(act('edit', 'src/price.js'), [], { '.claude/permissions.txt': 'allow edit src/' }, { edited: [] }).allowed, true);
+    assert.equal(check(act('edit', 'src/price.js'), [], {}, { edited: [] }).allowed, true);
+  });
   it('matches a name, a folder or a namespace, not a mere prefix of a name', () => {
     assert.ok(permissions.matches('src/', 'src/price.js'));
     assert.ok(permissions.matches('src', 'src/price.js'));

@@ -114,6 +114,14 @@ function renderChapters(){
     gotoMission(ci,mi);
     const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});
   }});
+  revealCurrent();
+}
+// scrollIntoView would also scroll the page at 390 px, so only the rail scrolls
+function revealCurrent(){
+  const a=chaptersEl.querySelector('[aria-current="true"]');if(!a)return;
+  const r=a.getBoundingClientRect(),c=chaptersEl.getBoundingClientRect();
+  if(r.bottom>c.bottom)chaptersEl.scrollTop+=r.bottom-c.bottom;else if(r.top<c.top)chaptersEl.scrollTop-=c.top-r.top;
+  if(r.right>c.right)chaptersEl.scrollLeft+=r.right-c.right;else if(r.left<c.left)chaptersEl.scrollLeft-=c.left-r.left;
 }
 function renderMission(){
   const ch=CH[S.ch],n=ch.missions.length;
@@ -203,7 +211,7 @@ function nextQ(){
   if(!fDeck.length)fDeck=shuffle(pool.map(q=>QF.indexOf(q)));
   fQ=QF[fDeck.pop()];
   fQ.opts=shuffle([fQ.a,...fQ.w.filter(w=>w!==fQ.a).slice(0,3)]);fLocked=false;
-  fStage.innerHTML=`<div class="task">${fQ.c}</div><div class="opts">${fQ.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><span class="ot">${esc(o)}</span></button>`).join('')}</div>
+  fStage.innerHTML=`<div class="task">${fQ.c}</div><div class="opts">${fQ.opts.map((o,i)=>`<button class="opt" data-i="${i}"><span class="n">${i+1}</span><span class="ot">${o}</span></button>`).join('')}</div>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fStop">End round</button></div>`;
   fStage.querySelector('.opt').focus({preventScroll:true});
 }
@@ -214,7 +222,7 @@ function pick(i){
   bs.forEach((b,j)=>{b.disabled=true;if(fQ.opts[j]===fQ.a)b.classList.add('right');else if(j===i)b.classList.add('wrong');});
   const f=$('#fFb');
   if(ok){fStreak++;const pts=10+Math.min(fStreak-1,5)*2;fScore+=pts;f.className='fb good';f.textContent=`Correct! +${pts}${fStreak>1?` (streak ${fStreak})`:''}`;}
-  else{fStreak=0;fMiss.push(fQ);f.className='fb bad';f.textContent='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
+  else{fStreak=0;fMiss.push(fQ);f.className='fb bad';f.innerHTML='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
   setStats();clearTimeout(fNext);fNext=setTimeout(()=>{if(fireOn)nextQ();},ok?700:2600);
 }
 function startFire(){
@@ -229,7 +237,7 @@ function stopFire(silent){
   if(fScore>S.best){S.best=fScore;save();}
   setStats();
   fStage.innerHTML=`<div class="task">Round over: ${fScore} points</div><p class="note" style="margin:0">${fScore>=S.best&&fScore>0?'That is your best score so far.':`Your best is ${S.best}.`}</p>
-  ${fMiss.length?`<div><p class="explain" style="margin:0 0 8px"><b>Worth another look:</b></p><ul class="misses">${fMiss.map(q=>`<li><span>${q.c}</span><span>Answer: <b>${esc(q.a)}</b></span><span class="note">${esc(q.why)}</span></li>`).join('')}</ul></div>`:'<p class="explain" style="margin:0">No misses. Your loop is in good shape.</p>'}
+  ${fMiss.length?`<div><p class="explain" style="margin:0 0 8px"><b>Worth another look:</b></p><ul class="misses">${fMiss.map(q=>`<li><span>${q.c}</span><span>Answer: <b>${q.a}</b></span><span class="note">${q.why}</span></li>`).join('')}</ul></div>`:'<p class="explain" style="margin:0">No misses. Your loop is in good shape.</p>'}
   <div class="actions"><button class="btn" id="fStart">Play again</button></div>`;
 }
 fStage.addEventListener('click',e=>{

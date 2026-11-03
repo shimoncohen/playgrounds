@@ -43,6 +43,24 @@ const FIRST = {
   injection: [/\binjections?\b/i, 6, 1],
   send: [/\bsend [a-z]+\.[a-z]+/, 6, 1],
   secret: [/\bsecrets?\b/i, 6, 2],
+  'max N files': [/\bmax \d+ files?\b/, 7, 1],
+  // 8.3 defines it in one sentence; the chapter 8 intro and 8.1 and 8.2 must not use it
+  'pull request': [/\bpull request\b/i, 7, 2],
+  PR: [/\bPR\b/, 7, 2],
+  'Use:': [/\bUse:/, 9, 0],
+  delegate: [/\bdelegat/i, 9, 0],
+  parallel: [/\bparallel\b/i, 9, 2],
+  worktree: [/\bworktrees?\b/i, 9, 2],
+  'after edit': [/\bafter edit\b/, 10, 0],
+  formatter: [/\bformatter\b/i, 10, 1],
+  'slash command': [/\bslash commands?\b/i, 11, 0],
+  '.claude/commands': [/\.claude\/commands/, 11, 0],
+  headless: [/\bheadless\b/i, 13, 0],
+  unattended: [/\bunattended\b/i, 13, 0],
+  CI: [/\bCI\b/, 13, 0],
+  // 14.1 says the job's permissions file lists its actions without writing a line of it
+  'allow VERB': [/\ballow (?:edit|read|run|call|send|delete)\b/, 13, 1],
+  'default check': [/\bdefault check\b/i, 14, 0],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),

@@ -2181,6 +2181,113 @@ test('agent-quest: layout at 390px and at 1000px', async () => {
   await ctx.close();
 });
 
+test('agent-quest: the dev path missions and the Run panel after a hook run and a stall run never scroll sideways at 390, 1000 and 1440', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(7, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    const showRun = async () => { if (width < 721) await page.click('.paneSwitch button[data-pane="run"]'); };
+    const gotoChapter = async (ch, mi) => { if (width < 721) await page.click('.paneSwitch button[data-pane="mission"]'); await page.click(`#chapters [data-ch="${ch}"]`); if (mi) await page.click(`#mission .dot[data-mi="${mi}"]`); };
+    await fits('mission 8.1');
+    await gotoChapter(9);
+    await fits('mission 10.1');
+    await gotoChapter(14, 1);
+    await fits('mission 15.2');
+    await gotoChapter(10);
+    await o.solve();
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Hook after edit/);
+    await fits('the Run panel after a hook run');
+    await gotoChapter(13);
+    await page.click('#runBtn');
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Waiting for approval, but nobody is there/);
+    await fits('the Run panel after a stall run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+const railGaps = page => page.evaluate(() => {
+  const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect();
+  return { chapter: document.querySelector('#chapters [aria-current="true"]').dataset.ch, v: Math.min(r.top - c.top, c.bottom - r.bottom) >= -1, h: Math.min(r.left - c.left, c.right - r.right) >= -1, chip: [r.left, r.right], rail: [c.left, c.right] };
+});
+
+test('agent-quest: after a reload at chapter 15 the active chapter chip is scrolled into the rail at 390 and 1280', async () => {
+  for (const width of [390, 740, 1280]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+    const { page } = o;
+    for (const when of ['on load', 'after a reload']) {
+      const g = await railGaps(page);
+      assert.equal(g.chapter, '14');
+      assert.equal(g.v, true, `the chapter 15 chip is cut off at the top or bottom of the rail at ${width}, ${when}`);
+      assert.equal(g.h, true, `the chapter 15 chip is cut off at the side at ${width}, ${when}: ${g.chip} in ${g.rail}`);
+      await page.reload();
+      await page.waitForSelector('#runBtn');
+    }
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
+  // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
+  const done = {};
+  for (const [ch, n] of [[11, 3], [14, 3]]) for (let i = 0; i < n; i++) done[`${ch}.${i}`] = true;
+  const o = await agentPage({}, async c => { await seedAgent(JSON.stringify({ done }))(c); await c.addInitScript(() => { Math.random = () => 0.999999; }); });
+  const { page } = o;
+  const codes = s => (s.match(/<code>/g) || []).length;
+  const plain = s => s.replace(/<[^>]+>/g, '');
+  const qf = await page.evaluate(() => AQ.QF.map(q => ({ ch: q.ch, c: q.c, a: q.a, w: q.w })));
+  await page.click('.tabs button[data-tab="fire"]');
+  await page.click('#fStart');
+  const missed = new Set();
+  for (let step = 0; step < 12 && !(missed.has(11) && missed.has(14)); step++) {
+    const text = await page.textContent('#fStage .task');
+    const q = qf.find(x => plain(x.c) === text);
+    assert.ok(q, `an unknown question: ${text}`);
+    assert.equal(await page.locator('#fStage .task code').count(), codes(q.c), `code in the question: ${text}`);
+    const opts = await page.$$eval('#fStage .opt .ot', es => es.map(e => e.innerHTML));
+    assert.equal(opts.join('|').split('<code>').length - 1, codes([q.a, ...q.w].join('|')), `code in the options: ${text}`);
+    const right = opts.indexOf(q.a), wrong = opts.findIndex((_, i) => i !== right);
+    // miss one question per chapter: the chapter 15 one whose answer has code, the chapter 12 one whose question has code
+    const miss = !missed.has(q.ch) && (q.ch === 14 ? codes(q.a) : q.ch === 11 && codes(q.c));
+    await page.click(`#fStage .opt[data-i="${miss ? wrong : right}"]`);
+    if (miss) {
+      missed.add(q.ch);
+      if (codes(q.a)) assert.ok(await page.locator('#fFb code').count() >= 1, 'the answer shown after a miss has code');
+    }
+    await page.waitForFunction(t => document.querySelector('#fStage .task')?.textContent !== t, text, { timeout: 5000 });
+  }
+  assert.deepEqual([...missed].sort(), [11, 14]);
+  await page.click('#fStop');
+  const items = page.locator('#fStage .misses li');
+  assert.equal(await items.count(), 2);
+  for (let i = 0; i < 2; i++) assert.ok(await items.nth(i).locator('code').count() >= 1, 'a miss has code');
+  assert.ok(await page.locator('#fStage .misses span:first-child code').count() >= 1, 'a miss question has code');
+  assert.ok(await page.locator('#fStage .misses b code').count() >= 1, 'a miss answer has code');
+  assert.ok(await page.locator('#fStage .misses .note code').count() >= 1, 'a miss explanation has code');
+  assert.doesNotMatch(await page.textContent('#fStage'), /<\/?(code|b)>/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a long command path in the files list breaks after each slash and keeps its plain text', async () => {
+  const o = await agentPage({}, seedAt(11, 0));
+  const { page } = o;
+  const rows = await page.$$eval('#tree [data-path^=".claude/commands/"]', es => es.map(e => ({ path: e.dataset.path, html: e.innerHTML, text: e.textContent, wbrs: e.querySelectorAll('wbr').length })));
+  assert.ok(rows.length >= 1);
+  for (const r of rows) {
+    assert.equal(r.wbrs, r.path.split('/').length - 1, r.path);
+    assert.ok(r.html.startsWith(r.path.split('/').slice(0, -1).join('/<wbr>') + '/<wbr>'), `<wbr> after each slash: ${r.html}`);
+    assert.ok(r.text.startsWith(r.path), r.path);
+    assert.match(r.text.slice(r.path.length), /^( \(edited\))?( \(read-only\))?$/, r.path);
+  }
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: quick-fire and the field guide render, and quick-fire opens after chapter 1', async () => {
   const o = await agentPage({}, seedAgent(JSON.stringify({ done: { '0.0': true, '0.1': true, '0.2': true, '0.3': true, '0.4': true }, badges: { 0: true } })));
   const { page } = o;
@@ -2199,10 +2306,40 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
+test('agent-quest: the rail shows 15 chapters, and Use is on the form from mission 10.1', async () => {
+  const o = await agentPage({}, seedAt(9, 0));
+  const { page } = o;
+  assert.equal(await page.locator('#chapters .chap').count(), 15);
+  assert.equal(await page.isVisible('#pf-use'), true);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the editor counts a root Done when as the default check, and only for the root file', async () => {
+  const o = await agentPage({}, seedAt(14, 0));
+  const { page } = o;
+  const rules = () => page.textContent('#fileEditor .rules');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', 'Done when: run npm test');
+  assert.match(await rules(), /1 acts as the default check/);
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await rules(), /no default check/);
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  assert.match(await rules(), /no default check/, '15.2 starts with a Done when line that does not parse');
+  assert.doesNotMatch(await rules(), /acts as the default check/);
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  assert.doesNotMatch(await rules(), /default check/, 'a folder file shows neither phrase');
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '7 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '15 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');

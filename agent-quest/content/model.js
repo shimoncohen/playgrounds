@@ -15,6 +15,7 @@ const norm=input=>typeof input==='string'?{prompt:input,files:{}}
 
 /* true, or a plain-text reason the run does not pass */
 function verdict(o,c){
+  if(o.steps.some(s=>s.type==='stall'))return 'The run stopped to wait for approval, and nobody was there to give it.';
   if(o.status==='failed')return 'The agent checked its work and the check failed, and it could not repair it. Look at the Run panel for the step that failed.';
   if(o.violations.length){const v=o.violations[0];return 'The agent did '+v.verb+' '+v.target+', and nothing told it not to.';}
   return c.scenario.accept(o);
@@ -46,6 +47,8 @@ function evaluate(m,input,opts={}){
 
 /* null when the whole setup fits the budget, else the reason */
 AQ.overBudget=(c,limit)=>{const n=AQ.context.setupTokens(c.setup);return n>limit?'Your setup still takes about '+n+' tokens. The goal is '+limit+' or fewer.':null;};
+/* what a run paid for helpers: every delegate step counts, including one that had nothing to read */
+AQ.helperCost=o=>o.steps.reduce((n,s)=>n+(s.type==='delegate'?s.cost:0),0);
 AQ.KINDS=KINDS;
 AQ.verdict=verdict;
 AQ.editable=editable;

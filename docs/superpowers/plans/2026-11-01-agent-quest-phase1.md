@@ -210,7 +210,25 @@ Each content PR: one task per chapter (write `content/ch-NN-*.js`, append its `<
 
 **Engine additions in PR 4** (each with its tests): `style()` for `Examples`, scenario `history`, and `agentCost` (policy, shell and config tests); skill matching against a scenario `tag` (`loadedSkills`, `skillBody`, `skillIssues`, the `Skill:` context segment and the `skill` run step: config, context, policy and provider tests); folder-level `CLAUDE.md` memory (`memoryFolders`, `folderMemory`, the counted-once rule, `setupTokens` and the create-gate in `prepare()`: config, context, policy and content tests). Specified in the spec sections "Skill matching" and "Folder memory".
 
+**Engine additions in PR 5** (each with its tests, in `tests/agent/devengine.test.mjs` unless noted): the default check, a parsing `Done when:` line in the root `CLAUDE.md` (`memoryRules` returns `check`; the policy uses `prompt.doneWhen || check`; the editor counter says `1 acts as the default check` or `no default check`); after-edit hooks (`after edit PATH run COMMAND`, `fire` and `afterEdit` in `policy.js`, repaired by the scenario `correction` up to the cap); tool connection (scenario `connected`, `AQ.config.hasTool`, skip reason `not connected`); unattended runs (scenario `unattended`, `allow VERB TARGET` into `setup.allow`, skip reason `no one to ask`, the `stall` step); helpers (scenario `explore` and `focus`, the `delegate` step, `AQ.helperCost`); saved commands (`.claude/commands/NAME.md`, `Use` expansion in `parsePrompt`, the `command` step, name-clash setup errors); and a registry of step types (`AQ.policy.STEP_TYPES`, asserted in `registry.test.mjs`) with skip reasons shown as words in the Run panel and the narration. Specified in the spec sections "Default check", "Helpers", "Commands", "After hooks", "Unattended runs" and "Tool connection".
+
 Chapter 3 carries the four prompt-structure missions in the spec (examples, specific versus general, when not to be specific, plan first), each with a defined `accept`. The "which mechanism" chooser in chapter 6 and the model-size chooser in chapter 2 are quick-fire `choose` questions plus a cost-multiplier mission. Chapter 23 shows the meter before and after.
+
+### Task 5: Dev path, chapters 8 to 15 (PR 5, #56)
+
+One PR on one branch, built in batches; each batch is one commit and runs the tests below before the next starts. Chapters append at indexes 7 to 14 under tier `dev`: three missions each, 24 missions in all, 10 XP per mission and a 25 XP badge per chapter.
+
+**Files:**
+- Create: `agent-quest/content/ch-08-explore.js`, `ch-09-verify.js`, `ch-10-helpers.js`, `ch-11-hook-checks.js`, `ch-12-commands.js`, `ch-13-dev-mcp.js`, `ch-14-headless.js`, `ch-15-project-memory.js`, `tests/agent/devengine.test.mjs`, `registry.test.mjs`, `content-dev.test.mjs`, `cases.mjs`
+- Modify: `agent-quest/engine/config.js`, `permissions.js`, `policy.js`, `provider.js`; `agent-quest/content/model.js`, `scenarios.js`, `facts.js`, `extras.js`, `ch-02-context.js`, `ch-06-extend.js`; `agent-quest/ui.js`, `editor.js`, `index.html` (script tags before `extras.js`); `tests/agent/harness.mjs` (`FILES`), `content-core.test.mjs`, `content.test.mjs`, `codestyle.test.mjs`, `teach.test.mjs`, `config.test.mjs`, `permissions.test.mjs`
+- Modify (text and tests): the root `index.html` landing card (15 chapters), `tests/smoke.mjs`, `README.md`, `AGENTS.md`, the spec and this plan
+
+- [ ] **Step 1: Scaffolding.** The shared case runner (`cases.mjs`), a guard over the core missions' answers, wrong and lazy inputs, and probe rows that all expect `fail` while the code is still as it was.
+- [ ] **Step 2: Engine A and B.** The default check, after hooks, tool connection and unattended runs, then helpers, saved commands and the step registry. The probe rows that the default check legitimately flips (3.3, 5.5, 7.5) change in the same commit.
+- [ ] **Step 3: Chapters, two at a time** (8 and 9, 10 and 11, 12 and 13, 14 and 15). Each mission has `answer`, `wrong`, `lazy`, a case table with `pass`, `fail` and (for prompt missions) `refused` rows, and a bypass probe; each new term has a teach-before-use entry; each volatile claim is a `facts.js` entry dated 2026-11-03 with an https `docUrl`.
+- [ ] **Step 4: Text, spec, plan and smoke.** The count text ("15 chapters" in the root landing card, `tests/smoke.mjs`, `README.md`, `AGENTS.md`); this spec and plan; three browser checks (15 chapters in the rail, `Use` visible at 10.1, the editor counter for root and folder `CLAUDE.md`).
+- [ ] **Step 5: Verify.** Run `npm run check`, `npm run test:engine` and `npm test`; then the `review-mission` skill over chapters 8 to 15, and the `playtest` skill at 390, 1000 and 1440 wide.
+- [ ] **Step 6: Open the PR** titled `feat(agent): dev path (chapters 8-15)`, the body says "Part of #56" and "Part of #51", with no `Closes` (stacked PR). The body lists the documented behaviour change for the core path (a root `CLAUDE.md` `Done when:` is now the default check) and a QA checklist of real checkboxes.
 
 ---
 

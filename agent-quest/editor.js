@@ -7,7 +7,7 @@ const FIELDS=[
   ['goal','Goal','text','What you want done. Context only.'],
   ['files','Files','text','Paths to read, separated by commas.'],
   ['examples','Examples','text','Paths of sample output.'],
-  ['use','Use','text','Names of skills, servers or subagents.'],
+  ['use','Use','text','Names of helpers (subagents) or saved commands.'],
   ['plan','Plan','check','Plan first'],
   ['constraints','Constraints','area','One rule per line.'],
   ['donewhen','Done when','text','run COMMAND, read PATH or call TOOL.'],
@@ -69,7 +69,11 @@ ED.create=({tree,fileEl,host,onChange})=>{
     tree.textContent='';
     const ul=el('ul');ul.setAttribute('role','listbox');ul.setAttribute('aria-label','Project files');
     for(const p of Object.keys(base).sort()){
-      const li=el('li','',p+(p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
+      const li=el('li');
+      // wbr lets a long path wrap at its slashes; textContent stays the plain path
+      const segs=p.split('/');
+      segs.forEach((s,i)=>{if(i<segs.length-1)li.append(s+'/',document.createElement('wbr'));else li.append(s);});
+      li.append((p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
       li.setAttribute('role','option');li.dataset.path=p;
       li.setAttribute('aria-selected',String(p===sel));li.tabIndex=p===sel?0:-1;
       ul.append(li);
@@ -90,7 +94,13 @@ ED.create=({tree,fileEl,host,onChange})=>{
     fileEl.append(head,ta);
     if(p==='CLAUDE.md'||AQ.isFolderMemory(p)){
       rulesEl=el('p','rules');fileEl.append(rulesEl);
-      const upd=()=>{const r=AQ.config.memoryRules({memory:ta.value},sc);rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules. '+plural(r.ignored.length,'other line')+' only cost'+(r.ignored.length===1?'s':'')+' tokens.';};
+      const root=p==='CLAUDE.md';
+      const upd=()=>{
+        const r=AQ.config.memoryRules({memory:ta.value},sc,root),n=r.ignored.length;
+        /* only the root file can supply a default check, so a folder file shows neither phrase */
+        const sep=root?(r.check?', 1 acts as the default check, ':', no default check, '):'. ';
+        rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules'+sep+plural(n,'other line')+' only cost'+(n===1?'s':'')+' tokens.';
+      };
       upd();ta.addEventListener('input',upd);
     }
     ta.addEventListener('input',()=>{
