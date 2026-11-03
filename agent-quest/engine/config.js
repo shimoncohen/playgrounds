@@ -101,7 +101,7 @@ const isFolderMemory=p=>typeof p==='string'&&valid(p)&&/^(?:[\w.@-]+\/)+CLAUDE\.
 
 function parseSetup(vfs){
   /* raw: every setup file under .claude/, so a size budget counts text the parsers ignore too */
-  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],hooks:[],subagents:[],errors:[],
+  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],allow:[],hooks:[],afterHooks:[],subagents:[],errors:[],
     memoryFolders:vfs.list().filter(isFolderMemory).map(path=>({path,dir:path.slice(0,-'CLAUDE.md'.length),text:vfs.read(path)}))};
   for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
@@ -114,12 +114,22 @@ function parseSetup(vfs){
     const m=/^([\w-]+):\s*([\w-]+(?:\s*,\s*[\w-]+)*)$/.exec(l);
     if(m)setup.mcp.push({name:m[1],tools:m[2].split(',').map(x=>x.trim())});else setup.errors.push({file:'.claude/mcp.txt',msg:'"'+show(l)+'" is not "server: tool, tool"'});
   }
-  const verbRule=(file,head,out)=>{for(const l of lines(vfs.read(file))){
-    const m=new RegExp('^'+head+'\\s+('+VERBS.join('|')+')\\s+(\\S.*)$').exec(l);
-    if(m)out.push({verb:m[1],target:m[2].trim()});else setup.errors.push({file,msg:'"'+show(l)+'" is not "'+head+' VERB TARGET"'});
+  const verbRule=(file,forms,extra)=>{for(const l of lines(vfs.read(file))){
+    let done=false;
+    for(const [head,out] of forms){
+      const m=new RegExp('^'+head+'\\s+('+VERBS.join('|')+')\\s+(\\S.*)$').exec(l);
+      if(m){out.push({verb:m[1],target:m[2].trim()});done=true;break;}
+    }
+    if(done||(extra&&extra(l)))continue;
+    const said=forms.map(([h])=>'"'+h+' VERB TARGET"').concat(extra?['"after edit PATH run COMMAND"']:[]);
+    setup.errors.push({file,msg:'"'+show(l)+'" is not '+said.join(' or ')});
   }};
-  verbRule('.claude/permissions.txt','deny',setup.rules);
-  verbRule('.claude/hooks.txt','before',setup.hooks);
+  verbRule('.claude/permissions.txt',[['deny',setup.rules],['allow',setup.allow]]);
+  verbRule('.claude/hooks.txt',[['before',setup.hooks]],l=>{
+    const m=/^after\s+edit\s+(\S+)\s+run\s+(\S.*)$/.exec(l);
+    if(m)setup.afterHooks.push({target:m[1],run:m[2].trim()});
+    return !!m;
+  });
   for(const p of vfs.list('.claude/agents/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
     if(f.name&&own(MODELS,f.model))setup.subagents.push({path:p,name:f.name,model:f.model,cost:MODELS[f.model]});
@@ -128,12 +138,21 @@ function parseSetup(vfs){
   return setup;
 }
 
-/* CLAUDE.md lines in the prompt grammar act as standing rules; any other line only costs tokens */
-function memoryRules(setup,scenario){
+/* CLAUDE.md lines in the prompt grammar act as standing rules; any other line only costs tokens. In the root file (root=true)
+   the first "Done when: …" line that parses is the default check, so it is not ignored; folder memory and skill bodies pass root=false. */
+function memoryRules(setup,scenario,root=true){
   const rules=[],ignored=[];
-  for(const l of lines(setup.memory)){const r=parseConstraint(l,scenario);if(r.ok)rules.push(r.c);else ignored.push(l);}
-  return {rules,ignored};
+  let check=null;
+  for(const l of lines(setup.memory)){
+    const r=parseConstraint(l,scenario);
+    if(r.ok){rules.push(r.c);continue;}
+    const m=root&&!check&&/^done when:\s*(.*)$/i.exec(l),d=m&&parseDoneWhen(m[1],scenario);
+    if(d&&d.ok)check=d.d;else ignored.push(l);
+  }
+  return {rules,ignored,check};
 }
+
+const hasTool=(setup,target)=>setup.mcp.some(m=>m.name===target||m.tools.some(t=>m.name+'.'+t===target));
 
 const folderMemory=(setup,readPaths)=>setup.memoryFolders.filter(f=>readPaths.some(p=>p.startsWith(f.dir)));
 
@@ -156,5 +175,5 @@ function skillIssues(setup,tag){
 const agentCost=setup=>setup.subagents.reduce((n,s)=>n+s.cost,0);
 
 AQ.isFolderMemory=isFolderMemory;
-AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
+AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,hasTool,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
 })();

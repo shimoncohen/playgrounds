@@ -18,16 +18,22 @@ UI.rove=(list,sel)=>{
   });
 };
 
-const TAGS={context:'context',skill:'skill',plan:'plan',approved:'plan',skip:'skipped'};
+const TAGS={context:'context',skill:'skill',plan:'plan',approved:'plan',skip:'skipped',hook:'hook',stall:'stalled'};
+const WHY={'not seen yet':'the agent has not read what it needs yet','not connected':'its server is not connected','no one to ask':'nobody is there to approve it'};
 const describe=s=>{
+  if(s.type==='hook')return 'Hook after edit '+s.target+': ran '+s.run+' ('+(s.ok?'passed':s.why||'failed')+')';
+  if(s.type==='stall')return 'Waiting for approval, but nobody is there';
   if(s.type==='skill')return 'Skill '+s.name+(s.loaded?' loaded':' not loaded ('+s.why+')');
   if(s.type==='context')return 'Loaded instructions and your prompt: ~'+s.tokens+' tokens'+(s.dropped?' ('+s.dropped+' earlier message'+(s.dropped>1?'s':'')+' dropped to fit)':'');
   if(s.type==='plan')return 'Plan: '+(s.files.length?'change '+s.files.join(', '):'no files');
   if(s.type==='approved')return 'Plan approved';
-  if(s.type==='skip')return s.verb+' '+s.target+' (blocked by '+s.by+')';
+  if(s.type==='skip')return s.verb+' '+s.target+' ('+(WHY[s.by]||'blocked by '+s.by)+')';
   return s.verb+' '+s.target+(s.ok?'':' (failed)');
 };
 const tagOf=s=>s.type==='act'?(s.violation?'violation':s.tag==='verify'?'check':s.tag==='fix'?'fix':'call'):TAGS[s.type];
+
+UI.describe=describe;
+UI.tagOf=tagOf;
 
 UI.runView=host=>{
   const empty=()=>{host.textContent='';host.append(el('p','empty','Press Run the agent to watch each step here.'));};

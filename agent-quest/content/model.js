@@ -15,6 +15,7 @@ const norm=input=>typeof input==='string'?{prompt:input,files:{}}
 
 /* true, or a plain-text reason the run does not pass */
 function verdict(o,c){
+  if(o.steps.some(s=>s.type==='stall'))return 'The run stopped to wait for approval, and nobody was there to give it.';
   if(o.status==='failed')return 'The agent checked its work and the check failed, and it could not repair it. Look at the Run panel for the step that failed.';
   if(o.violations.length){const v=o.violations[0];return 'The agent did '+v.verb+' '+v.target+', and nothing told it not to.';}
   return c.scenario.accept(o);

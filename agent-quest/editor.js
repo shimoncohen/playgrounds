@@ -90,7 +90,13 @@ ED.create=({tree,fileEl,host,onChange})=>{
     fileEl.append(head,ta);
     if(p==='CLAUDE.md'||AQ.isFolderMemory(p)){
       rulesEl=el('p','rules');fileEl.append(rulesEl);
-      const upd=()=>{const r=AQ.config.memoryRules({memory:ta.value},sc);rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules. '+plural(r.ignored.length,'other line')+' only cost'+(r.ignored.length===1?'s':'')+' tokens.';};
+      const root=p==='CLAUDE.md';
+      const upd=()=>{
+        const r=AQ.config.memoryRules({memory:ta.value},sc,root),n=r.ignored.length;
+        /* only the root file can supply a default check, so a folder file shows neither phrase */
+        const sep=root?(r.check?', 1 acts as the default check, ':', no default check, '):'. ';
+        rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules'+sep+plural(n,'other line')+' only cost'+(n===1?'s':'')+' tokens.';
+      };
       upd();ta.addEventListener('input',upd);
     }
     ta.addEventListener('input',()=>{
