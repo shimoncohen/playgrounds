@@ -392,6 +392,25 @@ describe('run: String and reference programs', () => {
   it('other limits keep their own reason', () => {
     assert.equal(run('    loop {}').limit, 'steps');
   });
+  // a 65,536-character string is under the string limit, but a loop printing it fills memory long before the step limit
+  const big = '    let mut s = String::from("a");\n    let mut i = 0;\n    while i < 16 {\n        let t = s.clone();\n        s.push_str(&t);\n        i += 1;\n    }\n';
+  it('a loop printing a big String stops with limit "output size" and keeps what it printed', () => {
+    const c = run(big + '    loop {\n        println!("{}", s);\n    }');
+    assert.equal(c.status, 'limit');
+    assert.equal(c.limit, 'output size');
+    assert.ok(c.stdout.length > 1000000 && c.stdout.length <= 1000000 + 65537, c.stdout.length);
+  });
+  it('stdout and stderr count together', () => {
+    const c = run(big + '    loop {\n        println!("{}", s);\n        eprintln!("{}", s);\n    }');
+    assert.equal(c.limit, 'output size');
+    assert.ok(c.stdout.length + c.stderr.length > 1000000 && c.stdout.length + c.stderr.length <= 1000000 + 65537);
+  });
+  it('a program that prints under the cap is unchanged', () => {
+    const c = run(big + '    println!("{}", s);\n    eprintln!("{}", s);\n    println!("done");');
+    assert.equal(c.status, 'ok');
+    assert.equal(c.stdout.length, 65537 + 5);
+    assert.equal(c.stderr.length, 65537);
+  });
 });
 
 describe(`a '-> &'static str' fn returns only string literals`, () => {
@@ -438,6 +457,12 @@ describe('the limit message', () => {
     const r = RQ.evalMission(m, doubling).result;
     assert.match(r, /string/);
     assert.doesNotMatch(r, /calling itself forever/);
+  });
+  it('a mission that prints without end is told about the output', () => {
+    const printing = 'fn main() {\n    let mut s = String::from("a");\n    let mut i = 0;\n    while i < 16 {\n        let t = s.clone();\n        s.push_str(&t);\n        i += 1;\n    }\n    loop {\n        println!("{}", s);\n    }\n}\n';
+    const r = RQ.evalMission(m, printing).result;
+    assert.match(r, /printed too much/);
+    assert.doesNotMatch(r, /calling itself forever|string too long/);
   });
   it('any other limit keeps the old text', () => {
     assert.match(RQ.evalMission(m, 'fn main() {\n    loop {}\n}\n').result, /calling itself forever/);

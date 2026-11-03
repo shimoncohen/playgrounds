@@ -23,6 +23,7 @@ const cmpCodePoints=(x,y)=>{
 };
 const peel=e=>e.t==='Paren'?peel(e.expr):e;
 const MAX_STRING=100000; // JS chars; a doubling loop would otherwise take all the memory
+const MAX_OUTPUT=1000000; // JS chars of stdout and stderr together; a loop printing a near-limit String would otherwise fill memory before maxSteps
 // Rust's len counts UTF-8 bytes; TextEncoder is not in the vm sandbox
 const utf8Len=s=>{let n=0;for(const c of s){const p=c.codePointAt(0);n+=p<0x80?1:p<0x800?2:p<0x10000?3:4;}return n;};
 
@@ -118,6 +119,7 @@ RQ.interp=(ast,opts)=>{
   function emit(name,s){
     if(name==='println'||name==='eprintln')s+='\n';
     if(name==='println'||name==='print')out+=s;else err+=s;
+    if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
   function macro(e,env){
     if(!e.args.length){emit(e.name,'');return UNIT;}
