@@ -754,5 +754,65 @@
     "src": "fn f(t: bool) {\n    if t {\n        return;\n    }\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "the same sum that fits; the call returns before printing", "pr": "P4"
+  },
+  {
+    "id": "string-from-print",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hello\n", "err": "", "exit": 0,
+    "why": "String::from copies a string literal into an owned String that prints like a &str", "pr": "P5"
+  },
+  {
+    "id": "string-push-str",
+    "src": "fn main() {\n    let mut s = String::from(\"ab\");\n    s.push_str(\"cd\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "abcd\n", "err": "", "exit": 0,
+    "why": "push_str appends to a mut String", "pr": "P5"
+  },
+  {
+    "id": "string-len-bytes",
+    "src": "fn main() {\n    let s = String::from(\"héllo\");\n    println!(\"{}\", s.len());\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "len counts UTF-8 bytes, and é takes two", "pr": "P5"
+  },
+  {
+    "id": "string-clone-indep",
+    "src": "fn main() {\n    let a = String::from(\"x\");\n    let mut b = a.clone();\n    b.push_str(\"y\");\n    println!(\"{} {}\", a, b);\n}\n",
+    "expect": "ok", "out": "x xy\n", "err": "", "exit": 0,
+    "why": "a clone is its own String: changing it leaves the original alone", "pr": "P5"
+  },
+  {
+    "id": "ref-param-read",
+    "src": "fn size(s: &String) -> usize {\n    s.len()\n}\n\nfn main() {\n    let s = String::from(\"four\");\n    println!(\"{}\", size(&s));\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "4\nfour\n", "err": "", "exit": 0,
+    "why": "a &String param only reads, so the caller still owns the String afterwards", "pr": "P5"
+  },
+  {
+    "id": "mut-ref-param-push",
+    "src": "fn add(s: &mut String) {\n    s.push_str(\"!\");\n}\n\nfn main() {\n    let mut s = String::from(\"hi\");\n    add(&mut s);\n    add(&mut s);\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hi!!\n", "err": "", "exit": 0,
+    "why": "a &mut String param changes the caller's String, and the loan ends with each call", "pr": "P5"
+  },
+  {
+    "id": "deref-assign-int",
+    "src": "fn bump(r: &mut i32) {\n    *r += 1;\n}\n\nfn main() {\n    let mut x = 1;\n    bump(&mut x);\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "*r += 1 writes through a &mut i32 to the caller's variable", "pr": "P5"
+  },
+  {
+    "id": "as-str-coerce",
+    "src": "fn shout(s: &str) {\n    println!(\"{}!\", s);\n}\n\nfn main() {\n    let s = String::from(\"hey\");\n    shout(&s);\n    shout(s.as_str());\n}\n",
+    "expect": "ok", "out": "hey!\nhey!\n", "err": "", "exit": 0,
+    "why": "&String coerces to &str at a call, and as_str gives the same &str", "pr": "P5"
+  },
+  {
+    "id": "drop-then-other",
+    "src": "fn main() {\n    let a = String::from(\"a\");\n    let b = String::from(\"b\");\n    drop(a);\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "drop moves one String away and leaves the other usable", "pr": "P5"
+  },
+  {
+    "id": "deferred-init-assign",
+    "src": "fn main() {\n    let x: i32;\n    x = 5;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a let without a value may be set once later, even when it is not mut", "pr": "P5"
   }
 ]

@@ -240,7 +240,7 @@ describe('what the checker records in info', () => {
 describe('lint with references', () => {
   const lintOf = (body, items) => { const c = RQ.compile(main(body, items)); return [c.diags.map((d) => `${d.lint || d.code}@${d.line}`), c.unsupported.map((u) => `${u.feature}@${u.line}`)]; };
   it('does not throw on a let without an init', () => {
-    const c = RQ.run(main('    let x: i32;'));
+    const c = RQ.run(main('    let x: i32;\n    println!("{}", x);'));
     assert.equal(c.status, 'unsupported');
     assert.equal(c.unsupported.feature, 'deferred initialization');
   });
@@ -282,14 +282,164 @@ describe('no internal between batches', () => {
   }
   it('the interpreter guards report the construct', () => {
     const feat = (src) => { const c = RQ.run(src); assert.equal(c.status, 'unsupported', src); return c.unsupported.feature; };
-    assert.equal(feat(main('    let x: i32;')), 'deferred initialization');
-    assert.equal(feat(main('    let s = String::from("a");')), 'call');
-    assert.equal(feat(main('    drop(1);')), 'call');
+    assert.equal(feat(main('    let x: i32;\n    println!("{}", x);')), 'deferred initialization');
   });
   it('an assignment to a non-Path target is unsupported even if it gets past the checker', () => {
     const r = RQ.parse(RQ.lex('fn main() {\n    let r = 5;\n    *r = 1;\n}'));
     const c = RQ.interp(r.ast, { info: new Map() });
     assert.equal(c.status, 'unsupported');
     assert.equal(c.unsupported.feature, 'assignment target');
+  });
+  it('a call to a fn that does not exist is unsupported even if it gets past the checker', () => {
+    const r = RQ.parse(RQ.lex('fn main() {\n    foo();\n    String::default();\n}'));
+    const c = RQ.interp(r.ast, { info: new Map() });
+    assert.equal(c.status, 'unsupported');
+    assert.equal(c.unsupported.feature, 'call');
+  });
+});
+
+describe('run: String and reference programs', () => {
+  const run = (body, items) => RQ.run(main(body, items));
+  const out = (body, items) => {
+    const c = run(body, items);
+    assert.equal(c.status, 'ok', `${body} ${JSON.stringify(c.unsupported || c.errors || c.message)}`);
+    return c.stdout;
+  };
+  const feat = (body, items) => {
+    const c = run(body, items);
+    assert.equal(c.status, 'unsupported', `${body} ${c.status}`);
+    return `${c.unsupported.feature}@${c.unsupported.line}`;
+  };
+  it('String::from, String::new and push_str', () => {
+    assert.equal(out('    let s = String::from("hi");\n    println!("{}", s);'), 'hi\n');
+    assert.equal(out('    let mut s = String::new();\n    s.push_str("a");\n    s.push_str("bc");\n    println!("[{}]", s);'), '[abc]\n');
+  });
+  it('push_str through a &mut String param, twice', () => {
+    assert.equal(out('    let mut s = String::from("hi");\n    add(&mut s);\n    add(&mut s);\n    println!("{}", s);', 'fn add(s: &mut String) { s.push_str("!"); }'), 'hi!!\n');
+  });
+  it('len counts UTF-8 bytes', () => {
+    assert.equal(out('    println!("{}", String::from("héllo").len());'), '6\n');
+    assert.equal(out('    let s = String::from("é€😀");\n    println!("{} {}", s.len(), "é€😀".len());'), '9 9\n');
+    assert.equal(out('    println!("{}", String::new().len());'), '0\n');
+  });
+  it('clone is independent of the original', () => {
+    assert.equal(out('    let a = String::from("x");\n    let mut b = a.clone();\n    b.push_str("y");\n    println!("{} {}", a, b);'), 'x xy\n');
+  });
+  it('as_str, and &String where a &str is wanted', () => {
+    const items = 'fn shout(s: &str) { println!("{}!", s); }';
+    assert.equal(out('    let s = String::from("hey");\n    shout(&s);\n    shout(s.as_str());', items), 'hey!\nhey!\n');
+    assert.equal(out('    let t = String::from("b");\n    let mut s = String::from("a");\n    s.push_str(&t);\n    println!("{}", s);'), 'ab\n');
+  });
+  it('a &String param reads the caller\'s String', () => {
+    assert.equal(out('    let s = String::from("four");\n    println!("{} {}", size(&s), s);', 'fn size(s: &String) -> usize { s.len() }'), '4 four\n');
+  });
+  it('*r += 1 and *r = v through a &mut i32', () => {
+    assert.equal(out('    let mut x = 1;\n    bump(&mut x);\n    bump(&mut x);\n    println!("{}", x);', 'fn bump(r: &mut i32) { *r += 1; }'), '3\n');
+    assert.equal(out('    let mut x = 1;\n    set(&mut x, 9);\n    println!("{}", x);', 'fn set(r: &mut i32, v: i32) { *r = v; }'), '9\n');
+    assert.equal(out('    let x = 4;\n    let r = &x;\n    println!("{} {}", *r + 1, *r == 4);'), '5 true\n');
+  });
+  it('*r = String through a &mut String replaces the caller\'s String', () => {
+    assert.equal(out('    let mut s = String::from("a");\n    reset(&mut s);\n    println!("{}", s);', 'fn reset(r: &mut String) { *r = String::from("z"); }'), 'z\n');
+  });
+  it('drop, and a deferred let assigned once', () => {
+    assert.equal(out('    let a = String::from("a");\n    let b = String::from("b");\n    drop(a);\n    println!("{}", b);'), 'b\n');
+    assert.equal(out('    let x: i32;\n    x = 5;\n    println!("{}", x);'), '5\n');
+    assert.equal(out('    let x: i32;\n    println!("done");'), 'done\n');
+    assert.equal(out('    drop(5);'), '');
+  });
+  it('a user fn named drop wins over the builtin', () => {
+    assert.equal(out('    drop(5);', 'fn drop(x: i32) { println!("mine {}", x); }'), 'mine 5\n');
+  });
+  it('{} and {:?} of String and of references', () => {
+    assert.equal(out('    let s = String::from("a\\"b");\n    println!("{} {:?}", s, s);'), 'a"b "a\\"b"\n');
+    assert.equal(out('    let s = String::from("hi");\n    let r = &s;\n    println!("{} {:?} {r} {r:?}", r, r);'), 'hi "hi" hi "hi"\n');
+    assert.equal(out('    let mut x = 7;\n    let r = &mut x;\n    println!("{} {:?} {:>3}", r, r, r);'), '7 7   7\n');
+    assert.equal(out('    let f = 1.5;\n    let r = &f;\n    println!("{} {:?}", r, r);'), '1.5 1.5\n');
+    assert.equal(out('    let t = (String::from("a"), 1);\n    println!("{:?}", t);'), '("a", 1)\n');
+  });
+  it('non-ASCII {:?} of a String stays unsupported, {} prints it', () => {
+    assert.equal(out('    println!("{}", String::from("é"));'), 'é\n');
+    assert.equal(feat('    println!("{:?}", String::from("é"));'), 'format spec@3');
+  });
+  it('a reference to a deferred let that is never set is unsupported', () => {
+    assert.equal(feat('    let x: i32;\n    let r = &x;'), 'deferred initialization@4');
+  });
+  it('reading an unset cell is unsupported, never internal', () => {
+    for (const use of ['println!("{}", x);', 'println!("{x}");', 'x += 1;', 'let y = x;']) {
+      assert.equal(feat(`    let x: i32;\n    ${use}`), 'deferred initialization@4', use);
+    }
+  });
+  it('a borrow of a field is unsupported at run time too (no copy standing in for the place)', () => {
+    assert.equal(feat('    let mut t = (1, 2);\n    let r = &mut t.0;\n    *r = 5;'), 'borrow of a field@4');
+  });
+  it('a string that grows past 100,000 characters stops with limit "string size"', () => {
+    for (const body of [
+      '    let mut s = String::from("a");\n    loop {\n        let t = s.clone();\n        s.push_str(&t);\n    }',
+      '    let mut s = String::from("a");\n    let mut i = 0;\n    while i < 100 {\n        let t = s.clone();\n        s.push_str(&t);\n        i += 1;\n    }'
+    ]) {
+      const c = run(body);
+      assert.equal(c.status, 'limit', body);
+      assert.equal(c.limit, 'string size', body);
+    }
+  });
+  it('a string of exactly 100,000 characters is fine, one more is the limit', () => {
+    const grow = (n) => RQ.run(main(`    let mut s = String::from("a");\n    let mut i = 0;\n    while i < ${n} {\n        s.push_str("b");\n        i += 1;\n    }\n    println!("{}", s.len());`), { maxSteps: 1e6 });
+    assert.equal(grow(99999).stdout, '100000\n');
+    const c = grow(100000);
+    assert.equal(c.status, 'limit');
+    assert.equal(c.limit, 'string size');
+  });
+  it('other limits keep their own reason', () => {
+    assert.equal(run('    loop {}').limit, 'steps');
+  });
+});
+
+describe(`a '-> &'static str' fn returns only string literals`, () => {
+  const items = (ret, body) => `fn pick(${ret}) -> &'static str {\n${body}\n}`;
+  const flag = (params, body) => assert.equal(un('', items(params, body)), 'explicit lifetime@2', body);
+  it('a &String param as the tail, a &str param as the tail, and return s;', () => {
+    flag('s: &String', '    s');
+    flag('s: &str', '    s');
+    flag('s: &str', '    return s;');
+    flag('s: &String', '    return s;');
+  });
+  it('a local, a call and as_str as the tail', () => {
+    assert.equal(un('', items('s: &String', '    let t = "a";\n    t')), 'explicit lifetime@3');
+    assert.equal(un('', items('s: &String', '    s.as_str()')), 'explicit lifetime@2');
+    assert.equal(un('', items('', '    other()') + "\nfn other() -> &'static str { \"a\" }"), 'explicit lifetime@2');
+  });
+  it('an if/else with a literal and s is unsupported at the leaf; so is a nested block and a return in a branch', () => {
+    assert.equal(un('', items('s: &str, c: bool', '    if c {\n        "a"\n    } else {\n        s\n    }')), 'explicit lifetime@5');
+    assert.equal(un('', items('s: &str, c: bool', '    if c {\n        s\n    } else {\n        "a"\n    }')), 'explicit lifetime@3');
+    assert.equal(un('', items('s: &str', '    {\n        s\n    }')), 'explicit lifetime@3');
+    assert.equal(un('', items('s: &str, c: bool', '    if c {\n        return s;\n    }\n    "a"')), 'explicit lifetime@3');
+    assert.equal(un('', items('s: &str, c: bool', '    if c {\n        "a"\n    } else if !c {\n        "b"\n    } else {\n        s\n    }')), 'explicit lifetime@7');
+  });
+  it('a literal tail, return "a";, and an if/else of two literals pass the checker and run', () => {
+    accepts('', items('', '    "a"'));
+    accepts('', items('c: bool', '    if c {\n        return "a";\n    }\n    "b"'));
+    accepts('', items('c: bool', '    if c {\n        "a"\n    } else {\n        "b"\n    }'));
+    accepts('', items('', '    {\n        "a"\n    }'));
+    const run = (body, its) => RQ.run(main(body, its));
+    assert.equal(run('    println!("{}", pick());', items('', '    "lit"')).stdout, 'lit\n');
+    assert.equal(run('    println!("{} {}", pick(true), pick(false));', items('c: bool', '    if c {\n        "a"\n    } else {\n        "b"\n    }')).stdout, 'a b\n');
+    assert.equal(run('    println!("{}", pick(false));', items('c: bool', '    if c {\n        return "a";\n    }\n    "b"')).stdout, 'b\n');
+  });
+  it('a type error stays E0308, and a fn that is not static-returning is not checked', () => {
+    assert.equal(code('', items('', '    5')), 'E0308@2');
+    accepts('', 'fn pick(s: &str) -> bool { s.len() == 0 }');
+  });
+});
+
+describe('the limit message', () => {
+  const m = { check: () => true };
+  const doubling = 'fn main() {\n    let mut s = String::from("a");\n    loop {\n        let t = s.clone();\n        s.push_str(&t);\n    }\n}\n';
+  it('a mission that builds a huge string is told about the string, not about calling itself forever', () => {
+    const r = RQ.evalMission(m, doubling).result;
+    assert.match(r, /string/);
+    assert.doesNotMatch(r, /calling itself forever/);
+  });
+  it('any other limit keeps the old text', () => {
+    assert.match(RQ.evalMission(m, 'fn main() {\n    loop {}\n}\n').result, /calling itself forever/);
   });
 });

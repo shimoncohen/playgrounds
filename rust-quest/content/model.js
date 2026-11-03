@@ -23,7 +23,7 @@ RQ.evalMission=(m,input)=>{
     result=e.code||e.lint?'The compiler would stop here: '+e.msg+' (line '+e.line+').':'The compiler would not accept this: '+e.msg+' (line '+e.line+').';
   }else if(c.status==='unsupported')result='Rust Quest does not model `'+c.unsupported.feature+'`. '+RQ.diag.hint(c.unsupported.feature);
   else if(c.status==='internal')result='This is a Rust Quest bug, not your code.';
-  else if(c.status==='limit')result='The program ran for too long and was stopped. Is something calling itself forever?';
+  else if(c.status==='limit')result=c.limit==='string size'?'The program made a string too long for the practice runner and was stopped. Is a loop making it longer every time round?':'The program ran for too long and was stopped. Is something calling itself forever?';
   else if(c.status==='panic'&&m.expect!=='panic')result='The program stopped with a panic: '+c.panic.msg+' (line '+c.panic.line+').';
   else result=m.check(c);
   return {c,result};

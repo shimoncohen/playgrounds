@@ -128,7 +128,15 @@ RQ.check=ast=>{
   }
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
-  let scopes=[],curRet=T.unit,loops=[],vars=[],lits=[],fmts=[];
+  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[];
+  // a fn declared `-> &'static str` may only give back string literals: any other leaf could borrow from a parameter, which rustc
+  // rejects, and the quest does not model lifetimes. Block tails and if branches are looked through; return/break/continue have their own check.
+  function staticLeaves(e){
+    e=peel(e);
+    if(e.t==='Block'){if(e.tail)staticLeaves(e.tail);}
+    else if(e.t==='If'){staticLeaves(e.then);if(e.els)staticLeaves(e.els);}
+    else if(!(e.t==='Lit'&&e.kind==='str')&&!['Return','Break','Continue'].includes(e.t))unsup('explicit lifetime',e.line);
+  }
   const lookup=n=>{for(let i=scopes.length-1;i>=0;i--)if(scopes[i].has(n))return scopes[i].get(n);return null;};
   const bindVar=(n,mut,kind,ty,node)=>{
     const b={mut,kind,ty,assigns:0};
@@ -383,7 +391,7 @@ RQ.check=ast=>{
       case 'Block':return block(e);
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
-        coerce(ex(e.expr),curRet,e.expr);
+        if(coerce(ex(e.expr),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
         return T.never;
       }
       case 'Tuple':return e.elems.length?T.tuple(e.elems.map(ex)):T.unit;
@@ -469,9 +477,10 @@ RQ.check=ast=>{
   function fnBody(f){
     if(!f.node.body)return;
     scopes=[new Map()];curRet=f.ret;loops=[];
+    const r=f.node.ret;curStatic=!!r&&r.t==='Ref'&&r.lt==='static';
     for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty,p.pat);
     const body=f.node.body,t=block(body);
-    if(body.tail||f.node.ret)coerce(t,f.ret,body.tail?endNode(body.tail):f.node.ret);
+    if(body.tail||f.node.ret){if(coerce(t,f.ret,body.tail?endNode(body.tail):f.node.ret)&&curStatic&&body.tail)staticLeaves(body.tail);}
     else if(!unify(t,f.ret))unsup('type checking',f.node.line);
     finish();
   }

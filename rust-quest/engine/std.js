@@ -84,12 +84,14 @@ function quoted(s,q){
   }
   return o+q;
 }
+const unref=v=>{while(v.k==='ref')v=v.cell.val;return v;};
 function display(v){
+  v=unref(v);
   switch(v.k){
     case 'int':return v.v.toString();
     case 'float':return f64(v.v,'');
     case 'bool':return v.v?'true':'false';
-    case 'char':case 'str':return v.v;
+    case 'char':case 'str':case 'String':return v.v;
     default:throw new Error('display of '+v.k);
   }
 }
@@ -97,10 +99,11 @@ function display(v){
 function debug(v,tick){
   if(tick)tick();
   const sub=x=>debug(x,tick);
+  v=unref(v);
   switch(v.k){
     case 'float':return f64(v.v,'?');
     case 'char':return quoted(v.v,"'");
-    case 'str':return quoted(v.v,'"');
+    case 'str':case 'String':return quoted(v.v,'"');
     case 'unit':return '()';
     case 'tuple':return '('+v.v.map(sub).join(', ')+(v.v.length===1?',':'')+')';
     case 'array':return '['+v.v.map(sub).join(', ')+']';
@@ -109,7 +112,7 @@ function debug(v,tick){
 }
 // width counts characters, as Rust does
 function render(v,fmt,tick){
-  const s=fmt.debug?debug(v,tick):fmt.prec!==null?f64(v.v,'.'+fmt.prec):display(v);
+  const s=fmt.debug?debug(v,tick):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
   if(fmt.width===null)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }
@@ -122,5 +125,5 @@ const methods=new Map([
   ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
   ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
 ]);
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled,methods};
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,methods,unref};
 })();

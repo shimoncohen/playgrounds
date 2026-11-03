@@ -1,5 +1,7 @@
 /* Values are {k:'int',v:BigInt,ty}, {k:'float',v:Number}, {k:'bool'|'char'|'str',v}, {k:'tuple'|'array',v:[values]} and
-   {k:'unit'}. The checker gives every literal its final type (opts.info), so a value always carries a concrete type.
+   {k:'unit'}. A String is {k:'String',v} and never changes: push_str puts a new one in the variable's cell. A reference is
+   {k:'ref',cell,mut}, where cell is the {val} of the variable it borrows (val is null until a deferred let is set).
+   The checker gives every literal its final type (opts.info), so a value always carries a concrete type.
    Deterministic: no clock, no randomness. DOM-free. */
 (()=>{
 'use strict';
@@ -20,6 +22,9 @@ const cmpCodePoints=(x,y)=>{
   return p.length-q.length;
 };
 const peel=e=>e.t==='Paren'?peel(e.expr):e;
+const MAX_STRING=100000; // JS chars; a doubling loop would otherwise take all the memory
+// Rust's len counts UTF-8 bytes; TextEncoder is not in the vm sandbox
+const utf8Len=s=>{let n=0;for(const c of s){const p=c.codePointAt(0);n+=p<0x80?1:p<0x800?2:p<0x10000?3:4;}return n;};
 
 RQ.interp=(ast,opts)=>{
   opts=opts||{};
@@ -33,6 +38,16 @@ RQ.interp=(ast,opts)=>{
   const find=(env,n)=>{for(let i=env.length-1;i>=0;i--)if(env[i].has(n))return env[i].get(n);return null;};
   const int=(v,ty)=>({k:'int',v,ty});
   const checked=(v,ty,msg,e)=>{if(!fits(v,ty))throw new Panic(msg,e);return int(v,ty);};
+  const unref=v=>RQ.std.unref(v);
+  const read=(cell,line)=>{if(cell.val===null)throw new Unsup('deferred initialization',line);return cell.val;};
+  const string=s=>{if(s.length>MAX_STRING)throw new Limit('string size');return {k:'String',v:s};};
+  function cellOf(e,env){
+    e=peel(e);
+    if(e.t==='Deref')return cellOf(e.expr,env);
+    let c=(e.t==='Path'&&find(env,e.segs[0].name))||{val:ev(e,env)};
+    while(read(c,e.line).k==='ref')c=c.val.cell;
+    return c;
+  }
 
   function intOp(op,a,b,e){
     const ty=a.ty;
@@ -52,6 +67,7 @@ RQ.interp=(ast,opts)=>{
     return null;
   }
   function binop(op,a,b,e){
+    a=unref(a);b=unref(b);
     if(a.k==='int'&&b.k==='int'){const r=intOp(op,a,b,e);if(r)return r;}
     if(a.k==='float'&&b.k==='float'){
       switch(op){
@@ -115,7 +131,7 @@ RQ.interp=(ast,opts)=>{
         else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick);
         else{
           let v=named.get(p.name);
-          if(!v){const c=find(env,p.name);v=c?c.val:consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
+          if(!v){const c=find(env,p.name);v=c?read(c,e.line):consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
           s+=RQ.std.render(v,p.fmt,tick);
         }
       }
@@ -151,8 +167,7 @@ RQ.interp=(ast,opts)=>{
       for(const s of b.stmts){
         tick();
         if(s.t==='Let'){
-          if(!s.init)throw new Unsup('deferred initialization',s.line);
-          const v=ev(s.init,env);
+          const v=s.init?ev(s.init,env):null;
           if(s.pat.t==='IdentPat')env[env.length-1].set(s.pat.name,{val:v});
         }else if(s.t==='ExprStmt')ev(s.expr,env);
         else throw new Unsup(s.t,s.line);
@@ -180,7 +195,7 @@ RQ.interp=(ast,opts)=>{
       case 'Paren':return ev(e.expr,env);
       case 'Path':{
         const n=e.segs[0].name,c=find(env,n);
-        if(c)return c.val;
+        if(c)return read(c,e.line);
         if(consts.has(n))return constVal(n);
         return bug('name '+n);
       }
@@ -200,17 +215,50 @@ RQ.interp=(ast,opts)=>{
         return binop(e.op,a,b,e);
       }
       case 'Assign':{
-        if(e.lhs.t!=='Path')throw new Unsup('assignment target',e.line);
-        const cell=find(env,e.lhs.segs[0].name);
+        let cell;
+        if(e.lhs.t==='Path')cell=find(env,e.lhs.segs[0].name);
+        else if(e.lhs.t==='Deref'){
+          const rv=ev(e.lhs.expr,env);
+          if(rv.k!=='ref')throw new Unsup('assignment target',e.line);
+          cell=rv.cell;
+        }else throw new Unsup('assignment target',e.line);
         if(!cell)return bug('assign');
         let r=ev(e.rhs,env);
-        if(e.op!=='=')r=binop(e.op.slice(0,-1),cell.val,r,e);
+        if(e.op!=='=')r=binop(e.op.slice(0,-1),read(cell,e.line),r,e);
         cell.val=r;return UNIT;
       }
       case 'Call':{
-        const f=e.callee.t==='Path'&&fns.get(e.callee.segs[0].name);
-        if(!f)throw new Unsup('call',e.line);
-        return callFn(f,e.args.map(a=>ev(a,env)),e.line);
+        const sg=e.callee.t==='Path'?e.callee.segs:[],f=sg.length===1&&fns.get(sg[0].name);
+        if(f)return callFn(f,e.args.map(a=>ev(a,env)),e.line);
+        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='new')return {k:'String',v:''};
+        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='from')return {k:'String',v:unref(ev(e.args[0],env)).v};
+        if(sg.length===1&&sg[0].name==='drop'&&e.args.length===1){ev(e.args[0],env);return UNIT;}
+        throw new Unsup('call',e.line);
+      }
+      case 'Ref':{
+        const x=peel(e.expr);
+        if(x.t==='Field'||x.t==='Index')throw new Unsup('borrow of a field',e.line);
+        if(x.t==='Deref')throw new Unsup('reborrow',e.line);
+        const own=x.t==='Path'&&find(env,x.segs[0].name);
+        if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut};}
+        return {k:'ref',cell:{val:ev(x,env)},mut:e.mut};
+      }
+      case 'Deref':{
+        const v=ev(e.expr,env);
+        if(v.k!=='ref')throw new Unsup('dereference',e.line);
+        return read(v.cell,e.line);
+      }
+      case 'MethodCall':{
+        if(!RQ.std.methods.has(e.name))throw new Unsup('method call',e.line);
+        if(e.name==='push_str'){
+          const r=peel(e.recv);
+          if(r.t==='Field'||r.t==='Index')throw new Unsup('borrow of a field',e.line);
+          const c=cellOf(r,env),add=unref(ev(e.args[0],env)).v;
+          c.val=string(c.val.v+add);return UNIT;
+        }
+        const s=unref(ev(e.recv,env)).v;
+        if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
+        return {k:e.name==='clone'?'String':'str',v:s};
       }
       case 'Macro':return macro(e,env);
       case 'Block':return block(e,env);
