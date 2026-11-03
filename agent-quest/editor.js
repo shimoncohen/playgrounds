@@ -7,7 +7,7 @@ const FIELDS=[
   ['goal','Goal','text','What you want done. Context only.'],
   ['files','Files','text','Paths to read, separated by commas.'],
   ['examples','Examples','text','Paths of sample output.'],
-  ['use','Use','text','Names of skills, servers or subagents.'],
+  ['use','Use','text','Names of helpers (subagents) or saved commands.'],
   ['plan','Plan','check','Plan first'],
   ['constraints','Constraints','area','One rule per line.'],
   ['donewhen','Done when','text','run COMMAND, read PATH or call TOOL.'],

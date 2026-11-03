@@ -6,7 +6,7 @@
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const CAP=3;
 /* every type of step a run can push; each needs narration, a ui.js TAGS key and a ui.js describe branch (tests/agent/registry.test.mjs) */
-const STEP_TYPES=['context','skill','plan','approved','act','skip','hook','stall'];
+const STEP_TYPES=['context','skill','command','plan','approved','delegate','act','skip','hook','stall'];
 
 function run(scenario,setup,prompt,opts={}){
   const vfs=(opts.vfs||AQ.vfs.create(scenario.vfs)).clone(),history=opts.history||[];
@@ -72,6 +72,7 @@ function run(scenario,setup,prompt,opts={}){
   steps.push({type:'context',tokens:ctx.total,dropped:ctx.dropped.length});
   for(const s of loaded)steps.push({type:'skill',name:s.name,loaded:true});
   for(const s of skipped)steps.push({type:'skill',name:s.name,loaded:false,why:s.why});
+  for(const c of prompt.commands)steps.push({type:'command',name:c.name,lines:c.lines});
   const script=scenario.script||[];
   if(prompt.plan&&scenario.unattended){steps.push({type:'stall',what:'plan'});return outcome('blocked');}
   if(prompt.plan){
@@ -79,7 +80,26 @@ function run(scenario,setup,prompt,opts={}){
     if(!opts.approved)return outcome('awaiting-approval');
     steps.push({type:'approved'});
   }
-  const scope=prompt.files.length?prompt.files.flatMap(f=>vfs.read(f)!==null?[f]:vfs.list(AQ.vfs.dir(f))):(scenario.explore||[]);
+  /* Each Use name that is a subagent takes a contiguous chunk of the explore list (the first m mod n chunks one file longer) and reads it
+     in its own context: obeying the same rules, counting in total but never in peak. The agent then reads only the focus files. */
+  const subs=[...new Set(prompt.use)].map(n=>setup.subagents.find(a=>a.name===n)).filter(Boolean);
+  const explore=[...new Set(scenario.explore||[])],focus=scenario.focus||[],delegated=!prompt.files.length&&explore.length>0&&focus.length>0;
+  let at=0;
+  subs.forEach((s,i)=>{
+    const size=delegated?Math.floor(explore.length/subs.length)+(i<explore.length%subs.length?1:0):0;
+    let files=0,tokens=0;
+    for(const p of explore.slice(at,at+size)){
+      const a={verb:'read',target:p};
+      if(!AQ.permissions.check(a,setup,rules(),{edited,unattended:!!scenario.unattended}).allowed)continue;
+      const r=AQ.shell.exec(scenario,a,vfs,styles);
+      if(!r.ok)continue;
+      files++;tokens+=AQ.tokens.estimate(a.verb+' '+p+' '+r.out);
+      if(hidden(a))violations.push(a);
+    }
+    at+=size;total+=tokens;
+    steps.push({type:'delegate',name:s.name,model:s.model,cost:s.cost,files,tokens,over:tokens>AQ.context.WINDOW});
+  });
+  const scope=prompt.files.length?prompt.files.flatMap(f=>vfs.read(f)!==null?[f]:vfs.list(AQ.vfs.dir(f))):subs.length&&delegated?focus:explore;
   for(const p of [...new Set(scope)])act({verb:'read',target:p},'explore');
   let ran=0;
   for(const a of script)if(act(a,'script'))ran++;

@@ -8,8 +8,10 @@ const UI = new Function('window', 'AQ', `${read('ui.js')}\nreturn window.AQUI;`)
 const SAMPLE = {
   context: { type: 'context', tokens: 12, dropped: 0 },
   skill: { type: 'skill', name: 'guard', loaded: true },
+  command: { type: 'command', name: 'fix', lines: 2 },
   plan: { type: 'plan', files: ['src/price.js'] },
   approved: { type: 'approved' },
+  delegate: { type: 'delegate', name: 'scout', model: 'small', cost: 1, files: 3, tokens: 380, over: false },
   act: { type: 'act', verb: 'edit', target: 'src/price.js', ok: true, tag: 'script' },
   skip: { type: 'skip', verb: 'edit', target: 'src/price.js', by: 'your constraint' },
   hook: { type: 'hook', when: 'after', target: 'src/price.js', run: 'npm run lint', ok: false },
@@ -35,6 +37,15 @@ describe('step type registry', () => {
   });
   it('tagOf gives a string for a sample of every type', () => {
     for (const t of AQ.policy.STEP_TYPES) assert.equal(typeof UI.tagOf(SAMPLE[t]), 'string', t);
+  });
+  it('a helper that overflows or has nothing to read says so in the panel and the narration', () => {
+    const over = { ...SAMPLE.delegate, over: true, tokens: 2800 }, idle = { ...SAMPLE.delegate, files: 0, tokens: 0 };
+    assert.match(UI.describe(over), /more than its window \(2000\)/);
+    assert.match(say(over), /lost track of some files/);
+    assert.match(UI.describe(idle), /nothing to search/);
+    assert.match(say(idle), /nothing for it to search/);
+    assert.match(say(SAMPLE.delegate), /3 files in its own context/);
+    assert.deepEqual([UI.tagOf(SAMPLE.delegate), UI.tagOf(SAMPLE.command)], ['helper', 'command']);
   });
   it('a skip reason shows as words in the Run panel and the narration', () => {
     for (const by of ['not seen yet', 'not connected', 'no one to ask']) {

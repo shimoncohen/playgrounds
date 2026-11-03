@@ -12,6 +12,10 @@ function narrate(s){
   if(s.type==='plan')return 'Here is my plan'+(s.files.length?': I will change '+s.files.join(', ')+'.':'.');
   if(s.type==='skill')return s.loaded?'I loaded the skill "'+s.name+'" because it matches this task.':'I did not load the skill "'+s.name+'": another skill already matches this task.';
   if(s.type==='approved')return 'The plan is approved, so I start.';
+  if(s.type==='command')return 'I expanded the saved command "'+s.name+'" into the prompt.';
+  if(s.type==='delegate')return !s.files?'I handed the search to '+s.name+', but there was nothing for it to search.'
+    :s.over?'I handed the search to '+s.name+', but it read more than fit in its window and lost track of some files.'
+    :'I handed the search to '+s.name+'. It read '+s.files+' file'+(s.files===1?'':'s')+' in its own context and sent back what matters.';
   if(s.type==='stall')return 'I made a plan and waited for approval, but this run has nobody to give it, so I stopped.';
   if(s.type==='hook')return 'The hook ran '+s.run+' after my edit of '+s.target+(s.ok?' and it passed.':s.why?', but '+s.why+'.':' and it failed.');
   const plain=s.verb+' '+s.target,did='I '+(VERB[s.verb]||s.verb)+' '+s.target+'.';
