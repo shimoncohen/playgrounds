@@ -42,7 +42,7 @@ const CASES = [
   { at: [7, 2],
     pass: ['Files: NOTES.md, src/cart/total.js\nDone when: run npm test', 'Files: src/cart/total.js, NOTES.md\nDone when: run npm test', 'Files: NOTES.md\nFiles: src/cart/total.js\nDone when: run npm test', P('Files: NOTES.md, src/cart/total.js', { 'CLAUDE.md': 'Done when: run npm test' })],
     fail: ['Files: src/cart/total.js\nDone when: run npm test', 'Done when: run npm test', 'Files: NOTES.md\nDone when: run npm test', 'Files: src/cart/\nDone when: run npm test', 'Files: NOTES.md, src/cart/total.js',
-      'Files: NOTES.md, src/cart/\nDone when: run npm test', 'Files: NOTES.md', ''],
+      'Files: NOTES.md, src/cart/\nDone when: run npm test', 'Files: NOTES.md', '', F({ 'CLAUDE.md': 'Done when: run npm test' })],
     refused: ['Files: src/cart/ghost.js', 'Files: ../x'] },
 
   { at: [8, 0],
@@ -190,8 +190,8 @@ describe('dev chapters', () => {
     const unshipped = (m, x) => !!x && typeof x === 'object' && Object.keys(x.files || {}).some((p) => p.startsWith('.claude/') && !Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p));
     for (const k of CASES.filter((x) => [10, 11, 13].includes(x.at[0]))) assert.ok(k.fail.some((x) => unshipped(M(...k.at), x)), `[${k.at}]`);
   });
-  it('every table of chapters 14 and 15 holds a failing row that puts lines in the root CLAUDE.md', () => {
-    for (const k of CASES.filter((x) => [13, 14].includes(x.at[0]))) assert.ok(k.fail.some((x) => x && typeof x === 'object' && x.files && 'CLAUDE.md' in x.files), `[${k.at}]`);
+  it('every table of every dev chapter holds a failing row that puts lines in the root CLAUDE.md', () => {
+    for (const k of CASES.filter((x) => inDev(x.at[0]))) assert.ok(k.fail.some((x) => x && typeof x === 'object' && x.files && 'CLAUDE.md' in x.files), `[${k.at}]`);
   });
   it('the answer, wrong and lazy inputs and the passing table inputs only edit files their scenario ships', () => {
     const ships = (m, x) => { if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`); };

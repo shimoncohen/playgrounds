@@ -228,7 +228,7 @@ One PR on one branch, built in batches; each batch is one commit and runs the te
 - [ ] **Step 3: Chapters, two at a time** (8 and 9, 10 and 11, 12 and 13, 14 and 15). Each mission has `answer`, `wrong`, `lazy`, a case table with `pass`, `fail` and (for prompt missions) `refused` rows, and a bypass probe; each new term has a teach-before-use entry; each volatile claim is a `facts.js` entry dated 2026-11-03 with an https `docUrl`.
 - [ ] **Step 4: Text, spec, plan and smoke.** The count text ("15 chapters" in the root landing card, `tests/smoke.mjs`, `README.md`, `AGENTS.md`); this spec and plan; three browser checks (15 chapters in the rail, `Use` visible at 10.1, the editor counter for root and folder `CLAUDE.md`).
 - [ ] **Step 5: Verify.** Run `npm run check`, `npm run test:engine` and `npm test`; then the `review-mission` skill over chapters 8 to 15, and the `playtest` skill at 390, 1000 and 1440 wide.
-- [ ] **Step 6: Open the PR** titled `feat(agent): dev path (chapters 8-15)`, "Part of #51", closes #56. The body lists the documented behaviour change for the core path (a root `CLAUDE.md` `Done when:` is now the default check) and a QA checklist of real checkboxes.
+- [ ] **Step 6: Open the PR** titled `feat(agent): dev path (chapters 8-15)`, the body says "Part of #56" and "Part of #51", with no `Closes` (stacked PR). The body lists the documented behaviour change for the core path (a root `CLAUDE.md` `Done when:` is now the default check) and a QA checklist of real checkboxes.
 
 ---
 
