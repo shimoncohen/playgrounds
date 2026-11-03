@@ -31,12 +31,12 @@ AQ.CH.push({
     },
     {
       title:'Cap the change',scenario:'creep',kind:'prompt',fields:ALL,
-      goal:'The agent should fix the rounding bugs in <code>src/price.js</code> and <code>src/tax.js</code>, and then it wants to tidy <code>src/format.js</code> too. A change that keeps growing is harder to check. Cap it: say how many files the agent may change at most, and prove the fixes work.',
+      goal:'The agent should fix the rounding bugs in <code>src/price.js</code> and <code>src/tax.js</code>, and then it wants to tidy <code>src/format.js</code> too. A change that keeps growing is harder to check. Cap it: say how many files the agent may change at most.',
       how:[
         'The two lines <code>Constraints: max 2 files</code> and <code>Done when: run npm test</code> let the agent change two different files at most, then run the tests.',
         '<code>max 2 files</code> is a rule about size. It counts different files, not edits: changing one file twice still counts once.',
         'Two bugs in two files need a cap of two. A cap of one would stop the second fix, and a cap of three would let the tidy-up in.',
-        '<code>Done when: run npm test</code> checks that both fixes work.'
+        '<code>Done when: run npm test</code> is optional here: it checks that both fixes work, and a run without it ends <code>unverified</code>.'
       ],
       explain:'A cap does not know which file matters. The agent spends it on files in the order it works, so here the price fix and the tax fix come first and the tidy-up is cut off. Too tight a cap leaves the job half done, and too loose a cap lets the extra changes in.',
       hint:'Count the files the two fixes need, and write a rule with that number.',

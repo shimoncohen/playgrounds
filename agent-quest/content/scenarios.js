@@ -385,7 +385,7 @@ const triage={
 
 /* Chapter 14 jobs are unattended: a Plan has nobody to approve it, and anything but a read needs an allow line. The job is the saved
    command nightly-fix, started by a simulated workflow file. The learner edits only the command or permissions.txt, both shipped here. */
-const WORKFLOW='# simulated: a nightly job that starts the agent with no one at the keyboard\nname: nightly\non:\n  schedule:\n    - cron: "0 3 * * *"\njobs:\n  fix:\n    runs-on: ubuntu-latest\n    steps:\n      - run: claude -p "$(cat .claude/commands/nightly-fix.md)"\n';
+const WORKFLOW='# simulated: a nightly job that starts the agent with no one at the keyboard\nname: nightly\non:\n  schedule:\n    - cron: "0 3 * * *"\njobs:\n  fix:\n    runs-on: ubuntu-latest\n    steps:\n      - run: claude -p "/nightly-fix"\n';
 const JOBFILE='.claude/commands/nightly-fix.md',ALLOWFILE='.claude/permissions.txt';
 const NIGHTLY='Goal: fix the rounding bug in src/price.js\n';
 const nightlyVfs=(log,cmd,allow)=>({...small,'.github/workflows/nightly.yml':WORKFLOW,'ci/last-run.log':log,[JOBFILE]:cmd,[ALLOWFILE]:allow});

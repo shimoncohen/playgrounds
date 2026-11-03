@@ -225,6 +225,9 @@ describe('extras', () => {
       assert.ok(q.c && q.a && q.why);
     }
   });
+  it('quick-fire strings are rendered as HTML, so they hold no tag but code', () => {
+    for (const q of AQ.QF) for (const s of [q.a, ...q.w, q.why, q.c]) assert.doesNotMatch(s, /<(?!\/?code>)/, s);
+  });
   it('the field guide has an entry per chapter and its examples are read-only text', () => {
     for (const ch of AQ.CH.keys()) assert.ok(AQ.GUIDE.some((g) => g.ch === ch), `chapter ${ch + 1}`);
     for (const g of AQ.GUIDE) {

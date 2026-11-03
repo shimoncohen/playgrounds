@@ -69,7 +69,11 @@ ED.create=({tree,fileEl,host,onChange})=>{
     tree.textContent='';
     const ul=el('ul');ul.setAttribute('role','listbox');ul.setAttribute('aria-label','Project files');
     for(const p of Object.keys(base).sort()){
-      const li=el('li','',p+(p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
+      const li=el('li');
+      // wbr lets a long path wrap at its slashes; textContent stays the plain path
+      const segs=p.split('/');
+      segs.forEach((s,i)=>{if(i<segs.length-1)li.append(s+'/',document.createElement('wbr'));else li.append(s);});
+      li.append((p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
       li.setAttribute('role','option');li.dataset.path=p;
       li.setAttribute('aria-selected',String(p===sel));li.tabIndex=p===sel?0:-1;
       ul.append(li);

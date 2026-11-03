@@ -17,7 +17,7 @@ AQ.CH.push({
       how:[
         'The line <code>docs: search</code> in <code>.claude/mcp.txt</code> connects a server named <code>docs</code> with one tool, <code>search</code>, which the agent calls as <code>docs.search</code>.',
         'One line is one server: its name, a colon and its tools, separated by commas.',
-        'A tool the agent wants but nobody connected is skipped, and the Run panel says its server is not connected. The rest of the run goes on without it.',
+        'A tool the agent wants but nobody connected is skipped, and the Run panel says the tool is not connected. The rest of the run goes on without it.',
         'The tool has to be the one the agent calls. A server with a different tool, such as <code>docs: lookup</code>, is connected, but <code>docs.search</code> still is not.'
       ],
       explain:'A tool is available only while a server lists it. When the agent reaches for one that is missing, the call is skipped and the work goes on without it, so the fix is made from old notes instead of the current docs. This practice only matches names. It does not start a server, log in or discover tools, as a real connection does.',
@@ -58,7 +58,7 @@ AQ.CH.push({
       goal:'The agent will fix the bug and comment on the issue to tell the team. It also plans to close the issue, which is for a person to decide. The <code>tracker</code> server in <code>.claude/mcp.txt</code> lists four tools. Edit the list so the agent can list the issues and comment, and the close is never available.',
       how:[
         'The line <code>tracker: list_issues, comment</code> connects only the two tools the job uses. The agent can read the issues and comment, and <code>tracker.close</code> is not connected.',
-        'The Run panel shows the close skipped because its server is not connected, not because a rule stopped it.',
+        'The Run panel shows the close skipped because the tool is not connected, not because a rule stopped it.',
         '<code>create_issue</code> may stay if you like. It does no harm here, but the job does not use it either.',
         'Dropping <code>comment</code> too would stop the close, but then the agent could not tell the team the fix is in.'
       ],

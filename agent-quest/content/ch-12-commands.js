@@ -20,7 +20,7 @@ AQ.CH.push({
         'The file holds lines in the same shape as a prompt: a <code>Goal:</code> line is already there, and you add the other two.',
         'The Run panel shows a command step that says how many lines the command added to the prompt.'
       ],
-      explain:'A command is a prompt written once. Its lines join the prompt of every run that calls it by name, so the whole team gets the same rule and the same check, not whatever each person remembers to type. It is the same outcome as the first time you guarded <code>migrations/</code> in 3.3, with a new place to keep it. This practice has no command arguments: a command is only its lines, added to the prompt.',
+      explain:'A command is a prompt written once. Its lines join the prompt of every run that calls it by name, so the whole team gets the same rule and the same check, not whatever each person remembers to type. It is the same outcome as the first time you guarded <code>migrations/</code> in 3.3, with a new place to keep it. This practice has no command arguments: a command is only its lines, added to the prompt. In real Claude Code you type <code>/</code> and the name instead of <code>Use</code>, and a file in <code>.claude/commands/</code> is now the older form of a skill: a skill of the same name works the same way, and Claude can also load a skill by itself when its job matches.',
       hint:'Open <code>.claude/commands/fix.md</code> and add one rule line and one check line under the goal.',
       answer:{files:{'.claude/commands/fix.md':'Goal: fix the rounding bugs in the shop totals\nConstraints: do not edit migrations/\nDone when: run npm test\n'}},
       wrong:{files:{'.claude/commands/fix.md':'Goal: fix the rounding bugs in the shop totals\nConstraints: only edit src/price.js\nDone when: run npm test\n'}},
@@ -67,7 +67,9 @@ AQ.CH.push({
       wrong:'Use: check',
       lazy:'Done when: run npm test',
       check:(o,c)=>{
-        if(!c.prompt.doneWhen||c.prompt.doneWhen.target!=='npm test')return 'The check that ran was the weak one in the command. Type your own Done when line: it wins over the command\'s.';
+        const own=c.prompt.doneWhen&&c.prompt.doneWhen.target==='npm test';
+        if(!own&&!commandUsed(c,'check'))return 'The saved command was never called, and your prompt has no Done when line that runs the tests. Call the command with Use, then add Done when: run npm test.';
+        if(!own)return 'The check that ran was the weak one in the command. Type your own Done when line: it wins over the command\'s.';
         if(!commandUsed(c,'check'))return 'The run passed, but the saved command was never used. Call it with Use.';
         /* the files of a prompt mission are editable too: a check moved into the command would not be the learner's own line */
         const cmd=c.setup.commands.find(x=>x.name==='check');

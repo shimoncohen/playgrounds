@@ -478,6 +478,9 @@ describe('12.3 Your line wins', () => {
     assert.ok(outcome.steps.some((s) => s.tag === 'verify' && s.target === 'npm test'));
   });
   it('each gap in the input gets its own message', () => {
+    assert.match(go(11, 2, '').result, /never called/);
+    assert.doesNotMatch(go(11, 2, '').result, /weak one/);
+    assert.match(go(11, 2, 'Done when: run npm run lint').result, /never called/);
     assert.match(go(11, 2, M(11, 2).wrong).result, /weak one in the command/);
     assert.match(go(11, 2, P('Use: check', { 'CLAUDE.md': 'Done when: run npm test' })).result, /weak one in the command/);
     for (const x of [M(11, 2).lazy, 'Constraints: do not edit migrations/\nDone when: run npm test', P('Done when: run npm test', { 'CLAUDE.md': 'do not edit migrations/' })]) assert.equal(go(11, 2, x).result, NEVER_USED);

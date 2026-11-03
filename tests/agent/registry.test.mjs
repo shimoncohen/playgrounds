@@ -54,6 +54,9 @@ describe('step type registry', () => {
       assert.ok(say(s).includes('I wanted to edit src/price.js, but '), by);
       assert.ok(UI.describe(s).length > 0 && !UI.describe(s).includes(`blocked by ${by}`), by);
     }
+    assert.match(say({ ...SAMPLE.skip, by: 'not connected' }), /but the tool is not connected/);
+    assert.match(say({ ...SAMPLE.skip, by: 'hook' }), /but a hook does not allow it/);
+    assert.match(say({ ...SAMPLE.skip, by: 'permission rule' }), /but a permission rule does not allow it/);
     assert.match(say(SAMPLE.skip), /your constraint does not allow it/);
     assert.match(UI.describe(SAMPLE.skip), /blocked by your constraint/);
   });
