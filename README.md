@@ -111,10 +111,11 @@ script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
 math-quest/              the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
+math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
 math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 shell-quest/            split by job (below)
-tests/                  engine tests (Node; shell/, ds/, net/ and math/), browser smoke + golden tests (Playwright)
+tests/                  engine tests (Node; shell/, ds/, net/ and math/), browser smoke + golden tests (Playwright), math scene browser test
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
