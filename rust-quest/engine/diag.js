@@ -11,6 +11,16 @@ const ERRORS={
     tip:'Variables are immutable unless you say otherwise. Write `let mut` to let the value change, or use a new `let` to make a fresh variable with the same name.',
     guide:'E0384'
   },
+  E0381:{
+    title:'a variable is used before it has a value',
+    msg:o=>'used binding `'+o.name+'` isn\'t initialized',
+    tip:'A `let` with only a type has no value until you assign one. Give it a value on every path that reaches this line, or give it one in the `let` itself.'
+  },
+  E0382:{
+    title:'a value is used after it moved',
+    msg:o=>'use of moved value: `'+o.name+'`',
+    tip:'A `String` has one owner. Passing it on, or writing `let t = s;`, moves it, and the old name stops working. Make a copy with `.clone()`, or lend it with `&`.'
+  },
   E0428:{
     title:'a name is defined twice',
     msg:o=>'the name `'+o.name+'` is defined multiple times',

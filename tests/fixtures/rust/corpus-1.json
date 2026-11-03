@@ -814,5 +814,107 @@
     "src": "fn main() {\n    let x: i32;\n    x = 5;\n    println!(\"{}\", x);\n}\n",
     "expect": "ok", "out": "5\n", "err": "", "exit": 0,
     "why": "a let without a value may be set once later, even when it is not mut", "pr": "P5"
+  },
+  {
+    "id": "move-let",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let t = s;\n    println!(\"{}\", s);\n}\n",
+    "expect": { "code": "E0382", "line": 4 }, "pair": "move-let-clone",
+    "why": "let t = s moves the String, so s cannot be printed afterwards", "pr": "P5"
+  },
+  {
+    "id": "move-let-clone",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let t = s.clone();\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "a clone is a copy, so the original is still there to print", "pr": "P5"
+  },
+  {
+    "id": "move-branch",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn f(c: bool) {\n    let s = String::from(\"a\");\n    if c {\n        take(s);\n    }\n    println!(\"{}\", s);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "code": "E0382", "line": 10 }, "pair": "move-branch-clone",
+    "why": "a move on one branch counts as a move afterwards, whichever way the branch went", "pr": "P5"
+  },
+  {
+    "id": "move-branch-clone",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn f(c: bool) {\n    let s = String::from(\"a\");\n    if c {\n        take(s.clone());\n    }\n    println!(\"{}\", s);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "a\na\n", "err": "", "exit": 0,
+    "why": "the branch passes a clone, so s is never moved", "pr": "P5"
+  },
+  {
+    "id": "move-loop",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn main() {\n    let s = String::from(\"a\");\n    for _i in 0..2 {\n        take(s);\n    }\n}\n",
+    "expect": { "code": "E0382", "line": 8 }, "pair": "move-loop-clone",
+    "why": "the second turn of the loop would use s after the first turn moved it", "pr": "P5"
+  },
+  {
+    "id": "move-loop-clone",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn main() {\n    let s = String::from(\"a\");\n    for _i in 0..2 {\n        take(s.clone());\n    }\n}\n",
+    "expect": "ok", "out": "a\na\n", "err": "", "exit": 0,
+    "why": "each turn passes its own clone", "pr": "P5"
+  },
+  {
+    "id": "move-fn-arg",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn main() {\n    let s = String::from(\"a\");\n    take(s);\n    println!(\"{}\", s);\n}\n",
+    "expect": { "code": "E0382", "line": 8 }, "pair": "move-fn-arg-clone",
+    "why": "passing a String by value hands it to the function", "pr": "P5"
+  },
+  {
+    "id": "move-fn-arg-clone",
+    "src": "fn take(s: String) {\n    println!(\"{}\", s);\n}\n\nfn main() {\n    let s = String::from(\"a\");\n    take(s.clone());\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "a\na\n", "err": "", "exit": 0,
+    "why": "the function gets a clone and main keeps s", "pr": "P5"
+  },
+  {
+    "id": "uninit-use",
+    "src": "fn main() {\n    let x: i32;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0381", "line": 3 }, "pair": "uninit-use-init",
+    "why": "a let with only a type has no value to print", "pr": "P5"
+  },
+  {
+    "id": "uninit-use-init",
+    "src": "fn main() {\n    let x: i32 = 5;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the same let with a value", "pr": "P5"
+  },
+  {
+    "id": "uninit-branch",
+    "src": "fn f(c: bool) {\n    let x: i32;\n    if c {\n        x = 1;\n    }\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "code": "E0381", "line": 6 }, "pair": "uninit-branch-init",
+    "why": "x is set on one branch only, and the compiler does not know which way c goes", "pr": "P5"
+  },
+  {
+    "id": "uninit-branch-init",
+    "src": "fn f(c: bool) {\n    let mut x: i32 = 0;\n    if c {\n        x = 1;\n    }\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "x has a value before the branch, so the branch may change it", "pr": "P5"
+  },
+  {
+    "id": "deferred-assign-twice",
+    "src": "fn main() {\n    let x: i32;\n    x = 1;\n    x = 2;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0384", "line": 4 }, "pair": "deferred-assign-twice-mut",
+    "why": "a deferred let that is not mut can be set only once", "pr": "P5"
+  },
+  {
+    "id": "deferred-assign-twice-mut",
+    "src": "fn main() {\n    let mut x: i32;\n    x = 1;\n    x = 2;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "with mut the second assignment is allowed", "pr": "P5"
+  },
+  {
+    "id": "reassign-after-move",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let t = s;\n    s = String::from(\"b\");\n    println!(\"{} {}\", s, t);\n}\n",
+    "expect": "ok", "out": "b a\n", "err": "", "exit": 0,
+    "why": "assigning a new String to a moved mut variable makes it usable again", "pr": "P5"
+  },
+  {
+    "id": "copy-no-move",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let x = 5;\n    let y = x;\n    println!(\"{} {} {}\", s, x, y);\n}\n",
+    "expect": "ok", "out": "a 5 5\n", "err": "", "exit": 0,
+    "why": "an integer is copied, so x is still there after let y = x", "pr": "P5"
+  },
+  {
+    "id": "branch-both-init",
+    "src": "fn f(c: bool) {\n    let x: i32;\n    if c {\n        x = 1;\n    } else {\n        x = 2;\n    }\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n    f(false);\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "x is set on every path, so it is initialised after the if", "pr": "P5"
   }
 ]

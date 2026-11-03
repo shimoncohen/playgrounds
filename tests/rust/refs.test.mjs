@@ -25,6 +25,14 @@ const code = (body, items) => {
   assert.deepEqual(c.unsupported, [], body);
   return c.diags.map((d) => `${d.code || d.lint}@${d.line}`).join(',');
 };
+// RQ.run stops a read of an unset cell at E0381 and a temporary borrow at mir, so a test of what lint or the interpreter do with them runs those stages itself
+const stages = (src) => { const r = RQ.parse(RQ.lex(src)), ck = RQ.check(r.ast); return { ast: r.ast, ck, lint: RQ.lint(r.ast, ck.info) }; };
+const bare = (src) => { const s = stages(src); return RQ.interp(s.ast, { info: s.ck.info }); };
+const bareFeat = (body, items) => {
+  const c = bare(main(body, items));
+  assert.equal(c.status, 'unsupported', `${body} ${c.status}`);
+  return `${c.unsupported.feature}@${c.unsupported.line}`;
+};
 const find = (c, pred) => { let n = null; RQ.walk(c.ast, (x) => { if (!n && pred(x)) n = x; }); return n; };
 const pathOf = (name, nth = 0) => (x) => x.t === 'Path' && x.segs.length === 1 && x.segs[0].name === name && nth-- === 0;
 
@@ -99,7 +107,8 @@ describe('the checker accepts the modeled String and reference shapes', () => {
     assert.equal(un('    drop(1, 2);'), 'wrong argument count@3');
   });
   it('as_str on a temporary String is accepted (mir reports it)', () => {
-    accepts('    let r = String::from("a").as_str();');
+    const { ck } = stages(main('    let r = String::from("a").as_str();'));
+    assert.deepEqual([ck.errors, ck.unsupported], [[], []]);
   });
 });
 
@@ -238,9 +247,12 @@ describe('what the checker records in info', () => {
 });
 
 describe('lint with references', () => {
-  const lintOf = (body, items) => { const c = RQ.compile(main(body, items)); return [c.diags.map((d) => `${d.lint || d.code}@${d.line}`), c.unsupported.map((u) => `${u.feature}@${u.line}`)]; };
+  const lintOf = (body, items) => {
+    const s = stages(main(body, items));
+    return [[...s.ck.errors, ...s.lint.errors].map((d) => `${d.lint || d.code}@${d.line}`), [...s.ck.unsupported, ...s.lint.unsupported].map((u) => `${u.feature}@${u.line}`)];
+  };
   it('does not throw on a let without an init', () => {
-    const c = RQ.run(main('    let x: i32;\n    println!("{}", x);'));
+    const c = bare(main('    let x: i32;\n    println!("{}", x);'));
     assert.equal(c.status, 'unsupported');
     assert.equal(c.unsupported.feature, 'deferred initialization');
   });
@@ -281,7 +293,7 @@ describe('no internal between batches', () => {
     it(name, () => assert.notEqual(RQ.run(src).status, 'internal', RQ.run(src).message));
   }
   it('the interpreter guards report the construct', () => {
-    const feat = (src) => { const c = RQ.run(src); assert.equal(c.status, 'unsupported', src); return c.unsupported.feature; };
+    const feat = (src) => { const c = bare(src); assert.equal(c.status, 'unsupported', src); return c.unsupported.feature; };
     assert.equal(feat(main('    let x: i32;\n    println!("{}", x);')), 'deferred initialization');
   });
   it('an assignment to a non-Path target is unsupported even if it gets past the checker', () => {
@@ -362,11 +374,11 @@ describe('run: String and reference programs', () => {
     assert.equal(feat('    println!("{:?}", String::from("é"));'), 'format spec@3');
   });
   it('a reference to a deferred let that is never set is unsupported', () => {
-    assert.equal(feat('    let x: i32;\n    let r = &x;'), 'deferred initialization@4');
+    assert.equal(bareFeat('    let x: i32;\n    let r = &x;'), 'deferred initialization@4');
   });
   it('reading an unset cell is unsupported, never internal', () => {
     for (const use of ['println!("{}", x);', 'println!("{x}");', 'x += 1;', 'let y = x;']) {
-      assert.equal(feat(`    let x: i32;\n    ${use}`), 'deferred initialization@4', use);
+      assert.equal(bareFeat(`    let x: i32;\n    ${use}`), 'deferred initialization@4', use);
     }
   });
   it('a borrow of a field is unsupported at run time too (no copy standing in for the place)', () => {
