@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIR = path.join(ROOT, 'rust-quest');
-export const FILES = ['../shared/how.js', 'engine/lex.js', 'engine/parse.js', 'engine/types.js', 'engine/check.js', 'engine/lint.js', 'engine/interp.js',
+export const FILES = ['../shared/how.js', 'engine/lex.js', 'engine/parse.js', 'engine/types.js', 'engine/check.js', 'engine/lint.js', 'engine/mir.js', 'engine/interp.js',
   'engine/std.js', 'engine/diag.js', 'engine/index.js', 'content/state.js', 'content/model.js', 'content/ch-01-hello.js', 'content/ch-02-types.js', 'content/ch-03-functions.js','content/extras.js', 'content/verified.js'];
 
 export function loadRust(files = FILES) {
