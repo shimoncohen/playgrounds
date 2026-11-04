@@ -7,14 +7,37 @@
     tracks: [
       { id: 'arithmetic', name: 'Arithmetic', key: 'math-arithmetic-v1' },
       { id: 'algebra', name: 'Algebra', key: 'math-algebra-v1' },
+      { id: 'geometry', name: 'Geometry', key: 'math-geometry-v1' },
     ],
     chapters: {
       arithmetic: [
         { id: 'arithmetic.order', title: 'Order of operations', requires: [] },
+        { id: 'arithmetic.negatives', title: 'Negative numbers', requires: ['arithmetic.order'],
+          why: 'a chain with minus signs still follows the order of operations' },
+        { id: 'arithmetic.fractions', title: 'Fractions', requires: ['arithmetic.order'],
+          why: 'adding fractions mixes × and + in one line, and the order decides which goes first' },
+        { id: 'arithmetic.powers', title: 'Powers and roots', requires: ['arithmetic.negatives'],
+          why: 'squaring a negative number is where (−2)² and −2² part ways' },
+        { id: 'arithmetic.ratios', title: 'Ratios and percentages', requires: ['arithmetic.fractions'],
+          why: 'a ratio or a percentage is a fraction written another way' },
       ],
       algebra: [
         { id: 'algebra.expressions', title: 'Expressions and volume', requires: ['arithmetic.order'],
           why: 'you evaluate expressions with the order of operations' },
+        { id: 'algebra.expanding', title: 'Expanding brackets', requires: ['algebra.expressions', 'arithmetic.negatives'],
+          why: 'multiplying out brackets is working with letters, and a minus in front flips every sign inside' },
+        { id: 'algebra.linear', title: 'Linear equations', requires: ['algebra.expanding', 'arithmetic.fractions'],
+          why: 'many equations start with brackets to multiply out, and many answers are fractions' },
+        { id: 'algebra.factoring', title: 'Factoring', requires: ['algebra.expanding', 'arithmetic.powers'],
+          why: 'factoring is expanding run backwards, and x² is a power' },
+        { id: 'algebra.quadratics', title: 'Quadratic equations', requires: ['algebra.factoring', 'algebra.linear'],
+          why: 'you solve x² + 5x + 6 = 0 by factoring it, then solving two linear equations' },
+      ],
+      geometry: [
+        { id: 'geometry.area', title: 'Area and perimeter', requires: ['arithmetic.order'],
+          why: 'area formulas such as ½ × b × h are worked out with the order of operations' },
+        { id: 'geometry.angles', title: 'Angles', requires: ['arithmetic.negatives'],
+          why: 'finding a missing angle means taking away, and the turn can go either way' },
       ],
     },
   };
