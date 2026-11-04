@@ -23,5 +23,10 @@ math-field.mq-field::part(menu-toggle){display:none}
 .mq-result:empty{display:none}
 .mq-notes-lab{display:block;font-weight:600;margin-bottom:4px}
 .mq-notes{width:100%;box-sizing:border-box;font:inherit;background:var(--bg,#E7ECF1);color:var(--ink,#14202A);border:1px solid var(--line,#C4CFDA);border-radius:8px;padding:8px}
-/* MathLive's keyboard covers about half the screen on a phone: keep the scene in view above it. */
-@media (max-width:600px){body.mq-kbd .mq-scene{position:sticky;top:0;max-height:40vh;overflow:auto;z-index:2}body.mq-kbd .mq-field{scroll-margin-top:calc(40vh + 8px)}}
+/* MathLive's keyboard covers half a phone screen: pin a short scene (no sliders, which sat cut off over the field) and pad the page so the field can scroll above the keyboard. */
+@media (max-width:600px){
+  body.mq-kbd{padding-bottom:50vh}
+  body.mq-kbd .mq-scene{position:sticky;top:0;max-height:40vh;overflow:hidden;z-index:2;box-shadow:0 10px 14px -8px rgb(0 0 0 / .45)}
+  body.mq-kbd .mq-scene :is(.mq-params,.mq-anim){display:none}
+  body.mq-kbd .mq-stage{max-width:min(100%,calc((40vh - 180px) / .75))}
+  body.mq-kbd .mq-field{scroll-margin-top:calc(40vh + 96px)}}

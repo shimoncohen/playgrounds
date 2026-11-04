@@ -16,6 +16,7 @@
     };
     const derived = () => (def.derived ? def.derived(p) : {});
     const all = () => ({ ...p, ...derived() });
+    const terms = [...names, ...(def.terms || [])];
 
     return {
       set(name, value) {
@@ -25,13 +26,13 @@
         else if (def.params[name]) p[name] = snap(def.params[name], value);
       },
       state: () => ({ params: { ...p }, derived: derived(), t }),
-      live: () => def.live.replace(/\{(\w+)\}/g, (m, k) => (k in all() ? show(all()[k]) : m)),
+      live: () => typeof def.live === 'function' ? def.live({ params: { ...p }, derived: derived(), t }) : def.live.replace(/\{(\w+)\}/g, (m, k) => (k in all() ? show(all()[k]) : m)),
       describe() {
         const parts = names.map(n => `${def.params[n].label} ${show(p[n])}`).join(', ');
         const d = Object.entries(derived()).map(([k, v]) => `${k} = ${show(v)}`).join('. ');
         return parts + (d ? `. ${d}` : '') + '.';
       },
-      colorOf: term => MQ.palette[Math.max(0, names.indexOf(term)) % MQ.palette.length],
+      colorOf: term => MQ.palette[Math.max(0, terms.indexOf(term)) % MQ.palette.length],
     };
   };
 })();

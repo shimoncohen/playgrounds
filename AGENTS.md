@@ -14,7 +14,7 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs; do node --check "$f" || break; done
+for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs all of these on every PR. A PR is not ready until they pass locally.
@@ -50,6 +50,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Change Network Quest (chapters 1 to 5) | `net-quest/engine/` (simulator, shell, commands; DOM-free), `net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `net-quest/index.html` script order) |
 | Change the Math Quest hub or its prerequisite graph | `math-quest/graph.js` (DOM-free; chapter ids and order must match each track's `content.js`), `math-quest/app.js` + `style.css` (hub), landing card `data-keys` in `index.html` + `tests/math/` |
+| Change a Math Quest track's course | `math-quest/<track>/content.js` (DOM-free: chapters, missions with `answer`/`wrong`/`lazy`, quick-fire templates, guide; chapter ids and order match `graph.js`), `math-quest/track.js` + `track.css` (the shared track page) + `tests/math/content.test.mjs` |
 | Upgrade a Math Quest vendored library | pins in `tools/vendor-math.sh`, rerun it, commit `math-quest/vendor/` (never edit those files by hand) |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
