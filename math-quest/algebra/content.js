@@ -82,7 +82,16 @@
   }; };
 
   const U = (max, value, label = 'x', min = 1) => ({ min, max, step: 1, value, label });
-  const tx = (x, y, s, term) => ({ type: 'text', x, y, s, term });
+  const tx = (x, y, s, term, small) => ({ type: 'text', x, y, s, term, small });
+  // The svg has no dashed or unfilled shape: a two-point polygon draws as a bare line, so dashes are short segments.
+  const dashed = (x0, y0, x1, y1, term) => {
+    const out = [];
+    for (const [[ax, ay], [bx, by]] of [[[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]], [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]]]) {
+      const n = Math.ceil(Math.hypot(bx - ax, by - ay) / 0.5);
+      for (let i = 0; i < n; i += 1) out.push({ type: 'polygon', term, pts: [[ax + (bx - ax) * i / n, ay + (by - ay) * i / n], [ax + (bx - ax) * (i + 0.6) / n, ay + (by - ay) * (i + 0.6) / n]] });
+    }
+    return out;
+  };
   const likeTerms = {
     id: 'like-terms', title: 'Two boxes side by side, 2a and 3a long',
     params: { a: U(3, 2, 'a') },
@@ -100,37 +109,66 @@
     },
   };
 
-  const bracket = (k, n, m) => ({
-    id: `bracket-${k}-${n}-${m}`, title: `A rectangle ${k} tall and ${n > 1 ? n : ''}x + ${m} wide`,
+  const bracket = {
+    id: 'bracket', title: 'A rectangle 3 tall and x + 2 wide',
     params: { x: U(5, 3) },
-    terms: ['w1', 'w2', 'p1', 'p2'],
-    derived: p => ({ p1: k * n * p.x, p2: k * m, total: k * (n * p.x + m) }),
-    formula: `${k}(\\term{w1}{${n > 1 ? n : ''}x}+\\term{w2}{${m}}) = \\term{p1}{${k * n}x}+\\term{p2}{${k * m}}`,
-    live: s => `x = ${s.params.x}: ${k} × ${n * s.params.x + m} = ${s.derived.p1} + ${s.derived.p2} = ${s.derived.total}`,
+    terms: ['w2', 'p1', 'p2'],
+    derived: p => ({ p1: 3 * p.x, p2: 6, total: 3 * (p.x + 2) }),
+    formula: '3(\\term{x}{x}+\\term{w2}{2})',
+    live: s => `x = ${s.params.x}: 3 × ${s.params.x + 2} = ${s.derived.p1} + ${s.derived.p2} = ${s.derived.total}`,
     draw: {
-      kind: '2d', view: [-1.5, 13.5, -0.6, k + 1.3], box: [400, 400 * (k + 1.9) / 15],
+      kind: '2d', view: [-1.5, 13.5, -0.6, 4.3], box: [400, 400 * 4.9 / 15],
       items: ({ params: { x } }) => [
-        { type: 'polygon', term: 'p1', pts: sq(0, 0, n * x, k) }, tx(n * x / 2, k / 2, `${k * n}x`, 'p1'),
-        { type: 'polygon', term: 'p2', pts: sq(n * x, 0, n * x + m, k) }, tx(n * x + m / 2, k / 2, String(k * m), 'p2'),
-        tx(n * x / 2, k + 0.6, `${n > 1 ? n : ''}x`, 'w1'), tx(n * x + m / 2, k + 0.6, String(m), 'w2'), tx(-0.7, k / 2, String(k)),
+        { type: 'polygon', term: 'p1', pts: sq(0, 0, x, 3) }, tx(x / 2, 1.5, String(3 * x), 'p1'),
+        { type: 'polygon', term: 'p2', pts: sq(x, 0, x + 2, 3) }, tx(x + 1, 1.5, '6', 'p2'),
+        tx(x / 2, 3.6, 'x', 'x'), tx(x + 1, 3.6, '2', 'w2'), tx(-0.7, 1.5, '3'),
       ],
     },
-  });
+  };
 
-  // A length cannot be negative, so the picture is 2(x − 4) without the minus in front: the 2 × 4 part cut off a 2 × x rectangle.
+  // The learner finds the number to take out: 6 x-pieces and 9 units go into k equal rows, and what does not fit waits below.
+  const commonFactor = {
+    id: 'common-factor', title: 'Share 6x + 9 into equal rows',
+    params: { k: U(9, 1, 'k') },
+    terms: ['p1', 'p2'],
+    derived: p => ({ fits: 6 % p.k === 0 && 9 % p.k === 0 }),
+    formula: '6x+9 = \\term{k}{k}(\\,?\\,)',
+    live: s => {
+      const k = s.params.k, bad = [[6, '6 x-pieces'], [9, '9 units']].filter(([n]) => n % k).map(([, w]) => `${w} do not`);
+      const rows = `split into ${k} equal ${k === 1 ? 'row' : 'rows'}`;
+      return `k = ${k}: ${bad.length ? `${bad.join(' and ')} ${rows}` : `6 x-pieces and 9 units both ${rows}`}`;
+    },
+    draw: {
+      kind: '2d', view: [-0.5, 15.5, -0.5, 9.7], box: [400, 245],
+      items: ({ params: { k } }) => {
+        const q6 = Math.floor(6 / k), q9 = Math.floor(9 / k), out = [];
+        const piece = (x0, y, w, term, label) => out.push({ type: 'polygon', term, pts: sq(x0, y, x0 + w, y + 0.7) }, ...(label ? [tx(x0 + w / 2, y + 0.35, 'x', term)] : []));
+        for (let r = 0; r < k; r++) {
+          const y = 8.2 - r * 0.9;
+          for (let i = 0; i < q6; i++) piece(i * 1.5, y, 1.4, 'p1', true);
+          for (let i = 0; i < q9; i++) piece(q6 * 1.5 + 0.2 + i * 0.6, y, 0.5, 'p2');
+        }
+        const y = 8 - k * 0.9;
+        for (let i = 0; i < 6 - q6 * k; i++) piece(i * 1.5, y, 1.4, null, true);
+        for (let i = 0; i < 9 - q9 * k; i++) piece(7 + i * 0.6, y, 0.5, null);
+        return out;
+      },
+    },
+  };
+
   const cutOff = {
-    id: 'cut-off', title: 'A rectangle 2 tall with a 4 wide part cut off',
+    id: 'cut-off', title: 'A rectangle 2 tall with a 2 by 4 part cut off',
     params: { x: U(10, 7, 'x', 5) },
     terms: ['kept', 'cut'],
-    derived: p => ({ kept: 2 * (p.x - 4), whole: 2 * p.x }),
-    formula: '\\term{kept}{2(x-4)} = 2\\term{x}{x} - \\term{cut}{8}',
-    live: s => `x = ${s.params.x}: 2(x − 4) = 2 × ${s.params.x - 4} = ${s.derived.kept}, and 2x − 8 = ${s.derived.whole} − 8 = ${s.derived.kept}`,
+    derived: p => ({ kept: 2 * (p.x - 4) }),
+    formula: '\\term{kept}{2(x-4)}',
+    live: s => `x = ${s.params.x}: 2 × ${s.params.x - 4} = ${s.derived.kept}`,
     draw: {
       kind: '2d', view: [-1.5, 11.5, -0.6, 3.4], box: [400, 125],
       items: ({ params: { x } }) => [
         { type: 'polygon', term: 'kept', pts: sq(0, 0, x - 4, 2) }, tx((x - 4) / 2, 1, String(2 * (x - 4)), 'kept'),
-        { type: 'polygon', term: 'cut', pts: sq(x - 4, 0, x, 2) }, tx(x - 2, 1, '−8', 'cut'),
-        tx((x - 4) / 2, 2.6, 'x − 4', 'kept'), tx(x - 2, 2.6, '4', 'cut'), tx(-0.7, 1, '2'),
+        ...dashed(x - 4, 0, x, 2, 'cut'), tx(x - 2, 1.4, 'take away', 'cut', true), tx(x - 2, 0.6, '2 × 4', 'cut', true),
+        tx(x / 2, 2.6, 'x', 'x'), tx(-0.7, 1, '2'),
       ],
     },
   };
@@ -138,19 +176,19 @@
   const diffSquares = {
     id: 'diff-squares', title: 'A square with a 3 by 3 corner cut out',
     params: { x: U(9, 6, 'x', 4) },
-    terms: ['top', 'bot', 'cut'],
+    terms: ['L', 'cut'],
     derived: p => ({ left: p.x * p.x - 9 }),
-    formula: '\\term{x}{x}^2-\\term{cut}{9}=(\\term{x}{x}-3)(\\term{x}{x}+3)',
-    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − 9 = ${s.derived.left} = ${s.params.x - 3} × ${s.params.x + 3}`,
+    formula: '\\term{L}{x^2-9}',
+    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − 9 = ${s.derived.left}`,
     draw: {
       kind: '2d', view: [-1.2, 10.4, -0.8, 10.4], box: [360, 360],
       items: ({ params: { x } }) => {
-        const k = 9 / x, p = (x0, y0, x1, y1) => sq(x0 * k, y0 * k, x1 * k, y1 * k);
+        const k = 9 / x, c = x - 3;
         return [
-          { type: 'polygon', term: 'top', pts: p(0, 3, x, x) }, tx(x / 2 * k, (x + 3) / 2 * k, String(x * (x - 3)), 'top'),
-          { type: 'polygon', term: 'bot', pts: p(0, 0, x - 3, 3) }, tx((x - 3) / 2 * k, 1.5 * k, String(3 * (x - 3)), 'bot'),
-          { type: 'polygon', term: 'cut', pts: p(x - 3, 0, x, 3) }, tx((x - 1.5) * k, 1.5 * k, '−9', 'cut'),
-          tx(4.5, -0.5, 'x', 'x'),
+          { type: 'polygon', term: 'L', pts: [[0, 0], [c * k, 0], [c * k, 3 * k], [x * k, 3 * k], [x * k, x * k], [0, x * k]] },
+          tx(x / 2 * k, (x + 3) / 2 * k, 'x² − 9', 'L'),
+          ...dashed(c * k, 0, x * k, 3 * k, 'cut'), tx((x - 1.5) * k, 1.5 * k, '3 × 3', 'cut', true),
+          tx(4.5, -0.5, 'x', 'x'), tx(-0.7, 4.5, 'x', 'x'),
         ];
       },
     },
@@ -161,17 +199,17 @@
     params: { x: U(9, 5, 'x', 3) },
     terms: ['sq', 'strips', 'back'],
     derived: p => ({ left: (p.x - 2) ** 2 }),
-    formula: '\\term{x}{x}^2-\\term{strips}{4x}+\\term{back}{4}=\\term{sq}{(x-2)^2}',
-    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − ${4 * s.params.x} + 4 = ${s.derived.left} = ${s.params.x - 2} × ${s.params.x - 2}`,
+    formula: '\\term{x}{x}^2-\\term{strips}{4x}+\\term{back}{4}',
+    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − ${2 * s.params.x} − ${2 * s.params.x} + 4 = ${s.derived.left}`,
     draw: {
       kind: '2d', view: [-1.2, 10.4, -0.8, 10.4], box: [360, 360],
       items: ({ params: { x } }) => {
-        const k = 9 / x, p = (x0, y0, x1, y1) => sq(x0 * k, y0 * k, x1 * k, y1 * k);
+        const k = 9 / x, p = (x0, y0, x1, y1) => [x0 * k, y0 * k, x1 * k, y1 * k];
         return [
-          { type: 'polygon', term: 'sq', pts: p(0, 2, x - 2, x) }, tx((x - 2) / 2 * k, (x + 2) / 2 * k, String((x - 2) ** 2), 'sq'),
-          { type: 'polygon', term: 'strips', pts: p(0, 0, x, 2) }, tx((x - 2) / 2 * k, k, '−2x', 'strips'),
-          { type: 'polygon', term: 'strips', pts: p(x - 2, 2, x, x) }, tx((x - 1) * k, (x + 2) / 2 * k, '−2x', 'strips'),
-          { type: 'polygon', term: 'back', pts: p(x - 2, 0, x, 2) }, tx((x - 1) * k, k, '+4', 'back'),
+          { type: 'polygon', term: 'sq', pts: sq(...p(0, 2, x - 2, x)) }, tx((x - 2) / 2 * k, (x + 2) / 2 * k, String((x - 2) ** 2), 'sq'),
+          { type: 'polygon', term: 'back', pts: sq(...p(x - 2, 0, x, 2)) }, tx((x - 1) * k, k, '+4', 'back'),
+          ...dashed(...p(0, 0, x, 2), 'strips'), ...dashed(...p(x - 2, 0, x, x), 'strips'),
+          tx((x - 2) / 2 * k, k, '−2x', 'strips'), tx((x - 1) * k, (x + 2) / 2 * k, '−2x', 'strips'),
           tx(4.5, -0.5, 'x', 'x'),
         ];
       },
@@ -283,7 +321,7 @@
       intro: 'A bracket groups a sum so it can be multiplied as one piece: <code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>. <b>Expanding</b> means multiplying out until no bracket is left around a sum: <code>3(x + 2) = 3x + 6</code>. The rectangle on this page shows why it works. Its sides are <code>a + b</code> and <code>c + d</code>, so it splits into four smaller rectangles, and its area is the sum of theirs: <code>ac + ad + bc + bd</code>, where two letters side by side, like <code>ac</code>, mean <code>a · c</code>. Each part has the same color in the picture and in the formula.',
       scene: rect('area-split', 'A rectangle split into four parts', [2, 1, 3, 2]),
       missions: [
-        { title: 'One number times a bracket', kind: 'expr', scene: bracket(3, 1, 2), vars: ['x'], question: '3(x+2)',
+        { title: 'One number times a bracket', kind: 'expr', scene: bracket, vars: ['x'], question: '3(x+2)',
           goal: 'A rectangle is 3 tall and <code>x + 2</code> wide, so its area is <code>3(x + 2)</code>. Write that area with no brackets left.',
           how: [
             '<code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>: a number right before a bracket multiplies everything inside it.',
@@ -295,7 +333,7 @@
           hint: 'Multiply 3 by <code>x</code>, then 3 by 2, and add the two.',
           answer: '3x+6', wrong: '3x+2', lazy: '3(x+2)', check: finalExpr('3x+6', ['expanded', 'collected']) },
         { title: 'A minus sign in front', kind: 'expr', scene: cutOff, vars: ['x'], question: '-2(x-4)',
-          goal: 'Expand <code>−2(x − 4)</code>: multiply <code>−2</code> by each part inside, and write it with no brackets. A length cannot be negative, so the scene shows <code>2(x − 4)</code>: the 2 by 4 part cut off a 2 by <code>x</code> rectangle. Then work out what the minus in front does.',
+          goal: 'Expand <code>−2(x − 4)</code>: multiply <code>−2</code> by each part inside, and write it with no brackets. A length cannot be negative, so the scene shows <code>2(x − 4)</code>: a 2 by <code>x</code> rectangle with a 2 by 4 part taken away. Then work out what the minus in front does.',
           how: [
             '<code>−2(x − 4)</code> multiplies the whole of <code>x − 4</code> by <code>−2</code>. Read <code>x − 4</code> as <code>x</code> plus <code>−4</code>, so there are two parts to multiply.',
             '<code>−2</code> times <code>x</code> is <code>−2x</code>.',
@@ -423,8 +461,8 @@
       intro: '<b>Factoring</b> is expanding run backwards. You start with a sum, like <code>x² + 5x + 6</code>, and write it as a product, like <code>(x + 2)(x + 3)</code>. Each thing being multiplied is a <b>factor</b>: 2 and 3 are factors of 6, and <code>x + 2</code> is a factor of <code>x² + 5x + 6</code>. Remember that <code>x²</code> means <code>x · x</code>. In the scene you know the four parts of the rectangle, and you look for its sides.',
       scene: rect('area-backwards', 'Find the sides from the four parts', [1, 1, 1, 1]),
       missions: [
-        { title: 'Take out a common factor', kind: 'expr', scene: bracket(3, 2, 3), vars: ['x'], question: '6x+9',
-          goal: 'Write <code>6x + 9</code> as a whole number times a bracket. Find the biggest number that divides both 6 and 9 exactly, and take it out in front.',
+        { title: 'Take out a common factor', kind: 'expr', scene: commonFactor, vars: ['x'], question: '6x+9',
+          goal: 'Write <code>6x + 9</code> as a whole number times a bracket. Find the biggest number that divides both 6 and 9 exactly, and take it out in front. In the scene, 6 pieces of <code>x</code> and 9 single units are shared into <code>k</code> equal rows: the pieces that do not fit wait below.',
           how: [
             'Factoring <code>6x + 9</code> means finding a number and a bracket that multiply back to it: expanding your answer must give <code>6x + 9</code> again.',
             '6 is <code>3 · 2</code> and 9 is <code>3 · 3</code>, so 3 divides both. It is a <b>common factor</b>.',
@@ -443,7 +481,7 @@
             const front = n.isOperatorNode && n.op === '*' ? n.args.map(strip).filter(a => a.isConstantNode) : [];
             return front.some(a => Number.isInteger(a.value) && a.value > 1) ? ok : no('That is equal, but no whole number is taken out in front yet. Which number divides both 6 and 9?');
           } },
-        { title: 'Back into two brackets', kind: 'expr', at: { a: 2, b: 2, c: 2, d: 3 }, vars: ['x'], question: 'x^2+5x+6',
+        { title: 'Back into two brackets', kind: 'expr', vars: ['x'], question: 'x^2+5x+6',
           goal: 'Factor <code>x² + 5x + 6</code> into two brackets, <code>(x + ?)(x + ?)</code>.',
           how: [
             'You want two brackets that expand back to <code>x² + 5x + 6</code>. Expanding <code>(x + p)(x + q)</code> gives <code>x² + (p + q)x + pq</code>, where <code>pq</code> means <code>p · q</code>.',
@@ -455,7 +493,7 @@
           hint: 'Two numbers: they multiply to 6 and add to 5.',
           answer: '(x+2)(x+3)', wrong: '(x+1)(x+6)', lazy: 'x^2+5x+6', check: finalExpr('x^2+5x+6', ['linearFactors', 'wholeNumbers']) },
         { title: 'A difference of squares', kind: 'expr', scene: diffSquares, vars: ['x'], question: 'x^2-9',
-          goal: 'Factor <code>x² − 9</code> into two brackets. There is no <code>x</code> term, and that is a clue. The scene shows it as a square of side <code>x</code> with a 3 by 3 corner cut out.',
+          goal: 'Factor <code>x² − 9</code> into two brackets. There is no <code>x</code> term, and that is a clue. The scene shows a square of side <code>x</code> with a 3 by 3 corner cut out; what is left has the area <code>x² − 9</code>.',
           how: [
             '<code>x² − 9</code> is <code>x</code> times itself, minus 3 times itself: one square taken away from another.',
             'Use the idea from the last mission: two numbers that multiply to <code>−9</code> and add to 0, because there is no <code>x</code> term (0 lots of <code>x</code>).',
@@ -466,7 +504,7 @@
           hint: 'Which number times itself is 9? One bracket gets a plus, the other a minus.',
           answer: '(x-3)(x+3)', wrong: '(x-3)^2', lazy: 'x^2-9', check: finalExpr('x^2-9', ['linearFactors', 'wholeNumbers']) },
         { title: 'A perfect square', kind: 'expr', scene: perfectSquare, vars: ['x'], question: 'x^2-4x+4',
-          goal: 'Factor <code>x² − 4x + 4</code>. Both brackets turn out the same. The scene shows a square of side <code>x</code> with two strips, each 2 wide, taken off.',
+          goal: 'Factor <code>x² − 4x + 4</code>. Both brackets turn out the same. The scene shows a square of side <code>x</code> with two strips, each 2 wide, taken away; the 2 by 2 corner is in both strips, so it is added back.',
           how: [
             'Again you want <code>(x + p)(x + q)</code>, where <code>p</code> and <code>q</code> multiply to 4 and add to <code>−4</code>.',
             'Two numbers that add to a negative number but multiply to a positive one are both negative.',
