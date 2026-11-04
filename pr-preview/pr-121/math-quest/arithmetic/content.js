@@ -8,7 +8,7 @@
   const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   const rect = (x0, y0, x1, y1, term) => ({ type: 'polygon', term, pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] });
 
-  const N = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
+  const N = (label, value) => ({ min: 1, max: 9, step: 1, value, label });
   const width = s => String(s).length * 0.35 + 0.55;
   const chips = (toks, y) => {
     const gap = 0.2, total = toks.reduce((w, t) => w + (t[2] === false ? 0.4 : width(t[0])) + gap, -gap);
@@ -51,17 +51,17 @@
     },
   };
 
-  // Sliders stop at ±4, so a target like −7 needs both arrows and cannot be read off one slider.
-  const I = (label, value) => ({ min: -4, max: 4, step: 1, value, label });
+  // Sliders stop at ±5, so a target like −7 needs both arrows and cannot be read off one slider.
+  const I = (label, value) => ({ min: -5, max: 5, step: 1, value, label });
   const numberLine = {
     id: 'number-line', title: 'Two arrows along the number line',
     params: { a: I('a', 2), b: I('b', -4) },
     terms: ['sum'],
     derived: p => ({ 'a + b': p.a + p.b }),
     formula: '\\term{a}{a} + \\term{b}{b} = \\term{sum}{a + b}',
-    live: s => { const { a, b } = s.params; return `Start at 0, move ${signed(a)}, then move ${signed(b)}: ${signed(a)} + ${b < 0 ? `(${signed(b)})` : b} = ${signed(a + b)}`; },
+    live: s => { const { a, b } = s.params; return `Start at 0, move ${signed(a)}, then move ${signed(b)}. Where does the dot land?`; },
     draw: {
-      kind: '2d', view: [-9, 9, -0.7, 1], box: [400, 120],
+      kind: '2d', view: [-11, 11, -0.7, 1], box: [400, 120],
       items: s => {
         const { a, b } = s.params;
         return [
@@ -111,7 +111,7 @@
     },
   };
 
-  const R = (label, value) => ({ min: 1, max: 9, step: 1, value, label });
+  const R = (label, value) => ({ min: 1, max: 18, step: 1, value, label });
   const pct = (x, all) => +(100 * x / all).toFixed(1);
   const ratioBar = {
     id: 'ratio-bar', title: 'A bar split in a ratio',
@@ -131,6 +131,240 @@
     },
   };
 
+  const dash = (x0, y0, w, h, term) => {
+    const out = [];
+    for (const [ax, ay, bx, by] of [[x0, y0, x0 + w, y0], [x0 + w, y0, x0 + w, y0 + h], [x0, y0 + h, x0 + w, y0 + h], [x0, y0, x0, y0 + h]]) {
+      const len = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.round(len / 0.12 / 2)) * 2 - 1;
+      for (let i = 0; i < n; i += 2) out.push({ type: 'polygon', term, pts: [[ax + (bx - ax) * i / n, ay + (by - ay) * i / n], [ax + (bx - ax) * (i + 1) / n, ay + (by - ay) * (i + 1) / n]] });
+    }
+    return out;
+  };
+  const sup = n => String(n).replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+  const br = v => (v < 0 ? `(${signed(v)})` : String(v));
+  const sq = (x0, y0, w, h, term) => rect(x0, y0, x0 + w, y0 + h, term);
+
+  const chain = (id, tex, stages) => ({
+    id, title: 'The line, one step at a time',
+    params: {},
+    terms: ['now'],
+    t: { min: 0, max: stages.length - 1, step: 0.01, value: 0, speed: 0.5, label: 'step' },
+    formula: tex,
+    live: s => { const k = Math.floor(s.t); return `Line ${k + 1} of ${stages.length}: ${stages[k][0]}`; },
+    draw: {
+      kind: '2d', view: [0, 10, 0, stages.length * 1.2], box: [420, 52 * stages.length],
+      items: s => {
+        const k = Math.floor(s.t), out = [];
+        for (let i = 0; i <= k; i++) {
+          const y = (stages.length - i - 0.5) * 1.2;
+          if (i === k) out.push(rect(0.05, y - 0.55, 9.95, y + 0.55, 'now'));
+          out.push({ type: 'text', x: 0.3, y: y + 0.22, s: stages[i][0], anchor: 'start' }, { type: 'text', x: 0.3, y: y - 0.3, s: stages[i][1], small: true, anchor: 'start' });
+        }
+        return out;
+      },
+    },
+  });
+  const orderChain = chain('order-chain', '1 \\times 2 - 3 \\times 2 + 10 \\div (2 - 1)', [
+    ['1 × 2 − 3 × 2 + 10 ÷ (2 − 1)', 'the line to work out'],
+    ['1 × 2 − 3 × 2 + 10 ÷ 1', 'bracket first: 2 − 1 is 1'],
+    ['2 − 6 + 10', '× and ÷ next: 1 × 2, 3 × 2, 10 ÷ 1'],
+    ['−4 + 10', '+ and − from the left: 2 − 6 is −4'],
+  ]);
+  const negChain = chain('negative-chain', '8 - (3 - 10) + (-2) \\times 3', [
+    ['8 − (3 − 10) + (−2) × 3', 'the line to work out'],
+    ['8 − (−7) + (−2) × 3', 'bracket first: 3 − 10 is −7'],
+    ['8 − (−7) + (−6)', '× next: (−2) × 3 is −6'],
+    ['15 + (−6)', 'taking away −7 is adding 7'],
+  ]);
+  const fracChain = chain('fraction-chain', '\\frac{1}{2} + \\frac{3}{4} \\times \\frac{2}{3} - \\frac{1}{3}', [
+    ['1/2 + 3/4 × 2/3 − 1/3', 'the line to work out'],
+    ['1/2 + 6/12 − 1/3', '× first: tops 3 × 2, bottoms 4 × 3'],
+    ['1/2 + 1/2 − 1/3', '6/12 simplifies to 1/2'],
+    ['1 − 1/3', '1/2 + 1/2 is 1'],
+  ]);
+
+  const divTimes = {
+    id: 'divide-then-times', title: 'Cut into parts, then take copies',
+    params: { a: { min: 2, max: 24, step: 1, value: 12, label: 'a' }, b: { min: 1, max: 6, step: 1, value: 2, label: 'b' }, c: { min: 1, max: 6, step: 1, value: 3, label: 'c' } },
+    formula: '\\term{a}{a} \\div \\term{b}{b} \\times \\term{c}{c}',
+    live: s => { const { a, b, c } = s.params; return `${a} cut into ${b} equal part${b === 1 ? '' : 's'}, then ${c} of those parts. Compare the two bars.`; },
+    draw: {
+      kind: '2d', view: [-0.3, 10.3, 0, 6], box: [400, 240],
+      items: s => {
+        const { a, b, c } = s.params, k = 10 / Math.max(a, a * c / b), w = a / b * k, out = [];
+        out.push({ type: 'text', x: 0, y: 5.5, s: `${a} cut into ${b} equal part${b === 1 ? '' : 's'}`, small: true, anchor: 'start' });
+        for (let i = 0; i < b; i++) out.push(sq(i * w, 4, w, 1, 'a'));
+        out.push({ type: 'text', x: 0, y: 2.7, s: `${c} of those parts, side by side`, small: true, anchor: 'start' });
+        for (let i = 0; i < c; i++) out.push(sq(i * w, 1.2, w, 1, 'c'));
+        return out;
+      },
+    },
+  };
+
+  const product = {
+    id: 'signed-product', title: 'A rectangle in four quarters',
+    params: { a: I('a', -4), b: I('b', -2) },
+    terms: ['prod'],
+    formula: '\\term{a}{a} \\times \\term{b}{b} = \\term{prod}{\\text{the rectangle}}',
+    live: s => {
+      const { a, b } = s.params;
+      return a && b ? `${br(a)} × ${br(b)}: ${Math.abs(a)} across, ${Math.abs(b)} up. A filled rectangle is a positive amount, a dashed one is a taken-away amount.` : `${br(a)} × ${br(b)}: a zero makes the rectangle flat.`;
+    },
+    draw: {
+      kind: '2d', view: [-6, 6, -6, 6], box: [320, 320],
+      items: s => {
+        const { a, b } = s.params;
+        return [
+          { type: 'grid' }, { type: 'axes' },
+          ...(a && b ? (a * b > 0 ? [rect(0, 0, a, b, 'prod')] : dash(Math.min(0, a), Math.min(0, b), Math.abs(a), Math.abs(b), 'prod')) : []),
+          { type: 'text', x: 5.2, y: 5.2, s: '+', small: true }, { type: 'text', x: -5.2, y: -5.2, s: '+', small: true },
+          { type: 'text', x: -5.2, y: 5.2, s: '−', small: true }, { type: 'text', x: 5.2, y: -5.2, s: '−', small: true },
+          { type: 'point', x: a, y: b, term: 'prod', drag: { x: 'a', y: 'b' }, label: 'corner of the rectangle: a across, b up' },
+        ];
+      },
+    },
+  };
+
+  const debt = {
+    id: 'shared-debt', title: 'A debt shared out',
+    params: { d: { min: 1, max: 24, step: 1, value: 12, label: 'd: coins owed' }, k: { min: 1, max: 6, step: 1, value: 3, label: 'k: friends' } },
+    terms: ['share'],
+    formula: '\\term{d}{-d} \\div \\term{k}{k} = \\term{share}{\\text{each share}}',
+    live: s => { const { d, k } = s.params; return `${d} coins owed, dealt out one at a time to ${k} friend${k === 1 ? '' : 's'}. Dashed squares are owed coins.${d % k ? ' They do not share out evenly.' : ''}`; },
+    draw: {
+      kind: '2d', view: [0, 10, 0, 7], box: [400, 260],
+      items: s => {
+        const { d, k } = s.params, rows = Math.ceil(d / k), cell = Math.min(0.7, 5 / rows), cw = Math.min(0.7, 10 / k * 0.6), out = [];
+        for (let i = 0; i < d; i++) out.push(...dash(10 / k * (i % k + 0.5) - cw / 2, 1.3 + Math.floor(i / k) * cell, cw * 0.9, cell * 0.85, 'share'));
+        for (let g = 0; g < k; g++) out.push({ type: 'text', x: 10 / k * (g + 0.5), y: 0.6, s: `friend ${g + 1}`, small: true });
+        return out;
+      },
+    },
+  };
+
+  const areaModel = {
+    id: 'area-model', title: 'A square cut both ways',
+    params: { a: { min: 1, max: 5, step: 1, value: 2, label: 'a: columns shaded' }, b: { min: 2, max: 6, step: 1, value: 3, label: 'b: columns in all' }, c: { min: 1, max: 5, step: 1, value: 4, label: 'c: rows shaded' }, d: { min: 2, max: 6, step: 1, value: 5, label: 'd: rows in all' } },
+    terms: ['prod'],
+    formula: '\\frac{\\term{a}{a}}{\\term{b}{b}} \\times \\frac{\\term{c}{c}}{\\term{d}{d}} = \\term{prod}{\\text{the cells shaded both ways}}',
+    live: s => { const { b, d } = s.params, a = Math.min(s.params.a, b), c = Math.min(s.params.c, d); return `${a}/${b} × ${c}/${d}: ${a} of ${b} columns and ${c} of ${d} rows. Count the cells shaded both ways, and all the cells. (A top above its bottom stops at the whole square.)`; },
+    draw: {
+      kind: '2d', view: [-0.5, 10.5, -1.2, 10.4], box: [320, 335],
+      items: s => {
+        const { b, d } = s.params, a = Math.min(s.params.a, b), c = Math.min(s.params.c, d), x0 = 1.2, S = 8, out = [];
+        for (let i = 0; i < b; i++) for (let j = 0; j < d; j++) {
+          const col = i < a, row = j >= d - c;
+          out.push(sq(x0 + i * S / b, 1.4 + j * S / d, S / b, S / d, col && row ? 'prod' : col ? 'a' : row ? 'c' : undefined));
+        }
+        out.push({ type: 'text', x: 5.2, y: 0.8, s: `${a} of ${b} columns`, small: true, term: 'a' }, { type: 'text', x: 5.2, y: 0.1, s: `${c} of ${d} rows`, small: true, term: 'c' });
+        return out;
+      },
+    },
+  };
+
+  const groups = {
+    id: 'fraction-groups', title: 'Groups of pieces that make a fraction smaller',
+    params: { top: { min: 1, max: 24, step: 1, value: 18, label: 'top: pieces taken' }, bottom: { min: 2, max: 24, step: 1, value: 24, label: 'bottom: pieces in all' }, g: { min: 1, max: 12, step: 1, value: 1, label: 'g: pieces per group' } },
+    terms: ['cut'],
+    formula: '\\frac{\\term{top}{top}}{\\term{bottom}{bottom}} = \\frac{\\term{top}{top} \\div \\term{g}{g}}{\\term{bottom}{bottom} \\div \\term{g}{g}}',
+    live: s => {
+      const { bottom: u, g } = s.params, t = Math.min(s.params.top, u);
+      if (t % g || u % g) return `${t}/${u}: groups of ${g} do not fit both numbers exactly.`;
+      return `${t}/${u} in groups of ${g}: ${t / g} of ${u / g} groups, ${t / g}/${u / g}${gcd(t / g, u / g) === 1 ? ', the simplest form' : ', which can still be simplified'}.`;
+    },
+    draw: {
+      kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 160],
+      items: s => {
+        const { bottom: u, g } = s.params, t = Math.min(s.params.top, u), w = 10 / u, out = [];
+        for (let i = 0; i < u; i++) out.push(sq(i * w, 1.4, w, 1.2, i < t ? 'top' : undefined));
+        if (g > 1) for (let i = g; i < u; i += g) out.push(sq(i * w - 0.03, 1.2, 0.06, 1.6, 'cut'));
+        out.push({ type: 'text', x: 0, y: 3.4, s: `${t} of ${u} pieces`, small: true, anchor: 'start' });
+        if (!(t % g || u % g)) out.push({ type: 'text', x: 0, y: 0.6, s: `${t / g} of ${u / g} groups of ${g}`, small: true, anchor: 'start', term: 'cut' });
+        return out;
+      },
+    },
+  };
+
+  const cube = {
+    id: 'power-cube', title: 'Layers of squares',
+    params: { n: { min: 1, max: 5, step: 1, value: 2, label: 'n: the base' }, e: { min: 1, max: 3, step: 1, value: 3, label: 'e: the exponent' } },
+    terms: ['v'],
+    formula: '\\term{n}{n}^{\\term{e}{e}} = \\term{v}{\\text{the tiles}}',
+    live: s => { const { n, e } = s.params; return `${n}${sup(e)}: ${e} cop${e === 1 ? 'y' : 'ies'} of ${n} multiplied. Count the tiles.`; },
+    draw: {
+      kind: '2d', view: [-0.5, 8.5, -1.3, 8.3], box: [320, 313],
+      items: s => {
+        const { n, e } = s.params, layers = e === 3 ? n : 1, o = 0.45, out = [];
+        const h = e === 1 ? 1 : n;
+        for (let i = layers - 1; i > 0; i--) out.push(sq(i * o, i * o, n, h, 'v'));
+        for (let x = 0; x < n; x++) for (let y = 0; y < h; y++) out.push(sq(x + 0.04, y + 0.04, 0.92, 0.92, 'v'));
+        out.push({ type: 'text', x: 4, y: -0.7, s: e === 1 ? `${n} tile${n === 1 ? '' : 's'}` : e === 2 ? `${n} rows of ${n}` : `${n} layer${n === 1 ? '' : 's'} of ${n} × ${n}`, small: true });
+        return out;
+      },
+    },
+  };
+
+  const squares = {
+    id: 'minus-and-square', title: 'A square with the minus outside, and inside',
+    params: { c: { min: 1, max: 5, step: 1, value: 2, label: 'c' } },
+    terms: ['neg', 'pos'],
+    formula: '-\\term{neg}{c^2} + \\term{pos}{(-c)^2}',
+    live: s => { const { c } = s.params; return `−${c}²: ${c} is squared first, then the minus goes in front, so the tiles are taken away (dashed). (−${c})²: the whole bracket is squared (filled).`; },
+    draw: {
+      kind: '2d', view: [0, 10, 0, 7], box: [400, 260],
+      items: s => {
+        const { c } = s.params, w = Math.min(1.6, 4.2 / c), out = [];
+        for (const [x0, term] of [[2.5, 'neg'], [7.5, 'pos']]) for (let i = 0; i < c; i++) for (let j = 0; j < c; j++) out.push(...(term === 'neg' ? dash : (...r) => [sq(...r)])(x0 - c * w / 2 + i * w, 1.5 + j * w, w * 0.92, w * 0.92, term));
+        out.push({ type: 'text', x: 2.5, y: 6.4, s: `−${c}²`, term: 'neg' }, { type: 'text', x: 7.5, y: 6.4, s: `(−${c})²`, term: 'pos' });
+        return out;
+      },
+    },
+  };
+
+  const sameBase = {
+    id: 'same-base', title: 'Copies of one base, joined',
+    params: { b: { min: 2, max: 5, step: 1, value: 3, label: 'b: the base' }, p: { min: 1, max: 5, step: 1, value: 2, label: 'p: first exponent' }, q: { min: 1, max: 5, step: 1, value: 3, label: 'q: second exponent' } },
+    formula: '\\term{b}{b}^{\\term{p}{p}} \\times \\term{b}{b}^{\\term{q}{q}}',
+    live: s => { const { b, p, q } = s.params; return `${b}${sup(p)} × ${b}${sup(q)}: ${p} copies of ${b} and ${q} copies of ${b}. Count the copies in the bottom row.`; },
+    draw: {
+      kind: '2d', view: [0, 10, 0, 7.2], box: [400, 290],
+      items: s => {
+        const { b, p, q } = s.params, w = 0.8, out = [];
+        const row = (y, n, from, label) => {
+          out.push({ type: 'text', x: 0.2, y, s: label, small: true, anchor: 'start' });
+          for (let i = 0; i < n; i++) {
+            const term = from(i);
+            out.push(sq(0.2 + i * 0.9, y - 1.15, w, 0.9, term), { type: 'text', x: 0.2 + i * 0.9 + w / 2, y: y - 0.7, s: String(b), term });
+          }
+        };
+        row(6.6, p, () => 'p', `${b}${sup(p)}: ${p} copies of ${b}`);
+        row(4.3, q, () => 'q', `${b}${sup(q)}: ${q} copies of ${b}`);
+        row(2.0, p + q, i => (i < p ? 'p' : 'q'), 'all the copies together');
+        return out;
+      },
+    },
+  };
+
+  const percent = grow => ({
+    id: grow ? 'percent-increase' : 'percent-of', title: grow ? 'A bar that grows by a percentage' : 'A percentage of a bar',
+    params: { base: { min: 10, max: 200, step: 10, value: grow ? 40 : 80, label: 'base: the amount' }, pct: { min: 5, max: grow ? 50 : 100, step: 5, value: grow ? 25 : 15, label: 'pct: percent' } },
+    terms: ['part'],
+    formula: grow ? '\\term{base}{\\text{base}} + \\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}}' : '\\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}} = \\term{part}{\\text{the shaded part}}',
+    live: s => { const { base, pct } = s.params; return grow ? `${base} grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `${pct}% of ${base} is the shaded part of the bar.`; },
+    draw: {
+      kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 150],
+      items: s => {
+        const { base, pct } = s.params, W = grow ? 10 / 1.5 : 10, w = W * pct / 100;
+        return grow
+          ? [sq(0, 1.4, W, 1.2, 'base'), sq(W, 1.4, w, 1.2, 'part'),
+            { type: 'text', x: W / 2, y: 0.7, s: String(base), small: true, term: 'base' }, { type: 'text', x: W + w / 2, y: 0.7, s: `+${pct}%`, small: true, term: 'part' },
+            { type: 'text', x: 0, y: 3.4, s: `${base} grown by ${pct}%`, small: true, anchor: 'start' }]
+          : [sq(0, 1.4, W, 1.2, 'base'), sq(0, 1.4, w, 1.2, 'part'),
+            { type: 'text', x: w / 2, y: 0.7, s: `${pct}%`, small: true, term: 'part' }, { type: 'text', x: 10, y: 0.7, s: String(base), small: true, anchor: 'end' },
+            { type: 'text', x: 0, y: 3.4, s: `${pct}% of ${base}`, small: true, anchor: 'start' }];
+      },
+    },
+  });
+
   MQ.content = {
     track: 'arithmetic',
     ranks: [[0, 'Counter'], [30, 'Bracket Breaker'], [75, 'Order Keeper'], [150, 'Sign Switcher'], [225, 'Fraction Fixer'], [300, 'Power Player'], [375, 'Ratio Ranger']],
@@ -149,6 +383,7 @@
           ],
           explain: 'On a keyboard, × is <code>*</code> and ÷ is <code>/</code>. The preview may show × as a raised dot, <code>·</code>: it means the same thing. Press <kbd>Enter</kbd> for a new line.',
           hint: 'Work out the bracket first: what is <code>6 + 4</code>? Then multiply that by 3.',
+          scene: { ...order, t: { ...order.t, max: 1 } }, at: { a: 6, b: 4, c: 3 }, reveal: true,
           answer: '30', wrong: '18', lazy: '(6+4)*3', check: finalNumber(30) },
         { title: 'Times and divide: left to right', kind: 'number', question: '12/2*3', tex: '12 \\div 2 \\times 3',
           goal: 'Work out <code>12 ÷ 2 × 3</code>. There are no brackets, so go from left to right.',
@@ -160,6 +395,7 @@
           ],
           explain: '× and ÷ have the same rank, so neither one goes first by rule: you take them from left to right, like reading a sentence.',
           hint: 'Start from the left. What is <code>12 ÷ 2</code>?',
+          scene: divTimes,
           answer: '18', wrong: '2', lazy: '12/2*3', check: finalNumber(18) },
         { title: 'Plus and minus come last', kind: 'number', question: '10-4+2*3', tex: '10 - 4 + 2 \\times 3',
           goal: 'Work out <code>10 − 4 + 2 × 3</code>.',
@@ -183,6 +419,7 @@
           explain: 'Each line of your working is checked against the question, not against the line above it, so one slip only marks that one line.',
           hint: 'Rewrite the line with the bracket worked out. Then rewrite it with every × and ÷ worked out. Each rewrite is one step.',
           steps: ['1*2-3*2+10/1', '2-6+10', '6'],
+          scene: orderChain,
           answer: '6', wrong: '0', lazy: '1*2-3*2+10/(2-1)', check: finalNumber(6) },
         { title: 'When brackets change nothing', kind: 'scene',
           goal: 'Move the sliders until <code>a + b × c</code> and <code>(a + b) × c</code> give the same answer.',
@@ -215,6 +452,7 @@
           ],
           explain: 'Adding a positive number moves right: <code>−3 + 5</code> is 2. Adding a negative number moves left, so <code>−3 + (−5)</code> is −8 too: adding −5 and taking away 5 are the same move.',
           hint: 'Start at −3 on the number line and move 5 steps to the left.',
+          at: { a: -3, b: -5 },
           answer: '-8', wrong: '8', lazy: '-3-5', check: finalNumber(-8) },
         { title: 'Minus times minus', kind: 'number', question: '-4*(-2)', tex: '-4 \\times (-2)',
           goal: 'Work out <code>−4 × (−2)</code>. The bracket keeps the two minus signs apart, so you can see each one.',
@@ -226,6 +464,7 @@
           ],
           explain: 'The rule for × and ÷: the same signs give a positive answer, different signs give a negative one. <code>−4 × 2</code> is −8, and so is <code>4 × (−2)</code>.',
           hint: 'Multiply 4 by 2 first. Then ask: are the two signs the same, or different?',
+          scene: product,
           answer: '8', wrong: '-8', lazy: '-4*(-2)', check: finalNumber(8) },
         { title: 'Sharing a debt', kind: 'number', question: '-12/3', tex: '-12 \\div 3',
           goal: 'Three friends owe 12 coins between them, written <code>−12</code>, and split the debt equally. Work out <code>−12 ÷ 3</code>, each friend\'s share.',
@@ -237,6 +476,7 @@
           ],
           explain: 'With the same signs the answer is positive: <code>−12 ÷ (−3)</code> is 4, because <code>4 × (−3)</code> is −12.',
           hint: 'Work out <code>12 ÷ 3</code>, then choose the sign: one number is negative and one is positive.',
+          scene: debt,
           answer: '-4', wrong: '4', lazy: '-12/3', check: finalNumber(-4) },
         { title: 'A minus in front of brackets', kind: 'number', question: '8-(3-10)+(-2)*3', tex: '8 - (3 - 10) + (-2) \\times 3',
           goal: 'Work out <code>8 − (3 − 10) + (−2) × 3</code>. The order of operations still holds: brackets first, then ×, then + and − from left to right.',
@@ -248,6 +488,7 @@
           ],
           explain: 'A common slip is to take away only the 3: <code>8 − 3 − 10 − 6</code> gives −11. The minus in front belongs to the whole bracket, so the −10 inside turns into +10.',
           hint: 'Work out <code>3 − 10</code> first. Then remember: taking away a negative number is the same as adding.',
+          scene: negChain,
           answer: '9', wrong: '-11', lazy: '8-(3-10)+(-2)*3', check: finalNumber(9) },
         { title: 'Further left', kind: 'scene',
           goal: 'Move the sliders so the dot, at the end of the second arrow, lands on <code>−7</code>.',
@@ -255,9 +496,9 @@
             'The scene works out <code>a + b</code> on a number line. The first arrow goes from 0 to <code>a</code>; the second starts there and moves by <code>b</code>.',
             'An arrow for a positive number points right, and an arrow for a negative number points left.',
             'The dot on the line marks where you end up, <code>a + b</code>.',
-            'Each slider goes from −4 to 4, so neither arrow alone can reach −7. Change one slider at a time and watch the dot.',
+            'Each slider goes from −5 to 5, so neither arrow alone can reach −7. Change one slider at a time and watch the dot.',
           ],
-          explain: 'To reach −7 with numbers no further than 4 from zero, both arrows have to point left: <code>−3 + (−4)</code> or <code>−4 + (−3)</code>. Adding two negative numbers always gives a negative number.',
+          explain: 'To reach −7 with numbers no further than 5 from zero, both arrows have to point left: <code>−3 + (−4)</code>, <code>−4 + (−3)</code> or <code>−2 + (−5)</code>. Adding two negative numbers always gives a negative number.',
           hint: 'Which way must each arrow point to get that far left of 0?',
           answer: { a: -3, b: -4 }, wrong: { a: 3, b: -4 }, lazy: {},
           check: s => { const v = s.derived['a + b']; return v === -7 ? ok : no(`The dot is at ${signed(v)}, not −7 yet.`); } },
@@ -277,6 +518,7 @@
           ],
           explain: 'Taking away works the same way: <code>1/3 − 1/4</code> is <code>4/12 − 3/12</code>, which is <code>1/12</code>. A number that both bottom numbers divide into is a <b>common denominator</b>; the scene shows one.',
           hint: 'Write both fractions as twelfths. How many twelfths is <code>1/4</code>? And <code>1/3</code>?',
+          at: { a: 4, b: 3 },
           answer: '7/12', wrong: '2/7', lazy: '1/4+1/3', check: finalFraction('7/12') },
         { title: 'Tops times tops', kind: 'number', question: '2/3*4/5', tex: '\\frac{2}{3} \\times \\frac{4}{5}',
           goal: 'Work out <code>2/3 × 4/5</code>.',
@@ -288,6 +530,7 @@
           ],
           explain: 'Adding needs a common denominator, multiplying does not: tops times tops, bottoms times bottoms.',
           hint: 'Multiply the two top numbers together, then the two bottom numbers.',
+          scene: areaModel,
           answer: '8/15', wrong: '6/8', lazy: '2/3*4/5', check: finalFraction('8/15') },
         { title: 'Simplest form', kind: 'number', question: '18/24', tex: '\\frac{18}{24}',
           goal: 'Write <code>18/24</code> in its <b>simplest form</b>: the same amount, with the smallest whole numbers possible on top and bottom.',
@@ -299,6 +542,7 @@
           ],
           explain: 'From here on, a fraction answer counts only in its simplest form. When the quest says "not in its simplest form yet", look for a number that divides both the top and the bottom.',
           hint: 'Find a number that divides both 18 and 24. Divide the top and the bottom by it, and repeat.',
+          scene: groups,
           answer: '3/4', wrong: '1/3', lazy: '18/24', check: finalFraction('3/4') },
         { title: 'The fraction chain', kind: 'number', question: '1/2+3/4*2/3-1/3', tex: '\\frac{1}{2} + \\frac{3}{4} \\times \\frac{2}{3} - \\frac{1}{3}', work: 'required',
           goal: 'Work out <code>1/2 + 3/4 × 2/3 − 1/3</code>, and finish with a fraction in its simplest form. This one checks your working: write at least one step before the answer, and every line has to be right.',
@@ -311,6 +555,7 @@
           explain: 'Adding first, as in <code>(1/2 + 3/4) × 2/3 − 1/3</code>, gives <code>1/2</code>. That answers a different question, because the order changed.',
           hint: 'Do the × first and simplify it. Then go from left to right.',
           steps: ['1/2+1/2-1/3', '1-1/3', '2/3'],
+          scene: fracChain,
           answer: '2/3', wrong: '1/2', lazy: '1/2+3/4*2/3-1/3', check: finalFraction('2/3') },
         { title: 'A common denominator', kind: 'scene',
           goal: 'Set <code>a</code> to 4 and <code>b</code> to 6, so the bars show <code>1/4</code> and <code>1/6</code>. Then find the smallest number of pieces <code>n</code> where both coloured parts end exactly on a cut.',
@@ -345,6 +590,7 @@
           ],
           explain: 'You can write the copies out as your first step, <code>2*2*2</code>. The preview shows <code>2^3</code> with a raised 3.',
           hint: 'Write out three 2s with × between them, then multiply.',
+          scene: cube,
           answer: '8', wrong: '6', lazy: '2^3', check: finalNumber(8) },
         { title: 'Where the minus belongs', kind: 'number', question: '-2^2+(-2)^2', tex: '-2^2 + (-2)^2',
           goal: 'Work out <code>−2² + (−2)²</code>. The two powers look alike, but they are different numbers.',
@@ -356,6 +602,7 @@
           ],
           explain: 'Powers come before × and ÷ in the order of operations: brackets, then powers, then × and ÷, then + and −. A minus in front of a number is a taking away, so it waits for the power.',
           hint: 'Work out each power on its own. Which one has the minus inside the bracket?',
+          scene: squares,
           answer: '0', wrong: '8', lazy: '-2^2+(-2)^2', check: finalNumber(0) },
         { title: 'Back to the side', kind: 'number', question: 'sqrt(49)', tex: '\\sqrt{49}',
           goal: 'A square of tiles has 49 tiles. How many tiles long is each side? Work out <code>√49</code>.',
@@ -378,6 +625,7 @@
           ],
           explain: 'Adding exponents works only when the base is the same: <code>2³ × 3²</code> is <code>8 × 9</code>, which is 72, and that is not a power of one number.',
           hint: 'Count the 3s: how many are multiplied together in all? Then work out that power.',
+          scene: sameBase,
           answer: '243', wrong: '729', lazy: '3^2*3^3', check: finalNumber(243) },
         { title: 'A square of 64', kind: 'scene',
           goal: 'Move the <code>n</code> slider until the square has 64 tiles.',
@@ -407,6 +655,7 @@
           ],
           explain: 'The fraction <code>2/3</code> compares girls to boys. It is not the part of the class that is girls: that is 12 out of 30, or <code>2/5</code>.',
           hint: 'Find the biggest number that divides both 12 and 18.',
+          at: { a: 12, b: 18 },
           answer: '2/3', wrong: '3/2', lazy: '12/18', check: finalFraction('2/3') },
         { title: 'Share in a ratio', kind: 'number', question: '35/(2+3)*3', tex: '35 \\text{ shared in the ratio } 2 : 3',
           goal: 'Ana and Ben share 35 stickers in the ratio <code>2 : 3</code>: Ana gets 2 for every 3 that Ben gets. How many stickers does Ben get?',
@@ -418,6 +667,7 @@
           ],
           explain: 'As one line, Ben\'s share is <code>35 ÷ (2 + 3) × 3</code>. Each step of your working is checked against it.',
           hint: 'How many parts are there in all? How many stickers make one part?',
+          at: { a: 2, b: 3 },
           answer: '21', wrong: '14', lazy: '35/(2+3)*3', check: finalNumber(21) },
         { title: 'A percentage of an amount', kind: 'number', question: '80*15/100', tex: '15\\% \\text{ of } 80',
           goal: 'A jacket costs 80 coins, and there is 15% off. How many coins is 15% of 80?',
@@ -429,6 +679,7 @@
           ],
           explain: 'Leaving out the ÷ 100 gives <code>80 × 15</code>, which is 1200: far more than the jacket costs. A percentage under 100 always gives less than the amount.',
           hint: 'What is 1% of 80? Then multiply that by 15.',
+          scene: percent(false),
           answer: '12', wrong: '1200', lazy: '80*15/100', check: finalNumber(12) },
         { title: 'A percentage increase', kind: 'number', question: '40*(100+25)/100', tex: '40 \\text{ increased by } 25\\%',
           goal: 'A plant is 40 cm tall and grows by 25%. How tall is it now?',
@@ -440,6 +691,7 @@
           ],
           explain: 'The 10 cm is only how much it grew. The question asks for the new height, so the 40 cm it started with counts too.',
           hint: 'Work out 25% of 40, then add it to 40.',
+          scene: percent(true),
           answer: '50', wrong: '10', lazy: '40*(100+25)/100', check: finalNumber(50) },
         { title: 'Parts and percentages', kind: 'scene',
           goal: 'Move the sliders until part <code>a</code> is 40% of the bar.',
