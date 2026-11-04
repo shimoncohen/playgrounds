@@ -12,9 +12,9 @@
   const shapes = {
     id: 'rect-tri', title: 'A rectangle and a triangle on a grid of 1 by 1 squares',
     params: {
-      b: { min: 1, max: 8, step: 1, value: 4, label: 'base b' },
-      h: { min: 1, max: 6, step: 1, value: 3, label: 'height h' },
-      p: { min: 0, max: 8, step: 1, value: 1, label: 'top corner of the triangle' },
+      b: { min: 1, max: 12, step: 1, value: 4, label: 'base b' },
+      h: { min: 1, max: 9, step: 1, value: 3, label: 'height h' },
+      p: { min: 0, max: 12, step: 1, value: 1, label: 'top corner of the triangle' },
     },
     terms: ['tri'],
     derived: ({ b, h }) => ({ 'rectangle area': b * h, 'rectangle perimeter': 2 * (b + h), 'triangle area': b * h / 2 }),
@@ -22,7 +22,7 @@
     formula: '\\begin{aligned}\\text{rectangle: } A &= \\term{b}{b}\\times\\term{h}{h}\\\\ \\text{triangle: } \\term{tri}{A} &= \\tfrac{1}{2}\\times\\term{b}{b}\\times\\term{h}{h}\\end{aligned}',
     live: ({ params: { b, h } }) => `Rectangle: A = ${b} × ${h} = ${b * h}, perimeter = ${2 * (b + h)}.   Triangle: A = ½ × ${b} × ${h} = ${num(b * h / 2)}.`,
     draw: {
-      kind: '2d', view: [-2, 9, -1, 7], box: [440, 320],
+      kind: '2d', view: [-3, 13, -1, 10], box: [440, 302],
       items: ({ params: { b, h, p } }) => [
         { type: 'grid' },
         { type: 'polygon', term: 'tri', pts: [[0, 0], [b, 0], [p, h]] },
@@ -36,6 +36,10 @@
       ],
     },
   };
+
+  // Same picture, but the live line only gives what the mission gives, not the area it asks for.
+  const shapesWith = live => ({ ...shapes, live });
+  const given = ({ params: { b, h } }) => `Base b = ${b}, height h = ${h}.`;
 
   const R = 4.9, rad = d => d * Math.PI / 180, at = (d, r) => [r * Math.cos(rad(d)), r * Math.sin(rad(d))];
   const wedge = (from, to, term) => ({ type: 'polygon', term, pts: [[0, 0], ...Array.from({ length: 13 }, (_, i) => at(from + (to - from) * i / 12, 1.3))] });
@@ -67,23 +71,150 @@
     },
   };
 
-  const lShape = '<svg viewBox="-30 -14 200 150" width="200" role="img" aria-label="An L shape: 10 along the bottom, 8 up the left side, with a 4 by 3 corner cut off at the top right" style="display:block;margin:8px 0;max-width:100%">'
-    + '<polygon points="0,112 140,112 140,42 84,42 84,0 0,0" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="2"/>'
-    + '<g fill="currentColor" font-size="13" text-anchor="middle"><text x="70" y="130">10</text><text x="-12" y="60">8</text><text x="112" y="36">4</text><text x="96" y="24">3</text></g></svg>';
+  const sector = (cx, cy, from, to, r, term) => ({ type: 'polygon', term, pts: [[cx, cy], ...Array.from({ length: 13 }, (_, i) => { const d = from + (to - from) * i / 12; return [cx + r * Math.cos(rad(d)), cy + r * Math.sin(rad(d))]; })] });
+  const tag = (cx, cy, from, to, r, s, term) => ({ type: 'text', x: cx + r * Math.cos(rad((from + to) / 2)), y: cy + r * Math.sin(rad((from + to) / 2)), s, term });
+  const ray = (cx, cy, d, len) => ({ type: 'polygon', pts: [[cx, cy], [cx + len * Math.cos(rad(d)), cy + len * Math.sin(rad(d))]] });
+
+  const lineRay = {
+    id: 'line-ray', title: 'One ray splits a straight line into two angles',
+    params: { r: { min: 1, max: 179, step: 1, value: 90, label: 'ray' } },
+    terms: ['a', 'x'],
+    derived: ({ r }) => ({ a: r, x: 180 - r }),
+    formula: '\\term{a}{a} + \\term{x}{x} = 180^\\circ',
+    live: ({ derived: d }) => `${d.a}° + x = 180°`,
+    draw: {
+      kind: '2d', view: [-5.5, 5.5, -1, 5.5], box: [440, 260],
+      items: ({ params: { r } }) => [
+        { type: 'polygon', pts: [[-5.2, 0], [5.2, 0]] },
+        sector(0, 0, 0, r, 1.3, 'a'), sector(0, 0, r, 180, 1.3, 'x'),
+        tag(0, 0, 0, r, 2.1, `${r}°`, 'a'), tag(0, 0, r, 180, 2.1, 'x', 'x'),
+        { type: 'vector', from: [0, 0], to: at(r, R) },
+        { type: 'point', x: 0, y: 0 },
+        { type: 'point', x: at(r, R - 0.6)[0], y: at(r, R - 0.6)[1], drag: { angle: 'r', step: 1 }, label: 'ray' },
+      ],
+    },
+  };
+
+  const around = ({ r1, r2, r3 }) => {
+    const [p, q, s] = [r1, r2, r3].sort((m, n) => m - n);
+    return { cuts: [0, p, q, s, 360], a: p, b: q - p, c: s - q, x: 360 - s };
+  };
+  const pointRays = {
+    id: 'point-rays', title: 'Three rays from a point make four angles that fill a full turn',
+    params: {
+      r1: { min: 5, max: 355, step: 5, value: 90, label: 'first ray' },
+      r2: { min: 5, max: 355, step: 5, value: 180, label: 'second ray' },
+      r3: { min: 5, max: 355, step: 5, value: 270, label: 'third ray' },
+    },
+    terms: ['a', 'b', 'c', 'x'],
+    derived: p => { const { a, b, c, x } = around(p); return { a, b, c, x }; },
+    formula: '\\term{a}{a} + \\term{b}{b} + \\term{c}{c} + \\term{x}{x} = 360^\\circ',
+    live: ({ derived: d }) => `${d.a}° + ${d.b}° + ${d.c}° + x = 360°`,
+    draw: {
+      kind: '2d', view: [-5.5, 5.5, -5.5, 5.5], box: [360, 360],
+      items: ({ params }) => {
+        const { cuts } = around(params), names = ['a', 'b', 'c', 'x'];
+        return [
+          ...cuts.slice(0, 4).flatMap((from, i) => cuts[i + 1] === from ? [] : [sector(0, 0, from, cuts[i + 1], 1.4, names[i]), tag(0, 0, from, cuts[i + 1], 2.7, i === 3 ? 'x' : `${cuts[i + 1] - from}°`, names[i])]),
+          ...cuts.slice(0, 4).map(d => ({ type: 'vector', from: [0, 0], to: at(d, R - 0.3) })),
+          { type: 'point', x: 0, y: 0 },
+        ];
+      },
+    },
+  };
+
+  const triangleAt = ({ a, b }) => {
+    const h0 = Math.sin(rad(a)) * Math.sin(rad(b)) / Math.sin(rad(a + b)), s = Math.min(9, 6 / h0), c = Math.sin(rad(b)) / Math.sin(rad(a + b));
+    return { s, L: [-s / 2, 0], R: [s / 2, 0], T: [-s / 2 + s * c * Math.cos(rad(a)), s * c * Math.sin(rad(a))] };
+  };
+  const triangle = {
+    id: 'triangle-angles', title: 'A triangle with its three angles marked',
+    params: {
+      a: { min: 30, max: 75, step: 1, value: 60, label: 'angle a, left corner' },
+      b: { min: 30, max: 75, step: 1, value: 60, label: 'angle b, right corner' },
+    },
+    terms: ['x'],
+    derived: ({ a, b }) => ({ x: 180 - a - b }),
+    formula: '\\term{a}{a} + \\term{b}{b} + \\term{x}{x} = 180^\\circ',
+    live: ({ params: { a, b } }) => `${a}° + ${b}° + x = 180°`,
+    draw: {
+      kind: '2d', view: [-5.5, 5.5, -1.5, 6.5], box: [440, 320],
+      items: ({ params }) => {
+        const { a, b } = params, { s, L, R: Rt, T } = triangleAt(params), r = Math.min(1.4, 0.4 * s);
+        return [
+          { type: 'polygon', pts: [L, Rt, T] },
+          sector(...L, 0, a, r, 'a'), sector(...Rt, 180 - b, 180, r, 'b'), sector(...T, 180 + a, 360 - b, r, 'x'),
+          tag(...L, 0, a, r + 0.9, `${a}°`, 'a'), tag(...Rt, 180 - b, 180, r + 0.9, `${b}°`, 'b'), tag(...T, 180 + a, 360 - b, r + 0.9, 'x', 'x'),
+        ];
+      },
+    },
+  };
+
+  const crossing = {
+    id: 'crossing-lines', title: 'Two straight lines cross and make four angles',
+    params: { k: { min: 10, max: 80, step: 1, value: 60, label: 'angle between the lines' } },
+    terms: ['x', 'y'],
+    derived: ({ k }) => ({ x: k, y: 180 - k }),
+    formula: '\\term{x}{x} + \\term{y}{y} = 180^\\circ',
+    live: ({ derived: d }) => `The two opposite angles of ${d.x}° are ${2 * d.x}° together. Aim for 76°.`,
+    draw: {
+      kind: '2d', view: [-5.5, 5.5, -5.5, 5.5], box: [360, 360],
+      items: ({ params: { k } }) => [
+        ray(0, 0, 0, 5.2), ray(0, 0, 180, 5.2), ray(0, 0, k, 5.2), ray(0, 0, k + 180, 5.2),
+        ...[[0, k, 'x', k], [k, 180, 'y', 180 - k], [180, 180 + k, 'x', k], [180 + k, 360, 'y', 180 - k]].flatMap(([f, e, term, n]) => [sector(0, 0, f, e, 1.4, term), tag(0, 0, f, e, 2.7, `${n}°`, term)]),
+        { type: 'point', x: 0, y: 0 },
+        { type: 'point', x: at(k, 4.6)[0], y: at(k, 4.6)[1], drag: { angle: 'k', step: 1 }, label: 'angle between the lines' },
+      ],
+    },
+  };
+
+  // svg2d polygons are always filled, so a taken-away part is drawn as short two-point segments.
+  const dashed = (pts, term) => pts.flatMap((p, i) => {
+    const q = pts[(i + 1) % pts.length], n = Math.round(Math.hypot(q[0] - p[0], q[1] - p[1]) / 0.5);
+    return Array.from({ length: n }, (_, k) => side(term, [p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n], [p[0] + (q[0] - p[0]) * (k + 0.6) / n, p[1] + (q[1] - p[1]) * (k + 0.6) / n]));
+  });
+
+  const lRoom = {
+    id: 'l-room', title: 'An L-shaped room: a rectangle with a corner cut off',
+    params: {
+      w: { min: 6, max: 12, step: 1, value: 10, label: 'width w' },
+      h: { min: 5, max: 9, step: 1, value: 8, label: 'height h' },
+      u: { min: 1, max: 5, step: 1, value: 4, label: 'cut width u' },
+      v: { min: 1, max: 4, step: 1, value: 3, label: 'cut height v' },
+    },
+    terms: ['whole', 'cut'],
+    formula: 'A = \\term{whole}{w\\times h} - \\term{cut}{u\\times v}',
+    live: ({ params: { w, h, u, v } }) => `Whole rectangle ${w} × ${h}. Dashed corner cut off: ${u} × ${v}.`,
+    draw: {
+      kind: '2d', view: [-3, 13, -1, 10], box: [440, 302],
+      items: ({ params: { w, h, u, v } }) => [
+        { type: 'grid' },
+        { type: 'polygon', term: 'whole', pts: [[0, 0], [w, 0], [w, h - v], [w - u, h - v], [w - u, h], [0, h]] },
+        ...dashed([[w - u, h - v], [w, h - v], [w, h], [w - u, h]], 'cut'),
+        { type: 'text', x: w / 2, y: -0.5, s: `w = ${w}`, term: 'whole' },
+        { type: 'text', x: -0.2, y: h / 2, s: `h = ${h}`, term: 'whole', anchor: 'end' },
+        { type: 'text', x: w - u / 2, y: h + 0.6, s: `cut ${u} × ${v}`, term: 'cut' },
+        { type: 'point', x: w, y: h, drag: { x: 'w', y: 'h' }, label: 'top right corner of the room' },
+      ],
+    },
+  };
 
   const wholeRoot = n => Math.round(Math.sqrt(n)) ** 2 === n;
-  const squares = {
+  // The view is sized so the squares on the longest legs and on the hypotenuse still fit.
+  // ask 'c': the hypotenuse is the question, so c² stays hidden. A number: the hypotenuse to aim for while moving a leg.
+  const squares = (max, ask) => ({
     id: 'right-tri', title: 'A right triangle with a square drawn on each of its three sides',
     params: {
-      a: { min: 2, max: 8, step: 1, value: 3, label: 'leg a' },
-      b: { min: 2, max: 8, step: 1, value: 4, label: 'leg b' },
+      a: { min: 2, max, step: 1, value: 3, label: 'leg a' },
+      b: { min: 2, max, step: 1, value: 4, label: 'leg b' },
     },
     terms: ['c'],
     derived: ({ a, b }) => ({ 'a²': a * a, 'b²': b * b, 'c²': a * a + b * b, c: +Math.hypot(a, b).toFixed(2) }),
     formula: '\\term{a}{a}^2 + \\term{b}{b}^2 = \\term{c}{c}^2',
-    live: ({ params: { a, b }, derived: d }) => `${a}² + ${b}² = ${d['a²']} + ${d['b²']} = ${d['c²']}, so c = ${wholeRoot(d['c²']) ? d.c : `√${d['c²']} ≈ ${num(d.c)}`}`,
+    live: ({ params: { a, b }, derived: d }) => ask === 'c' ? `a² = ${d['a²']}, b² = ${d['b²']}, c² = ?`
+      : `${a}² + ${b}² = ${d['a²']} + ${d['b²']} = ${d['c²']}, so c = ${wholeRoot(d['c²']) ? d.c : `√${d['c²']} ≈ ${num(d.c)}`}${ask ? `. Aim for c = ${ask}.` : ''}`,
     draw: {
-      kind: '2d', view: [-9, 17, -9, 17], box: [440, 440],
+      kind: '2d', view: [-max - 1, 2 * max + 1, -max - 1, 2 * max + 1], box: [440, 440],
       items: ({ params: { a, b }, derived: d }) => [
         { type: 'polygon', term: 'a', pts: [[0, 0], [a, 0], [a, -a], [0, -a]] },
         { type: 'polygon', term: 'b', pts: [[0, 0], [0, b], [-b, b], [-b, 0]] },
@@ -92,20 +223,21 @@
         { type: 'polygon', pts: [[0, 0], [0.8, 0], [0.8, 0.8], [0, 0.8]] },
         { type: 'text', x: a / 2, y: -a / 2, s: `a² = ${d['a²']}`, term: 'a' },
         { type: 'text', x: -b / 2, y: b / 2, s: `b² = ${d['b²']}`, term: 'b' },
-        { type: 'text', x: (a + b) / 2, y: (a + b) / 2, s: `c² = ${d['c²']}`, term: 'c' },
+        { type: 'text', x: (a + b) / 2, y: (a + b) / 2, s: ask === 'c' ? 'c² = ?' : `c² = ${d['c²']}`, term: 'c' },
         { type: 'point', x: a, y: 0, term: 'a', drag: { x: 'a' }, label: 'leg a' },
         { type: 'point', x: 0, y: b, term: 'b', drag: { y: 'b' }, label: 'leg b' },
       ],
     },
-  };
+  });
 
-  const circle = {
+  const radiusOnly = ({ params: { r }, derived: d }) => `Radius r = ${r}, diameter d = ${d.d}.`;
+  const circle = (step, liveLine) => ({
     id: 'circle', title: 'A circle with its radius and diameter marked',
-    params: { r: { min: 1, max: 8, step: 0.5, value: 3, label: 'radius r' } },
+    params: { r: { min: 1, max: 8, step, value: 3, label: 'radius r' } },
     terms: ['d', 'C', 'A'],
     derived: ({ r }) => ({ d: 2 * r, C: +(2 * Math.PI * r).toFixed(2), A: +(Math.PI * r * r).toFixed(2) }),
     formula: '\\begin{aligned}\\term{d}{d} &= 2\\times\\term{r}{r}\\\\ \\term{C}{C} &= 2\\times\\pi\\times\\term{r}{r}\\\\ \\term{A}{A} &= \\pi\\times\\term{r}{r}\\times\\term{r}{r}\\end{aligned}',
-    live: ({ params: { r }, derived: d }) => `r = ${r}, d = ${d.d}.   C = 2 × π × ${r} ≈ ${num(d.C)}.   A = π × ${r} × ${r} ≈ ${num(d.A)}.`,
+    live: liveLine || (({ params: { r }, derived: d }) => `r = ${r}, d = ${d.d}.   C = 2 × π × ${r} ≈ ${num(d.C)}.   A = π × ${r} × ${r} ≈ ${num(d.A)}.`),
     draw: {
       kind: '2d', view: [-9, 9, -9, 9], box: [400, 400],
       items: ({ params: { r } }) => [
@@ -115,7 +247,25 @@
         { type: 'text', x: r / 2, y: 0.8, s: `r = ${r}`, term: 'r' },
         { type: 'text', x: -r / 2, y: -0.8, s: `d = ${2 * r}`, term: 'd' },
         { type: 'point', x: 0, y: 0 },
-        { type: 'point', x: r, y: 0, term: 'r', drag: { x: 'r', stepX: 0.5 }, label: 'radius r' },
+        { type: 'point', x: r, y: 0, term: 'r', drag: { x: 'r', stepX: step }, label: 'radius r' },
+      ],
+    },
+  });
+
+  // The table is measured across (its diameter), so the radius is not shown: halving it is the learner's step.
+  const tableTop = {
+    id: 'circle-diameter', title: 'A circle measured all the way across, its diameter',
+    params: { d: { min: 2, max: 16, step: 1, value: 14, label: 'diameter d' } },
+    formula: '\\term{d}{d} = 2\\times r',
+    live: ({ params: { d } }) => `Diameter d = ${d}.`,
+    draw: {
+      kind: '2d', view: [-1, 17, -8.5, 8.5], box: [440, 416],
+      items: ({ params: { d } }) => [
+        { type: 'polygon', pts: Array.from({ length: 90 }, (_, i) => [d / 2 + d / 2 * Math.cos(i * Math.PI / 45), d / 2 * Math.sin(i * Math.PI / 45)]) },
+        { type: 'vector', term: 'd', from: [0, 0], to: [d, 0] },
+        { type: 'text', x: d / 2, y: -0.8, s: `d = ${d}`, term: 'd' },
+        { type: 'point', x: 0, y: 0 },
+        { type: 'point', x: d, y: 0, term: 'd', drag: { x: 'd' }, label: 'diameter d' },
       ],
     },
   };
@@ -136,8 +286,8 @@
             '<code>12 × 7</code> is 84, so 84 tiles cover the floor.',
             'Adding the sides all the way round, <code>12 + 7 + 12 + 7</code>, gives 38. That is the perimeter, the length of the edge, which measures something else.',
           ],
-          explain: 'The rectangle in the scene goes up to 8 by 6, so it cannot show this floor. Try a smaller one: drag its top right corner to 4 by 3 and count the 12 squares inside.',
-          hint: 'How many rows of tiles are there, and how many tiles are in each row?',
+          explain: 'The scene shows this floor, 12 by 7: count the 7 rows of 12 squares. Drag the top right corner to try other floors.',
+          hint: 'How many rows of tiles are there, and how many tiles are in each row?', scene: shapesWith(given), reveal: true, at: { b: 12, h: 7 },
           answer: '84', wrong: '38', lazy: '12*7', check: finalNumber(84) },
         { title: 'Half a rectangle', kind: 'number', question: '1/2*10*9', tex: 'A = \\tfrac{1}{2} \\times b \\times h \\;\\text{ with }\\; b = 10,\\ h = 9',
           goal: 'A triangle has a base of 10 and a height of 9. Work out its area <code>A = ½ × b × h</code>, where <code>½</code> means one half.',
@@ -148,10 +298,10 @@
             'Half of 90 is 45, the area of the triangle. Forgetting the <code>½</code> gives 90, the whole rectangle.',
           ],
           explain: 'The height of a triangle goes straight up from the base to the top corner, not along a sloping side. In the scene, slide the top corner of the triangle along: the base and height stay the same, and so does the area.',
-          hint: 'First find the rectangle, <code>10 × 9</code>. The triangle is half of it.',
+          hint: 'First find the rectangle, <code>10 × 9</code>. The triangle is half of it.', scene: shapesWith(given), reveal: true, at: { b: 10, h: 9 },
           answer: '45', wrong: '90', lazy: '1/2*10*9', check: finalNumber(45) },
         { title: 'An L-shaped room', kind: 'number', question: '10*8-4*3', tex: '\\text{a } 10 \\times 8 \\text{ rectangle with a } 4 \\times 3 \\text{ corner cut off}',
-          goal: 'A room is shaped like an L: a rectangle 10 wide and 8 tall with a 4 by 3 corner cut off at the top right. Work out its area.' + lShape,
+          goal: 'A room is shaped like an L: a rectangle 10 wide and 8 tall with a 4 by 3 corner cut off at the top right. Work out its area. The scene shows the room: the whole rectangle, with the cut corner in a second colour.',
           how: [
             'The L is not a rectangle, but it is made of rectangles: find their areas, then add or take away.',
             'One way: the whole 10 by 8 rectangle is <code>10 × 8 = 80</code> squares, before the corner is cut off.',
@@ -159,7 +309,7 @@
             'Another way gives the same answer: cut the L into a bottom part 10 by 5 and a top part 6 by 3. <code>50 + 18</code> is 68 too.',
           ],
           explain: 'Any shape with only square corners can be cut into rectangles like this. Whichever way you cut it, the area comes out the same.',
-          hint: 'Find the area of the full 10 by 8 rectangle. How much of it is missing?',
+          hint: 'Find the area of the full 10 by 8 rectangle. How much of it is missing?', scene: lRoom,
           answer: '68', wrong: '80', lazy: '10*8-4*3', check: finalNumber(68) },
         { title: 'The missing side', kind: 'number', question: '54/9', tex: 'b \\times h = 54 \\;\\text{ with }\\; b = 9,\\ h = ?',
           goal: 'A rectangle has an area of 54 and a base of 9. How tall is it? Find the height <code>h</code>.',
@@ -170,7 +320,7 @@
             'Check it: <code>9 × 6</code> is 54, so the height is 6. Taking away, <code>54 − 9</code>, gives 45, which does not fit.',
           ],
           explain: 'This is how a builder finds a missing length: if you know the area and one side, divide the area by that side.',
-          hint: 'Which number times 9 gives 54?',
+          hint: 'Which number times 9 gives 54?', scene: shapesWith(({ params: { b, h } }) => `Base ${b}, height ${h}: area ${b * h}. The area you need is 54.`), at: { b: 9, h: 3 },
           answer: '6', wrong: '45', lazy: '54/9', check: finalNumber(6) },
         { title: 'Area 24, perimeter 20', kind: 'scene',
           goal: 'Drag the top right corner of the rectangle until its area is 24 squares and its perimeter is 20.',
@@ -202,8 +352,8 @@
             'Take the part you know away from the whole: <code>180 − 47</code> (type <code>180-47</code>) is 133.',
             'Check it: <code>47 + 133</code> is 180. Taking 47 from 90 instead gives 43, which belongs to a right angle, not a straight line.',
           ],
-          explain: 'In the scene, put the two rays on top of each other: the middle angle shrinks to <code>0°</code>, and the other two still add up to <code>180°</code>.',
-          hint: 'A straight line is <code>180°</code>. How much is left after <code>47°</code>?',
+          explain: 'In the scene, drag the ray: one angle grows as the other shrinks, and together they always make <code>180°</code>.',
+          hint: 'A straight line is <code>180°</code>. How much is left after <code>47°</code>?', scene: lineRay, at: { r: 47 },
           answer: '133', wrong: '43', lazy: '180-47', check: angle(133) },
         { title: 'All the way round', kind: 'number', question: '360-110-95-80', tex: '110^\\circ + 95^\\circ + 80^\\circ + x = 360^\\circ',
           goal: 'Four angles fit round a point: <code>110°</code>, <code>95°</code>, <code>80°</code> and <code>x</code>. Find <code>x</code>.',
@@ -214,7 +364,7 @@
             'Check it: <code>285 + 75</code> is 360. The 285 alone is not the answer: it is the part already used.',
           ],
           explain: 'A full turn is two straight lines, back to back: <code>180° + 180° = 360°</code>.',
-          hint: 'Add up the three angles you know. How much of the <code>360°</code> is left?',
+          hint: 'Add up the three angles you know. How much of the <code>360°</code> is left?', scene: pointRays, at: { r1: 110, r2: 205, r3: 285 },
           answer: '75', wrong: '285', lazy: '360-110-95-80', check: angle(75) },
         { title: 'Inside a triangle', kind: 'number', question: '180-58-71', tex: '58^\\circ + 71^\\circ + x = 180^\\circ',
           goal: 'A triangle has two angles of <code>58°</code> and <code>71°</code>. The three angles inside a triangle always add up to <code>180°</code>. Find the third angle, <code>x</code>.',
@@ -224,8 +374,8 @@
             '<code>x</code> is what is left: <code>180 − 129</code> (type <code>180-129</code>) is 51.',
             'Check it: <code>58 + 71 + 51</code> is 180. Using 360 by mistake gives 231, bigger than a straight line, which cannot fit inside a triangle.',
           ],
-          explain: 'The three angles in the scene make a straight line. A triangle\'s three corners do the same: put them side by side and they fill a straight line, as the field guide shows.',
-          hint: 'Add the two angles you know, then take that away from <code>180°</code>.',
+          explain: 'In the scene, change one corner and the third angle changes to keep the total at <code>180°</code>. Put a triangle\'s three corners side by side and they fill a straight line, as the field guide shows.',
+          hint: 'Add the two angles you know, then take that away from <code>180°</code>.', scene: triangle, at: { a: 58, b: 71 },
           answer: '51', wrong: '231', lazy: '180-58-71', check: angle(51) },
         { title: 'Opposite angles', kind: 'number', question: '76/2', tex: '\\text{two opposite angles: } x + x = 76^\\circ',
           goal: 'Two straight lines cross like an open pair of scissors, making four angles. The angle between the blades and the one opposite it, between the handles, add up to <code>76°</code>. How big is one of them, <code>x</code>?',
@@ -236,7 +386,7 @@
             'Check it: the neighbour is <code>180 − 38 = 142</code>, and <code>38 + 142</code> is 180, a straight line. 104, which is 180 − 76, mixes the two angles up.',
           ],
           explain: 'Open and close a pair of scissors: the angle between the blades and the angle between the handles grow and shrink together.',
-          hint: 'The two opposite angles are equal. What is half of <code>76°</code>?',
+          hint: 'The two opposite angles are equal. What is half of <code>76°</code>?', scene: crossing,
           answer: '38', wrong: '104', lazy: '76/2', check: angle(38) },
         { title: 'Three equal slices', kind: 'scene',
           goal: 'Drag the two rays until the three angles on the straight line are all the same size.',
@@ -254,7 +404,7 @@
     }, {
       id: 'geometry.pythagoras', name: 'Pythagoras', badge: 'Right-Angle Pro',
       intro: 'A <b>right triangle</b> has one right angle, a <code>90°</code> corner like the corner of a page. The two sides that make the right angle are the <b>legs</b>, <code>a</code> and <code>b</code>. The longest side, across from the right angle, is the <b>hypotenuse</b>, <code>c</code>. Draw a square on each side: the two small squares together cover exactly as much area as the big one. This is <b>Pythagoras\' theorem</b>: <code>a² + b² = c²</code>, where <code>a²</code> means <code>a × a</code>. To go back from <code>c²</code> to <code>c</code> you take the <b>square root</b>, written <code>sqrt(…)</code> when you type it: <code>sqrt(25)</code> is 5, because <code>5 × 5 = 25</code>. Drag a leg, or move a slider, and watch the three areas.',
-      scene: squares,
+      scene: squares(8),
       missions: [
         { title: 'The long side', kind: 'number', question: 'sqrt(3^2+4^2)', tex: 'c = \\sqrt{3^2 + 4^2}',
           goal: 'A right triangle has legs of 3 and 4. How long is the hypotenuse <code>c</code>?',
@@ -265,7 +415,7 @@
             'Stopping at 25 is a slip: that is <code>c²</code>, the area of the big square, not the length of the side.',
           ],
           explain: 'In the scene, 3 and 4 are the starting legs: the squares cover 9 and 16, and the big square covers 25. Its side is 5.',
-          hint: 'Square both legs, add them, then take the square root.',
+          hint: 'Square both legs, add them, then take the square root.', scene: squares(8, 'c'), reveal: true,
           answer: '5', wrong: '25', lazy: 'sqrt(3^2+4^2)', check: finalNumber(5) },
         { title: 'Twice as big', kind: 'number', question: 'sqrt(6^2+8^2)', tex: 'c = \\sqrt{6^2 + 8^2}',
           goal: 'The legs are 6 and 8. Find the hypotenuse <code>c</code>.',
@@ -286,8 +436,8 @@
             '<code>169 − 25</code> is 144, and <code>sqrt(144)</code> is 12, because <code>12 × 12 = 144</code>.',
             'Take away, do not add: the hypotenuse is the longest side, so a leg must be shorter than 13. Subtracting the sides, <code>13 − 5 = 8</code>, is a slip too.',
           ],
-          explain: 'The hypotenuse is always the longest side, so it goes first in the subtraction. 5, 12 and 13 is another set of whole numbers that fit Pythagoras.',
-          hint: 'Take the small square away from the big one: <code>13² − 5²</code>. Then take the square root.',
+          explain: 'In the scene, slide leg b until c reaches 13: it stops at the leg you found. The hypotenuse is always the longest side, so it goes first in the subtraction. 5, 12 and 13 is another set of whole numbers that fit Pythagoras.',
+          hint: 'Take the small square away from the big one: <code>13² − 5²</code>. Then take the square root.', scene: squares(12, 13), at: { a: 5, b: 8 },
           answer: '12', wrong: '8', lazy: 'sqrt(13^2-5^2)', check: finalNumber(12) },
         { title: 'Not a whole number', kind: 'number', round: 1, question: 'sqrt(5^2+7^2)', tex: 'c = \\sqrt{5^2 + 7^2}',
           goal: 'The legs are 5 and 7. Find the hypotenuse <code>c</code>, rounded to 1 decimal place (one digit after the point).',
@@ -298,7 +448,7 @@
             'The answer 74 is a slip: that is <code>c²</code>, the area of the big square.',
           ],
           explain: 'Most right triangles do not have whole-number sides, so you round. Rounding to 1 decimal place means 8.6 is the closest number with one digit after the point.',
-          hint: 'Square and add the legs, take the square root, and round the result to 1 decimal place.',
+          hint: 'Square and add the legs, take the square root, and round the result to 1 decimal place.', scene: squares(8, 'c'), reveal: true, at: { a: 5, b: 7 },
           answer: '8.6', wrong: '74.0', lazy: 'sqrt(5^2+7^2)', check: finalRounded('sqrt(74)', 1) },
         { title: 'A whole-number triangle', kind: 'scene',
           goal: 'Drag the two legs until the hypotenuse is a whole number other than 5.',
@@ -309,7 +459,7 @@
             'The live line under the picture shows the sum and the root. The mission passes when <code>c</code> is a whole number that is not 5.',
           ],
           explain: '6, 8 and 10 is twice 3, 4 and 5. Sets of whole numbers like these are called Pythagorean triples. Builders use 3, 4 and 5 to check that a corner is square.',
-          hint: 'Double the legs 3 and 4.',
+          hint: 'Double the legs 3 and 4.', scene: squares(8, 'c'), reveal: true, at: { a: 6, b: 8 },
           answer: { a: 6, b: 8 }, wrong: { a: 3, b: 4 }, lazy: {},
           check: ({ derived: d }) => !wholeRoot(d['c²']) ? { ok: false, why: `c² is ${d['c²']}, and c is about ${num(d.c)}, not a whole number.` }
             : d.c === 5 ? { ok: false, why: 'c is 5. Find a triangle with a different whole-number hypotenuse.' } : ok },
@@ -317,7 +467,7 @@
     }, {
       id: 'geometry.circles', name: 'Circles', badge: 'Circle Master',
       intro: 'A circle is all the points at the same distance from its <b>centre</b>. That distance is the <b>radius</b> <code>r</code>. The <b>diameter</b> <code>d</code> goes straight across, through the centre, so <code>d = 2r</code>. The <b>circumference</b> <code>C</code> is the distance round the edge, and the <b>area</b> <code>A</code> is the space inside. Both depend on <b>pi</b>, written <code>π</code>: the number you get when you divide any circle\'s circumference by its diameter. It is about <code>3.14</code> and its digits never end, so answers are rounded. Type it as <code>pi</code>. Drag the radius tip, or move the slider, and watch <code>d</code>, <code>C</code> and <code>A</code> change.',
-      scene: circle,
+      scene: circle(0.5),
       missions: [
         { title: 'Round the pond', kind: 'number', round: 1, question: '2*pi*5', tex: 'C = 2 \\times \\pi \\times r \\;\\text{ with }\\; r = 5',
           goal: 'A round pond has a radius of 5. How far is it round its edge? Work out the circumference <code>C = 2 × π × r</code>, rounded to 1 decimal place.',
@@ -327,8 +477,8 @@
             'A calculator gives <code>31.415…</code>. The next digit after the 4 is 1, less than 5, so the 4 stays: 31.4.',
             'Leaving out the 2 gives 15.7, which is only half of the way round.',
           ],
-          explain: 'In the scene, set the radius to 5 with the slider and read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
-          hint: 'Two times pi times the radius. Type pi as <code>pi</code>.',
+          explain: 'The scene opens on this pond, radius 5: read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
+          hint: 'Two times pi times the radius. Type pi as <code>pi</code>.', scene: circle(0.5, radiusOnly), reveal: true, at: { r: 5 },
           answer: '31.4', wrong: '15.7', lazy: '2*pi*5', check: finalRounded('2*pi*5', 1) },
         { title: 'Covering a circle', kind: 'number', round: 1, question: 'pi*3^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = 3',
           goal: 'A round rug has a radius of 3. How much floor does it cover? Work out the area <code>A = π × r²</code>, rounded to 1 decimal place.',
@@ -339,7 +489,7 @@
             'Mixing it up with the circumference, <code>2 × π × 3</code>, gives 18.8, a length, not an area.',
           ],
           explain: 'Area counts squares, so the radius is multiplied by itself. Double the radius and the area gets four times as big.',
-          hint: 'Square the radius first, then multiply by pi.',
+          hint: 'Square the radius first, then multiply by pi.', scene: circle(0.5, radiusOnly), reveal: true,
           answer: '28.3', wrong: '18.8', lazy: 'pi*3^2', check: finalRounded('pi*3^2', 1) },
         { title: 'From the diameter', kind: 'number', round: 1, question: 'pi*(14/2)^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = \\tfrac{14}{2}',
           goal: 'A round table is 14 wide all the way across, its diameter. What is the area of its top, rounded to 1 decimal place?',
@@ -350,7 +500,7 @@
             'Using 14 as the radius gives 615.8, four times too big.',
           ],
           explain: 'A common slip is to put the diameter into <code>π × r²</code>. Halve first.',
-          hint: 'Halve the diameter to get the radius, then use <code>π × r²</code>.',
+          hint: 'Halve the diameter to get the radius, then use <code>π × r²</code>.', scene: tableTop,
           answer: '153.9', wrong: '615.8', lazy: 'pi*(14/2)^2', check: finalRounded('pi*(14/2)^2', 1) },
         { title: 'Back to the radius', kind: 'number', round: 1, question: '30/(2*pi)', tex: 'r = \\frac{C}{2 \\times \\pi} \\;\\text{ with }\\; C = 30',
           goal: 'A circular track is 30 long all the way round. What is its radius, rounded to 1 decimal place?',
@@ -361,7 +511,7 @@
             'Dividing by 2 alone, <code>30 ÷ 2 = 15</code>, forgets π.',
           ],
           explain: 'Check it: <code>2 × π × 4.8</code> is about 30.2, close to 30. The small gap is from rounding.',
-          hint: 'Divide the circumference by <code>2 × π</code>.',
+          hint: 'Divide the circumference by <code>2 × π</code>.', scene: circle(0.1, ({ params: { r }, derived: d }) => `r = ${r}, C = 2 × π × ${r} ≈ ${num(d.C)}. The length you need is 30.`),
           answer: '4.8', wrong: '15.0', lazy: '30/(2*pi)', check: finalRounded('30/(2*pi)', 1) },
         { title: 'Area of about 78', kind: 'scene',
           goal: 'Drag the radius tip until the area is between 75 and 80.',

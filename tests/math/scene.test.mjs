@@ -96,3 +96,31 @@ test('palette: 3:1 on both themes, and every pair is 12 apart in CIEDE2000 under
 test('deltaE2000 matches the Sharma reference pair', () => {
   assert.ok(Math.abs(deltaE2000([50, 2.6772, -79.7751], [50, 0, -82.7485]) - 2.0425) < 1e-3);
 });
+
+test('forMission: a mission picks its own scene and start values; fill starts a scene mission on its answer', () => {
+  const P = { a: { min: 0, max: 9, value: 1, label: 'a' }, b: { min: 0, max: 9, value: 2, label: 'b' } };
+  const ch = { scene: { id: 'ch', params: P } }, own = { id: 'own', params: { c: { min: 0, max: 9, value: 5, label: 'c' } } };
+  const vals = d => Object.fromEntries(Object.entries(d.params).map(([k, p]) => [k, p.value]));
+  assert.deepEqual(vals(MQ.scene.forMission(ch, { kind: 'number' })), { a: 1, b: 2 });
+  assert.deepEqual(vals(MQ.scene.forMission(ch, { kind: 'number', at: { b: 7 } })), { a: 1, b: 7 });
+  const m = { kind: 'scene', at: { a: 3 }, answer: { b: 8 } };
+  assert.deepEqual(vals(MQ.scene.forMission(ch, m)), { a: 3, b: 2 });
+  assert.deepEqual(vals(MQ.scene.forMission(ch, m, true)), { a: 3, b: 8 });
+  assert.equal(MQ.scene.forMission(ch, { kind: 'number', scene: own }).id, 'own');
+  assert.equal(P.b.value, 2, 'the chapter scene is not changed');
+});
+
+test('forMission hides worked-out values until a typed mission is solved, then reveals', () => {
+  const P = { a: { min: 0, max: 9, value: 1, label: 'a' } };
+  const ch = { scene: { id: 'ch', params: P, derived: p => ({ twice: p.a * 2 }), live: '' } };
+  const own = { id: 'own', params: P, derived: p => ({ twice: p.a * 2 }), live: '' };
+  const m = { kind: 'number', scene: own, at: { a: 4 }, reveal: true };
+  const desc = d => MQ.scene.model(d).describe();
+  assert.doesNotMatch(desc(MQ.scene.forMission(ch, m)), /twice = 8/);
+  const after = MQ.scene.forMission(ch, m, false, true);
+  assert.equal(after.id, 'ch');
+  assert.match(desc(after), /twice = 8/);
+  assert.equal(MQ.scene.forMission(ch, { ...m, reveal: own }, false, true).id, 'own');
+  assert.equal(MQ.scene.forMission(ch, { ...m, reveal: undefined }, false, true).id, 'own', 'without reveal the own scene stays');
+  assert.match(desc(MQ.scene.forMission(ch, { kind: 'scene' })), /twice = 2/, 'a scene mission keeps its values');
+});

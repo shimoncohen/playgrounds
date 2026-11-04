@@ -62,9 +62,8 @@ function startSession(fill) {
   if (scene) scene.destroy();
   const m = curMission(), ch = CH[S.ch], k = mkey();
   won = false; lastWhy = ''; renderFeedback(null);
-  let def = ch.scene, moved = false;
-  if (fill && m && m.kind === 'scene') def = { ...def, params: Object.fromEntries(Object.entries(def.params).map(([n, p]) => [n, { ...p, value: m.answer[n] ?? p.value }])) };
-  scene = MQ.scene.mount(sceneEl, def, { onChange: st => {
+  let moved = false;
+  scene = MQ.scene.mount(sceneEl, MQ.scene.forMission(ch, m, fill, !!S.done[k]), { onChange: st => {
     if (!m || m.kind !== 'scene' || won) return;
     const r = m.check(st);
     if (r.ok) { complete(); return; }
@@ -86,6 +85,8 @@ function complete() {
   const k = mkey(), first = !S.done[k], had = chapterDone(S.ch);
   let badge = false;
   if (first) { S.done[k] = true; S.xp += XP; if (!had && chapterDone(S.ch)) { S.badges[S.ch] = true; S.xp += T.chapterBadgeXp; badge = true; } pop = true; save(); }
+  const m = curMission();
+  if (m.kind !== 'scene') { scene.destroy(); scene = MQ.scene.mount(sceneEl, MQ.scene.forMission(CH[S.ch], m, false, true)); }
   renderFeedback({ win: true, first, badge });
   renderChapters(); renderMission(); renderXP();
 }
