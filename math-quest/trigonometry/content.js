@@ -10,25 +10,32 @@
   const r1 = v => +v.toFixed(1), r2 = v => v.toFixed(2);
   const side = (term, a, b) => ({ type: 'polygon', term, pts: [a, b] });
 
-  const triangle = {
+  // `ask` is the side a mission asks for: it reads "?" in the picture and the live line. `byAdj` sets the triangle by its
+  // adjacent side instead of the hypotenuse, for a mission that gives the distance along the ground.
+  const tri = ({ hypMax = 10, ask, byAdj } = {}) => ({
     id: 'right-triangle', title: 'A right triangle with a draggable angle and a hypotenuse slider',
     params: {
-      ang: { min: 5, max: 85, step: 5, value: 30, label: 'angle' },
-      hyp: { min: 4, max: 10, step: 1, value: 10, label: 'hypotenuse' },
+      ang: { min: 5, max: byAdj ? 50 : 85, step: 5, value: 30, label: 'angle' },
+      ...(byAdj ? { adj: { min: 4, max: 8, step: 1, value: 8, label: 'adjacent' } } : { hyp: { min: 4, max: hypMax, step: 1, value: 10, label: 'hypotenuse' } }),
     },
     terms: ['opp', 'adj'],
-    derived: ({ ang, hyp }) => ({
-      opp: r1(hyp * Math.sin(rad(ang))), adj: r1(hyp * Math.cos(rad(ang))),
-      sin: r2(Math.sin(rad(ang))), cos: r2(Math.cos(rad(ang))), tan: r2(Math.tan(rad(ang))),
-    }),
+    derived: p => {
+      const hyp = byAdj ? p.adj / Math.cos(rad(p.ang)) : p.hyp, d = {
+        hyp: r1(hyp), opp: r1(hyp * Math.sin(rad(p.ang))), adj: byAdj ? p.adj : r1(hyp * Math.cos(rad(p.ang))),
+        sin: r2(Math.sin(rad(p.ang))), cos: r2(Math.cos(rad(p.ang))), tan: r2(Math.tan(rad(p.ang))),
+      };
+      if (ask) d[ask] = '?';
+      return d;
+    },
     // One row each: on one line KaTeX would break between the three fractions at 390px.
     formula: '\\begin{aligned}\\sin\\term{ang}{\\theta} &= \\frac{\\term{opp}{\\text{opp}}}{\\term{hyp}{\\text{hyp}}}\\\\ \\cos\\term{ang}{\\theta} &= \\frac{\\term{adj}{\\text{adj}}}{\\term{hyp}{\\text{hyp}}}\\\\ \\tan\\term{ang}{\\theta} &= \\frac{\\term{opp}{\\text{opp}}}{\\term{adj}{\\text{adj}}}\\end{aligned}',
-    live: ({ params: { ang, hyp }, derived: d }) =>
-      `sin ${ang}° = ${d.opp} / ${hyp} = ${d.sin}.   cos ${ang}° = ${d.adj} / ${hyp} = ${d.cos}.   tan ${ang}° = ${d.opp} / ${d.adj} = ${d.tan}.`,
+    live: ({ params: { ang }, derived: d }) => ask
+      ? `Angle ${ang}°, ${byAdj ? `adjacent ${d.adj}` : `hypotenuse ${d.hyp}`}. The ${ask === 'opp' ? 'opposite' : 'adjacent'} side is yours to find.`
+      : `sin ${ang}° = ${d.opp} / ${d.hyp} = ${d.sin}.   cos ${ang}° = ${d.adj} / ${d.hyp} = ${d.cos}.   tan ${ang}° = ${d.opp} / ${d.adj} = ${d.tan}.`,
     draw: {
-      kind: '2d', view: [-4.5, 12.5, -2, 10.5], box: [440, 324],
-      items: ({ params: { ang, hyp }, derived: d }) => {
-        const x = hyp * Math.cos(rad(ang)), y = hyp * Math.sin(rad(ang));
+      kind: '2d', view: [-4.5, 12.5, -2, 10.5].map(v => v * hypMax / 10), box: [440, 324],
+      items: ({ params: p, derived: d }) => {
+        const ang = p.ang, hyp = byAdj ? p.adj / Math.cos(rad(ang)) : p.hyp, x = hyp * Math.cos(rad(ang)), y = hyp * Math.sin(rad(ang));
         const mid = rad(ang / 2), perp = rad(ang + 90);
         const wedge = Array.from({ length: 13 }, (_, i) => [1.6 * Math.cos(rad(ang) * i / 12), 1.6 * Math.sin(rad(ang) * i / 12)]);
         const sq = Math.min(0.7, x / 3, y / 3);
@@ -37,14 +44,17 @@
           { type: 'polygon', pts: [[x - sq, 0], [x - sq, sq], [x, sq]] },
           side('adj', [0, 0], [x, 0]), side('opp', [x, 0], [x, y]), side('hyp', [0, 0], [x, y]),
           { type: 'text', x: x / 2, y: -0.9, s: `adj = ${d.adj}`, term: 'adj' },
-          { type: 'text', x: x + 0.4, y: y / 2, s: `opp = ${d.opp}`, term: 'opp', anchor: 'start' },
-          { type: 'text', x: x / 2 + 0.7 * Math.cos(perp), y: y / 2 + 0.7 * Math.sin(perp), s: `hyp = ${hyp}`, term: 'hyp', anchor: 'end' },
+          // At a small angle the opposite side is short and sits at the right edge, so its label goes above the tip instead.
+          ang < 40 ? { type: 'text', x, y: y + 0.9, s: `opp = ${d.opp}`, term: 'opp', anchor: 'end' }
+            : { type: 'text', x: x + 0.4, y: y / 2, s: `opp = ${d.opp}`, term: 'opp', anchor: 'start' },
+          { type: 'text', x: x / 2 + 0.7 * Math.cos(perp), y: y / 2 + 0.7 * Math.sin(perp), s: `hyp = ${d.hyp}`, term: 'hyp', anchor: 'end' },
           { type: 'text', x: 2.9 * Math.cos(mid), y: 2.9 * Math.sin(mid), s: `${ang}°`, term: 'ang' },
           { type: 'point', x, y, term: 'hyp', drag: { angle: 'ang', step: 5 }, label: 'angle' },
         ];
       },
     },
-  };
+  });
+  const triangle = tri();
 
   const sketch = '<svg viewBox="-6 -6 212 132" width="210" role="img" aria-label="A right triangle with a 90 degree corner at the bottom right, an angle at the bottom left, and the sides marked hypotenuse, opposite and adjacent" style="display:block;margin:8px 0;max-width:100%">'
     + '<polygon points="0,110 190,110 190,0" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="2"/>'
@@ -67,8 +77,9 @@
             '<code>sin(35)</code> is about 0.5736, so the step comes to 5.736 and rounds to 5.7 (1 decimal place): the ramp climbs 5.7.',
             'Using <code>cos</code> instead of <code>sin</code> gives 8.2, which is the adjacent side, the distance along the ground.',
           ],
-          explain: 'In the scene, set the hypotenuse slider to 10 and drag the dot to 35°: the opposite side reads 5.7, and the live line shows sin 35° = 5.7 / 10 = 0.57.',
+          explain: 'The scene opens on this ramp, with the opposite side as ?. Once you solve it, the scene shows it: 5.7, and sin 35° = 5.7 / 10 = 0.57.',
           hint: 'The side you know is the hypotenuse and the side you want is the opposite. Which of S, C, T joins opp and hyp?',
+          scene: tri({ ask: 'opp' }), at: { ang: 35, hyp: 10 }, reveal: true,
           answer: '5.7', wrong: '8.2', lazy: '10*sin(35)', check: rounded('10*sin(35)', 1) },
         { title: 'Find the adjacent side', kind: 'number', round: 1, question: '12*cos(40)', tex: '\\text{adj} = \\text{hyp} \\times \\cos\\theta \\;\\text{ with }\\; \\text{hyp} = 12,\\ \\theta = 40^\\circ',
           goal: 'A 12 long ladder leans so that it makes an angle of <code>40°</code> with the ground. How far along the ground is its foot from the wall? That is the adjacent side. Round to 1 decimal place.',
@@ -80,6 +91,7 @@
           ],
           explain: 'In the scene, a small angle makes the adjacent side almost as long as the hypotenuse, and cos near 1. A big angle makes it short, and cos near 0.',
           hint: 'The sides in play are the hypotenuse and the adjacent. Which of S, C, T joins them?',
+          scene: tri({ hypMax: 12, ask: 'adj' }), at: { ang: 40, hyp: 12 }, reveal: tri({ hypMax: 12 }),
           answer: '9.2', wrong: '7.7', lazy: '12*cos(40)', check: rounded('12*cos(40)', 1) },
         { title: 'Use the tangent', kind: 'number', round: 1, question: '8*tan(30)', tex: '\\text{opp} = \\text{adj} \\times \\tan\\theta \\;\\text{ with }\\; \\text{adj} = 8,\\ \\theta = 30^\\circ',
           goal: 'You stand 8 from the foot of a tower and look at its top at an angle of <code>30°</code> above the ground. The 8 is the adjacent side. How tall is the tower, the opposite side? Round to 1 decimal place.',
@@ -91,6 +103,7 @@
           ],
           explain: 'tan 45° is exactly 1: at 45° the opposite and adjacent sides are the same length. Below 45° the opposite side is shorter, as here.',
           hint: 'Which of S, C, T uses opp and adj and leaves the hypotenuse out?',
+          scene: tri({ byAdj: true, ask: 'opp' }), at: { ang: 30, adj: 8 }, reveal: tri({ byAdj: true }),
           answer: '4.6', wrong: '13.9', lazy: '8*tan(30)', check: rounded('8*tan(30)', 1) },
         { title: 'Find the angle', kind: 'number', question: 'asin(5/10)', tex: '\\sin\\theta = \\frac{5}{10} \\;\\text{, so }\\; \\theta = \\sin^{-1}\\!\\left(\\frac{5}{10}\\right)',
           goal: 'A right triangle has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees?',
@@ -102,6 +115,7 @@
           ],
           explain: 'The inverse is a second step with its own name: sin takes an angle to a ratio, and asin takes a ratio back to an angle. Use acos and atan the same way for the other two ratios.',
           hint: 'Find <code>opp ÷ hyp</code>, then use the inverse sine on it.',
+          at: { ang: 45, hyp: 10 },
           answer: '30', wrong: '0.5', lazy: 'asin(5/10)', check: angle(30) },
         { title: 'Equal sides', kind: 'scene',
           goal: 'Drag the dot until the opposite side and the adjacent side are the same length.',
