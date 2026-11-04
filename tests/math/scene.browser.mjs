@@ -164,6 +164,30 @@ test('with reduced motion an animated scene starts paused, and scrubbing still w
   await normal.ctx.close();
 });
 
+test('the speed setting runs from ×0.25 to ×2, starts at ×1, and ×1 is slower than the scene speed', async () => {
+  const { ctx, page, errors } = await open();
+  const sel = '#s2d .mq-anim select';
+  assert.equal(await page.$eval(`label[for="${await page.$eval(sel, s => s.id)}"]`, l => l.textContent), 'Speed');
+  assert.deepEqual(await page.$$eval(`${sel} option`, o => o.map(x => x.textContent)), ['×0.25', '×0.5', '×1', '×1.5', '×2']);
+  assert.equal(await page.$eval(sel, s => s.selectedOptions[0].textContent), '×1');
+  // Units of t per second; the fixture scene has speed 1, so the old ×1 rate was 1.
+  const rate = () => page.evaluate(async () => {
+    const r = document.querySelector('#s2d .mq-anim input[type=range]');
+    const t0 = +r.value, a = performance.now();
+    await new Promise(ok => setTimeout(ok, 600));
+    return (+r.value - t0) / ((performance.now() - a) / 1000);
+  });
+  const normal = await rate();
+  assert.ok(normal > 0.2 && normal < 0.85, `×1 is slower than speed 1: ${normal}`);
+  await page.selectOption(sel, { label: '×0.25' });
+  const slow = await rate();
+  await page.selectOption(sel, { label: '×2' });
+  const fast = await rate();
+  assert.ok(fast > slow * 4, `×2 (${fast}) is much faster than ×0.25 (${slow})`);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('the 3D scene draws, or says why it cannot', async () => {
   const { ctx, page } = await open();
   const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });

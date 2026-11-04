@@ -105,7 +105,7 @@ A scene is data in a track's `content.js`:
 - **`scene/three3d.js`** wraps three.js: box, sphere, cylinder, cone, surface `z = f(x, y)`, vectors, planes; drag-to-rotate with three.js's `OrbitControls` (included in the vendored build); flat lighting; per-term colors.
 - **Color-linked terms.** `\term{a}{...}` is a KaTeX macro that expands to `\htmlData{term=a}{...}`. The formula term, its slider and its shape share one color from a fixed palette. Hovering or focusing any of the three highlights all three. Color is never the only cue: the label weight and an underline change too. The palette must pass contrast in light and dark themes and stay distinguishable for the common color-vision deficiencies.
 - **KaTeX trust** is enabled only for `\htmlData`, through KaTeX's `trust` callback, because formulas are our own content.
-- **Animation.** An optional `t` param gets play, pause and a scrub slider, driven by `requestAnimationFrame`. Under `prefers-reduced-motion` scenes start paused and scrubbing still works. Scenes pause when off-screen (`IntersectionObserver`).
+- **Animation.** An optional `t` param gets play, pause, a scrub slider and a speed setting (×0.25 to ×2; ×1 is 60% of the scene's `t.speed`), driven by `requestAnimationFrame`. Under `prefers-reduced-motion` scenes start paused and scrubbing still works. Scenes pause when off-screen (`IntersectionObserver`).
 - **One WebGL renderer per page.** Browsers cap live WebGL contexts (often around 16), so one shared three.js renderer draws whichever 3D scene is in view.
 - **No WebGL:** a 3D scene shows a short notice; its sliders, formula and live line still work, and scene missions stay solvable.
 
