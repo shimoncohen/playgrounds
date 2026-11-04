@@ -5,6 +5,10 @@
   const SPEEDS = [0.25, 0.5, 1, 1.5, 2];
   // ×1 plays at 60% of a scene's own `t.speed`: learners found the authored speeds too quick to follow.
   const BASE_RATE = 0.6;
+  // Same key and shape as input/work.js (`{ input, speed }`): merge, never overwrite the other field.
+  const PREFS = 'math-prefs-v1';
+  const prefs = () => { try { return JSON.parse(localStorage.getItem(PREFS)) || {}; } catch (e) { return {}; } };
+  const savePrefs = patch => { try { localStorage.setItem(PREFS, JSON.stringify(Object.assign(prefs(), patch))); } catch (e) { /* storage blocked: keep the choice for this visit */ } };
 
   const h = (tag, cls, parent, text) => {
     const e = document.createElement(tag);
@@ -52,7 +56,7 @@
     };
     for (const n of Object.keys(def.params)) row(n, def.params[n], true);
 
-    let playing = false, visible = true, last = 0, raf = 0, playBtn, speed = 1;
+    let playing = false, visible = true, last = 0, raf = 0, playBtn, speed = SPEEDS.includes(prefs().speed) ? prefs().speed : 1;
     if (def.t) {
       const bar = h('div', 'mq-anim', el);
       playBtn = h('button', 'btn', bar);
@@ -73,9 +77,9 @@
       for (const v of SPEEDS) {
         const o = h('option', null, spSel, '×' + v);
         o.value = v;
-        o.selected = v === 1;
+        o.selected = v === speed;
       }
-      spSel.addEventListener('change', () => { speed = +spSel.value; });
+      spSel.addEventListener('change', () => { speed = +spSel.value; savePrefs({ speed }); });
       playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
