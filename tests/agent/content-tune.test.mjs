@@ -318,6 +318,7 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' })), /must keep when: release/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' })), /is not a working skill/);
     assert.match(msg(21, 1, SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE)), /one of the six checklist lines is missing, such as "Bump the version in package\.json to the number the shop team agreed on for this release\."/);
+    assert.match(msg(21, 1, SKILLED(STEPS.slice(3).join('\n') + '\n' + RULE)), /3 of the six checklist lines are missing, such as/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: `name: release-steps\ndescription: ${STEPS.join(' ')}\nwhen: release\n` })), /all six checklist lines are missing/);
     assert.match(msg(21, 1, SKILLED(STEPS.join('\n') + '\n', DAILY + RULE)), /rule do not edit migrations\/ is not in the body of the skill/);
     assert.match(msg(21, 1, SKILLED(BLOCK + '\n', RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.rare} or fewer`));
@@ -339,6 +340,7 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(msg(21, 2, CMD(CG + CR + EX + 'Use: scout\n')), /would be refused: .*a command cannot use other names/);
     assert.match(msg(21, 2, CMD(CG + EX, DAILY + RULE)), /holds no Constraints: do not edit migrations\/ line/);
     assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(1).join('\n'))), /one of the six steps is missing, such as "Bump the version in package\.json to the number the shop team agreed on for this release\."/);
+    assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(3).join('\n'))), /3 of the six steps are missing, such as/);
     assert.match(msg(21, 2, CMD(CG + CR + EX, RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.cmd} or fewer`));
     assert.match(msg(21, 2, CMD(CG + CR + EX, HEAD)), /did delete data\/backup\.csv/);
   });
