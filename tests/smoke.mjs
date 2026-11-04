@@ -399,6 +399,32 @@ test('math-arithmetic: #ch=arithmetic.fractions opens Fractions, and its first m
   await ctx.close();
 });
 
+test('math-arithmetic: each mission opens its picture on its own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const go = async (ch, mi) => {
+    await page.evaluate(([c, m]) => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: c, mi: m, done: {}, badges: {} })), [ch, mi]);
+    await page.reload();
+    await page.waitForSelector('#scene .mq-live');
+  };
+  await go(0, 0);
+  assert.match(await live(), /Step 0: {2}6 \+ 4 × 3 {3}and {3}\(6 \+ 4\) × 3/);
+  await go(0, 1);
+  assert.match(await live(), /12 cut into 2 equal parts, then 3 of those parts/);
+  await go(0, 4);
+  assert.match(await live(), /Step 0: {2}2 \+ 3 × 4/, 'a scene mission keeps the chapter picture');
+  await go(1, 1);
+  assert.match(await live(), /\(−4\) × \(−2\): 4 across, 2 up/);
+  await go(2, 1);
+  assert.match(await live(), /2\/3 × 4\/5: 2 of 3 columns and 4 of 5 rows/);
+  await go(3, 0);
+  assert.match(await live(), /2³: 3 copies of 2 multiplied/);
+  await go(4, 3);
+  assert.match(await live(), /40 grown by 25%/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`);
   const live = () => page.textContent('#scene .mq-live');
