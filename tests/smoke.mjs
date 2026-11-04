@@ -352,6 +352,25 @@ test('math-geometry: Area suggests Order of operations and links to it; Angles n
   await ctx.close();
 });
 
+test('math-geometry: a mission picture hides the answer until solved, then shows it as a check', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const shown = async () => (await page.textContent('#scene .mq-live')) + ' ' + (await page.textContent('#scene .mq-desc'));
+  assert.doesNotMatch(await shown(), /c = 5\b|= 25\b/, 'legs 3 and 4 open without the hypotenuse');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(3^2+4^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  await until(async () => /25/.test(await shown()));
+  await page.reload();
+  await page.waitForSelector('#scene .mq-live');
+  assert.match(await shown(), /25/, 'a solved mission opens on the full picture');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-geometry: text mode passes an area mission, and an angle answer with a degree sign', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
