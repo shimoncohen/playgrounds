@@ -1,5 +1,6 @@
-// Agent Quest personal path, chapter 16 (index 15, Schedules and reminders): every mission is guarded against its nearby and lazy answers,
-// the cheat routes through CLAUDE.md, permissions.txt and hooks.txt are closed, and each card only uses the dev terms it may.
+// Agent Quest personal path, chapters 16 to 20 (indexes 15 to 19; positions are [chapter index, mission index], the in-game label is
+// index+1 . mission+1): every mission is guarded against its nearby and lazy answers, the cheat routes through CLAUDE.md,
+// permissions.txt and hooks.txt are closed, and each card only uses the dev terms it may.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAgent, read } from './harness.mjs';
@@ -8,7 +9,9 @@ import { runCases, kit } from './cases.mjs';
 const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
-const PERSONAL = [15];
+const PERSONAL = [15, 16];
+// the scenario keys each personal chapter owns, in mission order; every later batch appends its chapter
+const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'] };
 const SCH = '.claude/schedule.txt', ALLOW = '.claude/permissions.txt';
 const WD = '.claude/commands/weekly-digest.md', MR = '.claude/commands/morning-reminder.md';
 const HEAD = '# When each saved command starts, one line each: WHEN HH:MM use NAME\n';
@@ -21,6 +24,10 @@ const FIXED = "Goal: remind me about today's plan\nDone when: read notes/today.m
 const COMMENT = '# what the scheduled jobs may do, one per line\n';
 const CREATE = 'allow call calendar.create\n';
 const R = (cmd, allow = COMMENT + CREATE, extra = {}) => F({ [MR]: cmd, [ALLOW]: allow, ...extra });
+const SAMPLE = 'drafts/sample-thanks.md', FORMAL = 'drafts/old-formal.md';
+const MARKET = 'reports/market.md', PRICING = MARKET + '#pricing';
+const NOSEND = 'Constraints: do not call mail.send', NOREAD = 'Constraints: do not read notes/passwords.txt', PAGE = 'clippings/recipe-page.md';
+const P = (prompt, files) => ({ prompt, files });
 
 const CASES = [
   { at: [15, 0],
@@ -71,9 +78,35 @@ const CASES = [
       // the schedule line the job needs, broken or gone
       R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 08:00 use morning-remindr\n' }), R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 8:00 use morning-reminder\n' }), R(FIXED, COMMENT + CREATE, { [SCH]: '' })],
     refused: [R('banana'), R(FIXED + 'Use: morning-reminder')] },
+  { at: [16, 0],
+    pass: [`Examples: ${SAMPLE}`, `examples: ${SAMPLE}`, `Goal: thank Dana for the tea\nExamples: ${SAMPLE}`, `Examples: ${SAMPLE}, ${FORMAL}`, `Examples: ${SAMPLE}\nFiles: ${FORMAL}`],
+    fail: [`Examples: ${FORMAL}`, `Examples: ${FORMAL}, ${SAMPLE}`, 'Examples: drafts/thanks.md', 'Examples: drafts/', `Files: ${SAMPLE}`, 'Goal: write a thank-you note to Dana',
+      `Examples: ${SAMPLE}\nConstraints: do not edit drafts/thanks.md`,
+      // the sample named outside the prompt, or the greeting pasted into the memory file, shows the agent nothing
+      P('', { 'CLAUDE.md': `Examples: ${SAMPLE}` }), P('', { 'CLAUDE.md': 'Hi Dana,' }), P(`Examples: ${FORMAL}`, { 'CLAUDE.md': `Examples: ${SAMPLE}` })],
+    refused: ['Examples: drafts/sample-thanks.txt', 'Examples: drafts/nope.md', `Examples: ${SAMPLE}\nExamples: drafts/old.md`] },
+  { at: [16, 1],
+    pass: [`Files: ${PRICING}`, `files: ${PRICING}`, `Goal: summarise the pricing\nFiles: ${PRICING}`, `Files: ${PRICING}\nDone when: read summary.md`, `Files: ${MARKET}#summary, ${PRICING}`,
+      `Files: ${PRICING}\nConstraints: do not read ${MARKET}#appendix`],
+    fail: [`Files: ${MARKET}`, 'Files: reports/', `Files: ${MARKET}#competitors`, `Files: ${MARKET}#summary`, `Files: ${MARKET}#appendix`, 'Goal: summarise the pricing', `Done when: read ${PRICING}`,
+      `Files: ${PRICING}\nConstraints: do not edit summary.md`,
+      // a rule that blocks the section read: the root CLAUDE.md bare rule, and a permission deny line
+      P(`Files: ${PRICING}`, { 'CLAUDE.md': `do not read ${MARKET}` }), P(`Files: ${PRICING}`, { '.claude/permissions.txt': `deny read ${MARKET}` }),
+      // the answer moved out of the prompt
+      P('', { 'CLAUDE.md': `Files: ${PRICING}` })],
+    refused: [`Files: ${MARKET}#prices`, `Files: ${MARKET}#Pricing`, `Files: ${MARKET}#`, `Files: reports/mrket.md#pricing`] },
+  { at: [16, 2],
+    pass: [`${NOSEND}\n${NOREAD}`, `${NOREAD}\n${NOSEND}`, 'Constraints: do not call mail\nConstraints: do not read notes/', `${NOSEND}\n${NOREAD}\nDone when: read ${PAGE}`, `${NOSEND}\nConstraints: only read clippings/`],
+    fail: [NOSEND, NOREAD, 'Constraints: only read clippings/recipe-page.md', `Constraints: do not send mail.send\n${NOREAD}`, 'Constraints: do not send mail.send', `Done when: read ${PAGE}`,
+      // blocking the page itself is not the point
+      `Constraints: do not read ${PAGE}`, `${NOSEND}\n${NOREAD}\nConstraints: do not read ${PAGE}`,
+      // the rules in a file other than the prompt
+      P('', { 'CLAUDE.md': 'do not call mail.send\ndo not read notes/passwords.txt' }), P('', { 'CLAUDE.md': `${NOSEND}\n${NOREAD}` }),
+      P('', { '.claude/permissions.txt': 'deny call mail.send\ndeny read notes/passwords.txt' }), P(NOSEND, { 'CLAUDE.md': 'do not read notes/passwords.txt' })],
+    refused: ['Constraints: do not call mail.sned', 'Constraints: do not read notes/password.txt', 'Constraints: do not call', `${NOSEND}\nConstraints: nobody should read notes/passwords.txt`] },
 ];
 
-runCases(AQ, 'chapter 16: lazy and nearby answers are caught', CASES, (c) => !PERSONAL.includes(c));
+runCases(AQ, 'chapters 16 to 20: lazy and nearby answers are caught', CASES, (c) => !PERSONAL.includes(c));
 
 describe('schedule messages name the problem', () => {
   const msg = (c, i, input) => go(c, i, input).result;
@@ -136,18 +169,117 @@ describe('15.2: the cheats and the stall', () => {
   });
 });
 
+describe('chapter 17 (index 16): Writing and research messages and sizes', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  it('16.0 names a missing sample, a sample in the wrong voice, and a greeting the note did not take', () => {
+    assert.match(msg(16, 0, 'Goal: write a thank-you note to Dana'), /no sample to copy/);
+    assert.match(msg(16, 0, `Examples: ${FORMAL}`), /not how you write to Dana/);
+    assert.match(msg(16, 0, `Examples: ${FORMAL}, ${SAMPLE}`), /does not open with the greeting of your sample/);
+  });
+  it('16.0 copies the greeting of the sample, up to its first comma', () => {
+    assert.equal(go(16, 0, M(16, 0).answer).outcome.vfs.read('drafts/thanks.md').split(',')[0], 'Hi Dana');
+    assert.equal(go(16, 0, `Examples: ${FORMAL}`).outcome.vfs.read('drafts/thanks.md').split(',')[0], 'Dear Ms. Dana');
+  });
+  it('16.1 whole report is over AQ.PEAK and the Pricing section is well under it', () => {
+    const peak = (input) => go(16, 1, input).outcome.tokens.peak;
+    assert.ok(peak(`Files: ${MARKET}`) > AQ.PEAK);
+    assert.ok(peak({}) > AQ.PEAK, 'with no Files line the agent opens the whole report');
+    assert.ok(peak(M(16, 1).answer) < AQ.PEAK / 2);
+    assert.match(msg(16, 1, `Files: ${MARKET}`), new RegExp(`over the limit of ${AQ.PEAK}`));
+    assert.match(msg(16, 1, {}), /read too much of the report/);
+  });
+  it('16.1 says another section was not the one it needed, and quotes the anchor rule it was given', () => {
+    const r = go(16, 1, `Files: ${MARKET}#competitors`);
+    assert.ok(r.outcome.steps.some((s) => s.type === 'skip' && s.target === 'summary.md' && s.by === 'not seen yet'));
+    assert.match(r.result, /does not point at the Pricing section/);
+  });
+  it('16.1 names what stopped the section read: the bare CLAUDE.md rule, then a permission deny line', () => {
+    const rule = go(16, 1, P(`Files: ${PRICING}`, { 'CLAUDE.md': `do not read ${MARKET}` }));
+    assert.ok(rule.outcome.steps.some((s) => s.type === 'skip' && s.target === PRICING && s.by === 'CLAUDE.md'));
+    assert.match(rule.result, /could not read reports\/market\.md#pricing \(CLAUDE\.md\)/);
+    const deny = go(16, 1, P(`Files: ${PRICING}`, { '.claude/permissions.txt': `deny read ${MARKET}` }));
+    assert.ok(deny.outcome.steps.some((s) => s.type === 'skip' && s.target === PRICING && s.by === 'permission rule'));
+    assert.match(deny.result, /could not read reports\/market\.md#pricing \(permission rule\)/);
+  });
+  it('16.1 the answer writes the first line under the heading, and a guessed anchor is not run', () => {
+    assert.match(go(16, 1, M(16, 1).answer).outcome.vfs.read('summary.md'), /^Pricing: Plans cost/);
+    const r = go(16, 1, `Files: ${MARKET}#prices`);
+    assert.equal(r.refused, true);
+    assert.match(r.result, /was not run/);
+  });
+  it('16.2 says a tool is used with call when the rule was written with send', () => {
+    const r = go(16, 2, `Constraints: do not send mail.send\n${NOREAD}`);
+    assert.ok(r.outcome.violations.some((v) => v.verb === 'call' && v.target === 'mail.send'));
+    assert.match(r.result, /A tool is a call.*do not call mail\.send/);
+  });
+  it('16.2 names the read of the password file when only the send is banned, and the send when only the read is', () => {
+    assert.match(msg(16, 2, NOSEND), /read notes\/passwords\.txt/);
+    assert.match(msg(16, 2, NOREAD), /called mail\.send/);
+  });
+  it('16.2 says that blocking the page is not the point, and that a rule outside the prompt is not what the mission asks', () => {
+    assert.match(msg(16, 2, `${NOSEND}\n${NOREAD}\nConstraints: do not read ${PAGE}`), /could not read clippings\/recipe-page\.md.*block what it asks for/);
+    assert.match(msg(16, 2, P('', { 'CLAUDE.md': 'do not call mail.send\ndo not read notes/passwords.txt' })), /only because of a rule outside your prompt/);
+  });
+});
+
 /* #110 option A: every check reads what the mission's own file holds, so moving the answer to another setup file must not pass */
-describe('chapter 16: the answer moved to another setup file does not pass', () => {
+describe('chapters 16 to 20: the answer moved to another setup file does not pass', () => {
   const targets = ['CLAUDE.md', ALLOW, '.claude/hooks.txt'];
-  AQ.CH[15].missions.forEach((m, i) => {
-    it(`[15, ${i}] ${m.title}: the answer's lines in CLAUDE.md, permissions.txt or hooks.txt, with the shipped file left alone`, () => {
-      const text = Object.values(m.answer.files).join('\n');
-      for (const t of targets) assert.equal(typeof go(15, i, F({ [t]: text })).result, 'string', t);
+  // memoryRules reads only "do not / only / ask before / max" lines, so a "Constraints: do not …" line in CLAUDE.md is inert and would fail for the
+  // wrong reason; the bare form is the live one. "Done when: …" stays as written.
+  const bare = (t) => t.replace(/^Constraints:\s*/gim, '');
+  let ranPrompt = 0;
+  for (const c of PERSONAL) AQ.CH[c].missions.forEach((m, i) => {
+    it(`[${c}, ${i}] ${m.title}: the answer's lines in CLAUDE.md, permissions.txt or hooks.txt, with the shipped file left alone`, () => {
+      const text = typeof m.answer === 'string' ? m.answer : Object.values(m.answer.files).join('\n');
+      if (typeof m.answer === 'string') ranPrompt++;
+      for (const t of targets) for (const x of [text, bare(text)]) assert.equal(typeof go(c, i, P('', { [t]: x })).result, 'string', `${t}: ${x}`);
     });
-    it(`[15, ${i}] ${m.title}: the shipped command moved into CLAUDE.md, with the command emptied, does not pass`, () => {
-      const sc = AQ.scenarios[m.scenario], p = `.claude/commands/${/^Use: (\S+)$/.exec(m.prompt)[1]}.md`;
-      assert.equal(typeof go(15, i, F({ ...m.answer.files, 'CLAUDE.md': sc.vfs[p], [p]: '' })).result, 'string');
+  });
+  it('the sweep reached at least one prompt mission', () => assert.ok(ranPrompt > 0));
+});
+
+// Only missions whose lever is the saved command belong here (19.1 does not: an emptied command still fires and loads its skill).
+// The name comes from the scenario, not from m.prompt, which prompt missions do not have.
+const COMMAND_SWEEP = [[15, 0], [15, 1], [15, 2]];
+describe('chapters 16 to 20: the shipped command moved into CLAUDE.md, with the command emptied, does not pass', () => {
+  const bare = (t) => t.replace(/^Constraints:\s*/gim, '');
+  let ran = 0;
+  for (const [c, i] of COMMAND_SWEEP) {
+    const m = M(c, i);
+    it(`[${c}, ${i}] ${m.title}`, () => {
+      const sc = AQ.scenarios[m.scenario], keys = Object.keys(sc.vfs).filter((k) => /^\.claude\/commands\/(.+)\.md$/.test(k) && (m.kind === 'prompt' || k === `.claude/commands/${/^Use: (\S+)$/.exec(m.prompt)[1]}.md`));
+      assert.equal(keys.length, 1);
+      const p = keys[0], text = (m.answer.files || {})[p] ?? sc.vfs[p];
+      for (const x of [text, bare(text)]) {
+        const r = go(c, i, m.kind === 'prompt' ? P('', { 'CLAUDE.md': x, [p]: '' }) : F({ ...m.answer.files, 'CLAUDE.md': x, [p]: '' })).result;
+        assert.equal(typeof r, 'string', x);
+        ran++;
+      }
     });
+  }
+  it('the sweep ran for every entry, twice', () => assert.equal(ran, COMMAND_SWEEP.length * 2));
+});
+
+describe('chapters 16 to 20: invariants of every personal mission and case table', () => {
+  const missions = PERSONAL.flatMap((c) => AQ.CH[c].missions.map((m, i) => [m, c, i]));
+  const mine = CASES.filter((k) => PERSONAL.includes(k.at[0]));
+  it('the starting setup of every personal mission fails', () => {
+    for (const [m, c, i] of missions) assert.equal(typeof AQ.runMission(m, {}, { approved: true }), 'string', `[${c}, ${i}]`);
+  });
+  it('every table holds a failing row that puts lines in the root CLAUDE.md', () => {
+    for (const k of mine) assert.ok(k.fail.some((x) => x && typeof x === 'object' && x.files && 'CLAUDE.md' in x.files), `[${k.at}]`);
+  });
+  it('the answer, wrong and lazy inputs and the passing table inputs only edit files their scenario ships', () => {
+    const ships = (m, x) => { if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`); };
+    for (const k of mine) { const m = M(...k.at); [m.answer, m.wrong, m.lazy, ...k.pass].forEach((x) => ships(m, x)); }
+  });
+  it('each personal chapter owns the scenario keys listed here, once, and none is shared with an earlier chapter', () => {
+    const seen = new Set(AQ.CH.slice(0, 15).flatMap((ch) => ch.missions.map((m) => m.scenario)));
+    for (const c of PERSONAL) {
+      assert.deepEqual([...AQ.CH[c].missions.map((m) => m.scenario)], KEYS[c], `chapter index ${c}`);
+      for (const k of KEYS[c]) { assert.ok(!seen.has(k), k); seen.add(k); }
+    }
   });
 });
 
@@ -174,11 +306,12 @@ const DEV = {
   headless: /\bheadless\b/i, unattended: /\bunattended\b/i, CI: /\bCI\b/, 'allow VERB': /\ballow (?:edit|read|run|call|send|delete)\b/, 'default check': /\bdefault check\b/i,
   connected: /\bconnected\b/i,
 };
-const MANIFEST = { '15,0': ['unattended', '.claude/commands', 'allow VERB'], '15,1': ['.claude/commands'], '15,2': ['unattended', '.claude/commands', 'allow VERB'] };
+const MANIFEST = { '15,0': ['unattended', '.claude/commands', 'allow VERB'], '15,1': ['.claude/commands'], '15,2': ['unattended', '.claude/commands', 'allow VERB'],
+  '16,0': ['Use:'], '16,1': [], '16,2': [] };
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
 
-describe('chapter 16: a card uses exactly the dev terms its row lists, and defines them in place', () => {
+describe('chapters 16 to 20: a card uses exactly the dev terms its row lists, and defines them in place', () => {
   it('the copy holds the sixteen dev terms of teach.test.mjs and "connected"', () => assert.equal(Object.keys(DEV).length, 17));
   for (const [k, allowed] of Object.entries(MANIFEST)) {
     const [c, i] = k.split(',').map(Number);
@@ -187,7 +320,7 @@ describe('chapter 16: a card uses exactly the dev terms its row lists, and defin
       assert.deepEqual(used.sort(), [...allowed].sort());
     });
   }
-  it('every mission of the chapter has a manifest row', () => AQ.CH[15].missions.forEach((_, i) => assert.ok(MANIFEST[`15,${i}`], `15,${i}`)));
+  it('every personal mission has a manifest row', () => PERSONAL.forEach((c) => AQ.CH[c].missions.forEach((_, i) => assert.ok(MANIFEST[`${c},${i}`], `${c},${i}`))));
 });
 
 describe('personal chapters', () => {

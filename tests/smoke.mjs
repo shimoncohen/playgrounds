@@ -2219,7 +2219,7 @@ test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and
     const edit = async text => { await pane('files'); await page.click('#tree [data-path=".claude/schedule.txt"]'); await page.fill('#fileEditor textarea', text); await pane('mission'); await page.click('#runBtn'); await pane('run'); };
     await fits('mission 16.1');
     assert.equal(await page.locator('#chapters .tierhead[data-tier="personal"]').count(), 1);
-    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/1/);
+    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/2/);
     assert.match(await page.textContent('#chapters [data-ch="15"]'), /Schedules and reminders/);
     await pane('files');
     await page.click('#tree [data-path=".claude/schedule.txt"]');
@@ -2254,7 +2254,7 @@ test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a st
   assert.equal(await o.xp(), '55 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
   assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);
-  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/1/);
+  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/2/);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
   await o.ctx.close();
@@ -2368,10 +2368,10 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
-test('agent-quest: the rail shows 16 chapters, and Use is on the form from mission 10.1', async () => {
+test('agent-quest: the rail shows 17 chapters, and Use is on the form from mission 10.1', async () => {
   const o = await agentPage({}, seedAt(9, 0));
   const { page } = o;
-  assert.equal(await page.locator('#chapters .chap').count(), 16);
+  assert.equal(await page.locator('#chapters .chap').count(), 17);
   assert.equal(await page.isVisible('#pf-use'), true);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
@@ -2401,7 +2401,7 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '16 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '17 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');

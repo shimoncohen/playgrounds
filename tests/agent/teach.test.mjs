@@ -66,6 +66,8 @@ const FIRST = {
   'scheduled job': [/\bscheduled (?:task|job)s?\b/i, 15, 0],
   weekdays: [/\bweekdays\b/, 15, 0],
   reminder: [/\breminders?\b/i, 15, 2],
+  // chapter 17 (index 16): 16.1 defines the section anchor, a file name with #heading after it
+  'section anchor': [/[\w-]+\.md#[a-z][\w-]*/, 16, 1],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),
