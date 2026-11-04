@@ -126,7 +126,6 @@
     },
   };
 
-  // The learner finds the number to take out: 6 x-pieces and 9 units go into k equal rows, and what does not fit waits below.
   const commonFactor = {
     id: 'common-factor', title: 'Share 6x + 9 into equal rows',
     params: { k: U(9, 1, 'k') },

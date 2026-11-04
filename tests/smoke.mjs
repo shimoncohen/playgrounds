@@ -413,10 +413,10 @@ test('math-trigonometry: a rounded mission passes in text mode, and the scene an
   assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓', '✓']);
   await until(async () => JSON.parse(await read(page, 'math-trigonometry-v1') || '{}').xp === 10);
   const live = () => page.textContent('#scene .mq-live');
-  assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
+  assert.match(await live(), /sin 35° = 5\.7 \/ 10 = 0\.57\./, 'once solved, the picture reveals the opposite side');
   await page.focus('#scene circle.drag[aria-label="angle"]');
   await page.keyboard.press('ArrowRight');
-  assert.match(await live(), /sin 25° = 4\.2 \/ 10 = 0\.42\./);
+  assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
   await page.goto(`${base}/math-quest/trigonometry/#ch=trigonometry.ratios`);
   await page.click('#mission .dot[data-mi="4"]');
   await page.waitForSelector('#work', { state: 'hidden' });
@@ -630,7 +630,7 @@ test('math-algebra: missions open their scene on their own numbers', async () =>
     await page.click(`#mission .dot[data-mi="${mi}"]`);
     return live();
   };
-  assert.match(await at('expressions', 0), /V = 10·5·3 = 150/);
+  assert.match(await at('expressions', 0), /V = 10·5·3 = \?/);
   assert.match(await at('expressions', 4), /2a \+ 3a = 4 \+ 6 = 10/);
   assert.match(await at('expanding', 0), /3 × 5 = 9 \+ 6 = 15/);
   assert.match(await at('expanding', 1), /x = 7: 2 × 3 = 6$/);
@@ -642,8 +642,8 @@ test('math-algebra: missions open their scene on their own numbers', async () =>
   assert.match(await live(), /k = 3: 6 x-pieces and 9 units both split into 3 equal rows/);
   assert.match(await at('factoring', 2), /x = 6: 36 − 9 = 27$/);
   assert.match(await at('factoring', 3), /25 − 10 − 10 \+ 4 = 9$/);
-  assert.match(await at('quadratics', 1), /y = x² − 16: it crosses the x-axis at x = −4 and x = 4/);
-  assert.match(await at('quadratics', 2), /y = x² − 3x: it crosses the x-axis at x = 0 and x = 3/);
+  assert.match(await at('quadratics', 1), /y = x² − 16: where does it meet the x-axis\?/);
+  assert.match(await at('quadratics', 2), /y = x² − 3x: where does it meet the x-axis\?/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

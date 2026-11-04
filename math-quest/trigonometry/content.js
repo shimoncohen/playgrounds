@@ -24,7 +24,8 @@
         hyp: r1(hyp), opp: r1(hyp * Math.sin(rad(p.ang))), adj: byAdj ? p.adj : r1(hyp * Math.cos(rad(p.ang))),
         sin: r2(Math.sin(rad(p.ang))), cos: r2(Math.cos(rad(p.ang))), tan: r2(Math.tan(rad(p.ang))),
       };
-      if (ask) d[ask] = '?';
+      // Given the adjacent side, the hypotenuse would hand over the asked side too: hyp × sin θ.
+      if (ask) { d[ask] = '?'; if (byAdj) d.hyp = '?'; }
       return d;
     },
     // One row each: on one line KaTeX would break between the three fractions at 390px.
@@ -106,7 +107,7 @@
           scene: tri({ byAdj: true, ask: 'opp' }), at: { ang: 30, adj: 8 }, reveal: tri({ byAdj: true }),
           answer: '4.6', wrong: '13.9', lazy: '8*tan(30)', check: rounded('8*tan(30)', 1) },
         { title: 'Find the angle', kind: 'number', question: 'asin(5/10)', tex: '\\sin\\theta = \\frac{5}{10} \\;\\text{, so }\\; \\theta = \\sin^{-1}\\!\\left(\\frac{5}{10}\\right)',
-          goal: 'A right triangle has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees?',
+          goal: 'A right triangle has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees? The scene opens at 45°: you can also drag the angle until the opposite side reads 5.',
           how: [
             'Now you know the sides and want the angle. <code>sin θ = opp ÷ hyp = 5 ÷ 10</code>, which is 0.5.',
             'The <b>inverse sine</b> undoes the sine: it takes the ratio and gives back the angle. It is written <code>sin⁻¹</code> or <code>asin</code>. Your step is <code>asin(5/10)</code> (type <code>asin(5/10)</code>).',

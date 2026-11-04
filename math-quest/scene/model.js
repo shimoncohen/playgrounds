@@ -17,6 +17,7 @@
     const derived = () => (def.derived ? def.derived(p) : {});
     const all = () => ({ ...p, ...derived() });
     const terms = [...names, ...(def.terms || [])];
+    const liveText = () => typeof def.live === 'function' ? def.live({ params: { ...p }, derived: derived(), t }) : def.live.replace(/\{(\w+)\}/g, (m, k) => (k in all() ? show(all()[k]) : m));
 
     return {
       set(name, value) {
@@ -26,11 +27,12 @@
         else if (def.params[name]) p[name] = snap(def.params[name], value);
       },
       state: () => ({ params: { ...p }, derived: derived(), t }),
-      live: () => typeof def.live === 'function' ? def.live({ params: { ...p }, derived: derived(), t }) : def.live.replace(/\{(\w+)\}/g, (m, k) => (k in all() ? show(all()[k]) : m)),
+      live: liveText,
       describe() {
         const parts = names.map(n => `${def.params[n].label} ${show(p[n])}`).join(', ');
         const d = def.hideDerived ? '' : Object.entries(derived()).map(([k, v]) => `${k} = ${show(v)}`).join('. ');
-        return parts + (d ? `. ${d}` : '') + '.';
+        // A scene with no sliders and its values hidden would describe nothing, so it reads out its live line instead.
+        return parts || d ? parts + (d ? `. ${d}` : '') + '.' : liveText();
       },
       colorOf: term => MQ.palette[Math.max(0, terms.indexOf(term)) % MQ.palette.length],
     };
