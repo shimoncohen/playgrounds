@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 
@@ -51,6 +51,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Change Network Quest (chapters 1 to 5) | `net-quest/engine/` (simulator, shell, commands; DOM-free), `net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `net-quest/index.html` script order) |
 | Change the Math Quest hub or its prerequisite graph | `math-quest/graph.js` (DOM-free; chapter ids and order must match each track's `content.js`), `math-quest/app.js` + `style.css` (hub), landing card `data-keys` in `index.html` + `tests/math/` |
 | Change a Math Quest track's course | `math-quest/<track>/content.js` (DOM-free: chapters, missions with `answer`/`wrong`/`lazy`, quick-fire templates, guide; chapter ids and order match `graph.js`), `math-quest/track.js` + `track.css` (the shared track page) + `tests/math/content.test.mjs` |
+| Add a Math Quest track | `math-quest/<track>/` (`index.html`, `app.js`, `content.js`, copied from `geometry/` with its own `PROGRESS` key `math-<track>-v1`), the track and its chapters in `math-quest/graph.js`, landing card `data-keys` and text in `index.html`, `TRACKS` in `tests/math/content.test.mjs`, `PAGES` and the hub tests in `tests/smoke.mjs`, the README repo map |
 | Upgrade a Math Quest vendored library | pins in `tools/vendor-math.sh`, rerun it, commit `math-quest/vendor/` (never edit those files by hand) |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |

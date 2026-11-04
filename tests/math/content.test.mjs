@@ -4,7 +4,7 @@ import { loadMath } from './harness.mjs';
 
 const BASE = ['../math-quest/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
-const TRACKS = ['arithmetic', 'algebra'];
+const TRACKS = ['arithmetic', 'algebra', 'geometry'];
 
 const stateOf = (MQ, def, params) => {
   const m = MQ.scene.model(def);
@@ -87,5 +87,36 @@ for (const track of TRACKS) {
   test(`${track}: ranks start at 0 XP and climb`, () => {
     assert.equal(C.ranks[0][0], 0);
     for (let i = 1; i < C.ranks.length; i++) assert.ok(C.ranks[i][0] > C.ranks[i - 1][0]);
+  });
+}
+
+const GEO = {
+  'geometry.area': [
+    { yes: ['84', ' 84 ', '84.0'], no: ['38', '19', '84 squares', '12+7'] },
+    { yes: ['45', '45.0', ' 45'], no: ['90', '19', '10*9/2'] },
+    { yes: ['68', '68.0'], no: ['80', '36', '56'] },
+    { yes: ['6', '6.0', ' 6 '], no: ['45', '63', '486'] },
+    { yes: [{ b: 4, h: 6 }, { b: 6, h: 4, p: 7 }, { b: 6, h: 4, p: 0 }], no: [{ b: 8, h: 3 }, { b: 5, h: 5 }, { b: 6, h: 5 }] },
+  ],
+  'geometry.angles': [
+    { yes: ['133', '133°', ' 133 °', '133.0'], no: ['43', '227', '47°', '°133', '133°°'] },
+    { yes: ['75', '75°'], no: ['285', '-105', '105°'] },
+    { yes: ['51', '51°'], no: ['231', '129', '129°'] },
+    { yes: ['38', '38°'], no: ['76', '104', '142°'] },
+    { yes: [{ r1: 60, r2: 120 }, { r1: 120, r2: 60 }], no: [{ r1: 60, r2: 100 }, { r1: 90, r2: 90 }, { r1: 60, r2: 60 }] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  for (const ch of MQ.content.chapters) GEO[ch.id].forEach((alt, mi) => {
+    const m = ch.missions[mi];
+    test(`geometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
+      for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of alt.no) {
+        const r = judge(MQ, ch, m, v);
+        assert.equal(r.ok, false, `${JSON.stringify(v)} should fail`);
+        assert.ok(r.why, `${JSON.stringify(v)} fails without saying why`);
+      }
+    });
   });
 }

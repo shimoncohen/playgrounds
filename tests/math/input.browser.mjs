@@ -156,7 +156,7 @@ test('round trip: every notation goes text -> MathLive -> translate and keeps it
     f.remove();
     const at = [{ x: 0.5, r: 0.5, a: 1.5, b: 2.5, c: 0.75 }, { x: 1.5, r: 2, a: -2, b: 3, c: 4 }, { x: 3.25, r: 3, a: 7, b: -0.5, c: 2.25 }];
     let ok = true;
-    try { ok = at.every(s => Math.abs(MQ.math.full.evaluate(n, s) - MQ.math.full.evaluate(back, s)) < 1e-9); } catch (e) { ok = false; }
+    try { ok = at.every(s => Math.abs(MQ.math.full.evaluate(n.replace(/°/g, ''), s) - MQ.math.full.evaluate(back.replace(/°/g, ''), s)) < 1e-9); } catch (e) { ok = false; }
     return { n, ascii, back, ok };
   }), NOTATIONS);
   if (process.env.MQ_SHOTS) fs.writeFileSync(path.join(tmp, 'roundtrip.json'), JSON.stringify(rows, null, 2));
