@@ -268,6 +268,36 @@ describe('loans: unsupported rows', () => {
   });
 });
 
+describe('drop, a repeated &mut argument and the order operands are read in', () => {
+  it('std drop moves a &mut local; a user fn named drop reborrows it', () => {
+    assert.equal(diags(IX('let r = &mut x;', 'drop(r);', '*r = 5;', 'println!("{}", x);')), 'E0382@5');
+    const user = P('fn drop(a: &mut i32) {', '    *a = 0;', '}', 'fn main() {', '    let mut x = 1;', '    let r = &mut x;', '    drop(r);', '    *r = 5;', '    println!("{}", x);', '}');
+    assert.equal(diags(user), '');
+    assert.equal(RQ.run(user).status, 'ok');
+  });
+  const TWO = ['fn two(a: &mut i32, b: &mut i32) {', '}', 'fn one(a: &mut i32) {', '}'];
+  it('the same &mut local twice in one call is unsupported (E0499 in rustc)', () => {
+    assert.equal(unsup(P(...TWO, 'fn g(r: &mut i32) {', '    two(r, r);', '}', 'fn main() {', '    let mut x = 1;', '    g(&mut x);', '}')), 'reborrow@6');
+    assert.equal(unsup(P(...TWO, 'fn g(r: &mut i32) {', '    two(r, &mut *r);', '}', 'fn main() {', '    let mut x = 1;', '    g(&mut x);', '}')), 'reborrow@6');
+  });
+  it('one &mut local reborrowed in two calls, or two different ones in a call, is fine', () => {
+    assert.equal(diags(P(...TWO, 'fn g(r: &mut i32, q: &mut i32) {', '    one(r);', '    one(r);', '    two(r, q);', '}', 'fn main() {', '    let mut x = 1;', '    let mut y = 2;', '    g(&mut x, &mut y);', '}')), '');
+  });
+  it('a local read before a sibling that borrows is read there: a Copy read while a &mut loan is live', () => {
+    assert.equal(unsup(IX('let r = &mut x;', 'let y = x + *r;', 'println!("{}", y);')), 'use while borrowed@4');
+    assert.equal(unsup(IX('let r = &mut x;', 'let t = (x, *r);', 'println!("{}", t.0);')), 'use while borrowed@4');
+  });
+  it('a local moved before a sibling that borrows it is moved there', () => {
+    const take = ['fn take(a: String, b: &String) {', '}'];
+    assert.equal(diags(P(...take, 'fn main() {', '    let s = String::from("a");', '    take(s, &s);', '}')), 'E0382@5');
+  });
+  it('a local read next to plain siblings is not copied to a temp', () => {
+    const c = RQ.compile(IX('let y = x + 1;', 'let s = String::new();'));
+    const m = RQ.mir(c.ast, c.info).fns[0];
+    assert.equal(m.locals.filter((l) => l.name === null).length, 0);
+  });
+});
+
 describe('E0596: a mutable borrow of what is not mutable', () => {
   it('push_str on a local that is not mut, at the push_str', () => {
     assert.equal(diags(SIMPLE('let s = String::new();', 's.push_str("x");')), 'E0596@3');

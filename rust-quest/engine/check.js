@@ -52,15 +52,18 @@ RQ.check=ast=>{
   // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
   const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','String'].includes(t.k)?t.k:null;};
   const isRef=t=>{t=res(t);return t.k==='ref'||t.k==='str';};
+  function clashes(g,w){
+    g=res(g);w=res(w);
+    const gr=isRef(g),wr=isRef(w);
+    if(!gr&&!wr)return true;
+    if(gr&&wr)return g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&!!headOf(g.to)&&!!headOf(w.to)&&headOf(g.to)!==headOf(w.to);
+    return !!headOf(gr?w:g);
+  }
   function coerce(got,want,n){
     if(unify(got,want))return true;
-    const g=res(got),w=res(want),gr=isRef(g),wr=isRef(w);
+    const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
-    let clash;
-    if(!gr&&!wr)clash=true;
-    else if(gr&&wr)clash=g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&!!headOf(g.to)&&!!headOf(w.to)&&headOf(g.to)!==headOf(w.to);
-    else clash=!!headOf(gr?w:g);
-    if(clash)mism(want,got,n);else unsup('reference coercion',n.line);
+    if(clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
     return false;
   }
   const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
@@ -426,7 +429,11 @@ RQ.check=ast=>{
         const a=block(e.then);
         if(!e.els){return ['unit','never','any'].includes(res(a).k)?T.unit:unsup('type checking',e.line);}
         const b=e.els.t==='If'?ex(e.els):block(e.els);
-        if(!unify(a,b)){mism(a,b,endNode(e.els));return a;}
+        if(!unify(a,b)){
+          // rustc coerces each arm to an annotation the arms are not yet checked against, so a clash between references is not a verdict
+          if(!clashes(b,a))return unsup('reference coercion',e.line);
+          mism(a,b,endNode(e.els));return a;
+        }
         return res(a).k==='never'?b:a;
       }
       case 'Loop':{

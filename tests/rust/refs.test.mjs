@@ -427,6 +427,12 @@ describe('run: String and reference programs', () => {
     assert.equal(c.limit, 'output size');
     assert.ok(c.stdout.length + c.stderr.length > 1000000 && c.stdout.length + c.stderr.length <= 1000000 + 65537);
   });
+  it('one print repeating a big argument stops while the line is built, not after', () => {
+    const c = run(big + `    println!("${'{0}'.repeat(5000)}", s);`);
+    assert.equal(c.status, 'limit');
+    assert.equal(c.limit, 'output size');
+    assert.ok(c.stdout.length > 1000000 && c.stdout.length <= 1000000 + 65537 + 1, c.stdout.length);
+  });
   it('a program that prints under the cap is unchanged', () => {
     const c = run(big + '    println!("{}", s);\n    eprintln!("{}", s);\n    println!("done");');
     assert.equal(c.status, 'ok');
@@ -470,6 +476,18 @@ describe(`a '-> &'static str' fn returns only string literals`, () => {
     assert.equal(code('', items('', '    5')), 'E0308@2');
     accepts('', 'fn pick(s: &str) -> bool { s.len() == 0 }');
   });
+});
+
+describe('if arms that rustc may coerce', () => {
+  it('a reference clash between the arms is unsupported, not E0308', () => {
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { &s } else { "x" };\n    println!("{}", r);'), 'reference coercion@5');
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { "x" } else { &s };\n    println!("{}", r);'), 'reference coercion@5');
+  });
+  it('a clash of non-references stays E0308', () => {
+    assert.equal(code('    let c = true;\n    let x = if c { 1 } else { "x" };'), 'E0308@4');
+    assert.equal(code('    let c = true;\n    let x = if c { 1 } else { 2.5 };'), 'E0308@4');
+  });
+  it('arms that agree are unchanged', () => accepts('    let c = true;\n    let r = if c { "a" } else { "b" };\n    println!("{}", r);'));
 });
 
 describe('the limit message', () => {

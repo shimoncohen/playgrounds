@@ -166,6 +166,7 @@ function loanPass(F,errors,un,loans){
     else if(kind==='mut')code=mu?'E0499':'E0502';
     else if(kind==='move')code='E0505';
     else if(kind==='write')code='E0506';
+    // the `reborrow` arm is a backstop: no source shape reaches it (`&r` is a reference to a reference, which the checker rejects)
     else if(mu)un(refy(L[l].ty)?'reborrow':'use while borrowed',i);
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;

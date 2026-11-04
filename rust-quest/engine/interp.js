@@ -136,6 +136,8 @@ RQ.interp=(ast,opts)=>{
           if(!v){const c=find(env,p.name);v=c?read(c,e.line):consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
           s+=RQ.std.render(v,p.fmt,tick);
         }
+        // a line built from many big parts stops here; emit sees the total over the cap and throws
+        if(out.length+err.length+s.length>MAX_OUTPUT)break;
       }
     }catch(x){
       if(x instanceof RQ.std.Unmodeled)throw new Unsup('format spec',e.line);

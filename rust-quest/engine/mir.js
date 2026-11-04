@@ -26,9 +26,11 @@ const peel=e=>e.t==='Paren'?peel(e.expr):e;
 const NIL={k:'const'};
 const BIG={};
 
+const hasUserDrop=ast=>!!ast&&ast.items.some(i=>i.t==='Fn'&&i.name==='drop');
+
 function analysed(fn,info,ast){
   const {isCopy,hasRef}=RQ.types;
-  const userDrop=!!ast&&ast.items.some(i=>i.t==='Fn'&&i.name==='drop');
+  const userDrop=hasUserDrop(ast);
   let hit=false;
   RQ.walk(fn,n=>{
     if(hit)return false;
@@ -44,7 +46,7 @@ function analysed(fn,info,ast){
   return hit;
 }
 
-function lowerFn(f,info,un){
+function lowerFn(f,info,un,userDrop){
   const {T,res,isCopy}=RQ.types;
   const L=[],B=[],lm=new Map(),scopes=[],loops=[];
   let cur,count=0,retL;
@@ -92,6 +94,28 @@ function lowerFn(f,info,un){
     if(l>=0){const t=L[l].ty;return opnd(l,t.k==='ref'&&t.mut);}
     return ex(x);
   };
+  // std `drop<T>(x: T)` takes its argument by value: a generic parameter gets no reborrow, so a `&mut` local is moved
+  const moveOp=x=>{
+    const p=peel(x),l=p.t==='Path'?lid(p):-1;
+    return l>=0?opnd(l):ex(x);
+  };
+  // Operands are read left to right. A named local read before a sibling that emits instrs is copied or moved into a temp now,
+  // not by the instr that consumes it; a reborrow is left alone, its use at the consumer keeps the loans live (see rebTwice).
+  const seq=(es,f)=>es.map((e,i)=>{
+    const x=f(e);
+    if(x.k==='const'||x.reb||L[x.l].name===null||es.slice(i+1).every(s=>['Lit','Path'].includes(peel(s).t)))return x;
+    return put({k:'use',x},e,undefined,L[x.l].ty);
+  });
+  // the same `&mut` local twice among the operands of one call (E0499 in rustc) has no loan here: not modelled
+  const rebTwice=(es,nd)=>{
+    for(const a of es){
+      const p=peel(a),l=p.t==='Path'?lid(p):-1;
+      if(l<0||L[l].ty.k!=='ref'||!L[l].ty.mut)continue;
+      let n=0;
+      RQ.walk(es,x=>{if(x.t==='Path'&&lid(x)===l)n++;});
+      if(n>1){un('reborrow',nd);return;}
+    }
+  };
   const rootOf=p=>{
     const idx=[];
     for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(p.t==='Index')idx.unshift(p.index);
@@ -128,9 +152,11 @@ function lowerFn(f,info,un){
   function method(e,dest){
     const r=info.get(e).recv;
     if(!r){un('method call',e);return fin(NIL,e,dest);}
-    let ro;
-    if(r.adj==='val')ro=argOp(e.recv);
-    else{
+    let ro,args;
+    if(r.adj==='val'){
+      rebTwice([e.recv,...e.args],e);
+      [ro,...args]=seq([e.recv,...e.args],argOp);
+    }else{
       const mut=r.adj==='&mut',p=peel(e.recv);
       let target=-1;
       if(r.kind==='place'){
@@ -145,8 +171,10 @@ function lowerFn(f,info,un){
       else{const x=ex(e.recv);if(x.k!=='const')target=x.l;}
       if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
       ro=put({k:'ref',l:target,mut},e,undefined,T.ref(mut,L[target].ty,0));
+      rebTwice(e.args,e);
+      args=seq(e.args,argOp);
     }
-    return put({k:'method',name:e.name,recv:ro,args:e.args.map(argOp)},e,dest,tyOf(e));
+    return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
   }
 
   function assign(e){
@@ -275,14 +303,15 @@ function lowerFn(f,info,un){
           cur=r;ex(e.rhs,d);edge(cur,j);cur=j;
           return opnd(d);
         }
-        const a=ex(e.lhs),b=ex(e.rhs);
-        return put({k:'op',args:[a,b]},e,dest,tyOf(e));
+        return put({k:'op',args:seq([e.lhs,e.rhs],ex)},e,dest,tyOf(e));
       }
       case 'Assign':assign(e);return fin(NIL,e,dest);
       case 'Call':{
         const c=e.callee;
         if(c.t!=='Path'){un('call',e);return fin(NIL,e,dest);}
-        return put({k:'call',fn:c.segs.map(s=>s.name).join('::'),args:e.args.map(argOp)},e,dest,tyOf(e));
+        const fn=c.segs.map(s=>s.name).join('::');
+        rebTwice(e.args,e);
+        return put({k:'call',fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp)},e,dest,tyOf(e));
       }
       case 'MethodCall':return method(e,dest);
       case 'Ref':{
@@ -297,7 +326,7 @@ function lowerFn(f,info,un){
         return put({k:'deref',x:argOp(e.expr)},e,dest,t);
       }
       case 'Field':case 'Index':return place(e,dest);
-      case 'Tuple':case 'Array':return put({k:'agg',args:e.elems.map(x=>ex(x))},e,dest,tyOf(e));
+      case 'Tuple':case 'Array':return put({k:'agg',args:seq(e.elems,ex)},e,dest,tyOf(e));
       case 'ArrayRepeat':return put({k:'agg',args:[ex(e.elem)]},e,dest,tyOf(e));
       case 'Macro':{
         if(!PRINT.has(e.name)||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
@@ -352,7 +381,8 @@ RQ.mir=(ast,info)=>{
   const unsupported=[],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
   const fns=[];
-  for(const it of ast.items)if(it.t==='Fn'&&it.body&&analysed(it,info,ast)){const m=lowerFn(it,info,un);if(m)fns.push(m);}
+  const userDrop=hasUserDrop(ast);
+  for(const it of ast.items)if(it.t==='Fn'&&it.body&&analysed(it,info,ast)){const m=lowerFn(it,info,un,userDrop);if(m)fns.push(m);}
   return {fns,unsupported};
 };
 RQ.mir.analysed=analysed;
