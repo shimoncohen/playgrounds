@@ -404,14 +404,17 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   const live = () => page.textContent('#scene .mq-live');
   await page.waitForSelector('#scene .mq-live');
   assert.ok((await page.$$('#scene .grid line')).length > 10, 'the area scene has a grid');
-  assert.match(await live(), /Rectangle: A = 4 × 3 = 12, perimeter = 14\..*Triangle: A = ½ × 4 × 3 = 6\./);
+  assert.equal(await live(), 'Base b = 12, height h = 7.', 'the first mission opens on its own 12 by 7 floor, without the area it asks for');
   const corner = '#scene circle.drag[aria-label="top right corner of the rectangle"]';
   await page.focus(corner);
-  await page.keyboard.press('ArrowRight');
-  assert.match(await live(), /A = 5 × 3 = 15/);
-  await page.keyboard.press('ArrowUp');
-  assert.match(await live(), /A = 5 × 4 = 20, perimeter = 18\..*½ × 5 × 4 = 10\./);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'Base b = 11, height h = 7.');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await live(), 'Base b = 11, height h = 6.');
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'top right corner of the rectangle', 'focus survives the redraw');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /10 × 8/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'Whole rectangle 10 × 8. Dashed corner cut off: 4 × 3.', 'the L-shaped room has its own picture');
 
   await page.goto(`${base}/math-quest/geometry/#ch=geometry.angles`);
   await page.click('#mission .dot[data-mi="4"]');
@@ -437,18 +440,39 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   await ctx.close();
 });
 
+test('math-geometry: each angle mission opens on its own picture and numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  const live = () => page.textContent('#scene .mq-live');
+  await page.waitForSelector('#scene .mq-live');
+  assert.equal(await live(), '47° + x = 180°');
+  const want = [[1, '110° + 95° + 80° + x = 360°'], [2, '58° + 71° + x = 180°'], [3, 'The two opposite angles of 60° are 120° together. Aim for 76°.']];
+  for (const [i, text] of want) {
+    await page.click(`#mission .dot[data-mi="${i}"]`);
+    await page.waitForFunction(t => document.querySelector('#scene .mq-live').textContent === t, text);
+  }
+  await page.focus('#scene circle.drag[aria-label="angle between the lines"]');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'The two opposite angles of 61° are 122° together. Aim for 76°.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg moves the live sum', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
-  assert.equal(await live(), '3² + 4² = 9 + 16 = 25, so c = 5');
+  assert.equal(await live(), 'a² = 9, b² = 16, c² = ?');
   const leg = '#scene circle.drag[aria-label="leg a"]';
   await page.focus(leg);
   await page.keyboard.press('ArrowRight');
-  assert.equal(await live(), '4² + 4² = 16 + 16 = 32, so c = √32 ≈ 5.66');
+  assert.equal(await live(), 'a² = 16, b² = 16, c² = ?');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /^5² \+ 8²/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), '5² + 8² = 25 + 64 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
   await page.click('#mission .dot[data-mi="3"]');
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#mission h2'), /Not a whole number/);
+  assert.equal(await live(), 'a² = 25, b² = 49, c² = ?');
   await page.click('#work input.mq-field');
   await page.keyboard.type('sqrt(5^2+7^2)');
   await page.keyboard.press('Enter');
@@ -464,10 +488,17 @@ test('math-geometry: Circles passes a rounded mission in text mode, and the radi
   const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
-  assert.match(await live(), /r = 3, d = 6\..*C = 2 × π × 3 ≈ 18\.85\..*A = π × 3 × 3 ≈ 28\.27\./);
+  assert.equal(await live(), 'Radius r = 5, diameter d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
   await page.focus('#scene circle.drag[aria-label="radius r"]');
   await page.keyboard.press('ArrowRight');
-  assert.match(await live(), /r = 3\.5, d = 7\..*A = π × 3\.5 × 3\.5 ≈ 38\.48\./);
+  assert.equal(await live(), 'Radius r = 5.5, diameter d = 11.');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => document.querySelector('#scene .mq-live').textContent === 'Diameter d = 14.');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForFunction(() => /length you need is 30/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'r = 3, C = 2 × π × 3 ≈ 18.85. The length you need is 30.');
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.waitForSelector('#work input.mq-field');
   await page.click('#work input.mq-field');
   await page.keyboard.type('2*pi*5');
   await page.keyboard.press('Enter');
