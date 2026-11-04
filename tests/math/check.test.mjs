@@ -227,3 +227,66 @@ test('review fixes: irrational roots mix with whole numbers, split equations, im
   assert.equal(C.number('90°', 90).ok, true);
   assert.equal(C.number('9°0', 90).ok, false, 'a degree sign only ends a number');
 });
+
+test('roots and steps read x = ±n as two solutions', () => {
+  const r = C.final.roots([4, -4]);
+  for (const v of ['x = ±4', 'x=+-4', 'x = +/- 4', 'x = 4 or x = -4']) assert.equal(r(v).ok, true, v);
+  assert.match(r('x = 4').why, /another/);
+  assert.deepEqual(oks(C.steps('x^2=16', ['x=±4', 'x = ±sqrt(16)', 'x=±5'], { kind: 'equation' })), [true, true, false]);
+  assert.equal(C.tex('x = ±4'), C.tex('x = 4 or x = -4'));
+});
+
+test('trig functions work in degrees', () => {
+  assert.equal(C.number('sin(30)', '1/2').ok, true);
+  assert.equal(C.number('tan(45)', 1).ok, true);
+  assert.equal(C.number('cos(60)+1/3', '5/6').ok, true);
+  assert.equal(C.number('asin(1/2)', 30).ok, true);
+  assert.equal(C.number('10*sin(35°)', '10*sin(35)').ok, true);
+  assert.equal(C.expr('sin(x)^2+cos(x)^2', '1').ok, true);
+});
+
+test('final.rounded wants the right number of decimal places', () => {
+  const f = C.final.rounded('10*sin(35)', 1);
+  assert.equal(f('5.7').ok, true);
+  assert.equal(f('5.7°').ok, true);
+  assert.match(f('5.74').why, /1 decimal place/);
+  assert.match(f('6').why, /1 decimal place/);
+  assert.match(f('5.8').why, /5 or more rounds up/);
+  assert.match(f('10*sin(35)').why, /one number/);
+  assert.equal(C.final.rounded('sqrt(2)', 2)('1.41').ok, true);
+});
+
+test('steps with round accept a line that rounds to the same answer', () => {
+  assert.deepEqual(oks(C.steps('10*sin(35)', ['10*0.5736', '5.736', '5.7', '5.8'], { round: 1 })), [true, true, true, false]);
+  assert.equal(C.steps('10*sin(35)', ['5.7'])[0].ok, false, 'without round a step must be exact');
+});
+
+test('quick takes one number, fraction or angle with the right value', () => {
+  for (const [v, q] of [['3/4', '1/4+1/2'], ['6/8', '1/4+1/2'], ['133°', '180-47'], ['7.5', '1/2*5*3'], ['-3', '2-5']]) assert.equal(C.quick(v, q), true, v);
+  for (const [v, q] of [['180-47', '180-47'], ['3/5', '1/4+1/2'], ['', '1']]) assert.equal(C.quick(v, q), false, v);
+});
+
+test('translate reads what MathLive writes for degrees and inverse trig', () => {
+  // Outputs captured from MathLive's ascii-math for 35^{\circ}, \sin(35^{\circ}), \arcsin(0.5), \sin^{-1}(0.5), \sin 35.
+  assert.equal(C.translate('35^@'), '35°');
+  assert.equal(C.translate('sin (35^@)'), 'sin (35°)');
+  assert.equal(C.translate('arcsin (0.5)'), 'asin (0.5)');
+  assert.equal(C.translate('sin ^(-1)(0.5)'), 'asin(0.5)');
+  assert.equal(C.translate('10 * sin 35'), '10*sin(35)');
+  assert.equal(C.number(C.translate('sin (35^@)'), 'sin(35)').ok, true);
+});
+
+test('review fixes: bare inverse trig, no cut arguments, ° after a bracket, ± only on a plain letter, tan(90), halves', () => {
+  assert.equal(C.translate('arcsin 0.5'), 'asin(0.5)');
+  assert.equal(C.translate('sin ^(-1)0.5'), 'asin(0.5)');
+  assert.equal(C.translate('cos 2x'), 'cos 2x', 'a number followed by a letter is not split off as the whole argument');
+  assert.equal(C.number('asin(0.5)°', 30).ok, true);
+  assert.equal(C.steps('x^2=16', ['x^2=±16'], { kind: 'equation' })[0].ok, false, 'not rewritten into 2 = -16');
+  assert.match(C.number('tan(90)', 1).why, /one number/);
+  const r = (v, dp) => C.final.rounded(v, dp);
+  assert.equal(r('1.45', 1)('1.5').ok, true);
+  assert.equal(r('1.45', 1)('1.4').ok, false);
+  assert.equal(r('-2.25', 1)('-2.3').ok, true);
+  assert.equal(r('1.005', 2)('1.01').ok, true);
+  assert.equal(r('1.255', 2)('1.26').ok, true);
+});

@@ -3,6 +3,7 @@
   const MQ = globalThis.MQ = globalThis.MQ || {};
   const ok = { ok: true };
   const finalNumber = MQ.check.final.number;
+  const finalRounded = MQ.check.final.rounded;
   // final.number wants a bare number, so one trailing degree sign is dropped first.
   const angle = n => v => finalNumber(n)(String(v).replace(/\s*°\s*$/, ''));
   const num = v => String(+v.toFixed(2));
@@ -70,9 +71,58 @@
     + '<polygon points="0,112 140,112 140,42 84,42 84,0 0,0" fill="currentColor" fill-opacity=".15" stroke="currentColor" stroke-width="2"/>'
     + '<g fill="currentColor" font-size="13" text-anchor="middle"><text x="70" y="130">10</text><text x="-12" y="60">8</text><text x="112" y="36">4</text><text x="96" y="24">3</text></g></svg>';
 
+  const wholeRoot = n => Math.round(Math.sqrt(n)) ** 2 === n;
+  const squares = {
+    id: 'right-tri', title: 'A right triangle with a square drawn on each of its three sides',
+    params: {
+      a: { min: 2, max: 8, step: 1, value: 3, label: 'leg a' },
+      b: { min: 2, max: 8, step: 1, value: 4, label: 'leg b' },
+    },
+    terms: ['c'],
+    derived: ({ a, b }) => ({ 'a²': a * a, 'b²': b * b, 'c²': a * a + b * b, c: +Math.hypot(a, b).toFixed(2) }),
+    formula: '\\term{a}{a}^2 + \\term{b}{b}^2 = \\term{c}{c}^2',
+    live: ({ params: { a, b }, derived: d }) => `${a}² + ${b}² = ${d['a²']} + ${d['b²']} = ${d['c²']}, so c = ${wholeRoot(d['c²']) ? d.c : `√${d['c²']} ≈ ${num(d.c)}`}`,
+    draw: {
+      kind: '2d', view: [-9, 17, -9, 17], box: [440, 440],
+      items: ({ params: { a, b }, derived: d }) => [
+        { type: 'polygon', term: 'a', pts: [[0, 0], [a, 0], [a, -a], [0, -a]] },
+        { type: 'polygon', term: 'b', pts: [[0, 0], [0, b], [-b, b], [-b, 0]] },
+        { type: 'polygon', term: 'c', pts: [[a, 0], [0, b], [b, a + b], [a + b, a]] },
+        { type: 'polygon', pts: [[0, 0], [a, 0], [0, b]] },
+        { type: 'polygon', pts: [[0, 0], [0.8, 0], [0.8, 0.8], [0, 0.8]] },
+        { type: 'text', x: a / 2, y: -a / 2, s: `a² = ${d['a²']}`, term: 'a' },
+        { type: 'text', x: -b / 2, y: b / 2, s: `b² = ${d['b²']}`, term: 'b' },
+        { type: 'text', x: (a + b) / 2, y: (a + b) / 2, s: `c² = ${d['c²']}`, term: 'c' },
+        { type: 'point', x: a, y: 0, term: 'a', drag: { x: 'a' }, label: 'leg a' },
+        { type: 'point', x: 0, y: b, term: 'b', drag: { y: 'b' }, label: 'leg b' },
+      ],
+    },
+  };
+
+  const circle = {
+    id: 'circle', title: 'A circle with its radius and diameter marked',
+    params: { r: { min: 1, max: 8, step: 0.5, value: 3, label: 'radius r' } },
+    terms: ['d', 'C', 'A'],
+    derived: ({ r }) => ({ d: 2 * r, C: +(2 * Math.PI * r).toFixed(2), A: +(Math.PI * r * r).toFixed(2) }),
+    formula: '\\begin{aligned}\\term{d}{d} &= 2\\times\\term{r}{r}\\\\ \\term{C}{C} &= 2\\times\\pi\\times\\term{r}{r}\\\\ \\term{A}{A} &= \\pi\\times\\term{r}{r}\\times\\term{r}{r}\\end{aligned}',
+    live: ({ params: { r }, derived: d }) => `r = ${r}, d = ${d.d}.   C = 2 × π × ${r} ≈ ${num(d.C)}.   A = π × ${r} × ${r} ≈ ${num(d.A)}.`,
+    draw: {
+      kind: '2d', view: [-9, 9, -9, 9], box: [400, 400],
+      items: ({ params: { r } }) => [
+        { type: 'polygon', term: 'A', pts: Array.from({ length: 90 }, (_, i) => [r * Math.cos(i * Math.PI / 45), r * Math.sin(i * Math.PI / 45)]) },
+        { type: 'polygon', term: 'd', pts: [[-r, 0], [r, 0]] },
+        { type: 'vector', term: 'r', from: [0, 0], to: [r, 0] },
+        { type: 'text', x: r / 2, y: 0.8, s: `r = ${r}`, term: 'r' },
+        { type: 'text', x: -r / 2, y: -0.8, s: `d = ${2 * r}`, term: 'd' },
+        { type: 'point', x: 0, y: 0 },
+        { type: 'point', x: r, y: 0, term: 'r', drag: { x: 'r', stepX: 0.5 }, label: 'radius r' },
+      ],
+    },
+  };
+
   MQ.content = {
     track: 'geometry',
-    ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace'], [150, 'Geometer']],
+    ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace'], [200, 'Right-Angle Pro'], [300, 'Geometer']],
     chapters: [{
       id: 'geometry.area', name: 'Area and perimeter', badge: 'Area Builder',
       intro: 'The <b>area</b> of a flat shape is how much space it covers, counted in 1 by 1 squares, like floor tiles. Its <b>perimeter</b> is the distance all the way round its edge, like a fence. In the scene every grid square is 1 by 1. The bottom side of the rectangle is its <b>base</b> <code>b</code>, and its <b>height</b> <code>h</code> goes straight up. Drag a corner, or move a slider, and the shapes, the formulas and the numbers change together.',
@@ -201,6 +251,131 @@
           answer: { r1: 60, r2: 120 }, wrong: { r1: 60, r2: 100 }, lazy: {},
           check: ({ derived: { a, b, c } }) => a === b && b === c ? ok : { ok: false, why: `The angles are ${a}°, ${b}° and ${c}° now. Make all three the same.` } },
       ],
+    }, {
+      id: 'geometry.pythagoras', name: 'Pythagoras', badge: 'Right-Angle Pro',
+      intro: 'A <b>right triangle</b> has one right angle, a <code>90°</code> corner like the corner of a page. The two sides that make the right angle are the <b>legs</b>, <code>a</code> and <code>b</code>. The longest side, across from the right angle, is the <b>hypotenuse</b>, <code>c</code>. Draw a square on each side: the two small squares together cover exactly as much area as the big one. This is <b>Pythagoras\' theorem</b>: <code>a² + b² = c²</code>, where <code>a²</code> means <code>a × a</code>. To go back from <code>c²</code> to <code>c</code> you take the <b>square root</b>, written <code>sqrt(…)</code> when you type it: <code>sqrt(25)</code> is 5, because <code>5 × 5 = 25</code>. Drag a leg, or move a slider, and watch the three areas.',
+      scene: squares,
+      missions: [
+        { title: 'The long side', kind: 'number', question: 'sqrt(3^2+4^2)', tex: 'c = \\sqrt{3^2 + 4^2}',
+          goal: 'A right triangle has legs of 3 and 4. How long is the hypotenuse <code>c</code>?',
+          how: [
+            'Pythagoras says <code>a² + b² = c²</code>, so <code>c</code> is the square root of <code>a² + b²</code>.',
+            'Put the legs in: <code>sqrt(3^2+4^2)</code>. The <code>^2</code> means "squared", so <code>3^2</code> is <code>3 × 3 = 9</code> and <code>4^2</code> is 16.',
+            '<code>9 + 16</code> is 25, and <code>sqrt(25)</code> is 5, because <code>5 × 5 = 25</code>. So <code>c = 5</code>.',
+            'Stopping at 25 is a slip: that is <code>c²</code>, the area of the big square, not the length of the side.',
+          ],
+          explain: 'In the scene, 3 and 4 are the starting legs: the squares cover 9 and 16, and the big square covers 25. Its side is 5.',
+          hint: 'Square both legs, add them, then take the square root.',
+          answer: '5', wrong: '25', lazy: 'sqrt(3^2+4^2)', check: finalNumber(5) },
+        { title: 'Twice as big', kind: 'number', question: 'sqrt(6^2+8^2)', tex: 'c = \\sqrt{6^2 + 8^2}',
+          goal: 'The legs are 6 and 8. Find the hypotenuse <code>c</code>.',
+          how: [
+            'Same recipe: <code>c = sqrt(a² + b²)</code>.',
+            '<code>6^2</code> is 36 and <code>8^2</code> is 64, so your first step is <code>sqrt(6^2+8^2)</code>.',
+            '<code>36 + 64</code> is 100, and <code>sqrt(100)</code> is 10, because <code>10 × 10 = 100</code>.',
+            'Adding the legs, <code>6 + 8 = 14</code>, is another slip: a straight path from corner to corner is shorter than going round the two legs.',
+          ],
+          explain: 'The legs 6 and 8 are exactly twice 3 and 4, so the hypotenuse is twice 5. Double every side of a right triangle and it is still a right triangle.',
+          hint: 'The area of the big square is <code>36 + 64</code>. What number times itself is that?',
+          answer: '10', wrong: '14', lazy: 'sqrt(6^2+8^2)', check: finalNumber(10) },
+        { title: 'A missing leg', kind: 'number', question: 'sqrt(13^2-5^2)', tex: 'a = \\sqrt{13^2 - 5^2}',
+          goal: 'The hypotenuse is 13 and one leg is 5. Find the other leg <code>a</code>.',
+          how: [
+            'Now you know the big square, <code>c² = 13²</code>, and one small square, <code>5²</code>. The other small square is what is left: <code>a² = c² − b²</code>.',
+            '<code>13^2</code> is 169 and <code>5^2</code> is 25, so your first step is <code>sqrt(13^2-5^2)</code>.',
+            '<code>169 − 25</code> is 144, and <code>sqrt(144)</code> is 12, because <code>12 × 12 = 144</code>.',
+            'Take away, do not add: the hypotenuse is the longest side, so a leg must be shorter than 13. Subtracting the sides, <code>13 − 5 = 8</code>, is a slip too.',
+          ],
+          explain: 'The hypotenuse is always the longest side, so it goes first in the subtraction. 5, 12 and 13 is another set of whole numbers that fit Pythagoras.',
+          hint: 'Take the small square away from the big one: <code>13² − 5²</code>. Then take the square root.',
+          answer: '12', wrong: '8', lazy: 'sqrt(13^2-5^2)', check: finalNumber(12) },
+        { title: 'Not a whole number', kind: 'number', round: 1, question: 'sqrt(5^2+7^2)', tex: 'c = \\sqrt{5^2 + 7^2}',
+          goal: 'The legs are 5 and 7. Find the hypotenuse <code>c</code>, rounded to 1 decimal place (one digit after the point).',
+          how: [
+            '<code>5^2</code> is 25 and <code>7^2</code> is 49, so your first step is <code>sqrt(5^2+7^2)</code>, which is <code>sqrt(74)</code>.',
+            'No whole number times itself makes 74: <code>8 × 8 = 64</code> and <code>9 × 9 = 81</code>. So <code>c</code> is between 8 and 9.',
+            'A calculator gives <code>sqrt(74) = 8.602…</code>. To round to 1 decimal place, look at the next digit: it is 0, which is less than 5, so the 6 stays. Type <code>8.6</code>.',
+            'The answer 74 is a slip: that is <code>c²</code>, the area of the big square.',
+          ],
+          explain: 'Most right triangles do not have whole-number sides, so you round. Rounding to 1 decimal place means 8.6 is the closest number with one digit after the point.',
+          hint: 'Square and add the legs, take the square root, and round the result to 1 decimal place.',
+          answer: '8.6', wrong: '74.0', lazy: 'sqrt(5^2+7^2)', check: finalRounded('sqrt(74)', 1) },
+        { title: 'A whole-number triangle', kind: 'scene',
+          goal: 'Drag the two legs until the hypotenuse is a whole number other than 5.',
+          how: [
+            'The scene works out <code>c² = a² + b²</code> for you. You want a total that is a perfect square, like 25 or 100.',
+            'The starting triangle, 3 and 4, gives 25 and so <code>c = 5</code>. That one is already used up.',
+            'Try doubling it: what do 6 and 8 give? Drag a leg tip, or focus it and press the arrow keys, or use the sliders.',
+            'The live line under the picture shows the sum and the root. The mission passes when <code>c</code> is a whole number that is not 5.',
+          ],
+          explain: '6, 8 and 10 is twice 3, 4 and 5. Sets of whole numbers like these are called Pythagorean triples. Builders use 3, 4 and 5 to check that a corner is square.',
+          hint: 'Double the legs 3 and 4.',
+          answer: { a: 6, b: 8 }, wrong: { a: 3, b: 4 }, lazy: {},
+          check: ({ derived: d }) => !wholeRoot(d['c²']) ? { ok: false, why: `c² is ${d['c²']}, and c is about ${num(d.c)}, not a whole number.` }
+            : d.c === 5 ? { ok: false, why: 'c is 5. Find a triangle with a different whole-number hypotenuse.' } : ok },
+      ],
+    }, {
+      id: 'geometry.circles', name: 'Circles', badge: 'Circle Master',
+      intro: 'A circle is all the points at the same distance from its <b>centre</b>. That distance is the <b>radius</b> <code>r</code>. The <b>diameter</b> <code>d</code> goes straight across, through the centre, so <code>d = 2r</code>. The <b>circumference</b> <code>C</code> is the distance round the edge, and the <b>area</b> <code>A</code> is the space inside. Both depend on <b>pi</b>, written <code>π</code>: the number you get when you divide any circle\'s circumference by its diameter. It is about <code>3.14</code> and its digits never end, so answers are rounded. Type it as <code>pi</code>. Drag the radius tip, or move the slider, and watch <code>d</code>, <code>C</code> and <code>A</code> change.',
+      scene: circle,
+      missions: [
+        { title: 'Round the pond', kind: 'number', round: 1, question: '2*pi*5', tex: 'C = 2 \\times \\pi \\times r \\;\\text{ with }\\; r = 5',
+          goal: 'A round pond has a radius of 5. How far is it round its edge? Work out the circumference <code>C = 2 × π × r</code>, rounded to 1 decimal place.',
+          how: [
+            '<code>C = 2 × π × r</code>: the distance round is a little more than 3 diameters, and <code>2 × r</code> is the diameter.',
+            'Put in <code>r = 5</code>: your first step is <code>2*pi*5</code>.',
+            'A calculator gives <code>31.415…</code>. The next digit after the 4 is 1, less than 5, so the 4 stays: 31.4.',
+            'Leaving out the 2 gives 15.7, which is only half of the way round.',
+          ],
+          explain: 'In the scene, set the radius to 5 with the slider and read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
+          hint: 'Two times pi times the radius. Type pi as <code>pi</code>.',
+          answer: '31.4', wrong: '15.7', lazy: '2*pi*5', check: finalRounded('2*pi*5', 1) },
+        { title: 'Covering a circle', kind: 'number', round: 1, question: 'pi*3^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = 3',
+          goal: 'A round rug has a radius of 3. How much floor does it cover? Work out the area <code>A = π × r²</code>, rounded to 1 decimal place.',
+          how: [
+            '<code>A = π × r²</code>, where <code>r²</code> means <code>r × r</code>.',
+            '<code>3^2</code> is 9, so your first step is <code>pi*3^2</code>.',
+            'A calculator gives <code>28.274…</code>. The next digit after the 2 is 7, 5 or more, so round up: the 2 becomes 3 and you get 28.3.',
+            'Mixing it up with the circumference, <code>2 × π × 3</code>, gives 18.8, a length, not an area.',
+          ],
+          explain: 'Area counts squares, so the radius is multiplied by itself. Double the radius and the area gets four times as big.',
+          hint: 'Square the radius first, then multiply by pi.',
+          answer: '28.3', wrong: '18.8', lazy: 'pi*3^2', check: finalRounded('pi*3^2', 1) },
+        { title: 'From the diameter', kind: 'number', round: 1, question: 'pi*(14/2)^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = \\tfrac{14}{2}',
+          goal: 'A round table is 14 wide all the way across, its diameter. What is the area of its top, rounded to 1 decimal place?',
+          how: [
+            'The formula needs the radius, not the diameter. The radius is half of it: <code>14 ÷ 2 = 7</code>.',
+            'Put the radius in: <code>pi*(14/2)^2</code>, which is <code>π × 7²</code>, or <code>π × 49</code>.',
+            'A calculator gives <code>153.938…</code>. The next digit after the 9 is 3, less than 5, so round to 153.9.',
+            'Using 14 as the radius gives 615.8, four times too big.',
+          ],
+          explain: 'A common slip is to put the diameter into <code>π × r²</code>. Halve first.',
+          hint: 'Halve the diameter to get the radius, then use <code>π × r²</code>.',
+          answer: '153.9', wrong: '615.8', lazy: 'pi*(14/2)^2', check: finalRounded('pi*(14/2)^2', 1) },
+        { title: 'Back to the radius', kind: 'number', round: 1, question: '30/(2*pi)', tex: 'r = \\frac{C}{2 \\times \\pi} \\;\\text{ with }\\; C = 30',
+          goal: 'A circular track is 30 long all the way round. What is its radius, rounded to 1 decimal place?',
+          how: [
+            '<code>C = 2 × π × r</code>, and you know <code>C</code>. Dividing undoes multiplying, so <code>r = C ÷ (2 × π)</code>.',
+            'Put <code>C = 30</code> in: <code>30/(2*pi)</code>. The brackets make 2 × π the bottom of the fraction.',
+            'A calculator gives <code>4.774…</code>. The next digit after the 7 is 7, 5 or more, so round up: 4.8.',
+            'Dividing by 2 alone, <code>30 ÷ 2 = 15</code>, forgets π.',
+          ],
+          explain: 'Check it: <code>2 × π × 4.8</code> is about 30.2, close to 30. The small gap is from rounding.',
+          hint: 'Divide the circumference by <code>2 × π</code>.',
+          answer: '4.8', wrong: '15.0', lazy: '30/(2*pi)', check: finalRounded('30/(2*pi)', 1) },
+        { title: 'Area of about 78', kind: 'scene',
+          goal: 'Drag the radius tip until the area is between 75 and 80.',
+          how: [
+            'The live line shows the area <code>A = π × r × r</code> for the current radius.',
+            'The radius moves in steps of a half. Start at 3: the area is 28.3, far too small.',
+            'Try a radius of 4, then 5, and watch the area grow. Drag the tip, focus it and press the arrow keys, or use the slider.',
+            'The mission passes when the area is between 75 and 80.',
+          ],
+          explain: 'A radius of 5 gives an area of about 78.5. A radius of 4.5 gives 63.6 and 5.5 gives 95. Only one radius lands between 75 and 80.',
+          hint: 'Try a radius of 5.',
+          answer: { r: 5 }, wrong: { r: 4 }, lazy: {},
+          check: ({ derived: { A } }) => A >= 75 && A <= 80 ? ok : { ok: false, why: `The area is ${num(A)} now. You need it between 75 and 80.` } },
+      ],
     }],
     quickfire: [{
       ch: 0,
@@ -210,8 +385,7 @@
           const b = n(), h = n(), kind = Math.floor(r() * 3);
           if (kind === 0) return { q: `${b}*${h}`, show: `Rectangle ${b} by ${h}: area?`, a: b * h, why: `${b} × ${h} = ${b * h} squares.` };
           if (kind === 1) return { q: `2*(${b}+${h})`, show: `Rectangle ${b} by ${h}: perimeter?`, a: 2 * (b + h), why: `${b} + ${h} + ${b} + ${h} = ${2 * (b + h)}.` };
-          // whole-number triangle areas only: a half answer needs a decimal point the quick-fire field may not suggest
-          if ((b * h) % 2 === 0) return { q: `1/2*${b}*${h}`, show: `Triangle, base ${b}, height ${h}: area?`, a: b * h / 2, why: `${b} × ${h} = ${b * h}, and half of that is ${b * h / 2}.` };
+          return { q: `1/2*${b}*${h}`, show: `Triangle, base ${b}, height ${h}: area?`, a: b * h / 2, why: `${b} × ${h} = ${b * h}, and half of that is ${b * h / 2}.` };
         }
       },
     }, {
@@ -221,6 +395,23 @@
         if (kind === 0) { const a = n(11, 169); return { q: `180-${a}`, show: `A straight line is split into ${a}° and x. x = ?`, a: 180 - a, why: `180 − ${a} = ${180 - a}.` }; }
         if (kind === 1) { const a = n(20, 100), b = n(20, 150 - a); return { q: `180-${a}-${b}`, show: `A triangle has angles ${a}°, ${b}° and x. x = ?`, a: 180 - a - b, why: `${a} + ${b} = ${a + b}, and 180 − ${a + b} = ${180 - a - b}.` }; }
         const a = n(60, 150), b = n(40, 280 - a); return { q: `360-${a}-${b}`, show: `Round a point: ${a}°, ${b}° and x. x = ?`, a: 360 - a - b, why: `${a} + ${b} = ${a + b}, and 360 − ${a + b} = ${360 - a - b}.` };
+      },
+    }, {
+      ch: 2,
+      make: r => {
+        const T = [[3, 4, 5], [5, 12, 13], [6, 8, 10], [8, 15, 17], [9, 12, 15], [7, 24, 25], [12, 16, 20], [20, 21, 29]];
+        const [a, b, c] = T[Math.floor(r() * T.length)];
+        if (r() < 0.5) return { q: `sqrt(${a}^2+${b}^2)`, show: `Right triangle, legs ${a} and ${b}: hypotenuse?`, a: c, why: `${a * a} + ${b * b} = ${c * c}, and the square root of ${c * c} is ${c}.` };
+        return { q: `sqrt(${c}^2-${a}^2)`, show: `Right triangle, hypotenuse ${c} and one leg ${a}: other leg?`, a: b, why: `${c * c} − ${a * a} = ${b * b}, and the square root of ${b * b} is ${b}.` };
+      },
+    }, {
+      ch: 3,
+      make: r => {
+        const n = (lo, hi) => lo + Math.floor(r() * (hi - lo + 1)), kind = Math.floor(r() * 3);
+        if (kind === 0) { const x = n(2, 40); return { q: `2*${x}`, show: `A circle has radius ${x}: diameter?`, a: 2 * x, why: `The diameter is twice the radius: 2 × ${x} = ${2 * x}.` }; }
+        if (kind === 1) { const x = n(2, 40); return { q: `${2 * x}/2`, show: `A circle has diameter ${2 * x}: radius?`, a: x, why: `The radius is half the diameter: ${2 * x} ÷ 2 = ${x}.` }; }
+        const x = 7 * n(1, 6);
+        return { q: `2*22/7*${x}`, show: `Use π ≈ 22/7. A circle has radius ${x}: circumference?`, a: 44 * x / 7, why: `2 × 22/7 × ${x} = ${44 * x / 7}.` };
       },
     }],
     guide: [
@@ -238,6 +429,20 @@
         what: 'The three angles inside any triangle add up to <code>180°</code>. Where two straight lines cross, the angles opposite each other are equal.',
         tex: 'a + b + c = 180^\\circ',
         proof: 'Cut a triangle out of paper and tear off its three corners. Put their points together side by side: they always fill a straight line exactly, <code>180°</code>.' },
+      { ch: 2, title: 'Pythagoras\' theorem',
+        what: 'In a right triangle, the squares on the two legs together cover the same area as the square on the hypotenuse. To find a side, add or subtract the squares, then take the square root.',
+        tex: 'a^2 + b^2 = c^2', scene: true },
+      { ch: 2, title: 'Why the squares add up',
+        what: 'Take four copies of a right triangle with legs <code>a</code> and <code>b</code>. They fit inside a big square of side <code>a + b</code> in two different ways.',
+        tex: '(a+b)^2 = 4\\times\\tfrac{1}{2}ab + c^2 = 4\\times\\tfrac{1}{2}ab + a^2 + b^2',
+        proof: 'Put the four triangles in the corners of the big square, hypotenuses facing in: the gap left in the middle is a tilted square of side <code>c</code>. Slide the triangles into two rectangles instead: the gap is now two squares, one of side <code>a</code> and one of side <code>b</code>. The big square and the four triangles did not change, so the gap has the same area both times: <code>c² = a² + b²</code>.' },
+      { ch: 3, title: 'Diameter, circumference and area',
+        what: 'The diameter is twice the radius. The circumference is pi times the diameter, and the area is pi times the radius times itself. Pi is about <code>3.14</code>.',
+        tex: 'd = 2r \\qquad C = 2\\pi r \\qquad A = \\pi r^2', scene: true },
+      { ch: 3, title: 'Why the area is pi r squared',
+        what: 'Cut a circle into thin slices like a pizza and lay them side by side, pointing up and down. They make a shape close to a rectangle.',
+        tex: 'A \\approx \\tfrac{1}{2}C \\times r = \\tfrac{1}{2}(2\\pi r) \\times r = \\pi r^2',
+        proof: 'The slices stand on the edge of the circle, half pointing up and half down, so the long side of the rectangle is about half the circumference, <code>½ × 2πr = πr</code>. Its height is the length of a slice, the radius <code>r</code>. Area is long side times height, <code>πr × r = πr²</code>. The thinner the slices, the closer the shape is to a true rectangle.' },
     ],
   };
 })();

@@ -91,7 +91,7 @@
     const check = () => {
       const lis = [...list.children], vals = values();
       const filled = vals.map((v, i) => [v.trim(), i]).filter(([v]) => v);
-      const res = MQ.check.steps(mission.question, filled.map(([v]) => v), { kind, vars: mission.vars });
+      const res = MQ.check.steps(mission.question, filled.map(([v]) => v), { kind, vars: mission.vars, round: mission.round });
       lis.forEach(li => { li.querySelector('.mq-mark').textContent = ''; li.querySelector('.mq-why').replaceChildren(); li.classList.remove('ok', 'bad'); });
       filled.forEach(([, i], k) => {
         const li = lis[i], r = res[k], mark = li.querySelector('.mq-mark');

@@ -7,7 +7,7 @@
   const yes = { ok: true };
 
   // Angles may be typed with a degree sign; math.js cannot read `°`, and the value is the same without it.
-  const bare = s => String(s).replace(/(\d)\s*°(?!\s*\d)/g, '$1');
+  const bare = s => String(s).replace(/([\d)])\s*°(?!\s*\d)/g, '$1');
   const parse = s => {
     let node;
     try { node = full.parse(bare(s)); } catch (e) { return { why: UNREAD }; }
@@ -164,6 +164,11 @@
   const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
   const solvedRe = x => new RegExp(`^\\s*(?:${x}\\s*=\\s*(${NUM})|(${NUM})\\s*=\\s*${x})\\s*$`);
   const LIST = /\s*,\s*|\s+or\s+/;
+  // `x = ±4` is two solutions; written out as `x = 4 or x = -4`, every list check reads it. MathLive types ± as `+-`.
+  const pm = s => String(s).replace(/(?<![\w^.)])([A-Za-z]\w*)\s*=\s*(?:±|\+-|\+\/-)\s*([^,]+?)(?=\s*,|\s+or\s+|\s*$)/g,
+    (_, x, r) => `${x} = ${r} or ${x} = ${/^[\d.]+(?:\s*\/\s*\d+)?$/.test(r) ? '-' + r : '-(' + r + ')'}`);
+  // Shifting the decimal point in the text, not by multiplying, keeps 1.45 * 10 from becoming 14.4999…; halves round away from zero.
+  const round = (v, dp) => Math.sign(+v) * +(Math.round(+(+Math.abs(+v).toPrecision(12) + 'e' + dp)) + 'e-' + dp);
   C.final = {
     number: value => v => /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? number(v, value) : no('Keep going until your last line is one number.'),
     fraction: (value, { lowest = true } = {}) => v => {
@@ -179,7 +184,7 @@
     },
     roots: (values, x = 'x') => v => {
       const got = [];
-      for (const p of String(v).split(LIST)) {
+      for (const p of pm(v).split(LIST)) {
         const m = solvedRe(x).exec(p);
         if (!m) return no(`Keep going until your last line lists each solution as \`${x} = \` and a number, like \`${x} = 2 or ${x} = 3\`.`);
         got.push(m[1] || m[2]);
@@ -192,7 +197,17 @@
       if (left) return no(`You found ${found === 1 ? 'one solution' : found + ' solutions'}; there ${left === 1 ? 'is another' : 'are more'}.`);
       return yes;
     },
+    rounded: (expected, dp = 1) => v => {
+      const m = /^\s*-?\d+(?:\.(\d+))?\s*°?\s*$/.exec(v);
+      if (!m) return no(`Keep going until your last line is one number, rounded to ${dp} decimal place${dp === 1 ? '' : 's'}.`);
+      if ((m[1] || '').length !== dp) return no(`Round it to ${dp} decimal place${dp === 1 ? '' : 's'}: ${dp} digit${dp === 1 ? '' : 's'} after the point, like ${(3.14159).toFixed(dp)}.`);
+      const want = value(String(expected)), got = +bare(v);
+      return want.why ? no('The expected value could not be read.') : round(want.v, dp) === got ? yes
+        : no(`Rounded to ${dp} decimal place${dp === 1 ? '' : 's'}, the answer is not ${show(got)}. Look at the next digit: 5 or more rounds up.`);
+    },
   };
+  // Quick-fire takes one number, fraction or angle and nothing else, so typing the question back does not count.
+  C.quick = (v, q) => /^\s*-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s*°?\s*$/.test(v) && number(v, q).ok;
 
   const side = (s, vars) => {
     const parts = String(s).split('=');
@@ -241,12 +256,19 @@
 
   // `x = 2 or x = 3` has the same solutions as `(x - 2)(x - 3) = 0`, so a list of solutions is checked as that equation.
   const asProduct = s => {
-    const parts = String(s).split(LIST).map(p => p.split('='));
+    const parts = pm(s).split(LIST).map(p => p.split('='));
     return parts.length > 1 && parts.every(q => q.length === 2 && q[0].trim() && q[1].trim())
       ? parts.map(([l, r]) => `((${l})-(${r}))`).join('*') + '=0' : s;
   };
-  C.steps = (original, steps, { kind = 'number', vars = ['x'], seed = 1 } = {}) => {
-    if (kind === 'number') return steps.map(s => number(s, original));
+  // With `round`, a line counts once it rounds to the same answer: a learner copies sin(35) off a calculator as 0.5736.
+  const near = (s, original, dp) => {
+    const r = number(s, original);
+    if (r.ok || dp == null) return r;
+    const a = value(s), b = value(original);
+    return !a.why && !b.why && round(a.v, dp) === round(b.v, dp) ? yes : r;
+  };
+  C.steps = (original, steps, { kind = 'number', vars = ['x'], seed = 1, round: dp } = {}) => {
+    if (kind === 'number') return steps.map(s => near(s, original, dp));
     if (kind === 'expr') return steps.map(s => expr(s, original, { vars, seed }));
     const orig = side(original, vars);
     if (orig.why) return steps.map(() => no('The question could not be read.'));
@@ -257,12 +279,16 @@
   const eqTex = s => bare(s).split('=').map(p => full.parse(p).toTex({ parenthesis: 'auto' })).join(' = ').replace(/~/g, '');
   // Only a list when every item is an equation: the comma in `log(x, 2)` separates arguments.
   C.tex = s => {
-    const parts = String(s).split(/(\s*,\s*|\s+or\s+)/);
+    const parts = pm(s).split(/(\s*,\s*|\s+or\s+)/);
     if (parts.length === 1 || !parts.every((p, i) => i % 2 || p.split('=').length === 2)) return eqTex(String(s));
     return parts.map((p, i) => i % 2 ? (p.trim() === ',' ? ',\\ ' : '\\text{ or }') : eqTex(p)).join('');
   };
 
   C.translate = ascii => String(ascii)
+    // MathLive writes a superscript degree sign as `^@` and an inverse like sin⁻¹ as `sin ^(-1)` or `arcsin`.
+    .replace(/\s*\^\s*(?:@|\(@\))/g, '°')
+    .replace(/\b(?:arc(sin|cos|tan)|(sin|cos|tan)\s*\^\s*\(-1\))/g, (_, a, b) => 'a' + (a || b))
+    .replace(/\b(a?(?:sin|cos|tan))\s*(\d+(?:\.\d+)?°?)(?![\w.(])/g, '$1($2)')
     .replace(/\|([^|]+)\|/g, 'abs($1)')
     .replace(/log _\(?(\w+)\)?\(([^)]*)\)/g, 'log($2, $1)')
     .replace(/\s*\*\s*/g, '*')

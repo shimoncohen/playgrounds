@@ -5,6 +5,7 @@
   const no = why => ({ ok: false, why });
   const finalNumber = MQ.check.final.number, finalFraction = MQ.check.final.fraction;
   const signed = v => (v < 0 ? '−' + -v : String(v));
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   const rect = (x0, y0, x1, y1, term) => ({ type: 'polygon', term, pts: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] });
 
   const N = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
@@ -491,8 +492,13 @@
       ch: 2,
       make: r => {
         const b = 2 + Math.floor(r() * 5), a = 1 + Math.floor(r() * (b - 1)), k = 2 + Math.floor(r() * 4);
-        // Quick-fire takes whole-number answers only, so fractions are asked as a missing top or a fraction of an amount.
-        if (r() < 0.5) return { q: `${a}/${b}*${b * k}`, show: `${a}/${b} = ?/${b * k}`, a: a * k, why: `${b} × ${k} = ${b * k}, so the top is ${a} × ${k} = ${a * k}.` };
+        const t = r();
+        if (t < 1 / 3) {
+          const c = 1 + Math.floor(r() * (b - 1)), g = gcd(a + c, b), top = (a + c) / g, bot = b / g;
+          return { q: `${a}/${b}+${c}/${b}`, show: `${a}/${b} + ${c}/${b}`, a: bot === 1 ? top : `${top}/${bot}`,
+            why: `Same bottom, so add the tops: ${a + c}/${b}${g > 1 ? `, and dividing top and bottom by ${g} gives ${bot === 1 ? top : `${top}/${bot}`}` : ''}.` };
+        }
+        if (t < 2 / 3) return { q: `${a}/${b}*${b * k}`, show: `${a}/${b} = ?/${b * k}`, a: a * k, why: `${b} × ${k} = ${b * k}, so the top is ${a} × ${k} = ${a * k}.` };
         const n = b * k;
         return { q: `${a}/${b}*${n}`, show: `${a}/${b} of ${n}`, a: a * k, why: `1/${b} of ${n} is ${n} ÷ ${b} = ${k}, so ${a}/${b} of ${n} is ${a} × ${k} = ${a * k}.` };
       },

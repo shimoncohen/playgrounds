@@ -4,7 +4,7 @@ import { loadMath } from './harness.mjs';
 
 const BASE = ['../math-quest/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
-const TRACKS = ['arithmetic', 'algebra', 'geometry'];
+const TRACKS = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
 
 const stateOf = (MQ, def, params) => {
   const m = MQ.scene.model(def);
@@ -53,7 +53,7 @@ for (const track of TRACKS) {
     });
     else test(`${id}: the lazy answer is the question, and the step checker agrees with the answer`, () => {
       assert.equal(m.lazy, m.question, id);
-      const opts = { kind: m.kind, vars: m.vars };
+      const opts = { kind: m.kind, vars: m.vars, round: m.round };
       assert.equal(MQ.check.steps(m.question, [m.answer], opts)[0].ok, true, `${id}: the step checker rejects the answer`);
       assert.equal(MQ.check.steps(m.question, [m.wrong], opts)[0].ok, false, `${id}: the step checker accepts the wrong answer`);
       if (m.work === 'required') {
@@ -111,12 +111,49 @@ const GEO = {
     { yes: ['38', '38°'], no: ['76', '104', '142°'] },
     { yes: [{ r1: 60, r2: 120 }, { r1: 120, r2: 60 }], no: [{ r1: 60, r2: 100 }, { r1: 90, r2: 90 }, { r1: 60, r2: 60 }] },
   ],
+  'geometry.pythagoras': [
+    { yes: ['5', '5.0', ' 5 '], no: ['25', '7', '3^2+4^2', '5.1'] },
+    { yes: ['10', '10.0'], no: ['100', '14', '28'] },
+    { yes: ['12', '12.0'], no: ['144', '8', '194'] },
+    { yes: ['8.6', ' 8.6 '], no: ['8.60', '8', '9', '8.7', '8.602', '74', '74.0'] },
+    { yes: [{ a: 6, b: 8 }, { a: 8, b: 6 }], no: [{ a: 3, b: 4 }, { a: 4, b: 4 }, { a: 5, b: 7 }] },
+  ],
+  'geometry.circles': [
+    { yes: ['31.4', ' 31.4 '], no: ['31.40', '31', '31.3', '15.7', '31.41', '62.8'] },
+    { yes: ['28.3'], no: ['28.30', '28', '28.2', '18.8', '9'] },
+    { yes: ['153.9'], no: ['154', '153.94', '615.8', '153.8'] },
+    { yes: ['4.8'], no: ['4.80', '4.7', '5', '15.0', '4.77'] },
+    { yes: [{ r: 5 }], no: [{ r: 4 }, { r: 4.5 }, { r: 5.5 }, { r: 3 }] },
+  ],
 };
 {
   const MQ = loadMath([...BASE, 'geometry/content.js']);
   for (const ch of MQ.content.chapters) GEO[ch.id].forEach((alt, mi) => {
     const m = ch.missions[mi];
     test(`geometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
+      for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of alt.no) {
+        const r = judge(MQ, ch, m, v);
+        assert.equal(r.ok, false, `${JSON.stringify(v)} should fail`);
+        assert.ok(r.why, `${JSON.stringify(v)} fails without saying why`);
+      }
+    });
+  });
+}
+const TRIG = {
+  'trigonometry.ratios': [
+    { yes: ['5.7', '5.7°', ' 5.7 '], no: ['5.736', '5.74', '6', '8.2', '10*sin(35)', '5.80'] },
+    { yes: ['9.2', ' 9.2 '], no: ['9.19', '9', '7.7', '12*cos(40)'] },
+    { yes: ['4.6', ' 4.6'], no: ['4.62', '5', '13.9', '8*tan(30)'] },
+    { yes: ['30', '30°', ' 30 °', '30.0'], no: ['0.5', '60', '5/10', 'asin(5/10)=30'] },
+    { yes: [{ ang: 45, hyp: 10 }, { ang: 45, hyp: 4 }], no: [{ ang: 30, hyp: 10 }, { ang: 40, hyp: 10 }, { ang: 50, hyp: 7 }] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'trigonometry/content.js']);
+  for (const ch of MQ.content.chapters) TRIG[ch.id].forEach((alt, mi) => {
+    const m = ch.missions[mi];
+    test(`trigonometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
       for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
       for (const v of alt.no) {
         const r = judge(MQ, ch, m, v);
