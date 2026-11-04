@@ -21,6 +21,9 @@ trap 'git -C "$root" worktree remove --force "$work" 2>/dev/null || true; rm -rf
 rm -rf "$work"   # `git worktree add` wants to create the directory itself
 
 branch=gh-pages
+# Env, not `git config`: the publish worktree shares the caller's repo config. The retry's rebase commits too.
+bot="github-actions[bot]" bot_email="41898282+github-actions[bot]@users.noreply.github.com"
+export GIT_AUTHOR_NAME=$bot GIT_AUTHOR_EMAIL=$bot_email GIT_COMMITTER_NAME=$bot GIT_COMMITTER_EMAIL=$bot_email
 checkout_branch() {
   if git -C "$root" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
     git -C "$root" fetch --quiet --depth=1 origin "$branch"
@@ -58,8 +61,7 @@ apply
 cd "$work"
 git add -A
 if git diff --cached --quiet; then echo "gh-pages already up to date"; exit 0; fi
-git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-  commit --quiet -m "Publish ${mode}${num:+ $num} from ${GITHUB_SHA:-$(git -C "$root" rev-parse HEAD)}"
+git commit --quiet -m "Publish ${mode}${num:+ $num} from ${GITHUB_SHA:-$(git -C "$root" rev-parse HEAD)}"
 
 # Previews for different PRs can finish at the same time: retry on a rejected push.
 for attempt in 1 2 3 4 5; do
