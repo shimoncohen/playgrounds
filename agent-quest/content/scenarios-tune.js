@@ -47,7 +47,22 @@ const tuneRare={...TIDY,vfs:{...rareVfs,'.claude/skills/release-steps.md':skillF
 /* 22.2 tuneCmd: the same checklist, and a saved command that holds only a goal. The run does not call it, so the command costs nothing. */
 const tuneCmd={...TIDY,vfs:{...rareVfs,'.claude/commands/release-prep.md':'Goal: prepare the release\n'}};
 
-const tune={tuneDesc,tuneDead,tuneMcp,tuneDup,tuneRare,tuneCmd};
+/* 23.x: three things the job does not need, each paid for on every run: standup notes in memory, an unused skill with a long description,
+   and five MCP servers. The skill is asleep (when: docs) and no script step calls a tool, so only their lines are loaded. */
+const STYLE='name: docs-style\ndescription: Style guide for every documentation page. It covers headings, tone, code samples, screenshots and the review steps, and it should be read before any page is edited or published.\nwhen: docs\n';
+const SHOPMCP='calendar: list, create, delete\nmail: read, send, search\nbrowser: open, click, screenshot\ntracker: list_issues, create_issue\nchat: post, read\n';
+const tuneMeasure={...TIDY,vfs:{...S.tidy.vfs,'CLAUDE.md':'do not delete data/\n'+AQ.scenarioKit.scraps('Standup note',5),'.claude/skills/docs-style.md':STYLE,'.claude/mcp.txt':SHOPMCP}};
+
+/* 23.1 tuneHelpers: the haystack search, with the helper the run names and a second helper it does not name, both large. */
+const BIG=n=>'name: '+n+'\nmodel: large\n';
+const tuneHelpers={...S.haystack,vfs:{...S.haystack.vfs,'.claude/agents/scout.md':BIG('scout'),'.claude/agents/architect.md':BIG('architect')}};
+
+/* 23.2 tuneBoth: the tidy script on a team-sized search. Not team itself, whose accept also caps the peak. */
+const tuneBoth={...S.team,tag:'bugfix',script:S.tidy.script,hidden:S.tidy.hidden,accept:S.tidy.accept,
+  vfs:{...S.tidy.vfs,'src/report.js':AQ.scenarioKit.filler('report',20),'src/export.js':AQ.scenarioKit.filler('export',20),'docs/notes.md':AQ.scenarioKit.filler('notes',20),'CLAUDE.md':tuneMeasure.vfs['CLAUDE.md'],'.claude/skills/docs-style.md':STYLE,'.claude/mcp.txt':SHOPMCP,
+    '.claude/agents/scout.md':BIG('scout'),'.claude/agents/architect.md':BIG('architect')}};
+
+const tune={tuneDesc,tuneDead,tuneMcp,tuneDup,tuneRare,tuneCmd,tuneMeasure,tuneHelpers,tuneBoth};
 for(const k of Object.keys(tune))if(AQ.vfs.own(S,k))throw new Error('duplicate scenario key '+k);
 Object.assign(S,tune);
 })();

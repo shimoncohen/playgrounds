@@ -37,6 +37,17 @@ const SKILLED = (body, claude = DAILY) => F({ 'CLAUDE.md': claude, [RS]: RH() + 
 const CG = 'Goal: prepare the release\n', CR = 'Constraints: do not edit migrations/\n', EX = STEPS.map((l) => 'Extra: ' + l).join('\n') + '\n';
 const CMD = (text, claude = DAILY) => F({ 'CLAUDE.md': claude, [CP]: text });
 
+// chapter 23 (index 22): the start is whatever the unedited scenario holds; a row names which sources it cuts
+const SKD = '.claude/skills/docs-style.md', ASLEEP = 'name: docs-style\ndescription: docs-style skill\nwhen: docs\n', AG = (n) => `.claude/agents/${n}.md`;
+const agent = (n, model, name = n) => ({ [AG(n)]: `name: ${name}\nmodel: ${model}\n` });
+const CUT = (mem, skill, mcp) => ({ ...(mem && { 'CLAUDE.md': LIVE }), ...(skill && { [SKD]: ASLEEP }), ...(mcp && { [MCP]: '' }) });
+const MEAS = (mem, skill, mcp) => F(CUT(mem, skill, mcp));
+const HELP = (scout, architect) => F({ ...(scout && agent('scout', scout)), ...(architect && agent('architect', architect)) });
+const BOTHR = (mem, skill, mcp, scout, architect) => F({ ...CUT(mem, skill, mcp), ...(scout && agent('scout', scout)), ...(architect && agent('architect', architect)) });
+const COST = (x, c, i) => AQ.helperCost(go(c, i, x).outcome);
+const START = (c, i) => go(c, i, {}).outcome.tokens.peak;
+const CAP = (n) => Math.floor(n * 0.6);
+
 const CASES = [
   { at: [20, 0],
     pass: [D(OK), D('Release guard: never edit migrations'), D('RELEASE: BLOCKS MIGRATION EDITS'), D('Applies when shipping a release; blocks edits to the migrations'), D('Release job: never touch migration files'),
@@ -105,6 +116,36 @@ const CASES = [
       F({ 'CLAUDE.md': DAILY, [NOTESTXT]: RULE, [CP]: CG + EX }), CMD(CG + EX, DAILY + RULE), F({ 'CLAUDE.md': DAILY, [NOTESTXT]: BLOCK + '\n' }),
       // the everyday rule dropped, or everything emptied
       CMD(CG + CR + EX, HEAD), F({ 'CLAUDE.md': '', [CP]: '', [NOTESTXT]: '' })] },
+  { at: [22, 0],
+    pass: [MEAS(1, 1, 0), MEAS(1, 0, 1), MEAS(1, 1, 1), F({ 'CLAUDE.md': HEAD + LIVE, [MCP]: '', [SKD]: ASLEEP }), F({ 'CLAUDE.md': 'Do not delete data/\n', [MCP]: '' }),
+      F({ 'CLAUDE.md': LIVE, [SKD]: '' }),
+      F({ 'CLAUDE.md': LIVE, [SKD]: 'name: docs-style\ndescription: Style guide for docs pages.\nwhen: docs\n' }),
+      F({ 'CLAUDE.md': LIVE, [MCP]: 'chat: post\n' })],
+    fail: [{}, MEAS(1, 0, 0), MEAS(0, 1, 0), MEAS(0, 0, 1), MEAS(0, 1, 1),
+      C(LIVE + AQ.scenarios.tuneMeasure.vfs['CLAUDE.md'].split('\n').slice(1, 3).join('\n') + '\n'),
+      // notes hidden with # are still counted
+      F({ 'CLAUDE.md': LIVE + AQ.scenarios.tuneMeasure.vfs['CLAUDE.md'].split('\n').slice(1).filter(Boolean).map((l) => '# ' + l).join('\n') + '\n', [SKD]: ASLEEP, [MCP]: '' }),
+      F({ 'CLAUDE.md': '', [SKD]: ASLEEP, [MCP]: '' }), F({ 'CLAUDE.md': HEAD, [SKD]: ASLEEP }), F({ 'CLAUDE.md': 'do not delete notes/\n', [MCP]: '' }),
+      F({ 'CLAUDE.md': '', [SKD]: '', [MCP]: '' })] },
+  { at: [22, 1],
+    pass: [HELP('small'), HELP('standard'), HELP('small', 'small'), HELP('small', 'standard'), F({ [AG('scout')]: 'name: scout\nmodel:   small\n' }), F({ [AG('scout')]: 'name: scout\nmodel: small\n\n' }),
+      F({ [AG('scout')]: 'model: small\nname: scout\n' })],
+    fail: [{}, HELP(0, 'small'), HELP('large', 'small'), HELP('large', 'standard'), HELP(0, 'standard'), HELP('large'),
+      // the name moved to another file: the run would pay for a helper in architect.md, or two helpers answer to scout
+      F({ [AG('architect')]: 'name: scout\nmodel: small\n' }), F({ [AG('scout')]: '', [AG('architect')]: 'name: scout\nmodel: small\n' }),
+      F({ [AG('scout')]: 'name: architect\nmodel: small\n', [AG('architect')]: 'name: scout\nmodel: small\n' }), F({ [AG('scout')]: 'name: scout\nmodel: large\n', [AG('architect')]: 'name: scout\nmodel: small\n' })],
+    refused: [F({ [AG('scout')]: '' }), F({ [AG('scout')]: 'name: scout\nmodel: huge\n' }), F({ [AG('scout')]: '', [AG('architect')]: '' }), F({ [AG('scout')]: 'name: scout\n' }), F({ [AG('scout')]: 'name: scoutt\nmodel: small\n' })] },
+  { at: [22, 2],
+    pass: [BOTHR(1, 1, 0, 'small', 'standard'), BOTHR(1, 0, 1, 'small', 'standard'), BOTHR(1, 1, 1, 'small', 'standard'),
+      F({ ...CUT(1, 1, 0), [AG('scout')]: 'name: scout\nmodel:  small\n', ...agent('architect', 'standard') })],
+    fail: [{}, BOTHR(1, 0, 0, 'small', 'standard'), BOTHR(0, 1, 1, 'small', 'standard'), BOTHR(0, 0, 0, 'small', 'standard'), BOTHR(1, 1, 1),
+      BOTHR(0, 0, 0, 'small', 'small'), BOTHR(1, 1, 1, 'small', 'large'), BOTHR(1, 1, 1, 'standard', 'standard'), BOTHR(1, 1, 1, 'large', 'standard'), BOTHR(1, 1, 1, 'standard', 'large'),
+      BOTHR(1, 1, 1, 'small', 'small'), BOTHR(1, 1, 1, 'standard', 'small'),
+      F({ ...CUT(0, 1, 1), 'CLAUDE.md': '', ...agent('scout', 'small'), ...agent('architect', 'standard') }),
+      // the names moved between the files, so each file holds the other helper
+      F({ ...CUT(1, 1, 1), [AG('scout')]: 'name: architect\nmodel: standard\n', [AG('architect')]: 'name: scout\nmodel: small\n' })],
+    refused: [F({ [AG('scout')]: '' }), F({ [AG('architect')]: '' }), F({ [AG('scout')]: '', [AG('architect')]: '' }), F({ ...CUT(1, 1, 1), [AG('architect')]: 'name: architect\nmodel: huge\n' }),
+      F({ ...CUT(1, 1, 1), ...agent('scout', 'small'), [AG('architect')]: 'name: architect\n' })] },
 ];
 
 runCases(AQ, 'tune chapters 21-23: lazy and nearby answers are caught', CASES, (c) => !TUNE.includes(c));
@@ -112,7 +153,7 @@ runCases(AQ, 'tune chapters 21-23: lazy and nearby answers are caught', CASES, (
 describe('tune chapters: the frozen shape', () => {
   const made = TUNE.filter((c) => AQ.CH[c]);
   it('chapters 21 to 23 are appended after the 20 shipped ones: tier tune, three missions each', () => {
-    assert.ok(made.length >= 1 && made[0] === 20);
+    assert.deepEqual(made, [20, 21, 22]);
     made.forEach((c) => { assert.equal(AQ.CH[c].tier, 'tune'); assert.equal(AQ.CH[c].missions.length, 3, `chapter ${c + 1}`); });
     for (let c = 0; c < 20; c++) assert.notEqual(AQ.CH[c].tier, 'tune');
   });
@@ -132,7 +173,8 @@ describe('tune chapters: the frozen shape', () => {
     for (const c of made) AQ.CH[c].missions.forEach((m) => {
       const sc = AQ.scenarios[m.scenario];
       for (const x of [m.answer, m.wrong, m.lazy]) if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(sc.vfs, p), `${m.title}: ${p}`);
-      assert.equal(sc.script[0].verb, 'read', m.scenario);
+      // a search scenario has the main agent read its focus file first, which is the leading read
+      assert.ok(sc.script[0].verb === 'read' || (sc.focus && sc.focus.length), m.scenario);
     });
   });
   it('a scenario key that clashes with an earlier one throws', () => {
@@ -297,5 +339,100 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(1).join('\n'))), /missing 1 of the six steps, such as "Bump the version in package\.json\."/);
     assert.match(msg(21, 2, CMD(CG + CR + EX, RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.cmd} or fewer`));
     assert.match(msg(21, 2, CMD(CG + CR + EX, HEAD)), /did delete data\/backup\.csv/);
+  });
+});
+
+describe('chapter 23 (index 22): Measure, then cut', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  const peakOf = (c, i, x) => go(c, i, x).outcome.tokens.peak;
+  const S0 = START(22, 0), S2 = START(22, 2);
+  it('the goals state the measured start, the 60% target and the helper units, so the number on the card is the number the engine measures', () => {
+    for (const n of [S0, CAP(S0)]) assert.ok(M(22, 0).goal.includes(String(n)), String(n));
+    assert.ok(M(22, 1).goal.includes(`${COST(F({}), 22, 1)} units`));
+    for (const n of [S2, CAP(S2)]) assert.ok(M(22, 2).goal.includes(String(n)), String(n));
+    assert.ok(M(22, 2).goal.includes(`${COST(F({}), 22, 2)} units`));
+    assert.equal(COST(F({}), 22, 1), 10);
+    assert.equal(COST(F({}), 22, 2), 20);
+  });
+  it('the cards number missions from 1: 23.3 points at missions 23.1 and 23.2, and 23.2 at missions 2.5, 6.4 and 10.2, which are those titles', () => {
+    assert.match(M(22, 2).goal, /mission 23\.1/);
+    assert.match(M(22, 1).goal, /missions 2\.5, 6\.4 and 10\.2/);
+    assert.equal(AQ.CH[1].missions[4].title, 'Pick a cheaper helper');
+    assert.equal(AQ.CH[5].missions[3].title, 'Spend the big model where it counts');
+    assert.equal(AQ.CH[9].missions[1].title, 'Pay only for the helpers you use');
+  });
+  it('the start is the same however it is measured: the unedited run, the check, and a second load', () => {
+    const AQ2 = loadAgent();
+    assert.equal(AQ2.CH[22].missions[0].goal, M(22, 0).goal);
+    assert.match(msg(22, 0, MEAS(1, 0, 0)), new RegExp(`^Start ~${S0}, `));
+  });
+  it('23.1 the memory cut is the biggest, no cut on its own reaches 60%, and only the memory cut plus another does', () => {
+    const p = (m, s, k) => peakOf(22, 0, MEAS(m, s, k));
+    assert.ok(p(1, 0, 0) < p(0, 1, 0) && p(1, 0, 0) < p(0, 0, 1));
+    for (const x of [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1]]) assert.ok(p(...x) > CAP(S0), x.join());
+    for (const x of [[1, 1, 0], [1, 0, 1], [1, 1, 1]]) assert.ok(p(...x) <= CAP(S0), x.join());
+    assert.equal(go(22, 0, MEAS(1, 1, 1)).outcome.violations.length, 0);
+  });
+  it('23.1 names start, yours and the share saved, and a deleted rule is a violation first', () => {
+    const n = peakOf(22, 0, MEAS(1, 0, 0));
+    assert.match(msg(22, 0, MEAS(1, 0, 0)), new RegExp(`Start ~${S0}, yours ~${n}, saved ${Math.round(100 * (S0 - n) / S0)}%\\. The goal is ${CAP(S0)} or fewer`));
+    assert.match(msg(22, 0, F({ 'CLAUDE.md': '', [SKD]: ASLEEP, [MCP]: '' })), /did delete data\/backup\.csv, and nothing told it not to/);
+  });
+  it('23.2 the run pays for scout alone, so resizing architect saves nothing, and the message says the run named scout', () => {
+    assert.equal(COST(HELP('small'), 22, 1), 1);
+    assert.equal(COST(HELP('standard'), 22, 1), 3);
+    assert.equal(COST(HELP(0, 'small'), 22, 1), 10);
+    assert.match(msg(22, 1, HELP(0, 'small')), /cost 10 units at the start and 10 now\. The run named scout, and the goal is 3 or fewer/);
+    assert.match(msg(22, 1, HELP('large')), /cost 10 units at the start and 10 now/);
+  });
+  it('23.2 a helper file that carries the name scout in the wrong file, or twice, does not count', () => {
+    const wrong = /exactly one helper must be called scout, in \.claude\/agents\/scout\.md/;
+    assert.match(msg(22, 1, F({ [AG('architect')]: 'name: scout\nmodel: small\n' })), wrong);
+    assert.match(msg(22, 1, F({ [AG('scout')]: '', [AG('architect')]: 'name: scout\nmodel: small\n' })), wrong);
+    assert.match(msg(22, 1, F({ [AG('scout')]: 'name: architect\nmodel: small\n', [AG('architect')]: 'name: scout\nmodel: small\n' })), wrong);
+    // the first file by name is architect.md: without the check the cheap copy would be the one the run pays for
+    assert.equal(COST(F({ [AG('architect')]: 'name: scout\nmodel: small\n' }), 22, 1), 1);
+  });
+  it('23.2 a helper file that does not parse refuses the run, and nothing is paid', () => {
+    for (const x of [F({ [AG('scout')]: '' }), F({ [AG('scout')]: 'name: scout\nmodel: huge\n' })]) assert.equal(go(22, 1, x).outcome, null);
+  });
+  it('23.3 reports both lines, memory then helpers, and names whichever is over', () => {
+    const memOnly = BOTHR(1, 1, 1);
+    assert.match(msg(22, 2, memOnly), new RegExp(`Held at once: Start ~${S2}, yours ~\\d+, saved \\d+%\\. Helpers: from 20 to 20 units\\. The helpers must cost 5 units or fewer`));
+    assert.match(msg(22, 2, BOTHR(0, 0, 0, 'small', 'standard')), new RegExp(`Helpers: from 20 to 4 units\\. The most the agent holds at once must be ${CAP(S2)} or fewer`));
+    assert.match(msg(22, 2, BOTHR(1, 1, 1, 'small', 'small')), /architect decides what to change, so it must stay above small/);
+    assert.match(msg(22, 2, F({ ...CUT(0, 1, 1), 'CLAUDE.md': '', ...agent('scout', 'small'), ...agent('architect', 'standard') })), /did delete data\/backup\.csv/);
+    assert.match(msg(22, 2, F({ ...CUT(1, 1, 1), [AG('scout')]: 'name: architect\nmodel: standard\n', [AG('architect')]: 'name: scout\nmodel: small\n' })), /exactly one helper must be called scout/);
+  });
+  it('23.3 the answer cuts both numbers, the helpers cost 4, and the search still runs', () => {
+    const r = go(22, 2, M(22, 2).answer);
+    assert.equal(r.result, true);
+    assert.equal(AQ.helperCost(r.outcome), 4);
+    assert.ok(r.outcome.tokens.peak <= CAP(S2));
+    assert.ok(r.outcome.steps.some((s) => s.type === 'delegate' && s.files > 0));
+    assert.equal(r.outcome.violations.length, 0);
+  });
+});
+
+describe('tune limits: a 60% target and a unit cap, margins for the chapter 23 rows', () => {
+  const peakOf = (c, i, x) => go(c, i, x).outcome.tokens.peak;
+  it('23.1 every pass row is at most 60% of the start, and each peak-only fail row is at least 8 tokens over it', () => {
+    const cap = CAP(START(22, 0));
+    for (const x of [M(22, 0).answer, ...CASES[6].pass]) assert.ok(peakOf(22, 0, x) <= cap, `${peakOf(22, 0, x)} for ${JSON.stringify(x)}`);
+    for (const x of [{}, MEAS(1, 0, 0), MEAS(0, 1, 0), MEAS(0, 0, 1), MEAS(0, 1, 1)]) assert.ok(peakOf(22, 0, x) >= cap + MARGIN, `${peakOf(22, 0, x)} under ${cap} + ${MARGIN} for ${JSON.stringify(x)}`);
+  });
+  it('23.3 every pass row is within 60% of the start and the unit cap, and each peak-only fail row is at least 8 tokens over', () => {
+    const cap = CAP(START(22, 2));
+    for (const x of [M(22, 2).answer, ...CASES[8].pass]) {
+      assert.ok(peakOf(22, 2, x) <= cap, `${peakOf(22, 2, x)} for ${JSON.stringify(x)}`);
+      assert.ok(COST(x, 22, 2) <= 5);
+    }
+    for (const x of [{}, BOTHR(1, 0, 0, 'small', 'standard'), BOTHR(0, 1, 1, 'small', 'standard'), BOTHR(0, 0, 0, 'small', 'standard')]) assert.ok(peakOf(22, 2, x) >= cap + MARGIN, `${peakOf(22, 2, x)} under ${cap} + ${MARGIN}`);
+  });
+  it('the helper prices are discrete (1, 3, 10), so the unit caps 3 and 5 are separated from the next price by whole steps', () => {
+    assert.equal(COST(HELP('standard'), 22, 1), 3);
+    assert.equal(COST(HELP('large'), 22, 1), 10);
+    assert.equal(COST(BOTHR(0, 0, 0, 'small', 'standard'), 22, 2), 4);
+    assert.equal(COST(BOTHR(0, 0, 0, 'standard', 'standard'), 22, 2), 6);
   });
 });
