@@ -1,7 +1,7 @@
 /* Lowers the fns the move and borrow pass analyses to a control-flow graph. RQ.mir.analysed(fn, info, ast) is the skip rule: a fn
    without a reference, a String or a deferred let is never lowered, so old programs keep their results. DOM-free.
    RQ.mir(ast, info) gives {fns, unsupported}. A fn is {name, ast (the Fn node id), line, locals, blocks}; blocks[0] is the entry.
-     local  {id, name (null for a temp), bind (the checker's binding), ty, mut, param, line}
+     local  {id, name (null for a temp), src (the named local a temp was copied from), bind (the checker's binding), ty, mut, param, line}
      block  {id, instrs, succ (block ids), unreachable (no path from the entry; the analysis skips it)}
      instr  {op, ast (node id), line, col, ...}:
        decl   {l, uninit}     the local comes alive; uninit for `let x: T;`. Params have no decl, they are set on entry.
@@ -15,7 +15,7 @@
             | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
      operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call or a method
-            is an implicit reborrow, not a move (except std drop): {k:'copy',l,reb:true}. Reading a Field or Index is a copy of the root local. */
+            is an implicit reborrow, not a move (except std drop): {k:'copy',l,reb:true,sh} (sh: the callee takes `&`). Reading a Field or Index is a copy of the root local. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -65,7 +65,7 @@ function lowerFn(f,info,un,userDrop){
     if(++count>MAX_INSTRS)throw BIG;
     B[cur].instrs.push({op,ast:nd.id,line:nd.line,col:nd.col,...o});
   };
-  const opnd=(l,reb)=>reb?{k:'copy',l,reb:true}:{k:isCopy(L[l].ty)?'copy':'move',l};
+  const opnd=(l,reb,sh)=>reb?{k:'copy',l,reb:true,sh:!!sh}:{k:isCopy(L[l].ty)?'copy':'move',l};
   const lid=p=>{const o=info.get(p),b=o&&o.bind;return b&&lm.has(b)?lm.get(b):-1;};
   const put=(rv,nd,dest,ty)=>{
     if(dest===undefined){
@@ -88,10 +88,10 @@ function lowerFn(f,info,un,userDrop){
   const deads=(from,nd)=>{for(let i=scopes.length-1;i>=from;i--)kill(scopes[i],nd);};
   const retDest=ty=>retL===undefined?(retL=temp(ty)):retL;
 
-  // a Path argument or receiver: a `&mut` local is reborrowed here, not moved
-  const argOp=x=>{
+  // a Path argument or receiver: a `&mut` local is reborrowed here, not moved; sh: the callee takes `&`, so the reborrow is shared
+  const argOp=(x,sh)=>{
     const p=peel(x),l=p.t==='Path'?lid(p):-1;
-    if(l>=0){const t=L[l].ty;return opnd(l,t.k==='ref'&&t.mut);}
+    if(l>=0){const t=L[l].ty;return opnd(l,t.k==='ref'&&t.mut,sh);}
     return ex(x);
   };
   // std `drop<T>(x: T)` takes its argument by value: a generic parameter gets no reborrow, so a `&mut` local is moved
@@ -129,6 +129,11 @@ function lowerFn(f,info,un,userDrop){
   function printArg(x,nd){
     const p=peel(x);
     if(p.t==='Path'){const l=lid(p);if(l>=0)return printLocal(l,nd);}
+    // rustc takes `&*r` of a `*r` argument, which keeps r's loan alive to the call like `&r`
+    if(p.t==='Deref'){
+      const q=peel(p.expr),l=q.t==='Path'?lid(q):-1;
+      if(l>=0&&L[l].ty.k==='ref')return printLocal(l,nd);
+    }
     if(p.t==='Field'||p.t==='Index'){
       const r=rootOf(p);
       if(r.l>=0){
@@ -154,7 +159,8 @@ function lowerFn(f,info,un,userDrop){
     let ro,args;
     if(r.adj==='val'){
       rebTwice([e.recv,...e.args],e);
-      [ro,...args]=seq([e.recv,...e.args],argOp);
+      // std method args are all `&str`, so only `&mut self` methods reborrow mutably
+      [ro,...args]=seq([e.recv,...e.args],x=>argOp(x,x!==e.recv||RQ.std.methods.get(e.name).self==='&'));
     }else{
       const mut=r.adj==='&mut',p=peel(e.recv);
       let target=-1;
@@ -171,7 +177,7 @@ function lowerFn(f,info,un,userDrop){
       if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
       ro=put({k:'ref',l:target,mut},e,undefined,T.ref(mut,L[target].ty,0));
       rebTwice(e.args,e);
-      args=seq(e.args,argOp);
+      args=seq(e.args,x=>argOp(x,true));
     }
     return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
   }

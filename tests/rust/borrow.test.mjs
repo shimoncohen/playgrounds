@@ -303,6 +303,21 @@ describe('drop, a repeated &mut argument and the order operands are read in', ()
     assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", r, 1);', '*r += 1;', 'println!("{} {}", r, *r);')), '');
     assert.equal(diags(SI('let r = &mut s;', 'println!("{}", r);', 'r.push_str("b");', 'println!("{} {}", r, r);')), '');
   });
+  it('a &mut local printed next to a shared use (len, clone) is fine; a &mut use still conflicts', () => {
+    // passing a &mut local to a `&` param is a checker `reference coercion` unsupported, so a call arg needs no shared variant
+    const FN = (...body) => P('fn f(s: &mut String) {', ...body, '}', 'fn main() {', '    let mut s = String::new();', '    f(&mut s);', '}');
+    for (const use of ['s.len()', 's.clone()']) assert.equal(unsup(FN(`    println!("{} {}", s, ${use});`)), 'ok', use);
+    assert.equal(diags(FN('    println!("{} {}", s, s.len());')), '');
+    assert.equal(diags(FN('    println!("{} {}", s, { s.push_str("a"); 1 });')), 'E0502@2');
+  });
+  it('a print arg *r borrows r like r does (rustc takes &*r)', () => {
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", *r, x);')), 'E0502@4');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", *r, { *r += 1; 1 });')), 'E0506@4');
+    assert.equal(diags(IX('let r = &x;', 'println!("{} {}", *r, { x = 5; 1 });')), 'E0506@4');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", *r, r);')), '');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", *r, *r);')), '');
+    assert.equal(diags(P('fn f(s: &mut String) {', '    println!("{} {}", *s, s.len());', '}', 'fn main() {', '    let mut s = String::new();', '    f(&mut s);', '}')), '');
+  });
   it('a local moved before a sibling that borrows it is moved there', () => {
     const take = ['fn take(a: String, b: &String) {', '}'];
     assert.equal(diags(P(...take, 'fn main() {', '    let s = String::from("a");', '    take(s, &s);', '}')), 'E0382@5');

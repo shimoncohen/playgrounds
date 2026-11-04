@@ -20,7 +20,7 @@ const VISITS=50;
 function uses(i,use){
   const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move',x.k);};
   // a call or method operand that reborrows a `&mut` local needs it unborrowed; reading or writing through it (deref, store) does not
-  const a=x=>{if(x&&x.reb)use(x.l,false,'reb');else o(x);};
+  const a=x=>{if(x&&x.reb)use(x.l,false,x.sh?'rebs':'reb');else o(x);};
   const rv=r=>{
     if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref');
     else if(r.k==='use'||r.k==='deref')o(r.x);
@@ -168,6 +168,8 @@ function loanPass(F,errors,un,loans){
     if(kind==='ref'){if(mu)code='E0502';}
     else if(kind==='mut')code=mu?'E0499':'E0502';
     else if(kind==='reb'){if(mu)un('reborrow',i);else code='E0502';}
+    // a shared reborrow (callee takes `&`) only conflicts with a live `&mut` loan, which is not modelled for a reference local
+    else if(kind==='rebs'){if(mu)un('reborrow',i);}
     else if(kind==='move')code='E0505';
     else if(kind==='write')code='E0506';
     // the `reborrow` arm is a backstop: no source shape reaches it (`&r` is a reference to a reference, which the checker rejects)
