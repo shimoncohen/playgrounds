@@ -16,6 +16,7 @@ const SAMPLE = {
   skip: { type: 'skip', verb: 'edit', target: 'src/price.js', by: 'your constraint' },
   hook: { type: 'hook', when: 'after', target: 'src/price.js', run: 'npm run lint', ok: false },
   stall: { type: 'stall' },
+  fire: { type: 'fire', entry: { line: 'weekdays 07:30 use fix', day: 'weekdays', days: ['mon', 'tue', 'wed', 'thu', 'fri'], at: '07:30', use: 'fix' }, due: ['mon', 'tue', 'wed', 'thu', 'fri'] },
 };
 const say = (step) => AQ.provider.sim.complete([], { step }).text;
 
@@ -46,6 +47,17 @@ describe('step type registry', () => {
     assert.match(say(idle), /nothing for it to search/);
     assert.match(say(SAMPLE.delegate), /3 files in its own context/);
     assert.deepEqual([UI.tagOf(SAMPLE.delegate), UI.tagOf(SAMPLE.command)], ['helper', 'command']);
+  });
+  it('a fire step says which line starts the job and how often, or that none does, and shows a line that was ignored', () => {
+    const none = { type: 'fire', entry: null, due: [] }, bad = { ...SAMPLE.fire, why: '"weekday" is not daily, weekdays or a day name' };
+    assert.match(say(SAMPLE.fire), /The schedule starts the job at 07:30 on mon, tue, wed, thu, fri: 5 runs a week/);
+    assert.match(UI.describe(SAMPLE.fire), /starts fix at 07:30, 5 runs a week/);
+    assert.match(say(none), /No line in \.claude\/schedule\.txt starts the job/);
+    assert.match(UI.describe(none), /no line starts the job/);
+    assert.match(say(bad), /"weekday" is not daily/);
+    assert.match(UI.describe(bad), /Ignored: "weekday" is not daily/);
+    assert.equal(UI.tagOf(SAMPLE.fire), 'schedule');
+    assert.match(UI.describe({ ...SAMPLE.fire, due: ['mon'] }), /1 run a week/);
   });
   it('a skip reason shows as words in the Run panel and the narration', () => {
     for (const by of ['not seen yet', 'not connected', 'no one to ask']) {

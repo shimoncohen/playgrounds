@@ -18,6 +18,7 @@ function narrate(s){
     :s.over?'I handed the search to '+s.name+', but it read more than fit in its window and lost track of some files.'
     :'I handed the search to '+s.name+'. It read '+s.files+' file'+(s.files===1?'':'s')+' in its own context and sent back what matters.';
   if(s.type==='stall')return 'I made a plan and waited for approval, but this run has nobody to give it, so I stopped.';
+  if(s.type==='fire')return (s.entry?'The schedule starts the job at '+s.entry.at+' on '+s.due.join(', ')+': '+s.due.length+' run'+(s.due.length===1?'':'s')+' a week.':'No line in .claude/schedule.txt starts the job, so it never runs.')+(s.why?' One schedule line was ignored: '+s.why+'.':'');
   if(s.type==='hook')return 'The hook ran '+s.run+' after my edit of '+s.target+(s.ok?' and it passed.':s.why?', but '+s.why+'.':' and it failed.');
   const plain=s.verb+' '+s.target,did='I '+(VERB[s.verb]||s.verb)+' '+s.target+'.';
   if(s.type==='skip')return 'I wanted to '+plain+', but '+(WHY[s.by]||s.by+' does not allow it')+', so I skipped it.';
