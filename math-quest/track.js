@@ -124,7 +124,7 @@ function renderMission() {
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     <button type="button" class="btn ghost narrow-only" data-act="towork">${m.kind === 'scene' ? 'Go to the scene' : 'Go to your working'} ↓</button>
-    ${HowSteps.html(m.how)}
+    ${S.done[mkey()] || !m.how ? HowSteps.html(m.how) : `<details class="hint how-hidden"><summary>Show how it's solved</summary>${HowSteps.html(m.how)}</details>`}
     <p class="explain">${m.explain}</p>
     <details class="hint"><summary>Show a hint</summary><p>${m.hint}</p></details>
     <div class="actions"><button class="btn ghost" data-act="fill">${m.kind === 'scene' ? 'Set it for me' : 'Type it for me'}</button></div>

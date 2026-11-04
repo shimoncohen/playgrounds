@@ -42,7 +42,7 @@
   // worked-out values. Once solved, `reveal` (true for the chapter scene, or a scene) shows the full picture as a check.
   MQ.scene.forMission = (ch, m, fill, solved) => {
     const typed = m && m.kind !== 'scene', def = solved && typed && m.reveal ? (m.reveal === true ? ch.scene : m.reveal) : (m && m.scene) || ch.scene;
-    const start = { ...(m && m.at), ...(fill && m && m.kind === 'scene' ? m.answer : {}) };
+    const start = { ...(m && m.at), ...(solved && typed && m.reveal && m.revealAt), ...(fill && m && m.kind === 'scene' ? m.answer : {}) };
     return { ...def, hideDerived: typed && !solved, params: Object.fromEntries(Object.entries(def.params).map(([n, p]) => [n, { ...p, value: start[n] ?? p.value }])) };
   };
 })();
