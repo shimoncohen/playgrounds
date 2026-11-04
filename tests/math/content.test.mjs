@@ -4,7 +4,7 @@ import { loadMath } from './harness.mjs';
 
 const BASE = ['../math-quest/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
-const TRACKS = ['arithmetic', 'algebra', 'geometry'];
+const TRACKS = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
 
 const stateOf = (MQ, def, params) => {
   const m = MQ.scene.model(def);
@@ -131,6 +131,29 @@ const GEO = {
   for (const ch of MQ.content.chapters) GEO[ch.id].forEach((alt, mi) => {
     const m = ch.missions[mi];
     test(`geometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
+      for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of alt.no) {
+        const r = judge(MQ, ch, m, v);
+        assert.equal(r.ok, false, `${JSON.stringify(v)} should fail`);
+        assert.ok(r.why, `${JSON.stringify(v)} fails without saying why`);
+      }
+    });
+  });
+}
+const TRIG = {
+  'trigonometry.ratios': [
+    { yes: ['5.7', '5.7°', ' 5.7 '], no: ['5.736', '5.74', '6', '8.2', '10*sin(35)', '5.80'] },
+    { yes: ['9.2', ' 9.2 '], no: ['9.19', '9', '7.7', '12*cos(40)'] },
+    { yes: ['4.6', ' 4.6'], no: ['4.62', '5', '13.9', '8*tan(30)'] },
+    { yes: ['30', '30°', ' 30 °', '30.0'], no: ['0.5', '60', '5/10', 'asin(5/10)=30'] },
+    { yes: [{ ang: 45, hyp: 10 }, { ang: 45, hyp: 4 }], no: [{ ang: 30, hyp: 10 }, { ang: 40, hyp: 10 }, { ang: 50, hyp: 7 }] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'trigonometry/content.js']);
+  for (const ch of MQ.content.chapters) TRIG[ch.id].forEach((alt, mi) => {
+    const m = ch.missions[mi];
+    test(`trigonometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
       for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
       for (const v of alt.no) {
         const r = judge(MQ, ch, m, v);
