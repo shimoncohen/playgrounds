@@ -72,7 +72,7 @@
 
   MQ.content = {
     track: 'geometry',
-    ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace']],
+    ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace'], [150, 'Geometer']],
     chapters: [{
       id: 'geometry.area', name: 'Area and perimeter', badge: 'Area Builder',
       intro: 'The <b>area</b> of a flat shape is how much space it covers, counted in 1 by 1 squares, like floor tiles. Its <b>perimeter</b> is the distance all the way round its edge, like a fence. In the scene every grid square is 1 by 1. The bottom side of the rectangle is its <b>base</b> <code>b</code>, and its <b>height</b> <code>h</code> goes straight up. Drag a corner, or move a slider, and the shapes, the formulas and the numbers change together.',

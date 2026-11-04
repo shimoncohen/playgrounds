@@ -88,6 +88,12 @@ for (const track of TRACKS) {
     assert.equal(C.ranks[0][0], 0);
     for (let i = 1; i < C.ranks.length; i++) assert.ok(C.ranks[i][0] > C.ranks[i - 1][0]);
   });
+
+  test(`${track}: the top rank is reached exactly when every mission and badge is earned`, () => {
+    // 10 XP per mission (track.js) and 25 per chapter badge (shared/tiers.js BADGE_XP).
+    const full = C.chapters.reduce((xp, ch) => xp + ch.missions.length * 10 + 25, 0);
+    assert.equal(C.ranks.at(-1)[0], full);
+  });
 }
 
 const GEO = {

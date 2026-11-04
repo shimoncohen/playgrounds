@@ -107,7 +107,7 @@
 
   MQ.content = {
     track: 'algebra',
-    ranks: [[0, 'Letter Learner'], [30, 'Box Builder'], [75, 'Volume Master']],
+    ranks: [[0, 'Letter Learner'], [30, 'Box Builder'], [75, 'Volume Master'], [150, 'Bracket Opener'], [225, 'Balance Keeper'], [300, 'Factor Finder'], [375, 'Root Hunter']],
     chapters: [{
       id: 'algebra.expressions', name: 'Expressions and volume', badge: 'Volume Master',
       intro: 'In algebra, letters stand for numbers. A <b>variable</b> is a letter, like <code>a</code>, whose number can change. The box on this page has length <code>a</code>, width <code>b</code> and height <code>c</code>. Its <b>volume</b>, how many 1 by 1 by 1 cubes fit inside, is <code>V = a · b · c</code>, where the dot <code>·</code> means ×. A line made of numbers, letters and operations is an <b>expression</b>. Move the sliders and watch the box, the formula and the numbers change together.',

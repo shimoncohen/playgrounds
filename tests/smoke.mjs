@@ -474,6 +474,17 @@ test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its b
   await ctx.close();
 });
 
+test('math-arithmetic: the quick-fire answer field opens a keyboard with a minus sign', async () => {
+  const done = Object.fromEntries([0, 1, 2, 3, 4].map(i => [`1.${i}`, true]));
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#fire`, {}, c => c.addInitScript(d => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 50, done: d, badges: {} })), done));
+  await page.click('#fStart');
+  await page.waitForSelector('#fAns');
+  // Phone number pads (inputmode=numeric) have no minus key, and Negative numbers asks for negative answers.
+  assert.notEqual(await page.getAttribute('#fAns', 'inputmode'), 'numeric');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-arithmetic: Powers and roots suggests Negative numbers until it is done', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.powers`);
   await page.waitForSelector('#mission .prereq');

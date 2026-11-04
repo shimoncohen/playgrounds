@@ -203,7 +203,7 @@ function fireIdle() {
 }
 function nextQ() {
   const pool = qfPool(); fQ = pool[Math.floor(fRng() * pool.length)].make(fRng); fLocked = false;
-  fStage.innerHTML = `<div class="task">${esc(fQ.show)}</div><form class="qform" id="fForm" autocomplete="off"><label class="sr" for="fAns">Your answer</label><input id="fAns" inputmode="numeric" enterkeyhint="send" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Check</button></form>
+  fStage.innerHTML = `<div class="task">${esc(fQ.show)}</div><form class="qform" id="fForm" autocomplete="off"><label class="sr" for="fAns">Your answer</label><input id="fAns" inputmode="text" enterkeyhint="send" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Check</button></form>
   <p class="fb" id="fFb" aria-live="polite"></p><div class="actions"><button class="btn ghost" id="fStop">End round</button></div>`;
   $('#fAns').focus({ preventScroll: true });
 }

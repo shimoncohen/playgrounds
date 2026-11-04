@@ -97,6 +97,19 @@ test('required working: the answer alone does not pass, one step before it does'
   await ctx.close();
 });
 
+test('a right but unfinished last line says what is still missing', async () => {
+  const { ctx, page, errors } = await open('text');
+  await page.focus('#work .mq-field');
+  await typeChain(page, ['2-6+10']);
+  assert.deepEqual(await marks(page), ['✓', '']);
+  assert.match(await page.textContent('#work .mq-result'), /Finish with one number/);
+  await page.fill('#work .mq-step:nth-child(1) .mq-field', '2-6+1');
+  await page.press('#work .mq-step:nth-child(1) .mq-field', 'Tab');
+  assert.equal(await page.textContent('#work .mq-result'), '', 'a wrong last line explains itself on its own step');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('every field, the switch and the keypad are labelled and keyboard-usable', async () => {
   const { ctx, page, errors } = await open('text');
   assert.equal(await page.getAttribute('#work .mq-field', 'aria-label'), 'Step 1');

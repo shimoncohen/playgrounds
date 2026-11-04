@@ -132,7 +132,7 @@
 
   MQ.content = {
     track: 'arithmetic',
-    ranks: [[0, 'Counter'], [30, 'Bracket Breaker'], [75, 'Order Keeper']],
+    ranks: [[0, 'Counter'], [30, 'Bracket Breaker'], [75, 'Order Keeper'], [150, 'Sign Switcher'], [225, 'Fraction Fixer'], [300, 'Power Player'], [375, 'Ratio Ranger']],
     chapters: [{
       id: 'arithmetic.order', name: 'Order of operations', badge: 'Order Keeper',
       intro: '+, −, × and ÷ are called <b>operations</b>. A line with several of them can be read in more than one way: <code>6 + 4 × 3</code> is 30 if you add first and 18 if you multiply first. The <b>order of operations</b> is the rule everyone agrees on, so every line has one answer. Under each question you write your <b>working</b>: one step per line, each a shorter version of the line above. Your last line is your answer.',
