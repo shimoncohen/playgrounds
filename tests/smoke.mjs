@@ -2282,6 +2282,17 @@ test('agent-quest: after a reload at chapter 15 the active chapter chip is scrol
   }
 });
 
+test('agent-quest: the active chapter chip is scrolled back into the rail when earlier chips change size after load (web fonts)', async () => {
+  const o = await agentPage({ viewport: { width: 390, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+  const { page } = o;
+  await page.addStyleTag({ content: '#chapters .chap[data-ch="0"]{min-width:600px}' });
+  await page.waitForFunction(() => { const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect(); return r.left >= c.left - 1 && r.right <= c.right + 1; });
+  const g = await railGaps(page);
+  assert.equal(g.h, true, `the chip is cut off at the side: ${g.chip} in ${g.rail}`);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
   // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
   const done = {};

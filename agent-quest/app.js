@@ -108,6 +108,7 @@ $('.paneSwitch').addEventListener('click',e=>{const b=e.target.closest('button[d
 
 const mq=q=>{try{return !!(window.matchMedia&&matchMedia(q).matches);}catch(e){return false;}};
 const wide=()=>mq('(min-width:721px)');
+let railRO;
 function renderChapters(){
   Tiers.renderRail(chaptersEl,{status:AQ.tiers.status(S),chapters:CH,S,onPick:ci=>{
     let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;
@@ -115,6 +116,8 @@ function renderChapters(){
     const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});
   }});
   revealCurrent();
+  // Web fonts swap in after the first paint and resize the chips, so scroll again once any of them changes size.
+  if(window.ResizeObserver){railRO=railRO||new ResizeObserver(revealCurrent);railRO.disconnect();railRO.observe(chaptersEl);for(const k of chaptersEl.children)railRO.observe(k);}
 }
 // scrollIntoView would also scroll the page at 390 px, so only the rail scrolls
 function revealCurrent(){
