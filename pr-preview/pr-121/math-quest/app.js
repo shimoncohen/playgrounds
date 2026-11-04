@@ -65,14 +65,13 @@
       svg('path', { d: 'M0 0L10 5L0 10z' }))), ...kids);
 
   function renderOverview() {
-    const pos = {};
-    G.tracks.forEach((t, i) => { pos[t.id] = { x: PAD + i * (W + GX), y: PAD }; });
-    const w = PAD * 2 + G.tracks.length * W + (G.tracks.length - 1) * GX;
+    const pos = {}, { cols, links } = G.trackMap(), rows = Math.max(...cols.map(c => c.length));
+    cols.forEach((ids, ci) => ids.forEach((id, ri) => { pos[id] = { x: PAD + ci * (W + GX), y: PAD + ri * (H + GY) }; }));
     const edges = G.trackEdges();
-    $('overview').replaceChildren(canvas(w, H + PAD * 2,
+    $('overview').replaceChildren(canvas(PAD * 2 + cols.length * W + (cols.length - 1) * GX, PAD * 2 + rows * H + (rows - 1) * GY,
       `Track overview: ${G.tracks.map(t => t.name).join(', ')}. ` + edges.map(([a, b]) => `${name(a)} comes before ${name(b)}.`).join(' '),
-      ...edges.map(([a, b]) => edge(pos[a], pos[b])),
-      ...G.tracks.map(t => node(pos[t.id].x, PAD, t.name, selected === t.id ? 'sel' : '', null, () => select(t.id)))));
+      ...links.map(([a, b]) => edge(pos[a], pos[b])),
+      ...G.tracks.map(t => node(pos[t.id].x, pos[t.id].y, t.name, selected === t.id ? 'sel' : '', null, () => select(t.id)))));
   }
 
   function layout(trackId) {

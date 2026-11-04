@@ -31,13 +31,15 @@
     live: '({a} + {b})({c} + {d}) = {ac} + {ad} + {bc} + {bd} = {area}',
     draw: {
       kind: '2d', view: [-1.2, 10.4, -0.4, 11.2], box: [360, 360],
-      items: ({ params: { a, b, c, d } }) => {
-        const part = (term, x0, y0, x1, y1) => [{ type: 'polygon', term, pts: sq(x0, y0, x1, y1) }, { type: 'text', x: (x0 + x1) / 2, y: (y0 + y1) / 2, s: String((x1 - x0) * (y1 - y0)), term }];
-        const T = 10, m = T - a, bot = m - b;
+      items: ({ params }) => {
+        // Drawn scaled and centred so the longer side always spans the box; the labels keep the true areas.
+        const k = 10 / Math.max(params.a + params.b, params.c + params.d), [a, b, c, d] = ['a', 'b', 'c', 'd'].map(n => params[n] * k);
+        const part = (term, x0, y0, x1, y1) => [{ type: 'polygon', term, pts: sq(x0, y0, x1, y1) }, { type: 'text', x: (x0 + x1) / 2, y: (y0 + y1) / 2, s: String(Math.round((x1 - x0) * (y1 - y0) / k / k)), term }];
+        const L = (10 - c - d) / 2, T = 10 - (10 - a - b) / 2, m = T - a, bot = m - b, mid = L + c;
         return [
-          ...part('ac', 0, m, c, T), ...part('ad', c, m, c + d, T), ...part('bc', 0, bot, c, m), ...part('bd', c, bot, c + d, m),
-          { type: 'text', x: -0.6, y: T - a / 2, s: 'a', term: 'a' }, { type: 'text', x: -0.6, y: m - b / 2, s: 'b', term: 'b' },
-          { type: 'text', x: c / 2, y: T + 0.55, s: 'c', term: 'c' }, { type: 'text', x: c + d / 2, y: T + 0.55, s: 'd', term: 'd' },
+          ...part('ac', L, m, mid, T), ...part('ad', mid, m, mid + d, T), ...part('bc', L, bot, mid, m), ...part('bd', mid, bot, mid + d, m),
+          { type: 'text', x: L - 0.6, y: T - a / 2, s: 'a', term: 'a' }, { type: 'text', x: L - 0.6, y: m - b / 2, s: 'b', term: 'b' },
+          { type: 'text', x: L + c / 2, y: T + 0.55, s: 'c', term: 'c' }, { type: 'text', x: mid + d / 2, y: T + 0.55, s: 'd', term: 'd' },
         ];
       },
     },

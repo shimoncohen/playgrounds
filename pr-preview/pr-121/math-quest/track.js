@@ -9,7 +9,6 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TABS = ['quest', 'fire', 'guide'];
 const isObj = o => !!o && typeof o === 'object' && !Array.isArray(o);
-const ONE = /^\s*-?\d+(\.\d+)?\s*$/;
 const tex = (el, s) => { if (window.katex) katex.render(s, el, { throwOnError: false }); else el.textContent = s; };
 
 function fresh() { return { ch: 0, mi: 0, done: {}, xp: 0, best: 0, badges: {}, tab: 'quest', notes: {}, work: {} }; }
@@ -212,7 +211,7 @@ function answer(v) {
   const fb = $('#fFb');
   if (!v.trim()) { fb.className = 'fb bad'; fb.textContent = 'Type a number first.'; return; }
   fLocked = true;
-  const ok = ONE.test(v) && MQ.check.number(v, fQ.q).ok;
+  const ok = MQ.check.quick(v, fQ.q);
   if (ok) { fStreak++; const pts = 10 + Math.min(fStreak - 1, 5) * 2; fScore += pts; fb.className = 'fb good'; fb.textContent = `Right! +${pts}${fStreak > 1 ? ` (streak ${fStreak})` : ''}`; }
   else { fStreak = 0; fMiss.push(fQ); fb.className = 'fb bad'; fb.textContent = `Not this time: it is ${fQ.a}. ${fQ.why}`; }
   setStats(); clearTimeout(fNext); fNext = setTimeout(() => { if (fireOn) nextQ(); }, ok ? 700 : 2600);

@@ -8,6 +8,7 @@
       { id: 'arithmetic', name: 'Arithmetic', key: 'math-arithmetic-v1' },
       { id: 'algebra', name: 'Algebra', key: 'math-algebra-v1' },
       { id: 'geometry', name: 'Geometry', key: 'math-geometry-v1' },
+      { id: 'trigonometry', name: 'Trigonometry', key: 'math-trigonometry-v1' },
     ],
     chapters: {
       arithmetic: [
@@ -37,6 +38,14 @@
         { id: 'geometry.area', title: 'Area and perimeter', requires: ['arithmetic.order'],
           why: 'area formulas such as ½ × b × h are worked out with the order of operations' },
         { id: 'geometry.angles', title: 'Angles', requires: [] },
+        { id: 'geometry.pythagoras', title: 'Pythagoras', requires: ['geometry.area', 'arithmetic.powers'],
+          why: 'a² + b² = c² adds the areas of squares on the sides, then takes a square root' },
+        { id: 'geometry.circles', title: 'Circles', requires: ['geometry.area'],
+          why: 'a circle\'s area is counted in the same 1 by 1 squares as a rectangle\'s' },
+      ],
+      trigonometry: [
+        { id: 'trigonometry.ratios', title: 'Sine, cosine and tangent', requires: ['geometry.pythagoras', 'geometry.angles', 'arithmetic.ratios'],
+          why: 'sine, cosine and tangent are ratios of the sides of a right triangle, chosen by one of its angles' },
       ],
     },
   };
@@ -105,6 +114,18 @@
       if (from && from !== c.track && !edges.some(e => e[0] === from && e[1] === c.track)) edges.push([from, c.track]);
     }
     return edges;
+  };
+
+  // The overview draws tracks in columns by depth; a link already implied through another track is left out,
+  // because drawn straight it would run behind the track between them.
+  G.trackMap = () => {
+    const edges = G.trackEdges(), from = id => edges.filter(e => e[0] === id).map(e => e[1]);
+    const reach = (a, b, seen = new Set()) => from(a).some(n => n === b || (!seen.has(n) && seen.add(n) && reach(n, b, seen)));
+    const links = edges.filter(([a, b]) => !from(a).some(n => n !== b && reach(n, b)));
+    const depth = {}, d = id => depth[id] ??= 1 + Math.max(-1, ...links.filter(e => e[1] === id).map(e => d(e[0])));
+    const cols = [];
+    for (const t of G.tracks) (cols[d(t.id)] = cols[d(t.id)] || []).push(t.id);
+    return { cols: cols.filter(Boolean), links };
   };
 
   G.labelLines = (title, max) => {
