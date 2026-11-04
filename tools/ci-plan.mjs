@@ -26,7 +26,7 @@ export function scope(files) {
 }
 
 // `all` lists every quest; `withTests` the ones that have a tests/<name>/ folder.
-export function plan(files, { all, withTests }) {
+export function plan(files, { all, withTests, browser = {} }) {
   const picked = files === null ? null : scope(files);
   const shell = picked === null || picked.includes('shell');
   const jobs = [];
@@ -40,6 +40,7 @@ export function plan(files, { all, withTests }) {
   // Tests not named after a quest (landing page, theme, saves) always run: they cover every page.
   const skip = [...(others.length ? [`--test-skip-pattern=^(${others.join('|')})-quest\\b`] : []), ...(shell ? [`--test-skip-pattern=${COURSE}`] : [])];
   jobs.push({ name: picked === null ? 'browser smoke tests' : `browser smoke tests (${picked.join(', ')})`, args: [...skip, 'tests/smoke.mjs'], browser: true });
+  for (const q of picked ?? all) if (browser[q]?.length) jobs.push({ name: `${q} browser tests`, args: ['--test', ...browser[q]], browser: true });
   if (shell) {
     // The full-course test alone takes over two minutes, so it gets its own job.
     jobs.push({ name: 'shell-quest full course', args: [`--test-name-pattern=${COURSE}`, 'tests/smoke.mjs'], browser: true });
@@ -50,7 +51,9 @@ export function plan(files, { all, withTests }) {
 
 function repoQuests() {
   const all = fs.readdirSync(ROOT).map(d => d.match(/^([a-z]+)-quest$/)?.[1]).filter(Boolean).sort();
-  return { all, withTests: all.filter(q => fs.existsSync(path.join(ROOT, 'tests', q))) };
+  const withTests = all.filter(q => fs.existsSync(path.join(ROOT, 'tests', q)));
+  const browser = Object.fromEntries(withTests.map(q => [q, fs.readdirSync(path.join(ROOT, 'tests', q)).filter(f => f.endsWith('.browser.mjs')).sort().map(f => `tests/${q}/${f}`)]));
+  return { all, withTests, browser };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

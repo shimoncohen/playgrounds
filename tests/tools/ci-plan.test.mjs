@@ -42,3 +42,11 @@ test('--all runs every suite, split so the course runs once', () => {
   assert.deepEqual(jobs[0].args, ['--run', 'test:engine']);
   assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^shell-quest full course', 'tests/smoke.mjs']);
 });
+
+test('a quest with browser suites in its test folder gets a job that runs them, on its own changes and on --all', () => {
+  const withMath = { all: ['math', 'net'], withTests: ['math', 'net'], browser: { math: ['tests/math/a.browser.mjs', 'tests/math/b.browser.mjs'] } };
+  const job = plan(['math-quest/track.js'], withMath).find(j => j.name === 'math browser tests');
+  assert.deepEqual(job, { name: 'math browser tests', args: ['--test', 'tests/math/a.browser.mjs', 'tests/math/b.browser.mjs'], browser: true });
+  assert.ok(names(plan(null, withMath)).includes('math browser tests'));
+  assert.ok(!names(plan(['net-quest/app.js'], withMath)).includes('math browser tests'));
+});
