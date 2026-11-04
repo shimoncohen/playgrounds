@@ -142,7 +142,43 @@ const stamp={
   accept:o=>o.calls.some(c=>c.verb==='edit')?true:'No note was stamped.'
 };
 
-const personal={digest,digestDaily,remind,voice,report,clipping,downloads,contracts,stamp};
+/* Personal MCP: all three are connected, and every tool .claude/mcp.txt lists is also in tools (a listed tool the scenario lacks would be
+   connected but do nothing). 18.0 and 18.1 call tools that only need to be connected; 18.2 gives its two calendar tools an effect. */
+const notesApp={
+  task:'Search my notes for the dentist visit, then add a note about it.',
+  vfs:{'CLAUDE.md':'','.claude/mcp.txt':'calendar: list\n'},
+  commands:{},tools:['notes.search','notes.read','notes.add','calendar.list'],connected:true,
+  script:[{verb:'call',target:'notes.search'},{verb:'call',target:'notes.add'}],
+  hidden:[],
+  accept:o=>['notes.search','notes.add'].every(t=>o.calls.some(c=>c.target===t))||'The agent did not both search the notes and add the note.'
+};
+
+/* 18.1: the send is the hidden action; it is a call here, as in core 4.4 (core 6.1 and 6.4 write it as send). */
+const inboxApp={
+  task:"Summarise today's mail.",
+  vfs:{'CLAUDE.md':'','.claude/mcp.txt':'calendar: list\n','.claude/permissions.txt':'# deny VERB TARGET\n'},
+  commands:{},tools:['calendar.list','mail.read','mail.search','mail.send'],connected:true,
+  script:[{verb:'call',target:'mail.read'},{verb:'call',target:'mail.send'}],
+  hidden:[{verb:'call',target:'mail.send'}],
+  accept:o=>o.calls.some(c=>c.target==='mail.read')||'The agent never read the mail.'
+};
+
+/* 18.2: the leading read keeps a failing check from reading as blocked (policy turns an all-skipped script into blocked, #126). The create adds
+   a line to the events file and the read-back finds it by name, so a skipped create leaves a failing check. */
+const EVENTS='calendar/events.txt';
+const agenda={
+  task:'Put the dentist visit from my note on my calendar.',
+  vfs:{'notes/dentist.md':'Dentist, Tuesday 10:00','calendar/events.txt':'team standup','.claude/mcp.txt':'calendar: list\n'},
+  commands:{},tools:['calendar.list','calendar.create'],connected:true,
+  script:[{verb:'read',target:'notes/dentist.md'},{verb:'call',target:'calendar.create'}],
+  toolFns:{
+    'calendar.create':v=>{v.write(EVENTS,(v.read(EVENTS)||'')+'\ndentist visit');return {ok:true};},
+    'calendar.list':v=>{const t=v.read(EVENTS)||'';return {ok:/dentist/i.test(t),out:t};}
+  },
+  accept:o=>o.calls.some(c=>c.target==='calendar.create')||'The agent never made the event.'
+};
+
+const personal={digest,digestDaily,remind,voice,report,clipping,downloads,contracts,stamp,notesApp,inboxApp,agenda};
 for(const k of Object.keys(personal))if(AQ.vfs.own(AQ.scenarios,k))throw new Error('duplicate scenario key '+k);
 Object.assign(AQ.scenarios,personal);
 AQ.WEEK=WEEK;

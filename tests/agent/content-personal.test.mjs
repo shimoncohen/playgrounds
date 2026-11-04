@@ -9,9 +9,9 @@ import { runCases, kit } from './cases.mjs';
 const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
-const PERSONAL = [15, 16, 17];
+const PERSONAL = [15, 16, 17, 18];
 // the scenario keys each personal chapter owns, in mission order; every later batch appends its chapter
-const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'] };
+const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'], 18: ['notesApp', 'inboxApp', 'agenda'] };
 const SCH = '.claude/schedule.txt', ALLOW = '.claude/permissions.txt';
 const WD = '.claude/commands/weekly-digest.md', MR = '.claude/commands/morning-reminder.md';
 const HEAD = '# When each saved command starts, one line each: WHEN HH:MM use NAME\n';
@@ -33,6 +33,9 @@ const NODEL = (t) => `Constraints: do not delete ${t}`, PDFS = NODEL('downloads/
 const DENY_EDIT = 'deny edit *-signed.txt', DENY_DEL = 'deny delete *-signed.txt', PHEAD = '# deny VERB TARGET\n';
 const PERM = (lines) => F({ [ALLOW]: PHEAD + lines + '\n' });
 const SIGNED = ['documents/lease-signed.txt', 'documents/will-signed.txt'], DRAFTS = ['documents/lease-draft.txt', 'documents/will-draft.txt'];
+const MCP = '.claude/mcp.txt', CAL = 'calendar: list\n';
+const MC = (lines, extra = {}) => F({ [MCP]: lines, ...extra });
+const DENY = (t) => ({ [ALLOW]: `# deny VERB TARGET\ndeny ${t}\n` });
 
 const CASES = [
   { at: [15, 0],
@@ -137,6 +140,27 @@ const CASES = [
       // the cap outside the prompt: the root CLAUDE.md cap is live, but this mission asks for a typed one
       P('', { 'CLAUDE.md': 'max 3 files' }), P('', { 'CLAUDE.md': 'Constraints: max 3 files' })],
     refused: ['Constraints: max 0 files', 'Constraints: max three files', 'Constraints: max 3 pages', 'Constraints: at most 3 files', 'Constraints: max -3 files'] },
+  { at: [18, 0],
+    pass: [MC(CAL + 'notes: search, add'), MC('notes: search, add'), MC(CAL + 'notes: add, search'), MC(CAL + 'notes: search, read, add'), MC(CAL + 'notes: search\nnotes: add'), MC(CAL + 'notes:   search ,  add')],
+    fail: [{}, MC(CAL + 'notes: read'), MC(CAL + 'notes: search'), MC(CAL + 'notes: add'), MC(CAL + 'notes: search, read'), MC(CAL + 'note: search, add'), MC(CAL + 'notes: search, adds'),
+      MC(CAL + 'calendar: search, add'), MC(CAL + 'notes: search, add', DENY('call notes.add')), MC(CAL + 'notes: search, add', { 'CLAUDE.md': 'do not call notes.add' }), MC(''),
+      // the line in a file that is not the connection list, or an unshipped .claude/ file
+      F({ 'CLAUDE.md': 'notes: search, add' }), F({ '.claude/hooks.txt': 'notes: search, add' }), F({ '.claude/mcp.json': 'notes: search, add' }), F({ '.claude/servers.txt': 'notes: search, add' })] },
+  { at: [18, 1],
+    pass: [MC(CAL + 'mail: read, search'), MC(CAL + 'mail: read'), MC('mail: read'), MC(CAL + 'mail: search, read'), MC(CAL + 'mail: read\nmail: search'),
+      MC(CAL + 'mail: read, search, send', DENY('call mail.send')), MC(CAL + 'mail: read, send', { 'CLAUDE.md': 'do not call mail.send' }),
+      MC(CAL + 'mail: read, send', { [ALLOW]: '# deny VERB TARGET\ndeny send mail.send\ndeny call mail.send\n' }), MC(CAL + 'mail: read, send', DENY('call mail.send'))],
+    fail: [{}, MC(CAL + 'mail: read, send'), MC(CAL + 'mail: read, send', DENY('call mail.*')), MC(CAL + 'mail: read, send', DENY('send mail.send')), MC(CAL + 'mail: read, search', DENY('call mail')), MC(CAL + 'mail: send'), MC(CAL + 'mail: search'),
+      MC(CAL + 'mail: read, search, send'), MC(CAL + 'mail: read, send', DENY('call mail.search')), MC(CAL + 'mail: read, send', DENY('read mail.send')), MC(CAL + 'mail: read, send', { 'CLAUDE.md': 'do not send mail.send' }),
+      MC(CAL + 'mail: read, send', DENY('call mail.read')), MC(CAL + 'mail: reed, search'), MC(CAL + 'mails: read, search'), MC(''),
+      // the connection or the rule in a file that is not the one the mission reads, or an unshipped .claude/ file
+      F({ 'CLAUDE.md': 'mail: read, search' }), F({ [ALLOW]: 'mail: read, search' }), F({ '.claude/mcp.json': 'mail: read, search' }), F({ '.claude/deny.txt': 'deny call mail.send' })] },
+  { at: [18, 2],
+    pass: [MC('calendar: list, create'), MC('calendar: list, create, delete'), MC('calendar: create, list'), MC('calendar: create\ncalendar: list'), MC('calendar: list, create\ncalendar: delete')],
+    fail: [{}, MC('Calendar: list, create'), MC('calendar: create'), MC('calendar: list'), MC(''), MC('calendar: list, create', DENY('call calendar.create')), MC('calendar: list, create', DENY('call calendar')), MC('calendar: list, create', DENY('call calendar.list')),
+      MC('calendar: list, create', { 'CLAUDE.md': 'do not call calendar.create' }), MC('calendar: list, creat'), MC('calendars: list, create'), MC('calendar: delete'),
+      // the line in a file that is not the connection list, or an unshipped .claude/ file
+      F({ 'CLAUDE.md': 'calendar: list, create' }), F({ '.claude/hooks.txt': 'calendar: list, create' }), F({ '.claude/mcp.json': 'calendar: list, create' })] },
 ];
 
 runCases(AQ, 'chapters 16 to 20: lazy and nearby answers are caught', CASES, (c) => !PERSONAL.includes(c));
@@ -324,6 +348,84 @@ describe('chapter 18 (index 17): Files and documents messages', () => {
   });
 });
 
+describe('chapter 19 (index 18): Personal MCP messages and outcomes', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  const skip = (r, target) => r.outcome.steps.find((s) => s.type === 'skip' && s.target === target);
+  it('18.0 names the first notes tool that is not connected, and the answer makes both calls', () => {
+    assert.match(msg(18, 0, {}), /called notes\.search, but that tool is not connected/);
+    assert.match(msg(18, 0, MC(CAL + 'notes: search')), /called notes\.add, but that tool is not connected/);
+    assert.match(msg(18, 0, M(18, 0).wrong), /called notes\.search, but that tool is not connected/);
+    const r = go(18, 0, M(18, 0).answer);
+    assert.equal(r.result, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.calls)), [{ verb: 'call', target: 'notes.search' }, { verb: 'call', target: 'notes.add' }]);
+  });
+  it('18.1 names mail.read first when it is not connected, even when the send runs', () => {
+    for (const x of [{}, MC(CAL + 'mail: send'), MC(CAL + 'mail: search')]) assert.match(msg(18, 1, x), /read the mail, but mail\.read is not connected/);
+    assert.ok(go(18, 1, MC(CAL + 'mail: send')).outcome.violations.some((v) => v.target === 'mail.send'));
+  });
+  it('18.1 a send that runs says a tool is a call, whichever rule the learner wrote', () => {
+    for (const x of [MC(CAL + 'mail: read, send'), MC(CAL + 'mail: read, send', DENY('send mail.send')), MC(CAL + 'mail: read, send', DENY('call mail.search'))])
+      assert.match(msg(18, 1, x), /did call mail\.send.*A tool is used with the verb call/);
+  });
+  it('18.1 a rule on the whole mail server stops the read, and the mission says so', () => {
+    const r = go(18, 1, MC(CAL + 'mail: read, search', DENY('call mail')));
+    assert.equal(skip(r, 'mail.read').by, 'permission rule');
+    assert.match(r.result, /mail\.read was skipped \(permission rule\)/);
+  });
+  it('18.1 all four passing routes read the mail and never send it', () => {
+    for (const x of [M(18, 1).answer, MC(CAL + 'mail: read, search, send', DENY('call mail.send')), MC(CAL + 'mail: read, send', { 'CLAUDE.md': 'do not call mail.send' }),
+      MC(CAL + 'mail: read, send', { [ALLOW]: '# deny VERB TARGET\ndeny send mail.send\ndeny call mail.send\n' })]) {
+      const r = go(18, 1, x);
+      assert.equal(r.result, true, JSON.stringify(x));
+      assert.ok(r.outcome.calls.some((c) => c.target === 'mail.read'));
+      assert.ok(!r.outcome.calls.some((c) => c.target === 'mail.send'));
+    }
+  });
+  // [mcp.txt, extra files, status, which message the mission gives]
+  const ROWS = [
+    ['calendar: list, create', {}, 'done', true],
+    ['calendar: list, create, delete', {}, 'done', true],
+    ['calendar: create', {}, 'unverified', /nothing read the calendar back/],
+    ['calendar: list', {}, 'failed', /found no dentist visit, because calendar\.create was skipped \(not connected\)/],
+    ['calendar: list, create', DENY('call calendar.create'), 'failed', /calendar\.create was skipped \(permission rule\)/],
+    ['', {}, 'unverified', /Nothing is connected/],
+  ];
+  it('18.2 the six traced rows end with the status the design predicted', () => {
+    for (const [mcp, extra, status, want] of ROWS) {
+      const r = go(18, 2, MC(mcp, extra));
+      assert.equal(r.outcome.status, status, mcp || '(empty)');
+      if (want === true) assert.equal(r.result, true, mcp); else assert.match(r.result, want, mcp || '(empty)');
+    }
+  });
+  it('18.2 says the event was created only when the create ran', () => {
+    assert.match(msg(18, 2, MC('calendar: create')), /event was created/);
+    assert.doesNotMatch(msg(18, 2, MC('')), /event was created/);
+  });
+  it('18.2 a denied read-back is a different message from an unconnected one, and a rule on the CLAUDE.md names it', () => {
+    assert.match(msg(18, 2, MC('calendar: list, create', DENY('call calendar.list'))), /not read back/);
+    assert.match(msg(18, 2, MC('calendar: list, create', { 'CLAUDE.md': 'do not call calendar.create' })), /calendar\.create was skipped \(CLAUDE\.md\)/);
+  });
+  it('18.2 the answer adds the event and the read-back finds it, and the shipped scenario is unchanged', () => {
+    const r = go(18, 2, M(18, 2).answer);
+    assert.match(r.outcome.vfs.read('calendar/events.txt'), /dentist visit/);
+    assert.ok(r.outcome.steps.some((s) => s.type === 'act' && s.tag === 'verify' && s.target === 'calendar.list' && s.ok));
+    assert.equal(AQ.scenarios.agenda.vfs['calendar/events.txt'], 'team standup');
+  });
+  it('the three scenarios are connected, list only tools they have, and every toolFns key is one of their tools', () => {
+    for (const k of KEYS[18]) {
+      const s = AQ.scenarios[k];
+      assert.equal(s.connected, true, k);
+      for (const m of AQ.config.parseSetup(AQ.vfs.create(s.vfs)).mcp) for (const t of m.tools) assert.ok(s.tools.includes(`${m.name}.${t}`), `${k}: ${m.name}.${t}`);
+      for (const t of Object.keys(s.toolFns || {})) assert.ok(s.tools.includes(t), `${k}.${t}`);
+    }
+  });
+  it('agenda is the one personal scenario with toolFns, and its script starts with a read', () => {
+    const withFns = AQ.CH.slice(15).flatMap((ch) => ch.missions.map((m) => m.scenario)).filter((k) => AQ.scenarios[k].toolFns);
+    assert.deepEqual([...withFns], ['agenda']);
+    assert.equal(AQ.scenarios.agenda.script[0].verb, 'read');
+  });
+});
+
 /* #110 option A: every check reads what the mission's own file holds, so moving the answer to another setup file must not pass */
 describe('chapters 16 to 20: the answer moved to another setup file does not pass', () => {
   const targets = ['CLAUDE.md', ALLOW, '.claude/hooks.txt'];
@@ -410,7 +512,7 @@ const DEV = {
   connected: /\bconnected\b/i,
 };
 const MANIFEST = { '15,0': ['unattended', '.claude/commands', 'allow VERB'], '15,1': ['.claude/commands'], '15,2': ['unattended', '.claude/commands', 'allow VERB'],
-  '16,0': ['Use:'], '16,1': [], '16,2': [], '17,0': [], '17,1': [], '17,2': ['max N files'] };
+  '16,0': ['Use:'], '16,1': [], '16,2': [], '17,0': [], '17,1': [], '17,2': ['max N files'], '18,0': ['connected'], '18,1': ['connected'], '18,2': ['connected'] };
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
 

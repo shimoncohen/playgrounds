@@ -70,6 +70,9 @@ const FIRST = {
   'section anchor': [/[\w-]+\.md#[a-z][\w-]*/, 16, 1],
   // chapter 18 (index 17): 17.0 defines the star in a path; no card, quick-fire or guide entry before it writes one
   glob: [/\*/, 17, 0],
+  // chapter 19 (index 18): 18.0 and 18.1 name the personal tools, notes first and then mail
+  'notes tools': [/\bnotes\.(?:search|read|add)\b/, 18, 0],
+  'mail tools': [/\bmail\.(?:read|search)\b/, 18, 1],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),
