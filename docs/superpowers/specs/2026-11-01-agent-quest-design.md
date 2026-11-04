@@ -1,6 +1,6 @@
 # Agent Quest (`agent-quest/`) design
 
-Date: 2026-11-01. Status: approved design; chapters 1 to 20 are built; chapters 21 to 23 are not yet. Issue: #51. Live mode is #52 and is not part of this spec.
+Date: 2026-11-01. Status: approved design; chapters 1 to 23 are built. Issue: #51. Live mode is #52 and is not part of this spec.
 
 ## Goal
 
@@ -411,7 +411,7 @@ Node (`tests/agent/`, part of `npm run test:engine` once PR 3 wires the glob):
 - `teach`: every term a mission relies on was taught earlier on the default path or is defined in place (hard rule 12)
 - `codestyle`: learner text uses `<code>` for commands, fields and paths; copy the shell rules the same way `tests/net/codestyle.test.mjs:4-6` does (importing `tests/shell/codestyle.test.mjs` would run the Shell Quest tests too) and add the agent field names and commands
 
-Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 20 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
+Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 23 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
 
 Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style` in inlined files). Checked in PR 2: `tools/build.py` discovers `agent-quest/` without a list edit (`tools/build.py:43`, `ROOT.glob("*-quest")`).
 
