@@ -97,6 +97,19 @@ test('required working: the answer alone does not pass, one step before it does'
   await ctx.close();
 });
 
+test('a right but unfinished last line says what is still missing', async () => {
+  const { ctx, page, errors } = await open('text');
+  await page.focus('#work .mq-field');
+  await typeChain(page, ['2-6+10']);
+  assert.deepEqual(await marks(page), ['✓', '']);
+  assert.match(await page.textContent('#work .mq-result'), /Finish with one number/);
+  await page.fill('#work .mq-step:nth-child(1) .mq-field', '2-6+1');
+  await page.press('#work .mq-step:nth-child(1) .mq-field', 'Tab');
+  assert.equal(await page.textContent('#work .mq-result'), '', 'a wrong last line explains itself on its own step');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('every field, the switch and the keypad are labelled and keyboard-usable', async () => {
   const { ctx, page, errors } = await open('text');
   assert.equal(await page.getAttribute('#work .mq-field', 'aria-label'), 'Step 1');
@@ -155,8 +168,12 @@ test('round trip: every notation goes text -> MathLive -> translate and keeps it
     const ascii = f.getValue('ascii-math'), back = MQ.check.translate(ascii);
     f.remove();
     const at = [{ x: 0.5, r: 0.5, a: 1.5, b: 2.5, c: 0.75 }, { x: 1.5, r: 2, a: -2, b: 3, c: 4 }, { x: 3.25, r: 3, a: 7, b: -0.5, c: 2.25 }];
-    let ok = true;
-    try { ok = at.every(s => Math.abs(MQ.math.full.evaluate(n, s) - MQ.math.full.evaluate(back, s)) < 1e-9); } catch (e) { ok = false; }
+    // An equation or a list of solutions keeps its value side by side; `log(x, 2)` has no `=`, so its comma stays.
+    const parts = s => (s.includes('=') ? s.split(/=|,|\sor\s/) : [s]);
+    const pn = parts(n.replace(/°/g, '')), pb = parts(back.replace(/°/g, ''));
+    let ok = pn.length === pb.length;
+    // Text that comes back unchanged keeps its value, even where plain math.js reads it as a call (`x(x-3)`).
+    try { ok = back === n || ok && at.every(s => pn.every((p, i) => Math.abs(MQ.math.full.evaluate(p, s) - MQ.math.full.evaluate(pb[i], s)) < 1e-9)); } catch (e) { ok = false; }
     return { n, ascii, back, ok };
   }), NOTATIONS);
   if (process.env.MQ_SHOTS) fs.writeFileSync(path.join(tmp, 'roundtrip.json'), JSON.stringify(rows, null, 2));

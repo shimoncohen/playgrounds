@@ -3,6 +3,7 @@
 .mq-stage{min-width:0;width:100%;max-width:640px;justify-self:center;background:var(--bg,#E7ECF1);border-radius:10px;overflow:hidden}
 .mq-svg{display:block;width:100%;height:auto;color:var(--ink,#14202A);touch-action:pan-y}
 .mq-svg .axes line{stroke:var(--muted,#536677);stroke-width:1}
+.mq-svg .grid line{stroke:var(--line,#C4CFDA);stroke-width:1}
 .mq-svg .axes text{fill:var(--muted,#536677);paint-order:stroke;stroke:var(--bg,#E7ECF1);stroke-width:3px;stroke-linejoin:round;font:10px var(--font-mono,monospace)}
 .mq-svg .shape{stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
 .mq-svg .shape.hl{stroke-width:6}

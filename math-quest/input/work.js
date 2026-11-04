@@ -104,10 +104,11 @@
       const final = steps.length ? mission.check(steps.at(-1)) : { ok: false };
       const all = res.every(r => r.ok), shown = steps.length > 1;
       const ok = final.ok && (mission.work !== 'required' || (all && shown));
-      result.textContent = ok ? 'That solves it.'
-        : !final.ok ? ''
+      const lastRight = steps.length > 0 && res.at(-1).ok;
+      result.innerHTML = codeHtml(ok ? 'That solves it.'
+        : !final.ok ? (lastRight && final.why) || ''
         : !all ? 'The answer is right. Now make every step show ✓.'
-        : 'The answer is right. Now write at least one step before it, to show how you got there.';
+        : 'The answer is right. Now write at least one step before it, to show how you got there.');
       if (ok && !passed && onPass) onPass(steps);
       passed = ok;
     };

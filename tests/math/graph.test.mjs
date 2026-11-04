@@ -46,14 +46,19 @@ test('hint lists missing direct prerequisites', () => {
 test('layers put a chapter one layer after its deepest prerequisite', () => {
   const g = graph([ch('a'), ch('b', ['a']), ch('c'), ch('d', ['a', 'b'])]);
   assert.deepEqual(plain(G.layers('t', g)), [['a', 'c'], ['b'], ['d']]);
-  assert.deepEqual(plain(G.layers('algebra')), [['algebra.expressions']]);
+  assert.deepEqual(plain(G.layers('algebra')), [['algebra.expressions'], ['algebra.expanding'], ['algebra.linear', 'algebra.factoring'], ['algebra.quadratics']]);
+  assert.deepEqual(plain(G.layers('arithmetic')), [['arithmetic.order'], ['arithmetic.negatives', 'arithmetic.fractions'], ['arithmetic.powers', 'arithmetic.ratios']]);
+  assert.deepEqual(plain(G.layers('geometry')), [['geometry.area', 'geometry.angles']], 'prerequisites in other tracks do not add layers');
 });
 
 test('trackEdges and nextUp', () => {
-  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra']]);
-  assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order']);
-  assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order']))), ['algebra.expressions']);
-  assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order', 'algebra.expressions']))), []);
+  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry']]);
+  assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order', 'geometry.angles']);
+  assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order']))), ['arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions'], 'at most 3, in graph order');
+  assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order', 'arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions']))),
+    ['arithmetic.powers', 'arithmetic.ratios', 'algebra.expanding']);
+  const every = G.tracks.flatMap(t => G.chapters[t.id].map(c => c.id));
+  assert.deepEqual(plain(G.nextUp(new Set(every))), []);
 });
 
 test('labelLines wraps on a word boundary and truncates with an ellipsis', () => {

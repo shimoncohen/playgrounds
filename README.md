@@ -14,7 +14,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`shell-quest/`](shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
-| ∑ | **Math Quest** | Arithmetic and algebra, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
+| ∑ | **Math Quest** | Arithmetic, algebra and geometry, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
 
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
@@ -114,7 +114,7 @@ math-quest/              the hub: index.html + style.css + app.js (map and progr
 math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
 math-quest/input/        the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math-quest/rng.js is the seeded random source
 math-quest/track.js     the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
-math-quest/arithmetic/ math-quest/algebra/
+math-quest/arithmetic/ math-quest/algebra/ math-quest/geometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js

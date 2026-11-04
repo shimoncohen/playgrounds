@@ -4,7 +4,7 @@ import { loadMath } from './harness.mjs';
 
 const BASE = ['../math-quest/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
-const TRACKS = ['arithmetic', 'algebra'];
+const TRACKS = ['arithmetic', 'algebra', 'geometry'];
 
 const stateOf = (MQ, def, params) => {
   const m = MQ.scene.model(def);
@@ -34,7 +34,7 @@ for (const track of TRACKS) {
     const id = `${track} ${ci}.${mi} ${m.title}`;
     test(`${id}: answer passes, wrong and lazy fail`, () => {
       for (const f of ['title', 'goal', 'explain', 'hint', 'kind']) assert.ok(m[f], `${id} has no ${f}`);
-      assert.ok(['number', 'expr', 'scene'].includes(m.kind), id);
+      assert.ok(['number', 'expr', 'equation', 'scene'].includes(m.kind), id);
       assert.ok(Array.isArray(m.how) && m.how.length >= 3 && m.how.length <= 5, `${id}: how has 3 to 5 steps`);
       for (const f of ['answer', 'wrong', 'lazy']) assert.ok(m[f] !== undefined, `${id} has no ${f}`);
       assert.equal(judge(MQ, ch, m, m.answer).ok, true, `${id}: answer fails: ${judge(MQ, ch, m, m.answer).why}`);
@@ -87,5 +87,147 @@ for (const track of TRACKS) {
   test(`${track}: ranks start at 0 XP and climb`, () => {
     assert.equal(C.ranks[0][0], 0);
     for (let i = 1; i < C.ranks.length; i++) assert.ok(C.ranks[i][0] > C.ranks[i - 1][0]);
+  });
+
+  test(`${track}: the top rank is reached exactly when every mission and badge is earned`, () => {
+    // 10 XP per mission (track.js) and 25 per chapter badge (shared/tiers.js BADGE_XP).
+    const full = C.chapters.reduce((xp, ch) => xp + ch.missions.length * 10 + 25, 0);
+    assert.equal(C.ranks.at(-1)[0], full);
+  });
+}
+
+const GEO = {
+  'geometry.area': [
+    { yes: ['84', ' 84 ', '84.0'], no: ['38', '19', '84 squares', '12+7'] },
+    { yes: ['45', '45.0', ' 45'], no: ['90', '19', '10*9/2'] },
+    { yes: ['68', '68.0'], no: ['80', '36', '56'] },
+    { yes: ['6', '6.0', ' 6 '], no: ['45', '63', '486'] },
+    { yes: [{ b: 4, h: 6 }, { b: 6, h: 4, p: 7 }, { b: 6, h: 4, p: 0 }], no: [{ b: 8, h: 3 }, { b: 5, h: 5 }, { b: 6, h: 5 }] },
+  ],
+  'geometry.angles': [
+    { yes: ['133', '133°', ' 133 °', '133.0'], no: ['43', '227', '47°', '°133', '133°°'] },
+    { yes: ['75', '75°'], no: ['285', '-105', '105°'] },
+    { yes: ['51', '51°'], no: ['231', '129', '129°'] },
+    { yes: ['38', '38°'], no: ['76', '104', '142°'] },
+    { yes: [{ r1: 60, r2: 120 }, { r1: 120, r2: 60 }], no: [{ r1: 60, r2: 100 }, { r1: 90, r2: 90 }, { r1: 60, r2: 60 }] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  for (const ch of MQ.content.chapters) GEO[ch.id].forEach((alt, mi) => {
+    const m = ch.missions[mi];
+    test(`geometry ${ch.id} ${mi} ${m.title}: other right answers pass and slips fail`, () => {
+      for (const v of alt.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of alt.no) {
+        const r = judge(MQ, ch, m, v);
+        assert.equal(r.ok, false, `${JSON.stringify(v)} should fail`);
+        assert.ok(r.why, `${JSON.stringify(v)} fails without saying why`);
+      }
+    });
+  });
+}
+const ALT = {
+  'algebra.expanding': [
+    { yes: ['3x+6', '6+3x', '3*x+6', '3x + 6'], no: ['3x+2', '3x+5', 'x+6', '3(x+2)'] },
+    { yes: ['-2x+8', '8-2x', '-2*x+8', '8 - 2x'], no: ['-2x-8', '-2x-4', '2x+8', '-(2x-8)'] },
+    { yes: ['x^2+4x+3', '3+4x+x^2', 'x*x+4x+3'], no: ['x^2+3', 'x^2+4x+4', 'x(x+3)+x+3', 'x^2+x+3x+3'] },
+    { yes: ['x^2+4x+4', '4+4x+x^2', 'x*x+4x+4'], no: ['x^2+4', 'x^2+2x+4', '(x+2)(x+2)', 'x^2+2x+2x+4'] },
+  ],
+  'algebra.linear': [
+    { yes: ['x=4', '4=x', 'x = 4', ' x=4 '], no: ['x=7', 'x=8', '2x=8', 'x=4.1'] },
+    { yes: ['x=4', '4 = x', 'x=8/2'], no: ['x=2', 'x=3', '2x=8'] },
+    { yes: ['x=6', '6=x', 'x=6.0'], no: ['x=1.5', 'x=3', 'x=5'] },
+    { yes: ['x=5/3', '5/3=x', 'x = 5/3', 'x=10/6'], no: ['x=3', 'x=1.67', 'x=5', '3x=5'] },
+  ],
+  'algebra.factoring': [
+    { yes: ['3(2x+3)', '3(3+2x)', '(2x+3)*3', '3*(2x+3)'], no: ['3(2x+9)', '1*(6x+9)', '6(x+3/2)', '3*2x+9', '2(3x+4.5)', '6(x+1.5)'] },
+    { yes: ['(x+2)(x+3)', '(x+3)(x+2)', '(2+x)(3+x)', '(x+2)*(x+3)'], no: ['(x+1)(x+6)', 'x(x+5)+6', '(x-2)(x-3)', '(2x+4)(0.5x+1.5)'] },
+    { yes: ['(x-3)(x+3)', '(x+3)(x-3)', '(3+x)(x-3)', '(x+3)*(x-3)'], no: ['(x-3)^2', '(x-9)(x+1)', 'x^2-3^2'] },
+    { yes: ['(x-2)^2', '(x-2)(x-2)', '(2-x)^2', '(x-2)*(x-2)'], no: ['(x+2)^2', '(x-4)(x+1)', 'x(x-4)+4'] },
+  ],
+  'algebra.quadratics': [
+    { yes: ['x=-2 or x=-3', 'x=-3 or x=-2', 'x=-2, x=-3', '-2=x or -3=x'], no: ['x=2 or x=3', 'x=-2', 'x=-2 or x=-3 or x=1', '(x+2)(x+3)=0'] },
+    { yes: ['x=4 or x=-4', 'x=-4, x=4', 'x = 4 or x = -4'], no: ['x=4', 'x=16', 'x=4 or x=4'] },
+    { yes: ['x=0 or x=3', 'x=3 or x=0', 'x=0,x=3'], no: ['x=3', 'x=0', 'x=-3 or x=0'] },
+    { yes: ['x=3', '3=x', 'x = 3'], no: ['x=3 or x=3', 'x=-3', 'x=3 or x=-3'] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'algebra/content.js']);
+  for (const [id, rows] of Object.entries(ALT)) rows.forEach((row, mi) => test(`algebra ${id} ${mi}: other right answers pass and slips fail with a reason`, () => {
+    const ch = MQ.content.chapters.find(c => c.id === id);
+    assert.ok(ch, `${id} has content`);
+    const m = ch.missions[mi], opts = { kind: m.kind, vars: m.vars };
+    for (const v of row.yes) {
+      assert.equal(m.check(v).ok, true, `${v}: ${m.check(v).why}`);
+      assert.equal(MQ.check.steps(m.question, [v], opts)[0].ok, true, `${v} as a step`);
+    }
+    for (const v of row.no) {
+      const r = m.check(v);
+      assert.equal(r.ok, false, `${v} passes`);
+      assert.ok(r.why, `${v} fails without a reason`);
+    }
+  }));
+}
+const MORE = {
+  'arithmetic.negatives': [
+    { yes: ['-8', ' -8 ', '-8.0'], no: ['8', '-2', '2'] },
+    { yes: ['8', ' 8', '8.0'], no: ['-8', '-6', '-4*-2', '(-4)*(-2)'] },
+    { yes: ['-4', '-4.0'], no: ['4', '-9', '-36'] },
+    { yes: ['9', ' 9 '], no: ['-11', '21', '3'] },
+    { yes: [{ a: -3, b: -4 }, { a: -4, b: -3 }], no: [{ a: -3, b: 4 }, { a: 4, b: -3 }, { a: -4, b: -4 }] },
+  ],
+  'arithmetic.fractions': [
+    { yes: ['7/12', ' 7 / 12 ', '7/ 12'], no: ['2/7', '14/24', '0.5833', '7/13'] },
+    { yes: ['8/15', '8 / 15'], no: ['6/8', '10/12', '0.5333', '16/30'] },
+    { yes: ['3/4', ' 3/4 '], no: ['9/12', '6/8', '1/3', '0.75'] },
+    { yes: ['2/3', '2 / 3'], no: ['1/2', '4/6', '0.667'] },
+    { yes: [{ a: 4, b: 6, n: 12 }, { a: 6, b: 4, n: 12 }], no: [{ a: 4, b: 6, n: 24 }, { a: 4, b: 6, n: 10 }, { a: 4, b: 3, n: 12 }] },
+  ],
+  'arithmetic.powers': [
+    { yes: ['8', '8.0'], no: ['6', '9', '2*2*2'] },
+    { yes: ['0', ' 0 '], no: ['8', '-8', '4'] },
+    { yes: ['7', '7.0'], no: ['24.5', '49', '-7'] },
+    { yes: ['243'], no: ['729', '3^5', '45'] },
+    { yes: [{ n: 8 }], no: [{ n: 7 }, { n: 9 }] },
+  ],
+  'arithmetic.ratios': [
+    { yes: ['2/3', '2 / 3'], no: ['6/9', '4/6', '3/2'] },
+    { yes: ['21', '21.0'], no: ['14', '17.5', '7'] },
+    { yes: ['12', '12.0'], no: ['1200', '65', '0.12'] },
+    { yes: ['50'], no: ['10', '65', '1000'] },
+    { yes: [{ a: 2, b: 3 }, { a: 4, b: 6 }, { a: 6, b: 9 }], no: [{ a: 3, b: 2 }, { a: 1, b: 1 }, { a: 4, b: 5 }] },
+  ],
+};
+const STEPS = {
+  'arithmetic.negatives': [['-8'], ['8'], ['-4'], ['8+7+(-6)', '15-6', '9']],
+  'arithmetic.fractions': [['3/12+4/12', '7/12'], ['8/15'], ['9/12', '3/4'], ['1/2+6/12-1/3', '1/2+1/2-1/3', '1-1/3', '3/3-1/3', '2/3']],
+  'arithmetic.powers': [['2*2*2', '4*2', '8'], ['-4+4', '0'], ['7'], ['9*27', '3^5', '243']],
+  'arithmetic.ratios': [['6/9', '2/3'], ['35/5*3', '7*3', '21'], ['80/100*15', '0.15*80', '0.8*15', '12'], ['40+40*25/100', '40+10', '1.25*40', '50']],
+};
+
+{
+  const MQ = loadMath([...BASE, 'arithmetic/content.js']);
+  const C = MQ.content;
+  for (const [id, rows] of Object.entries(MORE)) test(`${id}: other right answers pass and slips fail`, () => {
+    const ci = C.chapters.findIndex(c => c.id === id), ch = C.chapters[ci];
+    assert.ok(ch, `${id} has content`);
+    assert.ok(C.quickfire.some(q => q.ch === ci), `${id} has a quick-fire template`);
+    assert.equal(C.guide.filter(g => g.ch === ci).length, 2, `${id} has 2 guide entries`);
+    rows.forEach((r, mi) => {
+      const m = ch.missions[mi];
+      for (const v of r.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${id} ${mi}: ${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of r.no) {
+        const res = judge(MQ, ch, m, v);
+        assert.equal(res.ok, false, `${id} ${mi}: ${JSON.stringify(v)} should fail`);
+        assert.ok(res.why, `${id} ${mi}: ${JSON.stringify(v)} fails without saying why`);
+      }
+      if (STEPS[id] && STEPS[id][mi]) assert.deepEqual(plain(MQ.check.steps(m.question, STEPS[id][mi]).map(x => x.ok)), STEPS[id][mi].map(() => true), `${id} ${mi} working`);
+    });
+  });
+
+  test('arithmetic.fractions: an unsimplified answer is told how to simplify', () => {
+    const m = C.chapters.find(c => c.id === 'arithmetic.fractions').missions[2];
+    assert.match(m.check('9/12').why, /Divide the top and bottom by the same number/);
   });
 }

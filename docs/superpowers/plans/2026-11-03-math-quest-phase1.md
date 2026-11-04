@@ -225,3 +225,18 @@ Each track `index.html` sets `window.PROGRESS = { key: 'math-<track>-v1', name: 
 - **Not in this plan:** proof mission kinds (`order`, `gap`, `justify`, `flaw`) are specified but first used by the Proofs track; their checker lands with it. Later tracks and chapters have their own plans.
 - **Naming consistency:** `MQ.graph`, `MQ.scene.model`, `MQ.scene.mount`, `MQ.svg2d`, `MQ.three3d`, `MQ.palette`, `MQ.rng`, `MQ.math.full`, `MQ.math.safe`, `MQ.check.*`, `MQ.work.mount` are used the same way in every task.
 - **To verify during work:** exact line numbers cited (`package.json:14-15`, `ci.yml:32`, `AGENTS.md:17`, `pre-pr-check` line 11, `index.html:127`, `shared/progress.js:44`, `tests/smoke.mjs:103`) against the tree at the start of each task.
+
+---
+
+## Phase 2 (one PR to `feat/103-math-quest`)
+
+Decided 2026-11-04: ten new chapters in a single PR, written by three agents at once against a fixed chapter map.
+
+- [x] **Groundwork:**
+  - `forms.expanded` and `MQ.check.final.{number, fraction, solved}` in `input/check.js`, with tests in `tests/math/check.test.mjs`.
+  - All ten chapters and the Geometry track (`math-geometry-v1`) added to `graph.js`, with `why` text; graph tests updated.
+  - The landing card's `data-keys` gains `math-geometry-v1`.
+- [ ] **Arithmetic** (`arithmetic.negatives`, `.fractions`, `.powers`, `.ratios`): number line, fraction bars, unit squares and cubes, ratio bar. Fractions answer in lowest terms.
+- [ ] **Algebra** (`algebra.expanding`, `.linear`, `.factoring`, `.quadratics`): area rectangle, balance scale, the rectangle run backwards, parabola with roots. Linear equations need working on 3 of 5 missions. Adds `final.roots` for two solutions.
+- [ ] **Geometry** (`geometry.area`, `.angles`): new track page, hub card and landing text; draggable corners and rays.
+- [ ] **Merge the three branches**, then review on Sonnet, then run `npm test` and `npm run check`, take screenshots at 390 and 1440 with the keyboard open and in dark theme, and open one PR.
