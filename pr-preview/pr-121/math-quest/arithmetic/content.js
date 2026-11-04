@@ -91,7 +91,7 @@
           hint: 'Find the × and work it out first. Then go left to right through the − and the +.',
           answer: '12', wrong: '0', lazy: '10-4+2*3', check: finalNumber(12) },
         { title: 'The full chain', kind: 'number', question: '1*2-3*2+10/(2-1)', tex: '1 \\times 2 - 3 \\times 2 + 10 \\div (2 - 1)', work: 'required',
-          goal: 'Work out <code>1 × 2 − 3 × 2 + 10 ÷ (2 − 1)</code>. This one checks all of your working: every line you write has to be right, so a slip keeps the mission open until you fix that line or delete it.',
+          goal: 'Work out <code>1 × 2 − 3 × 2 + 10 ÷ (2 − 1)</code>. This one checks your working: write at least one step before the answer, and every line has to be right, so a slip keeps the mission open until you fix that line or delete it.',
           how: [
             'This line uses every rule at once: brackets, then × and ÷, then + and −, each left to right.',
             '<code>(2 − 1)</code> first: it is 1, so the line becomes <code>1 × 2 − 3 × 2 + 10 ÷ 1</code>.',
