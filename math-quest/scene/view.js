@@ -56,7 +56,7 @@
     };
     for (const n of Object.keys(def.params)) row(n, def.params[n], true);
 
-    let playing = false, visible = true, last = 0, raf = 0, playBtn, speed = SPEEDS.includes(prefs().speed) ? prefs().speed : 1;
+    let playing = false, visible = true, last = 0, raf = 0, tRaw = null, playBtn, speed = SPEEDS.includes(prefs().speed) ? prefs().speed : 1;
     if (def.t) {
       const bar = h('div', 'mq-anim', el);
       playBtn = h('button', 'btn', bar);
@@ -92,10 +92,12 @@
       if (!playing || !visible) return;
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
-      const span = def.t.max - def.t.min;
-      let t = model.state().t + dt * (def.t.speed || 1) * BASE_RATE * speed;
-      if (t > def.t.max) t = def.t.min + ((t - def.t.min) % span);
-      model.set('t', t);
+      const span = def.t.max - def.t.min, shown = model.state().t;
+      // The model rounds t to its step, so a slow frame's tiny advance would round away: keep the unrounded time here.
+      if (tRaw === null || Math.abs(shown - tRaw) > (def.t.step || 0.01)) tRaw = shown;
+      tRaw += dt * (def.t.speed || 1) * BASE_RATE * speed;
+      if (tRaw > def.t.max) tRaw = def.t.min + ((tRaw - def.t.min) % span);
+      model.set('t', tRaw);
       update();
       raf = requestAnimationFrame(tick);
     }
