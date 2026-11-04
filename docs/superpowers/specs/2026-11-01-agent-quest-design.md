@@ -1,6 +1,6 @@
 # Agent Quest (`agent-quest/`) design
 
-Date: 2026-11-01. Status: approved design; chapters 1 to 15 and the personal Schedules chapter (chapter 16) are built; the rest of the personal path (17 to 20) and chapters 21 to 23 are not yet. Issue: #51. Live mode is #52 and is not part of this spec.
+Date: 2026-11-01. Status: approved design; chapters 1 to 20 are built; chapters 21 to 23 are not yet. Issue: #51. Live mode is #52 and is not part of this spec.
 
 ## Goal
 
@@ -54,7 +54,7 @@ Notes:
 
 - **Why the landing card is in PR 2.** `tests/smoke.mjs:15` (`NAMES`) and the landing-page check at `tests/smoke.mjs:58` tie the quest list to the cards on `index.html`. Adding one without the other fails the browser tests.
 - **Test evidence for PR 2.** CI does not run `tests/agent/` until PR 3 wires the glob. PR 2's description must carry the local `node --test "tests/agent/*.test.mjs"` output. PR 3 merges right after PR 2 and PRs 4 to 7 cannot start before it, so every content PR is checked in CI.
-- **Chapter order is merge order.** Saved progress is keyed `'<chapterIndex>.<missionIndex>'` (`net-quest/app.js:14`, `shared/tiers.js:36`). The index plan (core 0 to 6, dev 7 to 14, personal 15 to 19, tune 20 to 22) holds only under the strict order 5, 6, 7. After merge, chapters and missions are append-only. Issue #57 lands as two PRs. The first registers Schedules as index 15. The second appends 16 to 19. #58 (index 20 on) waits for the second, because a chapter merged in between would take index 16.
+- **Chapter order is merge order.** Saved progress is keyed `'<chapterIndex>.<missionIndex>'` (`net-quest/app.js:14`, `shared/tiers.js:36`). The index plan (core 0 to 6, dev 7 to 14, personal 15 to 19, tune 20 to 22) holds only under the strict order 5, 6, 7. After merge, chapters and missions are append-only. Issue #57 landed as two PRs. The first registered Schedules as index 15. The second appended 16 to 19. #58 (index 20 on) waits for the second, because a chapter merged in between would take index 16.
 - **Conflict surface.** Open PR #45 edits `README.md` and `tests/smoke.mjs`; issues #46 to #50 may touch the same shared files (landing, README table and count, `smoke.mjs` `NAMES`) before PR 2 lands. PR 2 sets the README "all seven" count (`README.md:134`) at merge time. PR #45 does not edit `package.json` or `ci.yml` (checked 2026-11-01); PR 3's author rechecks after #45 merges.
 - **`new-playground` skill vs `AGENTS.md`.** The skill's step list says "all in one PR" and includes CI scripts (`.claude/skills/new-playground/SKILL.md:10,20`), while `AGENTS.md` says CI changes go in a separate PR ("Where things go", last row). The chain resolves this: the commit scope is PR 0, the quest and its landing wiring are PR 2, and the CI wiring is PR 3. The skill itself is not edited here (follow-up issue #59).
 
@@ -304,11 +304,11 @@ Every mission carries `answer`, `wrong` and `lazy`. The solvability test require
 - Lazy: `Constraints: be careful and don't break anything`. It does not parse, so the run is refused with an inline error and the mission fails.
 - Lazy 2: `do not edit nonexistent/`. The target does not resolve, so the line is rejected and the run is refused.
 
-**Personal mission (calendar).** The setup has MCP servers `calendar` (list, create, delete) and `mail` (send). Task: move Friday's 1:1 with Dana to Monday 09:00 and tell nobody. `hidden` is a call to `mail.send`. `script`: `calendar.delete` the old event, `calendar.create` the new one, `mail.send` to attendees. `accept` needs the delete, a create with the Monday 09:00 start and the title (arguments computed by the scenario), no `mail.send`, and a read-back verification.
+**Personal MCP missions (chapter 19).** Three config missions on `connected` scenarios, graded on connect, deny and read-back. Times and titles are not graded, because a tool call logs only `{verb,target}`.
 
-- Answer: `Constraints: do not call mail.send` and `Done when: call calendar.list`.
-- Wrong: `do not call calendar.create`. The event is never recreated, so `accept` fails.
-- Lazy: `Done when: it is done`. It does not parse, so the run is refused and the mission fails.
+- 19.1 `notesApp` connects the notes tools the job calls.
+- 19.2 `inboxApp` reads the mail and never sends it, either by leaving `send` unconnected or with `deny call mail.send`.
+- 19.3 `agenda` proves a write: read the note, create the event, check with `call calendar.list`. `accept` needs `calendar.create` made, and the run ends `done` only if the read-back found the event.
 
 **Chapter 3 prompt-structure missions.** Each changes the run.
 
@@ -349,8 +349,8 @@ Chapter numbers are 1-based; the array index is the number minus 1.
 | R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match |
 | R2 CI and headless | Ch 14 (see "Unattended runs"). Not simulated: no runner, secrets, exit codes or clock (a schedule line is read and played once; see "Schedules"); `unattended` only blocks `Plan` and non-`read` actions without an `allow` line |
 | R2 writing a project `CLAUDE.md` | Ch 15 (see "Default check"). Not simulated: only the root `CLAUDE.md` supplies the check; global memory, `AGENTS.md`, imports and `/init` stay text |
-| R3 writing and research | Ch 16 |
-| R3 files and documents | Ch 17 |
+| R3 writing and research | Ch 17 |
+| R3 files and documents | Ch 18 |
 | R3 scheduled tasks and reminders | Ch 16, the first personal chapter, shipped first (artifact is a line `WHEN HH:MM use NAME` in `.claude/schedule.txt`) |
 | R3 personal MCP: mail, calendar, notes | Ch 19 |
 | R3 small personal skills and commands | Ch 20 |
@@ -411,7 +411,7 @@ Node (`tests/agent/`, part of `npm run test:engine` once PR 3 wires the glob):
 - `teach`: every term a mission relies on was taught earlier on the default path or is defined in place (hard rule 12)
 - `codestyle`: learner text uses `<code>` for commands, fields and paths; copy the shell rules the same way `tests/net/codestyle.test.mjs:4-6` does (importing `tests/shell/codestyle.test.mjs` would run the Shell Quest tests too) and add the agent field names and commands
 
-Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 16 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
+Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 20 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
 
 Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style` in inlined files). **To verify in PR 2:** that `tools/build.py` discovers `agent-quest/` without a list edit.
 

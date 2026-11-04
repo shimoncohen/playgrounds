@@ -661,12 +661,12 @@ describe('chapters 16 to 20: a card uses exactly the dev terms its row lists, an
 });
 
 describe('personal chapters', () => {
-  it('chapter 16 is frozen at 1 chapter (index 15) of 3 missions, in tier personal, after the dev chapters', () => {
-    assert.ok(AQ.CH.length >= 16);
-    assert.deepEqual([...AQ.CH.slice(15, 16).map((ch) => ch.missions.length)], [3]);
-    assert.ok(AQ.CH.slice(15, 16).every((ch) => ch.tier === 'personal'));
+  it('chapters 16 to 20 are frozen at 5 chapters (indexes 15 to 19) of 3 missions, in tier personal, after the dev chapters', () => {
+    assert.ok(AQ.CH.length >= 20);
+    assert.deepEqual([...AQ.CH.slice(15, 20).map((ch) => ch.missions.length)], [3, 3, 3, 3, 3]);
+    assert.ok(AQ.CH.slice(15, 20).every((ch) => ch.tier === 'personal'));
     assert.ok(AQ.CH.slice(0, 15).every((ch) => ch.tier !== 'personal'));
-    assert.equal(AQ.CH[15].badge, 'Clockwork');
+    assert.deepEqual([...AQ.CH.slice(15, 20).map((ch) => ch.badge)], ['Clockwork', 'Page Turner', 'Desk Clearer', 'Inbox Keeper', 'Pocket Toolsmith']);
   });
   it('the three scenarios are present once, scheduled, unattended-free and tag-free, and none is shared with an earlier chapter', () => {
     const keys = AQ.CH[15].missions.map((m) => m.scenario);
@@ -694,7 +694,6 @@ describe('personal chapters', () => {
       assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, `.claude/commands/${name}.md`), m.title);
     }
   });
-  // vacuous until a personal prompt mission or a scenario with toolFns exists (chapters 17 to 20)
   it('every prompt mission from index 15 lists exactly goal, donewhen, constraints, files, examples, plan and use', () => {
     for (const [c, ch] of AQ.CH.entries()) if (c >= 15) for (const m of ch.missions) if (m.kind === 'prompt') assert.deepEqual([...m.fields].sort(), ['constraints', 'donewhen', 'examples', 'files', 'goal', 'plan', 'use'], m.title);
   });

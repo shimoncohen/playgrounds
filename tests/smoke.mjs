@@ -2260,6 +2260,30 @@ test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and
   }
 });
 
+test('agent-quest: the Writing, Files, Personal MCP and Skills chapters never scroll sideways at 390, 1000 and 1440, and a reload at chapter 20 keeps its chip in the rail', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[16, 1], [17, 0], [18, 2], [19, 1]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      if (ch === 19) {
+        await page.reload();
+        await page.waitForSelector('#runBtn');
+        const g = await railGaps(page);
+        assert.equal(g.chapter, '19');
+        assert.equal(g.h && g.v, true, `the chapter 20 chip is cut off at ${width}: ${g.chip} in ${g.rail}`);
+      }
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
 test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
   const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
   const { page } = o;

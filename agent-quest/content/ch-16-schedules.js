@@ -23,7 +23,7 @@ AQ.CH.push({
   learned:['Starting a job on a schedule','What a repeating job costs','A reminder that can run alone'],
   missions:[
     {
-      title:'Set the schedule',scenario:'digest',kind:'config',prompt:'Use: weekly-digest',facts:['ci','permissions'],
+      title:'Set the schedule',scenario:'digest',kind:'config',prompt:'Use: weekly-digest',facts:['ci','permissions','scheduled-tasks'],
       goal:'A <b>scheduled job</b> is a saved command that starts by itself at a set time. Your digest job is the saved command <code>weekly-digest</code> in <code>.claude/commands</code>: it writes this week\'s digest from your inbox. The file <code>.claude/schedule.txt</code> starts only <code>backup-note</code>, on Mondays, so the digest never runs. Nobody is at the keyboard when a scheduled job runs, which makes the run <b>unattended</b>: nobody can approve anything, so the job may do only what <code>.claude/permissions.txt</code> lists ahead of time. Its list already has <code>allow edit digest.md</code>. Make the digest start every weekday morning at 07:30.',
       how:[
         'The line <code>weekdays 07:30 use weekly-digest</code> in <code>.claude/schedule.txt</code> starts the saved command <code>weekly-digest</code> at 07:30 on every weekday, Monday to Friday.',
