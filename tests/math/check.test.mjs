@@ -85,6 +85,44 @@ test('final-line checks: one number, one fraction, x = number', () => {
   assert.equal(F.solved(3, 'y')('y=3').ok, true);
 });
 
+test('final roots: every solution once, in any order, joined by or or a comma', () => {
+  const two = C.final.roots([2, 3]);
+  for (const v of ['x = 2 or x = 3', 'x=3 or x=2', 'x = 2, x = 3', 'x=3,x=2', '2 = x or x = 3']) assert.equal(two(v).ok, true, v);
+  assert.match(two('x = 2').why, /you found one solution; there is another/i);
+  assert.match(two('x = 2 or x = 4').why, /`x = 4` is not a solution/);
+  assert.match(two('x = 2 or x = 2').why, /twice/);
+  assert.match(two('x = 2 or 3').why, /x = 2 or x = 3/);
+  assert.match(two('(x-2)(x-3)=0').why, /Keep going/);
+  assert.equal(C.final.roots([3])('x = 3').ok, true, 'a repeated root is written once');
+  assert.match(C.final.roots([3])('x = 3 or x = 3').why, /twice/);
+  assert.equal(C.final.roots(['-1/2', 4])('x = 4 or x = -1/2').ok, true);
+  assert.match(C.final.roots([-1, 1, 2])('x=1 or x=2').why, /found 2 solutions; there is another/);
+  assert.equal(C.final.roots([5], 'y')('y = 5').ok, true);
+});
+
+test('a variable right before a bracket multiplies it, as in x(x - 3)', () => {
+  assert.deepEqual(oks(C.steps('x^2-3x=0', ['x(x-3)=0', 'x (x-3)=0', 'x(x(x-3))=x^2'], { kind: 'equation' })), [true, true, false]);
+  assert.equal(C.expr('x(x+5)', 'x^2+5x', { form: 'linearFactors' }).ok, true);
+  assert.equal(C.expr('a(b+1)', 'a*b+a', { vars: ['a', 'b'] }).ok, true);
+  assert.equal(C.expr('x(x+3)+x+3', '(x+1)(x+3)', { form: 'expanded' }).why, 'That is equal, but there are still brackets to multiply out.');
+});
+
+test('equation steps: a list of solutions is checked like the equation it stands for', () => {
+  const q = 'x^2+5x+6=0';
+  assert.deepEqual(oks(C.steps(q, ['(x+2)(x+3)=0', 'x=-2 or x=-3', 'x = -3, x = -2'], { kind: 'equation' })), [true, true, true]);
+  assert.match(plain(C.steps(q, ['x=-2'], { kind: 'equation' }))[0].why, /loses a solution/);
+  assert.match(plain(C.steps('x^2=16', ['x=4'], { kind: 'equation' }))[0].why, /square root/);
+  assert.match(plain(C.steps(q, ['x=2 or x=3'], { kind: 'equation' }))[0].why, /different solutions/);
+  assert.deepEqual(oks(C.steps('x^2-6x+9=0', ['x=3'], { kind: 'equation' })), [true], 'a repeated root');
+});
+
+test('tex and translate keep a list of solutions', () => {
+  assert.equal(C.tex('x=-2 or x=-3'), ' x = -2\\text{ or } x = -3');
+  assert.equal(C.tex('x=1, x=2'), ' x = 1,\\  x = 2');
+  assert.equal(C.tex('log(x, 2)'), C.tex('log(x,2)'), 'a comma inside a call is not a list');
+  assert.equal(C.translate('x=-2" or "x=-3'), 'x=-2 or x=-3');
+});
+
 test('number steps are each checked against the original', () => {
   const q = '1*2-3*2+10/(2-1)';
   assert.deepEqual(oks(C.steps(q, ['1*2-3*2+10/1', '2-6+10', '6'], { kind: 'number' })), [true, true, true]);

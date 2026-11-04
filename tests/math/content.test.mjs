@@ -34,7 +34,7 @@ for (const track of TRACKS) {
     const id = `${track} ${ci}.${mi} ${m.title}`;
     test(`${id}: answer passes, wrong and lazy fail`, () => {
       for (const f of ['title', 'goal', 'explain', 'hint', 'kind']) assert.ok(m[f], `${id} has no ${f}`);
-      assert.ok(['number', 'expr', 'scene'].includes(m.kind), id);
+      assert.ok(['number', 'expr', 'equation', 'scene'].includes(m.kind), id);
       assert.ok(Array.isArray(m.how) && m.how.length >= 3 && m.how.length <= 5, `${id}: how has 3 to 5 steps`);
       for (const f of ['answer', 'wrong', 'lazy']) assert.ok(m[f] !== undefined, `${id} has no ${f}`);
       assert.equal(judge(MQ, ch, m, m.answer).ok, true, `${id}: answer fails: ${judge(MQ, ch, m, m.answer).why}`);
@@ -119,4 +119,47 @@ const GEO = {
       }
     });
   });
+}
+const ALT = {
+  'algebra.expanding': [
+    { yes: ['3x+6', '6+3x', '3*x+6', '3x + 6'], no: ['3x+2', '3x+5', 'x+6', '3(x+2)'] },
+    { yes: ['-2x+8', '8-2x', '-2*x+8', '8 - 2x'], no: ['-2x-8', '-2x-4', '2x+8', '-(2x-8)'] },
+    { yes: ['x^2+4x+3', '3+4x+x^2', 'x*x+4x+3', 'x^2+x+3x+3'], no: ['x^2+3', 'x^2+4x+4', 'x(x+3)+x+3'] },
+    { yes: ['x^2+4x+4', '4+4x+x^2', 'x^2+2x+2x+4', 'x*x+4x+4'], no: ['x^2+4', 'x^2+2x+4', '(x+2)(x+2)'] },
+  ],
+  'algebra.linear': [
+    { yes: ['x=4', '4=x', 'x = 4', ' x=4 '], no: ['x=7', 'x=8', '2x=8', 'x=4.1'] },
+    { yes: ['x=4', '4 = x', 'x=8/2'], no: ['x=2', 'x=3', '2x=8'] },
+    { yes: ['x=6', '6=x', 'x=6.0'], no: ['x=1.5', 'x=3', 'x=5'] },
+    { yes: ['x=5/3', '5/3=x', 'x = 5/3', 'x=10/6'], no: ['x=3', 'x=1.67', 'x=5', '3x=5'] },
+  ],
+  'algebra.factoring': [
+    { yes: ['3(2x+3)', '3(3+2x)', '(2x+3)*3', '3*(2x+3)'], no: ['3(2x+9)', '1*(6x+9)', '6(x+3/2)', '3*2x+9'] },
+    { yes: ['(x+2)(x+3)', '(x+3)(x+2)', '(2+x)(3+x)', '(x+2)*(x+3)'], no: ['(x+1)(x+6)', 'x(x+5)+6', '(x-2)(x-3)'] },
+    { yes: ['(x-3)(x+3)', '(x+3)(x-3)', '(3+x)(x-3)', '(x+3)*(x-3)'], no: ['(x-3)^2', '(x-9)(x+1)', 'x^2-3^2'] },
+    { yes: ['(x-2)^2', '(x-2)(x-2)', '(2-x)^2', '(x-2)*(x-2)'], no: ['(x+2)^2', '(x-4)(x+1)', 'x(x-4)+4'] },
+  ],
+  'algebra.quadratics': [
+    { yes: ['x=-2 or x=-3', 'x=-3 or x=-2', 'x=-2, x=-3', '-2=x or -3=x'], no: ['x=2 or x=3', 'x=-2', 'x=-2 or x=-3 or x=1', '(x+2)(x+3)=0'] },
+    { yes: ['x=4 or x=-4', 'x=-4, x=4', 'x = 4 or x = -4'], no: ['x=4', 'x=16', 'x=4 or x=4'] },
+    { yes: ['x=0 or x=3', 'x=3 or x=0', 'x=0,x=3'], no: ['x=3', 'x=0', 'x=-3 or x=0'] },
+    { yes: ['x=3', '3=x', 'x = 3'], no: ['x=3 or x=3', 'x=-3', 'x=3 or x=-3'] },
+  ],
+};
+{
+  const MQ = loadMath([...BASE, 'algebra/content.js']);
+  for (const [id, rows] of Object.entries(ALT)) rows.forEach((row, mi) => test(`algebra ${id} ${mi}: other right answers pass and slips fail with a reason`, () => {
+    const ch = MQ.content.chapters.find(c => c.id === id);
+    assert.ok(ch, `${id} has content`);
+    const m = ch.missions[mi], opts = { kind: m.kind, vars: m.vars };
+    for (const v of row.yes) {
+      assert.equal(m.check(v).ok, true, `${v}: ${m.check(v).why}`);
+      assert.equal(MQ.check.steps(m.question, [v], opts)[0].ok, true, `${v} as a step`);
+    }
+    for (const v of row.no) {
+      const r = m.check(v);
+      assert.equal(r.ok, false, `${v} passes`);
+      assert.ok(r.why, `${v} fails without a reason`);
+    }
+  }));
 }
