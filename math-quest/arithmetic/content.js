@@ -2,9 +2,7 @@
 (() => {
   const MQ = globalThis.MQ = globalThis.MQ || {};
   const ok = { ok: true };
-  const oneNumber = /^\s*-?\d+(\.\d+)?\s*$/;
-  // The step checker accepts any line with the right value, so the final answer must also be a single number.
-  const finalNumber = value => v => !oneNumber.test(v) ? { ok: false, why: 'Keep going until your last line is one number.' } : MQ.check.number(v, value);
+  const finalNumber = MQ.check.final.number;
 
   const N = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
   const width = s => String(s).length * 0.35 + 0.55;

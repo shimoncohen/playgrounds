@@ -2,8 +2,7 @@
 (() => {
   const MQ = globalThis.MQ = globalThis.MQ || {};
   const ok = { ok: true };
-  const oneNumber = /^\s*-?\d+(\.\d+)?\s*$/;
-  const finalNumber = value => v => !oneNumber.test(v) ? { ok: false, why: 'Keep going until your last line is one number.' } : MQ.check.number(v, value);
+  const finalNumber = MQ.check.final.number;
   const E = (label, value) => ({ min: 1, max: 6, step: 1, value, label });
 
   const box = {

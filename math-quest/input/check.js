@@ -67,6 +67,7 @@
     noDivision: 'That is equal, but there is still a division in it. Cancel it out.',
     product: 'That is equal, but it is not written as one product yet.',
     linearFactors: 'That is equal, but it is not split into factors like (x - 1)(x + 1) yet.',
+    expanded: 'That is equal, but there are still brackets to multiply out.',
   };
 
   const expr = (input, expected, { vars = ['x'], seed = 1, form } = {}) => {
@@ -124,6 +125,26 @@
       noDivision: n => !n.filter(m => m.isOperatorNode && m.op === '/').length,
       product: n => !isSum(strip(n)),
       linearFactors: n => !isSum(strip(n)) && factors(n).every(f => degree(f) <= 1),
+      expanded: n => !n.filter(m => m.isOperatorNode && (
+        m.op === '^' ? isSum(strip(m.args[0])) : ['*', '/', '-'].includes(m.op) && (m.op !== '-' || m.fn === 'unaryMinus') && m.args.some(a => isSum(strip(a))))).length,
+    },
+  };
+
+  // The step checker accepts any line with the right value, so a mission's last line must also have the finished shape.
+  const NUM = '-?\\d+(?:\\.\\d+)?(?:\\s*/\\s*\\d+)?';
+  const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+  C.final = {
+    number: value => v => /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? number(v, value) : no('Keep going until your last line is one number.'),
+    fraction: (value, { lowest = true } = {}) => v => {
+      const m = /^\s*-?(\d+)(?:\s*\/\s*(\d+))?\s*$/.exec(v);
+      if (!m) return no(/\d\.\d/.test(v) ? 'Write the answer as a fraction of whole numbers, like 3/4, not as a decimal.' : 'Keep going until your last line is one fraction, like 3/4.');
+      const r = number(v, value, { exact: true });
+      if (r.ok && lowest && m[2] && gcd(+m[1], +m[2]) > 1) return no('That is equal, but not in its simplest form yet. Divide the top and bottom by the same number.');
+      return r;
+    },
+    solved: (value, x = 'x') => v => {
+      const m = new RegExp(`^\\s*(?:${x}\\s*=\\s*(${NUM})|(${NUM})\\s*=\\s*${x})\\s*$`).exec(v);
+      return m ? number(m[1] || m[2], value) : no(`Keep going until your last line reads \`${x} = \` and one number.`);
     },
   };
 

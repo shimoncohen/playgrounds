@@ -53,6 +53,38 @@ test('form rules read the parse tree', () => {
   assert.equal(C.expr('2a+3a', '2a+3a', { vars: ['a'], form: 'product' }).ok, false);
 });
 
+test('expanded: no bracket left around a sum', () => {
+  const p = s => MQ.math.full.parse(s);
+  for (const s of ['3x+6', 'x^2+4x+3', '-x-2', 'x^2', '2x*3', '6']) assert.equal(C.forms.expanded(p(s)), true, s);
+  for (const s of ['3(x+2)', '(x+1)(x+3)', '-(x+2)', '(x+1)^2', '(x+1)/2', '2(x-1)+3']) assert.equal(C.forms.expanded(p(s)), false, s);
+  assert.equal(C.expr('3x+6', '3(x+2)', { form: 'expanded' }).ok, true);
+  assert.match(C.expr('3(x+2)', '3(x+2)', { form: 'expanded' }).why, /brackets/);
+});
+
+test('final-line checks: one number, one fraction, x = number', () => {
+  const F = C.final;
+  assert.equal(F.number(6)('6').ok, true);
+  assert.equal(F.number(-4)('-4').ok, true);
+  assert.match(F.number(6)('2+4').why, /one number/);
+  assert.equal(F.number(6)('5').ok, false);
+
+  assert.equal(F.fraction('3/4')('3/4').ok, true);
+  assert.equal(F.fraction('3/4')('6/8').ok, false);
+  assert.match(F.fraction('3/4')('6/8').why, /simplest/);
+  assert.equal(F.fraction('3/4', { lowest: false })('6/8').ok, true);
+  assert.equal(F.fraction('-1/2')('-1/2').ok, true);
+  assert.equal(F.fraction('2')('2').ok, true);
+  assert.match(F.fraction('3/4')('0.75').why, /fraction/);
+  assert.match(F.fraction('3/4')('1/2+1/4').why, /one fraction/);
+
+  assert.equal(F.solved(4)('x = 4').ok, true);
+  assert.equal(F.solved(4)('4=x').ok, true);
+  assert.equal(F.solved('7/2')('x=7/2').ok, true);
+  assert.equal(F.solved(4)('x=5').ok, false);
+  assert.match(F.solved(4)('2x=8').why, /x = /);
+  assert.equal(F.solved(3, 'y')('y=3').ok, true);
+});
+
 test('number steps are each checked against the original', () => {
   const q = '1*2-3*2+10/(2-1)';
   assert.deepEqual(oks(C.steps(q, ['1*2-3*2+10/1', '2-6+10', '6'], { kind: 'number' })), [true, true, true]);
