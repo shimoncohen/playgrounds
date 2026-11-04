@@ -15,7 +15,7 @@
             | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
      operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call, a method or a print
-            is an implicit reborrow, not a move: {k:'copy',l,reb:true}. Reading a Field or Index is a copy of the root local. */
+            is an implicit reborrow, not a move (except std drop):{k:'copy',l,reb:true}. Reading a Field or Index is a copy of the root local. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -330,7 +330,7 @@ function lowerFn(f,info,un,userDrop){
       case 'ArrayRepeat':return put({k:'agg',args:[ex(e.elem)]},e,dest,tyOf(e));
       case 'Macro':{
         if(!PRINT.has(e.name)||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
-        const args=[...e.args.slice(1),...e.named.map(x=>x.expr)].map(x=>printArg(x,e));
+        const args=seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
         const caps=e.args[0]&&info.get(e.args[0])&&info.get(e.args[0]).caps||[];
         for(const c of caps)if(c.bind&&lm.has(c.bind))args.push(printLocal(lm.get(c.bind),e));
         return put({k:'macro',name:e.name,args},e,dest,T.unit);

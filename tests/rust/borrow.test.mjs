@@ -287,6 +287,10 @@ describe('drop, a repeated &mut argument and the order operands are read in', ()
     assert.equal(unsup(IX('let r = &mut x;', 'let y = x + *r;', 'println!("{}", y);')), 'use while borrowed@4');
     assert.equal(unsup(IX('let r = &mut x;', 'let t = (x, *r);', 'println!("{}", t.0);')), 'use while borrowed@4');
   });
+  it('a &T local print arg is read before a later arg that reassigns it (E0506 in rustc)', () => {
+    const src = P('fn main() {', '    let mut x = 1;', '    let y = 2;', '    let mut r = &x;', '    println!("{} {}", r, { r = &y; x = 5; 1 });', '}');
+    assert.equal(diags(src), 'E0506@5');
+  });
   it('a local moved before a sibling that borrows it is moved there', () => {
     const take = ['fn take(a: String, b: &String) {', '}'];
     assert.equal(diags(P(...take, 'fn main() {', '    let s = String::from("a");', '    take(s, &s);', '}')), 'E0382@5');

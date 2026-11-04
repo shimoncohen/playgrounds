@@ -74,13 +74,14 @@ function f64(x,spec){
 
 const ESC={'\n':'\\n','\r':'\\r','\t':'\\t','\\':'\\\\'};
 // the escapes Rust prints are modeled for plain ASCII text only; anything else is left to the real compiler
-function quoted(s,q){
+function quoted(s,q,room){
   let o=q;
   for(const c of s){
     if(c===q)o+='\\'+q;
     else if(ESC[c])o+=ESC[c];
     else if(c>=' '&&c<='~')o+=c;
     else throw new Unmodeled('debug text');
+    if(o.length>room)throw new Over();
   }
   return o+q;
 }
@@ -96,14 +97,17 @@ function display(v){
   }
 }
 // tick is called once per value printed, so a big array counts against the step budget
-function debug(v,tick){
+// room is how many chars the text may still have; past it Over is thrown, so a nested value never builds far beyond the output cap
+class Over extends Error{}
+function debug(v,tick,room=Infinity){
   if(tick)tick();
-  const sub=x=>debug(x,tick);
+  let used=0;
+  const sub=x=>{const s=debug(x,tick,room-used);used+=s.length+2;if(used>room)throw new Over();return s;};
   v=unref(v);
   switch(v.k){
     case 'float':return f64(v.v,'?');
-    case 'char':return quoted(v.v,"'");
-    case 'str':case 'String':return quoted(v.v,'"');
+    case 'char':return quoted(v.v,"'",room);
+    case 'str':case 'String':return quoted(v.v,'"',room);
     case 'unit':return '()';
     case 'tuple':return '('+v.v.map(sub).join(', ')+(v.v.length===1?',':'')+')';
     case 'array':return '['+v.v.map(sub).join(', ')+']';
@@ -111,8 +115,8 @@ function debug(v,tick){
   }
 }
 // width counts characters, as Rust does
-function render(v,fmt,tick){
-  const s=fmt.debug?debug(v,tick):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
+function render(v,fmt,tick,room){
+  const s=fmt.debug?debug(v,tick,room):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
   if(fmt.width===null)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }
@@ -125,5 +129,5 @@ const methods=new Map([
   ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
   ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
 ]);
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled,methods,unref};
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,Over,methods,unref};
 })();

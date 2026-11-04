@@ -130,17 +130,18 @@ RQ.interp=(ast,opts)=>{
     try{
       for(const p of parts){
         if(p.lit!==undefined)s+=p.lit;
-        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick);
+        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
         else{
           let v=named.get(p.name);
           if(!v){const c=find(env,p.name);v=c?read(c,e.line):consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
-          s+=RQ.std.render(v,p.fmt,tick);
+          s+=RQ.std.render(v,p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
         }
         // a line built from many big parts stops here; emit sees the total over the cap and throws
         if(out.length+err.length+s.length>MAX_OUTPUT)break;
       }
     }catch(x){
       if(x instanceof RQ.std.Unmodeled)throw new Unsup('format spec',e.line);
+      if(x instanceof RQ.std.Over)throw new Limit('output size');
       throw x;
     }
     emit(e.name,s);return UNIT;
@@ -310,7 +311,7 @@ RQ.interp=(ast,opts)=>{
     callFn(fns.get('main'),[],1);
     return {status:'ok',stdout:out,stderr:err,exit:0};
   }catch(x){
-    if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out,stderr:err,exit:null};
+    if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out.slice(0,MAX_OUTPUT),stderr:err.slice(0,MAX_OUTPUT),exit:null};
     if(x instanceof Unsup)return {status:'unsupported',unsupported:{feature:x.feature,line:x.line},stdout:out,stderr:err,exit:null};
     if(x instanceof Panic){
       const panic={msg:x.msg,line:x.line,col:x.col};

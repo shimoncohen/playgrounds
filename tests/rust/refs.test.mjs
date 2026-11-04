@@ -420,7 +420,16 @@ describe('run: String and reference programs', () => {
     const c = run(big + '    loop {\n        println!("{}", s);\n    }');
     assert.equal(c.status, 'limit');
     assert.equal(c.limit, 'output size');
-    assert.ok(c.stdout.length > 1000000 && c.stdout.length <= 1000000 + 65537, c.stdout.length);
+    assert.equal(c.stdout.length, 1000000);
+  });
+  it('Debug text of a tuple of big clones stops at the cap while it is built, and the result is cut to the cap', () => {
+    const items = 'fn f(s: &String) -> (String, String) {\n    (s.clone(), s.clone())\n}';
+    const one = 'f(&r)', ten = Array(10).fill(one).join(', ');
+    const c = RQ.run(main(`    let mut r = String::from("\\\\");\n    let mut i = 0;\n    while i < 16 {\n        let t = r.clone();\n        r.push_str(&t);\n        i += 1;\n    }\n    let t = (${ten});\n    println!("{:?}", t);`, items));
+    assert.equal(c.status, 'limit');
+    assert.equal(c.limit, 'output size');
+    assert.equal(c.stdout, '');
+    assert.throws(() => RQ.std.debug({ k: 'tuple', v: [{ k: 'String', v: 'x'.repeat(50) }] }, null, 10));
   });
   it('stdout and stderr count together', () => {
     const c = run(big + '    loop {\n        println!("{}", s);\n        eprintln!("{}", s);\n    }');
@@ -431,7 +440,7 @@ describe('run: String and reference programs', () => {
     const c = run(big + `    println!("${'{0}'.repeat(5000)}", s);`);
     assert.equal(c.status, 'limit');
     assert.equal(c.limit, 'output size');
-    assert.ok(c.stdout.length > 1000000 && c.stdout.length <= 1000000 + 65537 + 1, c.stdout.length);
+    assert.equal(c.stdout.length, 1000000);
   });
   it('a program that prints under the cap is unchanged', () => {
     const c = run(big + '    println!("{}", s);\n    eprintln!("{}", s);\n    println!("done");');
