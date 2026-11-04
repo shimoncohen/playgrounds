@@ -87,7 +87,7 @@
             'This time the sides are the adjacent (8) and the opposite (the height). <code>tan θ = opp ÷ adj</code> (TOA) joins them, and there is no hypotenuse in it.',
             'Multiply both sides by <code>adj</code>: <code>opp = adj × tan θ</code>. Your first step is <code>8 × tan(30)</code> (type <code>8*tan(30)</code>).',
             '<code>tan(30)</code> is about 0.5774, so the step comes to 4.619 and rounds to 4.6.',
-            'Dividing instead, <code>8 ÷ tan(30)</code>, gives 13.9, which is too tall: the tower cannot be taller than it is far away at such a small angle.',
+            'Dividing instead, <code>8 ÷ tan(30)</code>, gives 13.9. That cannot be right: at an angle under 45°, the tower is shorter than the 8 you stand away from it.',
           ],
           explain: 'tan 45° is exactly 1: at 45° the opposite and adjacent sides are the same length. Below 45° the opposite side is shorter, as here.',
           hint: 'Which of S, C, T uses opp and adj and leaves the hypotenuse out?',

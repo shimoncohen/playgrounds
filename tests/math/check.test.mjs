@@ -270,8 +270,23 @@ test('translate reads what MathLive writes for degrees and inverse trig', () => 
   // Outputs captured from MathLive's ascii-math for 35^{\circ}, \sin(35^{\circ}), \arcsin(0.5), \sin^{-1}(0.5), \sin 35.
   assert.equal(C.translate('35^@'), '35°');
   assert.equal(C.translate('sin (35^@)'), 'sin (35°)');
-  assert.equal(C.translate('arcsin (0.5)'), 'asin(0.5)');
+  assert.equal(C.translate('arcsin (0.5)'), 'asin (0.5)');
   assert.equal(C.translate('sin ^(-1)(0.5)'), 'asin(0.5)');
   assert.equal(C.translate('10 * sin 35'), '10*sin(35)');
   assert.equal(C.number(C.translate('sin (35^@)'), 'sin(35)').ok, true);
+});
+
+test('review fixes: bare inverse trig, no cut arguments, ° after a bracket, ± only on a plain letter, tan(90), halves', () => {
+  assert.equal(C.translate('arcsin 0.5'), 'asin(0.5)');
+  assert.equal(C.translate('sin ^(-1)0.5'), 'asin(0.5)');
+  assert.equal(C.translate('cos 2x'), 'cos 2x', 'a number followed by a letter is not split off as the whole argument');
+  assert.equal(C.number('asin(0.5)°', 30).ok, true);
+  assert.equal(C.steps('x^2=16', ['x^2=±16'], { kind: 'equation' })[0].ok, false, 'not rewritten into 2 = -16');
+  assert.match(C.number('tan(90)', 1).why, /one number/);
+  const r = (v, dp) => C.final.rounded(v, dp);
+  assert.equal(r('1.45', 1)('1.5').ok, true);
+  assert.equal(r('1.45', 1)('1.4').ok, false);
+  assert.equal(r('-2.25', 1)('-2.3').ok, true);
+  assert.equal(r('1.005', 2)('1.01').ok, true);
+  assert.equal(r('1.255', 2)('1.26').ok, true);
 });

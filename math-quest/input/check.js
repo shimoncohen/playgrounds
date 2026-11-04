@@ -7,7 +7,7 @@
   const yes = { ok: true };
 
   // Angles may be typed with a degree sign; math.js cannot read `°`, and the value is the same without it.
-  const bare = s => String(s).replace(/(\d)\s*°(?!\s*\d)/g, '$1');
+  const bare = s => String(s).replace(/([\d)])\s*°(?!\s*\d)/g, '$1');
   const parse = s => {
     let node;
     try { node = full.parse(bare(s)); } catch (e) { return { why: UNREAD }; }
@@ -165,9 +165,10 @@
   const solvedRe = x => new RegExp(`^\\s*(?:${x}\\s*=\\s*(${NUM})|(${NUM})\\s*=\\s*${x})\\s*$`);
   const LIST = /\s*,\s*|\s+or\s+/;
   // `x = ±4` is two solutions; written out as `x = 4 or x = -4`, every list check reads it. MathLive types ± as `+-`.
-  const pm = s => String(s).replace(/(\w+)\s*=\s*(?:±|\+-|\+\/-)\s*([^,]+?)(?=\s*,|\s+or\s+|\s*$)/g,
+  const pm = s => String(s).replace(/(?<![\w^.)])([A-Za-z]\w*)\s*=\s*(?:±|\+-|\+\/-)\s*([^,]+?)(?=\s*,|\s+or\s+|\s*$)/g,
     (_, x, r) => `${x} = ${r} or ${x} = ${/^[\d.]+(?:\s*\/\s*\d+)?$/.test(r) ? '-' + r : '-(' + r + ')'}`);
-  const round = (v, dp) => Math.round(+v * 10 ** dp) / 10 ** dp;
+  // Shifting the decimal point in the text, not by multiplying, keeps 1.45 * 10 from becoming 14.4999…; halves round away from zero.
+  const round = (v, dp) => Math.sign(+v) * +(Math.round(+(+Math.abs(+v).toPrecision(12) + 'e' + dp)) + 'e-' + dp);
   C.final = {
     number: value => v => /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? number(v, value) : no('Keep going until your last line is one number.'),
     fraction: (value, { lowest = true } = {}) => v => {
@@ -286,8 +287,8 @@
   C.translate = ascii => String(ascii)
     // MathLive writes a superscript degree sign as `^@` and an inverse like sin⁻¹ as `sin ^(-1)` or `arcsin`.
     .replace(/\s*\^\s*(?:@|\(@\))/g, '°')
-    .replace(/\b(?:arc(sin|cos|tan)|(sin|cos|tan)\s*\^\s*\(-1\))\s*/g, (_, a, b) => 'a' + (a || b))
-    .replace(/\b(a?(?:sin|cos|tan))\s+(\d+(?:\.\d+)?°?)/g, '$1($2)')
+    .replace(/\b(?:arc(sin|cos|tan)|(sin|cos|tan)\s*\^\s*\(-1\))/g, (_, a, b) => 'a' + (a || b))
+    .replace(/\b(a?(?:sin|cos|tan))\s*(\d+(?:\.\d+)?°?)(?![\w.(])/g, '$1($2)')
     .replace(/\|([^|]+)\|/g, 'abs($1)')
     .replace(/log _\(?(\w+)\)?\(([^)]*)\)/g, 'log($2, $1)')
     .replace(/\s*\*\s*/g, '*')
