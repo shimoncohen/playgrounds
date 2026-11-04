@@ -11,7 +11,7 @@ const stateOf = (MQ, def, params) => {
   for (const [k, v] of Object.entries(params)) m.set(k, v);
   return m.state();
 };
-const judge = (MQ, ch, m, v) => m.kind === 'scene' ? m.check(stateOf(MQ, ch.scene, v)) : m.check(v);
+const judge = (MQ, ch, m, v) => m.kind === 'scene' ? m.check(stateOf(MQ, m.scene || ch.scene, v)) : m.check(v);
 
 for (const track of TRACKS) {
   const MQ = loadMath([...BASE, `${track}/content.js`]);
@@ -44,9 +44,17 @@ for (const track of TRACKS) {
       assert.ok(lazy.why, `${id}: lazy fails without saying why`);
     });
 
+    if (m.scene) test(`${id}: its own scene is complete`, () => assert.ok(m.scene.params && m.scene.draw && m.scene.title, id));
+    if (m.at) test(`${id}: start values are params in range`, () => {
+      for (const [k, x] of Object.entries(m.at)) {
+        const p = (m.scene || ch.scene).params[k];
+        assert.ok(p, `${id}: unknown param ${k}`);
+        assert.ok(x >= p.min && x <= p.max && Math.abs((x - p.min) / (p.step || 1) - Math.round((x - p.min) / (p.step || 1))) < 1e-9, `${id}: ${k} = ${x} is out of range or off a step`);
+      }
+    });
     if (m.kind === 'scene') test(`${id}: scene answers are params in range`, () => {
       for (const v of [m.answer, m.wrong, m.lazy]) for (const [k, x] of Object.entries(v)) {
-        const p = ch.scene.params[k];
+        const p = (m.scene || ch.scene).params[k];
         assert.ok(p, `${id}: unknown param ${k}`);
         assert.ok(x >= p.min && x <= p.max, `${id}: ${k} = ${x} is out of range`);
       }

@@ -45,11 +45,12 @@
     },
   });
 
-  // Each box weighs X; the learner never sees X, only whether the scale is level.
-  const X = 3, W = (label, value, max) => ({ min: 0, max, step: 1, value, label });
+  // Each box weighs X, the mission's solution; the learner never sees X, only whether the scale is level.
+  const W = (label, value, max) => ({ min: 0, max, step: 1, value, label });
   const side = (n, u) => (n ? `${n === 1 ? '' : n}x${u ? ' + ' + u : ''}` : String(u));
-  const tilt = p => Math.sign((p.bl - p.br) * X + p.ul - p.ur);
-  const balance = {
+  // Rounded so a fraction weight like 5/3 still balances exactly: 3 · 5/3 + 2 − 7 is not quite 0 in floating point.
+  const tiltAt = X => p => Math.sign(+((p.bl - p.br) * X + p.ul - p.ur).toFixed(9));
+  const balance = X => { const tilt = tiltAt(X); return {
     id: 'balance', title: 'A balance scale with x boxes and unit weights',
     params: { bl: W('p: boxes on the left', 2, 4), ul: W('q: weights on the left', 3, 12), br: W('r: boxes on the right', 0, 4), ur: W('s: weights on the right', 9, 12) },
     derived: p => ({ scale: ['right side down', 'level', 'left side down'][tilt(p) + 1] }),
@@ -78,7 +79,7 @@
         ];
       },
     },
-  };
+  }; };
 
   const rootsOf = (b, c) => {
     const D = b * b - 4 * c;
@@ -249,7 +250,7 @@
     }, {
       id: 'algebra.linear', name: 'Linear equations', badge: 'Balance Keeper',
       intro: 'An <b>equation</b> says that two sides are equal, like <code>2x + 3 = 11</code>. <b>Solving</b> it means finding the number <code>x</code> stands for that makes it true: that number is the <b>solution</b>. The one rule is to do the same thing to both sides, so they stay equal, just as a balance scale stays level when you take the same weight off each side. Each line of your working is a new, simpler equation with the same solution, and your last line reads <code>x =</code> and a number. These are <b>linear</b> equations: <code>x</code> appears only on its own, never as <code>x²</code>.',
-      scene: balance,
+      scene: balance(3),
       missions: [
         { title: 'Undo the steps', kind: 'equation', question: '2x+3=11', work: 'required',
           goal: 'Solve <code>2x + 3 = 11</code>. This one checks your working: write at least one step before your answer, and every step must keep the same solution.',
@@ -262,9 +263,10 @@
           explain: 'Each line is checked against the question: it passes if it has the same solution. So a slip marks only the line with the slip.',
           hint: 'What can you do to both sides to get rid of the <code>+ 3</code>?',
           steps: ['2x=8', 'x=4'],
+          scene: balance(4), at: { bl: 2, ul: 3, br: 0, ur: 11 },
           answer: 'x=4', wrong: 'x=7', lazy: '2x+3=11', check: MQ.check.final.solved(4) },
         { title: 'Brackets, and x on both sides', kind: 'equation', question: '3(x-1)=x+5', work: 'required',
-          goal: 'Solve <code>3(x − 1) = x + 5</code>. Expand the bracket first, then get every <code>x</code> onto one side. Write your working.',
+          goal: 'Solve <code>3(x − 1) = x + 5</code>. Expand the bracket first, then get every <code>x</code> onto one side. Write your working. A scale cannot hold a minus, so the scene starts one step in, after expanding and adding 3 to both sides: <code>3x = x + 8</code>.',
           how: [
             'The equation has <code>x</code> on both sides. The plan: expand, gather the <code>x</code> terms on one side, then undo the rest as before.',
             'Expand <code>3(x − 1)</code>, as in Expanding brackets: <code>3x − 3 = x + 5</code>.',
@@ -274,9 +276,10 @@
           explain: 'Taking <code>x</code> off both sides is allowed: <code>x</code> is a number, even if you do not know it yet. On the scale, it is lifting one box off each side.',
           hint: 'After expanding, take <code>x</code> away from both sides.',
           steps: ['3x-3=x+5', '2x-3=5', '2x=8', 'x=4'],
+          scene: balance(4), at: { bl: 3, ul: 0, br: 1, ur: 8 },
           answer: 'x=4', wrong: 'x=3', lazy: '3(x-1)=x+5', check: MQ.check.final.solved(4) },
         { title: 'Half of x', kind: 'equation', question: 'x/2+1=4', work: 'required',
-          goal: 'Solve <code>x/2 + 1 = 4</code>: half of a number, plus 1, is 4. Write your working.',
+          goal: 'Solve <code>x/2 + 1 = 4</code>: half of a number, plus 1, is 4. Write your working. A scale cannot hold half a box, so the scene shows both sides doubled: <code>x + 2 = 8</code>.',
           how: [
             '<code>x/2</code> is a fraction, <code>x</code> divided by 2, or half of <code>x</code>. The equation says half of the number, plus 1, makes 4.',
             'Undo the <code>+ 1</code> first: take 1 off both sides, <code>x/2 = 3</code>.',
@@ -286,6 +289,7 @@
           explain: 'Multiplying both sides by the bottom number of a fraction is the usual way to clear it. The slip <code>x = 1.5</code> divides by 2 instead of multiplying.',
           hint: 'Get <code>x/2</code> alone first. Then: half of what is 3?',
           steps: ['x/2=3', 'x=6'],
+          scene: balance(6), at: { bl: 1, ul: 2, br: 0, ur: 8 },
           answer: 'x=6', wrong: 'x=1.5', lazy: 'x/2+1=4', check: MQ.check.final.solved(6) },
         { title: 'An answer that is a fraction', kind: 'equation', question: '3x+2=7',
           goal: 'Solve <code>3x + 2 = 7</code>. The answer is not a whole number: write it as a fraction, like <code>x = 4/5</code>.',
@@ -297,6 +301,7 @@
           ],
           explain: 'Check it: <code>3 · 5/3</code> is 5, and <code>5 + 2</code> is 7. A rounded decimal like 1.67 does not pass, because <code>3 · 1.67 + 2</code> is 7.01, not 7.',
           hint: 'After taking 2 off both sides you have <code>3x = 5</code>. Five divided by three is a fraction.',
+          scene: balance(5 / 3), at: { bl: 3, ul: 2, br: 0, ur: 7 },
           answer: 'x=5/3', wrong: 'x=3', lazy: '3x+2=7', check: MQ.check.final.solved('5/3') },
         { title: 'Keep it level', kind: 'scene',
           goal: 'The scale shows <code>2x + 3 = 9</code>: two boxes and 3 weights on the left, 9 weights on the right, and it is level. Every box weighs the same unknown amount, <code>x</code>, and each weight is 1. Change both sides the same way until one box sits alone on the left and the scale is level again.',

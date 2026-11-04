@@ -35,4 +35,10 @@
       colorOf: term => MQ.palette[Math.max(0, terms.indexOf(term)) % MQ.palette.length],
     };
   };
+
+  MQ.scene.forMission = (ch, m, fill) => {
+    const def = (m && m.scene) || ch.scene;
+    const start = { ...(m && m.at), ...(fill && m && m.kind === 'scene' ? m.answer : {}) };
+    return { ...def, params: Object.fromEntries(Object.entries(def.params).map(([n, p]) => [n, { ...p, value: start[n] ?? p.value }])) };
+  };
 })();

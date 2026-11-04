@@ -62,9 +62,8 @@ function startSession(fill) {
   if (scene) scene.destroy();
   const m = curMission(), ch = CH[S.ch], k = mkey();
   won = false; lastWhy = ''; renderFeedback(null);
-  let def = ch.scene, moved = false;
-  if (fill && m && m.kind === 'scene') def = { ...def, params: Object.fromEntries(Object.entries(def.params).map(([n, p]) => [n, { ...p, value: m.answer[n] ?? p.value }])) };
-  scene = MQ.scene.mount(sceneEl, def, { onChange: st => {
+  let moved = false;
+  scene = MQ.scene.mount(sceneEl, MQ.scene.forMission(ch, m, fill), { onChange: st => {
     if (!m || m.kind !== 'scene' || won) return;
     const r = m.check(st);
     if (r.ok) { complete(); return; }

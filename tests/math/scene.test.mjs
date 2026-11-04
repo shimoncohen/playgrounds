@@ -96,3 +96,16 @@ test('palette: 3:1 on both themes, and every pair is 12 apart in CIEDE2000 under
 test('deltaE2000 matches the Sharma reference pair', () => {
   assert.ok(Math.abs(deltaE2000([50, 2.6772, -79.7751], [50, 0, -82.7485]) - 2.0425) < 1e-3);
 });
+
+test('forMission: a mission picks its own scene and start values; fill starts a scene mission on its answer', () => {
+  const P = { a: { min: 0, max: 9, value: 1, label: 'a' }, b: { min: 0, max: 9, value: 2, label: 'b' } };
+  const ch = { scene: { id: 'ch', params: P } }, own = { id: 'own', params: { c: { min: 0, max: 9, value: 5, label: 'c' } } };
+  const vals = d => Object.fromEntries(Object.entries(d.params).map(([k, p]) => [k, p.value]));
+  assert.deepEqual(vals(MQ.scene.forMission(ch, { kind: 'number' })), { a: 1, b: 2 });
+  assert.deepEqual(vals(MQ.scene.forMission(ch, { kind: 'number', at: { b: 7 } })), { a: 1, b: 7 });
+  const m = { kind: 'scene', at: { a: 3 }, answer: { b: 8 } };
+  assert.deepEqual(vals(MQ.scene.forMission(ch, m)), { a: 3, b: 2 });
+  assert.deepEqual(vals(MQ.scene.forMission(ch, m, true)), { a: 3, b: 8 });
+  assert.equal(MQ.scene.forMission(ch, { kind: 'number', scene: own }).id, 'own');
+  assert.equal(P.b.value, 2, 'the chapter scene is not changed');
+});
