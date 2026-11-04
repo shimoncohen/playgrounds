@@ -193,7 +193,7 @@
           ],
           explain: 'Check it with a number: with <code>x = 1</code>, <code>3(1 + 2)</code> is 9, and <code>3 · 1 + 6</code> is 9 too. The quest checks your answer the same way, with many numbers for <code>x</code>.',
           hint: 'Multiply 3 by <code>x</code>, then 3 by 2, and add the two.',
-          answer: '3x+6', wrong: '3x+2', lazy: '3(x+2)', check: finalExpr('3x+6', 'expanded') },
+          answer: '3x+6', wrong: '3x+2', lazy: '3(x+2)', check: finalExpr('3x+6', ['expanded', 'collected']) },
         { title: 'A minus sign in front', kind: 'expr', vars: ['x'], question: '-2(x-4)',
           goal: 'Expand <code>−2(x − 4)</code>: multiply <code>−2</code> by each part inside, and write it with no brackets.',
           how: [
@@ -204,7 +204,7 @@
           ],
           explain: 'The slip to watch for is <code>−2x − 8</code>, which flips the first sign but not the second. Try <code>x = 0</code>: <code>−2(0 − 4)</code> is 8, not −8.',
           hint: 'Two multiplications: <code>−2 · x</code> and <code>−2 · (−4)</code>. What is a minus times a minus?',
-          answer: '-2x+8', wrong: '-2x-8', lazy: '-2(x-4)', check: finalExpr('-2x+8', 'expanded') },
+          answer: '-2x+8', wrong: '-2x-8', lazy: '-2(x-4)', check: finalExpr('-2x+8', ['expanded', 'collected']) },
         { title: 'Two brackets', kind: 'expr', vars: ['x'], question: '(x+1)(x+3)',
           goal: 'A rectangle is <code>x + 1</code> tall and <code>x + 3</code> wide. Expand <code>(x + 1)(x + 3)</code> into one sum, and add up the like terms.',
           how: [
@@ -215,7 +215,7 @@
           ],
           explain: 'This is the scene with <code>a</code> and <code>c</code> both standing for <code>x</code>, <code>b = 1</code> and <code>d = 3</code>. Set a = 2, b = 1, c = 2 and d = 3 to see it for <code>x = 2</code>: the parts are 4, 6, 2 and 3.',
           hint: 'Four multiplications: each of <code>x</code> and 1 times each of <code>x</code> and 3. Then add the two <code>x</code> terms.',
-          answer: 'x^2+4x+3', wrong: 'x^2+3', lazy: '(x+1)(x+3)', check: finalExpr('x^2+4x+3', 'expanded') },
+          answer: 'x^2+4x+3', wrong: 'x^2+3', lazy: '(x+1)(x+3)', check: finalExpr('x^2+4x+3', ['expanded', 'collected']) },
         { title: 'A bracket squared', kind: 'expr', vars: ['x'], question: '(x+2)^2',
           goal: 'Expand <code>(x + 2)²</code>. The small raised 2 means "times itself", so <code>(x + 2)²</code> is <code>(x + 2)(x + 2)</code>.',
           how: [
@@ -226,7 +226,7 @@
           ],
           explain: 'Squaring a sum is not the same as squaring each part. With <code>x = 1</code>, <code>(1 + 2)²</code> is 9, while <code>1² + 2²</code> is only 5. The next mission shows the missing pieces.',
           hint: 'Write it as <code>(x + 2)(x + 2)</code> and expand it like the last mission.',
-          answer: 'x^2+4x+4', wrong: 'x^2+4', lazy: '(x+2)^2', check: finalExpr('x^2+4x+4', 'expanded') },
+          answer: 'x^2+4x+4', wrong: 'x^2+4', lazy: '(x+2)^2', check: finalExpr('x^2+4x+4', ['expanded', 'collected']) },
         { title: 'The missing middle', kind: 'scene',
           goal: 'Make a square whose top-left part <code>ac</code> is 9 and whose bottom-right part <code>bd</code> is 4. Then look at the two middle parts.',
           how: [
@@ -331,7 +331,7 @@
           hint: 'Which number goes into both 6 and 9? Divide each part by it.',
           answer: '3(2x+3)', wrong: '3(2x+9)', lazy: '6x+9',
           check: v => {
-            const r = MQ.check.expr(v, '6x+9', { form: 'product' });
+            const r = MQ.check.expr(v, '6x+9', { form: ['product', 'wholeNumbers'] });
             if (!r.ok) return r;
             let n = strip(full.parse(v));
             if (n.isOperatorNode && n.fn === 'unaryMinus') n = strip(n.args[0]);
@@ -349,7 +349,7 @@
           ],
           explain: 'The order does not matter: <code>(x + 3)(x + 2)</code> is the same product, and it passes too. In the scene, the sides of the rectangle are the factors, and its four parts are the expanded form.',
           hint: 'Two numbers: they multiply to 6 and add to 5.',
-          answer: '(x+2)(x+3)', wrong: '(x+1)(x+6)', lazy: 'x^2+5x+6', check: finalExpr('x^2+5x+6', 'linearFactors') },
+          answer: '(x+2)(x+3)', wrong: '(x+1)(x+6)', lazy: 'x^2+5x+6', check: finalExpr('x^2+5x+6', ['linearFactors', 'wholeNumbers']) },
         { title: 'A difference of squares', kind: 'expr', vars: ['x'], question: 'x^2-9',
           goal: 'Factor <code>x² − 9</code> into two brackets. There is no <code>x</code> term, and that is a clue.',
           how: [
@@ -360,7 +360,7 @@
           ],
           explain: 'This pattern has a name, the <b>difference of two squares</b>: any <code>x² − n²</code> factors as <code>(x − n)(x + n)</code>.',
           hint: 'Which number times itself is 9? One bracket gets a plus, the other a minus.',
-          answer: '(x-3)(x+3)', wrong: '(x-3)^2', lazy: 'x^2-9', check: finalExpr('x^2-9', 'linearFactors') },
+          answer: '(x-3)(x+3)', wrong: '(x-3)^2', lazy: 'x^2-9', check: finalExpr('x^2-9', ['linearFactors', 'wholeNumbers']) },
         { title: 'A perfect square', kind: 'expr', vars: ['x'], question: 'x^2-4x+4',
           goal: 'Factor <code>x² − 4x + 4</code>. Both brackets turn out the same.',
           how: [
@@ -371,7 +371,7 @@
           ],
           explain: 'It is <code>(x + 2)²</code> from Expanding brackets with a minus instead: <code>(x − 2)² = x² − 4x + 4</code>. A sum that is one bracket times itself is called a <b>perfect square</b>.',
           hint: 'Look for two equal numbers that multiply to 4 and add to <code>−4</code>.',
-          answer: '(x-2)^2', wrong: '(x+2)^2', lazy: 'x^2-4x+4', check: finalExpr('x^2-4x+4', 'linearFactors') },
+          answer: '(x-2)^2', wrong: '(x+2)^2', lazy: 'x^2-4x+4', check: finalExpr('x^2-4x+4', ['linearFactors', 'wholeNumbers']) },
         { title: 'Find the sides', kind: 'scene',
           goal: 'A rectangle has the four parts <code>ac = 6</code>, <code>ad = 3</code>, <code>bc = 4</code> and <code>bd = 2</code>. Move the side sliders until it has exactly those parts.',
           how: [

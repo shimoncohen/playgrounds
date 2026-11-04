@@ -196,3 +196,34 @@ test('translate rewrites MathLive ascii-math for math.js', () => {
   assert.equal(C.translate('2(3)'), '2(3)');
   assert.equal(C.translate('pi * r^2'), 'pi*r^2');
 });
+
+test('review fixes: irrational roots mix with whole numbers, split equations, implicit times, tight roots, forms, degrees', () => {
+  for (const [s, v] of [['sqrt(2)+1', 1 + Math.SQRT2], ['3*sqrt(2)', 3 * Math.SQRT2], ['sqrt(2)/2', Math.SQRT1_2], ['sqrt(2)^2', 2]])
+    assert.equal(C.number(s, v).ok, true, s);
+  assert.equal(C.number('sqrt(49)+1/3', '22/3').ok, true, 'a perfect square stays exact next to a fraction');
+
+  const eq = (q, s) => plain(C.steps(q, [s], { kind: 'equation' }))[0];
+  assert.equal(eq('x^2+5x+6=0', 'x+2=0 or x+3=0').ok, true);
+  assert.equal(eq('x^2+5x+6=0', 'x+2=0, x+3=0').ok, true);
+  assert.match(eq('x^2+5x+6=0', 'x+2=0').why, /loses a solution/);
+  assert.equal(eq('x-1=0', 'x=1.03').ok, false, 'a nearby wrong value is not a solution');
+  assert.equal(eq('3x+2=7', 'x=1.67').ok, false, 'a rounded decimal is not the solution');
+  assert.equal(eq('3x+2=7', 'x=5/3').ok, true);
+  assert.equal(eq('x^2-6x+9=0', 'x=3').ok, true, 'a repeated root still matches');
+
+  assert.equal(C.expr('x(x+1)^2', 'x*(x+1)^2').ok, true, 'x(...) is x times (...), and the power stays on the bracket');
+  assert.equal(C.expr('2x(x-3)', '2x^2-6x').ok, true);
+  assert.equal(C.expr('max(x,1)', 'max(x,1)').ok, true, 'a real function call is left alone');
+
+  const p = s => MQ.math.full.parse(s);
+  assert.equal(C.forms.expanded(p('x-(x+1)')), false);
+  assert.equal(C.forms.expanded(p('3-(x+1)')), false);
+  for (const s of ['x^2+4x+3', '3+4x+x^2', '-2x+8', 'x^2+4']) assert.equal(C.forms.collected(p(s)), true, s);
+  for (const s of ['x^2+x+3x+3', 'x^2+4x+1+2', '2x+3x']) assert.equal(C.forms.collected(p(s)), false, s);
+  assert.equal(C.forms.wholeNumbers(p('3(2x+3)')), true);
+  for (const s of ['2(3x+4.5)', '(2x+4)(0.5x+1.5)']) assert.equal(C.forms.wholeNumbers(p(s)), false, s);
+  assert.match(C.expr('x^2+x+3x+3', '(x+1)(x+3)', { form: ['expanded', 'collected'] }).why, /like terms/);
+
+  assert.equal(C.number('90°', 90).ok, true);
+  assert.equal(C.number('9°0', 90).ok, false, 'a degree sign only ends a number');
+});

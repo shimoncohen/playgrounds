@@ -7,7 +7,7 @@
   const yes = { ok: true };
 
   // Angles may be typed with a degree sign; math.js cannot read `°`, and the value is the same without it.
-  const bare = s => String(s).replace(/°/g, '');
+  const bare = s => String(s).replace(/(\d)\s*°(?!\s*\d)/g, '$1');
   const parse = s => {
     let node;
     try { node = full.parse(bare(s)); } catch (e) { return { why: UNREAD }; }
@@ -23,7 +23,14 @@
     const p = parse(s);
     if (p.why) return p;
     let v;
-    try { v = safe.evaluate(bare(s)); } catch (e) {
+    const run = () => {
+      try { return safe.evaluate(bare(s)); } catch (e) {
+        // An irrational root is a plain number, which math.js will not mix with exact fractions; work it in decimals instead.
+        if (/implicitly convert a number to a Fraction/.test(e.message)) return full.evaluate(bare(s));
+        throw e;
+      }
+    };
+    try { v = run(); } catch (e) {
       if (/Division by zero/i.test(e.message)) return { why: 'This divides by zero, and that has no value.' };
       const u = unknown(e);
       return { why: u ? `I don't know what \`${u}\` is here. This one is about numbers only.` : UNREAD };
@@ -49,13 +56,13 @@
     return same ? yes : off(a.v);
   };
 
-  // math.js reads `x(x - 3)` as a call to a function named x; a learner means x times (x - 3).
-  const times = (n, vars) => n.transform(m => m.isFunctionNode && m.args.length === 1 && vars.includes(m.fn.name)
-    ? new full.OperatorNode('*', 'multiply', [m.fn, new full.ParenthesisNode(times(m.args[0], vars))], true) : m);
+  // math.js reads `x(x - 3)` as a call to a function named x; a learner means x times (x - 3). Rewriting the text,
+  // not the parse tree, keeps the power in `x(x+1)^2` on the bracket.
+  const times = (s, vars) => String(s).replace(new RegExp(`(?<![A-Za-z_])(${vars.join('|')})\\s*\\(`, 'g'), '$1*(');
   const compile = (s, vars) => {
-    const p = parse(s);
+    const p = parse(times(s, vars));
     if (p.why) return p;
-    const node = times(p.node, vars), code = node.compile();
+    const node = p.node, code = node.compile();
     const at = scope => { try { const v = code.evaluate(scope); return typeof v === 'number' ? v : NaN; } catch (e) { if (unknown(e)) throw e; return NaN; } };
     try { at(Object.fromEntries(vars.map(n => [n, 0.5]))); } catch (e) {
       return { why: `I don't know what \`${unknown(e)}\` is here. Use ${vars.map(v => '`' + v + '`').join(', ')}.` };
@@ -73,6 +80,8 @@
     product: 'That is equal, but it is not written as one product yet.',
     linearFactors: 'That is equal, but it is not split into factors like (x - 1)(x + 1) yet.',
     expanded: 'That is equal, but there are still brackets to multiply out.',
+    collected: 'That is equal, but some like terms are not added up yet.',
+    wholeNumbers: 'That is equal, but write it with whole numbers only, no decimals or fractions.',
   };
 
   const expr = (input, expected, { vars = ['x'], seed = 1, form } = {}) => {
@@ -96,11 +105,17 @@
       }
     }
     if (valid < 12) return no("I couldn't test this: it has no value for most of the numbers I tried.");
-    if (form && !C.forms[form](a.node)) return no(FORM_WHY[form]);
+    const broken = [].concat(form || []).find(f => !C.forms[f](a.node));
+    if (broken) return no(FORM_WHY[broken]);
     return yes;
   };
 
   const strip = n => { while (n.isParenthesisNode) n = n.content; return n; };
+  const terms = n => {
+    n = strip(n);
+    if (isSum(n)) return [...terms(n.args[0]), ...terms(n.args[1])];
+    return [n];
+  };
   const isSum = n => n.isOperatorNode && (n.op === '+' || n.op === '-') && n.args.length === 2;
   const isConst = n => n.isConstantNode || (n.isSymbolNode && (n.name === 'pi' || n.name === 'e'));
   const degree = n => {
@@ -131,7 +146,16 @@
       product: n => !isSum(strip(n)),
       linearFactors: n => !isSum(strip(n)) && factors(n).every(f => degree(f) <= 1),
       expanded: n => !n.filter(m => m.isOperatorNode && (
-        m.op === '^' ? isSum(strip(m.args[0])) : ['*', '/', '-'].includes(m.op) && (m.op !== '-' || m.fn === 'unaryMinus') && m.args.some(a => isSum(strip(a))))).length,
+        m.op === '^' ? isSum(strip(m.args[0]))
+          : m.op === '-' && m.fn !== 'unaryMinus' ? isSum(strip(m.args[1]))
+            : ['*', '/', '-'].includes(m.op) && m.args.some(a => isSum(strip(a))))).length,
+      // Two terms are like terms when one is a fixed multiple of the other at every point.
+      collected: n => {
+        const ts = terms(n).map(t => t.compile()), pts = points(n.filter(m => m.isSymbolNode && !isConst(m) && !m.isFunctionNode).map(m => m.name), 7);
+        const like = (a, b) => { const r = pts.map(p => a.evaluate(p) / b.evaluate(p)).filter(v => isFinite(v)); return r.length > 3 && r.every(v => close(v, r[0])); };
+        return ts.every((a, i) => ts.slice(i + 1).every(b => !like(a, b)));
+      },
+      wholeNumbers: n => !n.filter(m => (m.isConstantNode && !Number.isInteger(m.value)) || (m.isOperatorNode && m.op === '/')).length,
     },
   };
 
@@ -207,7 +231,7 @@
     }
     if (valid >= 12 && constant && real(r) && r !== 0) return yes;
     const at = f => x => f({ [vars[0]]: x }), ro = roots(at(orig.at)), rs = roots(at(s.at));
-    const near = (r, set) => set.some(q => Math.abs(q - r) < 0.05);
+    const near = (r, set) => set.some(q => Math.abs(q - r) < 1e-3);
     const lost = ro.some(r => !near(r, rs)), added = rs.some(r => !near(r, ro));
     if (lost && added) return no('This step has different solutions from the question. Check what you did to each side.');
     if (lost) return no(`This step loses a solution. Dividing both sides by something with \`${vars[0]}\` in it can do that, and so can keeping only the positive square root.`);
@@ -216,16 +240,17 @@
   };
 
   // `x = 2 or x = 3` has the same solutions as `(x - 2)(x - 3) = 0`, so a list of solutions is checked as that equation.
-  const asProduct = (s, x) => {
-    const ms = String(s).split(LIST).map(p => solvedRe(x).exec(p));
-    return ms.length > 1 && ms.every(Boolean) ? ms.map(m => `(${x}-(${m[1] || m[2]}))`).join('*') + '=0' : s;
+  const asProduct = s => {
+    const parts = String(s).split(LIST).map(p => p.split('='));
+    return parts.length > 1 && parts.every(q => q.length === 2 && q[0].trim() && q[1].trim())
+      ? parts.map(([l, r]) => `((${l})-(${r}))`).join('*') + '=0' : s;
   };
   C.steps = (original, steps, { kind = 'number', vars = ['x'], seed = 1 } = {}) => {
     if (kind === 'number') return steps.map(s => number(s, original));
     if (kind === 'expr') return steps.map(s => expr(s, original, { vars, seed }));
     const orig = side(original, vars);
     if (orig.why) return steps.map(() => no('The question could not be read.'));
-    return steps.map(s => equation(asProduct(s, vars[0]), orig, vars, seed));
+    return steps.map(s => equation(asProduct(s), orig, vars, seed));
   };
 
   // math.js writes implicit multiplication as `~`, which KaTeX renders as a visible gap ("2 x").
