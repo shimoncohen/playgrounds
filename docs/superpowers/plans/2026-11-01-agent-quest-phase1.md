@@ -46,7 +46,7 @@
 | 3 | 3 | #54 | `ci: wire agent-quest into checks` | 2 |
 | 4 | 4 | #55 | `feat(agent): core chapters 2-7` | 3 |
 | 5 | 5 | #56 | `feat(agent): dev path (chapters 8-15)` | 4 |
-| 6 | 6 | #57 | `feat(agent): personal path (chapters 16-20)` | 5 |
+| 6 | 6 | #57 | `feat(agent): personal path (chapters 16-20)` (lands as two PRs: Schedules at index 15, then chapters 16 to 19) | 5 |
 | 7 | 7 | #58 | `feat(agent): setup optimization (chapters 21-23)` | 6 |
 
 Each PR body links #51 as "Part of". Each PR carries a QA checklist of real checkboxes, each naming its command or action.
@@ -205,7 +205,7 @@ Each content PR: one task per chapter (write `content/ch-NN-*.js`, append its `<
 |---|---|---|---|---|
 | 4 | 4 | #55 | 2 context and tokens (`ch-02-context.js`), 3 prompt structure (`ch-03-prompt.js`), 4 memory (`ch-04-memory.js`), 5 skills and MCP (`ch-05-skills-mcp.js`), 6 hooks, plugins, subagents (`ch-06-extend.js`), 7 safety (`ch-07-safety.js`); engine files `config.js`, `context.js`, `policy.js`, `shell.js`, `provider.js` and `content/model.js` also change (below) | core |
 | 5 | 5 | #56 | 8 explore, plan, implement; 9 test, review, PR; 10 subagents, parallel, worktrees; 11 hooks for lint, format, guards; 12 slash commands and repo skills; 13 MCP for trackers, docs, browsers; 14 CI and headless; 15 writing a project `CLAUDE.md` | dev |
-| 6 | 6 | #57 | 16 writing and research; 17 files and documents; 18 scheduled tasks (artifact is a `schedule.json` entry); 19 personal MCP (mail, calendar, notes); 20 small personal skills and commands | personal |
+| 6 | 6 | #57 | 16 scheduled tasks (artifact is a line in `.claude/schedule.txt`); 17 writing and research; 18 files and documents; 19 personal MCP; 20 personal skills and commands | personal |
 | 7 | 7 | #58 | 21 audit what is loaded; 22 trim, dedupe, move rare rules into on-demand skills; 23 measure before and after, cheaper models for simple subagent work | tune |
 
 **Engine additions in PR 4** (each with its tests): `style()` for `Examples`, scenario `history`, and `agentCost` (policy, shell and config tests); skill matching against a scenario `tag` (`loadedSkills`, `skillBody`, `skillIssues`, the `Skill:` context segment and the `skill` run step: config, context, policy and provider tests); folder-level `CLAUDE.md` memory (`memoryFolders`, `folderMemory`, the counted-once rule, `setupTokens` and the create-gate in `prepare()`: config, context, policy and content tests). Specified in the spec sections "Skill matching" and "Folder memory".

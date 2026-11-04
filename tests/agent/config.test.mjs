@@ -196,6 +196,28 @@ describe('connected tools', () => {
   });
 });
 
+describe('schedule, glob and section targets in the setup grammar', () => {
+  const sc = { vfs: { 'downloads/a.pdf': 'x', 'downloads/b.txt': 'y', 'notes.md': '# Notes\n## Pricing\nten' }, commands: { 'npm test': () => ({ ok: true }) }, tools: [] };
+  it('an empty setup has an empty schedule, and a valid line fills it', () => {
+    assert.deepEqual(J(config.parseSetup(vfs.create({})).schedule), []);
+    const s = config.parseSetup(vfs.create({ '.claude/commands/fix.md': 'Goal: x', '.claude/schedule.txt': '# c\nweekdays 07:30 use fix\nweekday 07:30 use fix' }));
+    assert.deepEqual(J(s.schedule.map((x) => [x.day, x.at, x.use, x.days.length])), [['weekdays', '07:30', 'fix', 5]]);
+    assert.deepEqual(J(s.errors.map((e) => e.file)), ['.claude/schedule.txt']);
+  });
+  it('a star is accepted in an edit, read or delete rule that matches a file, and rejected elsewhere', () => {
+    assert.equal(config.parseConstraint('do not delete downloads/*.pdf', sc).ok, true);
+    assert.equal(config.parseConstraint('do not delete downloads/*.docx', sc).ok, false);
+    assert.equal(config.parseConstraint('do not run npm *', sc).ok, false);
+    assert.equal(config.parsePrompt('Files: downloads/*', sc, config.parseSetup(vfs.create(sc.vfs))).errors.length, 1);
+  });
+  it('file#section is accepted for a read when the section exists, and never for an edit', () => {
+    const p = config.parsePrompt('Files: notes.md#pricing', sc, config.parseSetup(vfs.create(sc.vfs)));
+    assert.deepEqual([p.errors.length, J(p.files)], [0, ['notes.md#pricing']]);
+    assert.equal(config.parsePrompt('Files: notes.md#nope', sc, config.parseSetup(vfs.create(sc.vfs))).errors.length, 1);
+    assert.equal(config.parseConstraint('do not edit notes.md#pricing', sc).ok, false);
+  });
+});
+
 describe('the default check from CLAUDE.md', () => {
   const sc = { ...scenario, commands: { 'npm test': () => ({ ok: true }), 'npm run lint': () => ({ ok: true }) } };
   const mem = (memory, root) => config.memoryRules({ memory }, sc, root);

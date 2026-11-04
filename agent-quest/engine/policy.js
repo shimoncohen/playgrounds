@@ -6,13 +6,15 @@
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const CAP=3;
 /* every type of step a run can push; each needs narration, a ui.js TAGS key and a ui.js describe branch (tests/agent/registry.test.mjs) */
-const STEP_TYPES=['context','skill','command','plan','approved','delegate','act','skip','hook','stall'];
+const STEP_TYPES=['context','skill','command','plan','approved','delegate','act','skip','hook','stall','fire'];
 
 function run(scenario,setup,prompt,opts={}){
   const vfs=(opts.vfs||AQ.vfs.create(scenario.vfs)).clone(),history=opts.history||[];
   const steps=[],calls=[],violations=[],read=[],edited=[],hookLast=new Map();
   let peak=0,total=0,ctx=null;
-  const {loaded,skipped}=AQ.config.loadedSkills(setup,vfs,scenario.tag);
+  /* a scheduled scenario is started by a schedule line: that makes the run unattended and tags it "schedule" unless it has a tag of its own */
+  const sched=AQ.config.fired(scenario,setup,prompt),unattended=!!scenario.unattended||!!sched,tag=scenario.tag||(sched?'schedule':undefined);
+  const {loaded,skipped}=AQ.config.loadedSkills(setup,vfs,tag);
   const styles=scenario.style?prompt.examples.map(p=>scenario.style(vfs.read(p)||'')):[];
   const refresh=()=>{ctx=AQ.context.build(setup,prompt,history,read.map(p=>({path:p,text:vfs.read(p)||''})),{skills:loaded});peak=Math.max(peak,ctx.peak);};
   const memRules=(text,by)=>AQ.config.memoryRules({memory:text},scenario,false).rules.map(c=>({...c,by}));
@@ -28,11 +30,12 @@ function run(scenario,setup,prompt,opts={}){
   const hidden=a=>(scenario.hidden||[]).some(h=>h.verb===a.verb&&AQ.permissions.matches(h.target,a.target));
   /* returns false when skipped, else the shell result. The order of the gates is the order a skip reason can win. */
   const act=(a,tag,o={})=>{
-    const p=AQ.permissions.check(a,setup,rules(),{edited,unattended:!!scenario.unattended});
+    const p=AQ.permissions.check(a,setup,rules(),{edited,unattended});
     const base={verb:a.verb,target:a.target,tag};
     const skip=by=>{steps.push({type:'skip',...base,by});return false;};
     if(!p.allowed)return skip(p.by);
-    if(a.needs&&a.needs.some(n=>!read.includes(n)))return skip('not seen yet');
+    /* a whole-file read also covers a section of it */
+    if(a.needs&&a.needs.some(n=>!read.some(r=>r===n||n.startsWith(r+'#'))))return skip('not seen yet');
     if(scenario.connected&&a.verb==='call'&&!AQ.config.hasTool(setup,a.target))return skip('not connected');
     const r=AQ.shell.exec(scenario,a,vfs,styles),bad=hidden(a);
     calls.push({verb:a.verb,target:a.target});
@@ -67,6 +70,11 @@ function run(scenario,setup,prompt,opts={}){
   };
   const outcome=status=>({status,vfs,calls,steps,violations,tokens:{peak,total}});
 
+  if(scenario.scheduled){
+    const why=(setup.errors.find(e=>e.file==='.claude/schedule.txt')||{}).msg;
+    steps.push({type:'fire',entry:sched?sched.entry:null,due:sched?sched.due:[],...(why?{why}:{})});
+    if(!sched)return outcome('blocked');
+  }
   refresh();
   total+=ctx.total;
   steps.push({type:'context',tokens:ctx.total,dropped:ctx.dropped.length});
@@ -74,7 +82,7 @@ function run(scenario,setup,prompt,opts={}){
   for(const s of skipped)steps.push({type:'skill',name:s.name,loaded:false,why:s.why});
   for(const c of prompt.commands)steps.push({type:'command',name:c.name,lines:c.lines});
   const script=scenario.script||[];
-  if(prompt.plan&&scenario.unattended){steps.push({type:'stall'});return outcome('blocked');}
+  if(prompt.plan&&unattended){steps.push({type:'stall'});return outcome('blocked');}
   if(prompt.plan){
     steps.push({type:'plan',files:script.filter(a=>a.verb==='edit').map(a=>a.target)});
     if(!opts.approved)return outcome('awaiting-approval');
@@ -90,7 +98,7 @@ function run(scenario,setup,prompt,opts={}){
     let files=0,tokens=0;
     for(const p of explore.slice(at,at+size)){
       const a={verb:'read',target:p};
-      if(!AQ.permissions.check(a,setup,rules(),{edited,unattended:!!scenario.unattended}).allowed)continue;
+      if(!AQ.permissions.check(a,setup,rules(),{edited,unattended}).allowed)continue;
       const r=AQ.shell.exec(scenario,a,vfs,styles);
       if(!r.ok)continue;
       files++;tokens+=AQ.tokens.estimate(a.verb+' '+p+' '+r.out);

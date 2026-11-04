@@ -49,6 +49,7 @@ function evaluate(m,input,opts={}){
 AQ.overBudget=(c,limit)=>{const n=AQ.context.setupTokens(c.setup);return n>limit?'Your setup still takes about '+n+' tokens. The goal is '+limit+' or fewer.':null;};
 /* what a run paid for helpers: every delegate step counts, including one that had nothing to read */
 AQ.helperCost=o=>o.steps.reduce((n,s)=>n+(s.type==='delegate'?s.cost:0),0);
+AQ.weekTokens=o=>{const f=o.steps.find(s=>s.type==='fire');return o.tokens.total*(f?f.due.length:1);};
 AQ.KINDS=KINDS;
 AQ.verdict=verdict;
 AQ.editable=editable;

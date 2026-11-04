@@ -39,7 +39,7 @@ function refresh(){
   const p=AQ.prepare(m,ed.getInput());
   ed.showErrors(p.prompt.errors);
   const scope=[...new Set(p.prompt.files.flatMap(f=>p.vfs.read(f)!==null?[f]:p.vfs.list(AQ.vfs.dir(f))))];
-  const skills=AQ.config.loadedSkills(p.setup,p.vfs,p.scenario.tag).loaded;
+  const skills=AQ.config.loadedSkills(p.setup,p.vfs,p.scenario.tag||(AQ.config.fired(p.scenario,p.setup,p.prompt)?'schedule':undefined)).loaded;
   const ctx=AQ.context.build(p.setup,p.prompt,p.scenario.history||[],scope.map(f=>({path:f,text:p.vfs.read(f)||''})),{skills});
   AQMETER.render({panel:$('#meter'),strip:$('#meterStrip')},ctx,lastPeak);
 }
@@ -108,6 +108,7 @@ $('.paneSwitch').addEventListener('click',e=>{const b=e.target.closest('button[d
 
 const mq=q=>{try{return !!(window.matchMedia&&matchMedia(q).matches);}catch(e){return false;}};
 const wide=()=>mq('(min-width:721px)');
+let railRO;
 function renderChapters(){
   Tiers.renderRail(chaptersEl,{status:AQ.tiers.status(S),chapters:CH,S,onPick:ci=>{
     let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;
@@ -115,6 +116,8 @@ function renderChapters(){
     const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});
   }});
   revealCurrent();
+  // Web fonts swap in after the first paint and resize the chips, so scroll again once any of them changes size.
+  if(window.ResizeObserver){railRO=railRO||new ResizeObserver(revealCurrent);railRO.disconnect();railRO.observe(chaptersEl);for(const k of chaptersEl.children)railRO.observe(k);}
 }
 // scrollIntoView would also scroll the page at 390 px, so only the rail scrolls
 function revealCurrent(){

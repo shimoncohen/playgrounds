@@ -436,4 +436,5 @@ AQ.scenarios={price,tidy,bigrepo,bloated,heavy,chat,twofiles,delegate,changelog,
   survey,creep,handoff,gamed,gate,ship,haystack,team,huge,linty,messy,both,cmdfix,cmdset,cmdlint,stale,ui,triage,
   nightly,'nightly-allow':nightlyAllow,'nightly-scope':nightlyScope,memgate,memtypo,newrepo};
 AQ.PEAK=PEAK;
+AQ.scenarioKit={filler,skillFile,scraps};
 })();

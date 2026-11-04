@@ -4,8 +4,18 @@
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
 
-/* a pattern covers itself, anything under it (a folder, a tool's namespace) and a command with more words after it */
-const matches=(pat,t)=>t===pat||t.startsWith(pat.endsWith('/')?pat:pat+'/')||t.startsWith(pat+'.')||t.startsWith(pat+' ');
+/* "*" stands for any text, "/" included. Whole-target match, greedy and leftmost, so it is linear and never builds a RegExp from input;
+   the length check keeps the prefix and the suffix from overlapping (a*a does not match a). */
+function glob(pat,t){
+  const parts=pat.split('*'),first=parts[0],last=parts[parts.length-1],end=t.length-last.length;
+  if(end<first.length||!t.startsWith(first)||!t.endsWith(last))return false;
+  let at=first.length;
+  for(const mid of parts.slice(1,-1)){const i=t.indexOf(mid,at);if(i<0||i+mid.length>end)return false;at=i+mid.length;}
+  return true;
+}
+/* a pattern covers itself, anything under it (a folder, a tool's namespace), a command with more words after it, and a section of it (X#anchor) */
+const matches=(pat,t)=>pat.includes('*')?glob(pat,t)||(t.includes('#')&&glob(pat,t.slice(0,t.indexOf('#'))))
+  :t===pat||t.startsWith(pat.endsWith('/')?pat:pat+'/')||t.startsWith(pat+'.')||t.startsWith(pat+' ')||t.startsWith(pat+'#');
 
 /* constraints: [{kind, verb, target, n?, by}]; state.edited: the files edited so far; state.unattended: the scenario has nobody to approve */
 function check(action,setup,constraints,state){

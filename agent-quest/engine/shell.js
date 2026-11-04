@@ -23,6 +23,11 @@ function exec(scenario,action,vfs,styles=[]){
       const r=cmd(vfs);
       return {ok:!!r.ok,out:String(r.out??'')};
     }
+    /* a send to the same name keeps the list match below */
+    if(action.verb==='call'&&AQ.vfs.own(scenario.toolFns||{},t)){
+      const r=scenario.toolFns[t](vfs);
+      return {ok:!!r.ok,out:String(r.out??'')};
+    }
     return {ok:(scenario.tools||[]).some(x=>x===t||x.startsWith(t+'.')),out:''};
   }catch(e){return {ok:false,out:'the action failed'};}
 }

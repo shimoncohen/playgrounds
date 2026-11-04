@@ -139,9 +139,10 @@ const CASES = [
       F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n' }), F({ 'CLAUDE.md': NOTES + 'Plan: first\nDone when: run npm test\n' }),
       F({ '.claude/commands/nightly.md': PG + 'Done when: run npm test\n' })] },
   { at: [13, 1],
-    pass: [PERM('allow edit src/price.js\nallow run npm test\n'), PERM('allow run npm test\nallow edit src/price.js'), PERM('# the job\nallow edit src/price.js\nallow run npm test\nallow read src/'),
+    // a star matches in permissions.txt: src/price* is only the intended file, src/* and * also reach src/legacy/old.js
+    pass: [PERM('allow edit src/price*\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm test\n'), PERM('allow run npm test\nallow edit src/price.js'), PERM('# the job\nallow edit src/price.js\nallow run npm test\nallow read src/'),
       PERM('allow edit src/price.js\nallow run npm test\nallow run npm run lint'), PERM('allow edit src/price.js\nallow run npm test\ndeny run npm run deploy')],
-    fail: [{}, PERM(''), PERM('allow edit src/price.js'), PERM('allow run npm test'), PERM('allow edit src/\nallow run npm'), PERM('allow edit src/\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm'),
+    fail: [{}, PERM('allow edit src/*\nallow run npm test'), PERM('allow edit *\nallow run npm test'), PERM(''), PERM('allow edit src/price.js'), PERM('allow run npm test'), PERM('allow edit src/\nallow run npm'), PERM('allow edit src/\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm'),
       PERM('allow edit src/price.js\nallow run npm test\nallow run npm run deploy'), PERM('allow edit src/price.js\nallow run npm test\nallow edit src/legacy/old.js'), PERM('allow edt src/price.js\nallow run npm test'),
       PERM('deny edit src/legacy/\ndeny run npm run deploy'),
       F({ 'CLAUDE.md': 'allow edit src/price.js\nallow run npm test' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n', '.claude/permissions.txt': '' }), F({ '.claude/hooks.txt': 'after edit src/ run npm test' }),
@@ -178,9 +179,9 @@ runCases(AQ, 'chapters 8 to 15: lazy and nearby answers are caught', CASES, (c) 
 describe('dev chapters', () => {
   it('are frozen at 8 chapters (indexes 7 to 14) of 3 missions each, in tier dev, after the 7 core chapters', () => {
     assert.deepEqual([...DEV], [7, 8, 9, 10, 11, 12, 13, 14]);
-    assert.equal(AQ.CH.length, 15);
-    assert.deepEqual([...AQ.CH.slice(7).map((ch) => ch.missions.length)], [3, 3, 3, 3, 3, 3, 3, 3]);
-    assert.ok(AQ.CH.slice(7).every((ch) => ch.tier === 'dev'));
+    assert.ok(AQ.CH.length >= 15);
+    assert.deepEqual([...AQ.CH.slice(7, 15).map((ch) => ch.missions.length)], [3, 3, 3, 3, 3, 3, 3, 3]);
+    assert.ok(AQ.CH.slice(7, 15).every((ch) => ch.tier === 'dev'));
     assert.ok(AQ.CH.slice(0, 7).every((ch) => ch.tier === 'core'));
   });
   it('the starting setup of every mission fails its own check', () => {

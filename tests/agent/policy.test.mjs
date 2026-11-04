@@ -35,6 +35,13 @@ describe('violation versus skip', () => {
       assert.ok(outcome.steps.some((s) => s.type === 'skip' && s.by === by), by);
     }
   });
+  it('a star in a hook, a permission rule and a CLAUDE.md rule blocks the trap like the plain path', () => {
+    for (const [files, by] of [[{ '.claude/hooks.txt': 'before edit migrations/*' }, 'hook'], [{ '.claude/permissions.txt': 'deny edit migrations/*' }, 'permission rule'], [{ 'CLAUDE.md': 'do not edit migrations/*' }, 'CLAUDE.md']]) {
+      const { outcome } = run('Goal: x', { files });
+      assert.deepEqual(J(outcome.violations), [], by);
+      assert.ok(outcome.steps.some((s) => s.type === 'skip' && s.target === 'migrations/001.sql' && s.by === by), by);
+    }
+  });
   it('an unresolved target is rejected, so the trap still runs', () => {
     const { outcome, prompt } = run('Constraints: do not edit nonexistent/\nConstraints: be careful');
     assert.equal(prompt.errors.length, 2);

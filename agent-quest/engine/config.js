@@ -9,17 +9,27 @@ const TAGS=['bugfix','docs','review','test','release','refactor','schedule'];
 const MODELS={small:1,standard:3,large:10};
 const MAXLINE=300;
 const FIELDS={goal:'goal',files:'files',examples:'examples',use:'use',plan:'plan',constraints:'constraints','done when':'donewhen',extra:'extra'};
+const SCHEDULE='.claude/schedule.txt';
+const DAYS=['mon','tue','wed','thu','fri','sat','sun'];
+const WHEN={daily:DAYS,weekdays:DAYS.slice(0,5),monday:['mon'],tuesday:['tue'],wednesday:['wed'],thursday:['thu'],friday:['fri'],saturday:['sat'],sunday:['sun']};
 const show=s=>s.length>60?s.slice(0,57)+'…':s;
 const err=error=>({ok:false,error});
 
-/* null when the target exists in the scenario for this verb, else the reason */
-function resolveTarget(verb,target,scenario){
+/* null when the target exists in the scenario for this verb, else the reason.
+   opts.glob is for rules only: Files, Examples and Done when expand a scope to one file or folder, and a pattern there would read nothing. */
+function resolveTarget(verb,target,scenario,opts={}){
   const sc=scenario||{};
   if(!target)return 'there is no target';
   if(target.includes('..'))return '".." paths are not allowed';
   if(verb==='edit'||verb==='read'||verb==='delete'){
-    const files=Object.keys(sc.vfs||{});
-    return valid(target)&&(own(sc.vfs||{},target)||files.some(f=>f.startsWith(dir(target))))?null:'"'+show(target)+'" is not a file or folder in this project';
+    const files=Object.keys(sc.vfs||{}),bad='"'+show(target)+'" is not a file or folder in this project';
+    if(opts.glob&&target.includes('*')){
+      if(!/^[\w.@/*-]+$/.test(target)||target.split('*').length>4)return bad;
+      return files.some(f=>AQ.permissions.matches(target,f))?null:'"'+show(target)+'" matches no file in this project';
+    }
+    const i=target.indexOf('#');
+    if(verb==='read'&&i>0)return own(sc.vfs||{},target.slice(0,i))&&AQ.vfs.section(sc.vfs[target.slice(0,i)],target.slice(i+1))!==null?null:bad;
+    return valid(target)&&(own(sc.vfs||{},target)||files.some(f=>f.startsWith(dir(target))))?null:bad;
   }
   if(verb==='run')return own(sc.commands||{},target)?null:'"'+show(target)+'" is not a command this project has';
   return (sc.tools||[]).some(t=>t===target||t.startsWith(target+'.'))?null:'"'+show(target)+'" is not a tool the agent has';
@@ -36,7 +46,7 @@ function parseConstraint(line,scenario){
   if(!m)return err('"'+show(s)+'" is not a rule. '+RULE_HELP);
   const kind=m[1].toLowerCase(),verb=m[2].toLowerCase(),target=m[3].trim();
   if(!VERBS.includes(verb))return err('"'+show(m[2])+'" is not a verb. Pick one of '+VERBS.join(', '));
-  const bad=resolveTarget(verb,target,scenario);
+  const bad=resolveTarget(verb,target,scenario,{glob:true});
   return bad?err(bad):{ok:true,c:{kind,verb,target}};
 }
 function parseDoneWhen(line,scenario){
@@ -117,7 +127,7 @@ const isFolderMemory=p=>typeof p==='string'&&valid(p)&&/^(?:[\w.@-]+\/)+CLAUDE\.
 
 function parseSetup(vfs){
   /* raw: every setup file under .claude/, so a size budget counts text the parsers ignore too */
-  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],allow:[],hooks:[],afterHooks:[],subagents:[],commands:[],errors:[],
+  const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],allow:[],hooks:[],afterHooks:[],subagents:[],commands:[],schedule:[],errors:[],
     memoryFolders:vfs.list().filter(isFolderMemory).map(path=>({path,dir:path.slice(0,-'CLAUDE.md'.length),text:vfs.read(path)}))};
   for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md'))){
     const f=frontmatter(vfs.read(p));
@@ -161,7 +171,24 @@ function parseSetup(vfs){
     const why=clash(m[1],['skill','subagent','MCP server']);
     if(why)setup.errors.push({file:p,msg:why});else setup.commands.push({name:m[1],path:p,text:vfs.read(p)});
   }
+  /* after the commands, so NAME can resolve: one line is "WHEN HH:MM use NAME" */
+  for(const l of lines(vfs.read(SCHEDULE))){
+    const bad=msg=>setup.errors.push({file:SCHEDULE,msg}),m=/^(\S+)\s+(\S+)\s+use\s+(\S+)$/i.exec(l),day=m&&m[1].toLowerCase();
+    if(!m)bad('"'+show(l)+'" is not "WHEN HH:MM use NAME"');
+    else if(!own(WHEN,day))bad('"'+show(m[1])+'" is not daily, weekdays or a day name');
+    else if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(m[2]))bad('"'+show(m[2])+'" is not a time: use two digits, like 07:30');
+    else if(!setup.commands.some(c=>c.name===m[3]))bad('"'+show(m[3])+'" is not a saved command');
+    else setup.schedule.push({line:l,day,days:WHEN[day],at:m[2],use:m[3]});
+  }
   return setup;
+}
+
+/* A scheduled scenario runs only when a schedule line starts a command the prompt uses: the first such line, and the days of all of them
+   (the runs per week). null for any other scenario and for a scheduled one nothing starts. */
+function fired(scenario,setup,prompt){
+  if(!scenario||!scenario.scheduled)return null;
+  const hits=setup.schedule.filter(s=>prompt.use.includes(s.use));
+  return hits.length?{entry:hits[0],due:DAYS.filter(d=>hits.some(h=>h.days.includes(d)))}:null;
 }
 
 /* CLAUDE.md lines in the prompt grammar act as standing rules; any other line only costs tokens. In the root file (root=true)
@@ -201,5 +228,5 @@ function skillIssues(setup,tag){
 const agentCost=setup=>setup.subagents.reduce((n,s)=>n+s.cost,0);
 
 AQ.isFolderMemory=isFolderMemory;
-AQ.config={TAGS,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,hasTool,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
+AQ.config={TAGS,fired,parseConstraint,parseDoneWhen,splitFields,parsePrompt,parseSetup,memoryRules,hasTool,folderMemory,skillBody,loadedSkills,skillIssues,agentCost};
 })();

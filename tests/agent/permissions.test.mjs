@@ -67,4 +67,28 @@ describe('permissions.check', () => {
     assert.ok(!permissions.matches('src/pri', 'src/price.js'));
     assert.ok(!permissions.matches('mail.send', 'mail'));
   });
+  it('a * stands for any text, whole-target, and the prefix and suffix may not overlap', () => {
+    assert.ok(!permissions.matches('a*a', 'a'));
+    assert.ok(permissions.matches('a*a', 'aa'));
+    assert.ok(permissions.matches('a*a', 'aba'));
+    assert.ok(permissions.matches('*.pdf', 'a/b.pdf'));
+    assert.ok(!permissions.matches('*.pdf', 'a.pdfx'));
+    assert.ok(permissions.matches('a*b*c', 'a1b2c'));
+    assert.ok(!permissions.matches('a*b*c', 'a1c2b'));
+    const long = 'a'.repeat(200);
+    assert.equal(permissions.matches('*a*a*b', long), false);
+    assert.equal(permissions.matches('a*a*a*a', long), true);
+  });
+  it('a rule on a file also covers a section of it, and not the other way round', () => {
+    assert.ok(permissions.matches('notes/x.md', 'notes/x.md#a'));
+    assert.ok(!permissions.matches('notes/x.md#a', 'notes/x.md'));
+    assert.ok(permissions.matches('notes/*.md', 'notes/x.md#a'));
+  });
+  it('a star in a deny line and in an allow line goes live', () => {
+    const un = { edited: [], unattended: true };
+    assert.equal(check(act('delete', 'downloads/a.pdf'), [], { '.claude/permissions.txt': 'deny delete downloads/*.pdf' }).by, 'permission rule');
+    assert.equal(check(act('delete', 'downloads/a.txt'), [], { '.claude/permissions.txt': 'deny delete downloads/*.pdf' }).allowed, true);
+    assert.equal(check(act('edit', 'src/price.js'), [], { '.claude/permissions.txt': 'allow edit src/price*' }, un).allowed, true);
+    assert.equal(check(act('edit', 'src/tax.js'), [], { '.claude/permissions.txt': 'allow edit src/price*' }, un).by, 'no one to ask');
+  });
 });

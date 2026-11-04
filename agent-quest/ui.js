@@ -18,13 +18,14 @@ UI.rove=(list,sel)=>{
   });
 };
 
-const TAGS={context:'context',skill:'skill',command:'command',plan:'plan',approved:'plan',delegate:'helper',skip:'skipped',hook:'hook',stall:'stalled'};
+const TAGS={context:'context',skill:'skill',command:'command',plan:'plan',approved:'plan',delegate:'helper',skip:'skipped',hook:'hook',stall:'stalled',fire:'schedule'};
 // engine/provider.js has a WHY map with the same keys in the agent's voice; add a key to both.
 const WHY={'not seen yet':'the agent has not read what it needs yet','not connected':'the tool is not connected','no one to ask':'nobody is there to approve it','hook':'a hook does not allow it','permission rule':'a permission rule does not allow it'};
 const describe=s=>{
   if(s.type==='hook')return 'Hook after edit '+s.target+': ran '+s.run+' ('+(s.ok?'passed':s.why||'failed')+')';
   if(s.type==='command')return 'Command '+s.name+' added '+s.lines+' line'+(s.lines===1?'':'s')+' to the prompt';
   if(s.type==='delegate')return 'Helper '+s.name+' ('+s.model+') '+(s.files?'searched '+s.files+' file'+(s.files===1?'':'s')+': ~'+s.tokens+' tokens'+(s.over?', more than its window ('+AQ.context.WINDOW+'), so it lost track of some files':' in its own context'):'had nothing to search')+', cost '+s.cost;
+  if(s.type==='fire')return 'Schedule: '+(s.entry?'starts '+s.entry.use+' at '+s.entry.at+', '+s.due.length+' run'+(s.due.length===1?'':'s')+' a week ('+s.due.join(', ')+')':'no line starts the job')+(s.why?'. Ignored: '+s.why:'');
   if(s.type==='stall')return 'Waiting for approval, but nobody is there';
   if(s.type==='skill')return 'Skill '+s.name+(s.loaded?' loaded':' not loaded ('+s.why+')');
   if(s.type==='context')return 'Loaded instructions and your prompt: ~'+s.tokens+' tokens'+(s.dropped?' ('+s.dropped+' earlier message'+(s.dropped>1?'s':'')+' dropped to fit)':'');
