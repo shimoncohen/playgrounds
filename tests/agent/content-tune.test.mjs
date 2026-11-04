@@ -96,7 +96,7 @@ const CASES = [
     fail: [{}, SKILLED(''), SKILLED(RULE), SKILLED(STEPS.join('\n')), SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE), SKILLED(STEPS.join('\n').replace('Bump', 'Raise') + '\n' + RULE),
       // the block copied and left in CLAUDE.md, or only half of it moved
       SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n'),
-      // one step left behind measures 96 to 99 (the duplicated rule line, 93, passes), so these rows are under the 8-token margin by design
+      // one step left behind: each step is long enough to sit 8 over the limit (the duplicated rule line passes)
       SKILLED(BLOCK + '\n', DAILY + STEPS[0] + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS[1] + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS[5] + '\n'),
       // the skill is the lever: it loads for this job, never loads, or is gone
       F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' }),
@@ -116,6 +116,7 @@ const CASES = [
       CMD(CG + CR + STEPS.join('\n') + '\n'), CMD(CG + RULE + EX), CMD(CG + '## Release checklist\n' + CR + EX), CMD(CG + CR + EX + 'Use: scout\n'), CMD(CG + 'Constraints: do not edit nowhere/\n' + EX),
       // the rule in a place no run reads, or only where it already was
       F({ 'CLAUDE.md': DAILY, [NOTESTXT]: RULE, [CP]: CG + EX }), CMD(CG + EX, DAILY + RULE), F({ 'CLAUDE.md': DAILY, [NOTESTXT]: BLOCK + '\n' }),
+      CMD(CG + CR + EX, DAILY + STEPS[0] + '\n'), CMD(CG + CR + EX, DAILY + STEPS[5] + '\n'),
       // the everyday rule dropped, or everything emptied
       CMD(CG + CR + EX, HEAD), F({ 'CLAUDE.md': '', [CP]: '', [NOTESTXT]: '' })] },
   { at: [22, 0],
@@ -193,8 +194,8 @@ const MARGINS = [
   { key: 'mcp', at: [20, 2], kind: 'peak', pass: CASES[2].pass, over: [{}, MC(LINES[0] + '\n' + LINES[1] + '\n'), MC(LINES[0] + '\nmail: read\n'), MC('calendar: list\n' + LINES[1] + '\n')] },
   // the rows that fail by a holder, a skill or a command line are not here: they fail whatever their size
   { key: 'dup', at: [21, 0], kind: 'peak', pass: CASES[3].pass, over: [DUP(ROOT, WHYL, DH() + WHYL), DUP(ROOT, WHYL, DH()), DUP(ROOT, '', DH() + WHYL), DUP(HEAD, GUARD, DH() + WHYL)] },
-  { key: 'rare', at: [21, 1], kind: 'peak', pass: CASES[4].pass, over: [SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n')] },
-  { key: 'cmd', at: [21, 2], kind: 'peak', pass: CASES[5].pass, over: [CMD(CG + CR + EX, RAW.join('\n') + '\n'), CMD(CG + CR + EX, DAILY + STEPS.slice(3).join('\n') + '\n')] },
+  { key: 'rare', at: [21, 1], kind: 'peak', pass: CASES[4].pass, over: [SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n'), ...STEPS.map((l) => SKILLED(BLOCK + '\n', DAILY + l + '\n'))] },
+  { key: 'cmd', at: [21, 2], kind: 'peak', pass: CASES[5].pass, over: [CMD(CG + CR + EX, RAW.join('\n') + '\n'), CMD(CG + CR + EX, DAILY + STEPS.slice(3).join('\n') + '\n'), ...STEPS.map((l) => CMD(CG + CR + EX, DAILY + l + '\n'))] },
 ];
 
 describe('tune limits: the answer fits, and a row that fails on size alone misses by at least 8 tokens', () => {
@@ -316,7 +317,7 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' })), /loads for this job, so the agent carries the checklist again/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' })), /must keep when: release/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' })), /is not a working skill/);
-    assert.match(msg(21, 1, SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE)), /missing 1 of the six checklist lines, such as "Bump the version in package\.json\."/);
+    assert.match(msg(21, 1, SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE)), /missing 1 of the six checklist lines, such as "Bump the version in package\.json to the number the shop team agreed on for this release\."/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: `name: release-steps\ndescription: ${STEPS.join(' ')}\nwhen: release\n` })), /missing 6 of the six/);
     assert.match(msg(21, 1, SKILLED(STEPS.join('\n') + '\n', DAILY + RULE)), /rule do not edit migrations\/ is not in the body of the skill/);
     assert.match(msg(21, 1, SKILLED(BLOCK + '\n', RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.rare} or fewer`));
@@ -332,12 +333,12 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.ok(peakOf(21, 2, {}) > r.outcome.tokens.peak + MARGIN);
   });
   it('22.3 shows the first line that does not parse, and the missing rule, step and size', () => {
-    assert.match(msg(21, 2, CMD(CG + CR + STEPS.join('\n') + '\n')), /would be refused: Command release-prep: Bump the version in package\.json\. does not start with a field name/);
+    assert.match(msg(21, 2, CMD(CG + CR + STEPS.join('\n') + '\n')), /would be refused: Command release-prep: Bump the version in package\.json to the number .* does not start with a field name/);
     assert.match(msg(21, 2, CMD(CG + RULE + EX)), /would be refused: Command release-prep: do not edit migrations\/ does not start with a field name/);
     assert.match(msg(21, 2, CMD(CG + '## Release checklist\n' + CR + EX)), /would be refused: Command release-prep: ## Release checklist does not start with a field name/);
     assert.match(msg(21, 2, CMD(CG + CR + EX + 'Use: scout\n')), /would be refused: .*a command cannot use other names/);
     assert.match(msg(21, 2, CMD(CG + EX, DAILY + RULE)), /holds no Constraints: do not edit migrations\/ line/);
-    assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(1).join('\n'))), /missing 1 of the six steps, such as "Bump the version in package\.json\."/);
+    assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(1).join('\n'))), /missing 1 of the six steps, such as "Bump the version in package\.json to the number the shop team agreed on for this release\."/);
     assert.match(msg(21, 2, CMD(CG + CR + EX, RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.cmd} or fewer`));
     assert.match(msg(21, 2, CMD(CG + CR + EX, HEAD)), /did delete data\/backup\.csv/);
   });

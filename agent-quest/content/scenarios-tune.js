@@ -7,9 +7,9 @@ const AQ=globalThis.AQ=globalThis.AQ||{};
 const S=AQ.scenarios;
 
 /* The most the agent may hold at once ("peak", in tokens), or the most a setup may weigh, for each mission. The measured answer sits under
-   its limit; the rows that fail on size alone sit at least 8 over it (tests/agent/content-tune.test.mjs asserts both). The one exception is rare: a
-   single checklist step left in CLAUDE.md measures 96 against the 93 of the one duplicated rule line that must pass, so it is only 2 over. */
-AQ.TUNE={desc:98,dead:20,mcp:60,dup:105,rare:94,cmd:95};
+   its limit; the rows that fail on size alone sit at least 8 over it (tests/agent/content-tune.test.mjs asserts both). For rare and cmd the one
+   duplicated rule line that must pass is the high point under the limit, so each checklist step is long enough for a single step left behind to clear it by 8. */
+AQ.TUNE={desc:98,dead:20,mcp:60,dup:105,rare:97,cmd:90};
 
 const LONGDESC='Loads for every release job. It blocks any edit to the migrations folder, so a release can never change the database tables or their history by accident, and it should be read before anything is shipped.';
 const tuneDesc={...S.release,vfs:{...S.release.vfs,'.claude/skills/release-guard.md':'name: release-guard\ndescription: '+LONGDESC+'\nwhen: release\ndo not edit migrations/\n'}};
@@ -37,7 +37,7 @@ const skillFile=AQ.scenarioKit.skillFile;
 const GUARD='do not delete data/\nWhy: data/ holds the backups the shop restores from after a crash.\n';
 const tuneDup={...TIDY,vfs:{...S.tidy.vfs,'CLAUDE.md':NOTES+GUARD,'src/CLAUDE.md':GUARD,'.claude/skills/data-guard.md':skillFile('data-guard','bugfix',GUARD)}};
 
-const CHORES=['Bump the version in package.json.','Update the changelog with the new entries.','Tag the commit with the version number.','Copy the build to the shop server.','Restart the checkout service after copying.','Email the shop team that the release is out.'];
+const CHORES=['Bump the version in package.json to the number the shop team agreed on for this release.','Update the changelog with the new entries, one short line for each change since the last release.','Tag the commit with the version number, so anyone can find exactly what was shipped.','Copy the build to the shop server, into the folder the checkout page is served from.','Restart the checkout service after copying, so shoppers get the new build right away.','Email the shop team that the release is out, and tell them what changed for the shoppers.'];
 const rareVfs={...S.tidy.vfs,'migrations/001.sql':'create table totals;\n','.claude/notes.txt':'',
   'CLAUDE.md':NOTES+'do not delete data/\n## Release checklist\ndo not edit migrations/\n'+CHORES.join('\n')+'\n'};
 const tuneRare={...TIDY,vfs:{...rareVfs,'.claude/skills/release-steps.md':skillFile('release-steps','release','')}};
