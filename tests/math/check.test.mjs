@@ -96,6 +96,13 @@ test('number steps are each checked against the original', () => {
   assert.deepEqual(oks(C.steps('x^2+2x+1', ['(x+1)^2', 'x^2+1', '(x+1)(x+1)'], { kind: 'expr' })), [true, false, true]);
 });
 
+test('a degree sign is read as part of the number, in steps and in the preview', () => {
+  assert.deepEqual(oks(C.steps('180-47', ['180°-47°', '133°', '133 °', '133'], { kind: 'number' })), [true, true, true, true]);
+  assert.equal(C.steps('180-47', ['134°'], { kind: 'number' })[0].ok, false);
+  assert.equal(C.tex('180°-47°'), C.tex('180-47'));
+  assert.equal(C.final.number(133)('133°').ok, false, 'final.number itself still wants a bare number');
+});
+
 test('equation steps: same solutions as the original', () => {
   assert.deepEqual(oks(C.steps('2x+4=10', ['2x=6', 'x=3'], { kind: 'equation' })), [true, true]);
   const slip = plain(C.steps('2x+4=10', ['2x=14', 'x=3'], { kind: 'equation' }));

@@ -6,9 +6,11 @@
   const no = why => ({ ok: false, why });
   const yes = { ok: true };
 
+  // Angles may be typed with a degree sign; math.js cannot read `°`, and the value is the same without it.
+  const bare = s => String(s).replace(/°/g, '');
   const parse = s => {
     let node;
-    try { node = full.parse(String(s)); } catch (e) { return { why: UNREAD }; }
+    try { node = full.parse(bare(s)); } catch (e) { return { why: UNREAD }; }
     if (node.filter(n => n.isAssignmentNode || n.isFunctionAssignmentNode || n.isBlockNode ||
       (n.isSymbolNode && BLOCKED.has(n.name))).length) return { why: UNREAD };
     return { node };
@@ -21,7 +23,7 @@
     const p = parse(s);
     if (p.why) return p;
     let v;
-    try { v = safe.evaluate(String(s)); } catch (e) {
+    try { v = safe.evaluate(bare(s)); } catch (e) {
       if (/Division by zero/i.test(e.message)) return { why: 'This divides by zero, and that has no value.' };
       const u = unknown(e);
       return { why: u ? `I don't know what \`${u}\` is here. This one is about numbers only.` : UNREAD };
@@ -202,7 +204,7 @@
   };
 
   // math.js writes implicit multiplication as `~`, which KaTeX renders as a visible gap ("2 x").
-  C.tex = s =>String(s).split('=').map(p => full.parse(p).toTex({ parenthesis: 'auto' })).join(' = ').replace(/~/g, '');
+  C.tex = s =>bare(s).split('=').map(p => full.parse(p).toTex({ parenthesis: 'auto' })).join(' = ').replace(/~/g, '');
 
   C.translate = ascii => String(ascii)
     .replace(/\|([^|]+)\|/g, 'abs($1)')

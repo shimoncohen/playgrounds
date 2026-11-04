@@ -53,7 +53,7 @@ test('layers put a chapter one layer after its deepest prerequisite', () => {
 
 test('trackEdges and nextUp', () => {
   assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry']]);
-  assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order']);
+  assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order', 'geometry.angles']);
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order']))), ['arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions'], 'at most 3, in graph order');
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order', 'arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions']))),
     ['arithmetic.powers', 'arithmetic.ratios', 'algebra.expanding']);
