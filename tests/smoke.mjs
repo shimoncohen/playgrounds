@@ -114,12 +114,13 @@ test('landing page sums Math Quest XP', async () => {
 test('math hub loads cleanly', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/`, { viewport: { width: 390, height: 844 } });
   await page.waitForSelector('.tcard');
-  assert.equal((await page.$$('.tcard')).length, 3);
+  assert.equal((await page.$$('.tcard')).length, 4);
   assert.match(await page.textContent('#next'), /Order of operations/);
   assert.ok(await page.isVisible('#mapList ol'), 'list hidden on a phone');
-  assert.equal((await page.$$('#mapList ol')).length, 3);
-  assert.deepEqual(await page.$$eval('#mapList ol:last-of-type li', l => l.length), 2);
-  assert.match(await page.textContent('#mapList ol:last-of-type li .needs'), /Needs first: Order of operations \(Arithmetic\)/);
+  assert.equal((await page.$$('#mapList ol')).length, 4);
+  assert.deepEqual(await page.$$eval('#mapList ol:nth-of-type(3) li', l => l.length), 4);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(3) li .needs'), /Needs first: Order of operations \(Arithmetic\)/);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(4) li .needs'), /Needs first: Pythagoras \(Geometry\), Angles \(Geometry\), Ratios and percentages \(Arithmetic\)/);
   assert.ok(!(await page.isVisible('svg.map')), 'map shown on a phone');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'horizontal overflow');
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -131,7 +132,7 @@ test('math hub loads cleanly', async () => {
   await ctx.close();
 });
 
-const PAGES = [...NAMES.map(n => `${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/'];
+const PAGES = [...NAMES.map(n => `${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/', 'math-quest/trigonometry/'];
 // A Math Quest track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
 const appOf = pg => pg.startsWith('math-quest/') ? 'math-' + pg.split('/')[1] : pg.slice(0, -1);
 for (const pg of PAGES) {
@@ -261,13 +262,13 @@ test('math hub links open the track pages', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/`);
   await page.waitForSelector('.tcard');
   const hrefs = await page.$$eval('.tcard a', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs, ['arithmetic/', 'algebra/', 'geometry/']);
+  assert.deepEqual(hrefs, ['arithmetic/', 'algebra/', 'geometry/', 'trigonometry/']);
   for (const h of hrefs) assert.equal((await page.request.get(`${base}/math-quest/${h}`)).status(), 200, h);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
 
-for (const track of ['arithmetic', 'algebra', 'geometry']) {
+for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
   test(`math-${track}: at 1440px the header is one row and its Math Quest link goes to the hub`, async () => {
     const { ctx, page, errors } = await open(`${base}/math-quest/${track}/`, { viewport: { width: 1440, height: 900 } });
     await page.waitForSelector('header .pg-wrap');
@@ -375,6 +376,51 @@ test('math-geometry: text mode passes an area mission, and an angle answer with 
   await page.keyboard.press('Enter');
   await page.waitForSelector('#feedback .msg.win');
   assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a rounded mission passes in text mode, and the scene angle follows the keys', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('10*sin(35)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('10*0.5736');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓', '✓']);
+  await until(async () => JSON.parse(await read(page, 'math-trigonometry-v1') || '{}').xp === 10);
+  const live = () => page.textContent('#scene .mq-live');
+  assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  await page.keyboard.press('ArrowRight');
+  assert.match(await live(), /sin 25° = 4\.2 \/ 10 = 0\.42\./);
+  await page.goto(`${base}/math-quest/trigonometry/#ch=trigonometry.ratios`);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a visual-mode answer with sin passes', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`);
+  await page.waitForSelector('#work math-field');
+  const fill = async (i, latex) => {
+    await page.locator('#work math-field').nth(i).focus();
+    await page.evaluate(latex => { document.activeElement.setValue(latex); }, latex);
+  };
+  await fill(0, '10\\sin\\left(35\\right)');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('#work math-field').length > 1);
+  await fill(1, '5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
