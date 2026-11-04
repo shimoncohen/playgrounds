@@ -31,6 +31,7 @@ a{color:var(--accent-text)}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-block:16px 18px}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:800;font-size:23px}
 .brand small{font-weight:600;font-size:15px;color:var(--muted)}
+.brand small a{color:inherit}
 .logo{font-family:var(--font-mono);font-weight:600;font-size:14px;background:var(--term-bg);color:var(--sy-fn);padding:5px 8px;border-radius:7px}
 .tabs{display:flex;gap:3px;background:var(--surface-2);padding:4px;border-radius:11px}
 .tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;font-weight:700;font-size:14px;color:var(--muted)}

@@ -63,6 +63,8 @@
     h('span', null, sw, 'Math keyboard');
     const list = h('ol', 'mq-steps', el);
     list.setAttribute('aria-label', 'Your working, one step per line');
+    const tip = h('p', 'mq-tip', el);
+    tip.innerHTML = 'Typing <kbd>/</kbd> starts a fraction. Press <kbd>→</kbd> to leave it before typing the rest.';
     const pad = h('div', 'mq-keypad', el);
     pad.setAttribute('aria-label', 'Symbols');
     for (const [label, ins, name] of KEYS) {
@@ -100,9 +102,12 @@
       });
       const steps = filled.map(([v]) => v);
       const final = steps.length ? mission.check(steps.at(-1)) : { ok: false };
-      const all = res.every(r => r.ok) && steps.length > 0;
-      const ok = final.ok && (mission.work !== 'required' || all);
-      result.textContent = ok ? 'That solves it.' : final.ok ? 'The answer is right. Now make every step show ✓.' : '';
+      const all = res.every(r => r.ok), shown = steps.length > 1;
+      const ok = final.ok && (mission.work !== 'required' || (all && shown));
+      result.textContent = ok ? 'That solves it.'
+        : !final.ok ? ''
+        : !all ? 'The answer is right. Now make every step show ✓.'
+        : 'The answer is right. Now write at least one step before it, to show how you got there.';
       if (ok && !passed && onPass) onPass(steps);
       passed = ok;
     };
@@ -155,6 +160,7 @@
       box.checked = mode === 'visual';
       el.dataset.mode = mode;
       pad.hidden = mode !== 'text';
+      tip.hidden = mode !== 'visual';
       list.replaceChildren();
       (vals.length ? vals : ['']).forEach(v => addStep(v));
       check();

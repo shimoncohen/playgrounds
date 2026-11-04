@@ -80,6 +80,23 @@ test('text mode: each step is checked against the question, and one wrong step s
   await ctx.close();
 });
 
+test('required working: the answer alone does not pass, one step before it does', async () => {
+  const { ctx, page, errors } = await open('text');
+  await page.focus('#work .mq-field');
+  await typeChain(page, ['6']);
+  assert.deepEqual(await marks(page), ['✓', '']);
+  assert.match(await page.textContent('#work .mq-result'), /at least one step before/);
+  assert.deepEqual(await page.evaluate(() => window.passed), []);
+
+  await page.fill('#work .mq-step:nth-child(1) .mq-field', '2-6+10');
+  await page.focus('#work .mq-step:nth-child(2) .mq-field');
+  await typeChain(page, ['6']);
+  assert.match(await page.textContent('#work .mq-result'), /solves it/);
+  assert.deepEqual(await page.evaluate(() => window.passed), [['2-6+10', '6']]);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('every field, the switch and the keypad are labelled and keyboard-usable', async () => {
   const { ctx, page, errors } = await open('text');
   assert.equal(await page.getAttribute('#work .mq-field', 'aria-label'), 'Step 1');
@@ -194,13 +211,16 @@ test('notes are saved after a pause in typing', async () => {
   await ctx.close();
 });
 
-test('visual is the default and MathLive is loaded only then', async () => {
+test('visual is the default and MathLive is loaded only then; only visual shows the fraction tip', async () => {
   const { ctx, page, errors } = await open(null);
   assert.ok(await page.$('#work math-field'));
+  assert.match(await page.textContent('#work .mq-tip'), /starts a fraction/);
+  assert.equal(await page.isVisible('#work .mq-tip'), true);
   assert.equal(await page.$$eval('script[src*="mathlive"]', s => s.length), 1);
   await ctx.close();
   const t = await open('text');
   assert.equal(await t.page.$$eval('script[src*="mathlive"]', s => s.length), 0);
+  assert.equal(await t.page.isVisible('#work .mq-tip'), false);
   assert.deepEqual([...errors, ...t.errors], []);
   await t.ctx.close();
 });
