@@ -500,6 +500,27 @@ test('math-algebra: a linear equation needs its working in text mode, and passes
   await ctx.close();
 });
 
+test('math-algebra: missions open their scene on their own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const at = async (ch, mi) => {
+    await page.goto(`${base}/math-quest/algebra/#ch=algebra.${ch}`);
+    await page.click(`#mission .dot[data-mi="${mi}"]`);
+    return live();
+  };
+  assert.match(await at('expressions', 0), /V = 10·5·3 = 150/);
+  assert.match(await at('expressions', 4), /2a \+ 3a = 4 \+ 6 = 10/);
+  assert.match(await at('expanding', 0), /3 × 5 = 9 \+ 6 = 15/);
+  assert.match(await at('expanding', 1), /2\(x − 4\) = 2 × 3 = 6/);
+  assert.match(await at('expanding', 3), /\(3 \+ 2\)\(3 \+ 2\) = 9 \+ 6 \+ 6 \+ 4 = 25/);
+  assert.match(await at('factoring', 2), /36 − 9 = 27 = 3 × 9/);
+  assert.match(await at('factoring', 3), /25 − 20 \+ 4 = 9 = 3 × 3/);
+  assert.match(await at('quadratics', 1), /y = x² − 16: it crosses the x-axis at x = −4 and x = 4/);
+  assert.match(await at('quadratics', 2), /y = x² − 3x: it crosses the x-axis at x = 0 and x = 3/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its badge is earned', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`);
   const hint = () => page.textContent('#mission .prereq');

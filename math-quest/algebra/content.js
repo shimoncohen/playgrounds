@@ -7,7 +7,7 @@
 
   const box = {
     id: 'box-volume', title: 'Box volume',
-    params: { a: E('length', 2), b: E('width', 3), c: E('height', 4) },
+    params: { a: { ...E('length', 2), max: 10 }, b: E('width', 3), c: E('height', 4) },
     derived: p => ({ V: p.a * p.b * p.c }),
     formula: 'V = \\term{a}{a}\\cdot\\term{b}{b}\\cdot\\term{c}{c}',
     live: 'V = {a}·{b}·{c} = {V}',
@@ -81,6 +81,103 @@
     },
   }; };
 
+  const U = (max, value, label = 'x', min = 1) => ({ min, max, step: 1, value, label });
+  const tx = (x, y, s, term) => ({ type: 'text', x, y, s, term });
+  const likeTerms = {
+    id: 'like-terms', title: 'Two boxes side by side, 2a and 3a long',
+    params: { a: U(3, 2, 'a') },
+    derived: p => ({ n2: 2 * p.a, n3: 3 * p.a, V: 5 * p.a }),
+    formula: '2\\term{a}{a}+3\\term{a}{a}',
+    live: 'a = {a}: 2a + 3a = {n2} + {n3} = {V}',
+    draw: {
+      kind: '2d', view: [-0.5, 17.5, -1.6, 2.2], box: [400, 90],
+      items: ({ params: { a } }) => {
+        const row = (n, x0) => Array.from({ length: n }, (_, i) => [
+          { type: 'polygon', term: 'a', pts: sq(x0 + i * a, 0, x0 + (i + 1) * a, 1) }, tx(x0 + (i + 0.5) * a, 0.5, 'a', 'a'),
+        ]).flat();
+        return [...row(2, 0), ...row(3, 2 * a + 1), tx(a, -0.8, '2a'), tx(2 * a + 1 + 1.5 * a, -0.8, '3a')];
+      },
+    },
+  };
+
+  const bracket = (k, n, m) => ({
+    id: `bracket-${k}-${n}-${m}`, title: `A rectangle ${k} tall and ${n > 1 ? n : ''}x + ${m} wide`,
+    params: { x: U(5, 3) },
+    terms: ['w1', 'w2', 'p1', 'p2'],
+    derived: p => ({ p1: k * n * p.x, p2: k * m, total: k * (n * p.x + m) }),
+    formula: `${k}(\\term{w1}{${n > 1 ? n : ''}x}+\\term{w2}{${m}}) = \\term{p1}{${k * n}x}+\\term{p2}{${k * m}}`,
+    live: s => `x = ${s.params.x}: ${k} × ${n * s.params.x + m} = ${s.derived.p1} + ${s.derived.p2} = ${s.derived.total}`,
+    draw: {
+      kind: '2d', view: [-1.5, 13.5, -0.6, k + 1.3], box: [400, 400 * (k + 1.9) / 15],
+      items: ({ params: { x } }) => [
+        { type: 'polygon', term: 'p1', pts: sq(0, 0, n * x, k) }, tx(n * x / 2, k / 2, `${k * n}x`, 'p1'),
+        { type: 'polygon', term: 'p2', pts: sq(n * x, 0, n * x + m, k) }, tx(n * x + m / 2, k / 2, String(k * m), 'p2'),
+        tx(n * x / 2, k + 0.6, `${n > 1 ? n : ''}x`, 'w1'), tx(n * x + m / 2, k + 0.6, String(m), 'w2'), tx(-0.7, k / 2, String(k)),
+      ],
+    },
+  });
+
+  // A length cannot be negative, so the picture is 2(x − 4) without the minus in front: the 2 × 4 part cut off a 2 × x rectangle.
+  const cutOff = {
+    id: 'cut-off', title: 'A rectangle 2 tall with a 4 wide part cut off',
+    params: { x: U(10, 7, 'x', 5) },
+    terms: ['kept', 'cut'],
+    derived: p => ({ kept: 2 * (p.x - 4), whole: 2 * p.x }),
+    formula: '\\term{kept}{2(x-4)} = 2\\term{x}{x} - \\term{cut}{8}',
+    live: s => `x = ${s.params.x}: 2(x − 4) = 2 × ${s.params.x - 4} = ${s.derived.kept}, and 2x − 8 = ${s.derived.whole} − 8 = ${s.derived.kept}`,
+    draw: {
+      kind: '2d', view: [-1.5, 11.5, -0.6, 3.4], box: [400, 125],
+      items: ({ params: { x } }) => [
+        { type: 'polygon', term: 'kept', pts: sq(0, 0, x - 4, 2) }, tx((x - 4) / 2, 1, String(2 * (x - 4)), 'kept'),
+        { type: 'polygon', term: 'cut', pts: sq(x - 4, 0, x, 2) }, tx(x - 2, 1, '−8', 'cut'),
+        tx((x - 4) / 2, 2.6, 'x − 4', 'kept'), tx(x - 2, 2.6, '4', 'cut'), tx(-0.7, 1, '2'),
+      ],
+    },
+  };
+
+  const diffSquares = {
+    id: 'diff-squares', title: 'A square with a 3 by 3 corner cut out',
+    params: { x: U(9, 6, 'x', 4) },
+    terms: ['top', 'bot', 'cut'],
+    derived: p => ({ left: p.x * p.x - 9 }),
+    formula: '\\term{x}{x}^2-\\term{cut}{9}=(\\term{x}{x}-3)(\\term{x}{x}+3)',
+    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − 9 = ${s.derived.left} = ${s.params.x - 3} × ${s.params.x + 3}`,
+    draw: {
+      kind: '2d', view: [-1.2, 10.4, -0.8, 10.4], box: [360, 360],
+      items: ({ params: { x } }) => {
+        const k = 9 / x, p = (x0, y0, x1, y1) => sq(x0 * k, y0 * k, x1 * k, y1 * k);
+        return [
+          { type: 'polygon', term: 'top', pts: p(0, 3, x, x) }, tx(x / 2 * k, (x + 3) / 2 * k, String(x * (x - 3)), 'top'),
+          { type: 'polygon', term: 'bot', pts: p(0, 0, x - 3, 3) }, tx((x - 3) / 2 * k, 1.5 * k, String(3 * (x - 3)), 'bot'),
+          { type: 'polygon', term: 'cut', pts: p(x - 3, 0, x, 3) }, tx((x - 1.5) * k, 1.5 * k, '−9', 'cut'),
+          tx(4.5, -0.5, 'x', 'x'),
+        ];
+      },
+    },
+  };
+
+  const perfectSquare = {
+    id: 'perfect-square', title: 'A square with two strips taken off',
+    params: { x: U(9, 5, 'x', 3) },
+    terms: ['sq', 'strips', 'back'],
+    derived: p => ({ left: (p.x - 2) ** 2 }),
+    formula: '\\term{x}{x}^2-\\term{strips}{4x}+\\term{back}{4}=\\term{sq}{(x-2)^2}',
+    live: s => `x = ${s.params.x}: ${s.params.x ** 2} − ${4 * s.params.x} + 4 = ${s.derived.left} = ${s.params.x - 2} × ${s.params.x - 2}`,
+    draw: {
+      kind: '2d', view: [-1.2, 10.4, -0.8, 10.4], box: [360, 360],
+      items: ({ params: { x } }) => {
+        const k = 9 / x, p = (x0, y0, x1, y1) => sq(x0 * k, y0 * k, x1 * k, y1 * k);
+        return [
+          { type: 'polygon', term: 'sq', pts: p(0, 2, x - 2, x) }, tx((x - 2) / 2 * k, (x + 2) / 2 * k, String((x - 2) ** 2), 'sq'),
+          { type: 'polygon', term: 'strips', pts: p(0, 0, x, 2) }, tx((x - 2) / 2 * k, k, '−2x', 'strips'),
+          { type: 'polygon', term: 'strips', pts: p(x - 2, 2, x, x) }, tx((x - 1) * k, (x + 2) / 2 * k, '−2x', 'strips'),
+          { type: 'polygon', term: 'back', pts: p(x - 2, 0, x, 2) }, tx((x - 1) * k, k, '+4', 'back'),
+          tx(4.5, -0.5, 'x', 'x'),
+        ];
+      },
+    },
+  };
+
   const rootsOf = (b, c) => {
     const D = b * b - 4 * c;
     if (D < 0) return [];
@@ -88,25 +185,25 @@
     return [(-b - Math.sqrt(D)) / 2, (-b + Math.sqrt(D)) / 2];
   };
   const fmt = v => String(+v.toFixed(2)).replace(/^-/, '−');
-  const parabola = {
+  const parabola = (view, cMin) => ({
     id: 'parabola', title: 'The curve y = x² + bx + c and where it crosses the x-axis',
-    params: { b: { min: -5, max: 5, step: 1, value: 0, label: 'b' }, c: { min: 1, max: 5, step: 1, value: 3, label: 'c' } },
+    params: { b: { min: -6, max: 6, step: 1, value: 0, label: 'b' }, c: { min: cMin, max: 9, step: 1, value: 3, label: 'c' } },
     terms: ['curve', 'root'],
     derived: p => ({ crossings: rootsOf(p.b, p.c).length }),
     formula: '\\term{curve}{y} = x^2+\\term{b}{b}\\,x+\\term{c}{c}\\qquad\\term{root}{y = 0}',
     live: s => {
-      const r = rootsOf(s.params.b, s.params.c), b = s.params.b, eq = `y = x²${b ? ` ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x` : ''} + ${s.params.c}`;
+      const r = rootsOf(s.params.b, s.params.c), { b, c } = s.params, eq = `y = x²${b ? ` ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x` : ''}${c ? ` ${c < 0 ? '−' : '+'} ${Math.abs(c)}` : ''}`;
       return `${eq}: ${!r.length ? 'it never reaches the x-axis' : r.length === 1 ? `it touches the x-axis at x = ${fmt(r[0])}` : `it crosses the x-axis at x = ${r.map(fmt).join(' and x = ')}`}`;
     },
     draw: {
-      kind: '2d', view: [-6, 6, -7, 8], box: [400, 400],
+      kind: '2d', view, box: [400, 400],
       items: ({ params: { b, c } }) => [
         { type: 'axes' },
         { type: 'fn', f: x => x * x + b * x + c, term: 'curve' },
         ...rootsOf(b, c).map(x => ({ type: 'point', x, y: 0, term: 'root' })),
       ],
     },
-  };
+  });
 
   MQ.content = {
     track: 'algebra',
@@ -116,7 +213,7 @@
       intro: 'In algebra, letters stand for numbers. A <b>variable</b> is a letter, like <code>a</code>, whose number can change. The box on this page has length <code>a</code>, width <code>b</code> and height <code>c</code>. Its <b>volume</b>, how many 1 by 1 by 1 cubes fit inside, is <code>V = a · b · c</code>, where the dot <code>·</code> means ×. A line made of numbers, letters and operations is an <b>expression</b>. Move the sliders and watch the box, the formula and the numbers change together.',
       scene: box,
       missions: [
-        { title: 'Letters for numbers', kind: 'number', question: '10*5*3', tex: 'a \\cdot b \\cdot c \\;\\text{ with }\\; a = 10,\\ b = 5,\\ c = 3',
+        { title: 'Letters for numbers', kind: 'number', at: { a: 10, b: 5, c: 3 }, question: '10*5*3', tex: 'a \\cdot b \\cdot c \\;\\text{ with }\\; a = 10,\\ b = 5,\\ c = 3',
           goal: 'A crate is 10 long, 5 wide and 3 tall. Put those numbers in for the letters of <code>V = a · b · c</code> and work out the volume <code>V</code>.',
           how: [
             '<code>V = a · b · c</code> says: the volume is length times width times height. Each letter is a variable, waiting for its number.',
@@ -137,13 +234,13 @@
           ],
           explain: 'To check an expression, the quest tries yours and the question with many different numbers for <code>c</code>. If they always agree, the two are equal.',
           hint: 'Multiply the numbers: what is <code>5 · 2</code>? Keep the <code>c</code>.',
-          answer: '10c', wrong: '7c', lazy: '5*2*c',
+          at: { a: 5, b: 2 }, answer: '10c', wrong: '7c', lazy: '5*2*c',
           check: v => {
             const r = MQ.check.expr(v, '10c', { vars: ['c'] });
             if (!r.ok) return r;
             return MQ.math.full.parse(v).filter(n => n.isConstantNode).length === 1 ? ok : { ok: false, why: 'That is equal, but it still has more than one number. Multiply the numbers together.' };
           } },
-        { title: 'Double the length', kind: 'expr', vars: ['a', 'b', 'c'], question: '(2a*b*c)/(a*b*c)', tex: '\\frac{(2a) \\cdot b \\cdot c}{a \\cdot b \\cdot c}',
+        { title: 'Double the length', kind: 'expr', at: { a: 1 }, vars: ['a', 'b', 'c'], question: '(2a*b*c)/(a*b*c)', tex: '\\frac{(2a) \\cdot b \\cdot c}{a \\cdot b \\cdot c}',
           goal: 'Make the box twice as long: its length becomes <code>2a</code>. How many times bigger is the new volume? The question divides the new volume by the old one: cancel until no division is left.',
           how: [
             'The question is a <b>fraction</b>, the top divided by the bottom: the new volume, <code>(2a) · b · c</code>, over the old one, <code>a · b · c</code>. Its value says how many old boxes fit in the new one.',
@@ -168,7 +265,7 @@
           answer: { a: 4, b: 4, c: 4 }, wrong: { a: 4, b: 4, c: 2 }, lazy: { a: 4, b: 2, c: 2 },
           check: s => s.params.a !== 4 ? { ok: false, why: 'Keep the length a at 4.' }
             : s.derived.V === 64 ? ok : { ok: false, why: `V is ${s.derived.V} now. You need 64.` } },
-        { title: 'Add like terms', kind: 'expr', vars: ['a'], question: '2a+3a',
+        { title: 'Add like terms', kind: 'expr', scene: likeTerms, vars: ['a'], question: '2a+3a',
           goal: 'Two boxes stand side by side. Both are 1 wide and 1 tall; one is <code>2a</code> long and the other <code>3a</code>. Together their volume is <code>2a + 3a</code>. Write it as one number times <code>a</code>.',
           how: [
             '<code>2a + 3a</code> is two lots of <code>a</code> plus three more lots of <code>a</code>, like 2 apples and 3 apples.',
@@ -186,7 +283,7 @@
       intro: 'A bracket groups a sum so it can be multiplied as one piece: <code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>. <b>Expanding</b> means multiplying out until no bracket is left around a sum: <code>3(x + 2) = 3x + 6</code>. The rectangle on this page shows why it works. Its sides are <code>a + b</code> and <code>c + d</code>, so it splits into four smaller rectangles, and its area is the sum of theirs: <code>ac + ad + bc + bd</code>, where two letters side by side, like <code>ac</code>, mean <code>a · c</code>. Each part has the same color in the picture and in the formula.',
       scene: rect('area-split', 'A rectangle split into four parts', [2, 1, 3, 2]),
       missions: [
-        { title: 'One number times a bracket', kind: 'expr', vars: ['x'], question: '3(x+2)',
+        { title: 'One number times a bracket', kind: 'expr', scene: bracket(3, 1, 2), vars: ['x'], question: '3(x+2)',
           goal: 'A rectangle is 3 tall and <code>x + 2</code> wide, so its area is <code>3(x + 2)</code>. Write that area with no brackets left.',
           how: [
             '<code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>: a number right before a bracket multiplies everything inside it.',
@@ -197,8 +294,8 @@
           explain: 'Check it with a number: with <code>x = 1</code>, <code>3(1 + 2)</code> is 9, and <code>3 · 1 + 6</code> is 9 too. The quest checks your answer the same way, with many numbers for <code>x</code>.',
           hint: 'Multiply 3 by <code>x</code>, then 3 by 2, and add the two.',
           answer: '3x+6', wrong: '3x+2', lazy: '3(x+2)', check: finalExpr('3x+6', ['expanded', 'collected']) },
-        { title: 'A minus sign in front', kind: 'expr', vars: ['x'], question: '-2(x-4)',
-          goal: 'Expand <code>−2(x − 4)</code>: multiply <code>−2</code> by each part inside, and write it with no brackets.',
+        { title: 'A minus sign in front', kind: 'expr', scene: cutOff, vars: ['x'], question: '-2(x-4)',
+          goal: 'Expand <code>−2(x − 4)</code>: multiply <code>−2</code> by each part inside, and write it with no brackets. A length cannot be negative, so the scene shows <code>2(x − 4)</code>: the 2 by 4 part cut off a 2 by <code>x</code> rectangle. Then work out what the minus in front does.',
           how: [
             '<code>−2(x − 4)</code> multiplies the whole of <code>x − 4</code> by <code>−2</code>. Read <code>x − 4</code> as <code>x</code> plus <code>−4</code>, so there are two parts to multiply.',
             '<code>−2</code> times <code>x</code> is <code>−2x</code>.',
@@ -208,7 +305,7 @@
           explain: 'The slip to watch for is <code>−2x − 8</code>, which flips the first sign but not the second. Try <code>x = 0</code>: <code>−2(0 − 4)</code> is 8, not −8.',
           hint: 'Two multiplications: <code>−2 · x</code> and <code>−2 · (−4)</code>. What is a minus times a minus?',
           answer: '-2x+8', wrong: '-2x-8', lazy: '-2(x-4)', check: finalExpr('-2x+8', ['expanded', 'collected']) },
-        { title: 'Two brackets', kind: 'expr', vars: ['x'], question: '(x+1)(x+3)',
+        { title: 'Two brackets', kind: 'expr', at: { a: 2, b: 1, c: 2, d: 3 }, vars: ['x'], question: '(x+1)(x+3)',
           goal: 'A rectangle is <code>x + 1</code> tall and <code>x + 3</code> wide. Expand <code>(x + 1)(x + 3)</code> into one sum, and add up the like terms.',
           how: [
             '<code>(x + 1)(x + 3)</code> multiplies every part of the first bracket by every part of the second: like the scene, the rectangle splits into four smaller ones.',
@@ -216,10 +313,10 @@
             '1 times <code>x</code> is <code>x</code>, and 1 times 3 is 3. So the four areas are <code>x² + 3x + x + 3</code>.',
             '<code>3x</code> and <code>x</code> are like terms, and together they make <code>4x</code>. The answer is <code>x² + 4x + 3</code>.',
           ],
-          explain: 'This is the scene with <code>a</code> and <code>c</code> both standing for <code>x</code>, <code>b = 1</code> and <code>d = 3</code>. Set a = 2, b = 1, c = 2 and d = 3 to see it for <code>x = 2</code>: the parts are 4, 6, 2 and 3.',
+          explain: 'This is the scene with <code>a</code> and <code>c</code> both standing for <code>x</code>, <code>b = 1</code> and <code>d = 3</code>. The scene opens on it for <code>x = 2</code> (a = 2, b = 1, c = 2, d = 3): the parts are 4, 6, 2 and 3.',
           hint: 'Four multiplications: each of <code>x</code> and 1 times each of <code>x</code> and 3. Then add the two <code>x</code> terms.',
           answer: 'x^2+4x+3', wrong: 'x^2+3', lazy: '(x+1)(x+3)', check: finalExpr('x^2+4x+3', ['expanded', 'collected']) },
-        { title: 'A bracket squared', kind: 'expr', vars: ['x'], question: '(x+2)^2',
+        { title: 'A bracket squared', kind: 'expr', at: { a: 3, b: 2, c: 3, d: 2 }, vars: ['x'], question: '(x+2)^2',
           goal: 'Expand <code>(x + 2)²</code>. The small raised 2 means "times itself", so <code>(x + 2)²</code> is <code>(x + 2)(x + 2)</code>.',
           how: [
             '<code>(x + 2)²</code> is the area of a square with side <code>x + 2</code>: <code>(x + 2)(x + 2)</code>.',
@@ -326,7 +423,7 @@
       intro: '<b>Factoring</b> is expanding run backwards. You start with a sum, like <code>x² + 5x + 6</code>, and write it as a product, like <code>(x + 2)(x + 3)</code>. Each thing being multiplied is a <b>factor</b>: 2 and 3 are factors of 6, and <code>x + 2</code> is a factor of <code>x² + 5x + 6</code>. Remember that <code>x²</code> means <code>x · x</code>. In the scene you know the four parts of the rectangle, and you look for its sides.',
       scene: rect('area-backwards', 'Find the sides from the four parts', [1, 1, 1, 1]),
       missions: [
-        { title: 'Take out a common factor', kind: 'expr', vars: ['x'], question: '6x+9',
+        { title: 'Take out a common factor', kind: 'expr', scene: bracket(3, 2, 3), vars: ['x'], question: '6x+9',
           goal: 'Write <code>6x + 9</code> as a whole number times a bracket. Find the biggest number that divides both 6 and 9 exactly, and take it out in front.',
           how: [
             'Factoring <code>6x + 9</code> means finding a number and a bracket that multiply back to it: expanding your answer must give <code>6x + 9</code> again.',
@@ -346,7 +443,7 @@
             const front = n.isOperatorNode && n.op === '*' ? n.args.map(strip).filter(a => a.isConstantNode) : [];
             return front.some(a => Number.isInteger(a.value) && a.value > 1) ? ok : no('That is equal, but no whole number is taken out in front yet. Which number divides both 6 and 9?');
           } },
-        { title: 'Back into two brackets', kind: 'expr', vars: ['x'], question: 'x^2+5x+6',
+        { title: 'Back into two brackets', kind: 'expr', at: { a: 2, b: 2, c: 2, d: 3 }, vars: ['x'], question: 'x^2+5x+6',
           goal: 'Factor <code>x² + 5x + 6</code> into two brackets, <code>(x + ?)(x + ?)</code>.',
           how: [
             'You want two brackets that expand back to <code>x² + 5x + 6</code>. Expanding <code>(x + p)(x + q)</code> gives <code>x² + (p + q)x + pq</code>, where <code>pq</code> means <code>p · q</code>.',
@@ -357,8 +454,8 @@
           explain: 'The order does not matter: <code>(x + 3)(x + 2)</code> is the same product, and it passes too. In the scene, the sides of the rectangle are the factors, and its four parts are the expanded form.',
           hint: 'Two numbers: they multiply to 6 and add to 5.',
           answer: '(x+2)(x+3)', wrong: '(x+1)(x+6)', lazy: 'x^2+5x+6', check: finalExpr('x^2+5x+6', ['linearFactors', 'wholeNumbers']) },
-        { title: 'A difference of squares', kind: 'expr', vars: ['x'], question: 'x^2-9',
-          goal: 'Factor <code>x² − 9</code> into two brackets. There is no <code>x</code> term, and that is a clue.',
+        { title: 'A difference of squares', kind: 'expr', scene: diffSquares, vars: ['x'], question: 'x^2-9',
+          goal: 'Factor <code>x² − 9</code> into two brackets. There is no <code>x</code> term, and that is a clue. The scene shows it as a square of side <code>x</code> with a 3 by 3 corner cut out.',
           how: [
             '<code>x² − 9</code> is <code>x</code> times itself, minus 3 times itself: one square taken away from another.',
             'Use the idea from the last mission: two numbers that multiply to <code>−9</code> and add to 0, because there is no <code>x</code> term (0 lots of <code>x</code>).',
@@ -368,8 +465,8 @@
           explain: 'This pattern has a name, the <b>difference of two squares</b>: any <code>x² − n²</code> factors as <code>(x − n)(x + n)</code>.',
           hint: 'Which number times itself is 9? One bracket gets a plus, the other a minus.',
           answer: '(x-3)(x+3)', wrong: '(x-3)^2', lazy: 'x^2-9', check: finalExpr('x^2-9', ['linearFactors', 'wholeNumbers']) },
-        { title: 'A perfect square', kind: 'expr', vars: ['x'], question: 'x^2-4x+4',
-          goal: 'Factor <code>x² − 4x + 4</code>. Both brackets turn out the same.',
+        { title: 'A perfect square', kind: 'expr', scene: perfectSquare, vars: ['x'], question: 'x^2-4x+4',
+          goal: 'Factor <code>x² − 4x + 4</code>. Both brackets turn out the same. The scene shows a square of side <code>x</code> with two strips, each 2 wide, taken off.',
           how: [
             'Again you want <code>(x + p)(x + q)</code>, where <code>p</code> and <code>q</code> multiply to 4 and add to <code>−4</code>.',
             'Two numbers that add to a negative number but multiply to a positive one are both negative.',
@@ -398,9 +495,9 @@
     }, {
       id: 'algebra.quadratics', name: 'Quadratic equations', badge: 'Root Hunter',
       intro: 'A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
-      scene: parabola,
+      scene: parabola([-6, 6, -7, 10], 0),
       missions: [
-        { title: 'Factor, then split', kind: 'equation', question: 'x^2+5x+6=0',
+        { title: 'Factor, then split', kind: 'equation', at: { b: 5, c: 6 }, question: 'x^2+5x+6=0',
           goal: 'Solve <code>x² + 5x + 6 = 0</code>. You factored this left side in Factoring. Find both solutions.',
           how: [
             'The equation asks which numbers make <code>x² + 5x + 6</code> come to 0. Factoring turns it into two smaller questions.',
@@ -412,7 +509,7 @@
           hint: 'Factor first. Then ask: what makes <code>x + 2</code> zero? What makes <code>x + 3</code> zero?',
           steps: ['(x+2)(x+3)=0', 'x=-2 or x=-3'],
           answer: 'x=-2 or x=-3', wrong: 'x=2 or x=3', lazy: 'x^2+5x+6=0', check: MQ.check.final.roots([-2, -3]) },
-        { title: 'Two square roots', kind: 'equation', question: 'x^2=16',
+        { title: 'Two square roots', kind: 'equation', scene: parabola([-6, 6, -18, 12], -16), at: { b: 0, c: -16 }, question: 'x^2=16',
           goal: 'Solve <code>x² = 16</code>. Which numbers times themselves make 16? There are two.',
           how: [
             '<code>x² = 16</code> asks for every number that, times itself, gives 16.',
@@ -423,7 +520,7 @@
           explain: 'The <b>square root</b> of 16, written <code>√16</code>, is the positive one, 4. An equation with <code>x²</code> wants the negative one too. Another way: <code>x² − 16 = 0</code> factors as <code>(x − 4)(x + 4) = 0</code>, a difference of two squares.',
           hint: 'What about a negative number times itself?',
           answer: 'x=4 or x=-4', wrong: 'x=4', lazy: 'x^2=16', check: MQ.check.final.roots([4, -4]) },
-        { title: 'Do not divide by x', kind: 'equation', question: 'x^2-3x=0',
+        { title: 'Do not divide by x', kind: 'equation', at: { b: -3, c: 0 }, question: 'x^2-3x=0',
           goal: 'Solve <code>x² − 3x = 0</code>. It is tempting to divide both sides by <code>x</code>: see what that would lose.',
           how: [
             'Both parts of <code>x² − 3x</code> have an <code>x</code>, so <code>x</code> is a common factor, as in Factoring.',
@@ -434,7 +531,7 @@
           explain: 'Put each one back in: <code>0² − 3 · 0</code> is 0, and <code>3² − 3 · 3</code> is 0. Both are solutions. The working area marks a step that loses a solution: type <code>x = 3</code> as a step to see it.',
           hint: 'Take <code>x</code> out as a common factor, then set each factor to 0.',
           answer: 'x=0 or x=3', wrong: 'x=3', lazy: 'x^2-3x=0', check: MQ.check.final.roots([0, 3]) },
-        { title: 'One root, twice', kind: 'equation', question: 'x^2-6x+9=0',
+        { title: 'One root, twice', kind: 'equation', at: { b: -6, c: 9 }, question: 'x^2-6x+9=0',
           goal: 'Solve <code>x² − 6x + 9 = 0</code>. Both of its factors are the same, so it has just one solution: write it once.',
           how: [
             'Factor first: you need two numbers that multiply to 9 and add to <code>−6</code>.',
