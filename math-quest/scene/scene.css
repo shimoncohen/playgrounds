@@ -24,6 +24,8 @@
 .mq-anim{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .mq-anim .btn{min-height:40px;min-width:5em}
 .mq-anim .mq-p{flex:1 1 220px}
+.mq-speed{display:flex;align-items:center;gap:8px}
+.mq-speed select{min-height:40px;font:inherit;padding:0 8px;border:1px solid var(--line,#C9D3DC);border-radius:8px;background:var(--surface,#fff);color:inherit}
 .mq-live{margin:0;font-family:var(--font-mono,monospace);font-size:15px;overflow-wrap:anywhere}
 .mq-desc{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .mq-scene .nogl{margin:0;padding:24px 16px;color:var(--muted,#536677);text-align:center}
