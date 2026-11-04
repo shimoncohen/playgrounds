@@ -60,7 +60,7 @@ Track pages load `../../shared/*` and `../vendor/*` with relative paths and plai
 - **One key per track:** `math-arithmetic-v1`, `math-algebra-v1`, and so on. The hub has no game state of its own.
 - **Missions are keyed `'<chapter>.<mission>'`** like every quest (`shared/progress.js` keeps the whole state object as one JSON string). The AGENTS.md rules apply unchanged: never rename a key, never renumber shipped missions, append to the end of a chapter, append chapters to the end of a track.
 - **New fields, all additive:** `notes` (per chapter, free text) and `work` (per passed mission, the steps the learner wrote). Old saves load without them. `shared/progress.js` exports the whole state, so both travel with export, import and the backup file. Its `pristine()` check must also count non-empty `notes` as progress, or a notes-only save is treated as empty.
-- **Input preference:** `math-prefs-v1` holds `{ input: 'visual' | 'text' }`, shared by every track. Absent means `visual`.
+- **Input preference:** `math-prefs-v1` holds `{ input: 'visual' | 'text', speed: 0.25 | 0.5 | 1 | 1.5 | 2 }`, shared by every track. Absent `input` means `visual`; absent or unknown `speed` means ×1.
 
 ## Prerequisite graph
 

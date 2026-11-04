@@ -188,6 +188,24 @@ test('the speed setting runs from ×0.25 to ×2, starts at ×1, and ×1 is slowe
   await ctx.close();
 });
 
+test('the speed choice is saved with the other Math Quest preferences and comes back on the next page', async () => {
+  const { ctx, page, errors } = await open({}, () => {
+    if (!sessionStorage.getItem('seeded')) { localStorage.setItem('math-prefs-v1', '{"input":"text"}'); sessionStorage.setItem('seeded', '1'); }
+  });
+  const sel = '#s2d .mq-anim select';
+  await page.selectOption(sel, { label: '×0.5' });
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('math-prefs-v1'))), { input: 'text', speed: 0.5 });
+  await page.reload();
+  await page.waitForSelector('#s3d .mq-live');
+  assert.equal(await page.$eval(sel, s => s.selectedOptions[0].textContent), '×0.5');
+  await page.evaluate(() => localStorage.setItem('math-prefs-v1', '{"speed":7}'));
+  await page.reload();
+  await page.waitForSelector('#s3d .mq-live');
+  assert.equal(await page.$eval(sel, s => s.selectedOptions[0].textContent), '×1', 'a speed that is not offered falls back to ×1');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('the 3D scene draws, or says why it cannot', async () => {
   const { ctx, page } = await open();
   const gl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); });
