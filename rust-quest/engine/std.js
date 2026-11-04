@@ -3,6 +3,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const MAX_PAD=1000;
 class Unmodeled extends Error{}
+class Over extends Error{}
 const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],
   [/^\.(\d{1,3})$/,m=>({debug:false,prec:+m[1],width:null})],[/^>(\d{1,3})$/,m=>({debug:false,prec:null,width:+m[1]})]];
 const fmtOf=s=>{for(const [re,mk] of SPECS){const m=re.exec(s);if(m)return mk(m);}return null;};
@@ -98,7 +99,6 @@ function display(v){
 }
 // tick is called once per value printed, so a big array counts against the step budget
 // room is how many chars the text may still have; past it Over is thrown, so a nested value never builds far beyond the output cap
-class Over extends Error{}
 function debug(v,tick,room=Infinity){
   if(tick)tick();
   let used=0;

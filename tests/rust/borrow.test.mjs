@@ -289,7 +289,19 @@ describe('drop, a repeated &mut argument and the order operands are read in', ()
   });
   it('a &T local print arg is read before a later arg that reassigns it (E0506 in rustc)', () => {
     const src = P('fn main() {', '    let mut x = 1;', '    let y = 2;', '    let mut r = &x;', '    println!("{} {}", r, { r = &y; x = 5; 1 });', '}');
-    assert.equal(diags(src), 'E0506@5');
+    assert.equal(diags(src), 'E0506@5,E0506@5', 'r = &y while &r is held, and x = 5 while r still holds &x');
+  });
+  it('a print arg that is a reference local is borrowed by format_args!, so a later arg that reassigns or writes through it is an error', () => {
+    assert.equal(diags(IX('let y = 2;', 'let mut r = &x;', 'println!("{} {}", r, { r = &y; 1 });')), 'E0506@5');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", r, { *r += 1; 1 });')), 'E0506@4');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", r, { *r = 1; 1 });')), 'E0506@4');
+    // an inline `{r}` is an implicit argument after the explicit ones, so it is borrowed after the block ran
+    assert.equal(diags(IX('let y = 2;', 'let mut r = &x;', 'println!("{r} {}", { r = &y; 1 });')), '');
+    assert.equal(diags(SI('let r = &mut s;', 'println!("{} {}", r, { r.push_str("b"); 1 });')), 'E0502@4');
+    assert.equal(diags(P('fn one(a: &mut i32) {', '}', 'fn g(r: &mut i32) {', '    println!("{} {}", r, { one(r); 1 });', '}', 'fn main() {', '    let mut x = 1;', '    g(&mut x);', '}')), 'E0502@4');
+    assert.equal(diags(IX('let y = 2;', 'let mut r = &x;', 'println!("{} {}", r, y);', 'r = &y;', 'println!("{}", r);')), '');
+    assert.equal(diags(IX('let r = &mut x;', 'println!("{} {}", r, 1);', '*r += 1;', 'println!("{} {}", r, *r);')), '');
+    assert.equal(diags(SI('let r = &mut s;', 'println!("{}", r);', 'r.push_str("b");', 'println!("{} {}", r, r);')), '');
   });
   it('a local moved before a sibling that borrows it is moved there', () => {
     const take = ['fn take(a: String, b: &String) {', '}'];
@@ -321,6 +333,11 @@ describe('E0596: a mutable borrow of what is not mutable', () => {
     assert.equal(diags(P('fn add(s: &String) {', '    s.push_str("x");', '}', 'fn main() {', '}')), 'E0596@2');
     assert.equal(diags(P('fn add(s: &mut String) {', '    s.push_str("x");', '}', 'fn main() {', '}')), '');
     assert.equal(diags(SI('let r = &mut s;', 'r.push_str("x");')), '');
+  });
+  it('names the source local when the receiver was copied to a temp before a later argument', () => {
+    const d = RQ.compile(P('fn add(s: &String, x: String) {', '    s.push_str(x.as_str());', '}', 'fn main() {', '}')).diags;
+    assert.deepEqual(d.map((e) => `${e.code}@${e.line}`), ['E0596@2']);
+    assert.ok(d[0].msg.includes('`*s`'), d[0].msg);
   });
   it('a deferred let that is not mut', () => {
     assert.equal(diags(SIMPLE('let s: String;', 's = String::new();', 's.push_str("x");')), 'E0596@4');

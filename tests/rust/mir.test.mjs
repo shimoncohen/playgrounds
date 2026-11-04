@@ -82,10 +82,10 @@ describe('lowering: the instructions', () => {
     assert.deepEqual(dump(mfn(S + '    let n = 5;\n    println!("{} {n}", s);')), [
       'decl s', 's = String::new()', 'decl n', 'n = const', '_2 = &s', '_3 = &n', 'println!(copy _2, copy _3)', 'dead n', 'dead s', 'return']);
   });
-  it('a println! of a reference local is a plain use, and a Field or Index argument borrows the root', () => {
+  it('a println! of a reference local borrows it like an owned one, and so does a Field or Index argument its root', () => {
     assert.deepEqual(dump(mfn('    let x = 1;\n    let r = &x;\n    let t = (1, 2);\n    let a = [1, 2];\n    let i = 0;\n    println!("{} {} {}", r, t.0, a[i]);')), [
       'decl x', 'x = const', 'decl r', 'r = &x', 'decl t', 't = agg(const, const)', 'decl a', 'a = agg(const, const)', 'decl i', 'i = const',
-      '_5 = copy r', '_6 = &t', 'op(copy i)', '_7 = &a', 'println!(copy _5, copy _6, copy _7)', 'dead i', 'dead a', 'dead t', 'dead r', 'dead x', 'return']);
+      '_5 = &r', '_6 = &t', 'op(copy i)', '_7 = &a', 'println!(copy _5, copy _6, copy _7)', 'dead i', 'dead a', 'dead t', 'dead r', 'dead x', 'return']);
   });
   it('Copy and non-Copy operands are classified by type, a tuple holding a String moves', () => {
     const f = mfn('', 'fn f(p: (String, i32), q: (i32, i32)) { let a = p; let b = q; }', 'f');

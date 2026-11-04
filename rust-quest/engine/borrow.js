@@ -16,14 +16,16 @@ RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate');
 const MOVED=1,UNINIT=2,EVER=4;
 const VISITS=50;
 
-// use(local, isMove, kind): kind is copy, move, ref (shared borrow) or mut (&mut borrow)
+// use(local, isMove, kind): kind is copy, move, reb (implicit reborrow of a `&mut` local), ref (shared borrow) or mut (&mut borrow)
 function uses(i,use){
   const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move',x.k);};
+  // a call or method operand that reborrows a `&mut` local needs it unborrowed; reading or writing through it (deref, store) does not
+  const a=x=>{if(x&&x.reb)use(x.l,false,'reb');else o(x);};
   const rv=r=>{
     if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref');
     else if(r.k==='use'||r.k==='deref')o(r.x);
-    else if(r.k==='method'){o(r.recv);r.args.forEach(o);}
-    else if(r.args)r.args.forEach(o);
+    else if(r.k==='method'){a(r.recv);r.args.forEach(a);}
+    else if(r.args)r.args.forEach(a);
   };
   if(i.rv)rv(i.rv);
   else if(i.op==='store'){o(i.ref);o(i.x);}
@@ -96,7 +98,7 @@ function mutability(F,errors){
       if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut)err(i,L[r.l].name,false);
       else if(r.k==='method'&&r.recv.k!=='const'&&RQ.std.methods.get(r.name).self==='&mut'){
         const t=L[r.recv.l].ty;
-        if(t.k==='ref'&&!t.mut)err(i,'*'+(L[r.recv.l].name||'value'),true);
+        if(t.k==='ref'&&!t.mut)err(i,'*'+(L[r.recv.l].name||L[r.recv.l].src||'value'),true);
       }
     }
   }
@@ -158,12 +160,14 @@ function loanPass(F,errors,un,loans){
 
   const seen=new Set();
   let lm=0n;
-  const access=(l,kind,i)=>{
+  // star: the access goes through the reference local `l`, so rustc names `*l`
+  const access=(l,kind,i,star)=>{
     const sh=lm&onS[l],mu=lm&onM[l];
     if(!(sh|mu))return;
     let code='';
     if(kind==='ref'){if(mu)code='E0502';}
     else if(kind==='mut')code=mu?'E0499':'E0502';
+    else if(kind==='reb'){if(mu)un('reborrow',i);else code='E0502';}
     else if(kind==='move')code='E0505';
     else if(kind==='write')code='E0506';
     // the `reborrow` arm is a backstop: no source shape reaches it (`&r` is a reference to a reference, which the checker rejects)
@@ -171,7 +175,7 @@ function loanPass(F,errors,un,loans){
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make(code,i.line,i.col,{name:L[l].name||'value',mut:kind==='mut'}));
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
   };
   for(const b of B){
     if(!inn[b.id])continue;
@@ -184,6 +188,7 @@ function loanPass(F,errors,un,loans){
       for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l])lm|=s[l];
       if(lm)lo.forEach((x,k)=>{if(lm&lb[k])x.live.add(i.ast);});
       uses(i,(l,_mv,kind)=>access(l,kind,i));
+      if(i.op==='store'&&i.ref.k!=='const')access(i.ref.l,'write',i,true);
       if(i.op==='dead'){
         const hit=lm&(onS[i.l]|onM[i.l]);
         if(hit)lo.forEach((x,k)=>{
@@ -198,7 +203,8 @@ function loanPass(F,errors,un,loans){
       hold(s,i);
     });
   }
-  for(const x of lo)loans.push({id:loans.length,ast:x.i.ast,local:L[x.l].name,mut:x.mut,line:x.i.line,live:[...x.live].sort((a,b)=>a-b)});
+  // a print's `&r` of a reference local guards r for the call; it is not a borrow the user wrote
+  for(const x of lo)if(!refy(L[x.l].ty))loans.push({id:loans.length,ast:x.i.ast,local:L[x.l].name,mut:x.mut,line:x.i.line,live:[...x.live].sort((a,b)=>a-b)});
   return true;
 }
 

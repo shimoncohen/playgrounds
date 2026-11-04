@@ -14,8 +14,8 @@
      rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut} | {k:'call',fn,args} | {k:'method',name,recv,args} | {k:'op',args}
             | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
-     operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call, a method or a print
-            is an implicit reborrow, not a move (except std drop):{k:'copy',l,reb:true}. Reading a Field or Index is a copy of the root local. */
+     operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call or a method
+            is an implicit reborrow, not a move (except std drop): {k:'copy',l,reb:true}. Reading a Field or Index is a copy of the root local. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -88,7 +88,7 @@ function lowerFn(f,info,un,userDrop){
   const deads=(from,nd)=>{for(let i=scopes.length-1;i>=from;i--)kill(scopes[i],nd);};
   const retDest=ty=>retL===undefined?(retL=temp(ty)):retL;
 
-  // a Path argument, receiver or print argument: a `&mut` local is reborrowed here, not moved
+  // a Path argument or receiver: a `&mut` local is reborrowed here, not moved
   const argOp=x=>{
     const p=peel(x),l=p.t==='Path'?lid(p):-1;
     if(l>=0){const t=L[l].ty;return opnd(l,t.k==='ref'&&t.mut);}
@@ -104,7 +104,9 @@ function lowerFn(f,info,un,userDrop){
   const seq=(es,f)=>es.map((e,i)=>{
     const x=f(e);
     if(x.k==='const'||x.reb||L[x.l].name===null||es.slice(i+1).every(s=>['Lit','Path'].includes(peel(s).t)))return x;
-    return put({k:'use',x},e,undefined,L[x.l].ty);
+    const t=put({k:'use',x},e,undefined,L[x.l].ty);
+    if(t.k!=='const')L[t.l].src=L[x.l].name;
+    return t;
   });
   // the same `&mut` local twice among the operands of one call (E0499 in rustc) has no loan here: not modelled
   const rebTwice=(es,nd)=>{
@@ -122,11 +124,8 @@ function lowerFn(f,info,un,userDrop){
     const l=p.t==='Path'?lid(p):-1;
     return {base:p,l,idx};
   };
-  const printLocal=(l,nd)=>{
-    const t=L[l].ty;
-    if(t.k==='ref'||t.k==='str')return opnd(l,t.k==='ref'&&t.mut);
-    return put({k:'ref',l,mut:false},nd,undefined,T.ref(false,t,0));
-  };
+  // format_args! takes `&arg` of every argument first, so a reference local is borrowed too and a later arg cannot reassign it
+  const printLocal=(l,nd)=>put({k:'ref',l,mut:false},nd,undefined,T.ref(false,L[l].ty,0));
   function printArg(x,nd){
     const p=peel(x);
     if(p.t==='Path'){const l=lid(p);if(l>=0)return printLocal(l,nd);}
