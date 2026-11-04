@@ -36,8 +36,7 @@
       geometry: [
         { id: 'geometry.area', title: 'Area and perimeter', requires: ['arithmetic.order'],
           why: 'area formulas such as ½ × b × h are worked out with the order of operations' },
-        { id: 'geometry.angles', title: 'Angles', requires: ['arithmetic.negatives'],
-          why: 'finding a missing angle means taking away, and the turn can go either way' },
+        { id: 'geometry.angles', title: 'Angles', requires: [] },
       ],
     },
   };
