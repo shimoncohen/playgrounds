@@ -1,6 +1,6 @@
 # Agent Quest (`agent-quest/`) design
 
-Date: 2026-11-01. Status: approved design; the engine and chapters 1 to 15 are built (PRs 2 to 5), chapters 16 to 23 are not yet. Issue: #51. Live mode is #52 and is not part of this spec.
+Date: 2026-11-01. Status: approved design; chapters 1 to 15 and the personal Schedules chapter (chapter 16) are built; the rest of the personal path (17 to 20) and chapters 21 to 23 are not yet. Issue: #51. Live mode is #52 and is not part of this spec.
 
 ## Goal
 
@@ -54,7 +54,7 @@ Notes:
 
 - **Why the landing card is in PR 2.** `tests/smoke.mjs:15` (`NAMES`) and the landing-page check at `tests/smoke.mjs:58` tie the quest list to the cards on `index.html`. Adding one without the other fails the browser tests.
 - **Test evidence for PR 2.** CI does not run `tests/agent/` until PR 3 wires the glob. PR 2's description must carry the local `node --test "tests/agent/*.test.mjs"` output. PR 3 merges right after PR 2 and PRs 4 to 7 cannot start before it, so every content PR is checked in CI.
-- **Chapter order is merge order.** Saved progress is keyed `'<chapterIndex>.<missionIndex>'` (`net-quest/app.js:14`, `shared/tiers.js:36`). The index plan (core 0 to 6, dev 7 to 14, personal 15 to 19, tune 20 to 22) holds only under the strict order 5, 6, 7. After merge, chapters and missions are append-only.
+- **Chapter order is merge order.** Saved progress is keyed `'<chapterIndex>.<missionIndex>'` (`net-quest/app.js:14`, `shared/tiers.js:36`). The index plan (core 0 to 6, dev 7 to 14, personal 15 to 19, tune 20 to 22) holds only under the strict order 5, 6, 7. After merge, chapters and missions are append-only. Issue #57 lands as two PRs. The first registers Schedules as index 15. The second appends 16 to 19. #58 (index 20 on) waits for the second, because a chapter merged in between would take index 16.
 - **Conflict surface.** Open PR #45 edits `README.md` and `tests/smoke.mjs`; issues #46 to #50 may touch the same shared files (landing, README table and count, `smoke.mjs` `NAMES`) before PR 2 lands. PR 2 sets the README "all seven" count (`README.md:134`) at merge time. PR #45 does not edit `package.json` or `ci.yml` (checked 2026-11-01); PR 3's author rechecks after #45 merges.
 - **`new-playground` skill vs `AGENTS.md`.** The skill's step list says "all in one PR" and includes CI scripts (`.claude/skills/new-playground/SKILL.md:10,20`), while `AGENTS.md` says CI changes go in a separate PR ("Where things go", last row). The chain resolves this: the commit scope is PR 0, the quest and its landing wiring are PR 2, and the CI wiring is PR 3. The skill itself is not edited here (follow-up issue #59).
 
@@ -187,7 +187,18 @@ Folder-level memory: a file named `CLAUDE.md` in a folder (for example `src/CLAU
 
 - A scenario with `unattended: true` has nobody to approve anything. `Plan: first` stalls: the run pushes a `stall` step after the context, skill and command steps, ends `blocked`, and shows no Approve button.
 - A non-`read` action is skipped with reason `no one to ask` unless an `allow VERB TARGET` line covers it. This includes the `Done when` check. `allow` has no effect in an attended scenario, and `deny`, constraints and hooks still win over it.
-- Not simulated: no runner, secrets, exit codes or schedule.
+- Not simulated: no runner, secrets or exit codes. Nothing fires on a clock: a line in `.claude/schedule.txt` is read, and the Run button plays the moment it starts the job (see "Schedules").
+
+#### Schedules
+
+- A scenario with `scheduled: true` is started by a schedule line, not by the learner. `.claude/schedule.txt` has one line per start, `WHEN HH:MM use NAME`: `WHEN` is `daily`, `weekdays` or a day name (`monday` to `sunday`), `HH:MM` has two digits each (`00:00` to `23:59`), and `NAME` is a saved command. Matching ignores case. Comment lines (`#`) and blank lines are skipped. A command dropped for a name clash is not a saved command.
+- A line that does not parse is an entry in `setup.errors` with the file `.claude/schedule.txt` and a message of its own for a bad `WHEN`, a bad time, a name that is not a saved command, and a line that is not `WHEN HH:MM use NAME`. It has no effect. A good line becomes `{line, day, days, at, use}` in `setup.schedule`, with `days` the three-letter days it covers (`weekdays` is Monday to Friday, `daily` is all seven).
+- `fired(scenario, setup, prompt)` is `null` unless the scenario is `scheduled`. Otherwise it is `{entry, due}`: the first line whose `NAME` the prompt uses, and the union of the days of all such lines (the runs per week). It is `null` again when no line matches.
+- A fired run is unattended (the rules above apply) and carries the task tag `schedule` unless the scenario has a `tag`. The run starts with a `fire` step, `{entry, due, why?}`, where `why` is the first `.claude/schedule.txt` error, shown with or without a match. When no line starts the job, the run ends `blocked` with only that step.
+- `AQ.weekTokens(outcome)` is the run's `tokens.total` times the number of days in the `fire` step's `due` (once, without a `fire` step).
+- Not simulated: no clock, no missed runs, no time zones; the time is not graded.
+
+Two shorthands of this simulator are not what real tools do. A `*` in an `edit`, `read` or `delete` target of a rule (`Constraints`, the root `CLAUDE.md`, `permissions.txt`, `hooks.txt`) stands for any text, `/` included, and has to match at least one file. `file#section` in a `read` target (`Files`, `Examples`, `Done when: read`) reads the part of a file from a heading to the next heading of the same or a higher level, with the heading lowercased and runs of other characters turned into `-`. Real agents read a range of lines, not an anchor.
 
 #### Tool connection
 
@@ -223,7 +234,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 
 ### Scenario
 
-`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended` and `connected`:
+`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended`, `connected`, `scheduled` and `toolFns`:
 
 - `script`: the ordered actions the policy would take (reads, edits, tool calls, verifications), including the trap action.
 - `hidden`: the scenario's hidden forbidden set, a list of `{verb, target}` pairs, for example an edit under `migrations/` or a call to `mail.send`. It exists independent of what the learner wrote and alone decides which executed actions log a violation.
@@ -235,11 +246,14 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 - `focus` (optional): the part of `explore` that matters. With it, `Use` helpers take the search and the agent reads only `focus` (see "Helpers").
 - `unattended` (optional): nobody is there to approve. `Plan` stalls and a non-`read` action needs an `allow` line (see "Unattended runs").
 - `connected` (optional): a `call` needs a setup MCP server that provides the tool (see "Tool connection").
+- `scheduled` (optional): a schedule line must start the run (see "Schedules").
+- `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed` only if at least one script action ran; if every script action was skipped, the run is `blocked`, so a scenario that relies on a failing read-back starts its script with a `read`.
 
 ### Policy
 
 `run(scenario, setup, prompt) -> Outcome` is deterministic and sits outside the provider seam.
 
+0. In a `scheduled` scenario, push the `fire` step first. If no schedule line starts the job, stop as `blocked` (see "Schedules").
 1. Build the context.
 2. If `Plan: first`, emit a plan step and stop with status `awaiting-approval`; nothing executes. The learner's "Approve plan" continues the same run from step 3, and only that result is graded. In an unattended scenario the run instead pushes a `stall` step and stops as `blocked` (see "Unattended runs").
 3. Load the matching skill, if the scenario has a `tag` (see "Skill matching"). Its steps come right after the context step and before the plan; a `command` step for each expanded saved command follows the skill steps.
@@ -256,7 +270,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 
 `{status: done|unverified|failed|blocked|awaiting-approval, vfs, calls[], steps[], violations[], tokens{peak,total}}`.
 
-A step has a `type` from `context`, `skill`, `command`, `plan`, `approved`, `delegate`, `act`, `skip`, `hook` and `stall` (`AQ.policy.STEP_TYPES`). Each type needs its own narration in the provider, a tag and a description in the Run panel, and a test asserts all three.
+A step has a `type` from `context`, `skill`, `command`, `plan`, `approved`, `delegate`, `act`, `skip`, `hook`, `stall` and `fire` (`AQ.policy.STEP_TYPES`). Each type needs its own narration in the provider, a tag and a description in the Run panel, and a test asserts all three.
 
 A mission passes when `status` is not `failed` or `awaiting-approval`, `violations` is empty, and `accept(outcome)` holds. A skipped required action fails `accept` but is not a violation. `unverified` fails only in missions that teach verification.
 
@@ -333,11 +347,11 @@ Chapter numbers are 1-based; the array index is the number minus 1.
 | R2 hooks for lint, format, guards | Ch 11 (see "After hooks"). Not simulated: hooks are config lines mapped to scripted commands; no exit codes or hook output are used beyond pass or fail |
 | R2 custom slash commands, repo skills | Ch 12 (see "Commands"). Not simulated: no command arguments; commands are merged text, not skills the agent decides to load; repo skills are text only |
 | R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match |
-| R2 CI and headless | Ch 14 (see "Unattended runs"). Not simulated: no runner, secrets, exit codes or schedule; `unattended` only blocks `Plan` and non-`read` actions without an `allow` line |
+| R2 CI and headless | Ch 14 (see "Unattended runs"). Not simulated: no runner, secrets, exit codes or clock (a schedule line is read and played once; see "Schedules"); `unattended` only blocks `Plan` and non-`read` actions without an `allow` line |
 | R2 writing a project `CLAUDE.md` | Ch 15 (see "Default check"). Not simulated: only the root `CLAUDE.md` supplies the check; global memory, `AGENTS.md`, imports and `/init` stay text |
 | R3 writing and research | Ch 16 |
 | R3 files and documents | Ch 17 |
-| R3 scheduled tasks and reminders | Ch 18 (artifact is a `schedule.json` entry) |
+| R3 scheduled tasks and reminders | Ch 16, the first personal chapter, shipped first (artifact is a line `WHEN HH:MM use NAME` in `.claude/schedule.txt`) |
 | R3 personal MCP: mail, calendar, notes | Ch 19 |
 | R3 small personal skills and commands | Ch 20 |
 | R4 audit what is loaded | Ch 21 |
@@ -397,7 +411,7 @@ Node (`tests/agent/`, part of `npm run test:engine` once PR 3 wires the glob):
 - `teach`: every term a mission relies on was taught earlier on the default path or is defined in place (hard rule 12)
 - `codestyle`: learner text uses `<code>` for commands, fields and paths; copy the shell rules the same way `tests/net/codestyle.test.mjs:4-6` does (importing `tests/shell/codestyle.test.mjs` would run the Shell Quest tests too) and add the agent field names and commands
 
-Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 15 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
+Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 16 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
 
 Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style` in inlined files). **To verify in PR 2:** that `tools/build.py` discovers `agent-quest/` without a list edit.
 

@@ -109,7 +109,7 @@ script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
-agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 15, ranks, quick-fire, guide), ui.js + editor.js + meter.js
+agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 16, ranks, quick-fire, guide), ui.js + editor.js + meter.js
 shell-quest/            split by job (below)
 tests/                  engine tests (Node; shell/, ds/, net/ and agent/), browser smoke + golden tests (Playwright)
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
