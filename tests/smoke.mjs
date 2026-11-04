@@ -437,6 +437,48 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   await ctx.close();
 });
 
+test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg moves the live sum', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.equal(await live(), '3² + 4² = 9 + 16 = 25, so c = 5');
+  const leg = '#scene circle.drag[aria-label="leg a"]';
+  await page.focus(leg);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await live(), '4² + 4² = 16 + 16 = 32, so c = √32 ≈ 5.66');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Not a whole number/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(5^2+7^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('8.6');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Circles passes a rounded mission in text mode, and the radius moves the live values', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.match(await live(), /r = 3, d = 6\..*C = 2 × π × 3 ≈ 18\.85\..*A = π × 3 × 3 ≈ 28\.27\./);
+  await page.focus('#scene circle.drag[aria-label="radius r"]');
+  await page.keyboard.press('ArrowRight');
+  assert.match(await live(), /r = 3\.5, d = 7\..*A = π × 3\.5 × 3\.5 ≈ 38\.48\./);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('2*pi*5');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('31.4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('math-algebra: a linear equation needs its working in text mode, and passes once a step comes before x = 4', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
