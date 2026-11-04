@@ -402,6 +402,7 @@ test('math-geometry: text mode passes an area mission, and an angle answer with 
 test('math-trigonometry: a rounded mission passes in text mode, and the scene angle follows the keys', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
+  assert.equal(await page.$eval('#mission details.how-hidden', d => d.open), false, 'How it works stays closed until solved');
   await page.click('#work input.mq-field');
   await page.keyboard.type('10*sin(35)');
   await page.keyboard.press('Enter');
@@ -414,6 +415,8 @@ test('math-trigonometry: a rounded mission passes in text mode, and the scene an
   await until(async () => JSON.parse(await read(page, 'math-trigonometry-v1') || '{}').xp === 10);
   const live = () => page.textContent('#scene .mq-live');
   assert.match(await live(), /sin 35° = 5\.7 \/ 10 = 0\.57\./, 'once solved, the picture reveals the opposite side');
+  assert.equal(await page.$$eval('#mission details.how-hidden', d => d.length), 0, 'once solved, How it works is shown open');
+  assert.ok(await page.isVisible('#mission .how'));
   await page.focus('#scene circle.drag[aria-label="angle"]');
   await page.keyboard.press('ArrowRight');
   assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
@@ -558,8 +561,8 @@ test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg
   await page.keyboard.press('ArrowRight');
   assert.equal(await live(), 'a² = 16, b² = 16, c² = ?');
   await page.click('#mission .dot[data-mi="2"]');
-  await page.waitForFunction(() => /^5² \+ 8²/.test(document.querySelector('#scene .mq-live').textContent));
-  assert.equal(await live(), '5² + 8² = 25 + 64 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
+  await page.waitForFunction(() => /^8² \+ 5²/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), '8² + 5² = 64 + 25 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
   await page.click('#mission .dot[data-mi="3"]');
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#mission h2'), /Not a whole number/);

@@ -123,4 +123,7 @@ test('forMission hides worked-out values until a typed mission is solved, then r
   assert.equal(MQ.scene.forMission(ch, { ...m, reveal: own }, false, true).id, 'own');
   assert.equal(MQ.scene.forMission(ch, { ...m, reveal: undefined }, false, true).id, 'own', 'without reveal the own scene stays');
   assert.match(desc(MQ.scene.forMission(ch, { kind: 'scene' })), /twice = 2/, 'a scene mission keeps its values');
+  const moved = { ...m, revealAt: { a: 6 } };
+  assert.equal(MQ.scene.forMission(ch, moved).params.a.value, 4, 'revealAt waits for the solve');
+  assert.equal(MQ.scene.forMission(ch, moved, false, true).params.a.value, 6, 'once solved, the reveal opens on revealAt');
 });

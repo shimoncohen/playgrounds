@@ -43,7 +43,7 @@
         const g = el('g', { class: 'axes' }, svg);
         el('line', { x1: 0, x2: W, y1: Y(0), y2: Y(0) }, g);
         el('line', { x1: X(0), x2: X(0), y1: 0, y2: H }, g);
-        for (let v = Math.floor(x0) + 1; v < x1; v++) if (v) el('text', { x: X(v), y: Math.min(H - 2, Y(0) + 12), 'text-anchor': 'middle' }, g).textContent = tick(v);
+        if (it.xTicks !== false) for (let v = Math.floor(x0) + 1; v < x1; v++) if (v) el('text', { x: X(v), y: Math.min(H - 2, Y(0) + 12), 'text-anchor': 'middle' }, g).textContent = tick(v);
         for (let v = Math.floor(y0) + 1; v < y1; v++) if (v) el('text', { x: Math.max(12, X(0) - 4), y: Y(v) + 4, 'text-anchor': 'end' }, g).textContent = tick(v);
       } else if (it.type === 'fn') {
         for (const seg of S.sample(it.f, x0, x1)) paint(el('polyline', { class: 'shape fn', fill: 'none', points: seg.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');

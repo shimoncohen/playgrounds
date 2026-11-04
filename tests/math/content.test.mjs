@@ -55,9 +55,16 @@ for (const track of TRACKS) {
       const text = [model.live(), model.describe(), ...drawn].join(' | ').replace(/−/g, '-');
       assert.doesNotMatch(text, new RegExp(`(?<![\\d.])${ans[1].replace('.', '\\.')}(?![\\d.])`), `${id}: ${text}`);
     });
+    if (m.kind !== 'scene') test(`${id}: the explanation, shown before solving, does not state the answer`, () => {
+      const flat = x => String(x).replace(/<[^>]+>/g, '').replace(/−/g, '-').replace(/[·×]/g, '*').replace(/²/g, '^2').replace(/\s+/g, '');
+      const words = m.explain.replace(/<[^>]+>/g, '').replace(/−/g, '-'), a = String(m.answer);
+      if (/[a-z(]/.test(a.replace(/^[a-z]=/, '').replace(/ or [a-z]=/g, ' '))) assert.ok(!flat(m.explain).includes(flat(a)), `${id}: ${words}`);
+      else for (const n of a.match(/-?\d+(?:[./]\d+)?/g)) if (n !== '0')
+        assert.doesNotMatch(words, new RegExp(`(?<![\\d./-])${n.replace(/[./]/g, '\\$&')}(?![\\d./a-z])`), `${id}: ${words}`);
+    });
     if (m.reveal) test(`${id}: the reveal scene takes the mission's start values`, () => {
       const r = m.reveal === true ? ch.scene : m.reveal;
-      for (const [k, x] of Object.entries(m.at || {})) assert.ok(r.params[k] && x >= r.params[k].min && x <= r.params[k].max, `${id}: ${k} = ${x} does not fit the reveal scene`);
+      for (const [k, x] of Object.entries({ ...m.at, ...m.revealAt })) assert.ok(r.params[k] && x >= r.params[k].min && x <= r.params[k].max, `${id}: ${k} = ${x} does not fit the reveal scene`);
     });
     if (m.at) test(`${id}: start values are params in range`, () => {
       for (const [k, x] of Object.entries(m.at)) {
@@ -290,3 +297,16 @@ const STEPS = {
     assert.match(m.check('9/12').why, /Divide the top and bottom by the same number/);
   });
 }
+
+test('algebra: an unsolved quadratic shows the curve without its crossing dots or x-axis numbers, and the solved one shows both', () => {
+  const MQ = loadMath([...BASE, 'algebra/content.js']);
+  const ch = MQ.content.chapters.find(c => c.id === 'algebra.quadratics');
+  for (const m of ch.missions.filter(x => x.kind !== 'scene')) {
+    const items = solved => { const def = MQ.scene.forMission(ch, m, false, solved); return def.draw.items(MQ.scene.model(def).state()); };
+    const before = items(false), after = items(true);
+    assert.ok(before.some(i => i.type === 'fn'), m.title);
+    assert.equal(before.filter(i => i.type === 'point').length, 0, m.title);
+    assert.equal(before.find(i => i.type === 'axes').xTicks, false, m.title);
+    assert.ok(after.some(i => i.type === 'point') && after.find(i => i.type === 'axes').xTicks !== false, m.title);
+  }
+});
