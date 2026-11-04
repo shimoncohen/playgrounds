@@ -61,6 +61,11 @@ const FIRST = {
   // 14.1 says the job's permissions file lists its actions without writing a line of it
   'allow VERB': [/\ballow (?:edit|read|run|call|send|delete)\b/, 13, 1],
   'default check': [/\bdefault check\b/i, 14, 0],
+  // chapter 16, the first personal chapter: 15.0 teaches the file and the day word, 15.2 is the first card to say reminder
+  'schedule.txt': [/schedule\.txt/, 15, 0],
+  'scheduled job': [/\bscheduled (?:task|job)s?\b/i, 15, 0],
+  weekdays: [/\bweekdays\b/, 15, 0],
+  reminder: [/\breminders?\b/i, 15, 2],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),

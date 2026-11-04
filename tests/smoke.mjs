@@ -2209,6 +2209,57 @@ test('agent-quest: the dev path missions and the Run panel after a hook run and 
   }
 });
 
+test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and 1440, and a schedule line stays inert text', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(15, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    // at 390px the Files, Mission and Run panels are separate panes
+    const pane = async p => { if (width < 721) await page.click(`.paneSwitch button[data-pane="${p}"]`); };
+    const edit = async text => { await pane('files'); await page.click('#tree [data-path=".claude/schedule.txt"]'); await page.fill('#fileEditor textarea', text); await pane('mission'); await page.click('#runBtn'); await pane('run'); };
+    await fits('mission 16.1');
+    assert.equal(await page.locator('#chapters .tierhead[data-tier="personal"]').count(), 1);
+    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/1/);
+    assert.match(await page.textContent('#chapters [data-ch="15"]'), /Schedules and reminders/);
+    await pane('files');
+    await page.click('#tree [data-path=".claude/schedule.txt"]');
+    assert.match(await page.inputValue('#fileEditor textarea'), /monday 09:00 use backup-note/);
+    await fits('the schedule file view');
+    // a rejected line is shown as text in the schedule step, and nothing it holds becomes an element or runs
+    await edit('<b>x</b>');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: no line starts the job\. Ignored: "<b>x<\/b>" is not "WHEN HH:MM use NAME"/);
+    assert.equal(await page.locator('#runPanel .steps b').count(), 0);
+    await fits('the Run panel after a run no line started');
+    await edit('<img src=x onerror="window.__z=1">');
+    assert.equal(await page.$('#runPanel img'), null);
+    assert.equal(await page.evaluate(() => window.__z), undefined);
+    await pane('mission');
+    await page.click('#promptHost [data-act="fill"]');
+    await page.click('#runBtn');
+    await pane('run');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: starts weekly-digest at 07:30, 5 runs a week \(mon, tue, wed, thu, fri\)/);
+    await fits('the Run panel after a fired run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
+  const { page } = o;
+  assert.equal(await o.xp(), '20 XP');
+  await o.solve();
+  assert.match(await page.textContent('#feedback'), /Badge earned: Clockwork/);
+  assert.equal(await o.xp(), '55 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
+  assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);
+  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/1/);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 const railGaps = page => page.evaluate(() => {
   const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect();
   return { chapter: document.querySelector('#chapters [aria-current="true"]').dataset.ch, v: Math.min(r.top - c.top, c.bottom - r.bottom) >= -1, h: Math.min(r.left - c.left, c.right - r.right) >= -1, chip: [r.left, r.right], rail: [c.left, c.right] };
@@ -2306,10 +2357,10 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
-test('agent-quest: the rail shows 15 chapters, and Use is on the form from mission 10.1', async () => {
+test('agent-quest: the rail shows 16 chapters, and Use is on the form from mission 10.1', async () => {
   const o = await agentPage({}, seedAt(9, 0));
   const { page } = o;
-  assert.equal(await page.locator('#chapters .chap').count(), 15);
+  assert.equal(await page.locator('#chapters .chap').count(), 16);
   assert.equal(await page.isVisible('#pf-use'), true);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
@@ -2339,7 +2390,7 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '15 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '16 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');
