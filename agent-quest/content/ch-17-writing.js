@@ -42,7 +42,7 @@ AQ.CH.push({
       goal:'The file <code>reports/market.md</code> is a long report, and you need only the first line of its Pricing section in <code>summary.md</code>. The agent may hold at most '+AQ.PEAK+' tokens at once, and the whole report is more than that. A <b>section</b> is the part of a file under one heading. You point at it by writing the file name, a <code>#</code> and the heading in lower case: the heading <code>## Summary</code> in this report becomes <code>reports/market.md#summary</code>. Real agents read a range of lines, not a heading, so this anchor is the practice\'s stand-in for that.',
       how:[
         'The line <code>Files: reports/market.md#pricing</code> makes the agent read only the Pricing section of the report, a few lines, so it holds far less than '+AQ.PEAK+' tokens and still has what it needs.',
-        'The part after <code>#</code> is the heading in lower case. A heading the file does not have is not found, and then the agent is not run at all.',
+        'The part after <code>#</code> is the heading in lower case. A heading the file does not have is refused with the message <code>is not a file or folder in this project</code>, and then the agent is not run at all.',
         'Naming the whole file, <code>reports/market.md</code>, reads the long appendix too and goes over the limit. A different section, such as <code>#competitors</code>, fits the limit, but the agent never sees the pricing it has to copy.',
         'No <code>Files</code> line at all is the same as naming the whole file: the agent opens everything.'
       ],
