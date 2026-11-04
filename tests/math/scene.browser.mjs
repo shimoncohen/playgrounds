@@ -148,6 +148,10 @@ test('with reduced motion an animated scene starts paused, and scrubbing still w
   assert.equal(await rm.page.textContent('#s2d .mq-desc'), before, 'nothing moves while paused');
   await setRange(rm.page, '#s2d .mq-anim input[type=range]', 1.5);
   assert.equal(await rm.page.$eval('#s2d .mq-anim input[type=range]', i => i.value), '1.5');
+  const [slider, accent] = await rm.page.$eval('#s2d .mq-anim input[type=range]', i =>
+    [getComputedStyle(i).accentColor, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()]);
+  const probe = await rm.page.evaluate(c => { const d = document.createElement('i'); d.style.color = c; document.body.append(d); const v = getComputedStyle(d).color; d.remove(); return v; }, accent);
+  assert.equal(slider, probe, 'the time slider uses the quest accent, not the browser default');
   await rm.ctx.close();
 
   const normal = await open();

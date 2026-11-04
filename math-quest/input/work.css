@@ -20,6 +20,8 @@ math-field.mq-field::part(menu-toggle){display:none}
 .mq-keypad[hidden]{display:none}
 .mq-keypad .btn{min-width:44px;min-height:44px;font:600 1.1em var(--font-mono,monospace)}
 .mq-result{margin:0;font-weight:700}
+.mq-tip{margin:0;font-size:14px;color:var(--muted,#536677)}
+.mq-tip[hidden]{display:none}
 .mq-result:empty{display:none}
 .mq-notes-lab{display:block;font-weight:600;margin-bottom:4px}
 .mq-notes{width:100%;box-sizing:border-box;font:inherit;background:var(--bg,#E7ECF1);color:var(--ink,#14202A);border:1px solid var(--line,#C4CFDA);border-radius:8px;padding:8px}

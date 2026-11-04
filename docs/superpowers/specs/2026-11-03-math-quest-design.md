@@ -139,7 +139,7 @@ Every `number` and `expr` mission has a **working area**.
   - numbers: equal to the original's exact value (math.js with `number: 'Fraction'`);
   - expressions: equivalent to the original (seeded evaluation);
   - equations: same solutions as the original. A step passes when its `lhs - rhs` is a non-zero constant multiple of the original's `lhs - rhs` at the seeded points. Doing the same thing to both sides passes; a step that loses or gains solutions (dividing by `x`, squaring) is flagged, with a note saying why.
-- Each step shows ✓ or ✗. **The final answer alone decides the mission** unless the mission sets `work: 'required'`, in which case every step must pass and there must be at least one.
+- Each step shows ✓ or ✗. **The final answer alone decides the mission** unless the mission sets `work: 'required'`, in which case every step must pass and there must be at least one step before the final answer.
 - **Two input modes, one checker.** Both modes produce plain text for math.js.
   - `visual` (default): one MathLive field per step, with MathLive's on-screen keyboard. The field's value is read as `ascii-math` and passed through the **translator**.
   - `text`: a plain-text field per step with a live KaTeX preview under it, and a symbol keypad (fraction, √, ^, π, brackets) for phones.

@@ -14,7 +14,7 @@
 .mq-svg .pt.drag:focus-visible{outline:2px solid var(--ink,#14202A);outline-offset:3px}
 .mq-params{display:grid;gap:8px 16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
 .mq-p{display:grid;grid-template-columns:minmax(0,1fr) 5.5em;grid-template-areas:"lab lab" "range num";gap:2px 10px;align-items:center}
-.mq-p input[type=range]{accent-color:var(--tc,auto);grid-area:range;width:100%;min-width:0;min-height:40px;margin:0}
+.mq-p input[type=range]{accent-color:var(--tc,var(--accent,auto));grid-area:range;width:100%;min-width:0;min-height:40px;margin:0}
 .mq-p .mq-n{grid-area:num;min-height:40px;width:100%;font:inherit;background:var(--surface-2,#DAE2EA);color:var(--ink,#14202A);border:1px solid var(--line,#C4CFDA);border-radius:8px;padding:4px 6px}
 .mq-p .mq-n:focus-visible{outline:2px solid var(--tc,var(--accent,#E5B42A));outline-offset:1px}
 .mq-lab{grid-area:lab;font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px;text-decoration-thickness:2px;text-underline-offset:3px}

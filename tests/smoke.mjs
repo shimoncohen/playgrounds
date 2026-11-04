@@ -267,6 +267,19 @@ test('math hub links open the track pages', async () => {
   await ctx.close();
 });
 
+for (const track of ['arithmetic', 'algebra']) {
+  test(`math-${track}: at 1440px the header is one row and its Math Quest link goes to the hub`, async () => {
+    const { ctx, page, errors } = await open(`${base}/math-quest/${track}/`, { viewport: { width: 1440, height: 900 } });
+    await page.waitForSelector('header .pg-wrap');
+    const tops = await page.$$eval('header.top > *', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert.ok(Math.max(...tops) - Math.min(...tops) < 20, `header items share one row: ${tops}`);
+    await page.click('header .brand a');
+    await page.waitForURL(u => new URL(u).pathname === '/math-quest/');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
 test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
   const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
   const hint = () => page.textContent('#mission .prereq');
