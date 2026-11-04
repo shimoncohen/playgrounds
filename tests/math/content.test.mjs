@@ -89,3 +89,67 @@ for (const track of TRACKS) {
     for (let i = 1; i < C.ranks.length; i++) assert.ok(C.ranks[i][0] > C.ranks[i - 1][0]);
   });
 }
+
+// Keyed by chapter id, then mission index.
+const MORE = {
+  'arithmetic.negatives': [
+    { yes: ['-8', ' -8 ', '-8.0'], no: ['8', '-2', '2'] },
+    { yes: ['8', ' 8', '8.0'], no: ['-8', '-6', '-4*-2', '(-4)*(-2)'] },
+    { yes: ['-4', '-4.0'], no: ['4', '-9', '-36'] },
+    { yes: ['9', ' 9 '], no: ['-11', '21', '3'] },
+    { yes: [{ a: -3, b: -4 }, { a: -4, b: -3 }], no: [{ a: -3, b: 4 }, { a: 4, b: -3 }, { a: -4, b: -4 }] },
+  ],
+  'arithmetic.fractions': [
+    { yes: ['7/12', ' 7 / 12 ', '7/ 12'], no: ['2/7', '14/24', '0.5833', '7/13'] },
+    { yes: ['8/15', '8 / 15'], no: ['6/8', '10/12', '0.5333', '16/30'] },
+    { yes: ['3/4', ' 3/4 '], no: ['9/12', '6/8', '1/3', '0.75'] },
+    { yes: ['2/3', '2 / 3'], no: ['1/2', '4/6', '0.667'] },
+    { yes: [{ a: 4, b: 6, n: 12 }, { a: 6, b: 4, n: 12 }], no: [{ a: 4, b: 6, n: 24 }, { a: 4, b: 6, n: 10 }, { a: 4, b: 3, n: 12 }] },
+  ],
+  'arithmetic.powers': [
+    { yes: ['8', '8.0'], no: ['6', '9', '2*2*2'] },
+    { yes: ['0', ' 0 '], no: ['8', '-8', '4'] },
+    { yes: ['7', '7.0'], no: ['24.5', '49', '-7'] },
+    { yes: ['243'], no: ['729', '3^5', '45'] },
+    { yes: [{ n: 8 }], no: [{ n: 7 }, { n: 9 }] },
+  ],
+  'arithmetic.ratios': [
+    { yes: ['2/3', '2 / 3'], no: ['6/9', '4/6', '3/2'] },
+    { yes: ['21', '21.0'], no: ['14', '17.5', '7'] },
+    { yes: ['12', '12.0'], no: ['1200', '65', '0.12'] },
+    { yes: ['50'], no: ['10', '65', '1000'] },
+    { yes: [{ a: 2, b: 3 }, { a: 4, b: 6 }, { a: 6, b: 9 }], no: [{ a: 3, b: 2 }, { a: 1, b: 1 }, { a: 4, b: 5 }] },
+  ],
+};
+const STEPS = {
+  'arithmetic.negatives': [['-8'], ['8'], ['-4'], ['8+7+(-6)', '15-6', '9']],
+  'arithmetic.fractions': [['3/12+4/12', '7/12'], ['8/15'], ['9/12', '3/4'], ['1/2+6/12-1/3', '1/2+1/2-1/3', '1-1/3', '3/3-1/3', '2/3']],
+  'arithmetic.powers': [['2*2*2', '4*2', '8'], ['-4+4', '0'], ['7'], ['9*27', '3^5', '243']],
+  'arithmetic.ratios': [['6/9', '2/3'], ['35/5*3', '7*3', '21'], ['80/100*15', '0.15*80', '0.8*15', '12'], ['40+40*25/100', '40+10', '1.25*40', '50']],
+};
+
+{
+  const MQ = loadMath([...BASE, 'arithmetic/content.js']);
+  const C = MQ.content;
+  for (const [id, rows] of Object.entries(MORE)) test(`${id}: other right answers pass and slips fail`, () => {
+    const ci = C.chapters.findIndex(c => c.id === id), ch = C.chapters[ci];
+    assert.ok(ch, `${id} has content`);
+    assert.ok(C.quickfire.some(q => q.ch === ci), `${id} has a quick-fire template`);
+    assert.equal(C.guide.filter(g => g.ch === ci).length, 2, `${id} has 2 guide entries`);
+    rows.forEach((r, mi) => {
+      const m = ch.missions[mi];
+      for (const v of r.yes) assert.equal(judge(MQ, ch, m, v).ok, true, `${id} ${mi}: ${JSON.stringify(v)} should pass: ${judge(MQ, ch, m, v).why}`);
+      for (const v of r.no) {
+        const res = judge(MQ, ch, m, v);
+        assert.equal(res.ok, false, `${id} ${mi}: ${JSON.stringify(v)} should fail`);
+        assert.ok(res.why, `${id} ${mi}: ${JSON.stringify(v)} fails without saying why`);
+      }
+      if (STEPS[id] && STEPS[id][mi]) assert.deepEqual(plain(MQ.check.steps(m.question, STEPS[id][mi]).map(x => x.ok)), STEPS[id][mi].map(() => true), `${id} ${mi} working`);
+    });
+  });
+
+  test('arithmetic.fractions: an unsimplified answer is told how to simplify', () => {
+    const m = C.chapters.find(c => c.id === 'arithmetic.fractions').missions[2];
+    assert.match(m.check('9/12').why, /Divide the top and bottom by the same number/);
+  });
+}
