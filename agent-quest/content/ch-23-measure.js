@@ -1,5 +1,4 @@
-/* Agent Quest chapter 23 (array index 22): Measure, then cut. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>').
-   Positions in comments are [chapter, mission], both 0-based; the cards say the in-game label, which is one more on each. */
+/* Agent Quest chapter 23 (array index 22): Measure, then cut. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>'). */
 (()=>{
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
@@ -22,7 +21,7 @@ const searched=o=>o.steps.some(s=>s.type==='delegate'&&s.files>0);
 const homeless=(c,n)=>{const s=c.setup.subagents.filter(a=>a.name===n);return s.length===1&&s[0].path==='.claude/agents/'+n+'.md'?null:'The run names '+n+', so exactly one helper must be called '+n+', in .claude/agents/'+n+'.md. Do not rename a helper or copy it to another file.';};
 
 const S0=start('tuneMeasure',FIX).tokens.peak,H0=AQ.helperCost(start('tuneHelpers',FIND));
-const S2=start('tuneBoth',BOTH).tokens.peak,H2=AQ.helperCost(start('tuneBoth',BOTH));
+const B0=start('tuneBoth',BOTH),S2=B0.tokens.peak,H2=AQ.helperCost(B0);
 
 AQ.CH.push({
   name:'Measure, then cut',badge:'Cost Cutter',tier:'tune',

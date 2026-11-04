@@ -1,5 +1,4 @@
-/* Agent Quest chapter 22 (array index 21): Trim, dedupe, move rare rules. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>').
-   Positions in comments are [chapter, mission], both 0-based; the cards say the in-game label, which is one more on each. */
+/* Agent Quest chapter 22 (array index 21): Trim, dedupe, move rare rules. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>'). */
 (()=>{
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};

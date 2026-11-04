@@ -1,5 +1,4 @@
-/* Agent Quest chapter 21 (array index 20): Audit what is loaded. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>').
-   Positions in comments are [chapter, mission], both 0-based; the cards say the in-game label, which is one more on each. */
+/* Agent Quest chapter 21 (array index 20): Audit what is loaded. Missions are append-only once shipped (saves are keyed '<chapter>.<mission>'). */
 (()=>{
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};

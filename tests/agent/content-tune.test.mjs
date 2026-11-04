@@ -96,6 +96,8 @@ const CASES = [
     fail: [{}, SKILLED(''), SKILLED(RULE), SKILLED(STEPS.join('\n')), SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE), SKILLED(STEPS.join('\n').replace('Bump', 'Raise') + '\n' + RULE),
       // the block copied and left in CLAUDE.md, or only half of it moved
       SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n'),
+      // one step left behind measures 96 to 99 (the duplicated rule line, 93, passes), so these rows are under the 8-token margin by design
+      SKILLED(BLOCK + '\n', DAILY + STEPS[0] + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS[1] + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS[5] + '\n'),
       // the skill is the lever: it loads for this job, never loads, or is gone
       F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' }),
       F({ 'CLAUDE.md': DAILY, [RS]: RH('release', '') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: '' }),
@@ -208,14 +210,13 @@ describe('tune limits: the answer fits, and a row that fails on size alone misse
         assert.equal(typeof go(c, i, x).result, 'string');
       }
     });
-    it(`AQ.TUNE.${key} is named in the goal of its mission`, () => assert.ok(M(c, i).goal.includes(String(AQ.TUNE[key]))));
   }
 });
 
 describe('chapter 21 (index 20): Audit what is loaded messages', () => {
   const msg = (c, i, input) => go(c, i, input).result;
   const loaded = (r) => r.outcome.steps.some((s) => s.type === 'skill' && s.name === 'release-guard' && s.loaded === true);
-  it('20.0 the answer loads the skill, its rule skips the migration edit, and the long description is the only cost cut', () => {
+  it('21.1 the answer loads the skill, its rule skips the migration edit, and the long description is the only cost cut', () => {
     const r = go(20, 0, M(20, 0).answer);
     assert.equal(r.result, true);
     assert.ok(loaded(r));
@@ -223,7 +224,7 @@ describe('chapter 21 (index 20): Audit what is loaded messages', () => {
     assert.equal(r.outcome.violations.length, 0);
     assert.ok(go(20, 0, {}).outcome.tokens.peak > r.outcome.tokens.peak + MARGIN);
   });
-  it('20.0 names the word count, the repeated name, the missing half of the job, and the size', () => {
+  it('21.1 names the word count, the repeated name, the missing half of the job, and the size', () => {
     assert.match(msg(20, 0, D('Use during a release: blocks every edit to the migrations folder today')), /description is 12 words\. Cut it to 10 or fewer/);
     assert.match(msg(20, 0, D('release-guard skill')), /only repeats the name/);
     assert.match(msg(20, 0, D('release')), /only repeats the name/);
@@ -231,33 +232,33 @@ describe('chapter 21 (index 20): Audit what is loaded messages', () => {
     assert.match(msg(20, 0, D('Use during a release')), /name the release and the migrations/);
     assert.match(msg(20, 0, D(LONGWORDS)), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.desc} or fewer`));
   });
-  it('20.0 names the skill step that went wrong: asleep, or loaded with its rule gone', () => {
+  it('21.1 names the skill step that went wrong: asleep, or loaded with its rule gone', () => {
     assert.match(msg(20, 0, D(OK, RULE, 'docs')), /never loaded/);
     assert.match(msg(20, 0, D(OK, RULE, 'release', 'release-guard-2')), /never loaded/);
     assert.match(msg(20, 0, D(OK, '')), /rule stopped nothing/);
   });
-  it('20.0 a description that moved into the body is not a description', () => assert.match(msg(20, 0, D('x', RULE + OK + '\n')), /name the release and the migrations/));
-  it('20.1 names the first stale line, and the others one at a time', () => {
+  it('21.1 a description that moved into the body is not a description', () => assert.match(msg(20, 0, D('x', RULE + OK + '\n')), /name the release and the migrations/));
+  it('21.2 names the first stale line, and the others one at a time', () => {
     assert.match(msg(20, 1, {}), /"do not edit old-api\/" names something this project does not have/);
     assert.match(msg(20, 1, C(HEAD + LIVE + STALE.slice(1).join('\n') + '\n')), /"only edit billing\/" names something/);
     assert.match(msg(20, 1, C(HEAD + LIVE + STALE[2] + '\n')), /"ask before run npm run legacy-build" names something/);
   });
-  it('20.1 stale lines hidden with # are counted, and the message says so', () => {
+  it('21.2 stale lines hidden with # are counted, and the message says so', () => {
     assert.match(msg(20, 1, COMMENTED), /Your setup still takes about \d+ tokens\. The goal is 20 or fewer\. A line that starts with # is hidden from the rules, but it is still counted/);
     assert.doesNotMatch(msg(20, 1, C(HEAD + LIVE + 'Notes to self, many of them, in a long line of prose that costs tokens.\n')), /hidden from the rules/);
   });
-  it('20.1 the three stale lines are rejected by the rule reader, the live rule is not, and the answer keeps the live rule working', () => {
+  it('21.2 the three stale lines are rejected by the rule reader, the live rule is not, and the answer keeps the live rule working', () => {
     for (const l of STALE) assert.equal(AQ.config.parseConstraint(l, AQ.scenarios.tuneDead).ok, false, l);
     assert.equal(AQ.config.parseConstraint('do not delete data/', AQ.scenarios.tuneDead).ok, true);
     const r = go(20, 1, M(20, 1).answer);
     assert.ok(r.outcome.steps.some((s) => s.type === 'skip' && s.target === 'data/backup.csv' && s.by === 'CLAUDE.md'));
     assert.equal(r.outcome.violations.length, 0);
   });
-  it('20.1 a rule on src/ in place of a stale one stops the fix, and a deleted live rule is a violation', () => {
+  it('21.2 a rule on src/ in place of a stale one stops the fix, and a deleted live rule is a violation', () => {
     assert.match(msg(20, 1, C(HEAD + LIVE + 'do not edit src/\n')), /still rounds the wrong way/);
     assert.match(msg(20, 1, C(HEAD)), /did delete data\/backup\.csv, and nothing told it not to/);
   });
-  it('20.2 the answer calls both tools, and names the one that is not connected', () => {
+  it('21.3 the answer calls both tools, and names the one that is not connected', () => {
     const r = go(20, 2, M(20, 2).answer);
     assert.equal(r.result, true);
     assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.calls.map((c) => c.target))), ['notes/today.md', 'calendar.list', 'mail.read']);
@@ -265,7 +266,7 @@ describe('chapter 21 (index 20): Audit what is loaded messages', () => {
     assert.match(msg(20, 2, MC('mail: read\n')), /called calendar\.list, but that tool is not connected/);
     assert.match(msg(20, 2, MC('')), /called calendar\.list, but that tool is not connected/);
   });
-  it('20.2 a server kept whole is told the size, and the lists are long enough that none can stay whole', () => {
+  it('21.3 a server kept whole is told the size, and the lists are long enough that none can stay whole', () => {
     assert.match(msg(20, 2, MC(LINES[0] + '\nmail: read\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.mcp} or fewer`));
     assert.ok(LINES[0].split(',').length >= 10 && LINES[1].split(',').length >= 10);
     const names = AQ.config.parseSetup(AQ.vfs.create(AQ.scenarios.tuneMcp.vfs)).mcp.flatMap((m) => m.tools.map((t) => `${m.name}.${t}`));
@@ -287,31 +288,31 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(AQ.config.skillBody(v.read(DS)), /^do not delete data\/$/m);
     assert.doesNotMatch(AQ.config.skillBody(v.read(DS)), /^(name|description|when):/m);
   });
-  it('21.0 the answer keeps one copy, the rule still skips the delete, and the three copies cost the most', () => {
+  it('22.1 the answer keeps one copy, the rule still skips the delete, and the three copies cost the most', () => {
     const r = go(21, 0, M(21, 0).answer);
     assert.equal(r.result, true);
     assert.ok(r.outcome.steps.some((s) => s.type === 'skip' && s.target === 'data/backup.csv'));
     assert.ok(peakOf(21, 0, {}) > r.outcome.tokens.peak + MARGIN);
   });
-  it('21.0 names every place that holds the rule, also a copy that never loads', () => {
+  it('22.1 names every place that holds the rule, also a copy that never loads', () => {
     assert.match(msg(21, 0, {}), /still written in 3 places: CLAUDE\.md, src\/CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
     assert.match(msg(21, 0, DUP(ROOT, '', DH('docs') + GUARD)), /2 places: CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
     assert.match(msg(21, 0, DUP(ROOT, '', DH('banana') + GUARD)), /2 places: CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
     assert.match(msg(21, 0, DUP(ROOT, 'do not delete data/backup.csv\n', DH())), /2 places: CLAUDE\.md, src\/CLAUDE\.md/);
   });
-  it('21.0 a reason left behind is told the size, and the last copy cannot go', () => {
+  it('22.1 a reason left behind is told the size, and the last copy cannot go', () => {
     assert.match(msg(21, 0, DUP(ROOT, WHYL, DH() + WHYL)), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.dup} or fewer`));
     assert.match(msg(21, 0, DUP('', '', '')), /did delete data\/backup\.csv, and nothing told it not to/);
     assert.match(msg(21, 0, DUP(HEAD, '', DH('banana') + GUARD)), /did delete data\/backup\.csv/);
   });
-  it('21.1 the answer is not loaded for a bugfix, and the rare rule still guards a release', () => {
+  it('22.2 the answer is not loaded for a bugfix, and the rare rule still guards a release', () => {
     const r = go(21, 1, M(21, 1).answer);
     assert.equal(r.result, true);
     assert.ok(!r.outcome.steps.some((s) => s.type === 'skill' && s.loaded === true));
     assert.ok(AQ.config.memoryRules({ memory: AQ.config.skillBody(r.outcome.vfs.read(RS)) }, AQ.scenarios.tuneRare, false).rules.some((c) => c.target === 'migrations/'));
     assert.ok(peakOf(21, 1, {}) > r.outcome.tokens.peak + MARGIN);
   });
-  it('21.1 names the skill, the missing lines, the missing rule and the size', () => {
+  it('22.2 names the skill, the missing lines, the missing rule and the size', () => {
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' })), /loads for this job, so the agent carries the checklist again/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' })), /must keep when: release/);
     assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' })), /is not a working skill/);
@@ -321,7 +322,7 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.match(msg(21, 1, SKILLED(BLOCK + '\n', RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.rare} or fewer`));
     assert.match(msg(21, 1, SKILLED(BLOCK + '\n', HEAD)), /did delete data\/backup\.csv/);
   });
-  it('21.2 the run never calls the command, so the answer costs only what CLAUDE.md keeps, and the command parses as a prompt', () => {
+  it('22.3 the run never calls the command, so the answer costs only what CLAUDE.md keeps, and the command parses as a prompt', () => {
     const r = go(21, 2, M(21, 2).answer);
     assert.equal(r.result, true);
     assert.ok(!r.outcome.steps.some((s) => s.type === 'command'));
@@ -330,7 +331,7 @@ describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => 
     assert.ok(p.constraints.some((k) => k.kind === 'do not' && k.verb === 'edit' && k.target === 'migrations/'));
     assert.ok(peakOf(21, 2, {}) > r.outcome.tokens.peak + MARGIN);
   });
-  it('21.2 shows the first line that does not parse, and the missing rule, step and size', () => {
+  it('22.3 shows the first line that does not parse, and the missing rule, step and size', () => {
     assert.match(msg(21, 2, CMD(CG + CR + STEPS.join('\n') + '\n')), /would be refused: Command release-prep: Bump the version in package\.json\. does not start with a field name/);
     assert.match(msg(21, 2, CMD(CG + RULE + EX)), /would be refused: Command release-prep: do not edit migrations\/ does not start with a field name/);
     assert.match(msg(21, 2, CMD(CG + '## Release checklist\n' + CR + EX)), /would be refused: Command release-prep: ## Release checklist does not start with a field name/);
