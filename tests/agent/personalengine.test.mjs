@@ -173,7 +173,7 @@ describe('E8: chapters 1 to 15 are unchanged', () => {
     }));
   });
   it('no scenario outside the personal set is scheduled', () => {
-    for (const [k, s] of Object.entries(AQ.scenarios)) if (s.scheduled) assert.ok(['digest', 'digestDaily', 'remind'].includes(k), k);
+    for (const [k, s] of Object.entries(AQ.scenarios)) if (s.scheduled) assert.ok(['digest', 'digestDaily', 'remind', 'quiet'].includes(k), k);
   });
 });
 

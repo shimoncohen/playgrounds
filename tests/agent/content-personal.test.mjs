@@ -9,9 +9,9 @@ import { runCases, kit } from './cases.mjs';
 const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
-const PERSONAL = [15, 16, 17, 18];
+const PERSONAL = [15, 16, 17, 18, 19];
 // the scenario keys each personal chapter owns, in mission order; every later batch appends its chapter
-const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'], 18: ['notesApp', 'inboxApp', 'agenda'] };
+const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'], 18: ['notesApp', 'inboxApp', 'agenda'], 19: ['weeklyReview', 'quiet', 'chores'] };
 const SCH = '.claude/schedule.txt', ALLOW = '.claude/permissions.txt';
 const WD = '.claude/commands/weekly-digest.md', MR = '.claude/commands/morning-reminder.md';
 const HEAD = '# When each saved command starts, one line each: WHEN HH:MM use NAME\n';
@@ -36,6 +36,13 @@ const SIGNED = ['documents/lease-signed.txt', 'documents/will-signed.txt'], DRAF
 const MCP = '.claude/mcp.txt', CAL = 'calendar: list\n';
 const MC = (lines, extra = {}) => F({ [MCP]: lines, ...extra });
 const DENY = (t) => ({ [ALLOW]: `# deny VERB TARGET\ndeny ${t}\n` });
+const RVW = '.claude/commands/weekly-review.md', QH = '.claude/skills/quiet-hours.md', TONE = '.claude/skills/tone.md', LAST = 'notes/last-week.md', THIS = 'notes/this-week.md', ARCH = 'archive/2024-w44.md', INDEX = 'notes/index.md';
+const WGOAL = "Goal: archive last week's notes", WRULE = 'Constraints: do not delete notes/this-week.md', WDONE = 'Done when: read archive/2024-w44.md', FILLED = `${WGOAL}\n${WRULE}\n${WDONE}\n`;
+const RV = (text, extra = {}) => F({ [RVW]: text, ...extra });
+const SK = (when, body = 'do not call calendar.delete\n', name = 'quiet-hours') => AQ.scenarioKit.skillFile(name, when, body);
+const QS = (when, extra = {}, body, name) => F({ [QH]: SK(when, body, name), ...extra });
+const SCHED = (line) => ({ [SCH]: HEAD + line + '\n' });
+const NARROW = { [ALLOW]: 'allow call calendar.create\n' };
 
 const CASES = [
   { at: [15, 0],
@@ -161,6 +168,42 @@ const CASES = [
       MC('calendar: list, create', { 'CLAUDE.md': 'do not call calendar.create' }), MC('calendar: list, creat'), MC('calendars: list, create'), MC('calendar: delete'),
       // the line in a file that is not the connection list, or an unshipped .claude/ file
       F({ 'CLAUDE.md': 'calendar: list, create' }), F({ '.claude/hooks.txt': 'calendar: list, create' }), F({ '.claude/mcp.json': 'calendar: list, create' })] },
+  { at: [19, 0],
+    pass: [RV(FILLED), RV(`${WRULE}\n${WDONE}`), RV(`${WGOAL}\n${WRULE}\n${WDONE}\nConstraints: do not edit notes/this-week.md`), RV(`${WRULE}\nDone when: read ${THIS}`), RV(`Constraints: only delete ${LAST}\n${WDONE}`),
+      RV(`done when: read ${ARCH}\nconstraints: do not delete ${THIS}`), RV(FILLED, { 'CLAUDE.md': 'do not edit notes/index.md' })],
+    fail: [{}, RV(''), RV(`${WGOAL}\n${WRULE}`), RV(`${WGOAL}\n${WDONE}`), RV(`${WGOAL}\n${WDONE}\nConstraints: do not edit notes/this-week.md`),
+      // a rule too wide or aimed at the wrong note, a check that fails, a write that is stopped
+      RV(`Constraints: do not delete notes/\n${WDONE}`), RV(`Constraints: do not delete ${LAST}\n${WDONE}`), RV(`Constraints: do not delete *.md\n${WDONE}`), RV(`Constraints: only delete ${THIS}\n${WDONE}`),
+      RV(`${WRULE}\nDone when: read ${LAST}`), RV(`${WRULE}\nConstraints: do not edit ${ARCH}\n${WDONE}`),
+      // the rule and the check outside the command: the command is the lever
+      RV('', { 'CLAUDE.md': `do not delete notes/this-week.md\n${WDONE}` }), RV('', { 'CLAUDE.md': `${WRULE}\n${WDONE}` }), RV('', { 'CLAUDE.md': 'Done when: read archive/2024-w44.md' }),
+      F({ '.claude/hooks.txt': 'before delete notes/this-week.md' }), F({ [ALLOW]: 'deny delete notes/this-week.md' }),
+      // an unshipped .claude/ file is read by nothing, and a saved command is a .md file named for the call
+      F({ '.claude/commands/review.md': FILLED }), F({ '.claude/commands/weekly-review.txt': FILLED }), F({ '.claude/commands/weekly-review/steps.md': FILLED })],
+    refused: [RV('banana'), RV(`${WRULE}\nUse: weekly-review`), RV(`Constraints: do not delete notes/nope.md\n${WDONE}`), RV(`${WRULE}\nDone when: read archive/nope.md`), RV(`${WRULE}\nDone when: archive`)] },
+  { at: [19, 1],
+    pass: [QS('schedule'), QS('schedule', NARROW), QS('schedule', SCHED('daily 06:30 use weekly-review')), QS('schedule', SCHED('monday 20:00 use weekly-review')), QS('schedule', SCHED('weekdays 20:00 use weekly-review\ndaily 08:00 use weekly-review')),
+      QS('schedule', {}, 'do not call calendar.delete\ndo not read notes/this-week.md\n'), QS('schedule', { [RVW]: '' }), QS('schedule', { [ALLOW]: 'allow call calendar.create\nallow call calendar.delete\n' }), QS('schedule', { 'CLAUDE.md': 'do not edit notes/this-week.md' })],
+    fail: [{}, QS('review'), QS('docs'), QS('schedule', {}, ''), QS('schedule', {}, 'do not call calendar.list\n'), QS('Schedule'), QS('schedule', {}, undefined, 'calm'),
+      // the skill is the lever: the same stop in another place leaves it asleep
+      F({ 'CLAUDE.md': 'do not call calendar.delete' }), F({ '.claude/hooks.txt': 'before call calendar.delete' }), F({ [ALLOW]: '# deny VERB TARGET\ndeny call calendar.delete\n' }), F(NARROW), F({ [ALLOW]: '' }),
+      // the skill loads, but the reminder is never made: nothing to approve it, or the skill stops the create too
+      QS('schedule', { [ALLOW]: '' }), QS('schedule', { [ALLOW]: 'allow call calendar.delete\n' }), QS('schedule', {}, 'do not call calendar\n'), QS('schedule', {}, 'do not call calendar.create\ndo not call calendar.delete\n'),
+      QS('schedule', { [ALLOW]: '# deny VERB TARGET\ndeny call calendar.create\nallow call calendar\n' }),
+      // the schedule line that starts the job, gone or broken
+      QS('schedule', { [SCH]: '' }), QS('schedule', SCHED('daily 20:00 use quiet-hours')), QS('schedule', SCHED('daily 20:00 use weekly-reviw')), QS('schedule', SCHED('daily 8:00 use weekly-review')), F({ [SCH]: '' }),
+      // an unshipped .claude/ file
+      F({ '.claude/skills/quiet.md': SK('schedule') }), F({ '.claude/skills/quiet-hours.txt': SK('schedule') })],
+    refused: [RV('banana'), RV("Goal: set up this week's reminders\nUse: weekly-review")] },
+  { at: [19, 2],
+    pass: ['Use: weekly-review', 'use: weekly-review', "Goal: archive last week's notes\nUse: weekly-review", 'Use: weekly-review, tone', 'Use: tone, weekly-review', 'Use: tone\nUse: weekly-review', 'Use: weekly-review\nUse: weekly-review',
+      P('Use: weekly-review', { 'CLAUDE.md': 'do not edit notes/index.md' })],
+    fail: ['', 'Use: tone', "Goal: archive last week's notes", `${WRULE}\n${WDONE}`, `Use: tone\n${WRULE}\n${WDONE}`, `${WRULE}\n${WDONE}\nUse: tone`,
+      // the command's lines moved to the root CLAUDE.md, or the shelf rewritten
+      P('', { 'CLAUDE.md': `do not delete notes/this-week.md\n${WDONE}`, [RVW]: '' }), P('', { 'CLAUDE.md': FILLED }), P('Use: tone', { 'CLAUDE.md': 'do not delete notes/this-week.md' }),
+      P('Use: weekly-review', { [RVW]: '' }), P('Use: weekly-review', { [RVW]: FILLED + 'Constraints: do not edit notes/index.md\n' }), P('Use: weekly-review', { [TONE]: '' }),
+      P('Use: weekly-review', { [TONE]: SK('review', 'do not edit notes/index.md\n', 'tone') }), P('Use: weekly-review', { [TONE]: SK('docs', '', 'tone') }), P('', { [TONE]: '' })],
+    refused: ['Use: nope', 'Use: weekly-review\nConstraints: do not delete notes/nope.md', 'Files: notes/nope.md', 'Plan: sometimes', 'Use: weekly-review\nDone when: read nope.md'] },
 ];
 
 runCases(AQ, 'chapters 16 to 20: lazy and nearby answers are caught', CASES, (c) => !PERSONAL.includes(c));
@@ -426,6 +469,94 @@ describe('chapter 19 (index 18): Personal MCP messages and outcomes', () => {
   });
 });
 
+describe('chapter 20 (index 19): Personal skills and commands messages and outcomes', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  const skips = (r, target) => Array.from(r.outcome.steps.filter((s) => s.type === 'skip' && s.target === target).map((s) => s.by));
+  const loaded = (r, name) => r.outcome.steps.some((s) => s.type === 'skill' && s.name === name && s.loaded === true);
+  it('19.0 the answer archives last week, clears the old note and keeps this week, with the command as the only lever', () => {
+    const r = go(19, 0, M(19, 0).answer);
+    assert.equal(r.result, true);
+    assert.equal(r.outcome.status, 'done');
+    assert.equal(r.outcome.vfs.read(LAST), null);
+    assert.match(r.outcome.vfs.read(ARCH), /^Week 44:/);
+    assert.equal(r.outcome.vfs.read(THIS), AQ.scenarios.weeklyReview.vfs[THIS]);
+    assert.deepEqual(skips(r, THIS), ['your constraint']);
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.violations)), []);
+  });
+  it('19.0 the empty archive counts as shipped: a Done when can read it, and the shipped command is empty', () => {
+    assert.equal(AQ.scenarios.weeklyReview.vfs[ARCH], '');
+    assert.equal(AQ.scenarios.weeklyReview.vfs[RVW], '');
+    assert.deepEqual(Array.from(go(19, 0, RV(`${WRULE}\n${WDONE}`)).prompt.errors), []);
+  });
+  it('19.0 names the missing rule, then the missing check, then a rule that is too wide', () => {
+    assert.match(msg(19, 0, {}), /holds no rule/);
+    assert.match(msg(19, 0, RV('', { 'CLAUDE.md': `${WRULE}\n${WDONE}` })), /holds no rule/);
+    assert.match(msg(19, 0, RV(`${WGOAL}\n${WRULE}`)), /holds no Done when line/);
+    assert.match(msg(19, 0, M(19, 0).wrong), /Last week's note is still in notes\//);
+    assert.match(msg(19, 0, RV(`${WRULE}\nConstraints: do not edit ${ARCH}\n${WDONE}`)), /archive is still empty/);
+  });
+  it('19.2 starts from the filled command of the 19.0 answer', () => assert.equal(AQ.scenarios.chores.vfs[RVW], M(19, 0).answer.files[RVW]));
+  it('19.1 the answer loads the skill from the schedule line and the delete is skipped by it, with the broad allow line left alone', () => {
+    const r = go(19, 1, M(19, 1).answer);
+    assert.equal(r.result, true);
+    assert.equal(AQ.scenarios.quiet.tag, undefined);
+    assert.ok(loaded(r, 'quiet-hours'));
+    assert.deepEqual(skips(r, 'calendar.delete'), ['skill quiet-hours']);
+    assert.ok(r.outcome.calls.some((c) => c.target === 'calendar.create'));
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.violations)), []);
+  });
+  it('19.1 without the skill the broad allow line lets the delete through', () => {
+    const r = go(19, 1, {});
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.violations)), [{ verb: 'call', target: 'calendar.delete' }]);
+    assert.match(r.result, /quiet-hours skill never loaded.*schedule job/);
+    assert.match(msg(19, 1, M(19, 1).wrong), /never loaded/);
+  });
+  it('19.1 the stops that are not the skill leave it asleep, and the message says so', () => {
+    for (const x of [F({ 'CLAUDE.md': 'do not call calendar.delete' }), F(NARROW), F({ '.claude/hooks.txt': 'before call calendar.delete' })]) assert.match(msg(19, 1, x), /never loaded/);
+    assert.deepEqual(skips(go(19, 1, F(NARROW)), 'calendar.delete'), ['no one to ask']);
+  });
+  it('19.1 a loaded skill whose rule stops nothing is named', () => assert.match(msg(19, 1, QS('schedule', {}, '')), /loaded, but its rule stopped nothing/));
+  it('19.1 the reminder has to be made: no allow line, or a skill that stops the create too', () => {
+    const none = go(19, 1, QS('schedule', { [ALLOW]: '' }));
+    assert.deepEqual(skips(none, 'calendar.create'), ['no one to ask']);
+    assert.equal(none.outcome.violations.length, 0);
+    assert.match(none.result, /Nothing created the reminder: calendar\.create was skipped \(no one to ask\)\. A scheduled run needs an allow line/);
+    assert.match(msg(19, 1, QS('schedule', {}, 'do not call calendar\n')), /calendar\.create was skipped \(skill quiet-hours\)/);
+  });
+  it('19.1 the narrow allow line still passes: the create is allowed and the skill stops the delete', () => {
+    const r = go(19, 1, QS('schedule', NARROW));
+    assert.equal(r.result, true);
+    assert.deepEqual(skips(r, 'calendar.delete'), ['skill quiet-hours']);
+  });
+  it('19.1 a schedule line that is gone or broken has its own message, with the reader\'s reason when there is one', () => {
+    assert.match(msg(19, 1, QS('schedule', { [SCH]: '' })), /No line in \.claude\/schedule\.txt starts weekly-review.*Keep the line that starts it/);
+    assert.match(msg(19, 1, QS('schedule', SCHED('daily 8:00 use weekly-review'))), /The reader ignored a line: .*is not a time/);
+  });
+  it('19.1 an emptied saved command still fires the job and loads the skill, so it is not the lever', () => assert.equal(msg(19, 1, QS('schedule', { [RVW]: '' })), true));
+  it('19.2 the answer calls the command, and the tone skill loads by the docs tag and guards the index', () => {
+    const r = go(19, 2, M(19, 2).answer);
+    assert.equal(r.result, true);
+    assert.equal(AQ.scenarios.chores.tag, 'docs');
+    assert.ok(loaded(r, 'tone'));
+    assert.deepEqual(skips(r, INDEX), ['skill tone']);
+    assert.deepEqual(skips(r, THIS), ['your constraint']);
+    assert.equal(r.outcome.vfs.read(INDEX), AQ.scenarios.chores.vfs[INDEX]);
+  });
+  it('19.2 Use: tone is accepted and inert, and the skill loads without any call', () => {
+    const r = go(19, 2, M(19, 2).wrong);
+    assert.ok(!r.refused);
+    assert.ok(loaded(r, 'tone'));
+    assert.ok(r.outcome.violations.some((v) => v.target === THIS));
+    assert.match(r.result, /weekly-review was never called.*a skill is not called by name/);
+  });
+  it('19.2 typed rules, a changed command and a changed skill each have their own message', () => {
+    assert.match(msg(19, 2, `${WRULE}\n${WDONE}`), /You typed the rule yourself/);
+    assert.match(msg(19, 2, `Use: tone\n${WRULE}`), /You typed the rule yourself/);
+    assert.match(msg(19, 2, P('Use: weekly-review', { [RVW]: '' })), /changed the saved command or the skill/);
+    assert.match(msg(19, 2, P('Use: weekly-review', { [TONE]: '' })), /changed the saved command or the skill/);
+  });
+});
+
 /* #110 option A: every check reads what the mission's own file holds, so moving the answer to another setup file must not pass */
 describe('chapters 16 to 20: the answer moved to another setup file does not pass', () => {
   const targets = ['CLAUDE.md', ALLOW, '.claude/hooks.txt'];
@@ -446,7 +577,7 @@ describe('chapters 16 to 20: the answer moved to another setup file does not pas
 
 // Only missions whose lever is the saved command belong here (19.1 does not: an emptied command still fires and loads its skill).
 // The name comes from the scenario, not from m.prompt, which prompt missions do not have.
-const COMMAND_SWEEP = [[15, 0], [15, 1], [15, 2]];
+const COMMAND_SWEEP = [[15, 0], [15, 1], [15, 2], [19, 0], [19, 2]];
 describe('chapters 16 to 20: the shipped command moved into CLAUDE.md, with the command emptied, does not pass', () => {
   const bare = (t) => t.replace(/^Constraints:\s*/gim, '');
   let ran = 0;
@@ -512,7 +643,8 @@ const DEV = {
   connected: /\bconnected\b/i,
 };
 const MANIFEST = { '15,0': ['unattended', '.claude/commands', 'allow VERB'], '15,1': ['.claude/commands'], '15,2': ['unattended', '.claude/commands', 'allow VERB'],
-  '16,0': ['Use:'], '16,1': [], '16,2': [], '17,0': [], '17,1': [], '17,2': ['max N files'], '18,0': ['connected'], '18,1': ['connected'], '18,2': ['connected'] };
+  '16,0': ['Use:'], '16,1': [], '16,2': [], '17,0': [], '17,1': [], '17,2': ['max N files'], '18,0': ['connected'], '18,1': ['connected'], '18,2': ['connected'],
+  '19,0': ['.claude/commands', 'slash command', 'Use:'], '19,1': ['unattended', 'allow VERB'], '19,2': ['Use:', 'slash command', '.claude/commands'] };
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
 

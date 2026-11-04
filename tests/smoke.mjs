@@ -2101,6 +2101,21 @@ test('agent-quest: chapter 5 loads the matching skill, shows its step in the run
   await o.ctx.close();
 });
 
+// F15: this scenario has no tag of its own, so only the fired-schedule branch of refresh() in app.js can make the meter count the skill body
+test('agent-quest: a scheduled mission with no tag of its own loads the skill into the meter before the run (mission 20.2)', async () => {
+  const o = await agentPage({}, seedAt(19, 1));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the schedule line makes this a schedule job, so the skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill quiet-hours loaded/);
+  assert.match(await page.textContent('#run .steps'), /Schedule: starts weekly-review/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: chapter 5 names the duplicate skill that was not loaded, with no undefined', async () => {
   const o = await agentPage({}, seedAt(4, 1));
   const { page } = o;
@@ -2219,7 +2234,7 @@ test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and
     const edit = async text => { await pane('files'); await page.click('#tree [data-path=".claude/schedule.txt"]'); await page.fill('#fileEditor textarea', text); await pane('mission'); await page.click('#runBtn'); await pane('run'); };
     await fits('mission 16.1');
     assert.equal(await page.locator('#chapters .tierhead[data-tier="personal"]').count(), 1);
-    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/4/);
+    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/5/);
     assert.match(await page.textContent('#chapters [data-ch="15"]'), /Schedules and reminders/);
     await pane('files');
     await page.click('#tree [data-path=".claude/schedule.txt"]');
@@ -2254,7 +2269,7 @@ test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a st
   assert.equal(await o.xp(), '55 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
   assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);
-  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/4/);
+  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/5/);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
   await o.ctx.close();
@@ -2368,10 +2383,10 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
-test('agent-quest: the rail shows 19 chapters, and Use is on the form from mission 10.1', async () => {
+test('agent-quest: the rail shows 20 chapters, and Use is on the form from mission 10.1', async () => {
   const o = await agentPage({}, seedAt(9, 0));
   const { page } = o;
-  assert.equal(await page.locator('#chapters .chap').count(), 19);
+  assert.equal(await page.locator('#chapters .chap').count(), 20);
   assert.equal(await page.isVisible('#pf-use'), true);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
@@ -2401,7 +2416,7 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '19 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '20 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');
