@@ -334,6 +334,43 @@ test('math-arithmetic: the working area passes a mission once, keeps the working
   await ctx.close();
 });
 
+test('math-algebra: a linear equation needs its working in text mode, and passes once a step comes before x = 4', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Undo the steps/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await until(async () => /at least one step before it/.test(await page.textContent('#work .mq-result')));
+  assert.equal(await page.locator('#feedback .msg.win').count(), 0, 'the answer alone does not pass');
+  await page.fill('#work input.mq-field >> nth=0', '2x=8');
+  await page.click('#work input.mq-field >> nth=1');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-step.ok', ls => ls.length), 2);
+  await until(async () => JSON.parse(await read(page, 'math-algebra-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-algebra-v1')).work['2.0'], ['2x=8', 'x=4']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its badge is earned', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), Fractions \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /many answers are fractions/);
+  assert.equal(await page.getAttribute('#mission .prereq a >> text=Fractions', 'href'), '../arithmetic/#ch=arithmetic.fractions');
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, done: {}, badges: { 2: true } })));
+  await page.reload();
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), not done yet/);
+  assert.doesNotMatch(await hint(), /Fractions/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
   const key = 'python-quest-v1';
   const { ctx, page, errors } = await open(`${base}/python-quest/`);

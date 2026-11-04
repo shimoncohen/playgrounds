@@ -47,15 +47,18 @@
     return same ? yes : off(a.v);
   };
 
+  // math.js reads `x(x - 3)` as a call to a function named x; a learner means x times (x - 3).
+  const times = (n, vars) => n.transform(m => m.isFunctionNode && m.args.length === 1 && vars.includes(m.fn.name)
+    ? new full.OperatorNode('*', 'multiply', [m.fn, new full.ParenthesisNode(times(m.args[0], vars))], true) : m);
   const compile = (s, vars) => {
     const p = parse(s);
     if (p.why) return p;
-    const code = p.node.compile();
+    const node = times(p.node, vars), code = node.compile();
     const at = scope => { try { const v = code.evaluate(scope); return typeof v === 'number' ? v : NaN; } catch (e) { if (unknown(e)) throw e; return NaN; } };
     try { at(Object.fromEntries(vars.map(n => [n, 0.5]))); } catch (e) {
       return { why: `I don't know what \`${unknown(e)}\` is here. Use ${vars.map(v => '`' + v + '`').join(', ')}.` };
     }
-    return { node: p.node, at };
+    return { node, at };
   };
   const points = (vars, seed) => {
     const rng = MQ.rng(seed);
@@ -133,6 +136,8 @@
   // The step checker accepts any line with the right value, so a mission's last line must also have the finished shape.
   const NUM = '-?\\d+(?:\\.\\d+)?(?:\\s*/\\s*\\d+)?';
   const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a));
+  const solvedRe = x => new RegExp(`^\\s*(?:${x}\\s*=\\s*(${NUM})|(${NUM})\\s*=\\s*${x})\\s*$`);
+  const LIST = /\s*,\s*|\s+or\s+/;
   C.final = {
     number: value => v => /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? number(v, value) : no('Keep going until your last line is one number.'),
     fraction: (value, { lowest = true } = {}) => v => {
@@ -143,8 +148,23 @@
       return r;
     },
     solved: (value, x = 'x') => v => {
-      const m = new RegExp(`^\\s*(?:${x}\\s*=\\s*(${NUM})|(${NUM})\\s*=\\s*${x})\\s*$`).exec(v);
+      const m = solvedRe(x).exec(v);
       return m ? number(m[1] || m[2], value) : no(`Keep going until your last line reads \`${x} = \` and one number.`);
+    },
+    roots: (values, x = 'x') => v => {
+      const got = [];
+      for (const p of String(v).split(LIST)) {
+        const m = solvedRe(x).exec(p);
+        if (!m) return no(`Keep going until your last line lists each solution as \`${x} = \` and a number, like \`${x} = 2 or ${x} = 3\`.`);
+        got.push(m[1] || m[2]);
+      }
+      const is = (g, w) => number(g, w).ok;
+      const bad = got.find(g => !values.some(w => is(g, w)));
+      if (bad !== undefined) return no(`\`${x} = ${bad}\` is not a solution. Put it back into the question to check.`);
+      if (got.some((g, i) => got.slice(0, i).some(h => is(g, h)))) return no('You wrote the same solution twice. Write each one once.');
+      const found = values.filter(w => got.some(g => is(g, w))).length, left = values.length - found;
+      if (left) return no(`You found ${found === 1 ? 'one solution' : found + ' solutions'}; there ${left === 1 ? 'is another' : 'are more'}.`);
+      return yes;
     },
   };
 
@@ -188,26 +208,38 @@
     const near = (r, set) => set.some(q => Math.abs(q - r) < 0.05);
     const lost = ro.some(r => !near(r, rs)), added = rs.some(r => !near(r, ro));
     if (lost && added) return no('This step has different solutions from the question. Check what you did to each side.');
-    if (lost) return no(`This step loses a solution. Dividing both sides by something with \`${vars[0]}\` in it can do that.`);
+    if (lost) return no(`This step loses a solution. Dividing both sides by something with \`${vars[0]}\` in it can do that, and so can keeping only the positive square root.`);
     if (added) return no('This step adds a solution. Squaring both sides can do that.');
     return yes;
   };
 
+  // `x = 2 or x = 3` has the same solutions as `(x - 2)(x - 3) = 0`, so a list of solutions is checked as that equation.
+  const asProduct = (s, x) => {
+    const ms = String(s).split(LIST).map(p => solvedRe(x).exec(p));
+    return ms.length > 1 && ms.every(Boolean) ? ms.map(m => `(${x}-(${m[1] || m[2]}))`).join('*') + '=0' : s;
+  };
   C.steps = (original, steps, { kind = 'number', vars = ['x'], seed = 1 } = {}) => {
     if (kind === 'number') return steps.map(s => number(s, original));
     if (kind === 'expr') return steps.map(s => expr(s, original, { vars, seed }));
     const orig = side(original, vars);
     if (orig.why) return steps.map(() => no('The question could not be read.'));
-    return steps.map(s => equation(s, orig, vars, seed));
+    return steps.map(s => equation(asProduct(s, vars[0]), orig, vars, seed));
   };
 
   // math.js writes implicit multiplication as `~`, which KaTeX renders as a visible gap ("2 x").
-  C.tex = s =>String(s).split('=').map(p => full.parse(p).toTex({ parenthesis: 'auto' })).join(' = ').replace(/~/g, '');
+  const eqTex = s => s.split('=').map(p => full.parse(p).toTex({ parenthesis: 'auto' })).join(' = ').replace(/~/g, '');
+  // Only a list when every item is an equation: the comma in `log(x, 2)` separates arguments.
+  C.tex = s => {
+    const parts = String(s).split(/(\s*,\s*|\s+or\s+)/);
+    if (parts.length === 1 || !parts.every((p, i) => i % 2 || p.split('=').length === 2)) return eqTex(String(s));
+    return parts.map((p, i) => i % 2 ? (p.trim() === ',' ? ',\\ ' : '\\text{ or }') : eqTex(p)).join('');
+  };
 
   C.translate = ascii => String(ascii)
     .replace(/\|([^|]+)\|/g, 'abs($1)')
     .replace(/log _\(?(\w+)\)?\(([^)]*)\)/g, 'log($2, $1)')
     .replace(/\s*\*\s*/g, '*')
+    .replace(/\s*"\s*or\s*"\s*/g, ' or ')
     .replace(/\(\(([^()]*)\)\)/g, '($1)')
     // MathLive brackets every fraction part; drop brackets around one number or letter unless they are a call like `sin (x)`.
     .replace(/(?<![\w)]\s*)\((\d+(?:\.\d+)?|[a-z])\)/g, '$1');
