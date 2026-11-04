@@ -1,6 +1,7 @@
 name: CI
 
 # Runs on pull requests, and is called by the Pages workflow so nothing deploys unless it passes.
+# A pull request runs only the tests for the parts it changes (tools/ci-plan.mjs); the Pages run tests everything.
 on:
   pull_request:
   workflow_call:
@@ -9,11 +10,16 @@ permissions:
   contents: read
 
 jobs:
-  checks:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # the browser smoke suite plays the whole Shell Quest course (about 3 minutes)
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
+      # Depth 2: a pull request checks out its merge commit, whose first parent is the base branch.
       - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-python@v7.0.0
         with:
@@ -22,7 +28,6 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
-          cache: npm
 
       - name: Playgrounds bundle for the Artifact tool
         run: python3 tools/build.py --check
@@ -33,14 +38,61 @@ jobs:
             node --check "$f" || exit 1
           done
 
+      - name: Pick the test jobs
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ] && git rev-parse -q --verify HEAD^2 >/dev/null; then
+            git diff --name-only HEAD^1 HEAD | node tools/ci-plan.mjs
+          else
+            node tools/ci-plan.mjs --all
+          fi
+
+  test:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # The smoke tests run tools/build.py.
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
       - run: npm ci
 
-      - name: Shell Quest engine tests
-        run: npm run test:engine
-
       - name: Install Chromium
+        if: matrix.browser
         run: npx playwright install --with-deps chromium
 
-      # The engine tests already ran above; `npm test` would run them a second time.
-      - name: Browser smoke and golden tests
-        run: npm run test:browser
+      - name: Run
+        env:
+          TASK: ${{ toJSON(matrix) }}
+        run: node tools/ci-plan.mjs run
+
+  # The required status check: one name however many test jobs ran, and green when none were needed.
+  checks:
+    needs: [plan, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All jobs passed or were not needed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          case " $RESULTS " in *" failure "*|*" cancelled "*) exit 1 ;; esac

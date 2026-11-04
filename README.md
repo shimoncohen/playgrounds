@@ -150,7 +150,7 @@ Then, in a Claude session with the Artifact tool, ask Claude to publish `dist/<n
 
 ### CI and deployment
 
-- `ci.yml` runs on every pull request: the bundle check, `node --check` on every script, the engine tests and the browser tests.
+- `ci.yml` runs on every pull request: the bundle check and `node --check` on every script, then, in parallel jobs, the engine and browser tests for the parts the PR changes. `tools/ci-plan.mjs` picks them: a change inside one `<name>-quest/` or `tests/<name>/` folder tests that quest, docs-only changes skip the tests, and anything else (shared code, tools, fixtures, config) tests everything. The `checks` job is the one status to require.
 - `pages.yml` runs on every push to `main`: it calls CI, and only if that passes publishes the site (`index.html`, `shared/` and the `*-quest/` folders) to the root of the `gh-pages` branch.
 - `pr-preview.yml` publishes a live preview of a pull request to `pr-preview/pr-<number>/` and comments the link on the PR. It only runs for PRs from branches in this repo; **PRs from forks and Dependabot get no preview** (run the page locally instead).
 

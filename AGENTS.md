@@ -17,7 +17,7 @@ npm test               # both
 for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs; do node --check "$f" || break; done
 ```
 
-CI runs all of these on every PR. A PR is not ready until they pass locally.
+CI runs the tests for the parts a PR changes (`tools/ci-plan.mjs`) and all of them on `main`. A PR is not ready until they all pass locally.
 
 ## Hard rules
 
