@@ -383,7 +383,7 @@
           ],
           explain: 'On a keyboard, × is <code>*</code> and ÷ is <code>/</code>. The preview may show × as a raised dot, <code>·</code>: it means the same thing. Press <kbd>Enter</kbd> for a new line.',
           hint: 'Work out the bracket first: what is <code>6 + 4</code>? Then multiply that by 3.',
-          at: { a: 6, b: 4, c: 3 },
+          scene: { ...order, t: { ...order.t, max: 1 } }, at: { a: 6, b: 4, c: 3 }, reveal: true,
           answer: '30', wrong: '18', lazy: '(6+4)*3', check: finalNumber(30) },
         { title: 'Times and divide: left to right', kind: 'number', question: '12/2*3', tex: '12 \\div 2 \\times 3',
           goal: 'Work out <code>12 ÷ 2 × 3</code>. There are no brackets, so go from left to right.',

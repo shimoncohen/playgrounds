@@ -45,6 +45,10 @@ for (const track of TRACKS) {
     });
 
     if (m.scene) test(`${id}: its own scene is complete`, () => assert.ok(m.scene.params && m.scene.draw && m.scene.title, id));
+    if (m.reveal) test(`${id}: the reveal scene takes the mission's start values`, () => {
+      const r = m.reveal === true ? ch.scene : m.reveal;
+      for (const [k, x] of Object.entries(m.at || {})) assert.ok(r.params[k] && x >= r.params[k].min && x <= r.params[k].max, `${id}: ${k} = ${x} does not fit the reveal scene`);
+    });
     if (m.at) test(`${id}: start values are params in range`, () => {
       for (const [k, x] of Object.entries(m.at)) {
         const p = (m.scene || ch.scene).params[k];

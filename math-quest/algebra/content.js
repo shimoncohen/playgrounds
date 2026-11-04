@@ -223,7 +223,7 @@
     return [(-b - Math.sqrt(D)) / 2, (-b + Math.sqrt(D)) / 2];
   };
   const fmt = v => String(+v.toFixed(2)).replace(/^-/, '−');
-  const parabola = (view, cMin) => ({
+  const parabola = (view, cMin, ask) => ({
     id: 'parabola', title: 'The curve y = x² + bx + c and where it crosses the x-axis',
     params: { b: { min: -6, max: 6, step: 1, value: 0, label: 'b' }, c: { min: cMin, max: 9, step: 1, value: 3, label: 'c' } },
     terms: ['curve', 'root'],
@@ -231,7 +231,7 @@
     formula: '\\term{curve}{y} = x^2+\\term{b}{b}\\,x+\\term{c}{c}\\qquad\\term{root}{y = 0}',
     live: s => {
       const r = rootsOf(s.params.b, s.params.c), { b, c } = s.params, eq = `y = x²${b ? ` ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x` : ''}${c ? ` ${c < 0 ? '−' : '+'} ${Math.abs(c)}` : ''}`;
-      return `${eq}: ${!r.length ? 'it never reaches the x-axis' : r.length === 1 ? `it touches the x-axis at x = ${fmt(r[0])}` : `it crosses the x-axis at x = ${r.map(fmt).join(' and x = ')}`}`;
+      return ask ? `${eq}: where does it meet the x-axis?` : `${eq}: ${!r.length ? 'it never reaches the x-axis' : r.length === 1 ? `it touches the x-axis at x = ${fmt(r[0])}` : `it crosses the x-axis at x = ${r.map(fmt).join(' and x = ')}`}`;
     },
     draw: {
       kind: '2d', view, box: [400, 400],
@@ -251,7 +251,7 @@
       intro: 'In algebra, letters stand for numbers. A <b>variable</b> is a letter, like <code>a</code>, whose number can change. The box on this page has length <code>a</code>, width <code>b</code> and height <code>c</code>. Its <b>volume</b>, how many 1 by 1 by 1 cubes fit inside, is <code>V = a · b · c</code>, where the dot <code>·</code> means ×. A line made of numbers, letters and operations is an <b>expression</b>. Move the sliders and watch the box, the formula and the numbers change together.',
       scene: box,
       missions: [
-        { title: 'Letters for numbers', kind: 'number', at: { a: 10, b: 5, c: 3 }, question: '10*5*3', tex: 'a \\cdot b \\cdot c \\;\\text{ with }\\; a = 10,\\ b = 5,\\ c = 3',
+        { title: 'Letters for numbers', kind: 'number', scene: { ...box, live: 'V = {a}·{b}·{c} = ?' }, at: { a: 10, b: 5, c: 3 }, reveal: true, question: '10*5*3', tex: 'a \\cdot b \\cdot c \\;\\text{ with }\\; a = 10,\\ b = 5,\\ c = 3',
           goal: 'A crate is 10 long, 5 wide and 3 tall. Put those numbers in for the letters of <code>V = a · b · c</code> and work out the volume <code>V</code>.',
           how: [
             '<code>V = a · b · c</code> says: the volume is length times width times height. Each letter is a variable, waiting for its number.',
@@ -535,7 +535,7 @@
       intro: 'A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
       scene: parabola([-6, 6, -7, 10], 0),
       missions: [
-        { title: 'Factor, then split', kind: 'equation', at: { b: 5, c: 6 }, question: 'x^2+5x+6=0',
+        { title: 'Factor, then split', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: 5, c: 6 }, reveal: true, question: 'x^2+5x+6=0',
           goal: 'Solve <code>x² + 5x + 6 = 0</code>. You factored this left side in Factoring. Find both solutions.',
           how: [
             'The equation asks which numbers make <code>x² + 5x + 6</code> come to 0. Factoring turns it into two smaller questions.',
@@ -547,7 +547,7 @@
           hint: 'Factor first. Then ask: what makes <code>x + 2</code> zero? What makes <code>x + 3</code> zero?',
           steps: ['(x+2)(x+3)=0', 'x=-2 or x=-3'],
           answer: 'x=-2 or x=-3', wrong: 'x=2 or x=3', lazy: 'x^2+5x+6=0', check: MQ.check.final.roots([-2, -3]) },
-        { title: 'Two square roots', kind: 'equation', scene: parabola([-6, 6, -18, 12], -16), at: { b: 0, c: -16 }, question: 'x^2=16',
+        { title: 'Two square roots', kind: 'equation', scene: parabola([-6, 6, -18, 12], -16, true), at: { b: 0, c: -16 }, reveal: parabola([-6, 6, -18, 12], -16), question: 'x^2=16',
           goal: 'Solve <code>x² = 16</code>. Which numbers times themselves make 16? There are two.',
           how: [
             '<code>x² = 16</code> asks for every number that, times itself, gives 16.',
@@ -558,7 +558,7 @@
           explain: 'The <b>square root</b> of 16, written <code>√16</code>, is the positive one, 4. An equation with <code>x²</code> wants the negative one too. Another way: <code>x² − 16 = 0</code> factors as <code>(x − 4)(x + 4) = 0</code>, a difference of two squares.',
           hint: 'What about a negative number times itself?',
           answer: 'x=4 or x=-4', wrong: 'x=4', lazy: 'x^2=16', check: MQ.check.final.roots([4, -4]) },
-        { title: 'Do not divide by x', kind: 'equation', at: { b: -3, c: 0 }, question: 'x^2-3x=0',
+        { title: 'Do not divide by x', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: -3, c: 0 }, reveal: true, question: 'x^2-3x=0',
           goal: 'Solve <code>x² − 3x = 0</code>. It is tempting to divide both sides by <code>x</code>: see what that would lose.',
           how: [
             'Both parts of <code>x² − 3x</code> have an <code>x</code>, so <code>x</code> is a common factor, as in Factoring.',
@@ -569,7 +569,7 @@
           explain: 'Put each one back in: <code>0² − 3 · 0</code> is 0, and <code>3² − 3 · 3</code> is 0. Both are solutions. The working area marks a step that loses a solution: type <code>x = 3</code> as a step to see it.',
           hint: 'Take <code>x</code> out as a common factor, then set each factor to 0.',
           answer: 'x=0 or x=3', wrong: 'x=3', lazy: 'x^2-3x=0', check: MQ.check.final.roots([0, 3]) },
-        { title: 'One root, twice', kind: 'equation', at: { b: -6, c: 9 }, question: 'x^2-6x+9=0',
+        { title: 'One root, twice', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: -6, c: 9 }, reveal: true, question: 'x^2-6x+9=0',
           goal: 'Solve <code>x² − 6x + 9 = 0</code>. Both of its factors are the same, so it has just one solution: write it once.',
           how: [
             'Factor first: you need two numbers that multiply to 9 and add to <code>−6</code>.',
