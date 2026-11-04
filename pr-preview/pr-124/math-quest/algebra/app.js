@@ -1,1 +1,0 @@
-MQ.trackApp(MQ.content);
