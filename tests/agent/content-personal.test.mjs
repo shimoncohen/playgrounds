@@ -102,6 +102,14 @@ describe('schedule messages name the problem', () => {
   it('15.1 names the runs and the tokens, and the day when only the day is wrong', () => {
     assert.match(msg(15, 1, {}), /runs 7 times a week \(mon, tue, wed, thu, fri, sat, sun\), about \d+ tokens\. The limit is \d+\./);
     assert.match(msg(15, 1, S('weekdays 07:30 use weekly-digest')), /runs 5 times a week/);
+    // two days cannot fit the shipped limit, so raise it to reach the case where the day count alone is what is wrong
+    const week = AQ.WEEK;
+    AQ.WEEK = 1e6;
+    try {
+      const two = msg(15, 1, S('monday 07:30 use weekly-digest\ntuesday 07:30 use weekly-digest'));
+      assert.match(two, /runs 2 times a week \(mon, tue\), about \d+ tokens\. It only has to run on Monday/);
+      assert.doesNotMatch(two, /The limit is/);
+    } finally { AQ.WEEK = week; }
     assert.match(msg(15, 1, S('friday 07:30 use weekly-digest')), /on Monday, but this schedule starts it on fri/);
     assert.match(msg(15, 1, F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', 'CLAUDE.md': 'x '.repeat(2500) })), /Even one run a week costs about \d+ tokens/);
   });

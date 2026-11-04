@@ -139,7 +139,7 @@ const CASES = [
       F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n' }), F({ 'CLAUDE.md': NOTES + 'Plan: first\nDone when: run npm test\n' }),
       F({ '.claude/commands/nightly.md': PG + 'Done when: run npm test\n' })] },
   { at: [13, 1],
-    // a star now matches in permissions.txt: src/price* is only the intended file, src/* and * also reach src/legacy/old.js
+    // a star matches in permissions.txt: src/price* is only the intended file, src/* and * also reach src/legacy/old.js
     pass: [PERM('allow edit src/price*\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm test\n'), PERM('allow run npm test\nallow edit src/price.js'), PERM('# the job\nallow edit src/price.js\nallow run npm test\nallow read src/'),
       PERM('allow edit src/price.js\nallow run npm test\nallow run npm run lint'), PERM('allow edit src/price.js\nallow run npm test\ndeny run npm run deploy')],
     fail: [{}, PERM('allow edit src/*\nallow run npm test'), PERM('allow edit *\nallow run npm test'), PERM(''), PERM('allow edit src/price.js'), PERM('allow run npm test'), PERM('allow edit src/\nallow run npm'), PERM('allow edit src/\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm'),

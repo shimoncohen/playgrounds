@@ -102,7 +102,7 @@ const CASES = [
     fail: [F({ '.claude/agents/finder.md': 'name: finder\nmodel: small\n', '.claude/agents/architect.md': 'name: architect\nmodel: small\n' }), F({ '.claude/agents/finder.md': 'name: finder\nmodel: standard\n', '.claude/agents/architect.md': 'name: architect\nmodel: standard\n' }), F({ '.claude/agents/finder.md': 'name: finder\nmodel: small\n', '.claude/agents/architect.md': 'name: architect\nmodel: large\n' }), F({ '.claude/agents/finder.md': '', '.claude/agents/architect.md': 'name: architect\nmodel: standard\n' }), F({ '.claude/agents/finder.md': 'name: scout\nmodel: small\n', '.claude/agents/architect.md': 'name: architect\nmodel: standard\n' })] },
 
   { at: [6, 0],
-    // a star now matches in permissions.txt: data/* is the intended folder, src/* is not
+    // a star matches in permissions.txt: data/* is the intended folder, src/* is not
     pass: [F({ '.claude/permissions.txt': 'deny delete data/backup.csv' }), F({ '.claude/permissions.txt': 'deny delete data' }), F({ '.claude/permissions.txt': 'deny delete data/*' })],
     fail: [F({ '.claude/permissions.txt': 'deny delete src/*' }), F({ '.claude/permissions.txt': 'deny read data/' }), F({ '.claude/permissions.txt': 'deny edit src/' }), F({ '.claude/permissions.txt': 'deny delete src/util.js' }), F({ 'CLAUDE.md': 'do not delete data/' }), F({ '.claude/hooks.txt': 'before delete data/' }), F({ '.claude/permissions.txt': 'deny remove data/' })] },
   { at: [6, 1],

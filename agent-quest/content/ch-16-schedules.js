@@ -59,7 +59,7 @@ AQ.CH.push({
         'The schedule step in the Run panel counts the runs a week. A week costs about as much as one run times that number, so seven runs cost seven times as much.',
         'Change the daily line instead of adding to it. The days of every line that starts a command add up, so a Monday line below a daily one still runs seven times. The command in <code>.claude/commands/weekly-digest.md</code> stays as it is.'
       ],
-      explain:'A schedule makes a cheap job expensive by repetition. A run of a few hundred tokens costs seven times that when it fires every day, and nobody sees it happen because nobody is there. The days of every line that starts the same command are added together, so a second line does not replace the first. Pick the least often that still does the job. The token counts here are this practice\'s own estimate, not a real price.',
+      explain:'A schedule makes a cheap job expensive by repetition. A run of about a hundred tokens costs seven times that when it fires every day, and nobody sees it happen because nobody is there. The days of every line that starts the same command are added together, so a second line does not replace the first. Pick the least often that still does the job. The token counts here are this practice\'s own estimate, not a real price.',
       hint:'Change the first word of the line so the digest starts on one day only.',
       answer:{files:{[SCHEDULE]:HEAD+'monday 07:30 use weekly-digest\n'}},
       wrong:{files:{[SCHEDULE]:HEAD+'weekdays 07:30 use weekly-digest\n'}},
@@ -70,7 +70,7 @@ AQ.CH.push({
         if(!f||!f.entry)return 'No line in .claude/schedule.txt starts weekly-digest, so the digest never runs. It has to run on Mondays.';
         if(edited(c,'weekly-digest'))return CHANGED;
         const week=AQ.weekTokens(o);
-        if(f.due.length>1)return 'The digest runs '+f.due.length+' times a week ('+f.due.join(', ')+'), about '+week+' tokens. The limit is '+AQ.WEEK+'. It only has to run on Monday.';
+        if(f.due.length>1)return 'The digest runs '+f.due.length+' times a week ('+f.due.join(', ')+'), about '+week+' tokens'+(week>AQ.WEEK?'. The limit is '+AQ.WEEK:'')+'. It only has to run on Monday.';
         if(f.due[0]!=='mon')return 'The digest has to run on Monday, but this schedule starts it on '+f.due[0]+'.';
         if(week>AQ.WEEK)return 'Even one run a week costs about '+week+' tokens here, over the limit of '+AQ.WEEK+'. Trim what the setup carries.';
         if(o.status!=='done'||!(o.vfs.read('digest.md')||'').trim())return 'The job did not finish a checked digest. Look at the Run panel for the step that failed.';
