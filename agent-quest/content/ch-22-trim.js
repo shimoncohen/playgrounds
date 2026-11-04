@@ -6,6 +6,7 @@ const SKILL='.claude/skills/release-steps.md',CMD='release-prep';
 const BACKUP='data/backup.csv',RULE='do not edit migrations/';
 /* the six steps: the prose under the heading of the shipped CLAUDE.md, without the rule line */
 const chores=sc=>{const l=sc.vfs['CLAUDE.md'].split('\n');return l.slice(l.indexOf('## Release checklist')+1).filter(x=>x.trim()&&!AQ.config.parseConstraint(x,sc).ok);};
+const howMany=(miss,what)=>miss.length===6?'all six '+what+' are missing':miss.length===1?'one of the six '+what+' is missing':miss.length+' of the six '+what+' are missing';
 const covers=(text,sc)=>AQ.config.memoryRules({memory:AQ.config.skillBody(text)},sc,false).rules.some(r=>r.verb==='delete'&&AQ.permissions.matches(r.target,BACKUP));
 /* the files that hold a delete rule for data/backup.csv. Counted from the files, not from setup.skills, which drops a skill with a bad when: or no name: */
 const holders=(o,c)=>[['CLAUDE.md',c.setup.memory],...c.setup.memoryFolders.map(f=>[f.path,f.text]),
@@ -63,7 +64,7 @@ AQ.CH.push({
         if(sk.when!=='release')return sk.when==='bugfix'?'The skill release-steps loads for this job, so the agent carries the checklist again. Keep when: release.':'The checklist belongs to a release, so the skill release-steps must keep when: release.';
         const body=AQ.config.skillBody(o.vfs.read(SKILL)).split('\n').map(l=>l.trim());
         const miss=chores(c.scenario).filter(l=>!body.includes(l));
-        if(miss.length)return 'The body of the skill is missing '+miss.length+' of the six checklist lines, such as "'+miss[0]+'". Move them below the header lines, not onto one of them.';
+        if(miss.length)return 'In the body of the skill, '+howMany(miss,'checklist lines')+', such as "'+miss[0]+'". Move them below the header lines, not onto one of them.';
         if(!AQ.config.memoryRules({memory:body.join('\n')},c.scenario,false).rules.some(r=>r.verb==='edit'&&AQ.permissions.matches(r.target,'migrations/001.sql')))return 'The rule '+RULE+' is not in the body of the skill, so a release would not be guarded. Move that line with the steps.';
         return o.tokens.peak<=AQ.TUNE.rare?true:'The skill holds the checklist, but the agent still held about '+o.tokens.peak+' tokens at once. The goal is '+AQ.TUNE.rare+' or fewer. Take the checklist out of CLAUDE.md, not only copy it.';
       }
@@ -92,7 +93,7 @@ AQ.CH.push({
         if(!p.constraints.some(k=>k.kind==='do not'&&k.verb==='edit'&&AQ.permissions.matches(k.target,'migrations/001.sql')))return 'The command '+CMD+' holds no Constraints: '+RULE+' line, so a release run would not be guarded.';
         const cmd=c.setup.commands.find(x=>x.name===CMD),have=cmd.text.split('\n').map(bare);
         const miss=chores(c.scenario).filter(l=>!have.includes(l));
-        if(miss.length)return 'The command is missing '+miss.length+' of the six steps, such as "'+miss[0]+'". Move them after Extra: lines.';
+        if(miss.length)return 'In the command, '+howMany(miss,'steps')+', such as "'+miss[0]+'". Move them after Extra: lines.';
         return o.tokens.peak<=AQ.TUNE.cmd?true:'The command holds the steps, but the agent still held about '+o.tokens.peak+' tokens at once. The goal is '+AQ.TUNE.cmd+' or fewer. Take the steps out of CLAUDE.md, not only copy them.';
       }
     }
