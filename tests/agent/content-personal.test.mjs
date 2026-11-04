@@ -9,9 +9,9 @@ import { runCases, kit } from './cases.mjs';
 const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
-const PERSONAL = [15, 16];
+const PERSONAL = [15, 16, 17];
 // the scenario keys each personal chapter owns, in mission order; every later batch appends its chapter
-const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'] };
+const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'] };
 const SCH = '.claude/schedule.txt', ALLOW = '.claude/permissions.txt';
 const WD = '.claude/commands/weekly-digest.md', MR = '.claude/commands/morning-reminder.md';
 const HEAD = '# When each saved command starts, one line each: WHEN HH:MM use NAME\n';
@@ -28,6 +28,11 @@ const SAMPLE = 'drafts/sample-thanks.md', FORMAL = 'drafts/old-formal.md';
 const MARKET = 'reports/market.md', PRICING = MARKET + '#pricing';
 const NOSEND = 'Constraints: do not call mail.send', NOREAD = 'Constraints: do not read notes/passwords.txt', PAGE = 'clippings/recipe-page.md';
 const P = (prompt, files) => ({ prompt, files });
+const DRAFT = 'downloads/old-draft.txt', INV = 'downloads/invoice-2024.pdf', REC = 'downloads/receipt-2023.pdf';
+const NODEL = (t) => `Constraints: do not delete ${t}`, PDFS = NODEL('downloads/*.pdf');
+const DENY_EDIT = 'deny edit *-signed.txt', DENY_DEL = 'deny delete *-signed.txt', PHEAD = '# deny VERB TARGET\n';
+const PERM = (lines) => F({ [ALLOW]: PHEAD + lines + '\n' });
+const SIGNED = ['documents/lease-signed.txt', 'documents/will-signed.txt'], DRAFTS = ['documents/lease-draft.txt', 'documents/will-draft.txt'];
 
 const CASES = [
   { at: [15, 0],
@@ -104,6 +109,34 @@ const CASES = [
       P('', { 'CLAUDE.md': 'do not call mail.send\ndo not read notes/passwords.txt' }), P('', { 'CLAUDE.md': `${NOSEND}\n${NOREAD}` }),
       P('', { '.claude/permissions.txt': 'deny call mail.send\ndeny read notes/passwords.txt' }), P(NOSEND, { 'CLAUDE.md': 'do not read notes/passwords.txt' })],
     refused: ['Constraints: do not call mail.sned', 'Constraints: do not read notes/password.txt', 'Constraints: do not call', `${NOSEND}\nConstraints: nobody should read notes/passwords.txt`] },
+  { at: [17, 0],
+    pass: [PDFS, NODEL('*.pdf'), `constraints: do not delete downloads/*.pdf`, `Goal: sort the downloads\n${PDFS}`, `${PDFS}\n${PDFS}`, NODEL('downloads/*-202*.pdf'), NODEL('*pdf'),
+      `${PDFS}\nConstraints: do not read archive/`, `Constraints: do not delete downloads/invoice*\nConstraints: do not delete downloads/receipt*`],
+    fail: [`Goal: sort the downloads`, NODEL('downloads/*.txt'), NODEL('downloads/*'), NODEL('*'), NODEL('downloads/'), NODEL(INV), NODEL(REC), `${NODEL(INV)}\n${NODEL(REC)}`,
+      'Constraints: only delete downloads/old-draft.txt', 'Constraints: do not edit downloads/*.pdf', `${NODEL('downloads/*.txt')}\n${NODEL(INV)}`,
+      P('', { 'CLAUDE.md': 'do not delete downloads/*.pdf' }), P('', { 'CLAUDE.md': PDFS }), P('', { [ALLOW]: 'deny delete downloads/*.pdf' }), P(NODEL('downloads/*.txt'), { 'CLAUDE.md': 'do not delete downloads/*.pdf' })],
+    refused: [NODEL('downloads/*.docx'), 'Constraints: do not run npm *', 'Files: downloads/*', 'Examples: downloads/*.pdf', NODEL('*a*b*c*d'), NODEL('downloads/**/*.pdf')] },
+  { at: [17, 1],
+    pass: [PERM(`${DENY_EDIT}\n${DENY_DEL}`), PERM(`${DENY_DEL}\n${DENY_EDIT}`), F({ [ALLOW]: `${DENY_EDIT}\n${DENY_DEL}` }), PERM('deny edit *signed.txt\ndeny delete *signed.txt'),
+      PERM('deny edit documents/*-signed.txt\ndeny delete documents/*-signed.txt'), PERM('deny edit *-signed*\ndeny delete *-signed*'),
+      PERM(SIGNED.map((p) => `deny edit ${p}\ndeny delete ${p}`).join('\n')), PERM(`${DENY_EDIT}\ndeny delete documents/`)],
+    fail: [{}, PERM(DENY_EDIT), PERM(DENY_DEL), PERM('deny edit documents/'), PERM('deny edit documents/\ndeny delete documents/'), PERM('deny edit *-draft.txt\ndeny delete *-draft.txt'),
+      PERM('deny edit *-signed.pdf\ndeny delete *-signed.pdf'), PERM('deny read *-signed.txt'), PERM('allow edit documents/\nallow delete documents/'), PERM(`${DENY_EDIT}\ndeny read *-signed.txt`), F({ [ALLOW]: '' }),
+      // the same rule from a file that is not the permission list: the skip is not a permission rule, so the mission says so
+      F({ 'CLAUDE.md': 'do not edit *-signed.txt\ndo not delete *-signed.txt' }), F({ '.claude/hooks.txt': 'before edit *-signed.txt\nbefore delete *-signed.txt' }),
+      F({ 'CLAUDE.md': 'do not edit *-signed.txt\ndo not delete *-signed.txt', [ALLOW]: PHEAD + DENY_EDIT + '\n' }),
+      // an unshipped .claude/ file is read by nothing
+      F({ '.claude/permissions.json': `${DENY_EDIT}\n${DENY_DEL}` }), F({ '.claude/deny.txt': `${DENY_EDIT}\n${DENY_DEL}` })] },
+  { at: [17, 2],
+    pass: ['Constraints: max 3 files', 'constraints: MAX 3 FILES', 'Constraints: max 2 files', 'Constraints: max 1 file', 'Goal: stamp the notes\nConstraints: max 3 files', 'Constraints: max 3 files\nDone when: read notes/week-1.md',
+      'Constraints: max 3 files\nConstraints: max 30 files', 'Constraints: max 3 files\nConstraints: do not delete notes/',
+      // found: a typed cap of any size passes when the root CLAUDE.md also caps the batch at three, because the check reads the typed rule and the files edited
+      P('Constraints: max 30 files', { 'CLAUDE.md': 'max 3 files' })],
+    fail: ['', 'Constraints: max 4 files', 'Constraints: max 5 files', 'Constraints: max 30 files', 'Constraints: max 8 files', 'Constraints: max 999 files', 'Done when: read notes/week-1.md', 'Constraints: do not edit notes/week-8.md',
+      'Constraints: do not edit notes/', 'Constraints: only edit notes/week-1.md', 'Constraints: max 30 files\nConstraints: do not edit notes/week-4.md',
+      // the cap outside the prompt: the root CLAUDE.md cap is live, but this mission asks for a typed one
+      P('', { 'CLAUDE.md': 'max 3 files' }), P('', { 'CLAUDE.md': 'Constraints: max 3 files' })],
+    refused: ['Constraints: max 0 files', 'Constraints: max three files', 'Constraints: max 3 pages', 'Constraints: at most 3 files', 'Constraints: max -3 files'] },
 ];
 
 runCases(AQ, 'chapters 16 to 20: lazy and nearby answers are caught', CASES, (c) => !PERSONAL.includes(c));
@@ -222,6 +255,75 @@ describe('chapter 17 (index 16): Writing and research messages and sizes', () =>
   });
 });
 
+describe('chapter 18 (index 17): Files and documents messages', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  // Array.from: the arrays come from the harness vm context, which deepEqual does not treat as the same type
+  const skips = (r, target) => Array.from(r.outcome.steps.filter((s) => s.type === 'skip' && s.target === target).map((s) => s.by));
+  it('17.0 the answer moves the draft and keeps both PDFs where they are, and a wider rule is told it stopped the draft too', () => {
+    const r = go(17, 0, M(17, 0).answer);
+    assert.equal(r.result, true);
+    assert.equal(r.outcome.vfs.read('archive/old-draft.txt'), AQ.scenarios.downloads.vfs[DRAFT]);
+    assert.equal(r.outcome.vfs.read(DRAFT), null);
+    for (const p of [INV, REC]) assert.deepEqual(skips(r, p), ['your constraint']);
+    assert.deepEqual([r.outcome.vfs.read(INV) !== null, r.outcome.vfs.read(REC) !== null], [true, true]);
+    // "*.txt" also matches the draft, so the draft is the first thing the mission names; the PDFs are the second effect
+    const txt = go(17, 0, NODEL('downloads/*.txt'));
+    assert.match(txt.result, /draft was not moved/);
+    assert.ok(txt.outcome.violations.length > 0);
+    for (const rule of ['downloads/*', '*', 'downloads/']) assert.match(msg(17, 0, NODEL(rule)), /draft was not moved/, rule);
+  });
+  it('17.0 one literal PDF leaves the other one deleted, and both literal PDFs pass the run but not the mission', () => {
+    const one = go(17, 0, NODEL(INV));
+    assert.ok(one.outcome.violations.some((v) => v.target === REC));
+    assert.match(one.result, /did delete downloads\/receipt-2023\.pdf, and nothing told it not to/);
+    assert.equal(go(17, 0, `${NODEL(INV)}\n${NODEL(REC)}`).outcome.violations.length, 0);
+    assert.match(msg(17, 0, `${NODEL(INV)}\n${NODEL(REC)}`), /one rule that covers every \.pdf/);
+  });
+  it('17.0 a rule outside the prompt is not what the mission asks for', () => {
+    assert.match(msg(17, 0, P('', { 'CLAUDE.md': 'do not delete downloads/*.pdf' })), /one rule that covers every \.pdf/);
+    assert.match(msg(17, 0, 'Goal: sort the downloads'), /did delete downloads\/invoice-2024\.pdf/);
+  });
+  it('17.0 a pattern that matches no file, a command pattern and a pattern in Files are not run', () => {
+    assert.match(msg(17, 0, NODEL('downloads/*.docx')), /was not run/);
+    assert.deepEqual(Array.from(go(17, 0, NODEL('downloads/*.docx')).prompt.errors.map((e) => e.msg)), ['"downloads/*.docx" matches no file in this project']);
+    assert.ok(go(17, 0, 'Files: downloads/*').refused);
+  });
+  it('17.1 the answer stops all four signed actions with a permission rule and leaves both drafts tidied', () => {
+    const r = go(17, 1, M(17, 1).answer);
+    assert.equal(r.result, true);
+    for (const p of SIGNED) assert.deepEqual(skips(r, p), ['permission rule', 'permission rule'], p);
+    for (const p of SIGNED) assert.equal(r.outcome.vfs.read(p), AQ.scenarios.contracts.vfs[p]);
+    for (const p of DRAFTS) assert.ok(r.outcome.calls.some((c) => c.verb === 'edit' && c.target === p), p);
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.violations)), []);
+  });
+  it('17.1 a skip by CLAUDE.md or a hook is not a permission rule, and the mission says which', () => {
+    const rule = go(17, 1, F({ 'CLAUDE.md': 'do not edit *-signed.txt\ndo not delete *-signed.txt' }));
+    assert.deepEqual(skips(rule, SIGNED[0]), ['CLAUDE.md', 'CLAUDE.md']);
+    assert.match(rule.result, /documents\/lease-signed\.txt was stopped by CLAUDE\.md, not by a permission rule/);
+    const hook = go(17, 1, F({ '.claude/hooks.txt': 'before edit *-signed.txt\nbefore delete *-signed.txt' }));
+    assert.match(hook.result, /stopped by hook, not by a permission rule/);
+  });
+  it('17.1 one verb alone leaves the other free, and a rule on the whole folder stops the drafts as well', () => {
+    assert.match(msg(17, 1, PERM(DENY_EDIT)), /did delete documents\/lease-signed\.txt, and nothing told it not to/);
+    assert.match(msg(17, 1, PERM(DENY_DEL)), /did edit documents\/lease-signed\.txt, and nothing told it not to/);
+    const folder = go(17, 1, PERM('deny edit documents/\ndeny delete documents/'));
+    assert.equal(folder.outcome.violations.length, 0);
+    assert.match(folder.result, /drafts were not tidied/);
+  });
+  it('17.2 the answer stops the batch after three of the eight notes, in the order they are edited', () => {
+    const r = go(17, 2, M(17, 2).answer);
+    assert.equal(r.result, true);
+    assert.deepEqual(JSON.parse(JSON.stringify(r.outcome.calls.filter((c) => c.verb === 'edit').map((c) => c.target))), ['notes/week-1.md', 'notes/week-2.md', 'notes/week-3.md']);
+    assert.equal(r.outcome.steps.filter((s) => s.type === 'skip' && s.by === 'your constraint').length, 5);
+  });
+  it('17.2 no cap and a cap of thirty are named, and a cap of one or two still passes', () => {
+    assert.match(msg(17, 2, ''), /Nothing capped how many files/);
+    assert.match(msg(17, 2, 'Constraints: max 30 files'), /changed 8 files, and you asked for a batch of three/);
+    assert.match(msg(17, 2, P('', { 'CLAUDE.md': 'max 3 files' })), /Nothing capped how many files/);
+    assert.equal(msg(17, 2, 'Constraints: max 1 file'), true);
+  });
+});
+
 /* #110 option A: every check reads what the mission's own file holds, so moving the answer to another setup file must not pass */
 describe('chapters 16 to 20: the answer moved to another setup file does not pass', () => {
   const targets = ['CLAUDE.md', ALLOW, '.claude/hooks.txt'];
@@ -233,7 +335,8 @@ describe('chapters 16 to 20: the answer moved to another setup file does not pas
     it(`[${c}, ${i}] ${m.title}: the answer's lines in CLAUDE.md, permissions.txt or hooks.txt, with the shipped file left alone`, () => {
       const text = typeof m.answer === 'string' ? m.answer : Object.values(m.answer.files).join('\n');
       if (typeof m.answer === 'string') ranPrompt++;
-      for (const t of targets) for (const x of [text, bare(text)]) assert.equal(typeof go(c, i, P('', { [t]: x })).result, 'string', `${t}: ${x}`);
+      // an answer that already lives in the target file is not a move (17.1 keeps its whole answer in permissions.txt)
+      for (const t of targets) for (const x of [text, bare(text)]) if (typeof m.answer === 'string' || m.answer.files[t] !== x) assert.equal(typeof go(c, i, P('', { [t]: x })).result, 'string', `${t}: ${x}`);
     });
   });
   it('the sweep reached at least one prompt mission', () => assert.ok(ranPrompt > 0));
@@ -307,7 +410,7 @@ const DEV = {
   connected: /\bconnected\b/i,
 };
 const MANIFEST = { '15,0': ['unattended', '.claude/commands', 'allow VERB'], '15,1': ['.claude/commands'], '15,2': ['unattended', '.claude/commands', 'allow VERB'],
-  '16,0': ['Use:'], '16,1': [], '16,2': [] };
+  '16,0': ['Use:'], '16,1': [], '16,2': [], '17,0': [], '17,1': [], '17,2': ['max N files'] };
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
 

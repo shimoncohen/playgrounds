@@ -68,6 +68,8 @@ const FIRST = {
   reminder: [/\breminders?\b/i, 15, 2],
   // chapter 17 (index 16): 16.1 defines the section anchor, a file name with #heading after it
   'section anchor': [/[\w-]+\.md#[a-z][\w-]*/, 16, 1],
+  // chapter 18 (index 17): 17.0 defines the star in a path; no card, quick-fire or guide entry before it writes one
+  glob: [/\*/, 17, 0],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),
