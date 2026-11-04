@@ -15,6 +15,16 @@ test('rng is repeatable for a seed', () => {
   assert.notDeepEqual(a, (() => { const r = MQ.rng(2); return [r(), r(), r(), r(), r()]; })());
 });
 
+test('number: sqrt works on the exact-fraction instance', () => {
+  assert.equal(C.number('7', 'sqrt(49)').ok, true);
+  assert.equal(C.number('sqrt(49)/2', '7/2').ok, true);
+  assert.equal(C.number('1/3+sqrt(4)', '7/3').ok, true);
+  assert.equal(C.number('1.41421356237', 'sqrt(2)').ok, true);
+  assert.equal(C.number('-7', 'sqrt(49)').ok, false);
+  assert.match(C.number('sqrt(-4)', 2).why, /one number/);
+  assert.equal(C.steps('sqrt(49)', ['7'])[0].ok, true);
+});
+
 test('number: value, exact fractions', () => {
   assert.equal(C.number('3/4', 0.75).ok, true);
   const dec = C.number('0.75', '3/4', { exact: true });
