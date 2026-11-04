@@ -37,8 +37,9 @@ export function plan(files, { all, withTests, browser = {} }) {
   }
   if (picked !== null && !picked.length) return jobs;
   const others = picked === null ? [] : all.filter(q => !picked.includes(q));
+  // A quest's smoke tests start with its name and a hyphen or space (`net-quest …`, `math-algebra …`, `math hub …`).
   // Tests not named after a quest (landing page, theme, saves) always run: they cover every page.
-  const skip = [...(others.length ? [`--test-skip-pattern=^(${others.join('|')})-quest\\b`] : []), ...(shell ? [`--test-skip-pattern=${COURSE}`] : [])];
+  const skip = [...(others.length ? [`--test-skip-pattern=^(${others.join('|')})[- ]`] : []), ...(shell ? [`--test-skip-pattern=${COURSE}`] : [])];
   jobs.push({ name: picked === null ? 'browser smoke tests' : `browser smoke tests (${picked.join(', ')})`, args: [...skip, 'tests/smoke.mjs'], browser: true });
   for (const q of picked ?? all) if (browser[q]?.length) jobs.push({ name: `${q} browser tests`, args: ['--test', ...browser[q]], browser: true });
   if (shell) {

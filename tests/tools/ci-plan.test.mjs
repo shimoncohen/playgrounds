@@ -22,7 +22,7 @@ test('a non-shell quest skips the other quests and every shell-only job', () => 
   const jobs = plan(['net-quest/app.js'], repo);
   assert.deepEqual(names(jobs), ['engine tests (net)', 'browser smoke tests (net)']);
   assert.deepEqual(jobs[0].args, ['--test', 'tests/net/*.test.mjs']);
-  assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|shell)-quest\\b', 'tests/smoke.mjs']);
+  assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|shell)[- ]', 'tests/smoke.mjs']);
 });
 
 test('a quest without an engine test folder gets only the browser job', () => {
@@ -32,7 +32,7 @@ test('a quest without an engine test folder gets only the browser job', () => {
 test('shell changes add the full course and golden jobs, and the smoke job leaves the course to them', () => {
   const jobs = plan(['shell-quest/engine/interp.js'], repo);
   assert.deepEqual(names(jobs), ['engine tests (shell)', 'browser smoke tests (shell)', 'shell-quest full course', 'shell-quest golden']);
-  assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|net)-quest\\b', '--test-skip-pattern=^shell-quest full course', 'tests/smoke.mjs']);
+  assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|net)[- ]', '--test-skip-pattern=^shell-quest full course', 'tests/smoke.mjs']);
   assert.deepEqual(jobs[2].args, ['--test-name-pattern=^shell-quest full course', 'tests/smoke.mjs']);
 });
 
@@ -49,4 +49,11 @@ test('a quest with browser suites in its test folder gets a job that runs them, 
   assert.deepEqual(job, { name: 'math browser tests', args: ['--test', 'tests/math/a.browser.mjs', 'tests/math/b.browser.mjs'], browser: true });
   assert.ok(names(plan(null, withMath)).includes('math browser tests'));
   assert.ok(!names(plan(['net-quest/app.js'], withMath)).includes('math browser tests'));
+});
+
+test('the smoke skip pattern catches every way a quest names its tests, and nothing shared', () => {
+  const [skip] = plan(['net-quest/app.js'], { all: ['math', 'net', 'shell'], withTests: [] }).at(-1).args;
+  const re = new RegExp(skip.replace('--test-skip-pattern=', ''));
+  for (const n of ['shell-quest loads cleanly', 'math hub loads cleanly', 'math-algebra: missions open their scene', 'math-arithmetic loads cleanly']) assert.match(n, re, n);
+  for (const n of ['net-quest loads cleanly', 'landing page sums Math Quest XP', 'theme button cycles auto, light, dark', 'mathematics']) assert.doesNotMatch(n, re, n);
 });
