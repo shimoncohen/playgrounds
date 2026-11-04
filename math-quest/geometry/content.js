@@ -17,7 +17,8 @@
     },
     terms: ['tri'],
     derived: ({ b, h }) => ({ 'rectangle area': b * h, 'rectangle perimeter': 2 * (b + h), 'triangle area': b * h / 2 }),
-    formula: '\\text{rectangle: } A = \\term{b}{b}\\times\\term{h}{h}\\qquad\\text{triangle: } \\term{tri}{A} = \\tfrac{1}{2}\\times\\term{b}{b}\\times\\term{h}{h}',
+    // Two rows: on one line KaTeX breaks after a ×, splitting each formula at 390px.
+    formula: '\\begin{aligned}\\text{rectangle: } A &= \\term{b}{b}\\times\\term{h}{h}\\\\ \\text{triangle: } \\term{tri}{A} &= \\tfrac{1}{2}\\times\\term{b}{b}\\times\\term{h}{h}\\end{aligned}',
     live: ({ params: { b, h } }) => `Rectangle: A = ${b} × ${h} = ${b * h}, perimeter = ${2 * (b + h)}.   Triangle: A = ½ × ${b} × ${h} = ${num(b * h / 2)}.`,
     draw: {
       kind: '2d', view: [-2, 9, -1, 7], box: [440, 320],
