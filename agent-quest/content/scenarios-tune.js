@@ -8,7 +8,7 @@ const S=AQ.scenarios;
 
 /* The most the agent may hold at once ("peak", in tokens), or the most a setup may weigh, for each mission. The measured answer sits under
    its limit; the rows that fail on size alone sit at least 8 over it (tests/agent/content-tune.test.mjs asserts both). */
-AQ.TUNE={desc:98,dead:20,mcp:60};
+AQ.TUNE={desc:98,dead:20,mcp:60,dup:105,rare:100,cmd:95};
 
 /* 21.0 tuneDesc: the release-guard skill loads by when:, and its long description is paid for on every run. */
 const LONGDESC='Loads for every release job. It blocks any edit to the migrations folder, so a release can never change the database tables or their history by accident, and it should be read before anything is shipped.';
@@ -29,7 +29,25 @@ const tuneMcp={
   accept:o=>['calendar.list','mail.read'].every(t=>o.calls.some(c=>c.target===t))||'The agent did not both read the calendar and read the mail.'
 };
 
-const tune={tuneDesc,tuneDead,tuneMcp};
+/* 22.x: the tidy script (read, fix, delete the backup) on a bugfix job. The delete is what the daily rule stops. */
+const TIDY={...S.tidy,tag:'bugfix'};
+const NOTES='# Shop notes\nPrices are in dollars.\n';
+const skillFile=AQ.scenarioKit.skillFile;
+
+/* 22.0 tuneDup: the same rule and reason in the root memory, a folder memory the run reads, and a skill that loads for a bugfix. */
+const GUARD='do not delete data/\nWhy: data/ holds the backups the shop restores from after a crash.\n';
+const tuneDup={...TIDY,vfs:{...S.tidy.vfs,'CLAUDE.md':NOTES+GUARD,'src/CLAUDE.md':GUARD,'.claude/skills/data-guard.md':skillFile('data-guard','bugfix',GUARD)}};
+
+/* 22.1 tuneRare: a release checklist that only a release job needs, in the memory every job reads. The stub skill is where it belongs. */
+const CHORES=['Bump the version in package.json.','Update the changelog with the new entries.','Tag the commit with the version number.','Copy the build to the shop server.','Restart the checkout service after copying.','Email the shop team that the release is out.'];
+const rareVfs={...S.tidy.vfs,'migrations/001.sql':'create table totals;\n','.claude/notes.txt':'',
+  'CLAUDE.md':NOTES+'do not delete data/\n## Release checklist\ndo not edit migrations/\n'+CHORES.join('\n')+'\n'};
+const tuneRare={...TIDY,vfs:{...rareVfs,'.claude/skills/release-steps.md':skillFile('release-steps','release','')}};
+
+/* 22.2 tuneCmd: the same checklist, and a saved command that holds only a goal. The run does not call it, so the command costs nothing. */
+const tuneCmd={...TIDY,vfs:{...rareVfs,'.claude/commands/release-prep.md':'Goal: prepare the release\n'}};
+
+const tune={tuneDesc,tuneDead,tuneMcp,tuneDup,tuneRare,tuneCmd};
 for(const k of Object.keys(tune))if(AQ.vfs.own(S,k))throw new Error('duplicate scenario key '+k);
 Object.assign(S,tune);
 })();

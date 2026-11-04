@@ -24,6 +24,19 @@ const MC = (t) => F({ [MCP]: t });
 
 const COMMENTED = C(HEAD + LIVE + STALE.map((l) => '# ' + l).join('\n') + '\n');
 
+// chapter 22 (index 21)
+const DS = '.claude/skills/data-guard.md', SRC = 'src/CLAUDE.md', GUARD = AQ.scenarios.tuneDup.vfs[SRC], WHYL = GUARD.split('\n')[1] + '\n';
+const DH = (when = 'bugfix', name = 'name: data-guard\n') => `${name}description: data-guard skill\nwhen: ${when}\n`;
+const DUP = (root, src, skill) => F({ 'CLAUDE.md': root, [SRC]: src, [DS]: skill });
+const ROOT = HEAD + GUARD;
+const RS = '.claude/skills/release-steps.md', CP = '.claude/commands/release-prep.md', NOTESTXT = '.claude/notes.txt';
+const RAW = AQ.scenarios.tuneRare.vfs['CLAUDE.md'].split('\n');
+const BLOCK = RAW.slice(3).join('\n'), STEPS = RAW.slice(5).filter(Boolean), DAILY = HEAD + LIVE;
+const RH = (when = 'release', name = 'release-steps') => `name: ${name}\ndescription: release-steps skill\nwhen: ${when}\n`;
+const SKILLED = (body, claude = DAILY) => F({ 'CLAUDE.md': claude, [RS]: RH() + body });
+const CG = 'Goal: prepare the release\n', CR = 'Constraints: do not edit migrations/\n', EX = STEPS.map((l) => 'Extra: ' + l).join('\n') + '\n';
+const CMD = (text, claude = DAILY) => F({ 'CLAUDE.md': claude, [CP]: text });
+
 const CASES = [
   { at: [20, 0],
     pass: [D(OK), D('Release guard: never edit migrations'), D('RELEASE: BLOCKS MIGRATION EDITS'), D('Applies when shipping a release; blocks edits to the migrations'), D('Release job: never touch migration files'),
@@ -52,6 +65,46 @@ const CASES = [
     fail: [{}, MC('calendar: list\n'), MC('mail: read\n'), MC(''), MC(LINES[0] + '\n' + LINES[1] + '\n'), MC(LINES[0] + '\nmail: read\n'), MC('calendar: list\n' + LINES[1] + '\n'),
       MC(LINES.slice(0, 5).join('\n')), MC('calendar: create\nmail: read\n'), MC('calendar: list\nmail: reed\n'), MC('calender: list\nmail: read\n'), MC('calendar: list, mail: read\n'),
       F({ 'CLAUDE.md': 'calendar: list\nmail: read\n' }), F({ '.claude/mcp.json': 'calendar: list\nmail: read\n' })] },
+  { at: [21, 0],
+    pass: [DUP(ROOT, '', DH()), DUP(HEAD, GUARD, DH()), DUP(HEAD, '', DH() + GUARD), DUP(ROOT, '', ''), DUP(HEAD + 'Do not delete data/\n' + WHYL, '', DH()), DUP(ROOT, '', DH('docs')),
+      // the guard's Why line is not needed to guard
+      DUP(HEAD + LIVE, '', DH()), DUP(HEAD, LIVE, DH())],
+    fail: [{}, DUP('', '', ''), DUP(HEAD, '', DH()), DUP(ROOT, GUARD, DH()), DUP(ROOT, '', DH() + GUARD), DUP(ROOT, GUARD, DH() + GUARD),
+      // a copy that never loads is still a copy: asleep, nameless, with a when: that is not a kind
+      DUP(ROOT, '', DH('docs') + GUARD), DUP(ROOT, '', DH('banana') + GUARD), DUP(ROOT, '', DH('bugfix', '') + GUARD), DUP(HEAD, '', DH('docs') + GUARD),
+      // the copy that is left never loads, so the delete goes through
+      DUP(HEAD, '', DH('banana') + GUARD), DUP(HEAD, '', DH('docs') + GUARD + WHYL),
+      // the rule taken out of two places, the reason left behind
+      DUP(ROOT, WHYL, DH() + WHYL), DUP(ROOT, WHYL, DH()), DUP(ROOT, '', DH() + WHYL), DUP(HEAD, GUARD, DH() + WHYL),
+      // rewritten differently in two places
+      DUP(ROOT, 'do not delete data/backup.csv\n', DH()), DUP(HEAD + 'do not delete data/backup.csv\n', LIVE, DH()), DUP(ROOT, 'only delete data/\n', DH())] },
+  { at: [21, 1],
+    pass: [SKILLED(BLOCK + '\n'), SKILLED(RAW.slice(4).join('\n') + '\n'), SKILLED(STEPS.slice().reverse().join('\n') + '\n' + RULE), SKILLED('\n' + RULE + '\n' + STEPS.join('\n\n') + '\n'),
+      // the one rule line also left in CLAUDE.md is a 7-token duplicate, and fits
+      SKILLED(BLOCK + '\n', DAILY + RULE), SKILLED('Do not' + RULE.slice('do not'.length) + STEPS.join('\n')), SKILLED('  ' + RULE + STEPS.map((l) => '  ' + l).join('\n') + '\n')],
+    fail: [{}, SKILLED(''), SKILLED(RULE), SKILLED(STEPS.join('\n')), SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE), SKILLED(STEPS.join('\n').replace('Bump', 'Raise') + '\n' + RULE),
+      // the block copied and left in CLAUDE.md, or only half of it moved
+      SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n'),
+      // the skill is the lever: it loads for this job, never loads, or is gone
+      F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' }),
+      F({ 'CLAUDE.md': DAILY, [RS]: RH('release', '') + BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: BLOCK + '\n' }), F({ 'CLAUDE.md': DAILY, [RS]: '' }),
+      // the block squeezed onto a header line, or parked in a file nothing loads
+      F({ 'CLAUDE.md': DAILY, [RS]: `name: release-steps\ndescription: ${RULE.trim()} ${STEPS.join(' ')}\nwhen: release\n` }), F({ 'CLAUDE.md': DAILY, [NOTESTXT]: BLOCK + '\n' }),
+      // the rule line stays behind in CLAUDE.md only
+      SKILLED(STEPS.join('\n') + '\n', DAILY + RULE),
+      // the everyday rule dropped, or everything emptied
+      SKILLED(BLOCK + '\n', HEAD), F({ 'CLAUDE.md': '', [RS]: '' })] },
+  { at: [21, 2],
+    pass: [CMD(CG + CR + EX), CMD(CG + CR + EX, DAILY + RULE), CMD(CR + EX), CMD(EX + CR + CG), CMD(CG + CR + STEPS.map((l) => 'EXTRA:   ' + l).join('\n') + '\n'), CMD(CG + 'Constraints: Do not edit migrations/\n' + EX),
+      CMD(CR + STEPS.map((l) => (l === STEPS[0] ? 'Goal: ' : 'Extra: ') + l).join('\n') + '\n'), CMD(CG + CR + EX + '\n\n')],
+    fail: [{}, CMD(CG + CR + EX, RAW.join('\n') + '\n'), CMD(CG, RAW.join('\n') + '\n'), CMD(CG + CR, DAILY), CMD(CG + EX), CMD(CG + CR + STEPS.slice(1).map((l) => 'Extra: ' + l).join('\n') + '\n'),
+      CMD(CG + CR + 'Extra: ' + STEPS.join(' ') + '\n'), CMD(CG + CR + 'Extra: ' + STEPS[0] + '\n' + STEPS.slice(1).join('\n') + '\n'),
+      // a line that is not a prompt line: the command could not be called
+      CMD(CG + CR + STEPS.join('\n') + '\n'), CMD(CG + RULE + EX), CMD(CG + '## Release checklist\n' + CR + EX), CMD(CG + CR + EX + 'Use: scout\n'), CMD(CG + 'Constraints: do not edit nowhere/\n' + EX),
+      // the rule in a place no run reads, or only where it already was
+      F({ 'CLAUDE.md': DAILY, [NOTESTXT]: RULE, [CP]: CG + EX }), CMD(CG + EX, DAILY + RULE), F({ 'CLAUDE.md': DAILY, [NOTESTXT]: BLOCK + '\n' }),
+      // the everyday rule dropped, or everything emptied
+      CMD(CG + CR + EX, HEAD), F({ 'CLAUDE.md': '', [CP]: '', [NOTESTXT]: '' })] },
 ];
 
 runCases(AQ, 'tune chapters 21-23: lazy and nearby answers are caught', CASES, (c) => !TUNE.includes(c));
@@ -94,6 +147,10 @@ const MARGINS = [
   { key: 'desc', at: [20, 0], kind: 'peak', pass: CASES[0].pass.slice(0, 5), over: [{}, D(LONGDESC), D(LONGWORDS)] },
   { key: 'dead', at: [20, 1], kind: 'setup', pass: CASES[1].pass, over: [{}, COMMENTED] },
   { key: 'mcp', at: [20, 2], kind: 'peak', pass: CASES[2].pass, over: [{}, MC(LINES[0] + '\n' + LINES[1] + '\n'), MC(LINES[0] + '\nmail: read\n'), MC('calendar: list\n' + LINES[1] + '\n')] },
+  // the rows that fail by a holder, a skill or a command line are not here: they fail whatever their size
+  { key: 'dup', at: [21, 0], kind: 'peak', pass: CASES[3].pass, over: [DUP(ROOT, WHYL, DH() + WHYL), DUP(ROOT, WHYL, DH()), DUP(ROOT, '', DH() + WHYL), DUP(HEAD, GUARD, DH() + WHYL)] },
+  { key: 'rare', at: [21, 1], kind: 'peak', pass: CASES[4].pass, over: [SKILLED(BLOCK + '\n', RAW.join('\n') + '\n'), SKILLED(BLOCK + '\n', DAILY + STEPS.slice(3).join('\n') + '\n')] },
+  { key: 'cmd', at: [21, 2], kind: 'peak', pass: CASES[5].pass, over: [CMD(CG + CR + EX, RAW.join('\n') + '\n'), CMD(CG + CR + EX, DAILY + STEPS.slice(3).join('\n') + '\n')] },
 ];
 
 describe('tune limits: the answer fits, and a row that fails on size alone misses by at least 8 tokens', () => {
@@ -171,5 +228,74 @@ describe('chapter 21 (index 20): Audit what is loaded messages', () => {
     assert.ok(LINES[0].split(',').length >= 10 && LINES[1].split(',').length >= 10);
     const names = AQ.config.parseSetup(AQ.vfs.create(AQ.scenarios.tuneMcp.vfs)).mcp.flatMap((m) => m.tools.map((t) => `${m.name}.${t}`));
     assert.deepEqual([...names].sort(), [...AQ.scenarios.tuneMcp.tools].sort());
+  });
+});
+
+describe('chapter 22 (index 21): Trim, dedupe, move rare rules messages', () => {
+  const msg = (c, i, input) => go(c, i, input).result;
+  const peakOf = (c, i, x) => go(c, i, x).outcome.tokens.peak;
+  it('the cards number missions from 1: 22.3 points at missions 12.1 and 20.1, which are those titles', () => {
+    assert.match(M(21, 2).goal, /missions 12\.1 and 20\.1/);
+    assert.equal(AQ.CH[11].missions[0].title, 'Save a prompt as a command');
+    assert.equal(AQ.CH[19].missions[0].title, 'Save the weekly chore as a command');
+  });
+  it('the skill files are listed under the path that vfs.read and skillBody expect, so the holder count sees all of them', () => {
+    const v = AQ.vfs.create(AQ.scenarios.tuneDup.vfs);
+    assert.deepEqual([...v.list('.claude/skills/')], [DS]);
+    assert.match(AQ.config.skillBody(v.read(DS)), /^do not delete data\/$/m);
+    assert.doesNotMatch(AQ.config.skillBody(v.read(DS)), /^(name|description|when):/m);
+  });
+  it('21.0 the answer keeps one copy, the rule still skips the delete, and the three copies cost the most', () => {
+    const r = go(21, 0, M(21, 0).answer);
+    assert.equal(r.result, true);
+    assert.ok(r.outcome.steps.some((s) => s.type === 'skip' && s.target === 'data/backup.csv'));
+    assert.ok(peakOf(21, 0, {}) > r.outcome.tokens.peak + MARGIN);
+  });
+  it('21.0 names every place that holds the rule, also a copy that never loads', () => {
+    assert.match(msg(21, 0, {}), /still written in 3 places: CLAUDE\.md, src\/CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
+    assert.match(msg(21, 0, DUP(ROOT, '', DH('docs') + GUARD)), /2 places: CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
+    assert.match(msg(21, 0, DUP(ROOT, '', DH('banana') + GUARD)), /2 places: CLAUDE\.md, \.claude\/skills\/data-guard\.md/);
+    assert.match(msg(21, 0, DUP(ROOT, 'do not delete data/backup.csv\n', DH())), /2 places: CLAUDE\.md, src\/CLAUDE\.md/);
+  });
+  it('21.0 a reason left behind is told the size, and the last copy cannot go', () => {
+    assert.match(msg(21, 0, DUP(ROOT, WHYL, DH() + WHYL)), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.dup} or fewer`));
+    assert.match(msg(21, 0, DUP('', '', '')), /did delete data\/backup\.csv, and nothing told it not to/);
+    assert.match(msg(21, 0, DUP(HEAD, '', DH('banana') + GUARD)), /did delete data\/backup\.csv/);
+  });
+  it('21.1 the answer is not loaded for a bugfix, and the rare rule still guards a release', () => {
+    const r = go(21, 1, M(21, 1).answer);
+    assert.equal(r.result, true);
+    assert.ok(!r.outcome.steps.some((s) => s.type === 'skill' && s.loaded === true));
+    assert.ok(AQ.config.memoryRules({ memory: AQ.config.skillBody(r.outcome.vfs.read(RS)) }, AQ.scenarios.tuneRare, false).rules.some((c) => c.target === 'migrations/'));
+    assert.ok(peakOf(21, 1, {}) > r.outcome.tokens.peak + MARGIN);
+  });
+  it('21.1 names the skill, the missing lines, the missing rule and the size', () => {
+    assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('bugfix') + BLOCK + '\n' })), /loads for this job, so the agent carries the checklist again/);
+    assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('docs') + BLOCK + '\n' })), /must keep when: release/);
+    assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: RH('banana') + BLOCK + '\n' })), /is not a working skill/);
+    assert.match(msg(21, 1, SKILLED(STEPS.slice(1).join('\n') + '\n' + RULE)), /missing 1 of the six checklist lines, such as "Bump the version in package\.json\."/);
+    assert.match(msg(21, 1, F({ 'CLAUDE.md': DAILY, [RS]: `name: release-steps\ndescription: ${STEPS.join(' ')}\nwhen: release\n` })), /missing 6 of the six/);
+    assert.match(msg(21, 1, SKILLED(STEPS.join('\n') + '\n', DAILY + RULE)), /rule do not edit migrations\/ is not in the body of the skill/);
+    assert.match(msg(21, 1, SKILLED(BLOCK + '\n', RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.rare} or fewer`));
+    assert.match(msg(21, 1, SKILLED(BLOCK + '\n', HEAD)), /did delete data\/backup\.csv/);
+  });
+  it('21.2 the run never calls the command, so the answer costs only what CLAUDE.md keeps, and the command parses as a prompt', () => {
+    const r = go(21, 2, M(21, 2).answer);
+    assert.equal(r.result, true);
+    assert.ok(!r.outcome.steps.some((s) => s.type === 'command'));
+    const p = AQ.config.parsePrompt('Use: release-prep', AQ.scenarios.tuneCmd, r.setup);
+    assert.equal(p.errors.length, 0);
+    assert.ok(p.constraints.some((k) => k.kind === 'do not' && k.verb === 'edit' && k.target === 'migrations/'));
+    assert.ok(peakOf(21, 2, {}) > r.outcome.tokens.peak + MARGIN);
+  });
+  it('21.2 shows the first line that does not parse, and the missing rule, step and size', () => {
+    assert.match(msg(21, 2, CMD(CG + CR + STEPS.join('\n') + '\n')), /would be refused: Command release-prep: Bump the version in package\.json\. does not start with a field name/);
+    assert.match(msg(21, 2, CMD(CG + RULE + EX)), /would be refused: Command release-prep: do not edit migrations\/ does not start with a field name/);
+    assert.match(msg(21, 2, CMD(CG + '## Release checklist\n' + CR + EX)), /would be refused: Command release-prep: ## Release checklist does not start with a field name/);
+    assert.match(msg(21, 2, CMD(CG + CR + EX + 'Use: scout\n')), /would be refused: .*a command cannot use other names/);
+    assert.match(msg(21, 2, CMD(CG + EX, DAILY + RULE)), /holds no Constraints: do not edit migrations\/ line/);
+    assert.match(msg(21, 2, CMD(CG + CR + EX.split('\n').slice(1).join('\n'))), /missing 1 of the six steps, such as "Bump the version in package\.json\."/);
+    assert.match(msg(21, 2, CMD(CG + CR + EX, RAW.join('\n') + '\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.cmd} or fewer`));
+    assert.match(msg(21, 2, CMD(CG + CR + EX, HEAD)), /did delete data\/backup\.csv/);
   });
 });
