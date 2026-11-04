@@ -66,24 +66,37 @@
         c.setAttribute('tabindex', '0');
         c.setAttribute('role', 'slider');
         c.setAttribute('aria-label', it.label || 'point');
-        c.setAttribute('aria-valuetext', `(${+it.x.toFixed(2)}, ${+it.y.toFixed(2)})`);
+        // drag.angle: the param is the point's direction in degrees from drag.about, counter-clockwise from the +x axis.
+        const ang = it.drag.angle, [ox, oy] = it.drag.about || [0, 0];
+        c.setAttribute('aria-valuetext', ang ? `${state.params[ang]}°` : `(${+it.x.toFixed(2)}, ${+it.y.toFixed(2)})`);
         const move = (dx, dy) => { if (it.drag.x) set(it.drag.x, state.params[it.drag.x] + dx); if (it.drag.y) set(it.drag.y, state.params[it.drag.y] + dy); };
         c.addEventListener('keydown', e => {
           const d = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
           if (!d) return;
           e.preventDefault();
-          move(d[0] * (it.drag.stepX || 1), d[1] * (it.drag.stepY || 1));
+          if (ang) set(ang, state.params[ang] + (d[1] || -d[0]) * (it.drag.step || 1));
+          else move(d[0] * (it.drag.stepX || 1), d[1] * (it.drag.stepY || 1));
         });
         c.addEventListener('pointerdown', e => {
           svg.setPointerCapture(e.pointerId);
           const r = svg.getBoundingClientRect();
           const at = ev => [x0 + (ev.clientX - r.left) / r.width * (x1 - x0), y1 - (ev.clientY - r.top) / r.height * (y1 - y0)];
-          const drag = ev => { const q = at(ev); if (it.drag.x) set(it.drag.x, q[0]); if (it.drag.y) set(it.drag.y, q[1]); };
+          const drag = ev => {
+            const q = at(ev);
+            // -90..-180 (below the line, left side) counts as past 180, so a ray pulled under the left end stays there
+            if (ang) { const a = Math.atan2(q[1] - oy, q[0] - ox) * 180 / Math.PI; set(ang, a < -90 ? a + 360 : a); return; }
+            if (it.drag.x) set(it.drag.x, q[0]);
+            if (it.drag.y) set(it.drag.y, q[1]);
+          };
           svg.addEventListener('pointermove', drag);
           const up = () => { svg.removeEventListener('pointermove', drag); svg.removeEventListener('pointerup', up); svg.removeEventListener('pointercancel', up); };
           svg.addEventListener('pointerup', up);
           svg.addEventListener('pointercancel', up);
         });
+      } else if (it.type === 'grid') {
+        const g = el('g', { class: 'grid' }, svg);
+        for (let v = Math.ceil(x0); v <= x1; v++) el('line', { x1: X(v), x2: X(v), y1: 0, y2: H }, g);
+        for (let v = Math.ceil(y0); v <= y1; v++) el('line', { x1: 0, x2: W, y1: Y(v), y2: Y(v) }, g);
       }
     });
     if (focused) { const f = svg.querySelector(`[data-id="${focused}"]`); if (f) f.focus(); }
