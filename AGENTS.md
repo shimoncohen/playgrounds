@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, `trigonometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 

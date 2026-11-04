@@ -52,6 +52,13 @@ test('layers put a chapter one layer after its deepest prerequisite', () => {
   assert.deepEqual(plain(G.layers('trigonometry')), [['trigonometry.ratios']]);
 });
 
+test('trackMap puts tracks in columns by depth and drops links implied through another track', () => {
+  assert.deepEqual(plain(G.trackMap()), {
+    cols: [['arithmetic'], ['algebra', 'geometry'], ['trigonometry']],
+    links: [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry']],
+  });
+});
+
 test('trackEdges and nextUp', () => {
   assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry'], ['arithmetic', 'trigonometry']]);
   assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order', 'geometry.angles']);

@@ -116,6 +116,18 @@
     return edges;
   };
 
+  // The overview draws tracks in columns by depth; a link already implied through another track is left out,
+  // because drawn straight it would run behind the track between them.
+  G.trackMap = () => {
+    const edges = G.trackEdges(), from = id => edges.filter(e => e[0] === id).map(e => e[1]);
+    const reach = (a, b, seen = new Set()) => from(a).some(n => n === b || (!seen.has(n) && seen.add(n) && reach(n, b, seen)));
+    const links = edges.filter(([a, b]) => !from(a).some(n => n !== b && reach(n, b)));
+    const depth = {}, d = id => depth[id] ??= 1 + Math.max(-1, ...links.filter(e => e[1] === id).map(e => d(e[0])));
+    const cols = [];
+    for (const t of G.tracks) (cols[d(t.id)] = cols[d(t.id)] || []).push(t.id);
+    return { cols: cols.filter(Boolean), links };
+  };
+
   G.labelLines = (title, max) => {
     if (title.length <= max) return [title];
     const cut = (s, n) => s.length <= n ? s : s.slice(0, n - 1) + '…';
