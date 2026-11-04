@@ -11,7 +11,7 @@ AQ.CH.push({
   learned:['Connecting your own apps','Reading without sending','Proving a change with a read-back'],
   missions:[
     {
-      title:'Connect your notes',scenario:'notesApp',kind:'config',prompt:"Goal: save a note about the dentist visit",facts:['mcp'],
+      title:'Connect your notes',scenario:'notesApp',kind:'config',prompt:'Goal: save a note about the dentist visit',facts:['mcp'],
       goal:'The agent will search your notes for the dentist visit and then add a note about it, with the tools <code>notes.search</code> and <code>notes.add</code>. But no notes server is connected: <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect a notes server with the tools the job calls.',
       how:[
         'The line <code>notes: search, add</code> in <code>.claude/mcp.txt</code> connects a server named <code>notes</code> with two tools, which the agent calls as <code>notes.search</code> and <code>notes.add</code>. The <code>calendar</code> line can stay.',

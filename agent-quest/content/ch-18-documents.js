@@ -30,7 +30,7 @@ AQ.CH.push({
         if(moved!==true)return moved;
         const v=AQ.verdict(o,c);
         if(v!==true)return v;
-        return c.prompt.constraints.some(x=>x.verb==='delete'&&x.target.includes('*'))?true:'The PDFs are safe, but this mission is about one rule that covers every .pdf: a path with a * in a rule you type under Constraints. Anything else would miss the next PDF.';
+        return c.prompt.constraints.some(x=>x.verb==='delete'&&x.target.includes('*'))?true:'The PDFs are safe, but this mission is about one rule that covers every .pdf: a path with a * in a rule you type under Constraints. This mission asks for a pattern with a *.';
       }
     },
     {

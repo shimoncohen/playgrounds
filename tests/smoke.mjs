@@ -2101,7 +2101,7 @@ test('agent-quest: chapter 5 loads the matching skill, shows its step in the run
   await o.ctx.close();
 });
 
-// F15: this scenario has no tag of its own, so only the fired-schedule branch of refresh() in app.js can make the meter count the skill body
+// this scenario has no tag of its own, so only the fired-schedule branch of refresh() in app.js can make the meter count the skill body
 test('agent-quest: a scheduled mission with no tag of its own loads the skill into the meter before the run (mission 20.2)', async () => {
   const o = await agentPage({}, seedAt(19, 1));
   const { page } = o;

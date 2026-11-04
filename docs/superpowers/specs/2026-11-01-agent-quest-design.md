@@ -413,7 +413,7 @@ Node (`tests/agent/`, part of `npm run test:engine` once PR 3 wires the glob):
 
 Browser: `agent` in `tests/smoke.mjs` `NAMES` (loads cleanly, tabs, scroll and sticky checks, progress export and import) plus the `xp === 0` after clean load assertion. The dev path adds three checks: the rail shows 20 chapters, `Use` is on the form from 10.1, and the editor counter for the root `CLAUDE.md` reads `1 acts as the default check` for `Done when: run npm test`, `no default check` for a line that does not parse (the 15.2 start state), and neither phrase for a folder `CLAUDE.md`.
 
-Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style` in inlined files). **To verify in PR 2:** that `tools/build.py` discovers `agent-quest/` without a list edit.
+Other gates: `python3 tools/build.py --check` bundles (no `</script` or `</style` in inlined files). Checked in PR 2: `tools/build.py` discovers `agent-quest/` without a list edit (`tools/build.py:43`, `ROOT.glob("*-quest")`).
 
 ## Wiring: touchpoints (R11)
 
@@ -536,7 +536,7 @@ flowchart LR
 - **Seam.** A contract only. A real live provider may need streaming (#52).
 - **Serial work.** The strict chain makes PR 3 a bottleneck between PRs 2 and 4.
 - **Teaching-scale window.** Numbers do not match real models; the UI labels them as simulated.
-- **To verify in PR 2:** `tools/build.py` quest discovery, and the 1000×700 sticky layout. PR 3 reads the `pre-pr-check` glob itself when it edits that line.
+- `tools/build.py` quest discovery is checked (`tools/build.py:43`, `ROOT.glob("*-quest")`). **To verify in PR 2:** the 1000×700 sticky layout. PR 3 reads the `pre-pr-check` glob itself when it edits that line.
 
 ## Open questions (closed)
 

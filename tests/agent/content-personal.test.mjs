@@ -10,7 +10,7 @@ const AQ = loadAgent();
 const { M, go } = kit(AQ);
 const F = (files) => ({ files });
 const PERSONAL = [15, 16, 17, 18, 19];
-// the scenario keys each personal chapter owns, in mission order; every later batch appends its chapter
+// the scenario keys each personal chapter owns, in mission order
 const KEYS = { 15: ['digest', 'digestDaily', 'remind'], 16: ['voice', 'report', 'clipping'], 17: ['downloads', 'contracts', 'stamp'], 18: ['notesApp', 'inboxApp', 'agenda'], 19: ['weeklyReview', 'quiet', 'chores'] };
 const SCH = '.claude/schedule.txt', ALLOW = '.claude/permissions.txt';
 const WD = '.claude/commands/weekly-digest.md', MR = '.claude/commands/morning-reminder.md';
@@ -433,7 +433,7 @@ describe('chapter 19 (index 18): Personal MCP messages and outcomes', () => {
     ['calendar: list, create', DENY('call calendar.create'), 'failed', /calendar\.create was skipped \(permission rule\)/],
     ['', {}, 'unverified', /Nothing is connected/],
   ];
-  it('18.2 the six traced rows end with the status the design predicted', () => {
+  it('18.2 the six traced rows each end with its status and message', () => {
     for (const [mcp, extra, status, want] of ROWS) {
       const r = go(18, 2, MC(mcp, extra));
       assert.equal(r.outcome.status, status, mcp || '(empty)');
