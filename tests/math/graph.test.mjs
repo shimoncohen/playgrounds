@@ -48,11 +48,12 @@ test('layers put a chapter one layer after its deepest prerequisite', () => {
   assert.deepEqual(plain(G.layers('t', g)), [['a', 'c'], ['b'], ['d']]);
   assert.deepEqual(plain(G.layers('algebra')), [['algebra.expressions'], ['algebra.expanding'], ['algebra.linear', 'algebra.factoring'], ['algebra.quadratics']]);
   assert.deepEqual(plain(G.layers('arithmetic')), [['arithmetic.order'], ['arithmetic.negatives', 'arithmetic.fractions'], ['arithmetic.powers', 'arithmetic.ratios']]);
-  assert.deepEqual(plain(G.layers('geometry')), [['geometry.area', 'geometry.angles']], 'prerequisites in other tracks do not add layers');
+  assert.deepEqual(plain(G.layers('geometry')), [['geometry.area', 'geometry.angles'], ['geometry.pythagoras', 'geometry.circles']], 'prerequisites in other tracks do not add layers');
+  assert.deepEqual(plain(G.layers('trigonometry')), [['trigonometry.ratios']]);
 });
 
 test('trackEdges and nextUp', () => {
-  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry']]);
+  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry'], ['arithmetic', 'trigonometry']]);
   assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order', 'geometry.angles']);
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order']))), ['arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions'], 'at most 3, in graph order');
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order', 'arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions']))),

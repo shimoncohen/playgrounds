@@ -8,6 +8,7 @@
       { id: 'arithmetic', name: 'Arithmetic', key: 'math-arithmetic-v1' },
       { id: 'algebra', name: 'Algebra', key: 'math-algebra-v1' },
       { id: 'geometry', name: 'Geometry', key: 'math-geometry-v1' },
+      { id: 'trigonometry', name: 'Trigonometry', key: 'math-trigonometry-v1' },
     ],
     chapters: {
       arithmetic: [
@@ -37,6 +38,14 @@
         { id: 'geometry.area', title: 'Area and perimeter', requires: ['arithmetic.order'],
           why: 'area formulas such as ½ × b × h are worked out with the order of operations' },
         { id: 'geometry.angles', title: 'Angles', requires: [] },
+        { id: 'geometry.pythagoras', title: 'Pythagoras', requires: ['geometry.area', 'arithmetic.powers'],
+          why: 'a² + b² = c² adds the areas of squares on the sides, then takes a square root' },
+        { id: 'geometry.circles', title: 'Circles', requires: ['geometry.area'],
+          why: 'a circle\'s area is counted in the same 1 by 1 squares as a rectangle\'s' },
+      ],
+      trigonometry: [
+        { id: 'trigonometry.ratios', title: 'Sine, cosine and tangent', requires: ['geometry.pythagoras', 'geometry.angles', 'arithmetic.ratios'],
+          why: 'sine, cosine and tangent are ratios of the sides of a right triangle, chosen by one of its angles' },
       ],
     },
   };

@@ -31,8 +31,10 @@
     live: '({a} + {b})({c} + {d}) = {ac} + {ad} + {bc} + {bd} = {area}',
     draw: {
       kind: '2d', view: [-1.2, 10.4, -0.4, 11.2], box: [360, 360],
-      items: ({ params: { a, b, c, d } }) => {
-        const part = (term, x0, y0, x1, y1) => [{ type: 'polygon', term, pts: sq(x0, y0, x1, y1) }, { type: 'text', x: (x0 + x1) / 2, y: (y0 + y1) / 2, s: String((x1 - x0) * (y1 - y0)), term }];
+      items: ({ params }) => {
+        // Drawn scaled so the longer side always spans the box; the labels keep the true areas.
+        const k = 10 / Math.max(params.a + params.b, params.c + params.d), [a, b, c, d] = ['a', 'b', 'c', 'd'].map(n => params[n] * k);
+        const part = (term, x0, y0, x1, y1) => [{ type: 'polygon', term, pts: sq(x0, y0, x1, y1) }, { type: 'text', x: (x0 + x1) / 2, y: (y0 + y1) / 2, s: String(Math.round((x1 - x0) * (y1 - y0) / k / k)), term }];
         const T = 10, m = T - a, bot = m - b;
         return [
           ...part('ac', 0, m, c, T), ...part('ad', c, m, c + d, T), ...part('bc', 0, bot, c, m), ...part('bd', c, bot, c + d, m),

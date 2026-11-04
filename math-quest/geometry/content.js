@@ -210,8 +210,7 @@
           const b = n(), h = n(), kind = Math.floor(r() * 3);
           if (kind === 0) return { q: `${b}*${h}`, show: `Rectangle ${b} by ${h}: area?`, a: b * h, why: `${b} × ${h} = ${b * h} squares.` };
           if (kind === 1) return { q: `2*(${b}+${h})`, show: `Rectangle ${b} by ${h}: perimeter?`, a: 2 * (b + h), why: `${b} + ${h} + ${b} + ${h} = ${2 * (b + h)}.` };
-          // whole-number triangle areas only: a half answer needs a decimal point the quick-fire field may not suggest
-          if ((b * h) % 2 === 0) return { q: `1/2*${b}*${h}`, show: `Triangle, base ${b}, height ${h}: area?`, a: b * h / 2, why: `${b} × ${h} = ${b * h}, and half of that is ${b * h / 2}.` };
+          return { q: `1/2*${b}*${h}`, show: `Triangle, base ${b}, height ${h}: area?`, a: b * h / 2, why: `${b} × ${h} = ${b * h}, and half of that is ${b * h / 2}.` };
         }
       },
     }, {
