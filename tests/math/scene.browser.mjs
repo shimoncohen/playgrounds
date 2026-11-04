@@ -183,6 +183,11 @@ test('the speed setting runs from ×0.25 to ×2, starts at ×1, and ×1 is slowe
   const slow = await rate();
   await page.selectOption(sel, { label: '×2' });
   const fast = await rate();
+  assert.ok(slow > 0.05, `×0.25 still moves: ${slow}`);
+  await setRange(page, '#s2d .mq-anim input[type=range]', 5);
+  await page.waitForTimeout(300);
+  const after = await page.$eval('#s2d .mq-anim input[type=range]', i => +i.value);
+  assert.ok(after >= 5 && after < 5 + fast, `playing goes on from where the slider was dragged: ${after}`);
   assert.ok(fast > slow * 4, `×2 (${fast}) is much faster than ×0.25 (${slow})`);
   assert.deepEqual(errors, []);
   await ctx.close();
