@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, `trigonometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`, `agent-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, `trigonometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 
@@ -14,7 +14,7 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs; do node --check "$f" || break; done
+for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs agent-quest/*.js agent-quest/engine/*.js agent-quest/content/*.js tests/agent/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs the tests for the parts a PR changes (`tools/ci-plan.mjs`) and all of them on `main`. A PR is not ready until they all pass locally.
@@ -48,6 +48,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add a mission that needs several commands tried | `steps` on the mission (guideline section 3); engine in `shell-quest/engine/exec.js`, list in `ui.js` |
 | Change how mission cards render | `shared/how.js` + `shared/how.css` (affects every quest; keep it bundle-safe) |
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
+| Change Agent Quest (chapters 1 to 23) | `agent-quest/engine/` (simulator: files, prompt grammar, context, policy; DOM-free), `agent-quest/content/` (`tiers.js`, `state.js`, `model.js`, `facts.js`, `scenarios.js`, `scenarios-personal.js`, `scenarios-tune.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `agent-quest/ui.js` + `editor.js` + `meter.js` + `app.js` (UI) + `tests/agent/` (keep `tests/agent/harness.mjs` `FILES` in `agent-quest/index.html` script order) |
 | Change Network Quest (chapters 1 to 5) | `net-quest/engine/` (simulator, shell, commands; DOM-free), `net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `net-quest/index.html` script order) |
 | Change the Math Quest hub or its prerequisite graph | `math-quest/graph.js` (DOM-free; chapter ids and order must match each track's `content.js`), `math-quest/app.js` + `style.css` (hub), landing card `data-keys` in `index.html` + `tests/math/` |
 | Change a Math Quest track's course | `math-quest/<track>/content.js` (DOM-free: chapters, missions with `answer`/`wrong`/`lazy`, quick-fire templates, guide; chapter ids and order match `graph.js`), `math-quest/track.js` + `track.css` (the shared track page) + `tests/math/content.test.mjs` |

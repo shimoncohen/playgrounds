@@ -16,6 +16,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
 | ∑ | **Math Quest** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
+| ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`agent-quest/`](agent-quest/) |
 
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
 
@@ -118,8 +119,9 @@ math-quest/arithmetic/ math-quest/algebra/ math-quest/geometry/ math-quest/trigo
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
+agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
 shell-quest/            split by job (below)
-tests/                  engine tests (Node; shell/, ds/, net/ and math/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
+tests/                  engine tests (Node; shell/, ds/, net/, math/ and agent/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
