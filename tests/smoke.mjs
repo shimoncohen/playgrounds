@@ -69,14 +69,26 @@ const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
 // How many tier headers the shell-quest rail should draw: one per tier that has chapters (Stage 3 Task 17: 3 until the Expert chapters land, then 4).
 const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(s => s.chapters.length).length);
 
-test('landing page links to every playground', async () => {
-  const { ctx, page, errors } = await open(base + '/');
-  const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs.sort(), [...NAMES.map(n => `${n}-quest/`), 'math-quest/'].sort());
-  for (const h of hrefs) {
-    const r = await page.request.get(`${base}/${h}`);
-    assert.equal(r.status(), 200, h);
-  }
+for (const [where, cards] of [['/', ['programming/', 'math-quest/']], ['/programming/', NAMES.map(n => `${n}-quest/`)]]) {
+  test(`landing page ${where} links to every playground in it`, async () => {
+    const { ctx, page, errors } = await open(base + where);
+    const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
+    assert.deepEqual(hrefs.sort(), [...cards].sort());
+    for (const h of hrefs) {
+      const r = await page.request.get(base + where + h);
+      assert.equal(r.status(), 200, h);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('programming hub links back to the landing page', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/`, { viewport: { width: 390, height: 844 } });
+  assert.equal(await overflow(page), false);
+  await page.click('header.top a.nv-home');
+  await page.waitForSelector('a.card[href="programming/"]');
+  assert.equal(new URL(page.url()).pathname, '/');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -92,11 +104,16 @@ test('landing page links to GitHub and the feature request form', async () => {
   await ctx.close();
 });
 
-test('landing page shows saved XP', async () => {
-  const { ctx, page } = await open(base + '/');
-  await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
+test('programming hub shows saved XP and the landing page sums it', async () => {
+  const { ctx, page } = await open(`${base}/programming/`);
+  await page.evaluate(() => {
+    localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 }));
+    localStorage.setItem('shell-quest-v1', JSON.stringify({ xp: 10 }));
+  });
   await page.reload();
   assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
+  await page.goto(base + '/');
+  assert.match(await page.textContent('a[href="programming/"] .xp'), /35 XP/);
   await ctx.close();
 });
 
@@ -136,9 +153,9 @@ test('math hub loads cleanly', async () => {
   await ctx.close();
 });
 
-const PAGES = [...NAMES.map(n => `${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/', 'math-quest/trigonometry/'];
+const PAGES = [...NAMES.map(n => `programming/${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/', 'math-quest/trigonometry/'];
 // A Math Quest track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
-const appOf = pg => pg.startsWith('math-quest/') ? 'math-' + pg.split('/')[1] : pg.slice(0, -1);
+const appOf = pg => pg.startsWith('math-quest/') ? 'math-' + pg.split('/')[1] : pg.split('/')[1];
 for (const pg of PAGES) {
   const app = appOf(pg), name = app.replace(/-quest$/, '');
   test(`${app} loads cleanly`, async () => {
@@ -702,7 +719,7 @@ test('math-arithmetic: Powers and roots suggests Negative numbers until it is do
 
 test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
   const key = 'python-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/python-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/python-quest/`);
   await ctx.addInitScript(() => {
     const h = async () => (await navigator.storage.getDirectory()).getFileHandle('notes.json', { create: true });
     window.showSaveFilePicker = h;
@@ -736,7 +753,7 @@ test('a notes-only save counts as progress: it is exported and restored from the
 });
 
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
@@ -748,7 +765,7 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 });
 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
@@ -804,7 +821,7 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   f.data.xp = xp; f.data.ch = 10; f.data.mi = counts[10];
   const file = path.join(tmp, 'intermediate-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -842,7 +859,7 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   f.data.xp = xp; f.data.ch = 14; f.data.mi = 7;
   const file = path.join(tmp, 'advanced-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -901,7 +918,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
 
 test('shell-quest: runaway output is capped, so progress still saves and survives a reload', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   // The file-doubling repro, scaled down: the caps must stop it before the saved state outgrows localStorage.
@@ -921,7 +938,7 @@ test('shell-quest: runaway output is capped, so progress still saves and survive
 });
 
 test('shell-quest: a finished mission is not celebrated again, and a typo never completes one', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -949,7 +966,7 @@ test('shell-quest: a finished mission is not celebrated again, and a typo never 
 });
 
 test('harbor-quest: a finished mission is not celebrated again when it is revisited', async () => {
-  const { ctx, page, errors } = await open(`${base}/harbor-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/harbor-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -967,7 +984,7 @@ test('harbor-quest: a finished mission is not celebrated again when it is revisi
 });
 
 test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
   const warnings = () => page.$$eval('#screen .line.err', ls => ls.filter(l => /would not store your progress/.test(l.textContent)).length);
@@ -981,7 +998,7 @@ test('shell-quest warns once in the terminal when the browser refuses to save', 
 });
 
 test('shell-quest field guide groups by tier and keeps extras explicit', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-guide');
   assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate', 'advanced', 'expert']);
@@ -1012,7 +1029,7 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
 const finishShellCourse = page => page.evaluate(() => { SQ.content.chapters.forEach((c, ci) => c.missions.forEach((_, i) => { SQ.S.done[ci + '.' + i] = 1; })); });
 
 test('shell-quest quick-fire is locked until chapter 1 is done, then offers only what the finished chapters taught', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-fire');
   assert.match(await page.textContent('#fStage'), /Locked for now/);
@@ -1031,7 +1048,7 @@ test('shell-quest quick-fire is locked until chapter 1 is done, then offers only
 });
 
 test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draws from the chosen pool', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -1077,7 +1094,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
 });
 
 test('shell-quest quick-fire: single-quote question rejects expanding forms, tee accepts ./', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -1104,7 +1121,7 @@ test('shell-quest quick-fire: single-quote question rejects expanding forms, tee
 });
 
 test('import rejects another playground\'s file and garbage', async () => {
-  const { ctx, page } = await open(`${base}/shell-quest/`);
+  const { ctx, page } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   const send = async body => {
@@ -1122,7 +1139,7 @@ test('import rejects another playground\'s file and garbage', async () => {
 
 test('linked save file: follows saves, restores after wipes', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   // Stand-in for the OS file picker: a file in the browser's private storage (supports the same writable API).
   const stub = () => {
     const h = async () => (await navigator.storage.getDirectory()).getFileHandle('linked.json', { create: true });
@@ -1185,7 +1202,7 @@ test('linked save file: follows saves, restores after wipes', async () => {
 // ---- Task 9: editor panel ----
 const SQ_KEY = 'shell-quest-v1';
 async function shellPage(opts = {}, prep) {
-  const o = await open(`${base}/shell-quest/`, opts, prep);
+  const o = await open(`${base}/programming/shell-quest/`, opts, prep);
   await o.page.waitForSelector('#cmd');
   o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
   o.screen = () => o.page.textContent('#screen');
@@ -1956,7 +1973,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
 });
 
 test('theme button cycles auto, light, dark, remembers the choice and sets data-theme', async () => {
-  for (const url of [base + '/', `${base}/shell-quest/`]) {
+  for (const url of [base + '/', `${base}/programming/shell-quest/`]) {
     const { ctx, page, errors } = await open(url, { colorScheme: 'light' });
     const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1978,7 +1995,7 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
 });
 
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
-  const { ctx, page, errors } = await open(`${base}/ds-quest/`, { viewport: { width: 1280, height: 900 } });
+  const { ctx, page, errors } = await open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 } });
   await page.waitForSelector('#mission');
   await page.click('.tabs button[data-tab="guide"]');
   await page.waitForSelector('#demo-tree .dbtn');
@@ -1998,7 +2015,7 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
 
 /* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */
 async function netPage(opts = {}, prep) {
-  const o = await open(`${base}/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  const o = await open(`${base}/programming/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
   o.console = [];
   o.page.on('console', m => { if (m.type() === 'error') o.console.push(m.text()); });
   await o.page.waitForSelector('#cmd');
@@ -2367,7 +2384,7 @@ test('net-quest: the mission card puts the goal first and keeps the chapter intr
 const AGENT_KEYS = ['badges', 'best', 'ch', 'done', 'mi', 'tab', 'xp'];
 const seedAgent = raw => c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('agent-quest-v1', v); sessionStorage.seeded = 1; } }, raw);
 async function agentPage(opts = {}, prep) {
-  const o = await open(`${base}/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  const o = await open(`${base}/programming/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
   o.console = [];
   o.page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) o.console.push(m.text()); });
   await o.page.waitForSelector('#runBtn');
@@ -2985,14 +3002,14 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 });
 
 test('landing page shows Agent Quest XP only after progress', async () => {
-  const { ctx, page, errors } = await open(base + '/');
+  const { ctx, page, errors } = await open(`${base}/programming/`);
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
   assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '23 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
-  await page.goto(base + '/agent-quest/');
+  await page.goto(base + '/programming/agent-quest/');
   await page.waitForSelector('#mission');
-  await page.goto(base + '/');
+  await page.goto(`${base}/programming/`);
   assert.match(await page.textContent('a[href="agent-quest/"] .xp'), /10 XP/);
   assert.deepEqual(errors, []);
   await ctx.close();

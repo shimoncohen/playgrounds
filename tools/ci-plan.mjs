@@ -18,7 +18,7 @@ export function scope(files) {
   const quests = new Set();
   for (const f of files) {
     if (IGNORED.some(r => r.test(f))) continue;
-    const m = f.match(/^([a-z]+)-quest\//) || f.match(/^tests\/([a-z]+)\//);
+    const m = f.match(/^(?:programming\/)?([a-z]+)-quest\//) || f.match(/^tests\/([a-z]+)\//);
     if (!m || m[1] === 'fixtures' || m[1] === 'tools') return null;
     quests.add(m[1]);
   }
@@ -51,7 +51,7 @@ export function plan(files, { all, withTests, browser = {} }) {
 }
 
 function repoQuests() {
-  const all = fs.readdirSync(ROOT).map(d => d.match(/^([a-z]+)-quest$/)?.[1]).filter(Boolean).sort();
+  const all = [...fs.readdirSync(ROOT), ...fs.readdirSync(path.join(ROOT, 'programming'))].map(d => d.match(/^([a-z]+)-quest$/)?.[1]).filter(Boolean).sort();
   const withTests = all.filter(q => fs.existsSync(path.join(ROOT, 'tests', q)));
   const browser = Object.fromEntries(withTests.map(q => [q, fs.readdirSync(path.join(ROOT, 'tests', q)).filter(f => f.endsWith('.browser.mjs')).sort().map(f => `tests/${q}/${f}`)]));
   return { all, withTests, browser };

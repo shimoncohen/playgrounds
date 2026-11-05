@@ -13,6 +13,7 @@ on:
     paths:
       - 'index.html'
       - 'shared/**'
+      - 'programming/**'
       - '*-quest/**'
       - 'tools/publish_site.sh'
       - '.github/workflows/pr-preview.yml'

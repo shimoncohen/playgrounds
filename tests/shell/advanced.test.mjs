@@ -998,7 +998,7 @@ describe('Reset world and chapter switches clear jobs, traps and the clock (SQ.r
     assert.equal(run(SQ, 'mktemp').out, '/tmp/tmp.A00002', 'the file from before still exists, so the counter skips it');
   });
   it('app.js calls SQ.resetProcs on Reset world, Reset all progress and every chapter switch', () => {
-    const app = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../shell-quest/app.js'), 'utf8');
+    const app = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../programming/shell-quest/app.js'), 'utf8');
     const goChapter = app.slice(app.indexOf('function goChapter'), app.indexOf('\n', app.indexOf('function goChapter') + 200));
     assert.match(goChapter, /SQ\.resetProcs\(\)/);
     assert.equal((app.match(/SQ\.resetProcs\(\)/g) || []).length, 3);

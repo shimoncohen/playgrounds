@@ -45,6 +45,8 @@ test('a push rejected because another preview landed first is rebased and pushed
   writeFileSync(join(site, 'shared', 'a.js'), '');
   mkdirSync(join(site, 'demo-quest'));
   writeFileSync(join(site, 'demo-quest', 'index.html'), 'demo');
+  mkdirSync(join(site, 'programming', 'code-quest'), { recursive: true });
+  writeFileSync(join(site, 'programming', 'code-quest', 'index.html'), 'code');
   git(site, ['add', '-A']);
   git(site, ['commit', '-qm', 'site'], who);
   git(site, ['remote', 'add', 'origin', url]);
@@ -72,5 +74,6 @@ exec "${realGit}" "$@"
   const files = git(origin, ['ls-tree', '-r', '--name-only', 'gh-pages']).split('\n');
   assert.ok(files.includes('pr-preview/pr-1/index.html'), 'rival preview kept');
   assert.ok(files.includes('pr-preview/pr-7/demo-quest/index.html'), 'our preview published');
+  assert.ok(files.includes('pr-preview/pr-7/programming/code-quest/index.html'), 'programming quests published');
   assert.equal(git(origin, ['log', '-1', '--format=%an|%cn', 'gh-pages']), 'github-actions[bot]|github-actions[bot]');
 });
