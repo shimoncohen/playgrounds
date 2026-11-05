@@ -4,7 +4,7 @@ Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for h
 
 ## What this is
 
-Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
+Playgrounds: static, no-build, in-browser learning quests (`script-quest/`, `python-quest/`, `cpp-quest/`, `shell-quest/`, `harbor-quest/`, `ds-quest/`, `net-quest/`), Math Quest (`math-quest/`: a hub plus one page per track, `arithmetic/`, `algebra/`, `geometry/`, `trigonometry/`, sharing `track.js`) plus a landing page (`index.html`) and `shared/` code. Shell Quest is the reference implementation (a DOM-free engine in `shell-quest/engine/`, course content in `shell-quest/content/`).
 
 ## Commands
 
@@ -14,14 +14,14 @@ npm run check          # every *-quest/ folder bundles for claude.ai artifacts
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs; do node --check "$f" || break; done
+for f in */app.js math-quest/*.js math-quest/scene/*.js math-quest/input/*.js math-quest/*/app.js math-quest/*/content.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs the tests for the parts a PR changes (`tools/ci-plan.mjs`) and all of them on `main`. A PR is not ready until they all pass locally.
 
 ## Hard rules
 
-1. **No build step, no framework, no new runtime dependency (dev tooling such as commitlint is fine).** Plain browser scripts. Pages must work opened from disk and served by GitHub Pages. Fonts and `acorn`/`typescript` come from CDNs; do not add more without an issue.
+1. **No build step, no framework, no new runtime dependency (dev tooling such as commitlint is fine; the libraries vendored under `math-quest/vendor/` by `tools/vendor-math.sh` are the one approved exception).** Plain browser scripts. Pages must work opened from disk and served by GitHub Pages. Fonts and `acorn`/`typescript` come from CDNs; do not add more without an issue.
 2. **Must bundle.** `tools/build.py` inlines local `style.css`/`app.js`/`shared/*` into one body-only file. Local assets must be referenced as `<script src="...">` / `<link rel="stylesheet" href="...">` with relative paths, and an inlined file must not contain `</script` or `</style`.
 3. **Never regenerate fixtures to make a test pass.** `tests/fixtures/` (golden transcript, corpus 1 and 2) record what old content did. If one fails, your code is wrong. A deliberate change to old behaviour is its own reviewed decision; see the "differential guards" part of the guideline.
 4. **Saved progress must keep working.** Never rename a `localStorage` key (`<name>-quest-v1`), never renumber missions that shipped (state is keyed `'<chapter>.<mission>'`); append to the end of a chapter. See guideline section 4.
@@ -49,6 +49,10 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Change how mission cards render | `shared/how.js` + `shared/how.css` (affects every quest; keep it bundle-safe) |
 | Change Data Structures Quest | `ds-quest/content.js` (missions, `QF`, `GUIDE`), `ds-quest/demos.js` (guide explainers), `ds-quest/engine.js` (runner, DOM-free), `ds-quest/app.js` (UI) + `tests/ds/` |
 | Change Network Quest (chapters 1 to 5) | `net-quest/engine/` (simulator, shell, commands; DOM-free), `net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `net-quest/index.html` script order) |
+| Change the Math Quest hub or its prerequisite graph | `math-quest/graph.js` (DOM-free; chapter ids and order must match each track's `content.js`), `math-quest/app.js` + `style.css` (hub), landing card `data-keys` in `index.html` + `tests/math/` |
+| Change a Math Quest track's course | `math-quest/<track>/content.js` (DOM-free: chapters, missions with `answer`/`wrong`/`lazy`, quick-fire templates, guide; chapter ids and order match `graph.js`), `math-quest/track.js` + `track.css` (the shared track page) + `tests/math/content.test.mjs` |
+| Add a Math Quest track | `math-quest/<track>/` (`index.html`, `app.js`, `content.js`, copied from `geometry/` with its own `PROGRESS` key `math-<track>-v1`), the track and its chapters in `math-quest/graph.js`, landing card `data-keys` and text in `index.html`, `TRACKS` in `tests/math/content.test.mjs`, `PAGES` and the hub tests in `tests/smoke.mjs`, the README repo map |
+| Upgrade a Math Quest vendored library | pins in `tools/vendor-math.sh`, rerun it, commit `math-quest/vendor/` (never edit those files by hand) |
 | Add a whole playground | new `<name>-quest/`, landing card, smoke list; use the `new-playground` skill |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
 | Change CI / deploy | `.github/workflows/`, `tools/` (separate PR, flag it) |

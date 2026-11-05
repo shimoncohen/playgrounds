@@ -72,7 +72,7 @@ const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(
 test('landing page links to every playground', async () => {
   const { ctx, page, errors } = await open(base + '/');
   const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs.sort(), NAMES.map(n => `${n}-quest/`).sort());
+  assert.deepEqual(hrefs.sort(), [...NAMES.map(n => `${n}-quest/`), 'math-quest/'].sort());
   for (const h of hrefs) {
     const r = await page.request.get(`${base}/${h}`);
     assert.equal(r.status(), 200, h);
@@ -100,9 +100,45 @@ test('landing page shows saved XP', async () => {
   await ctx.close();
 });
 
-for (const name of NAMES) {
-  test(`${name}-quest loads cleanly`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+test('landing page sums Math Quest XP', async () => {
+  const { ctx, page } = await open(base + '/');
+  await page.evaluate(() => {
+    localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10 }));
+    localStorage.setItem('math-algebra-v1', JSON.stringify({ xp: 15 }));
+  });
+  await page.reload();
+  assert.match(await page.textContent('a[href="math-quest/"] .xp'), /25 XP/);
+  await ctx.close();
+});
+
+test('math hub loads cleanly', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('.tcard');
+  assert.equal((await page.$$('.tcard')).length, 4);
+  assert.match(await page.textContent('#next'), /Order of operations/);
+  assert.ok(await page.isVisible('#mapList ol'), 'list hidden on a phone');
+  assert.equal((await page.$$('#mapList ol')).length, 4);
+  assert.deepEqual(await page.$$eval('#mapList ol:nth-of-type(3) li', l => l.length), 4);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(3) li .needs'), /Needs first: Order of operations \(Arithmetic\)/);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(4) li .needs'), /Needs first: Pythagoras \(Geometry\), Angles \(Geometry\), Ratios and percentages \(Arithmetic\)/);
+  assert.ok(!(await page.isVisible('svg.map')), 'map shown on a phone');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'horizontal overflow');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(await page.isVisible('svg.map'), 'map hidden on desktop');
+  assert.ok(await page.$eval('#mapList', e => e.getBoundingClientRect().width <= 1), 'list visible on desktop');
+  await page.click('.tcard button');
+  assert.ok(await page.isVisible('#trackView svg.map'), 'track view missing');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+const PAGES = [...NAMES.map(n => `${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/', 'math-quest/trigonometry/'];
+// A Math Quest track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
+const appOf = pg => pg.startsWith('math-quest/') ? 'math-' + pg.split('/')[1] : pg.slice(0, -1);
+for (const pg of PAGES) {
+  const app = appOf(pg), name = app.replace(/-quest$/, '');
+  test(`${app} loads cleanly`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     assert.ok((await page.textContent('#mission')).trim().length > 20, 'mission card is empty');
     assert.ok(await page.$('.pg-trigger'), 'Progress button missing');
@@ -110,8 +146,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest shows only the selected tab`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1280, height: 800 } });
+  test(`${app} shows only the selected tab`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 1280, height: 800 } });
     await page.waitForSelector('#mission');
     const tabs = await page.$$eval('.tabs button[data-tab]', bs => bs.map(b => b.dataset.tab));
     assert.ok(tabs.length >= 3, 'expected at least 3 tabs');
@@ -126,8 +162,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest side sections scroll on their own on a wide screen`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1440, height: 800 } });
+  test(`${app} side sections scroll on their own on a wide screen`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 1440, height: 800 } });
     await page.waitForSelector('#mission');
     const r = await page.evaluate(() => {
       const c = document.getElementById('chapters'), m = document.querySelector('.mapCol .panel');
@@ -141,9 +177,9 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest mission column fits the screen on desktop and stays plain on a phone`, async () => {
+  test(`${app} mission column fits the screen on desktop and stays plain on a phone`, async () => {
     for (const [w, h] of [[1440, 800], [1000, 700]]) {
-      const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: w, height: h } });
+      const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: w, height: h } });
       await page.waitForSelector('#mission');
       await page.waitForTimeout(300);
       const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, colY: getComputedStyle(c).overflowY, cardY: getComputedStyle(document.getElementById('mission')).overflowY, bottom: c.getBoundingClientRect().bottom }; });
@@ -154,7 +190,7 @@ for (const name of NAMES) {
       assert.deepEqual(errors, []);
       await ctx.close();
     }
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 390, height: 800 } });
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 390, height: 800 } });
     await page.waitForSelector('#mission');
     const m = await page.evaluate(() => ({ pos: getComputedStyle(document.querySelector('.missionCol')).position, over: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(m.pos, 'static');
@@ -163,8 +199,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest links back to the landing page and to the feature request form`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+  test(`${app} links back to the landing page and to the feature request form`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     const idea = await page.getAttribute('footer.nv-foot a.nv-idea', 'href');
     assert.equal(idea, 'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml');
@@ -175,9 +211,9 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest progress survives export, wipe and import`, async () => {
-    const key = `${name}-quest-v1`;
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+  test(`${app} progress survives export, wipe and import`, async () => {
+    const key = `${app}-v1`;
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     // Get a real saved state first (some apps only save after an action).
     if (await read(page, key) === null && !(await page.$('#cmd'))) {
@@ -203,11 +239,11 @@ for (const name of NAMES) {
 
     await page.click('.pg-trigger');
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
-    const file = path.join(tmp, `${name}.json`);
+    const file = path.join(tmp, `${app}.json`);
     await dl.saveAs(file);
-    assert.equal(dl.suggestedFilename(), `${name}-quest-progress.json`);
+    assert.equal(dl.suggestedFilename(), `${app}-progress.json`);
     const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.equal(exported.app, `${name}-quest`);
+    assert.equal(exported.app, app);
     assert.equal(exported.data.xp, 77);
 
     await page.evaluate(() => localStorage.clear());
@@ -221,6 +257,477 @@ for (const name of NAMES) {
     await ctx.close();
   });
 }
+
+test('math hub links open the track pages', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/`);
+  await page.waitForSelector('.tcard');
+  const hrefs = await page.$$eval('.tcard a', a => a.map(x => x.getAttribute('href')));
+  assert.deepEqual(hrefs, ['arithmetic/', 'algebra/', 'geometry/', 'trigonometry/']);
+  for (const h of hrefs) assert.equal((await page.request.get(`${base}/math-quest/${h}`)).status(), 200, h);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
+  test(`math-${track}: at 1440px the header is one row and its Math Quest link goes to the hub`, async () => {
+    const { ctx, page, errors } = await open(`${base}/math-quest/${track}/`, { viewport: { width: 1440, height: 900 } });
+    await page.waitForSelector('header .pg-wrap');
+    const tops = await page.$$eval('header.top > *', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert.ok(Math.max(...tops) - Math.min(...tops) < 20, `header items share one row: ${tops}`);
+    await page.click('header .brand a');
+    await page.waitForURL(u => new URL(u).pathname === '/math-quest/');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /you evaluate expressions with the order of operations/);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true } })));
+  await page.reload();
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /^Ready/);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10, ch: 0, mi: 4, done: { '0.0': true }, badges: {} })));
+  await page.reload();
+  await page.click('#mission .prereq a');
+  await page.waitForURL(/\/math-quest\/arithmetic\//);
+  await page.waitForSelector('#mission');
+  const u = new URL(page.url());
+  assert.equal(u.pathname + u.hash, '/math-quest/arithmetic/#ch=arithmetic.order');
+  assert.match(await page.textContent('#chapters [aria-current="true"]'), /Order of operations/);
+  assert.match(await page.textContent('#mission'), /Mission 2 of 5/, 'opens the first open mission of the chapter');
+  await page.goto(`${base}/math-quest/arithmetic/#guide`);
+  await page.waitForSelector('#guide .card');
+  assert.ok(await page.isVisible('#tab-guide') && !(await page.isVisible('#tab-quest')), '#guide opens the field guide');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: the working area passes a mission once, keeps the working, and a scene mission passes from its sliders', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('10*3');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('30');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await until(async () => JSON.parse(await read(page, 'math-arithmetic-v1') || '{}').xp === 10);
+  const s = JSON.parse(await read(page, 'math-arithmetic-v1'));
+  assert.deepEqual(s.work['0.0'], ['10*3', '30']);
+  await page.reload();
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /You solved this one before/);
+  assert.deepEqual(await page.$$eval('#work input.mq-field', f => f.map(x => x.value).filter(Boolean)), ['10*3', '30']);
+  assert.match(await page.textContent('#xpText'), /^10 XP/);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  await page.fill('#scene input[type=number][aria-label="c value"]', '1');
+  await page.dispatchEvent('#scene input[type=number][aria-label="c value"]', 'input');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#xpText'), /^20 XP/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Area suggests Order of operations and links to it; Angles needs nothing first', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /area formulas such as ½ × b × h are worked out with the order of operations/);
+  await page.click('#chapters [data-ch="1"]');
+  await until(async () => /^Ready: this chapter needs nothing first/.test(await hint()));
+  await page.click('#chapters [data-ch="0"]');
+  await until(async () => /Suggested first/.test(await hint()));
+  await page.click('#mission .prereq a');
+  await page.waitForURL(/\/math-quest\/arithmetic\//);
+  const u = new URL(page.url());
+  assert.equal(u.pathname + u.hash, '/math-quest/arithmetic/#ch=arithmetic.order');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: a mission picture hides the answer until solved, then shows it as a check', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const shown = async () => (await page.textContent('#scene .mq-live')) + ' ' + (await page.textContent('#scene .mq-desc'));
+  assert.doesNotMatch(await shown(), /c = 5\b|= 25\b/, 'legs 3 and 4 open without the hypotenuse');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(3^2+4^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  await until(async () => /25/.test(await shown()));
+  await page.reload();
+  await page.waitForSelector('#scene .mq-live');
+  assert.match(await shown(), /25/, 'a solved mission opens on the full picture');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: text mode passes an area mission, and an angle answer with a degree sign', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('12*7');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('84');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await until(async () => JSON.parse(await read(page, 'math-geometry-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-geometry-v1')).work['0.0'], ['12*7', '84']);
+
+  await page.goto(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /On a straight line/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('180°-47°');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('133°');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a rounded mission passes in text mode, and the scene angle follows the keys', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.equal(await page.$eval('#mission details.how-hidden', d => d.open), false, 'How it works stays closed until solved');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('10*sin(35)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('10*0.5736');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓', '✓']);
+  await until(async () => JSON.parse(await read(page, 'math-trigonometry-v1') || '{}').xp === 10);
+  const live = () => page.textContent('#scene .mq-live');
+  assert.match(await live(), /sin 35° = 5\.7 \/ 10 = 0\.57\./, 'once solved, the picture reveals the opposite side');
+  assert.equal(await page.$$eval('#mission details.how-hidden', d => d.length), 0, 'once solved, How it works is shown open');
+  assert.ok(await page.isVisible('#mission .how'));
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  await page.keyboard.press('ArrowRight');
+  assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
+  await page.goto(`${base}/math-quest/trigonometry/#ch=trigonometry.ratios`);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a visual-mode answer with sin passes', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`);
+  await page.waitForSelector('#work math-field');
+  const fill = async (i, latex) => {
+    await page.locator('#work math-field').nth(i).focus();
+    await page.evaluate(latex => { document.activeElement.setValue(latex); }, latex);
+  };
+  await fill(0, '10\\sin\\left(35\\right)');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('#work math-field').length > 1);
+  await fill(1, '5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: #ch=arithmetic.fractions opens Fractions, and its first mission passes on a simplest-form fraction', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.fractions`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#chapters [aria-current="true"]'), /Fractions/);
+  assert.match(await page.textContent('#mission'), /1\/4 \+ 1\/3/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('3/12+4/12');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('14/24');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.isVisible('#feedback .msg.win'), false, 'an unsimplified fraction does not pass');
+  await page.fill('#work .mq-step:nth-child(2) .mq-field', '7/12');
+  await page.press('#work .mq-step:nth-child(2) .mq-field', 'Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  await until(async () => JSON.parse(await read(page, 'math-arithmetic-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-arithmetic-v1')).work['2.0'], ['3/12+4/12', '7/12']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: each mission opens its picture on its own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const go = async (ch, mi) => {
+    await page.evaluate(([c, m]) => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: c, mi: m, done: {}, badges: {} })), [ch, mi]);
+    await page.reload();
+    await page.waitForSelector('#scene .mq-live');
+  };
+  await go(0, 0);
+  assert.match(await live(), /Step 0: {2}6 \+ 4 × 3 {3}and {3}\(6 \+ 4\) × 3/);
+  await go(0, 1);
+  assert.match(await live(), /12 cut into 2 equal parts, then 3 of those parts/);
+  await go(0, 4);
+  assert.match(await live(), /Step 0: {2}2 \+ 3 × 4/, 'a scene mission keeps the chapter picture');
+  await go(1, 1);
+  assert.match(await live(), /\(−4\) × \(−2\): 4 across, 2 up/);
+  await go(2, 1);
+  assert.match(await live(), /2\/3 × 4\/5: 2 of 3 columns and 4 of 5 rows/);
+  await go(3, 0);
+  assert.match(await live(), /2³: 3 copies of 2 multiplied/);
+  await go(4, 3);
+  assert.match(await live(), /40 grown by 25%/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`);
+  const live = () => page.textContent('#scene .mq-live');
+  await page.waitForSelector('#scene .mq-live');
+  assert.ok((await page.$$('#scene .grid line')).length > 10, 'the area scene has a grid');
+  assert.equal(await live(), 'Base b = 12, height h = 7.', 'the first mission opens on its own 12 by 7 floor, without the area it asks for');
+  const corner = '#scene circle.drag[aria-label="top right corner of the rectangle"]';
+  await page.focus(corner);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'Base b = 11, height h = 7.');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await live(), 'Base b = 11, height h = 6.');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'top right corner of the rectangle', 'focus survives the redraw');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /10 × 8/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'Whole rectangle 10 × 8. Dashed corner cut off: 4 × 3.', 'the L-shaped room has its own picture');
+
+  await page.goto(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  assert.equal(await live(), '40° + 70° + 70° = 180°');
+  const first = '#scene circle.drag[aria-label="first ray"]', second = '#scene circle.drag[aria-label="second ray"]';
+  await page.focus(first);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), '50° + 60° + 70° = 180°');
+  assert.equal(await page.getAttribute(first, 'aria-valuetext'), '50°');
+  const box = await page.locator('#scene svg').boundingBox(), dot = await page.locator(first).boundingBox();
+  const screen = (x, y) => [box.x + (x + 5.5) / 11 * box.width, box.y + (5.5 - y) / 6.5 * box.height];
+  await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(...screen(4 * Math.cos(Math.PI / 3), 4 * Math.sin(Math.PI / 3)), { steps: 5 });
+  await page.mouse.up();
+  assert.equal(await live(), '60° + 50° + 70° = 180°');
+  await page.focus(second);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), '60° + 60° + 60° = 180°');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: each angle mission opens on its own picture and numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  const live = () => page.textContent('#scene .mq-live');
+  await page.waitForSelector('#scene .mq-live');
+  assert.equal(await live(), '47° + x = 180°');
+  const want = [[1, '110° + 95° + 80° + x = 360°'], [2, '58° + 71° + x = 180°'], [3, 'The two opposite angles of 60° are 120° together. Aim for 76°.']];
+  for (const [i, text] of want) {
+    await page.click(`#mission .dot[data-mi="${i}"]`);
+    await page.waitForFunction(t => document.querySelector('#scene .mq-live').textContent === t, text);
+  }
+  await page.focus('#scene circle.drag[aria-label="angle between the lines"]');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'The two opposite angles of 61° are 122° together. Aim for 76°.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg moves the live sum', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.equal(await live(), 'a² = 9, b² = 16, c² = ?');
+  const leg = '#scene circle.drag[aria-label="leg a"]';
+  await page.focus(leg);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await live(), 'a² = 16, b² = 16, c² = ?');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /^8² \+ 5²/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), '8² + 5² = 64 + 25 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Not a whole number/);
+  assert.equal(await live(), 'a² = 25, b² = 49, c² = ?');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(5^2+7^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('8.6');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Circles passes a rounded mission in text mode, and the radius moves the live values', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.equal(await live(), 'Radius r = 5, diameter d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
+  await page.focus('#scene circle.drag[aria-label="radius r"]');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await live(), 'Radius r = 5.5, diameter d = 11.');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => document.querySelector('#scene .mq-live').textContent === 'Diameter d = 14.');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForFunction(() => /length you need is 30/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'r = 3, C = 2 × π × 3 ≈ 18.85. The length you need is 30.');
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('2*pi*5');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('31.4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: a linear equation needs its working in text mode, and passes once a step comes before x = 4', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Undo the steps/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await until(async () => /at least one step before it/.test(await page.textContent('#work .mq-result')));
+  assert.equal(await page.locator('#feedback .msg.win').count(), 0, 'the answer alone does not pass');
+  await page.fill('#work input.mq-field >> nth=0', '2x=8');
+  await page.click('#work input.mq-field >> nth=1');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-step.ok', ls => ls.length), 2);
+  await until(async () => JSON.parse(await read(page, 'math-algebra-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-algebra-v1')).work['2.0'], ['2x=8', 'x=4']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: missions open their scene on their own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const at = async (ch, mi) => {
+    await page.goto(`${base}/math-quest/algebra/#ch=algebra.${ch}`);
+    await page.click(`#mission .dot[data-mi="${mi}"]`);
+    return live();
+  };
+  assert.match(await at('expressions', 0), /V = 10·5·3 = \?/);
+  assert.match(await at('expressions', 4), /2a \+ 3a = 4 \+ 6 = 10/);
+  assert.match(await at('expanding', 0), /3 × 5 = 9 \+ 6 = 15/);
+  assert.match(await at('expanding', 1), /x = 7: 2 × 3 = 6$/);
+  assert.match(await at('expanding', 3), /\(3 \+ 2\)\(3 \+ 2\) = 9 \+ 6 \+ 6 \+ 4 = 25/);
+  assert.match(await at('factoring', 0), /k = 1: 6 x-pieces and 9 units both split into 1 equal row/);
+  await page.fill('#scene input[type=range]', '2');
+  assert.match(await live(), /k = 2: 9 units do not split into 2 equal rows/);
+  await page.fill('#scene input[type=range]', '3');
+  assert.match(await live(), /k = 3: 6 x-pieces and 9 units both split into 3 equal rows/);
+  assert.match(await at('factoring', 2), /x = 6: 36 − 9 = 27$/);
+  assert.match(await at('factoring', 3), /25 − 10 − 10 \+ 4 = 9$/);
+  assert.match(await at('quadratics', 1), /y = x² − 16: where does it meet the x-axis\?/);
+  assert.match(await at('quadratics', 2), /y = x² − 3x: where does it meet the x-axis\?/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its badge is earned', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), Fractions \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /many answers are fractions/);
+  assert.equal(await page.getAttribute('#mission .prereq a >> text=Fractions', 'href'), '../arithmetic/#ch=arithmetic.fractions');
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, done: {}, badges: { 2: true } })));
+  await page.reload();
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), not done yet/);
+  assert.doesNotMatch(await hint(), /Fractions/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: the quick-fire answer field opens a keyboard with a minus sign', async () => {
+  const done = Object.fromEntries([0, 1, 2, 3, 4].map(i => [`1.${i}`, true]));
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#fire`, {}, c => c.addInitScript(d => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 50, done: d, badges: {} })), done));
+  await page.click('#fStart');
+  await page.waitForSelector('#fAns');
+  // Phone number pads (inputmode=numeric) have no minus key, and Negative numbers asks for negative answers.
+  assert.notEqual(await page.getAttribute('#fAns', 'inputmode'), 'numeric');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: Powers and roots suggests Negative numbers until it is done', async () => {
+  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.powers`);
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await page.textContent('#mission .prereq'), /Suggested first: Negative numbers \(Arithmetic\), not done yet/);
+  assert.match(await page.textContent('#mission .prereq'), /\(−2\)² and −2² part ways/);
+  assert.equal(await page.getAttribute('#mission .prereq a', 'href'), '#ch=arithmetic.negatives');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // The page saves its own state as it unloads, so the finished save is set before the next page loads.
+  const done = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.powers`, {}, c => c.addInitScript(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true, 1: true } }))));
+  await done.page.waitForSelector('#mission .prereq');
+  assert.match(await done.page.textContent('#mission .prereq'), /^Ready/);
+  assert.deepEqual(done.errors, []);
+  await done.ctx.close();
+});
+
+test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
+  const key = 'python-quest-v1';
+  const { ctx, page, errors } = await open(`${base}/python-quest/`);
+  await ctx.addInitScript(() => {
+    const h = async () => (await navigator.storage.getDirectory()).getFileHandle('notes.json', { create: true });
+    window.showSaveFilePicker = h;
+    window.showOpenFilePicker = async () => [await h()];
+  });
+  await page.evaluate(k => {
+    Storage.prototype.setItem.call(localStorage, k, JSON.stringify({ xp: 0, done: {}, notes: { 0: 'hello' } }));
+    Storage.prototype.setItem = () => {};
+  }, key);
+  await page.reload();
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
+  const file = path.join(tmp, 'notes-only.json');
+  await dl.saveAs(file);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).data.notes[0], 'hello');
+
+  await page.click('.pg-trigger');
+  await page.click('text=Create save file');
+  await page.waitForSelector('.pg-state.pg-ok');
+  // A fresh page writes its empty state on load; the linked file must still win, because notes are progress.
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await until(async () => {
+    try { return /hello/.test(await read(page, key) || ''); }
+    catch (e) { if (/context was destroyed|navigation/i.test(e.message)) return false; throw e; }
+  });
+  await page.waitForLoadState('load');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
 
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
   const { ctx, page, errors } = await open(`${base}/shell-quest/`);
