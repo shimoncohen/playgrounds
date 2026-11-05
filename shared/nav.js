@@ -21,8 +21,10 @@
     return s;
   };
 
-  if (/-quest\/(index\.html)?$/.test(location.pathname)) {
-    const up = location.protocol === 'file:' ? '../index.html' : '../';
+  // A Math Quest track sits one folder deeper (math-quest/algebra/), so its way home climbs one more level.
+  const at = /-quest\/(\w+\/)?(index\.html)?$/.exec(location.pathname);
+  if (at) {
+    const up = (at[1] ? '../' : '') + (location.protocol === 'file:' ? '../index.html' : '../');
     host.prepend(link('nv-home', up, icon('← '), 'All playgrounds'));
   }
 
