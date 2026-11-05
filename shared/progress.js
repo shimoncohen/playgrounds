@@ -41,7 +41,7 @@
 
   // Every playground starts from a state with xp 0 and nothing done, and writes it on load,
   // so "empty" has to mean "no progress", not "no key".
-  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0));
+  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && (!d.notes || Object.values(d.notes).every(v => !v)));
   const hasProgress = () => {
     const raw = rawGet.call(ls, KEY);
     if (raw === null) return false;
