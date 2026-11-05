@@ -14,6 +14,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`shell-quest/`](shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
+| ∑ | **Math Quest** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`agent-quest/`](agent-quest/) |
 
@@ -100,6 +101,8 @@ npm run check                     # does every folder still bundle for artifacts
 
 Node 24 or newer, and Python 3 for the bundler. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
 
+Math Quest vendors four libraries under `math-quest/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
+
 ### Map of the repo
 
 ```
@@ -108,11 +111,18 @@ shared/                 code every playground reuses: progress saving, tier mode
 script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
 ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
+math-quest/              the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
+math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
+math-quest/input/        the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math-quest/rng.js is the seeded random source
+math-quest/track.js     the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
+math-quest/arithmetic/ math-quest/algebra/ math-quest/geometry/ math-quest/trigonometry/
+                        a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
+math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
 agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
 shell-quest/            split by job (below)
-tests/                  engine tests (Node; shell/, ds/, net/ and agent/), browser smoke + golden tests (Playwright)
-tools/                  build.py (artifact bundler), publish_site.sh (gh-pages)
+tests/                  engine tests (Node; shell/, ds/, net/, math/ and agent/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
+tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
 .claude/skills/         agent skills for this repo
@@ -126,7 +136,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 
 ### Tests, in one breath
 
-`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
+`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. `tests/tools/publish_site.test.mjs` checks that a preview whose push loses a race with another is rebased and published. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
 
 ### Publishing to claude.ai artifacts
 
@@ -142,7 +152,7 @@ Then, in a Claude session with the Artifact tool, ask Claude to publish `dist/<n
 
 ### CI and deployment
 
-- `ci.yml` runs on every pull request: the bundle check, `node --check` on every script, the engine tests and the browser tests.
+- `ci.yml` runs on every pull request: the bundle check and `node --check` on every script, then, in parallel jobs, the engine and browser tests for the parts the PR changes. `tools/ci-plan.mjs` picks them: a change inside one `<name>-quest/` or `tests/<name>/` folder tests that quest, docs-only changes skip the tests, and anything else (shared code, tools, fixtures, config) tests everything. The `checks` job is the one status to require.
 - `pages.yml` runs on every push to `main`: it calls CI, and only if that passes publishes the site (`index.html`, `shared/` and the `*-quest/` folders) to the root of the `gh-pages` branch.
 - `pr-preview.yml` publishes a live preview of a pull request to `pr-preview/pr-<number>/` and comments the link on the PR. It only runs for PRs from branches in this repo; **PRs from forks and Dependabot get no preview** (run the page locally instead).
 
