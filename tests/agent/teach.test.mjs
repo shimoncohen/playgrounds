@@ -73,6 +73,10 @@ const FIRST = {
   // chapter 19 (index 18): 18.0 and 18.1 name the personal tools, notes first and then mail
   'notes tools': [/\bnotes\.(?:search|read|add)\b/, 18, 0],
   'mail tools': [/\bmail\.(?:read|search)\b/, 18, 1],
+  // chapter 21 (index 20): 21.2 says a line hidden with # is still in the file and still counted
+  'comment out': [/\bcomment(?:ed)?[ -]out\b/i, 20, 1],
+  // chapter 22 (index 21): 22.3 defines the Extra field in place
+  'Extra:': [/\bExtra:/, 21, 2],
 };
 const extras = () => [
   ...AQ.QF.map((q) => ({ ch: q.ch, where: 'quick-fire', text: plain([q.c, q.a, ...q.w, q.why].join('\n')) })),

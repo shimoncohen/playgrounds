@@ -2284,6 +2284,29 @@ test('agent-quest: the Writing, Files, Personal MCP and Skills chapters never sc
   }
 });
 
+test('agent-quest: the Tune chapters never scroll sideways at 390, 1000 and 1440, and the Tune rail header is on screen', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[20, 0], [21, 1], [22, 2]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      if (width === 390) {
+        const head = page.locator('#chapters .tierhead[data-tier="tune"]');
+        assert.match(await head.textContent(), /Tune.*0\/3/);
+        assert.equal(await head.isVisible(), true);
+      }
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      assert.equal(await page.isVisible('#runPanel .steps'), true, `the Run panel of ${ch + 1}.${mi + 1} is shown`);
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
 test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
   const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
   const { page } = o;
@@ -2407,10 +2430,10 @@ test('agent-quest: quick-fire and the field guide render, and quick-fire opens a
   await o.ctx.close();
 });
 
-test('agent-quest: the rail shows 20 chapters, and Use is on the form from mission 10.1', async () => {
+test('agent-quest: the rail shows 23 chapters, and Use is on the form from mission 10.1', async () => {
   const o = await agentPage({}, seedAt(9, 0));
   const { page } = o;
-  assert.equal(await page.locator('#chapters .chap').count(), 20);
+  assert.equal(await page.locator('#chapters .chap').count(), 23);
   assert.equal(await page.isVisible('#pf-use'), true);
   assert.deepEqual(o.console, []);
   assert.deepEqual(o.errors, []);
@@ -2440,7 +2463,7 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 test('landing page shows Agent Quest XP only after progress', async () => {
   const { ctx, page, errors } = await open(base + '/');
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
-  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '20 chapters');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '23 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
   await page.goto(base + '/agent-quest/');
