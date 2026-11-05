@@ -31,7 +31,7 @@ The agent finds the rules in [AGENTS.md](AGENTS.md) and the task skills in [`.cl
    npm ci && npx playwright install chromium
    ```
 4. **Make the change.** Keep it to one concern. Add or update tests with it (see below).
-5. **Run the checks.** All of these must pass; CI runs the same:
+5. **Run the checks.** All of these must pass. CI runs them on `main`, and on a PR only the ones for the parts it changes:
    ```
    npm run check && npm test
    ```
