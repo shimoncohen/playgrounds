@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
@@ -99,6 +99,10 @@ test('landing page shows saved XP', async () => {
   assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
   await ctx.close();
 });
+
+// The export test seeds every quest with xp 77 and two done keys. Agent Quest recomputes xp from valid done keys on load, so its
+// seed is two real chapter 1 missions and the xp is worked out in the page.
+const SEED = { default: { xp: 77, done: { '0-0': true, '0-1': true } }, agent: { done: { '0.0': true, '0.1': true } } };
 
 test('landing page sums Math Quest XP', async () => {
   const { ctx, page } = await open(base + '/');
@@ -225,7 +229,9 @@ for (const pg of PAGES) {
       await page.waitForFunction(k => localStorage.getItem(k) !== null, key);
     }
     const state = JSON.parse(await read(page, key));
-    state.xp = 77; state.done = { '0-0': true, '0-1': true };
+    const seed = SEED[name] || SEED.default;
+    const want = seed.xp ?? await page.evaluate(d => window.AQ.state.xpFor(d, {}), seed.done);
+    state.xp = want; state.done = seed.done;
     // The app keeps its own copy of the state and saves it (some after a short delay), which would
     // overwrite a seed written behind its back. Write the seed, block any later writes from this
     // page, then reload so the app starts from the seeded state.
@@ -235,7 +241,7 @@ for (const pg of PAGES) {
     }, [key, JSON.stringify(state)]);
     await page.reload();
     await page.waitForSelector('#mission');
-    assert.equal(JSON.parse(await read(page, key)).xp, 77, 'seed did not stick');
+    assert.equal(JSON.parse(await read(page, key)).xp, want, 'seed did not stick');
 
     await page.click('.pg-trigger');
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
@@ -244,15 +250,15 @@ for (const pg of PAGES) {
     assert.equal(dl.suggestedFilename(), `${app}-progress.json`);
     const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(exported.app, app);
-    assert.equal(exported.data.xp, 77);
+    assert.equal(exported.data.xp, want);
 
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.click('.pg-trigger');
     await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
     await page.waitForSelector('#mission');
-    assert.equal(JSON.parse(await read(page, key)).xp, 77);
-    assert.match(await page.textContent('#xpText'), /77/);
+    assert.equal(JSON.parse(await read(page, key)).xp, want);
+    assert.match(await page.textContent('#xpText'), new RegExp(String(want)));
     assert.deepEqual(errors, []);
     await ctx.close();
   });
@@ -2356,4 +2362,684 @@ test('net-quest: the mission card puts the goal first and keeps the chapter intr
   assert.equal((await card()).open, false, 'closed once the mission is done');
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+const AGENT_KEYS = ['badges', 'best', 'ch', 'done', 'mi', 'tab', 'xp'];
+const seedAgent = raw => c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('agent-quest-v1', v); sessionStorage.seeded = 1; } }, raw);
+async function agentPage(opts = {}, prep) {
+  const o = await open(`${base}/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  o.console = [];
+  o.page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) o.console.push(m.text()); });
+  await o.page.waitForSelector('#runBtn');
+  o.xp = async () => (await o.page.textContent('#xpText')).trim();
+  o.stored = async () => JSON.parse(await read(o.page, 'agent-quest-v1'));
+  o.solve = async () => { await o.page.click('#promptHost [data-act="fill"]'); await o.page.click('#runBtn'); };
+  return o;
+}
+
+test('agent-quest: a clean load stores a pristine state with xp 0 and the whitelisted keys', async () => {
+  const { ctx, errors, stored, console } = await agentPage();
+  const s = await stored();
+  assert.equal(s.xp, 0);
+  assert.deepEqual(s.done, {});
+  assert.deepEqual(Object.keys(s).sort(), AGENT_KEYS);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(console, []);
+  await ctx.close();
+});
+
+test('agent-quest: a tampered xp is replaced at boot by the value derived from done', async () => {
+  const done = { '0.0': true };
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 0, mi: 1, done, xp: 999, badges: {}, best: 0, tab: 'quest' })));
+  const want = await o.page.evaluate(d => window.AQ.state.xpFor(d, {}), done);
+  assert.ok(want > 0 && want !== 999);
+  assert.equal((await o.stored()).xp, want);
+  assert.equal(await o.xp(), `${want} XP`);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: finishing a mission awards XP once, even if it is run again or after a reload', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  assert.equal(await o.xp(), '0 XP');
+  await o.solve();
+  assert.equal(await o.xp(), '10 XP');
+  assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 1);
+  assert.equal(await page.$$eval('#feedback .win', e => e.length), 1);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await until(async () => (await o.stored()).xp === 10);
+  assert.deepEqual(Object.keys((await o.stored()).done), ['0.0']);
+  await page.reload();
+  await page.waitForSelector('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await o.solve();
+  assert.equal(await o.xp(), '10 XP');
+  assert.equal((await page.textContent('#feedback')).includes('already earned'), true);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the feedback follows the latest run (pass, fail, pass)', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await o.solve();
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  await page.fill('#pf-donewhen', '');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .tip').count(), 1);
+  assert.equal(await page.locator('#feedback .win').count(), 0);
+  await o.solve();
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await page.locator('#feedback .tip').count(), 0, 'the stale tip is gone');
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a damaged save loads without errors and is replaced by the normalized state', async () => {
+  for (const [raw, want] of [['{"done":5,"xp":"x"}', 0], ['not json', 0], ['[1,2]', 0],
+    ['{"done":{"9.9":true,"0.0":true},"xp":-5,"ch":99,"mi":-1,"tab":"nope","answers":{"0.0":"typed"},"best":"x"}', 10]]) {
+    const o = await agentPage({}, seedAgent(raw));
+    const s = await o.stored();
+    assert.equal(s.xp, want, raw);
+    assert.deepEqual(Object.keys(s).sort(), AGENT_KEYS, raw);
+    assert.equal(s.tab, 'quest', raw);
+    assert.equal(await o.xp(), `${want} XP`, raw);
+    assert.ok((await o.page.textContent('#mission h2')).trim().length > 3, raw);
+    assert.deepEqual(o.errors, [], raw);
+    assert.deepEqual(o.console, [], raw);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: a line that does not parse shows an inline error, has no effect, and is shown as text', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.fill('#pf-constraints', "be careful and don't delete anything");
+  assert.equal(await page.locator('#perrs li').count(), 1);
+  assert.match(await page.textContent('#perrs li'), /be careful/);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps').count(), 0, 'no run happens while a line is rejected');
+  assert.equal(await page.locator('#feedback .msg').count(), 0, 'no feedback either');
+  assert.equal(await o.xp(), '0 XP');
+  assert.equal(await page.evaluate(() => document.activeElement.closest('#perrs') !== null), true, 'focus goes to the error');
+  await page.fill('#pf-constraints', '<img src=x onerror="window.__x=1"> and <b>bold</b>');
+  assert.equal(await page.$('#perrs img'), null);
+  assert.equal(await page.$('#perrs b'), null);
+  assert.match(await page.textContent('#perrs'), /<img src=x/);
+  await page.click('#runBtn');
+  assert.equal(await page.$('#feedback img'), null);
+  assert.equal(await page.evaluate(() => window.__x), undefined);
+  assert.equal(await page.locator('#run .steps').count(), 0);
+  await page.fill('#pf-constraints', 'do not delete data/');
+  assert.equal(await page.locator('#perrs li').count(), 0);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps li').count() > 0, true, 'the run happens once every line parses');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: Plan first pauses the run until the plan is approved', async () => {
+  const withPlan = async ctx => ctx.route('**/agent-quest/content/ch-01-loop.js', async r => {
+    const res = await r.fetch();
+    await r.fulfill({ response: res, body: (await res.text()).replace("fields:['goal','donewhen'],", "fields:['goal','donewhen','plan'],") });
+  });
+  const o = await agentPage({}, withPlan);
+  const { page } = o;
+  await page.click('#promptHost [data-act="fill"]');
+  await page.check('#pf-plan');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps li').count(), 2, 'only the context and the plan');
+  assert.match(await page.textContent('#run .steps'), /Plan: change src\/price\.js/);
+  assert.equal(await page.isVisible('#run [data-act="approve"]'), true);
+  assert.match(await page.textContent('#feedback'), /Waiting for your approval/);
+  assert.equal(await o.xp(), '0 XP');
+  await page.click('#run [data-act="approve"]');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 0);
+  assert.ok(await page.locator('#run .steps li').count() > 4);
+  assert.match(await page.textContent('#run .steps'), /Plan approved/);
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  await page.check('#pf-plan');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 1);
+  await page.fill('#pf-donewhen', 'run npm run lint');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 0,'editing the form drops the pending plan');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: nothing the learner types is ever stored', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.fill('#pf-goal', 'zzsecretzz goal');
+  await page.fill('#pf-donewhen', 'zzsecretzz check');
+  await page.fill('#fileEditor textarea', 'zzsecretzz notes');
+  await page.click('#runBtn');
+  await o.solve();
+  await until(async () => (await o.stored()).xp === 10);
+  await page.waitForTimeout(500);
+  const all = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+  assert.ok(!all.includes('zzsecret'), 'a typed string reached storage');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the config and budget missions are played in the file editor', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="3"]');
+  assert.equal(await page.isVisible('#pf-goal'), false, 'the prompt is fixed for this mission');
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await page.textContent('#fileEditor .rules'), /^1 line acts as rules/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="4"]');
+  assert.match(await page.textContent('#meter .mlabel'), /~[6-9]\d\d of 2000 tokens/, 'the heavy memory file shows in the meter');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .tip').count(), 1);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.match(await page.textContent('#meter .mlabel'), /~\d{1,2} of 2000 tokens/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '20 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the prompt form shows only the fields taught so far', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  const shown = () => page.$$eval('#promptHost [id^="pf-"]', es => es.map(e => e.id.slice(3)));
+  assert.deepEqual(await shown(), ['goal', 'donewhen']);
+  await page.click('#mission .dot[data-mi="1"]');
+  assert.deepEqual(await shown(), ['goal', 'constraints', 'donewhen']);
+  await page.click('#mission .dot[data-mi="2"]');
+  assert.deepEqual(await shown(), ['goal', 'files', 'constraints', 'donewhen']);
+  assert.equal(await page.locator('#pf-use, #pf-plan, #pf-examples, #pf-extra').count(), 0);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.equal(await page.inputValue('#pf-files'), 'src/price.js');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+const seedAt = (ch, mi) => seedAgent(JSON.stringify({ ch, mi }));
+
+test('agent-quest: chapter 3 shows Examples from its first mission and Plan from its fourth, never Use, and plays Plan first', async () => {
+  const o = await agentPage({}, seedAt(2, 0));
+  const { page } = o;
+  const shown = () => page.$$eval('#promptHost [id^="pf-"]', es => es.map(e => e.id.slice(3)));
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'constraints', 'donewhen']);
+  await page.click('#mission .dot[data-mi="3"]');
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'plan', 'constraints', 'donewhen']);
+  assert.equal(await page.locator('#pf-use, #pf-extra').count(), 0);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.equal(await page.isChecked('#pf-plan'), true);
+  await page.click('#runBtn');
+  assert.equal(await page.isVisible('#run [data-act="approve"]'), true);
+  await page.click('#run [data-act="approve"]');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 4 edits a folder memory file, counts its rules and shows it in the meter once the agent reads there', async () => {
+  const o = await agentPage({}, seedAt(3, 1));
+  const { page } = o;
+  const tree = await page.$$eval('#tree li', ls => ls.map(l => l.textContent));
+  assert.ok(tree.includes('src/CLAUDE.md'), 'the folder memory file is editable, with no read-only mark');
+  assert.ok(tree.some(t => t.startsWith('src/price.js') && t.endsWith('(read-only)')));
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', '# Rules for work inside src/\ndo not edit src/legacy/\n');
+  assert.match(await page.textContent('#fileEditor .rules'), /^1 line acts as rules/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="3"]');
+  const memory = () => page.$eval('#meter tbody tr:nth-child(2) td.n', e => +e.textContent.slice(1));
+  const before = await memory();
+  await page.fill('#pf-files', 'src/price.js');
+  assert.ok(await memory() > before, 'the folder memory file joins the Memory row once a file under it is read');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '20 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 loads the matching skill, shows its step in the run panel and its body in the meter', async () => {
+  const o = await agentPage({}, seedAt(4, 0));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the loaded skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill release-guard loaded/);
+  assert.match(await page.textContent('#run .steps'), /blocked by skill release-guard/);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+// this scenario has no tag of its own, so only the fired-schedule branch of refresh() in app.js can make the meter count the skill body
+test('agent-quest: a scheduled mission with no tag of its own loads the skill into the meter before the run (mission 20.2)', async () => {
+  const o = await agentPage({}, seedAt(19, 1));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the schedule line makes this a schedule job, so the skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill quiet-hours loaded/);
+  assert.match(await page.textContent('#run .steps'), /Schedule: starts weekly-review/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 names the duplicate skill that was not loaded, with no undefined', async () => {
+  const o = await agentPage({}, seedAt(4, 1));
+  const { page } = o;
+  await page.click('#runBtn');
+  const steps = await page.textContent('#run .steps');
+  assert.match(steps, /Skill release-notes not loaded \(duplicate\)/);
+  assert.doesNotMatch(steps, /undefined/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 2 previews earlier messages and notes the ones dropped to fit', async () => {
+  const o = await agentPage({}, seedAt(1, 1));
+  const { page } = o;
+  const history = await page.$eval('#meter tbody tr:nth-child(6) td.n', e => e.textContent);
+  assert.notEqual(history, '~0', 'some earlier messages are still held');
+  assert.match(await page.textContent('#meter'), /oldest earlier messages were dropped/);
+  await page.click('#promptHost [data-act="fill"]');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the file tree works from the keyboard', async () => {
+  const { ctx, page, errors } = await agentPage();
+  assert.equal(await page.locator('#tree [tabindex="0"]').count(), 1, 'the tree is one tab stop');
+  await page.focus('#tree [aria-selected="true"]');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$eval('#tree [aria-selected="true"]', e => e.dataset.path), 'src/price.js');
+  assert.equal(await page.$eval('#fileEditor textarea', e => e.readOnly), true, 'project files are read-only');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the meter is a meter with a text table, patterns and the estimate label', async () => {
+  const { ctx, page, errors } = await agentPage();
+  assert.equal(await page.locator('#meter [role="meter"]').count(), 1);
+  assert.equal(await page.getAttribute('#meter [role="meter"]', 'aria-valuemax'), '2000');
+  assert.match(await page.textContent('#meter .mlabel'), /^~\d+ of 2000 tokens \(estimate, chars\/4\)$/);
+  assert.equal(await page.locator('#meter table tbody tr').count(), 7);
+  assert.match(await page.textContent('#meter'), /Simulated/);
+  const fills = await page.$$eval('#meter .mbar span', ss => ss.map(s => getComputedStyle(s).backgroundImage));
+  assert.ok(fills.length >= 2 && fills.every(f => f !== 'none'), 'each segment has a pattern, not only a colour');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.fill('#pf-files', 'src/price.js');
+  const t =await page.$eval('#meter tbody tr:nth-child(5) td.n', e => e.textContent);
+  assert.notEqual(t, '~0', 'the file named in Files shows up as files read');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: layout at 390px and at 1000px', async () => {
+  const { ctx, page, errors } = await agentPage({ viewport: { width: 390, height: 800 } });
+  assert.equal(await page.$$eval('.tabs', e => e.length), 1, 'the pane switcher is not .tabs');
+  assert.equal(await page.isVisible('.paneSwitch'), true);
+  assert.equal(await page.isVisible('.meterStrip'), true);
+  assert.equal(await page.isVisible('#mission'), true);
+  assert.equal(await page.isVisible('#filesPanel'), false);
+  for (const [pane, panel] of [['files', '#filesPanel'], ['meter', '#meterPanel'], ['run', '#runPanel']]) {
+    await page.click(`.paneSwitch button[data-pane="${pane}"]`);
+    assert.equal(await page.isVisible(panel), true, pane);
+    assert.equal(await page.isVisible('#mission'), false, pane);
+    assert.equal(await page.$$eval('.mapCol .panel', ps => ps.filter(p => p.getBoundingClientRect().height > 0).length), 1, pane);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${pane} overflows sideways`);
+  }
+  await page.click('.paneSwitch button[data-pane="mission"]');
+  await page.click('#runBtn');
+  assert.equal(await page.isVisible('#feedback [data-act="torun"]'), true);
+  await page.click('#feedback [data-act="torun"]');
+  assert.equal(await page.isVisible('#runPanel .steps'), true);
+  await page.setViewportSize({ width: 1000, height: 700 });
+  assert.equal(await page.isVisible('.paneSwitch'), false, 'hidden from 721px up');
+  assert.equal(await page.isVisible('.meterStrip'), false);
+  assert.equal(await page.$$eval('.mapCol .panel', ps => ps.filter(p => p.getBoundingClientRect().height > 0).length), 3);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the dev path missions and the Run panel after a hook run and a stall run never scroll sideways at 390, 1000 and 1440', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(7, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    const showRun = async () => { if (width < 721) await page.click('.paneSwitch button[data-pane="run"]'); };
+    const gotoChapter = async (ch, mi) => { if (width < 721) await page.click('.paneSwitch button[data-pane="mission"]'); await page.click(`#chapters [data-ch="${ch}"]`); if (mi) await page.click(`#mission .dot[data-mi="${mi}"]`); };
+    await fits('mission 8.1');
+    await gotoChapter(9);
+    await fits('mission 10.1');
+    await gotoChapter(14, 1);
+    await fits('mission 15.2');
+    await gotoChapter(10);
+    await o.solve();
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Hook after edit/);
+    await fits('the Run panel after a hook run');
+    await gotoChapter(13);
+    await page.click('#runBtn');
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Waiting for approval, but nobody is there/);
+    await fits('the Run panel after a stall run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and 1440, and a schedule line stays inert text', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(15, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    // at 390px the Files, Mission and Run panels are separate panes
+    const pane = async p => { if (width < 721) await page.click(`.paneSwitch button[data-pane="${p}"]`); };
+    const edit = async text => { await pane('files'); await page.click('#tree [data-path=".claude/schedule.txt"]'); await page.fill('#fileEditor textarea', text); await pane('mission'); await page.click('#runBtn'); await pane('run'); };
+    await fits('mission 16.1');
+    assert.equal(await page.locator('#chapters .tierhead[data-tier="personal"]').count(), 1);
+    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/5/);
+    assert.match(await page.textContent('#chapters [data-ch="15"]'), /Schedules and reminders/);
+    await pane('files');
+    await page.click('#tree [data-path=".claude/schedule.txt"]');
+    assert.match(await page.inputValue('#fileEditor textarea'), /monday 09:00 use backup-note/);
+    await fits('the schedule file view');
+    // a rejected line is shown as text in the schedule step, and nothing it holds becomes an element or runs
+    await edit('<b>x</b>');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: no line starts the job\. Ignored: "<b>x<\/b>" is not "WHEN HH:MM use NAME"/);
+    assert.equal(await page.locator('#runPanel .steps b').count(), 0);
+    await fits('the Run panel after a run no line started');
+    await edit('<img src=x onerror="window.__z=1">');
+    assert.equal(await page.$('#runPanel img'), null);
+    assert.equal(await page.evaluate(() => window.__z), undefined);
+    await pane('mission');
+    await page.click('#promptHost [data-act="fill"]');
+    await page.click('#runBtn');
+    await pane('run');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: starts weekly-digest at 07:30, 5 runs a week \(mon, tue, wed, thu, fri\)/);
+    await fits('the Run panel after a fired run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the Writing, Files, Personal MCP and Skills chapters never scroll sideways at 390, 1000 and 1440, and a reload at chapter 20 keeps its chip in the rail', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[16, 1], [17, 0], [18, 2], [19, 1]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      if (ch === 19) {
+        await page.reload();
+        await page.waitForSelector('#runBtn');
+        const g = await railGaps(page);
+        assert.equal(g.chapter, '19');
+        assert.equal(g.h && g.v, true, `the chapter 20 chip is cut off at ${width}: ${g.chip} in ${g.rail}`);
+      }
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
+test('agent-quest: the Tune chapters never scroll sideways at 390, 1000 and 1440, and the Tune rail header is on screen', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[20, 0], [21, 1], [22, 2]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      if (width === 390) {
+        const head = page.locator('#chapters .tierhead[data-tier="tune"]');
+        assert.match(await head.textContent(), /Tune.*0\/3/);
+        assert.equal(await head.isVisible(), true);
+      }
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      assert.equal(await page.isVisible('#runPanel .steps'), true, `the Run panel of ${ch + 1}.${mi + 1} is shown`);
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
+test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
+  const { page } = o;
+  assert.equal(await o.xp(), '20 XP');
+  await o.solve();
+  assert.match(await page.textContent('#feedback'), /Badge earned: Clockwork/);
+  assert.equal(await o.xp(), '55 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
+  assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);
+  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/5/);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+const railGaps = page => page.evaluate(() => {
+  const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect();
+  return { chapter: document.querySelector('#chapters [aria-current="true"]').dataset.ch, v: Math.min(r.top - c.top, c.bottom - r.bottom) >= -1, h: Math.min(r.left - c.left, c.right - r.right) >= -1, chip: [r.left, r.right], rail: [c.left, c.right] };
+});
+
+test('agent-quest: after a reload at chapter 15 the active chapter chip is scrolled into the rail at 390 and 1280', async () => {
+  for (const width of [390, 740, 1280]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+    const { page } = o;
+    for (const when of ['on load', 'after a reload']) {
+      const g = await railGaps(page);
+      assert.equal(g.chapter, '14');
+      assert.equal(g.v, true, `the chapter 15 chip is cut off at the top or bottom of the rail at ${width}, ${when}`);
+      assert.equal(g.h, true, `the chapter 15 chip is cut off at the side at ${width}, ${when}: ${g.chip} in ${g.rail}`);
+      await page.reload();
+      await page.waitForSelector('#runBtn');
+    }
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the active chapter chip is scrolled back into the rail when earlier chips change size after load (web fonts)', async () => {
+  const o = await agentPage({ viewport: { width: 390, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+  const { page } = o;
+  await page.addStyleTag({ content: '#chapters .chap[data-ch="0"]{min-width:600px}' });
+  await page.waitForFunction(() => { const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect(); return r.left >= c.left - 1 && r.right <= c.right + 1; });
+  const g = await railGaps(page);
+  assert.equal(g.h, true, `the chip is cut off at the side: ${g.chip} in ${g.rail}`);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
+  // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
+  const done = {};
+  for (const [ch, n] of [[11, 3], [14, 3]]) for (let i = 0; i < n; i++) done[`${ch}.${i}`] = true;
+  const o = await agentPage({}, async c => { await seedAgent(JSON.stringify({ done }))(c); await c.addInitScript(() => { Math.random = () => 0.999999; }); });
+  const { page } = o;
+  const codes = s => (s.match(/<code>/g) || []).length;
+  const plain = s => s.replace(/<[^>]+>/g, '');
+  const qf = await page.evaluate(() => AQ.QF.map(q => ({ ch: q.ch, c: q.c, a: q.a, w: q.w })));
+  await page.click('.tabs button[data-tab="fire"]');
+  await page.click('#fStart');
+  const missed = new Set();
+  for (let step = 0; step < 12 && !(missed.has(11) && missed.has(14)); step++) {
+    const text = await page.textContent('#fStage .task');
+    const q = qf.find(x => plain(x.c) === text);
+    assert.ok(q, `an unknown question: ${text}`);
+    assert.equal(await page.locator('#fStage .task code').count(), codes(q.c), `code in the question: ${text}`);
+    const opts = await page.$$eval('#fStage .opt .ot', es => es.map(e => e.innerHTML));
+    assert.equal(opts.join('|').split('<code>').length - 1, codes([q.a, ...q.w].join('|')), `code in the options: ${text}`);
+    const right = opts.indexOf(q.a), wrong = opts.findIndex((_, i) => i !== right);
+    // miss one question per chapter: the chapter 15 one whose answer has code, the chapter 12 one whose question has code
+    const miss = !missed.has(q.ch) && (q.ch === 14 ? codes(q.a) : q.ch === 11 && codes(q.c));
+    await page.click(`#fStage .opt[data-i="${miss ? wrong : right}"]`);
+    if (miss) {
+      missed.add(q.ch);
+      if (codes(q.a)) assert.ok(await page.locator('#fFb code').count() >= 1, 'the answer shown after a miss has code');
+    }
+    await page.waitForFunction(t => document.querySelector('#fStage .task')?.textContent !== t, text, { timeout: 5000 });
+  }
+  assert.deepEqual([...missed].sort(), [11, 14]);
+  await page.click('#fStop');
+  const items = page.locator('#fStage .misses li');
+  assert.equal(await items.count(), 2);
+  for (let i = 0; i < 2; i++) assert.ok(await items.nth(i).locator('code').count() >= 1, 'a miss has code');
+  assert.ok(await page.locator('#fStage .misses span:first-child code').count() >= 1, 'a miss question has code');
+  assert.ok(await page.locator('#fStage .misses b code').count() >= 1, 'a miss answer has code');
+  assert.ok(await page.locator('#fStage .misses .note code').count() >= 1, 'a miss explanation has code');
+  assert.doesNotMatch(await page.textContent('#fStage'), /<\/?(code|b)>/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a long command path in the files list breaks after each slash and keeps its plain text', async () => {
+  const o = await agentPage({}, seedAt(11, 0));
+  const { page } = o;
+  const rows = await page.$$eval('#tree [data-path^=".claude/commands/"]', es => es.map(e => ({ path: e.dataset.path, html: e.innerHTML, text: e.textContent, wbrs: e.querySelectorAll('wbr').length })));
+  assert.ok(rows.length >= 1);
+  for (const r of rows) {
+    assert.equal(r.wbrs, r.path.split('/').length - 1, r.path);
+    assert.ok(r.html.startsWith(r.path.split('/').slice(0, -1).join('/<wbr>') + '/<wbr>'), `<wbr> after each slash: ${r.html}`);
+    assert.ok(r.text.startsWith(r.path), r.path);
+    assert.match(r.text.slice(r.path.length), /^( \(edited\))?( \(read-only\))?$/, r.path);
+  }
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: quick-fire and the field guide render, and quick-fire opens after chapter 1', async () => {
+  const o = await agentPage({}, seedAgent(JSON.stringify({ done: { '0.0': true, '0.1': true, '0.2': true, '0.3': true, '0.4': true }, badges: { 0: true } })));
+  const { page } = o;
+  assert.equal(await o.xp(), '75 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Loop Watcher');
+  await page.click('.tabs button[data-tab="fire"]');
+  assert.equal(await page.isVisible('#fStart'), true);
+  await page.click('#fStart');
+  assert.equal(await page.locator('#fStage .opt').count(), 4);
+  await page.click('#fStop');
+  await page.click('.tabs button[data-tab="guide"]');
+  assert.ok(await page.locator('#guide .card').count() >= 1);
+  assert.equal(await page.locator('#guide button[data-cmd]').count(), 0, 'guide examples are read-only');
+  assert.match(await page.textContent('#aqFoot'), /last checked on 2026-11-01/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the rail shows 23 chapters, and Use is on the form from mission 10.1', async () => {
+  const o = await agentPage({}, seedAt(9, 0));
+  const { page } = o;
+  assert.equal(await page.locator('#chapters .chap').count(), 23);
+  assert.equal(await page.isVisible('#pf-use'), true);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the editor counts a root Done when as the default check, and only for the root file', async () => {
+  const o = await agentPage({}, seedAt(14, 0));
+  const { page } = o;
+  const rules = () => page.textContent('#fileEditor .rules');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', 'Done when: run npm test');
+  assert.match(await rules(), /1 acts as the default check/);
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await rules(), /no default check/);
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  assert.match(await rules(), /no default check/, '15.2 starts with a Done when line that does not parse');
+  assert.doesNotMatch(await rules(), /acts as the default check/);
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  assert.doesNotMatch(await rules(), /default check/, 'a folder file shows neither phrase');
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('landing page shows Agent Quest XP only after progress', async () => {
+  const { ctx, page, errors } = await open(base + '/');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '23 chapters');
+  await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
+  // The card reads the stored xp, which the quest page derives and writes at boot.
+  await page.goto(base + '/agent-quest/');
+  await page.waitForSelector('#mission');
+  await page.goto(base + '/');
+  assert.match(await page.textContent('a[href="agent-quest/"] .xp'), /10 XP/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the footer warns once the facts are over 90 days old', async () => {
+  const fresh = await agentPage();
+  assert.doesNotMatch(await fresh.page.textContent('#aqFoot'), /over 90 days ago/);
+  await fresh.ctx.close();
+  const old = await agentPage({}, c => c.clock.setFixedTime(new Date('2027-02-01T12:00:00Z')));
+  assert.match(await old.page.textContent('#aqFoot'), /last checked on 2026-11-01/);
+  assert.match(await old.page.textContent('#aqFoot .stale'), /over 90 days ago/);
+  assert.deepEqual(old.errors, []);
+  await old.ctx.close();
+});
+
+test('agent-quest: the file tree jumps to the last file with End, and the run steps move with the arrow keys', async () => {
+  const { ctx, page, errors } = await agentPage();
+  await page.focus('#tree [aria-selected="true"]');
+  const paths = await page.$$eval('#tree [data-path]', es => es.map(e => e.dataset.path));
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$eval('#tree [aria-selected="true"]', e => e.dataset.path), paths[paths.length - 1]);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#runPanel .steps li[tabindex="0"]').count(), 1, 'the steps are one tab stop');
+  const first = await page.$eval('#runPanel .steps li[tabindex="0"]', e => e.textContent);
+  await page.focus('#runPanel .steps li[tabindex="0"]');
+  await page.keyboard.press('ArrowDown');
+  assert.notEqual(await page.evaluate(() => document.activeElement.textContent), first);
+  assert.equal(await page.evaluate(() => document.activeElement.closest('.steps') !== null), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: long lines and unresolved paths show inline errors, and learner text stays inert', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.fill('#pf-files', 'nope/missing.js');
+  assert.ok(await page.locator('#perrs li').count() >= 1, 'unresolved path');
+  await page.fill('#pf-files', '');
+  await page.fill('#pf-donewhen', 'x'.repeat(5000));
+  assert.match(await page.textContent('#perrs'), /longer than 300 characters/);
+  await page.fill('#pf-donewhen', '<img src=x onerror="window.__y=1">');
+  assert.equal(await page.$('#perrs img'), null);
+  assert.equal(await page.evaluate(() => window.__y), undefined);
+  assert.equal(await o.xp(), '0 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
 });
