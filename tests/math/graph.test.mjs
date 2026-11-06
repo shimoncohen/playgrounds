@@ -81,7 +81,7 @@ test('labelLines wraps on a word boundary and truncates with an ellipsis', () =>
 
 test('landing card keys match the tracks', () => {
   const html = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'index.html'), 'utf8');
-  const m = html.match(/<a class="card" href="math-quest\/"[^>]*data-keys="([^"]*)"/);
+  const m = html.match(/<a class="card" href="math\/"[^>]*data-keys="([^"]*)"/);
   assert.ok(m, 'math card with data-keys');
   assert.equal(m[1], G.tracks.map(t => t.key).join(' '));
 });

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DIR = path.join(ROOT, 'agent-quest');
+const DIR = path.join(ROOT, 'programming', 'agent-quest');
 export const SHARED = ['shared/tiers.js', 'shared/how.js'];
 export const FILES = ['engine/tokens.js', 'engine/vfs.js', 'engine/config.js', 'engine/context.js', 'engine/permissions.js', 'engine/shell.js',
   'engine/policy.js', 'engine/provider.js', 'content/tiers.js', 'content/state.js', 'content/facts.js', 'content/scenarios.js',

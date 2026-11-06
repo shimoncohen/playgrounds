@@ -43,8 +43,10 @@ test('a push rejected because another preview landed first is rebased and pushed
   writeFileSync(join(site, 'index.html'), 'hub');
   mkdirSync(join(site, 'shared'));
   writeFileSync(join(site, 'shared', 'a.js'), '');
-  mkdirSync(join(site, 'demo-quest'));
-  writeFileSync(join(site, 'demo-quest', 'index.html'), 'demo');
+  mkdirSync(join(site, 'programming', 'code-quest'), { recursive: true });
+  writeFileSync(join(site, 'programming', 'code-quest', 'index.html'), 'code');
+  mkdirSync(join(site, 'math'));
+  writeFileSync(join(site, 'math', 'index.html'), 'math');
   git(site, ['add', '-A']);
   git(site, ['commit', '-qm', 'site'], who);
   git(site, ['remote', 'add', 'origin', url]);
@@ -71,6 +73,7 @@ exec "${realGit}" "$@"
   assert.match(run.stderr, /push rejected, retrying \(1\)/);
   const files = git(origin, ['ls-tree', '-r', '--name-only', 'gh-pages']).split('\n');
   assert.ok(files.includes('pr-preview/pr-1/index.html'), 'rival preview kept');
-  assert.ok(files.includes('pr-preview/pr-7/demo-quest/index.html'), 'our preview published');
+  assert.ok(files.includes('pr-preview/pr-7/programming/code-quest/index.html'), 'programming quests published');
+  assert.ok(files.includes('pr-preview/pr-7/math/index.html'), 'math section published');
   assert.equal(git(origin, ['log', '-1', '--format=%an|%cn', 'gh-pages']), 'github-actions[bot]|github-actions[bot]');
 });

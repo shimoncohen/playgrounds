@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-export const readApp = quest => fs.readFileSync(path.join(ROOT, quest, 'app.js'), 'utf8');
+export const readApp = quest => fs.readFileSync(path.join(ROOT, 'programming', quest, 'app.js'), 'utf8');
 
 // from === null means the start of the file.
 export function cut(src, from, to) {

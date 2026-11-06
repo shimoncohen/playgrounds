@@ -10,7 +10,7 @@ import { loadShell } from './harness.mjs';
 
 const SQ = loadShell();
 const CH = SQ.content.chapters, QF = SQ.content.quickfire, GUIDE = SQ.content.guide;
-const appSrc = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'shell-quest', 'app.js'), 'utf8');
+const appSrc = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'shell-quest', 'app.js'), 'utf8');
 const line = appSrc.split('\n').find((l) => l.startsWith('const qfOpen='));
 assert.ok(line, 'content marker moved: const qfOpen=');
 const qfOpen = new Function('QF', 'CH', line + '\nreturn qfOpen;')(QF, CH);

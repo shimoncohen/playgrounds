@@ -10,7 +10,7 @@ Tiers are **open**: nothing is locked. A learner can click any chapter in the ra
 
 ## 2. Declaring tiers and tagging chapters
 
-`shared/tiers.js` is a pure module (no DOM except `Tiers.renderRail`). Create the model once, before the content files load. Shell Quest does it in `shell-quest/content/tiers.js`:
+`shared/tiers.js` is a pure module (no DOM except `Tiers.renderRail`). Create the model once, before the content files load. Shell Quest does it in `programming/shell-quest/content/tiers.js`:
 
 ```js
 SQ.tiers = window.Tiers.create({
@@ -77,7 +77,7 @@ Rules: step 1 is one plain sentence about the whole line (what goes in, what com
 - Rules: two to four steps; every step is its own goal the learner can name; do not use steps to chop a one-line idea into pieces. The mission-level `answer` must equal the first step's (the solvability test asserts it). Add steps to a **shipped** mission only as a reviewed behaviour change: the golden fixture records its transcript, so say so in the PR (Beginner 6.4 "Find by type" is the example, and its golden record was re-recorded in a commit of its own).
 - Only Shell Quest supports `steps` so far.
 
-The check context is built per line by `SQ.ctxFor(line)` in `shell-quest/engine/exec.js`. The real helpers:
+The check context is built per line by `SQ.ctxFor(line)` in `programming/shell-quest/engine/exec.js`. The real helpers:
 
 | Helper | Meaning |
 |---|---|
@@ -131,7 +131,7 @@ check: c => c.log.some((e, k) => {
 
 ### 3a. Script and challenge missions
 
-A script mission, shortened from 14.7 in `shell-quest/content/tier-advanced.js` (the 15.7 capstone is the full challenge example; `tests/fixtures/fake-advanced.js` has a minimal test-only pair):
+A script mission, shortened from 14.7 in `programming/shell-quest/content/tier-advanced.js` (the 15.7 capstone is the full challenge example; `tests/fixtures/fake-advanced.js` has a minimal test-only pair):
 
 ```js
 { title: 'Script: greeter', kind: 'script', file: 'scripts/greet.sh',
