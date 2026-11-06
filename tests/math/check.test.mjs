@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMath } from './harness.mjs';
 
-const MQ = loadMath(['../math-quest/vendor/mathjs/math.js', 'rng.js', 'input/mathjs-setup.js', 'input/check.js']);
+const MQ = loadMath(['../math/vendor/mathjs/math.js', 'rng.js', 'input/mathjs-setup.js', 'input/check.js']);
 const C = MQ.check;
 const plain = x => JSON.parse(JSON.stringify(x));
 const oks = r => plain(r).map(s => s.ok);

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMath } from './harness.mjs';
 
-const BASE = ['../math-quest/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
+const BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
 const TRACKS = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
 

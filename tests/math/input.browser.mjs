@@ -1,4 +1,4 @@
-// Browser tests for the Math Quest working area. Set PW_CHROMIUM to use a specific Chromium; MQ_SHOTS to keep the screenshots.
+// Browser tests for the Math working area. Set PW_CHROMIUM to use a specific Chromium; MQ_SHOTS to keep the screenshots.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';

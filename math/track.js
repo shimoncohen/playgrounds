@@ -115,7 +115,7 @@ function renderMission() {
     h = `<div class="eyebrow">Chapter ${S.ch + 1} complete</div><div class="badge-art${all ? '' : ' dim'}" aria-hidden="true">${all ? '★' : S.ch + 1}</div>
     <h2>${all ? 'Badge earned: ' + esc(ch.badge) : 'Chapter finished'}</h2>
     <p class="explain">${all ? 'Every mission in this chapter is done.' : 'A few missions are still open: the dots below show which.'} The scene is still live, so keep playing with it as long as you like.</p>
-    ${last ? `<p class="note">That is every chapter in this track for now. Play Quick-fire to keep it fresh, or see what comes next on the <a href="../">Math Quest map</a>.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
+    ${last ? `<p class="note">That is every chapter in this track for now. Play Quick-fire to keep it fresh, or see what comes next on the <a href="../">Math map</a>.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       : `<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch + 2}: ${esc(CH[S.ch + 1].name)}</button></div>`}${dots}`;
   } else {
     const m = ch.missions[S.mi];

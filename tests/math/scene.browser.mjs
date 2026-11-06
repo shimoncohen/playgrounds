@@ -1,4 +1,4 @@
-// Browser tests for the Math Quest scene layer. Set PW_CHROMIUM to use a specific Chromium; MQ_SHOTS to keep the screenshots.
+// Browser tests for the Math scene layer. Set PW_CHROMIUM to use a specific Chromium; MQ_SHOTS to keep the screenshots.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -193,7 +193,7 @@ test('the speed setting runs from ×0.25 to ×2, starts at ×1, and ×1 is slowe
   await ctx.close();
 });
 
-test('the speed choice is saved with the other Math Quest preferences and comes back on the next page', async () => {
+test('the speed choice is saved with the other Math preferences and comes back on the next page', async () => {
   const { ctx, page, errors } = await open({}, () => {
     if (!sessionStorage.getItem('seeded')) { localStorage.setItem('math-prefs-v1', '{"input":"text"}'); sessionStorage.setItem('seeded', '1'); }
   });

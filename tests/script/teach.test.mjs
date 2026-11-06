@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'script-quest', 'app.js'), 'utf8');
+const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'script-quest', 'app.js'), 'utf8');
 const a = src.indexOf('const isArr='), b = src.indexOf('// ================= UI =================');
 assert.ok(a > 0 && b > a && src.slice(a, b).includes('const qfOpen='), 'content markers moved: update this loader');
 const g0 = src.indexOf('const BLOCKS=['), g1 = src.indexOf('function renderGuide');

@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const VENDOR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math-quest', 'vendor');
+const VENDOR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math', 'vendor');
 const FILES = ['katex/katex.min.js', 'katex/katex.min.css', 'katex/fonts/KaTeX_Main-Regular.woff2', 'mathjs/math.js', 'mathlive/mathlive.min.js', 'three/three.min.js'];
 
 function load(file) {
