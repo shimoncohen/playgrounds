@@ -9,7 +9,7 @@ Only start after an issue agreed the topic and scope. Copy the shape of a small 
 
 Checklist, all in one PR:
 
-1. **Folder** `programming/<name>-quest/` (a non-programming topic is its own section, like `math-quest/`: ask first) with `index.html`, `style.css`, `app.js`. Plain scripts, relative paths, no build step, no new dependency (Math Quest's vendored libraries are an approved exception, not a precedent).
+1. **Folder** `programming/<name>-quest/` (a non-programming topic is its own section, like `math/`: ask first) with `index.html`, `style.css`, `app.js`. Plain scripts, relative paths, no build step, no new dependency (Math's vendored libraries are an approved exception, not a precedent).
 2. **Progress**: in `index.html`, `<script>window.PROGRESS={key:"<name>-quest-v1",name:"<Name> Quest"}</script>`, then load `../../shared/progress.css` and `../../shared/progress.js` before `app.js`. Never rename the key later.
    **Navigation**: load `../../shared/nav.css` and `../../shared/nav.js` the same way (back-to-landing link in `header.top`, feature-request footer).
    **Mission steps**: load `../../shared/how.css` and `../../shared/how.js` too, and render `HowSteps.html(m.how)` between the anatomy chips and `explain` on the mission card. Write `how` (whole line first, then each part) for every mission, with code in `<code>` (where a field is escaped, use backticks and `HowSteps.tick(text, esc)`); see `docs/tiers-guideline.md` section 3.

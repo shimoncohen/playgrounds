@@ -5,7 +5,7 @@
 #   tools/publish_site.sh pr <number>      pr-preview/pr-<number>/
 #   tools/publish_site.sh remove-pr <n>    delete that preview
 #
-# Run from the repo root with push access to `origin`. The site is index.html, shared/, programming/ and *-quest/.
+# Run from the repo root with push access to `origin`. The site is index.html, shared/, programming/, math/ and *-quest/.
 set -euo pipefail
 
 mode=${1:?usage: publish_site.sh main | pr <number> | remove-pr <number>}
@@ -13,7 +13,7 @@ num=${2:-}
 if [[ $mode != main && ! $num =~ ^[0-9]+$ ]]; then echo "a PR number is required" >&2; exit 2; fi
 
 root=$(git rev-parse --show-toplevel)
-site=(index.html shared programming)
+site=(index.html shared programming math)
 for d in "$root"/*-quest; do site+=("$(basename "$d")"); done
 
 work=$(mktemp -d)

@@ -14,6 +14,7 @@ on:
       - 'index.html'
       - 'shared/**'
       - 'programming/**'
+      - 'math/**'
       - '*-quest/**'
       - 'tools/publish_site.sh'
       - '.github/workflows/pr-preview.yml'

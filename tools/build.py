@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bundle each <name>-quest/ folder (top level or under programming/) into dist/<name>-quest.html.
+"""Bundle each <name>-quest/ folder (top level or under programming/), and the math/ hub, into dist/<folder>.html.
 
 The bundle is the body-only fragment the claude.ai Artifact tool expects: local
 stylesheets and scripts (style.css, app.js, ../shared/*) are inlined and <title>
@@ -40,7 +40,7 @@ def bundle(folder: Path) -> str:
 def main(argv):
     check = "--check" in argv
     names = [a for a in argv if not a.startswith("--")]
-    folders = sorted((p for p in [*ROOT.glob("*-quest"), *ROOT.glob("programming/*-quest")] if p.is_dir()), key=lambda p: p.name)
+    folders = sorted((p for p in [*ROOT.glob("*-quest"), *ROOT.glob("programming/*-quest"), ROOT / "math"] if p.is_dir()), key=lambda p: p.name)
     if names:
         folders = [p for p in folders if p.name in names or p.name.removesuffix("-quest") in names]
     if not folders:

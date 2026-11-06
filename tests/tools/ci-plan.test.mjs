@@ -11,6 +11,7 @@ test('docs-only changes run no test job', () => {
 
 test('quest folders and their test folders select that quest', () => {
   assert.deepEqual(scope(['programming/net-quest/app.js', 'tests/cpp/teach.test.mjs', 'docs/x.md']), ['cpp', 'net']);
+  assert.deepEqual(scope(['math/track.js', 'math/geometry/content.js']), ['math']);
 });
 
 test('shared code, tools, fixtures, config and unknown files select everything', () => {
@@ -45,7 +46,7 @@ test('--all runs every suite, split so the course runs once', () => {
 
 test('a quest with browser suites in its test folder gets a job that runs them, on its own changes and on --all', () => {
   const withMath = { all: ['math', 'net'], withTests: ['math', 'net'], browser: { math: ['tests/math/a.browser.mjs', 'tests/math/b.browser.mjs'] } };
-  const job = plan(['math-quest/track.js'], withMath).find(j => j.name === 'math browser tests');
+  const job = plan(['math/track.js'], withMath).find(j => j.name === 'math browser tests');
   assert.deepEqual(job, { name: 'math browser tests', args: ['--test', 'tests/math/a.browser.mjs', 'tests/math/b.browser.mjs'], browser: true });
   assert.ok(names(plan(null, withMath)).includes('math browser tests'));
   assert.ok(!names(plan(['programming/net-quest/app.js'], withMath)).includes('math browser tests'));
@@ -55,5 +56,5 @@ test('the smoke skip pattern catches every way a quest names its tests, and noth
   const [skip] = plan(['programming/net-quest/app.js'], { all: ['math', 'net', 'shell'], withTests: [] }).at(-1).args;
   const re = new RegExp(skip.replace('--test-skip-pattern=', ''));
   for (const n of ['shell-quest loads cleanly', 'math hub loads cleanly', 'math-algebra: missions open their scene', 'math-arithmetic loads cleanly']) assert.match(n, re, n);
-  for (const n of ['net-quest loads cleanly', 'landing page sums Math Quest XP', 'theme button cycles auto, light, dark', 'mathematics']) assert.doesNotMatch(n, re, n);
+  for (const n of ['net-quest loads cleanly', 'landing page sums Math XP', 'theme button cycles auto, light, dark', 'mathematics']) assert.doesNotMatch(n, re, n);
 });

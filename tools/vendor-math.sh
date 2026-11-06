@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuilds math-quest/vendor/ from pinned npm packages. Run only to upgrade a library.
+# Rebuilds math/vendor/ from pinned npm packages. Run only to upgrade a library.
 set -euo pipefail
 
 KATEX=0.19.1
@@ -9,7 +9,7 @@ THREE=0.187.0
 ESBUILD=0.25.10
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-out="$root/math-quest/vendor"
+out="$root/math/vendor"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 

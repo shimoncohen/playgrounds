@@ -16,9 +16,9 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`programming/ds-quest/`](programming/ds-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
-| ∑ | **Math Quest** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
+| ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
 
-Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page), `programming/<name>-quest/index.html` or `math-quest/index.html` in a browser. There is no build step, no server and no database.
+Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page), `programming/<name>-quest/index.html` or `math/index.html` in a browser. There is no build step, no server and no database.
 
 ## 🧭 How a quest works
 
@@ -101,7 +101,7 @@ npm run check                     # does every folder still bundle for artifacts
 
 Node 24 or newer, and Python 3 for the bundler. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
 
-Math Quest vendors four libraries under `math-quest/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
+The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
 
 ### Map of the repo
 
@@ -115,15 +115,15 @@ programming/            the Programming section: index.html (hub with a card per
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
   shell-quest/          split by job (below)
-math-quest/              the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
-math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
-math-quest/input/        the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math-quest/rng.js is the seeded random source
-math-quest/track.js     the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
-math-quest/arithmetic/ math-quest/algebra/ math-quest/geometry/ math-quest/trigonometry/
+math/                   the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
+math/scene/             the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
+math/input/             the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math/rng.js is the seeded random source
+math/track.js           the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
+math/arithmetic/ math/algebra/ math/geometry/ math/trigonometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
-math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
+math/vendor/            committed third-party scripts for Math (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 tests/                  engine tests (Node; shell/, ds/, net/, math/ and agent/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
-tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
+tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
 .claude/skills/         agent skills for this repo
