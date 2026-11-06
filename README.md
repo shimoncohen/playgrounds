@@ -8,17 +8,17 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 
 | | Playground | You will learn | Folder |
 |---|---|---|---|
-| 📜 | **Script Quest** | JavaScript, TypeScript and Node, in a real console | [`script-quest/`](script-quest/) |
-| 🐍 | **Python Quest** | Python, with a memory map and step-by-step replay | [`python-quest/`](python-quest/) |
-| ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`cpp-quest/`](cpp-quest/) |
-| 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`shell-quest/`](shell-quest/) |
-| ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`harbor-quest/`](harbor-quest/) |
-| 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`ds-quest/`](ds-quest/) |
-| ∑ | **Math Quest** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math-quest/`](math-quest/) |
-| ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`net-quest/`](net-quest/) |
-| ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`agent-quest/`](agent-quest/) |
+| 📜 | **Script Quest** | JavaScript, TypeScript and Node, in a real console | [`programming/script-quest/`](programming/script-quest/) |
+| 🐍 | **Python Quest** | Python, with a memory map and step-by-step replay | [`programming/python-quest/`](programming/python-quest/) |
+| ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`programming/cpp-quest/`](programming/cpp-quest/) |
+| 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`programming/shell-quest/`](programming/shell-quest/) |
+| ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`programming/harbor-quest/`](programming/harbor-quest/) |
+| 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`programming/ds-quest/`](programming/ds-quest/) |
+| ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
+| ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
+| ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
 
-Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page) or `<name>-quest/index.html` in a browser. There is no build step, no server and no database.
+Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page), `programming/<name>-quest/index.html` or `math/index.html` in a browser. There is no build step, no server and no database.
 
 ## 🧭 How a quest works
 
@@ -46,7 +46,7 @@ Type `help` in the shell for every command by tier. The practice shell is a docu
 
 These make good, low-stakes onboarding material: new hires learn by doing, at their own pace, with nothing to install.
 
-- **Share a link.** Every playground has a stable URL. Send `https://shimoncohen.github.io/playgrounds/shell-quest/` and a new colleague is typing commands in seconds.
+- **Share a link.** Every playground has a stable URL. Send `https://shimoncohen.github.io/playgrounds/programming/shell-quest/` and a new colleague is typing commands in seconds.
 - **Pick a path.** Backend newcomers: Shell Quest, then Harbor Quest. Frontend newcomers: Script Quest. Data folks: Python Quest. Systems folks: C++ Quest.
 - **Set a rank as the goal.** "Reach *Pipe Fitter* in your first week" is a friendly, measurable milestone. Progress exports to a small JSON file, so people can show where they are.
 - **Pair on it.** The missions read well out loud. Take turns driving.
@@ -101,28 +101,29 @@ npm run check                     # does every folder still bundle for artifacts
 
 Node 24 or newer, and Python 3 for the bundler. Set `PW_CHROMIUM=/path/to/chromium` to use an existing browser.
 
-Math Quest vendors four libraries under `math-quest/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
+The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math.sh` is the only thing that changes them and needs `npm` and `npx` (`npm --version`).
 
 ### Map of the repo
 
 ```
-index.html              landing page
-shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps
-script-quest/ python-quest/ cpp-quest/ harbor-quest/
+index.html              landing page (a card per section)
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, landing.css + cards.js (landing and hub cards)
+programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
+  script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
-ds-quest/               like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
-math-quest/              the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
-math-quest/scene/        the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
-math-quest/input/        the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math-quest/rng.js is the seeded random source
-math-quest/track.js     the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
-math-quest/arithmetic/ math-quest/algebra/ math-quest/geometry/ math-quest/trigonometry/
+  ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
+  net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
+  agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
+  shell-quest/          split by job (below)
+math/                   the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
+math/scene/             the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
+math/input/             the working area: mathjs-setup.js and check.js (DOM-free step checker), work.js + work.css (step fields, input modes, notes); math/rng.js is the seeded random source
+math/track.js           the app every track page shares (rail, mission card, scene and working area, prerequisite hint, #ch= links, quick-fire, guide) + track.css
+math/arithmetic/ math/algebra/ math/geometry/ math/trigonometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
-math-quest/vendor/      committed third-party scripts for Math Quest (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
-net-quest/              like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
-agent-quest/            like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
-shell-quest/            split by job (below)
+math/vendor/            committed third-party scripts for Math (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 tests/                  engine tests (Node; shell/, ds/, net/, math/ and agent/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
-tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math-quest/vendor/)
+tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
 .claude/skills/         agent skills for this repo
@@ -130,9 +131,9 @@ docs/                   guidelines, design specs, implementation plans
 
 Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `index.html`:
 
-- `shell-quest/engine/`: the DOM-free engine. File system (`fs.js`), tokenizer and expansions (`parse.js`), arithmetic (`arith.js`), AST parser (`ast.js`), interpreter and scripts (`interp.js`), commands (`cmds-*.js`), `printf.js`, `sed.js`, `awk-parse.js` and `awk.js`, the virtual clock and process table (`procs.js`), background jobs (`jobs.js`), and `exec.js` (runs a line and builds the mission check context).
-- `shell-quest/content/`: the course. `tiers.js` (tier setup), `tier-beginner.js`, `tier-intermediate.js`, `tier-advanced.js`, `tier-expert.js` (chapters and missions), `guide.js`, `quickfire.js`.
-- `shell-quest/ui.js`, `editor.js`, `app.js`: rendering, the script editor panel, and event wiring.
+- `programming/shell-quest/engine/`: the DOM-free engine. File system (`fs.js`), tokenizer and expansions (`parse.js`), arithmetic (`arith.js`), AST parser (`ast.js`), interpreter and scripts (`interp.js`), commands (`cmds-*.js`), `printf.js`, `sed.js`, `awk-parse.js` and `awk.js`, the virtual clock and process table (`procs.js`), background jobs (`jobs.js`), and `exec.js` (runs a line and builds the mission check context).
+- `programming/shell-quest/content/`: the course. `tiers.js` (tier setup), `tier-beginner.js`, `tier-intermediate.js`, `tier-advanced.js`, `tier-expert.js` (chapters and missions), `guide.js`, `quickfire.js`.
+- `programming/shell-quest/ui.js`, `editor.js`, `app.js`: rendering, the script editor panel, and event wiring.
 
 ### Tests, in one breath
 

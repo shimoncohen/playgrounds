@@ -69,14 +69,26 @@ const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
 // How many tier headers the shell-quest rail should draw: one per tier that has chapters (Stage 3 Task 17: 3 until the Expert chapters land, then 4).
 const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(s => s.chapters.length).length);
 
-test('landing page links to every playground', async () => {
-  const { ctx, page, errors } = await open(base + '/');
-  const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs.sort(), [...NAMES.map(n => `${n}-quest/`), 'math-quest/'].sort());
-  for (const h of hrefs) {
-    const r = await page.request.get(`${base}/${h}`);
-    assert.equal(r.status(), 200, h);
-  }
+for (const [where, cards] of [['/', ['programming/', 'math/']], ['/programming/', NAMES.map(n => `${n}-quest/`)]]) {
+  test(`landing page ${where} links to every playground in it`, async () => {
+    const { ctx, page, errors } = await open(base + where);
+    const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
+    assert.deepEqual(hrefs.sort(), [...cards].sort());
+    for (const h of hrefs) {
+      const r = await page.request.get(base + where + h);
+      assert.equal(r.status(), 200, h);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('programming hub links back to the landing page', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/`, { viewport: { width: 390, height: 844 } });
+  assert.equal(await overflow(page), false);
+  await page.click('header.top a.nv-home');
+  await page.waitForSelector('a.card[href="programming/"]');
+  assert.equal(new URL(page.url()).pathname, '/');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -92,11 +104,16 @@ test('landing page links to GitHub and the feature request form', async () => {
   await ctx.close();
 });
 
-test('landing page shows saved XP', async () => {
-  const { ctx, page } = await open(base + '/');
-  await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
+test('programming hub shows saved XP and the landing page sums it', async () => {
+  const { ctx, page } = await open(`${base}/programming/`);
+  await page.evaluate(() => {
+    localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 }));
+    localStorage.setItem('shell-quest-v1', JSON.stringify({ xp: 10 }));
+  });
   await page.reload();
   assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
+  await page.goto(base + '/');
+  assert.match(await page.textContent('a[href="programming/"] .xp'), /35 XP/);
   await ctx.close();
 });
 
@@ -104,19 +121,19 @@ test('landing page shows saved XP', async () => {
 // seed is two real chapter 1 missions and the xp is worked out in the page.
 const SEED = { default: { xp: 77, done: { '0-0': true, '0-1': true } }, agent: { done: { '0.0': true, '0.1': true } } };
 
-test('landing page sums Math Quest XP', async () => {
+test('landing page sums Math XP', async () => {
   const { ctx, page } = await open(base + '/');
   await page.evaluate(() => {
     localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10 }));
     localStorage.setItem('math-algebra-v1', JSON.stringify({ xp: 15 }));
   });
   await page.reload();
-  assert.match(await page.textContent('a[href="math-quest/"] .xp'), /25 XP/);
+  assert.match(await page.textContent('a[href="math/"] .xp'), /25 XP/);
   await ctx.close();
 });
 
 test('math hub loads cleanly', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/`, { viewport: { width: 390, height: 844 } });
+  const { ctx, page, errors } = await open(`${base}/math/`, { viewport: { width: 390, height: 844 } });
   await page.waitForSelector('.tcard');
   assert.equal((await page.$$('.tcard')).length, 4);
   assert.match(await page.textContent('#next'), /Order of operations/);
@@ -136,9 +153,9 @@ test('math hub loads cleanly', async () => {
   await ctx.close();
 });
 
-const PAGES = [...NAMES.map(n => `${n}-quest/`), 'math-quest/arithmetic/', 'math-quest/algebra/', 'math-quest/geometry/', 'math-quest/trigonometry/'];
-// A Math Quest track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
-const appOf = pg => pg.startsWith('math-quest/') ? 'math-' + pg.split('/')[1] : pg.slice(0, -1);
+const PAGES = [...NAMES.map(n => `programming/${n}-quest/`), 'math/arithmetic/', 'math/algebra/', 'math/geometry/', 'math/trigonometry/'];
+// A Math track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
+const appOf = pg => pg.startsWith('math/') ? 'math-' + pg.split('/')[1] : pg.split('/')[1];
 for (const pg of PAGES) {
   const app = appOf(pg), name = app.replace(/-quest$/, '');
   test(`${app} loads cleanly`, async () => {
@@ -265,30 +282,30 @@ for (const pg of PAGES) {
 }
 
 test('math hub links open the track pages', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/`);
+  const { ctx, page, errors } = await open(`${base}/math/`);
   await page.waitForSelector('.tcard');
   const hrefs = await page.$$eval('.tcard a', a => a.map(x => x.getAttribute('href')));
   assert.deepEqual(hrefs, ['arithmetic/', 'algebra/', 'geometry/', 'trigonometry/']);
-  for (const h of hrefs) assert.equal((await page.request.get(`${base}/math-quest/${h}`)).status(), 200, h);
+  for (const h of hrefs) assert.equal((await page.request.get(`${base}/math/${h}`)).status(), 200, h);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
 
 for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
-  test(`math-${track}: at 1440px the header is one row and its Math Quest link goes to the hub`, async () => {
-    const { ctx, page, errors } = await open(`${base}/math-quest/${track}/`, { viewport: { width: 1440, height: 900 } });
+  test(`math-${track}: at 1440px the header is one row and its Math link goes to the hub`, async () => {
+    const { ctx, page, errors } = await open(`${base}/math/${track}/`, { viewport: { width: 1440, height: 900 } });
     await page.waitForSelector('header .pg-wrap');
     const tops = await page.$$eval('header.top > *', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
     assert.ok(Math.max(...tops) - Math.min(...tops) < 20, `header items share one row: ${tops}`);
     await page.click('header .brand a');
-    await page.waitForURL(u => new URL(u).pathname === '/math-quest/');
+    await page.waitForURL(u => new URL(u).pathname === '/math/');
     assert.deepEqual(errors, []);
     await ctx.close();
   });
 }
 
 test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
+  const { ctx, page, errors } = await open(`${base}/math/algebra/`);
   const hint = () => page.textContent('#mission .prereq');
   await page.waitForSelector('#mission .prereq');
   assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
@@ -300,13 +317,13 @@ test('math-algebra suggests Order of operations until it is done, and the link o
   await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10, ch: 0, mi: 4, done: { '0.0': true }, badges: {} })));
   await page.reload();
   await page.click('#mission .prereq a');
-  await page.waitForURL(/\/math-quest\/arithmetic\//);
+  await page.waitForURL(/\/math\/arithmetic\//);
   await page.waitForSelector('#mission');
   const u = new URL(page.url());
-  assert.equal(u.pathname + u.hash, '/math-quest/arithmetic/#ch=arithmetic.order');
+  assert.equal(u.pathname + u.hash, '/math/arithmetic/#ch=arithmetic.order');
   assert.match(await page.textContent('#chapters [aria-current="true"]'), /Order of operations/);
   assert.match(await page.textContent('#mission'), /Mission 2 of 5/, 'opens the first open mission of the chapter');
-  await page.goto(`${base}/math-quest/arithmetic/#guide`);
+  await page.goto(`${base}/math/arithmetic/#guide`);
   await page.waitForSelector('#guide .card');
   assert.ok(await page.isVisible('#tab-guide') && !(await page.isVisible('#tab-quest')), '#guide opens the field guide');
   assert.deepEqual(errors, []);
@@ -314,7 +331,7 @@ test('math-algebra suggests Order of operations until it is done, and the link o
 });
 
 test('math-arithmetic: the working area passes a mission once, keeps the working, and a scene mission passes from its sliders', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   await page.click('#work input.mq-field');
   await page.keyboard.type('10*3');
@@ -342,7 +359,7 @@ test('math-arithmetic: the working area passes a mission once, keeps the working
 });
 
 test('math-geometry: Area suggests Order of operations and links to it; Angles needs nothing first', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`);
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`);
   const hint = () => page.textContent('#mission .prereq');
   await page.waitForSelector('#mission .prereq');
   assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
@@ -352,15 +369,15 @@ test('math-geometry: Area suggests Order of operations and links to it; Angles n
   await page.click('#chapters [data-ch="0"]');
   await until(async () => /Suggested first/.test(await hint()));
   await page.click('#mission .prereq a');
-  await page.waitForURL(/\/math-quest\/arithmetic\//);
+  await page.waitForURL(/\/math\/arithmetic\//);
   const u = new URL(page.url());
-  assert.equal(u.pathname + u.hash, '/math-quest/arithmetic/#ch=arithmetic.order');
+  assert.equal(u.pathname + u.hash, '/math/arithmetic/#ch=arithmetic.order');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
 
 test('math-geometry: a mission picture hides the answer until solved, then shows it as a check', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const shown = async () => (await page.textContent('#scene .mq-live')) + ' ' + (await page.textContent('#scene .mq-desc'));
   assert.doesNotMatch(await shown(), /c = 5\b|= 25\b/, 'legs 3 and 4 open without the hypotenuse');
@@ -379,7 +396,7 @@ test('math-geometry: a mission picture hides the answer until solved, then shows
 });
 
 test('math-geometry: text mode passes an area mission, and an angle answer with a degree sign', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   await page.click('#work input.mq-field');
   await page.keyboard.type('12*7');
@@ -391,7 +408,7 @@ test('math-geometry: text mode passes an area mission, and an angle answer with 
   await until(async () => JSON.parse(await read(page, 'math-geometry-v1') || '{}').xp === 10);
   assert.deepEqual(JSON.parse(await read(page, 'math-geometry-v1')).work['0.0'], ['12*7', '84']);
 
-  await page.goto(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  await page.goto(`${base}/math/geometry/#ch=geometry.angles`);
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#mission h2'), /On a straight line/);
   await page.click('#work input.mq-field');
@@ -406,7 +423,7 @@ test('math-geometry: text mode passes an area mission, and an angle answer with 
 });
 
 test('math-trigonometry: a rounded mission passes in text mode, and the scene angle follows the keys', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   assert.equal(await page.$eval('#mission details.how-hidden', d => d.open), false, 'How it works stays closed until solved');
   await page.click('#work input.mq-field');
@@ -426,7 +443,7 @@ test('math-trigonometry: a rounded mission passes in text mode, and the scene an
   await page.focus('#scene circle.drag[aria-label="angle"]');
   await page.keyboard.press('ArrowRight');
   assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
-  await page.goto(`${base}/math-quest/trigonometry/#ch=trigonometry.ratios`);
+  await page.goto(`${base}/math/trigonometry/#ch=trigonometry.ratios`);
   await page.click('#mission .dot[data-mi="4"]');
   await page.waitForSelector('#work', { state: 'hidden' });
   await page.focus('#scene circle.drag[aria-label="angle"]');
@@ -437,7 +454,7 @@ test('math-trigonometry: a rounded mission passes in text mode, and the scene an
 });
 
 test('math-trigonometry: a visual-mode answer with sin passes', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/trigonometry/`);
+  const { ctx, page, errors } = await open(`${base}/math/trigonometry/`);
   await page.waitForSelector('#work math-field');
   const fill = async (i, latex) => {
     await page.locator('#work math-field').nth(i).focus();
@@ -454,7 +471,7 @@ test('math-trigonometry: a visual-mode answer with sin passes', async () => {
 });
 
 test('math-arithmetic: #ch=arithmetic.fractions opens Fractions, and its first mission passes on a simplest-form fraction', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.fractions`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#ch=arithmetic.fractions`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#chapters [aria-current="true"]'), /Fractions/);
   assert.match(await page.textContent('#mission'), /1\/4 \+ 1\/3/);
@@ -474,7 +491,7 @@ test('math-arithmetic: #ch=arithmetic.fractions opens Fractions, and its first m
 });
 
 test('math-arithmetic: each mission opens its picture on its own numbers', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/`);
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`);
   const live = () => page.textContent('#scene .mq-live');
   const go = async (ch, mi) => {
     await page.evaluate(([c, m]) => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: c, mi: m, done: {}, badges: {} })), [ch, mi]);
@@ -500,7 +517,7 @@ test('math-arithmetic: each mission opens its picture on its own numbers', async
 });
 
 test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/`);
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`);
   const live = () => page.textContent('#scene .mq-live');
   await page.waitForSelector('#scene .mq-live');
   assert.ok((await page.$$('#scene .grid line')).length > 10, 'the area scene has a grid');
@@ -516,7 +533,7 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   await page.waitForFunction(() => /10 × 8/.test(document.querySelector('#scene .mq-live').textContent));
   assert.equal(await live(), 'Whole rectangle 10 × 8. Dashed corner cut off: 4 × 3.', 'the L-shaped room has its own picture');
 
-  await page.goto(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  await page.goto(`${base}/math/geometry/#ch=geometry.angles`);
   await page.click('#mission .dot[data-mi="4"]');
   await page.waitForSelector('#work', { state: 'hidden' });
   assert.equal(await live(), '40° + 70° + 70° = 180°');
@@ -541,7 +558,7 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
 });
 
 test('math-geometry: each angle mission opens on its own picture and numbers', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.angles`);
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.angles`);
   const live = () => page.textContent('#scene .mq-live');
   await page.waitForSelector('#scene .mq-live');
   assert.equal(await live(), '47° + x = 180°');
@@ -558,7 +575,7 @@ test('math-geometry: each angle mission opens on its own picture and numbers', a
 });
 
 test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg moves the live sum', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
   assert.equal(await live(), 'a² = 9, b² = 16, c² = ?');
@@ -585,7 +602,7 @@ test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg
 });
 
 test('math-geometry: Circles passes a rounded mission in text mode, and the radius moves the live values', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
   assert.equal(await live(), 'Radius r = 5, diameter d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
@@ -611,7 +628,7 @@ test('math-geometry: Circles passes a rounded mission in text mode, and the radi
 });
 
 test('math-algebra: a linear equation needs its working in text mode, and passes once a step comes before x = 4', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  const { ctx, page, errors } = await open(`${base}/math/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#mission h2'), /Undo the steps/);
   await page.click('#work input.mq-field');
@@ -632,10 +649,10 @@ test('math-algebra: a linear equation needs its working in text mode, and passes
 });
 
 test('math-algebra: missions open their scene on their own numbers', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/`);
+  const { ctx, page, errors } = await open(`${base}/math/algebra/`);
   const live = () => page.textContent('#scene .mq-live');
   const at = async (ch, mi) => {
-    await page.goto(`${base}/math-quest/algebra/#ch=algebra.${ch}`);
+    await page.goto(`${base}/math/algebra/#ch=algebra.${ch}`);
     await page.click(`#mission .dot[data-mi="${mi}"]`);
     return live();
   };
@@ -658,7 +675,7 @@ test('math-algebra: missions open their scene on their own numbers', async () =>
 });
 
 test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its badge is earned', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/algebra/#ch=algebra.linear`);
+  const { ctx, page, errors } = await open(`${base}/math/algebra/#ch=algebra.linear`);
   const hint = () => page.textContent('#mission .prereq');
   await page.waitForSelector('#mission .prereq');
   assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), Fractions \(Arithmetic\), not done yet/);
@@ -675,7 +692,7 @@ test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its b
 
 test('math-arithmetic: the quick-fire answer field opens a keyboard with a minus sign', async () => {
   const done = Object.fromEntries([0, 1, 2, 3, 4].map(i => [`1.${i}`, true]));
-  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#fire`, {}, c => c.addInitScript(d => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 50, done: d, badges: {} })), done));
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#fire`, {}, c => c.addInitScript(d => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 50, done: d, badges: {} })), done));
   await page.click('#fStart');
   await page.waitForSelector('#fAns');
   // Phone number pads (inputmode=numeric) have no minus key, and Negative numbers asks for negative answers.
@@ -685,7 +702,7 @@ test('math-arithmetic: the quick-fire answer field opens a keyboard with a minus
 });
 
 test('math-arithmetic: Powers and roots suggests Negative numbers until it is done', async () => {
-  const { ctx, page, errors } = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.powers`);
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#ch=arithmetic.powers`);
   await page.waitForSelector('#mission .prereq');
   assert.match(await page.textContent('#mission .prereq'), /Suggested first: Negative numbers \(Arithmetic\), not done yet/);
   assert.match(await page.textContent('#mission .prereq'), /\(−2\)² and −2² part ways/);
@@ -693,7 +710,7 @@ test('math-arithmetic: Powers and roots suggests Negative numbers until it is do
   assert.deepEqual(errors, []);
   await ctx.close();
   // The page saves its own state as it unloads, so the finished save is set before the next page loads.
-  const done = await open(`${base}/math-quest/arithmetic/#ch=arithmetic.powers`, {}, c => c.addInitScript(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true, 1: true } }))));
+  const done = await open(`${base}/math/arithmetic/#ch=arithmetic.powers`, {}, c => c.addInitScript(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true, 1: true } }))));
   await done.page.waitForSelector('#mission .prereq');
   assert.match(await done.page.textContent('#mission .prereq'), /^Ready/);
   assert.deepEqual(done.errors, []);
@@ -702,7 +719,7 @@ test('math-arithmetic: Powers and roots suggests Negative numbers until it is do
 
 test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
   const key = 'python-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/python-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/python-quest/`);
   await ctx.addInitScript(() => {
     const h = async () => (await navigator.storage.getDirectory()).getFileHandle('notes.json', { create: true });
     window.showSaveFilePicker = h;
@@ -736,7 +753,7 @@ test('a notes-only save counts as progress: it is exported and restored from the
 });
 
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
@@ -748,7 +765,7 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 });
 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
@@ -804,7 +821,7 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   f.data.xp = xp; f.data.ch = 10; f.data.mi = counts[10];
   const file = path.join(tmp, 'intermediate-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -842,7 +859,7 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   f.data.xp = xp; f.data.ch = 14; f.data.mi = 7;
   const file = path.join(tmp, 'advanced-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -901,7 +918,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
 
 test('shell-quest: runaway output is capped, so progress still saves and survives a reload', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   // The file-doubling repro, scaled down: the caps must stop it before the saved state outgrows localStorage.
@@ -921,7 +938,7 @@ test('shell-quest: runaway output is capped, so progress still saves and survive
 });
 
 test('shell-quest: a finished mission is not celebrated again, and a typo never completes one', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -949,7 +966,7 @@ test('shell-quest: a finished mission is not celebrated again, and a typo never 
 });
 
 test('harbor-quest: a finished mission is not celebrated again when it is revisited', async () => {
-  const { ctx, page, errors } = await open(`${base}/harbor-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/harbor-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -967,7 +984,7 @@ test('harbor-quest: a finished mission is not celebrated again when it is revisi
 });
 
 test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
   const warnings = () => page.$$eval('#screen .line.err', ls => ls.filter(l => /would not store your progress/.test(l.textContent)).length);
@@ -981,7 +998,7 @@ test('shell-quest warns once in the terminal when the browser refuses to save', 
 });
 
 test('shell-quest field guide groups by tier and keeps extras explicit', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-guide');
   assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate', 'advanced', 'expert']);
@@ -1012,7 +1029,7 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
 const finishShellCourse = page => page.evaluate(() => { SQ.content.chapters.forEach((c, ci) => c.missions.forEach((_, i) => { SQ.S.done[ci + '.' + i] = 1; })); });
 
 test('shell-quest quick-fire is locked until chapter 1 is done, then offers only what the finished chapters taught', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-fire');
   assert.match(await page.textContent('#fStage'), /Locked for now/);
@@ -1031,7 +1048,7 @@ test('shell-quest quick-fire is locked until chapter 1 is done, then offers only
 });
 
 test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draws from the chosen pool', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -1077,7 +1094,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
 });
 
 test('shell-quest quick-fire: single-quote question rejects expanding forms, tee accepts ./', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -1104,7 +1121,7 @@ test('shell-quest quick-fire: single-quote question rejects expanding forms, tee
 });
 
 test('import rejects another playground\'s file and garbage', async () => {
-  const { ctx, page } = await open(`${base}/shell-quest/`);
+  const { ctx, page } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   const send = async body => {
@@ -1122,7 +1139,7 @@ test('import rejects another playground\'s file and garbage', async () => {
 
 test('linked save file: follows saves, restores after wipes', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   // Stand-in for the OS file picker: a file in the browser's private storage (supports the same writable API).
   const stub = () => {
     const h = async () => (await navigator.storage.getDirectory()).getFileHandle('linked.json', { create: true });
@@ -1185,7 +1202,7 @@ test('linked save file: follows saves, restores after wipes', async () => {
 // ---- Task 9: editor panel ----
 const SQ_KEY = 'shell-quest-v1';
 async function shellPage(opts = {}, prep) {
-  const o = await open(`${base}/shell-quest/`, opts, prep);
+  const o = await open(`${base}/programming/shell-quest/`, opts, prep);
   await o.page.waitForSelector('#cmd');
   o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
   o.screen = () => o.page.textContent('#screen');
@@ -1956,7 +1973,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
 });
 
 test('theme button cycles auto, light, dark, remembers the choice and sets data-theme', async () => {
-  for (const url of [base + '/', `${base}/shell-quest/`]) {
+  for (const url of [base + '/', `${base}/programming/shell-quest/`]) {
     const { ctx, page, errors } = await open(url, { colorScheme: 'light' });
     const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1978,7 +1995,7 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
 });
 
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
-  const { ctx, page, errors } = await open(`${base}/ds-quest/`, { viewport: { width: 1280, height: 900 } });
+  const { ctx, page, errors } = await open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 } });
   await page.waitForSelector('#mission');
   await page.click('.tabs button[data-tab="guide"]');
   await page.waitForSelector('#demo-tree .dbtn');
@@ -1998,7 +2015,7 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
 
 /* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */
 async function netPage(opts = {}, prep) {
-  const o = await open(`${base}/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  const o = await open(`${base}/programming/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
   o.console = [];
   o.page.on('console', m => { if (m.type() === 'error') o.console.push(m.text()); });
   await o.page.waitForSelector('#cmd');
@@ -2367,7 +2384,7 @@ test('net-quest: the mission card puts the goal first and keeps the chapter intr
 const AGENT_KEYS = ['badges', 'best', 'ch', 'done', 'mi', 'tab', 'xp'];
 const seedAgent = raw => c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('agent-quest-v1', v); sessionStorage.seeded = 1; } }, raw);
 async function agentPage(opts = {}, prep) {
-  const o = await open(`${base}/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  const o = await open(`${base}/programming/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
   o.console = [];
   o.page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) o.console.push(m.text()); });
   await o.page.waitForSelector('#runBtn');
@@ -2985,14 +3002,14 @@ test('agent-quest: the editor counts a root Done when as the default check, and 
 });
 
 test('landing page shows Agent Quest XP only after progress', async () => {
-  const { ctx, page, errors } = await open(base + '/');
+  const { ctx, page, errors } = await open(`${base}/programming/`);
   assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
   assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '23 chapters');
   await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
   // The card reads the stored xp, which the quest page derives and writes at boot.
-  await page.goto(base + '/agent-quest/');
+  await page.goto(base + '/programming/agent-quest/');
   await page.waitForSelector('#mission');
-  await page.goto(base + '/');
+  await page.goto(`${base}/programming/`);
   assert.match(await page.textContent('a[href="agent-quest/"] .xp'), /10 XP/);
   assert.deepEqual(errors, []);
   await ctx.close();

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'harbor-quest', 'app.js'), 'utf8');
+const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'harbor-quest', 'app.js'), 'utf8');
 const cut = (a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); assert.ok(i >= 0 && j > i, `content marker moved: ${a}`); return src.slice(i, j); };
 const code = [cut('const CH=[', '\nCH.forEach'), cut('const QF=[', 'const VALUED_D'), cut('const PZ_DF=[', 'const RANKS'), cut('const GUIDE=[', '/* ---------- UI')].join('\n');
 const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = new Function(code + '\nreturn {CH,QF,PZ_DF,PZ_Y,GUIDE,qfOpen};')();
