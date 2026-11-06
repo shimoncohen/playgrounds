@@ -14,7 +14,9 @@ if [[ $mode != main && ! $num =~ ^[0-9]+$ ]]; then echo "a PR number is required
 
 root=$(git rev-parse --show-toplevel)
 site=(index.html shared programming math)
+shopt -s nullglob
 for d in "$root"/*-quest; do site+=("$(basename "$d")"); done
+shopt -u nullglob
 
 work=$(mktemp -d)
 trap 'git -C "$root" worktree remove --force "$work" 2>/dev/null || true; rm -rf "$work"' EXIT
