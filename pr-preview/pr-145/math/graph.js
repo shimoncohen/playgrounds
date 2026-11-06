@@ -1,4 +1,4 @@
-// Prerequisite graph for Math Quest (DOM-free). Each track's chapter list must match its content.js: same ids, same order,
+// Prerequisite graph for Math (DOM-free). Each track's chapter list must match its content.js: same ids, same order,
 // because saved badges are keyed by chapter position (S.badges[i]).
 (() => {
   const MQ = globalThis.MQ = globalThis.MQ || {};
