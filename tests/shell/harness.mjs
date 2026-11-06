@@ -4,12 +4,12 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../shell-quest');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../programming/shell-quest');
 
 function scriptList() {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const srcs = [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]);
-  return srcs.filter((s) => /^(engine\/|content\/|\.\.\/shared\/tiers\.js$)/.test(s));
+  return srcs.filter((s) => /^(engine\/|content\/|(\.\.\/)+shared\/tiers\.js$)/.test(s));
 }
 
 export function loadContext() {

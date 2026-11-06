@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'python-quest', 'app.js'), 'utf8');
+const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'python-quest', 'app.js'), 'utf8');
 const head = src.slice(0, src.indexOf('const ERRS={'));
 assert.ok(head.includes('const QF=[') && head.includes('const qfOpen='), 'content markers moved: update this loader');
 const { PY, CH, QF, GUIDE, qfOpen } = new Function(head + '\nreturn {PY,CH,QF,GUIDE,qfOpen};')();

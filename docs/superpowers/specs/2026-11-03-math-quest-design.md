@@ -60,7 +60,7 @@ Track pages load `../../shared/*` and `../vendor/*` with relative paths and plai
 - **One key per track:** `math-arithmetic-v1`, `math-algebra-v1`, and so on. The hub has no game state of its own.
 - **Missions are keyed `'<chapter>.<mission>'`** like every quest (`shared/progress.js` keeps the whole state object as one JSON string). The AGENTS.md rules apply unchanged: never rename a key, never renumber shipped missions, append to the end of a chapter, append chapters to the end of a track.
 - **New fields, all additive:** `notes` (per chapter, free text) and `work` (per passed mission, the steps the learner wrote). Old saves load without them. `shared/progress.js` exports the whole state, so both travel with export, import and the backup file. Its `pristine()` check must also count non-empty `notes` as progress, or a notes-only save is treated as empty.
-- **Input preference:** `math-prefs-v1` holds `{ input: 'visual' | 'text' }`, shared by every track. Absent means `visual`.
+- **Input preference:** `math-prefs-v1` holds `{ input: 'visual' | 'text', speed: 0.25 | 0.5 | 1 | 1.5 | 2 }`, shared by every track. Absent `input` means `visual`; absent or unknown `speed` means ×1.
 
 ## Prerequisite graph
 
@@ -105,7 +105,7 @@ A scene is data in a track's `content.js`:
 - **`scene/three3d.js`** wraps three.js: box, sphere, cylinder, cone, surface `z = f(x, y)`, vectors, planes; drag-to-rotate with three.js's `OrbitControls` (included in the vendored build); flat lighting; per-term colors.
 - **Color-linked terms.** `\term{a}{...}` is a KaTeX macro that expands to `\htmlData{term=a}{...}`. The formula term, its slider and its shape share one color from a fixed palette. Hovering or focusing any of the three highlights all three. Color is never the only cue: the label weight and an underline change too. The palette must pass contrast in light and dark themes and stay distinguishable for the common color-vision deficiencies.
 - **KaTeX trust** is enabled only for `\htmlData`, through KaTeX's `trust` callback, because formulas are our own content.
-- **Animation.** An optional `t` param gets play, pause and a scrub slider, driven by `requestAnimationFrame`. Under `prefers-reduced-motion` scenes start paused and scrubbing still works. Scenes pause when off-screen (`IntersectionObserver`).
+- **Animation.** An optional `t` param gets play, pause, a scrub slider and a speed setting (×0.25 to ×2; ×1 is 60% of the scene's `t.speed`), driven by `requestAnimationFrame`. Under `prefers-reduced-motion` scenes start paused and scrubbing still works. Scenes pause when off-screen (`IntersectionObserver`).
 - **One WebGL renderer per page.** Browsers cap live WebGL contexts (often around 16), so one shared three.js renderer draws whichever 3D scene is in view.
 - **No WebGL:** a 3D scene shows a short notice; its sliders, formula and live line still work, and scene missions stay solvable.
 
@@ -139,7 +139,7 @@ Every `number` and `expr` mission has a **working area**.
   - numbers: equal to the original's exact value (math.js with `number: 'Fraction'`);
   - expressions: equivalent to the original (seeded evaluation);
   - equations: same solutions as the original. A step passes when its `lhs - rhs` is a non-zero constant multiple of the original's `lhs - rhs` at the seeded points. Doing the same thing to both sides passes; a step that loses or gains solutions (dividing by `x`, squaring) is flagged, with a note saying why.
-- Each step shows ✓ or ✗. **The final answer alone decides the mission** unless the mission sets `work: 'required'`, in which case every step must pass and there must be at least one.
+- Each step shows ✓ or ✗. **The final answer alone decides the mission** unless the mission sets `work: 'required'`, in which case every step must pass and there must be at least one step before the final answer.
 - **Two input modes, one checker.** Both modes produce plain text for math.js.
   - `visual` (default): one MathLive field per step, with MathLive's on-screen keyboard. The field's value is read as `ascii-math` and passed through the **translator**.
   - `text`: a plain-text field per step with a live KaTeX preview under it, and a symbol keypad (fraction, √, ^, π, brackets) for phones.

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { loadRust, ROOT } from './harness.mjs';
 
 const RQ = loadRust();
-const DIR = path.join(ROOT, 'rust-quest');
+const DIR = path.join(ROOT, 'programming', 'rust-quest');
 
 // Shipped mission titles, in order. Content is append only: saves are keyed '<chapter>.<mission>', so a new mission goes
 // at the end of its chapter and a new chapter after the last. Add to this list; never edit or reorder it.

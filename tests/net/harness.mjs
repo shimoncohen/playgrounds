@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'net-quest');
+const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'net-quest');
 export const FILES = ['engine/ip.js', 'engine/packets.js', 'engine/topology.js', 'engine/sim.js', 'engine/shell.js',
   'engine/cmds-ip.js', 'engine/cmds-net.js', 'content/model.js', 'content/ch-1-layers.js', 'content/ch-2-mac-arp.js', 'content/ch-3-ip-addressing.js', 'content/ch-4-routing.js', 'content/ch-5-nat.js', 'content/extras.js'];
 

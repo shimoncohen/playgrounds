@@ -31,7 +31,7 @@ The agent finds the rules in [AGENTS.md](AGENTS.md) and the task skills in [`.cl
    npm ci && npx playwright install chromium
    ```
 4. **Make the change.** Keep it to one concern. Add or update tests with it (see below).
-5. **Run the checks.** All of these must pass; CI runs the same:
+5. **Run the checks.** All of these must pass. CI runs them on `main`, and on a PR only the ones for the parts it changes:
    ```
    npm run check && npm test
    ```
@@ -54,7 +54,7 @@ feat(shell)!: rename the saved-state key      # breaking change
 ```
 
 - **Types**: `feat` (new learner-visible thing), `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`, `revert`.
-- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `ds`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`, `release`, `net`, `agent`, `rust`.
+- **Scopes** (optional): `script`, `python`, `cpp`, `shell`, `harbor`, `ds`, `landing`, `shared`, `progress`, `engine`, `content`, `tests`, `ci`, `deps`, `docs`, `tools`, `skills`, `release`, `net`, `agent`, `math`, `rust`.
 - **The PR title is what lands on `main`** (we squash-merge), so it must follow the format; a check enforces it. Individual commit messages are checked locally by a git hook after `npm ci`.
 - Breaking changes (for example anything that would invalidate saved progress) use `!` and a `BREAKING CHANGE:` footer.
 
