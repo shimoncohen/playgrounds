@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'rust'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
@@ -69,14 +69,26 @@ const read = (page, key) => page.evaluate(k => localStorage.getItem(k), key);
 // How many tier headers the shell-quest rail should draw: one per tier that has chapters (Stage 3 Task 17: 3 until the Expert chapters land, then 4).
 const railTiers = page => page.evaluate(() => window.SQ.tiers.status({}).filter(s => s.chapters.length).length);
 
-test('landing page links to every playground', async () => {
-  const { ctx, page, errors } = await open(base + '/');
-  const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
-  assert.deepEqual(hrefs.sort(), NAMES.map(n => `${n}-quest/`).sort());
-  for (const h of hrefs) {
-    const r = await page.request.get(`${base}/${h}`);
-    assert.equal(r.status(), 200, h);
-  }
+for (const [where, cards] of [['/', ['programming/', 'math/']], ['/programming/', NAMES.map(n => `${n}-quest/`)]]) {
+  test(`landing page ${where} links to every playground in it`, async () => {
+    const { ctx, page, errors } = await open(base + where);
+    const hrefs = await page.$$eval('a.card', a => a.map(x => x.getAttribute('href')));
+    assert.deepEqual(hrefs.sort(), [...cards].sort());
+    for (const h of hrefs) {
+      const r = await page.request.get(base + where + h);
+      assert.equal(r.status(), 200, h);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('programming hub links back to the landing page', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/`, { viewport: { width: 390, height: 844 } });
+  assert.equal(await overflow(page), false);
+  await page.click('header.top a.nv-home');
+  await page.waitForSelector('a.card[href="programming/"]');
+  assert.equal(new URL(page.url()).pathname, '/');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -92,17 +104,62 @@ test('landing page links to GitHub and the feature request form', async () => {
   await ctx.close();
 });
 
-test('landing page shows saved XP', async () => {
-  const { ctx, page } = await open(base + '/');
-  await page.evaluate(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 })));
+test('programming hub shows saved XP and the landing page sums it', async () => {
+  const { ctx, page } = await open(`${base}/programming/`);
+  await page.evaluate(() => {
+    localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 25 }));
+    localStorage.setItem('shell-quest-v1', JSON.stringify({ xp: 10 }));
+  });
   await page.reload();
   assert.match(await page.textContent('a[href="python-quest/"] .xp'), /25 XP/);
+  await page.goto(base + '/');
+  assert.match(await page.textContent('a[href="programming/"] .xp'), /35 XP/);
   await ctx.close();
 });
 
-for (const name of NAMES) {
-  test(`${name}-quest loads cleanly`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+// The export test seeds every quest with xp 77 and two done keys. Agent Quest recomputes xp from valid done keys on load, so its
+// seed is two real chapter 1 missions and the xp is worked out in the page.
+const SEED = { default: { xp: 77, done: { '0-0': true, '0-1': true } }, agent: { done: { '0.0': true, '0.1': true } } };
+
+test('landing page sums Math XP', async () => {
+  const { ctx, page } = await open(base + '/');
+  await page.evaluate(() => {
+    localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10 }));
+    localStorage.setItem('math-algebra-v1', JSON.stringify({ xp: 15 }));
+  });
+  await page.reload();
+  assert.match(await page.textContent('a[href="math/"] .xp'), /25 XP/);
+  await ctx.close();
+});
+
+test('math hub loads cleanly', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('.tcard');
+  assert.equal((await page.$$('.tcard')).length, 4);
+  assert.match(await page.textContent('#next'), /Order of operations/);
+  assert.ok(await page.isVisible('#mapList ol'), 'list hidden on a phone');
+  assert.equal((await page.$$('#mapList ol')).length, 4);
+  assert.deepEqual(await page.$$eval('#mapList ol:nth-of-type(3) li', l => l.length), 4);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(3) li .needs'), /Needs first: Order of operations \(Arithmetic\)/);
+  assert.match(await page.textContent('#mapList ol:nth-of-type(4) li .needs'), /Needs first: Pythagoras \(Geometry\), Angles \(Geometry\), Ratios and percentages \(Arithmetic\)/);
+  assert.ok(!(await page.isVisible('svg.map')), 'map shown on a phone');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'horizontal overflow');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(await page.isVisible('svg.map'), 'map hidden on desktop');
+  assert.ok(await page.$eval('#mapList', e => e.getBoundingClientRect().width <= 1), 'list visible on desktop');
+  await page.click('.tcard button');
+  assert.ok(await page.isVisible('#trackView svg.map'), 'track view missing');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+const PAGES = [...NAMES.map(n => `programming/${n}-quest/`), 'math/arithmetic/', 'math/algebra/', 'math/geometry/', 'math/trigonometry/'];
+// A Math track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
+const appOf = pg => pg.startsWith('math/') ? 'math-' + pg.split('/')[1] : pg.split('/')[1];
+for (const pg of PAGES) {
+  const app = appOf(pg), name = app.replace(/-quest$/, '');
+  test(`${app} loads cleanly`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     assert.ok((await page.textContent('#mission')).trim().length > 20, 'mission card is empty');
     assert.ok(await page.$('.pg-trigger'), 'Progress button missing');
@@ -110,8 +167,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest shows only the selected tab`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1280, height: 800 } });
+  test(`${app} shows only the selected tab`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 1280, height: 800 } });
     await page.waitForSelector('#mission');
     const tabs = await page.$$eval('.tabs button[data-tab]', bs => bs.map(b => b.dataset.tab));
     assert.ok(tabs.length >= 3, 'expected at least 3 tabs');
@@ -126,8 +183,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest side sections scroll on their own on a wide screen`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 1440, height: 800 } });
+  test(`${app} side sections scroll on their own on a wide screen`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 1440, height: 800 } });
     await page.waitForSelector('#mission');
     const r = await page.evaluate(() => {
       const c = document.getElementById('chapters'), m = document.querySelector('.mapCol .panel');
@@ -141,9 +198,9 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest mission column fits the screen on desktop and stays plain on a phone`, async () => {
+  test(`${app} mission column fits the screen on desktop and stays plain on a phone`, async () => {
     for (const [w, h] of [[1440, 800], [1000, 700]]) {
-      const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: w, height: h } });
+      const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: w, height: h } });
       await page.waitForSelector('#mission');
       await page.waitForTimeout(300);
       const r = await page.evaluate(() => { const c = document.querySelector('.missionCol'); return { pos: getComputedStyle(c).position, colY: getComputedStyle(c).overflowY, cardY: getComputedStyle(document.getElementById('mission')).overflowY, bottom: c.getBoundingClientRect().bottom }; });
@@ -154,7 +211,7 @@ for (const name of NAMES) {
       assert.deepEqual(errors, []);
       await ctx.close();
     }
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`, { viewport: { width: 390, height: 800 } });
+    const { ctx, page, errors } = await open(`${base}/${pg}`, { viewport: { width: 390, height: 800 } });
     await page.waitForSelector('#mission');
     const m = await page.evaluate(() => ({ pos: getComputedStyle(document.querySelector('.missionCol')).position, over: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(m.pos, 'static');
@@ -163,8 +220,8 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest links back to the landing page and to the feature request form`, async () => {
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+  test(`${app} links back to the landing page and to the feature request form`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     const idea = await page.getAttribute('footer.nv-foot a.nv-idea', 'href');
     assert.equal(idea, 'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml');
@@ -175,9 +232,9 @@ for (const name of NAMES) {
     await ctx.close();
   });
 
-  test(`${name}-quest progress survives export, wipe and import`, async () => {
-    const key = `${name}-quest-v1`;
-    const { ctx, page, errors } = await open(`${base}/${name}-quest/`);
+  test(`${app} progress survives export, wipe and import`, async () => {
+    const key = `${app}-v1`;
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
     await page.waitForSelector('#mission');
     // Get a real saved state first (some apps only save after an action).
     if (await read(page, key) === null && !(await page.$('#cmd'))) {
@@ -189,7 +246,9 @@ for (const name of NAMES) {
       await page.waitForFunction(k => localStorage.getItem(k) !== null, key);
     }
     const state = JSON.parse(await read(page, key));
-    state.xp = 77; state.done = { '0-0': true, '0-1': true };
+    const seed = SEED[name] || SEED.default;
+    const want = seed.xp ?? await page.evaluate(d => window.AQ.state.xpFor(d, {}), seed.done);
+    state.xp = want; state.done = seed.done;
     // The app keeps its own copy of the state and saves it (some after a short delay), which would
     // overwrite a seed written behind its back. Write the seed, block any later writes from this
     // page, then reload so the app starts from the seeded state.
@@ -199,24 +258,47 @@ for (const name of NAMES) {
     }, [key, JSON.stringify(state)]);
     await page.reload();
     await page.waitForSelector('#mission');
-    assert.equal(JSON.parse(await read(page, key)).xp, 77, 'seed did not stick');
+    assert.equal(JSON.parse(await read(page, key)).xp, want, 'seed did not stick');
 
     await page.click('.pg-trigger');
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
-    const file = path.join(tmp, `${name}.json`);
+    const file = path.join(tmp, `${app}.json`);
     await dl.saveAs(file);
-    assert.equal(dl.suggestedFilename(), `${name}-quest-progress.json`);
+    assert.equal(dl.suggestedFilename(), `${app}-progress.json`);
     const exported = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.equal(exported.app, `${name}-quest`);
-    assert.equal(exported.data.xp, 77);
+    assert.equal(exported.app, app);
+    assert.equal(exported.data.xp, want);
 
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await page.click('.pg-trigger');
     await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
     await page.waitForSelector('#mission');
-    assert.equal(JSON.parse(await read(page, key)).xp, 77);
-    assert.match(await page.textContent('#xpText'), /77/);
+    assert.equal(JSON.parse(await read(page, key)).xp, want);
+    assert.match(await page.textContent('#xpText'), new RegExp(String(want)));
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('math hub links open the track pages', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/`);
+  await page.waitForSelector('.tcard');
+  const hrefs = await page.$$eval('.tcard a', a => a.map(x => x.getAttribute('href')));
+  assert.deepEqual(hrefs, ['arithmetic/', 'algebra/', 'geometry/', 'trigonometry/']);
+  for (const h of hrefs) assert.equal((await page.request.get(`${base}/math/${h}`)).status(), 200, h);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
+  test(`math-${track}: at 1440px the header is one row and its Math link goes to the hub`, async () => {
+    const { ctx, page, errors } = await open(`${base}/math/${track}/`, { viewport: { width: 1440, height: 900 } });
+    await page.waitForSelector('header .pg-wrap');
+    const tops = await page.$$eval('header.top > *', els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+    assert.ok(Math.max(...tops) - Math.min(...tops) < 20, `header items share one row: ${tops}`);
+    await page.click('header .brand a');
+    await page.waitForURL(u => new URL(u).pathname === '/math/');
     assert.deepEqual(errors, []);
     await ctx.close();
   });
@@ -226,7 +308,7 @@ const RUST_KEY = 'rust-quest-v1';
 const RUST_HELLO = 'fn main() {\n    println!("Hello, Rust!");\n}\n';
 
 test('rust-quest writes a pristine state on a clean load', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   const s = JSON.parse(await read(page, RUST_KEY));
   assert.equal(s.xp, 0);
@@ -236,7 +318,7 @@ test('rust-quest writes a pristine state on a clean load', async () => {
 });
 
 test('rust-quest: finishing mission 0.0 changes the XP text exactly once, even after running again', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
   await page.fill('#code', RUST_HELLO);
@@ -253,7 +335,7 @@ test('rust-quest: finishing mission 0.0 changes the XP text exactly once, even a
 });
 
 test('rust-quest: a bad saved shape loads with no console errors', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`, {}, ctx => ctx.addInitScript(k => { if (!localStorage.getItem(k)) localStorage.setItem(k, '{"done":5,"xp":"x"}'); }, RUST_KEY));
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, {}, ctx => ctx.addInitScript(k => { if (!localStorage.getItem(k)) localStorage.setItem(k, '{"done":5,"xp":"x"}'); }, RUST_KEY));
   await page.waitForSelector('#mission');
   assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
   assert.equal(JSON.parse(await read(page, RUST_KEY)).xp, 0);
@@ -262,7 +344,7 @@ test('rust-quest: a bad saved shape loads with no console errors', async () => {
 });
 
 test('rust-quest: typed code survives a reload and reset restores the starter', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   const starter = await page.inputValue('#code');
   assert.match(starter, /fn main/);
@@ -278,7 +360,7 @@ test('rust-quest: typed code survives a reload and reset restores the starter', 
 });
 
 test('rust-quest: the Playground link never carries learner code', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
   await page.click('#bRun');
@@ -292,7 +374,7 @@ test('rust-quest: the Playground link never carries learner code', async () => {
 });
 
 test('rust-quest: the extra keys row inserts symbols at the caret', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`, { viewport: { width: 390, height: 800 } });
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 800 } });
   await page.waitForSelector('#mission');
   await page.fill('#code', '');
   await page.click('#keys button:has-text("<>")');
@@ -308,7 +390,7 @@ test('rust-quest: the extra keys row inserts symbols at the caret', async () => 
 });
 
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   await page.fill('#code', RUST_HELLO);
   await page.click('#bRun');
@@ -329,7 +411,7 @@ test('rust-quest: a failing run clears the stale "Mission complete" card', async
 });
 
 test('rust-quest: missions 1.1 to 1.6 give XP once each, wrong tries give a hint and no XP, the last one earns the badge', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   const ms = await page.evaluate(() => RQ.CH[0].missions.map(m => ({ answer: m.answer, wrong: m.wrong[0].src })));
   assert.equal(ms.length, 6);
@@ -357,7 +439,7 @@ test('rust-quest: missions 1.1 to 1.6 give XP once each, wrong tries give a hint
 });
 
 test('rust-quest: the unsupported card names the feature and the line; the internal-error card links no learner code', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
   await page.click('#bRun');
@@ -379,7 +461,7 @@ test('rust-quest: the unsupported card names the feature and the line; the inter
 });
 
 test('rust-quest: a panic shows its output, the header and exit code 101, gives feedback, and the panic mission still completes', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   await page.fill('#code', 'fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!("before");\n    println!("{}", add(250, 10));\n}\n');
   await page.click('#bRun');
@@ -405,7 +487,7 @@ test('rust-quest: a panic shows its output, the header and exit code 101, gives 
 });
 
 test('rust-quest: a lint card shows the lint id, the line and a tip, and does not complete the mission', async () => {
-  const { ctx, page, errors } = await open(`${base}/rust-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
   await page.fill('#code', 'fn main() {\n    let x: u8 = 255 + 1;\n    println!("{}", x);\n}\n');
   await page.click('#bRun');
@@ -418,8 +500,456 @@ test('rust-quest: a lint card shows the lint id, the line and a tip, and does no
   await ctx.close();
 });
 
+test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/algebra/`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /you evaluate expressions with the order of operations/);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true } })));
+  await page.reload();
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /^Ready/);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 10, ch: 0, mi: 4, done: { '0.0': true }, badges: {} })));
+  await page.reload();
+  await page.click('#mission .prereq a');
+  await page.waitForURL(/\/math\/arithmetic\//);
+  await page.waitForSelector('#mission');
+  const u = new URL(page.url());
+  assert.equal(u.pathname + u.hash, '/math/arithmetic/#ch=arithmetic.order');
+  assert.match(await page.textContent('#chapters [aria-current="true"]'), /Order of operations/);
+  assert.match(await page.textContent('#mission'), /Mission 2 of 5/, 'opens the first open mission of the chapter');
+  await page.goto(`${base}/math/arithmetic/#guide`);
+  await page.waitForSelector('#guide .card');
+  assert.ok(await page.isVisible('#tab-guide') && !(await page.isVisible('#tab-quest')), '#guide opens the field guide');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: the working area passes a mission once, keeps the working, and a scene mission passes from its sliders', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('10*3');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('30');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await until(async () => JSON.parse(await read(page, 'math-arithmetic-v1') || '{}').xp === 10);
+  const s = JSON.parse(await read(page, 'math-arithmetic-v1'));
+  assert.deepEqual(s.work['0.0'], ['10*3', '30']);
+  await page.reload();
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /You solved this one before/);
+  assert.deepEqual(await page.$$eval('#work input.mq-field', f => f.map(x => x.value).filter(Boolean)), ['10*3', '30']);
+  assert.match(await page.textContent('#xpText'), /^10 XP/);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  await page.fill('#scene input[type=number][aria-label="c value"]', '1');
+  await page.dispatchEvent('#scene input[type=number][aria-label="c value"]', 'input');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#xpText'), /^20 XP/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Area suggests Order of operations and links to it; Angles needs nothing first', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Order of operations \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /area formulas such as ½ × b × h are worked out with the order of operations/);
+  await page.click('#chapters [data-ch="1"]');
+  await until(async () => /^Ready: this chapter needs nothing first/.test(await hint()));
+  await page.click('#chapters [data-ch="0"]');
+  await until(async () => /Suggested first/.test(await hint()));
+  await page.click('#mission .prereq a');
+  await page.waitForURL(/\/math\/arithmetic\//);
+  const u = new URL(page.url());
+  assert.equal(u.pathname + u.hash, '/math/arithmetic/#ch=arithmetic.order');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: a mission picture hides the answer until solved, then shows it as a check', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const shown = async () => (await page.textContent('#scene .mq-live')) + ' ' + (await page.textContent('#scene .mq-desc'));
+  assert.doesNotMatch(await shown(), /c = 5\b|= 25\b/, 'legs 3 and 4 open without the hypotenuse');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(3^2+4^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  await until(async () => /25/.test(await shown()));
+  await page.reload();
+  await page.waitForSelector('#scene .mq-live');
+  assert.match(await shown(), /25/, 'a solved mission opens on the full picture');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: text mode passes an area mission, and an angle answer with a degree sign', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('12*7');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('84');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await until(async () => JSON.parse(await read(page, 'math-geometry-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-geometry-v1')).work['0.0'], ['12*7', '84']);
+
+  await page.goto(`${base}/math/geometry/#ch=geometry.angles`);
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /On a straight line/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('180°-47°');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('133°');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a rounded mission passes in text mode, and the scene angle follows the keys', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/trigonometry/`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.equal(await page.$eval('#mission details.how-hidden', d => d.open), false, 'How it works stays closed until solved');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('10*sin(35)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('10*0.5736');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓', '✓']);
+  await until(async () => JSON.parse(await read(page, 'math-trigonometry-v1') || '{}').xp === 10);
+  const live = () => page.textContent('#scene .mq-live');
+  assert.match(await live(), /sin 35° = 5\.7 \/ 10 = 0\.57\./, 'once solved, the picture reveals the opposite side');
+  assert.equal(await page.$$eval('#mission details.how-hidden', d => d.length), 0, 'once solved, How it works is shown open');
+  assert.ok(await page.isVisible('#mission .how'));
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  await page.keyboard.press('ArrowRight');
+  assert.match(await live(), /sin 30° = 5 \/ 10 = 0\.50\./);
+  await page.goto(`${base}/math/trigonometry/#ch=trigonometry.ratios`);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  await page.focus('#scene circle.drag[aria-label="angle"]');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-trigonometry: a visual-mode answer with sin passes', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/trigonometry/`);
+  await page.waitForSelector('#work math-field');
+  const fill = async (i, latex) => {
+    await page.locator('#work math-field').nth(i).focus();
+    await page.evaluate(latex => { document.activeElement.setValue(latex); }, latex);
+  };
+  await fill(0, '10\\sin\\left(35\\right)');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelectorAll('#work math-field').length > 1);
+  await fill(1, '5.7');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: #ch=arithmetic.fractions opens Fractions, and its first mission passes on a simplest-form fraction', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#ch=arithmetic.fractions`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#chapters [aria-current="true"]'), /Fractions/);
+  assert.match(await page.textContent('#mission'), /1\/4 \+ 1\/3/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('3/12+4/12');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('14/24');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.isVisible('#feedback .msg.win'), false, 'an unsimplified fraction does not pass');
+  await page.fill('#work .mq-step:nth-child(2) .mq-field', '7/12');
+  await page.press('#work .mq-step:nth-child(2) .mq-field', 'Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  await until(async () => JSON.parse(await read(page, 'math-arithmetic-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-arithmetic-v1')).work['2.0'], ['3/12+4/12', '7/12']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: each mission opens its picture on its own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const go = async (ch, mi) => {
+    await page.evaluate(([c, m]) => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: c, mi: m, done: {}, badges: {} })), [ch, mi]);
+    await page.reload();
+    await page.waitForSelector('#scene .mq-live');
+  };
+  await go(0, 0);
+  assert.match(await live(), /Step 0: {2}6 \+ 4 × 3 {3}and {3}\(6 \+ 4\) × 3/);
+  await go(0, 1);
+  assert.match(await live(), /12 cut into 2 equal parts, then 3 of those parts/);
+  await go(0, 4);
+  assert.match(await live(), /Step 0: {2}2 \+ 3 × 4/, 'a scene mission keeps the chapter picture');
+  await go(1, 1);
+  assert.match(await live(), /\(−4\) × \(−2\): 4 across, 2 up/);
+  await go(2, 1);
+  assert.match(await live(), /2\/3 × 4\/5: 2 of 3 columns and 4 of 5 rows/);
+  await go(3, 0);
+  assert.match(await live(), /2³: 3 copies of 2 multiplied/);
+  await go(4, 3);
+  assert.match(await live(), /40 grown by 25%/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/`);
+  const live = () => page.textContent('#scene .mq-live');
+  await page.waitForSelector('#scene .mq-live');
+  assert.ok((await page.$$('#scene .grid line')).length > 10, 'the area scene has a grid');
+  assert.equal(await live(), 'Base b = 12, height h = 7.', 'the first mission opens on its own 12 by 7 floor, without the area it asks for');
+  const corner = '#scene circle.drag[aria-label="top right corner of the rectangle"]';
+  await page.focus(corner);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'Base b = 11, height h = 7.');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await live(), 'Base b = 11, height h = 6.');
+  assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'top right corner of the rectangle', 'focus survives the redraw');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /10 × 8/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'Whole rectangle 10 × 8. Dashed corner cut off: 4 × 3.', 'the L-shaped room has its own picture');
+
+  await page.goto(`${base}/math/geometry/#ch=geometry.angles`);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.waitForSelector('#work', { state: 'hidden' });
+  assert.equal(await live(), '40° + 70° + 70° = 180°');
+  const first = '#scene circle.drag[aria-label="first ray"]', second = '#scene circle.drag[aria-label="second ray"]';
+  await page.focus(first);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), '50° + 60° + 70° = 180°');
+  assert.equal(await page.getAttribute(first, 'aria-valuetext'), '50°');
+  const box = await page.locator('#scene svg').boundingBox(), dot = await page.locator(first).boundingBox();
+  const screen = (x, y) => [box.x + (x + 5.5) / 11 * box.width, box.y + (5.5 - y) / 6.5 * box.height];
+  await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(...screen(4 * Math.cos(Math.PI / 3), 4 * Math.sin(Math.PI / 3)), { steps: 5 });
+  await page.mouse.up();
+  assert.equal(await live(), '60° + 50° + 70° = 180°');
+  await page.focus(second);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), '60° + 60° + 60° = 180°');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: each angle mission opens on its own picture and numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.angles`);
+  const live = () => page.textContent('#scene .mq-live');
+  await page.waitForSelector('#scene .mq-live');
+  assert.equal(await live(), '47° + x = 180°');
+  const want = [[1, '110° + 95° + 80° + x = 360°'], [2, '58° + 71° + x = 180°'], [3, 'The two opposite angles of 60° are 120° together. Aim for 76°.']];
+  for (const [i, text] of want) {
+    await page.click(`#mission .dot[data-mi="${i}"]`);
+    await page.waitForFunction(t => document.querySelector('#scene .mq-live').textContent === t, text);
+  }
+  await page.focus('#scene circle.drag[aria-label="angle between the lines"]');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await live(), 'The two opposite angles of 61° are 122° together. Aim for 76°.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg moves the live sum', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.equal(await live(), 'a² = 9, b² = 16, c² = ?');
+  const leg = '#scene circle.drag[aria-label="leg a"]';
+  await page.focus(leg);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await live(), 'a² = 16, b² = 16, c² = ?');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => /^8² \+ 5²/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), '8² + 5² = 64 + 25 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Not a whole number/);
+  assert.equal(await live(), 'a² = 25, b² = 49, c² = ?');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('sqrt(5^2+7^2)');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('8.6');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-geometry: Circles passes a rounded mission in text mode, and the radius moves the live values', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  const live = () => page.textContent('#scene .mq-live');
+  assert.equal(await live(), 'Radius r = 5, diameter d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
+  await page.focus('#scene circle.drag[aria-label="radius r"]');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await live(), 'Radius r = 5.5, diameter d = 11.');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.waitForFunction(() => document.querySelector('#scene .mq-live').textContent === 'Diameter d = 14.');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.waitForFunction(() => /length you need is 30/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'r = 3, C = 2 × π × 3 ≈ 18.85. The length you need is 30.');
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.waitForSelector('#work input.mq-field');
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('2*pi*5');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('31.4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-mark', m => m.map(x => x.textContent).filter(Boolean)), ['✓', '✓']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: a linear equation needs its working in text mode, and passes once a step comes before x = 4', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/algebra/#ch=algebra.linear`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
+  await page.waitForSelector('#work input.mq-field');
+  assert.match(await page.textContent('#mission h2'), /Undo the steps/);
+  await page.click('#work input.mq-field');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await until(async () => /at least one step before it/.test(await page.textContent('#work .mq-result')));
+  assert.equal(await page.locator('#feedback .msg.win').count(), 0, 'the answer alone does not pass');
+  await page.fill('#work input.mq-field >> nth=0', '2x=8');
+  await page.click('#work input.mq-field >> nth=1');
+  await page.keyboard.type('x=4');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.deepEqual(await page.$$eval('#work .mq-step.ok', ls => ls.length), 2);
+  await until(async () => JSON.parse(await read(page, 'math-algebra-v1') || '{}').xp === 10);
+  assert.deepEqual(JSON.parse(await read(page, 'math-algebra-v1')).work['2.0'], ['2x=8', 'x=4']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: missions open their scene on their own numbers', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/algebra/`);
+  const live = () => page.textContent('#scene .mq-live');
+  const at = async (ch, mi) => {
+    await page.goto(`${base}/math/algebra/#ch=algebra.${ch}`);
+    await page.click(`#mission .dot[data-mi="${mi}"]`);
+    return live();
+  };
+  assert.match(await at('expressions', 0), /V = 10·5·3 = \?/);
+  assert.match(await at('expressions', 4), /2a \+ 3a = 4 \+ 6 = 10/);
+  assert.match(await at('expanding', 0), /3 × 5 = 9 \+ 6 = 15/);
+  assert.match(await at('expanding', 1), /x = 7: 2 × 3 = 6$/);
+  assert.match(await at('expanding', 3), /\(3 \+ 2\)\(3 \+ 2\) = 9 \+ 6 \+ 6 \+ 4 = 25/);
+  assert.match(await at('factoring', 0), /k = 1: 6 x-pieces and 9 units both split into 1 equal row/);
+  await page.fill('#scene input[type=range]', '2');
+  assert.match(await live(), /k = 2: 9 units do not split into 2 equal rows/);
+  await page.fill('#scene input[type=range]', '3');
+  assert.match(await live(), /k = 3: 6 x-pieces and 9 units both split into 3 equal rows/);
+  assert.match(await at('factoring', 2), /x = 6: 36 − 9 = 27$/);
+  assert.match(await at('factoring', 3), /25 − 10 − 10 \+ 4 = 9$/);
+  assert.match(await at('quadratics', 1), /y = x² − 16: where does it meet the x-axis\?/);
+  assert.match(await at('quadratics', 2), /y = x² − 3x: where does it meet the x-axis\?/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-algebra: Linear equations suggests Fractions (Arithmetic) until its badge is earned', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/algebra/#ch=algebra.linear`);
+  const hint = () => page.textContent('#mission .prereq');
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), Fractions \(Arithmetic\), not done yet/);
+  assert.match(await hint(), /many answers are fractions/);
+  assert.equal(await page.getAttribute('#mission .prereq a >> text=Fractions', 'href'), '../arithmetic/#ch=arithmetic.fractions');
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, done: {}, badges: { 2: true } })));
+  await page.reload();
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await hint(), /Suggested first: Expanding brackets \(Algebra\), not done yet/);
+  assert.doesNotMatch(await hint(), /Fractions/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: the quick-fire answer field opens a keyboard with a minus sign', async () => {
+  const done = Object.fromEntries([0, 1, 2, 3, 4].map(i => [`1.${i}`, true]));
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#fire`, {}, c => c.addInitScript(d => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 50, done: d, badges: {} })), done));
+  await page.click('#fStart');
+  await page.waitForSelector('#fAns');
+  // Phone number pads (inputmode=numeric) have no minus key, and Negative numbers asks for negative answers.
+  assert.notEqual(await page.getAttribute('#fAns', 'inputmode'), 'numeric');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: Powers and roots suggests Negative numbers until it is done', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/#ch=arithmetic.powers`);
+  await page.waitForSelector('#mission .prereq');
+  assert.match(await page.textContent('#mission .prereq'), /Suggested first: Negative numbers \(Arithmetic\), not done yet/);
+  assert.match(await page.textContent('#mission .prereq'), /\(−2\)² and −2² part ways/);
+  assert.equal(await page.getAttribute('#mission .prereq a', 'href'), '#ch=arithmetic.negatives');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // The page saves its own state as it unloads, so the finished save is set before the next page loads.
+  const done = await open(`${base}/math/arithmetic/#ch=arithmetic.powers`, {}, c => c.addInitScript(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 75, done: {}, badges: { 0: true, 1: true } }))));
+  await done.page.waitForSelector('#mission .prereq');
+  assert.match(await done.page.textContent('#mission .prereq'), /^Ready/);
+  assert.deepEqual(done.errors, []);
+  await done.ctx.close();
+});
+
+test('a notes-only save counts as progress: it is exported and restored from the linked file', async () => {
+  const key = 'python-quest-v1';
+  const { ctx, page, errors } = await open(`${base}/programming/python-quest/`);
+  await ctx.addInitScript(() => {
+    const h = async () => (await navigator.storage.getDirectory()).getFileHandle('notes.json', { create: true });
+    window.showSaveFilePicker = h;
+    window.showOpenFilePicker = async () => [await h()];
+  });
+  await page.evaluate(k => {
+    Storage.prototype.setItem.call(localStorage, k, JSON.stringify({ xp: 0, done: {}, notes: { 0: 'hello' } }));
+    Storage.prototype.setItem = () => {};
+  }, key);
+  await page.reload();
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=Export to file')]);
+  const file = path.join(tmp, 'notes-only.json');
+  await dl.saveAs(file);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).data.notes[0], 'hello');
+
+  await page.click('.pg-trigger');
+  await page.click('text=Create save file');
+  await page.waitForSelector('.pg-state.pg-ok');
+  // A fresh page writes its empty state on load; the linked file must still win, because notes are progress.
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await until(async () => {
+    try { return /hello/.test(await read(page, key) || ''); }
+    catch (e) { if (/context was destroyed|navigation/i.test(e.message)) return false; throw e; }
+  });
+  await page.waitForLoadState('load');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/shell-progress-beginner-complete.json'))]);
@@ -431,7 +961,7 @@ test('shell-quest imports a complete beginner save: 695 XP, Pipe Fitter', async 
 });
 
 test('shell-quest tier rail: Beginner header counts chapters and shows a star when complete', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = () => page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
@@ -487,7 +1017,7 @@ test('shell-quest: finishing chapters 7 to 10 completes the Intermediate tier (4
   f.data.xp = xp; f.data.ch = 10; f.data.mi = counts[10];
   const file = path.join(tmp, 'intermediate-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -525,7 +1055,7 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   f.data.xp = xp; f.data.ch = 14; f.data.mi = 7;
   const file = path.join(tmp, 'advanced-complete.json');
   fs.writeFileSync(file, JSON.stringify(f));
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', file)]);
@@ -584,7 +1114,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
 
 test('shell-quest: runaway output is capped, so progress still saves and survives a reload', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   // The file-doubling repro, scaled down: the caps must stop it before the saved state outgrows localStorage.
@@ -604,7 +1134,7 @@ test('shell-quest: runaway output is capped, so progress still saves and survive
 });
 
 test('shell-quest: a finished mission is not celebrated again, and a typo never completes one', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -632,7 +1162,7 @@ test('shell-quest: a finished mission is not celebrated again, and a typo never 
 });
 
 test('harbor-quest: a finished mission is not celebrated again when it is revisited', async () => {
-  const { ctx, page, errors } = await open(`${base}/harbor-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/harbor-quest/`);
   await page.waitForSelector('#cmd');
   const type = async line => { await page.fill('#cmd', line); await page.press('#cmd', 'Enter'); };
   const wins = () => page.$$eval('#screen .win', els => els.map(e => e.textContent));
@@ -650,7 +1180,7 @@ test('harbor-quest: a finished mission is not celebrated again when it is revisi
 });
 
 test('shell-quest warns once in the terminal when the browser refuses to save', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
   await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; });
   const warnings = () => page.$$eval('#screen .line.err', ls => ls.filter(l => /would not store your progress/.test(l.textContent)).length);
@@ -664,7 +1194,7 @@ test('shell-quest warns once in the terminal when the browser refuses to save', 
 });
 
 test('shell-quest field guide groups by tier and keeps extras explicit', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-guide');
   assert.deepEqual(await page.$$eval('#guide h3[data-tier]', hs => hs.map(h => h.dataset.tier)), ['beginner', 'intermediate', 'advanced', 'expert']);
@@ -695,7 +1225,7 @@ test('shell-quest field guide groups by tier and keeps extras explicit', async (
 const finishShellCourse = page => page.evaluate(() => { SQ.content.chapters.forEach((c, ci) => c.missions.forEach((_, i) => { SQ.S.done[ci + '.' + i] = 1; })); });
 
 test('shell-quest quick-fire is locked until chapter 1 is done, then offers only what the finished chapters taught', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('#t-fire');
   assert.match(await page.textContent('#fStage'), /Locked for now/);
@@ -714,7 +1244,7 @@ test('shell-quest quick-fire is locked until chapter 1 is done, then offers only
 });
 
 test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draws from the chosen pool', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -760,7 +1290,7 @@ test('shell-quest quick-fire tier picker: Mixed + tiers with questions, run draw
 });
 
 test('shell-quest quick-fire: single-quote question rejects expanding forms, tee accepts ./', async () => {
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await finishShellCourse(page);
   await page.click('#t-fire');
@@ -787,7 +1317,7 @@ test('shell-quest quick-fire: single-quote question rejects expanding forms, tee
 });
 
 test('import rejects another playground\'s file and garbage', async () => {
-  const { ctx, page } = await open(`${base}/shell-quest/`);
+  const { ctx, page } = await open(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#mission');
   await page.click('.pg-trigger');
   const send = async body => {
@@ -805,7 +1335,7 @@ test('import rejects another playground\'s file and garbage', async () => {
 
 test('linked save file: follows saves, restores after wipes', async () => {
   const key = 'shell-quest-v1';
-  const { ctx, page, errors } = await open(`${base}/shell-quest/`);
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   // Stand-in for the OS file picker: a file in the browser's private storage (supports the same writable API).
   const stub = () => {
     const h = async () => (await navigator.storage.getDirectory()).getFileHandle('linked.json', { create: true });
@@ -868,7 +1398,7 @@ test('linked save file: follows saves, restores after wipes', async () => {
 // ---- Task 9: editor panel ----
 const SQ_KEY = 'shell-quest-v1';
 async function shellPage(opts = {}, prep) {
-  const o = await open(`${base}/shell-quest/`, opts, prep);
+  const o = await open(`${base}/programming/shell-quest/`, opts, prep);
   await o.page.waitForSelector('#cmd');
   o.type = async line => { await o.page.fill('#cmd', line); await o.page.press('#cmd', 'Enter'); };
   o.screen = () => o.page.textContent('#screen');
@@ -1639,7 +2169,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
 });
 
 test('theme button cycles auto, light, dark, remembers the choice and sets data-theme', async () => {
-  for (const url of [base + '/', `${base}/shell-quest/`]) {
+  for (const url of [base + '/', `${base}/programming/shell-quest/`]) {
     const { ctx, page, errors } = await open(url, { colorScheme: 'light' });
     const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1661,7 +2191,7 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
 });
 
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
-  const { ctx, page, errors } = await open(`${base}/ds-quest/`, { viewport: { width: 1280, height: 900 } });
+  const { ctx, page, errors } = await open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 } });
   await page.waitForSelector('#mission');
   await page.click('.tabs button[data-tab="guide"]');
   await page.waitForSelector('#demo-tree .dbtn');
@@ -1681,7 +2211,7 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
 
 /* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */
 async function netPage(opts = {}, prep) {
-  const o = await open(`${base}/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  const o = await open(`${base}/programming/net-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
   o.console = [];
   o.page.on('console', m => { if (m.type() === 'error') o.console.push(m.text()); });
   await o.page.waitForSelector('#cmd');
@@ -2045,4 +2575,684 @@ test('net-quest: the mission card puts the goal first and keeps the chapter intr
   assert.equal((await card()).open, false, 'closed once the mission is done');
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+const AGENT_KEYS = ['badges', 'best', 'ch', 'done', 'mi', 'tab', 'xp'];
+const seedAgent = raw => c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('agent-quest-v1', v); sessionStorage.seeded = 1; } }, raw);
+async function agentPage(opts = {}, prep) {
+  const o = await open(`${base}/programming/agent-quest/`, { viewport: { width: 1280, height: 900 }, ...opts }, prep);
+  o.console = [];
+  o.page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) o.console.push(m.text()); });
+  await o.page.waitForSelector('#runBtn');
+  o.xp = async () => (await o.page.textContent('#xpText')).trim();
+  o.stored = async () => JSON.parse(await read(o.page, 'agent-quest-v1'));
+  o.solve = async () => { await o.page.click('#promptHost [data-act="fill"]'); await o.page.click('#runBtn'); };
+  return o;
+}
+
+test('agent-quest: a clean load stores a pristine state with xp 0 and the whitelisted keys', async () => {
+  const { ctx, errors, stored, console } = await agentPage();
+  const s = await stored();
+  assert.equal(s.xp, 0);
+  assert.deepEqual(s.done, {});
+  assert.deepEqual(Object.keys(s).sort(), AGENT_KEYS);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(console, []);
+  await ctx.close();
+});
+
+test('agent-quest: a tampered xp is replaced at boot by the value derived from done', async () => {
+  const done = { '0.0': true };
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 0, mi: 1, done, xp: 999, badges: {}, best: 0, tab: 'quest' })));
+  const want = await o.page.evaluate(d => window.AQ.state.xpFor(d, {}), done);
+  assert.ok(want > 0 && want !== 999);
+  assert.equal((await o.stored()).xp, want);
+  assert.equal(await o.xp(), `${want} XP`);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: finishing a mission awards XP once, even if it is run again or after a reload', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  assert.equal(await o.xp(), '0 XP');
+  await o.solve();
+  assert.equal(await o.xp(), '10 XP');
+  assert.equal(await page.$$eval('#mission .dot.done', e => e.length), 1);
+  assert.equal(await page.$$eval('#feedback .win', e => e.length), 1);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await until(async () => (await o.stored()).xp === 10);
+  assert.deepEqual(Object.keys((await o.stored()).done), ['0.0']);
+  await page.reload();
+  await page.waitForSelector('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await o.solve();
+  assert.equal(await o.xp(), '10 XP');
+  assert.equal((await page.textContent('#feedback')).includes('already earned'), true);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the feedback follows the latest run (pass, fail, pass)', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await o.solve();
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  await page.fill('#pf-donewhen', '');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .tip').count(), 1);
+  assert.equal(await page.locator('#feedback .win').count(), 0);
+  await o.solve();
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await page.locator('#feedback .tip').count(), 0, 'the stale tip is gone');
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a damaged save loads without errors and is replaced by the normalized state', async () => {
+  for (const [raw, want] of [['{"done":5,"xp":"x"}', 0], ['not json', 0], ['[1,2]', 0],
+    ['{"done":{"9.9":true,"0.0":true},"xp":-5,"ch":99,"mi":-1,"tab":"nope","answers":{"0.0":"typed"},"best":"x"}', 10]]) {
+    const o = await agentPage({}, seedAgent(raw));
+    const s = await o.stored();
+    assert.equal(s.xp, want, raw);
+    assert.deepEqual(Object.keys(s).sort(), AGENT_KEYS, raw);
+    assert.equal(s.tab, 'quest', raw);
+    assert.equal(await o.xp(), `${want} XP`, raw);
+    assert.ok((await o.page.textContent('#mission h2')).trim().length > 3, raw);
+    assert.deepEqual(o.errors, [], raw);
+    assert.deepEqual(o.console, [], raw);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: a line that does not parse shows an inline error, has no effect, and is shown as text', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.fill('#pf-constraints', "be careful and don't delete anything");
+  assert.equal(await page.locator('#perrs li').count(), 1);
+  assert.match(await page.textContent('#perrs li'), /be careful/);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps').count(), 0, 'no run happens while a line is rejected');
+  assert.equal(await page.locator('#feedback .msg').count(), 0, 'no feedback either');
+  assert.equal(await o.xp(), '0 XP');
+  assert.equal(await page.evaluate(() => document.activeElement.closest('#perrs') !== null), true, 'focus goes to the error');
+  await page.fill('#pf-constraints', '<img src=x onerror="window.__x=1"> and <b>bold</b>');
+  assert.equal(await page.$('#perrs img'), null);
+  assert.equal(await page.$('#perrs b'), null);
+  assert.match(await page.textContent('#perrs'), /<img src=x/);
+  await page.click('#runBtn');
+  assert.equal(await page.$('#feedback img'), null);
+  assert.equal(await page.evaluate(() => window.__x), undefined);
+  assert.equal(await page.locator('#run .steps').count(), 0);
+  await page.fill('#pf-constraints', 'do not delete data/');
+  assert.equal(await page.locator('#perrs li').count(), 0);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps li').count() > 0, true, 'the run happens once every line parses');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: Plan first pauses the run until the plan is approved', async () => {
+  const withPlan = async ctx => ctx.route('**/agent-quest/content/ch-01-loop.js', async r => {
+    const res = await r.fetch();
+    await r.fulfill({ response: res, body: (await res.text()).replace("fields:['goal','donewhen'],", "fields:['goal','donewhen','plan'],") });
+  });
+  const o = await agentPage({}, withPlan);
+  const { page } = o;
+  await page.click('#promptHost [data-act="fill"]');
+  await page.check('#pf-plan');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps li').count(), 2, 'only the context and the plan');
+  assert.match(await page.textContent('#run .steps'), /Plan: change src\/price\.js/);
+  assert.equal(await page.isVisible('#run [data-act="approve"]'), true);
+  assert.match(await page.textContent('#feedback'), /Waiting for your approval/);
+  assert.equal(await o.xp(), '0 XP');
+  await page.click('#run [data-act="approve"]');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 0);
+  assert.ok(await page.locator('#run .steps li').count() > 4);
+  assert.match(await page.textContent('#run .steps'), /Plan approved/);
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  await page.check('#pf-plan');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 1);
+  await page.fill('#pf-donewhen', 'run npm run lint');
+  assert.equal(await page.locator('#run [data-act="approve"]').count(), 0,'editing the form drops the pending plan');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: nothing the learner types is ever stored', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.fill('#pf-goal', 'zzsecretzz goal');
+  await page.fill('#pf-donewhen', 'zzsecretzz check');
+  await page.fill('#fileEditor textarea', 'zzsecretzz notes');
+  await page.click('#runBtn');
+  await o.solve();
+  await until(async () => (await o.stored()).xp === 10);
+  await page.waitForTimeout(500);
+  const all = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+  assert.ok(!all.includes('zzsecret'), 'a typed string reached storage');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the config and budget missions are played in the file editor', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="3"]');
+  assert.equal(await page.isVisible('#pf-goal'), false, 'the prompt is fixed for this mission');
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await page.textContent('#fileEditor .rules'), /^1 line acts as rules/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="4"]');
+  assert.match(await page.textContent('#meter .mlabel'), /~[6-9]\d\d of 2000 tokens/, 'the heavy memory file shows in the meter');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .tip').count(), 1);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.match(await page.textContent('#meter .mlabel'), /~\d{1,2} of 2000 tokens/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '20 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the prompt form shows only the fields taught so far', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  const shown = () => page.$$eval('#promptHost [id^="pf-"]', es => es.map(e => e.id.slice(3)));
+  assert.deepEqual(await shown(), ['goal', 'donewhen']);
+  await page.click('#mission .dot[data-mi="1"]');
+  assert.deepEqual(await shown(), ['goal', 'constraints', 'donewhen']);
+  await page.click('#mission .dot[data-mi="2"]');
+  assert.deepEqual(await shown(), ['goal', 'files', 'constraints', 'donewhen']);
+  assert.equal(await page.locator('#pf-use, #pf-plan, #pf-examples, #pf-extra').count(), 0);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.equal(await page.inputValue('#pf-files'), 'src/price.js');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+const seedAt = (ch, mi) => seedAgent(JSON.stringify({ ch, mi }));
+
+test('agent-quest: chapter 3 shows Examples from its first mission and Plan from its fourth, never Use, and plays Plan first', async () => {
+  const o = await agentPage({}, seedAt(2, 0));
+  const { page } = o;
+  const shown = () => page.$$eval('#promptHost [id^="pf-"]', es => es.map(e => e.id.slice(3)));
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'constraints', 'donewhen']);
+  await page.click('#mission .dot[data-mi="3"]');
+  assert.deepEqual(await shown(), ['goal', 'files', 'examples', 'plan', 'constraints', 'donewhen']);
+  assert.equal(await page.locator('#pf-use, #pf-extra').count(), 0);
+  await page.click('#promptHost [data-act="fill"]');
+  assert.equal(await page.isChecked('#pf-plan'), true);
+  await page.click('#runBtn');
+  assert.equal(await page.isVisible('#run [data-act="approve"]'), true);
+  await page.click('#run [data-act="approve"]');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 4 edits a folder memory file, counts its rules and shows it in the meter once the agent reads there', async () => {
+  const o = await agentPage({}, seedAt(3, 1));
+  const { page } = o;
+  const tree = await page.$$eval('#tree li', ls => ls.map(l => l.textContent));
+  assert.ok(tree.includes('src/CLAUDE.md'), 'the folder memory file is editable, with no read-only mark');
+  assert.ok(tree.some(t => t.startsWith('src/price.js') && t.endsWith('(read-only)')));
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', '# Rules for work inside src/\ndo not edit src/legacy/\n');
+  assert.match(await page.textContent('#fileEditor .rules'), /^1 line acts as rules/);
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  await page.click('#mission .dot[data-mi="3"]');
+  const memory = () => page.$eval('#meter tbody tr:nth-child(2) td.n', e => +e.textContent.slice(1));
+  const before = await memory();
+  await page.fill('#pf-files', 'src/price.js');
+  assert.ok(await memory() > before, 'the folder memory file joins the Memory row once a file under it is read');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '20 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 loads the matching skill, shows its step in the run panel and its body in the meter', async () => {
+  const o = await agentPage({}, seedAt(4, 0));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the loaded skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill release-guard loaded/);
+  assert.match(await page.textContent('#run .steps'), /blocked by skill release-guard/);
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+// this scenario has no tag of its own, so only the fired-schedule branch of refresh() in app.js can make the meter count the skill body
+test('agent-quest: a scheduled mission with no tag of its own loads the skill into the meter before the run (mission 20.2)', async () => {
+  const o = await agentPage({}, seedAt(19, 1));
+  const { page } = o;
+  const skills = () => page.$eval('#meter tbody tr:nth-child(3) td.n', e => +e.textContent.slice(1));
+  const before = await skills();
+  await page.click('#promptHost [data-act="fill"]');
+  assert.ok(await skills() > before, 'the schedule line makes this a schedule job, so the skill body joins the Skills row');
+  await page.click('#runBtn');
+  assert.match(await page.textContent('#run .steps'), /Skill quiet-hours loaded/);
+  assert.match(await page.textContent('#run .steps'), /Schedule: starts weekly-review/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 5 names the duplicate skill that was not loaded, with no undefined', async () => {
+  const o = await agentPage({}, seedAt(4, 1));
+  const { page } = o;
+  await page.click('#runBtn');
+  const steps = await page.textContent('#run .steps');
+  assert.match(steps, /Skill release-notes not loaded \(duplicate\)/);
+  assert.doesNotMatch(steps, /undefined/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: chapter 2 previews earlier messages and notes the ones dropped to fit', async () => {
+  const o = await agentPage({}, seedAt(1, 1));
+  const { page } = o;
+  const history = await page.$eval('#meter tbody tr:nth-child(6) td.n', e => e.textContent);
+  assert.notEqual(history, '~0', 'some earlier messages are still held');
+  assert.match(await page.textContent('#meter'), /oldest earlier messages were dropped/);
+  await page.click('#promptHost [data-act="fill"]');
+  await page.click('#runBtn');
+  assert.equal(await o.xp(), '10 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the file tree works from the keyboard', async () => {
+  const { ctx, page, errors } = await agentPage();
+  assert.equal(await page.locator('#tree [tabindex="0"]').count(), 1, 'the tree is one tab stop');
+  await page.focus('#tree [aria-selected="true"]');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$eval('#tree [aria-selected="true"]', e => e.dataset.path), 'src/price.js');
+  assert.equal(await page.$eval('#fileEditor textarea', e => e.readOnly), true, 'project files are read-only');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the meter is a meter with a text table, patterns and the estimate label', async () => {
+  const { ctx, page, errors } = await agentPage();
+  assert.equal(await page.locator('#meter [role="meter"]').count(), 1);
+  assert.equal(await page.getAttribute('#meter [role="meter"]', 'aria-valuemax'), '2000');
+  assert.match(await page.textContent('#meter .mlabel'), /^~\d+ of 2000 tokens \(estimate, chars\/4\)$/);
+  assert.equal(await page.locator('#meter table tbody tr').count(), 7);
+  assert.match(await page.textContent('#meter'), /Simulated/);
+  const fills = await page.$$eval('#meter .mbar span', ss => ss.map(s => getComputedStyle(s).backgroundImage));
+  assert.ok(fills.length >= 2 && fills.every(f => f !== 'none'), 'each segment has a pattern, not only a colour');
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.fill('#pf-files', 'src/price.js');
+  const t =await page.$eval('#meter tbody tr:nth-child(5) td.n', e => e.textContent);
+  assert.notEqual(t, '~0', 'the file named in Files shows up as files read');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: layout at 390px and at 1000px', async () => {
+  const { ctx, page, errors } = await agentPage({ viewport: { width: 390, height: 800 } });
+  assert.equal(await page.$$eval('.tabs', e => e.length), 1, 'the pane switcher is not .tabs');
+  assert.equal(await page.isVisible('.paneSwitch'), true);
+  assert.equal(await page.isVisible('.meterStrip'), true);
+  assert.equal(await page.isVisible('#mission'), true);
+  assert.equal(await page.isVisible('#filesPanel'), false);
+  for (const [pane, panel] of [['files', '#filesPanel'], ['meter', '#meterPanel'], ['run', '#runPanel']]) {
+    await page.click(`.paneSwitch button[data-pane="${pane}"]`);
+    assert.equal(await page.isVisible(panel), true, pane);
+    assert.equal(await page.isVisible('#mission'), false, pane);
+    assert.equal(await page.$$eval('.mapCol .panel', ps => ps.filter(p => p.getBoundingClientRect().height > 0).length), 1, pane);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${pane} overflows sideways`);
+  }
+  await page.click('.paneSwitch button[data-pane="mission"]');
+  await page.click('#runBtn');
+  assert.equal(await page.isVisible('#feedback [data-act="torun"]'), true);
+  await page.click('#feedback [data-act="torun"]');
+  assert.equal(await page.isVisible('#runPanel .steps'), true);
+  await page.setViewportSize({ width: 1000, height: 700 });
+  assert.equal(await page.isVisible('.paneSwitch'), false, 'hidden from 721px up');
+  assert.equal(await page.isVisible('.meterStrip'), false);
+  assert.equal(await page.$$eval('.mapCol .panel', ps => ps.filter(p => p.getBoundingClientRect().height > 0).length), 3);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the dev path missions and the Run panel after a hook run and a stall run never scroll sideways at 390, 1000 and 1440', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(7, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    const showRun = async () => { if (width < 721) await page.click('.paneSwitch button[data-pane="run"]'); };
+    const gotoChapter = async (ch, mi) => { if (width < 721) await page.click('.paneSwitch button[data-pane="mission"]'); await page.click(`#chapters [data-ch="${ch}"]`); if (mi) await page.click(`#mission .dot[data-mi="${mi}"]`); };
+    await fits('mission 8.1');
+    await gotoChapter(9);
+    await fits('mission 10.1');
+    await gotoChapter(14, 1);
+    await fits('mission 15.2');
+    await gotoChapter(10);
+    await o.solve();
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Hook after edit/);
+    await fits('the Run panel after a hook run');
+    await gotoChapter(13);
+    await page.click('#runBtn');
+    await showRun();
+    assert.match(await page.textContent('#runPanel .steps'), /Waiting for approval, but nobody is there/);
+    await fits('the Run panel after a stall run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and 1440, and a schedule line stays inert text', async () => {
+  for (const width of [390, 1000, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(15, 0));
+    const { page } = o;
+    const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+    // at 390px the Files, Mission and Run panels are separate panes
+    const pane = async p => { if (width < 721) await page.click(`.paneSwitch button[data-pane="${p}"]`); };
+    const edit = async text => { await pane('files'); await page.click('#tree [data-path=".claude/schedule.txt"]'); await page.fill('#fileEditor textarea', text); await pane('mission'); await page.click('#runBtn'); await pane('run'); };
+    await fits('mission 16.1');
+    assert.equal(await page.locator('#chapters .tierhead[data-tier="personal"]').count(), 1);
+    assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /Personal.*0\/5/);
+    assert.match(await page.textContent('#chapters [data-ch="15"]'), /Schedules and reminders/);
+    await pane('files');
+    await page.click('#tree [data-path=".claude/schedule.txt"]');
+    assert.match(await page.inputValue('#fileEditor textarea'), /monday 09:00 use backup-note/);
+    await fits('the schedule file view');
+    // a rejected line is shown as text in the schedule step, and nothing it holds becomes an element or runs
+    await edit('<b>x</b>');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: no line starts the job\. Ignored: "<b>x<\/b>" is not "WHEN HH:MM use NAME"/);
+    assert.equal(await page.locator('#runPanel .steps b').count(), 0);
+    await fits('the Run panel after a run no line started');
+    await edit('<img src=x onerror="window.__z=1">');
+    assert.equal(await page.$('#runPanel img'), null);
+    assert.equal(await page.evaluate(() => window.__z), undefined);
+    await pane('mission');
+    await page.click('#promptHost [data-act="fill"]');
+    await page.click('#runBtn');
+    await pane('run');
+    assert.match(await page.textContent('#runPanel .steps'), /Schedule: starts weekly-digest at 07:30, 5 runs a week \(mon, tue, wed, thu, fri\)/);
+    await fits('the Run panel after a fired run');
+    assert.deepEqual(o.console, []);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the Writing, Files, Personal MCP and Skills chapters never scroll sideways at 390, 1000 and 1440, and a reload at chapter 20 keeps its chip in the rail', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[16, 1], [17, 0], [18, 2], [19, 1]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      if (ch === 19) {
+        await page.reload();
+        await page.waitForSelector('#runBtn');
+        const g = await railGaps(page);
+        assert.equal(g.chapter, '19');
+        assert.equal(g.h && g.v, true, `the chapter 20 chip is cut off at ${width}: ${g.chip} in ${g.rail}`);
+      }
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
+test('agent-quest: the Tune chapters never scroll sideways at 390, 1000 and 1440, and the Tune rail header is on screen', async () => {
+  for (const width of [390, 1000, 1440]) {
+    for (const [ch, mi] of [[20, 0], [21, 1], [22, 2]]) {
+      const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(ch, mi));
+      const { page } = o;
+      const fits = label => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).then(ok => assert.equal(ok, true, `${label} overflows sideways at ${width}`));
+      await fits(`mission ${ch + 1}.${mi + 1}`);
+      if (width === 390) {
+        const head = page.locator('#chapters .tierhead[data-tier="tune"]');
+        assert.match(await head.textContent(), /Tune.*0\/3/);
+        assert.equal(await head.isVisible(), true);
+      }
+      await o.solve();
+      if (width < 721) await page.click('.paneSwitch button[data-pane="run"]');
+      assert.equal(await page.isVisible('#runPanel .steps'), true, `the Run panel of ${ch + 1}.${mi + 1} is shown`);
+      await fits(`the Run panel of ${ch + 1}.${mi + 1}`);
+      assert.deepEqual(o.console, []);
+      assert.deepEqual(o.errors, []);
+      await o.ctx.close();
+    }
+  }
+});
+
+test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
+  const { page } = o;
+  assert.equal(await o.xp(), '20 XP');
+  await o.solve();
+  assert.match(await page.textContent('#feedback'), /Badge earned: Clockwork/);
+  assert.equal(await o.xp(), '55 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
+  assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);
+  assert.match(await page.textContent('#chapters .tierhead[data-tier="personal"]'), /1\/5/);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+const railGaps = page => page.evaluate(() => {
+  const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect();
+  return { chapter: document.querySelector('#chapters [aria-current="true"]').dataset.ch, v: Math.min(r.top - c.top, c.bottom - r.bottom) >= -1, h: Math.min(r.left - c.left, c.right - r.right) >= -1, chip: [r.left, r.right], rail: [c.left, c.right] };
+});
+
+test('agent-quest: after a reload at chapter 15 the active chapter chip is scrolled into the rail at 390 and 1280', async () => {
+  for (const width of [390, 740, 1280]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+    const { page } = o;
+    for (const when of ['on load', 'after a reload']) {
+      const g = await railGaps(page);
+      assert.equal(g.chapter, '14');
+      assert.equal(g.v, true, `the chapter 15 chip is cut off at the top or bottom of the rail at ${width}, ${when}`);
+      assert.equal(g.h, true, `the chapter 15 chip is cut off at the side at ${width}, ${when}: ${g.chip} in ${g.rail}`);
+      await page.reload();
+      await page.waitForSelector('#runBtn');
+    }
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
+test('agent-quest: the active chapter chip is scrolled back into the rail when earlier chips change size after load (web fonts)', async () => {
+  const o = await agentPage({ viewport: { width: 390, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+  const { page } = o;
+  await page.addStyleTag({ content: '#chapters .chap[data-ch="0"]{min-width:600px}' });
+  await page.waitForFunction(() => { const r = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), c = document.querySelector('#chapters').getBoundingClientRect(); return r.left >= c.left - 1 && r.right <= c.right + 1; });
+  const g = await railGaps(page);
+  assert.equal(g.h, true, `the chip is cut off at the side: ${g.chip} in ${g.rail}`);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
+  // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
+  const done = {};
+  for (const [ch, n] of [[11, 3], [14, 3]]) for (let i = 0; i < n; i++) done[`${ch}.${i}`] = true;
+  const o = await agentPage({}, async c => { await seedAgent(JSON.stringify({ done }))(c); await c.addInitScript(() => { Math.random = () => 0.999999; }); });
+  const { page } = o;
+  const codes = s => (s.match(/<code>/g) || []).length;
+  const plain = s => s.replace(/<[^>]+>/g, '');
+  const qf = await page.evaluate(() => AQ.QF.map(q => ({ ch: q.ch, c: q.c, a: q.a, w: q.w })));
+  await page.click('.tabs button[data-tab="fire"]');
+  await page.click('#fStart');
+  const missed = new Set();
+  for (let step = 0; step < 12 && !(missed.has(11) && missed.has(14)); step++) {
+    const text = await page.textContent('#fStage .task');
+    const q = qf.find(x => plain(x.c) === text);
+    assert.ok(q, `an unknown question: ${text}`);
+    assert.equal(await page.locator('#fStage .task code').count(), codes(q.c), `code in the question: ${text}`);
+    const opts = await page.$$eval('#fStage .opt .ot', es => es.map(e => e.innerHTML));
+    assert.equal(opts.join('|').split('<code>').length - 1, codes([q.a, ...q.w].join('|')), `code in the options: ${text}`);
+    const right = opts.indexOf(q.a), wrong = opts.findIndex((_, i) => i !== right);
+    // miss one question per chapter: the chapter 15 one whose answer has code, the chapter 12 one whose question has code
+    const miss = !missed.has(q.ch) && (q.ch === 14 ? codes(q.a) : q.ch === 11 && codes(q.c));
+    await page.click(`#fStage .opt[data-i="${miss ? wrong : right}"]`);
+    if (miss) {
+      missed.add(q.ch);
+      if (codes(q.a)) assert.ok(await page.locator('#fFb code').count() >= 1, 'the answer shown after a miss has code');
+    }
+    await page.waitForFunction(t => document.querySelector('#fStage .task')?.textContent !== t, text, { timeout: 5000 });
+  }
+  assert.deepEqual([...missed].sort(), [11, 14]);
+  await page.click('#fStop');
+  const items = page.locator('#fStage .misses li');
+  assert.equal(await items.count(), 2);
+  for (let i = 0; i < 2; i++) assert.ok(await items.nth(i).locator('code').count() >= 1, 'a miss has code');
+  assert.ok(await page.locator('#fStage .misses span:first-child code').count() >= 1, 'a miss question has code');
+  assert.ok(await page.locator('#fStage .misses b code').count() >= 1, 'a miss answer has code');
+  assert.ok(await page.locator('#fStage .misses .note code').count() >= 1, 'a miss explanation has code');
+  assert.doesNotMatch(await page.textContent('#fStage'), /<\/?(code|b)>/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a long command path in the files list breaks after each slash and keeps its plain text', async () => {
+  const o = await agentPage({}, seedAt(11, 0));
+  const { page } = o;
+  const rows = await page.$$eval('#tree [data-path^=".claude/commands/"]', es => es.map(e => ({ path: e.dataset.path, html: e.innerHTML, text: e.textContent, wbrs: e.querySelectorAll('wbr').length })));
+  assert.ok(rows.length >= 1);
+  for (const r of rows) {
+    assert.equal(r.wbrs, r.path.split('/').length - 1, r.path);
+    assert.ok(r.html.startsWith(r.path.split('/').slice(0, -1).join('/<wbr>') + '/<wbr>'), `<wbr> after each slash: ${r.html}`);
+    assert.ok(r.text.startsWith(r.path), r.path);
+    assert.match(r.text.slice(r.path.length), /^( \(edited\))?( \(read-only\))?$/, r.path);
+  }
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: quick-fire and the field guide render, and quick-fire opens after chapter 1', async () => {
+  const o = await agentPage({}, seedAgent(JSON.stringify({ done: { '0.0': true, '0.1': true, '0.2': true, '0.3': true, '0.4': true }, badges: { 0: true } })));
+  const { page } = o;
+  assert.equal(await o.xp(), '75 XP');
+  assert.equal((await page.textContent('#rank')).trim(), 'Loop Watcher');
+  await page.click('.tabs button[data-tab="fire"]');
+  assert.equal(await page.isVisible('#fStart'), true);
+  await page.click('#fStart');
+  assert.equal(await page.locator('#fStage .opt').count(), 4);
+  await page.click('#fStop');
+  await page.click('.tabs button[data-tab="guide"]');
+  assert.ok(await page.locator('#guide .card').count() >= 1);
+  assert.equal(await page.locator('#guide button[data-cmd]').count(), 0, 'guide examples are read-only');
+  assert.match(await page.textContent('#aqFoot'), /last checked on 2026-11-01/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the rail shows 23 chapters, and Use is on the form from mission 10.1', async () => {
+  const o = await agentPage({}, seedAt(9, 0));
+  const { page } = o;
+  assert.equal(await page.locator('#chapters .chap').count(), 23);
+  assert.equal(await page.isVisible('#pf-use'), true);
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: the editor counts a root Done when as the default check, and only for the root file', async () => {
+  const o = await agentPage({}, seedAt(14, 0));
+  const { page } = o;
+  const rules = () => page.textContent('#fileEditor .rules');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  await page.fill('#fileEditor textarea', 'Done when: run npm test');
+  assert.match(await rules(), /1 acts as the default check/);
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  assert.match(await rules(), /no default check/);
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#tree [data-path="CLAUDE.md"]');
+  assert.match(await rules(), /no default check/, '15.2 starts with a Done when line that does not parse');
+  assert.doesNotMatch(await rules(), /acts as the default check/);
+  await page.click('#tree [data-path="src/CLAUDE.md"]');
+  assert.doesNotMatch(await rules(), /default check/, 'a folder file shows neither phrase');
+  assert.deepEqual(o.console, []);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('landing page shows Agent Quest XP only after progress', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/`);
+  assert.equal((await page.textContent('a[href="agent-quest/"] .xp')).trim(), '');
+  assert.equal((await page.textContent('a[href="agent-quest/"] .sub')).trim(), '23 chapters');
+  await page.evaluate(() => localStorage.setItem('agent-quest-v1', JSON.stringify({ done: { '0.0': true } })));
+  // The card reads the stored xp, which the quest page derives and writes at boot.
+  await page.goto(base + '/programming/agent-quest/');
+  await page.waitForSelector('#mission');
+  await page.goto(`${base}/programming/`);
+  assert.match(await page.textContent('a[href="agent-quest/"] .xp'), /10 XP/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: the footer warns once the facts are over 90 days old', async () => {
+  const fresh = await agentPage();
+  assert.doesNotMatch(await fresh.page.textContent('#aqFoot'), /over 90 days ago/);
+  await fresh.ctx.close();
+  const old = await agentPage({}, c => c.clock.setFixedTime(new Date('2027-02-01T12:00:00Z')));
+  assert.match(await old.page.textContent('#aqFoot'), /last checked on 2026-11-01/);
+  assert.match(await old.page.textContent('#aqFoot .stale'), /over 90 days ago/);
+  assert.deepEqual(old.errors, []);
+  await old.ctx.close();
+});
+
+test('agent-quest: the file tree jumps to the last file with End, and the run steps move with the arrow keys', async () => {
+  const { ctx, page, errors } = await agentPage();
+  await page.focus('#tree [aria-selected="true"]');
+  const paths = await page.$$eval('#tree [data-path]', es => es.map(e => e.dataset.path));
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$eval('#tree [aria-selected="true"]', e => e.dataset.path), paths[paths.length - 1]);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#runPanel .steps li[tabindex="0"]').count(), 1, 'the steps are one tab stop');
+  const first = await page.$eval('#runPanel .steps li[tabindex="0"]', e => e.textContent);
+  await page.focus('#runPanel .steps li[tabindex="0"]');
+  await page.keyboard.press('ArrowDown');
+  assert.notEqual(await page.evaluate(() => document.activeElement.textContent), first);
+  assert.equal(await page.evaluate(() => document.activeElement.closest('.steps') !== null), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('agent-quest: long lines and unresolved paths show inline errors, and learner text stays inert', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  await page.click('#mission .dot[data-mi="2"]');
+  await page.fill('#pf-files', 'nope/missing.js');
+  assert.ok(await page.locator('#perrs li').count() >= 1, 'unresolved path');
+  await page.fill('#pf-files', '');
+  await page.fill('#pf-donewhen', 'x'.repeat(5000));
+  assert.match(await page.textContent('#perrs'), /longer than 300 characters/);
+  await page.fill('#pf-donewhen', '<img src=x onerror="window.__y=1">');
+  assert.equal(await page.$('#perrs img'), null);
+  assert.equal(await page.evaluate(() => window.__y), undefined);
+  assert.equal(await o.xp(), '0 XP');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
 });

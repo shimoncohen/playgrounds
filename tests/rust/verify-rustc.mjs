@@ -1,6 +1,6 @@
 // Checks the corpus and every mission program against a real rustc, three ways for programs that compile (the authored
 // fields, rustc, RQ.run) and two ways for the rest. On 0 mismatches it writes tests/fixtures/rust/verified.json and
-// rust-quest/content/verified.js; on any mismatch it exits nonzero and writes nothing. It never edits the corpus.
+// programming/rust-quest/content/verified.js; on any mismatch it exits nonzero and writes nothing. It never edits the corpus.
 //
 //   node tests/rust/verify-rustc.mjs                              uses a local rustc (>= 1.85, edition 2024)
 //   RUSTC_RUNNER="sh tests/rust/docker-run.sh" RUST_IMAGE=rust:slim@sha256:... node tests/rust/verify-rustc.mjs
@@ -112,5 +112,5 @@ if (mismatches.length) {
 
 const rec = { rustc: version, edition: EDITION, date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
 fs.writeFileSync(path.join(ROOT, 'tests/fixtures/rust/verified.json'), JSON.stringify(rec, null, 2) + '\n');
-fs.writeFileSync(path.join(ROOT, 'rust-quest/content/verified.js'), verifiedJs(rec));
+fs.writeFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), verifiedJs(rec));
 console.log(`rustc ${version} edition ${EDITION}: ${rec.counts.corpus} corpus + ${rec.counts.missions} mission programs, 0 mismatches`);

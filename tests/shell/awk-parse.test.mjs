@@ -417,7 +417,7 @@ describe('robustness', () => {
 describe('wiring', () => {
   it('index.html loads awk-parse.js after printf.js and sed.js, and awk itself is not registered yet', async () => {
     const fs = await import('node:fs');
-    const html = fs.readFileSync(new URL('../../shell-quest/index.html', import.meta.url), 'utf8');
+    const html = fs.readFileSync(new URL('../../programming/shell-quest/index.html', import.meta.url), 'utf8');
     const at = (f) => html.indexOf(`<script src="engine/${f}"></script>`);
     assert.ok(at('awk-parse.js') > at('sed.js') && at('sed.js') > 0, 'awk-parse.js after sed.js');
     assert.ok(at('awk-parse.js') < at('cmds-text.js'), 'awk-parse.js before cmds-text.js');

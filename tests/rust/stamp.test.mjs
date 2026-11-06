@@ -29,7 +29,7 @@ describe('the verify record matches the tree', () => {
     const sandbox = {};
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    const js = fs.readFileSync(path.join(ROOT, 'rust-quest/content/verified.js'), 'utf8');
+    const js = fs.readFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), 'utf8');
     vm.runInContext(js, sandbox);
     const { rustc, edition, date, inputsHash: ih, resultsHash: rh, counts } = v();
     assert.deepEqual(JSON.parse(JSON.stringify(sandbox.RQ.verified)), { rustc, edition, date, inputsHash: ih, resultsHash: rh, counts });

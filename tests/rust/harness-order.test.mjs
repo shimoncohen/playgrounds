@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FILES, ROOT } from './harness.mjs';
 
-const DIR = path.join(ROOT, 'rust-quest');
+const DIR = path.join(ROOT, 'programming', 'rust-quest');
 const SRC = /<script src="([^"]+)"/g;
 
-const pageFiles = (html) => [...html.matchAll(SRC)].map((m) => m[1]).filter((f) => f === '../shared/how.js' || f.startsWith('engine/') || f.startsWith('content/'));
+const pageFiles = (html) => [...html.matchAll(SRC)].map((m) => m[1]).filter((f) => f === '../../shared/how.js' || f.startsWith('engine/') || f.startsWith('content/'));
 const onDisk = () => ['engine', 'content'].flatMap((d) => fs.readdirSync(path.join(DIR, d)).filter((f) => f.endsWith('.js')).map((f) => `${d}/${f}`));
 
 export function orderProblems(files, html, disk) {
@@ -26,7 +26,7 @@ export function orderProblems(files, html, disk) {
 
 const html = fs.readFileSync(path.join(DIR, 'index.html'), 'utf8');
 
-describe('harness FILES follow rust-quest/index.html', () => {
+describe('harness FILES follow programming/rust-quest/index.html', () => {
   it('agree, with every engine and content file listed', () => {
     assert.deepEqual(orderProblems(FILES, html, onDisk()), []);
   });

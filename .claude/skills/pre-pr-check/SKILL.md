@@ -8,14 +8,14 @@ description: Use before opening or updating a pull request in this repo. Runs th
 Run in order; stop and fix at the first failure.
 
 1. `git status` clean except intended changes; branch is not `main`; diff is one concern (`git diff --stat origin/main...`).
-2. Syntax: `for f in */app.js ds-quest/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs rust-quest/*.js rust-quest/engine/*.js rust-quest/content/*.js tests/rust/*.mjs tests/fixtures/*.js; do node --check "$f" || break; done`
+2. Syntax: `for f in */app.js programming/*/app.js math/*.js math/scene/*.js math/input/*.js math/*/app.js math/*/content.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs programming/rust-quest/*.js programming/rust-quest/engine/*.js programming/rust-quest/content/*.js tests/rust/*.mjs tests/math/*.mjs programming/agent-quest/*.js programming/agent-quest/engine/*.js programming/agent-quest/content/*.js tests/agent/*.mjs; do node --check "$f" || break; done`
 3. Commit messages and the PR title are Conventional Commits (`echo "type(scope): subject" | npx commitlint`).
 4. `npm run check` (bundling) then `npm run test:engine`, then `npm run test:browser` (about 3 minutes; set `PW_CHROMIUM` if Chromium is preinstalled elsewhere).
 5. **Adversarial diff read** against `AGENTS.md` hard rules:
    - any fixture under `tests/fixtures/` changed? Revert unless a reviewed, documented decision.
    - any `localStorage` key renamed, shipped mission renumbered or reordered?
    - new dependency, build step, or non-relative asset path?
-   - DOM use inside `shell-quest/engine/`?
+   - DOM use inside `programming/shell-quest/engine/`?
    - weakened or skipped test?
    - mission checks passable by `echo`-ing the answer?
    - new or changed missions without `how` steps (whole line first, then each part)?
