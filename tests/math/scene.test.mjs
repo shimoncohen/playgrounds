@@ -82,7 +82,7 @@ test('sample splits 1/x into two segments and drops non-finite points', () => {
 });
 
 test('palette: 3:1 on both themes, and every pair is 12 apart in CIEDE2000 under each vision mode', () => {
-  const css = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math-quest', 'style.css'), 'utf8');
+  const css = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math', 'style.css'), 'utf8');
   const block = re => css.match(re)[1];
   const bgs = [block(/:root\{([^}]*)\}/), block(/:root\[data-theme="dark"\]\{([^}]*)\}/)]
     .flatMap(b => ['--bg', '--surface', '--surface-2'].map(v => b.match(new RegExp(v + ':(#[0-9A-Fa-f]{6})'))[1]));

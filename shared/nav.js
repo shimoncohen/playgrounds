@@ -1,6 +1,6 @@
 /* Links shared by every playground: a way back to the landing page (in the header) and a feature-request
  * button (in a footer line). Load after the header exists (end of <body>). The back link only appears on pages served from a
- * <name>-quest/ folder, so it stays out of the claude.ai artifact bundle, where "../" leads nowhere. */
+ * <name>-quest/, math/ or programming/ folder, so it stays out of the claude.ai artifact bundle, where "../" leads nowhere. */
 (() => {
   'use strict';
   const host = document.querySelector('header.top');
@@ -21,10 +21,10 @@
     return s;
   };
 
-  // A Math Quest track sits one folder deeper (math-quest/algebra/), so its way home climbs one more level.
-  const at = /-quest\/(\w+\/)?(index\.html)?$/.exec(location.pathname);
+  // Pages one folder deeper (a Math track, a quest in programming/) climb one more level to get home.
+  const at = /\/((?:programming\/)?\w+-quest\/(?:\w+\/)?|math\/(?:\w+\/)?|programming\/)(?:index\.html)?$/.exec(location.pathname);
   if (at) {
-    const up = (at[1] ? '../' : '') + (location.protocol === 'file:' ? '../index.html' : '../');
+    const up = '../'.repeat(at[1].split('/').length - 2) + (location.protocol === 'file:' ? '../index.html' : '../');
     host.prepend(link('nv-home', up, icon('← '), 'All playgrounds'));
   }
 

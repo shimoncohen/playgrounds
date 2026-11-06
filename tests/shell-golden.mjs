@@ -38,7 +38,7 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('dialog', d => d.accept());
-  await page.goto(`${base}/shell-quest/`);
+  await page.goto(`${base}/programming/shell-quest/`);
   await page.waitForSelector('#cmd');
 
   // Beginner regression guard only: later tiers are covered by solvability/negative tests in tests/shell/.

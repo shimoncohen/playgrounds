@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math-quest');
+const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'math');
 export const FILES_GRAPH = ['graph.js'];
 
 export function loadMath(files) {
