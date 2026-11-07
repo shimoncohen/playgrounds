@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship `rust-quest/`: an in-repo Rust checker and interpreter that runs the learner's real source, a memory view, and 13 chapters on one linear path, delivered as 16 strictly ordered PRs (P0 to P15). This plan details P0 to P5 (up to checkpoint 1); P6 to P15 are summary rows and are re-planned after checkpoint 1 and again after checkpoint 2.
+**Goal:** Ship `programming/rust-quest/`: an in-repo Rust checker and interpreter that runs the learner's real source, a memory view, and 13 chapters on one linear path, delivered as 16 strictly ordered PRs (P0 to P15). This plan details P0 to P5 (up to checkpoint 1); P6 to P15 are summary rows and are re-planned after checkpoint 1 and again after checkpoint 2.
 
 **Architecture:** Plain browser scripts sharing one global namespace `RQ` (like `AQ`, `NQ` and `SQ`), loaded in order from `index.html`. `engine/` (no DOM) holds the lexer, parser, type checker, CFG lowering, borrow pass, interpreter, std signatures and diagnostics. `content/` holds the course as data. `ui.js`, `editor.js`, `memview.js` and `app.js` are the only DOM files. Node tests load the engine and content in a `vm` sandbox, as `tests/net/harness.mjs` does. A corpus of programs checked against a real `rustc` by an owner-run script, plus a hash stamp recomputed in CI, keeps the checker honest.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - No build step, no framework, no new runtime dependency, no network. Pages work opened from disk and on GitHub Pages.
-- Engine and content files (`rust-quest/engine/*.js`, `rust-quest/content/*.js`) never touch `window`, `document` or `localStorage`.
+- Engine and content files (`programming/rust-quest/engine/*.js`, `programming/rust-quest/content/*.js`) never touch `window`, `document` or `localStorage`.
 - The engine is deterministic: no `Math.random`, no `Date.now`. `HashMap` order is a fixed scramble plus the two-seed rule.
 - Progress key is exactly `rust-quest-v1`. Saved learner code is the added field `codes` with a per-mission length cap; no key is renamed. Mission keys are `'<chapter>.<mission>'`; once shipped they are never renumbered, only appended.
 - Local assets use relative `<script src>` / `<link href>`; an inlined file never contains `</script` or `</style` (`npm run check` bundles every `*-quest/`).
@@ -23,7 +23,7 @@
 - Learner text: whole line explained first, then each part (`how` steps as HTML strings); commands, types, macros, fields and file names are `<code>`; friendly, concrete, never assumes untaught knowledge (AGENTS.md rules 9 to 12, skills `mission-voice` and `add-mission`).
 - Every mission has `answer`, `wrong` and `lazy`: the answer passes its own check, the other two fail for their `wrongWhy`, and at least one alternative valid answer passes.
 - Conventional Commits, scope `rust` (Task 0 merges before any other PR starts). Never bump the version or edit `CHANGELOG.md`. Keep the attribution trailer your tooling adds.
-- Match surrounding code: compact style of `net-quest/*.js` and `cpp-quest/app.js`, comment density, naming.
+- Match surrounding code: compact style of `programming/net-quest/*.js` and `programming/cpp-quest/app.js`, comment density, naming.
 - One concern per PR. The chain is strict: P0 to P15 in order. Do not open a PR before the one before it has merged, except P0 and P1, where P1 is stacked on P0 until P0 merges.
 - Every engine PR extends the corpus for the cases it adds and merges only with 0 mismatches from the owner's verify run.
 
@@ -90,37 +90,37 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 #### 2.1 Scaffold and wire the quest
 
 **Files:**
-- Create: `rust-quest/index.html`, `rust-quest/style.css`, `rust-quest/app.js`
+- Create: `programming/rust-quest/index.html`, `programming/rust-quest/style.css`, `programming/rust-quest/app.js`
 - Modify: `index.html` (landing card), `tests/smoke.mjs` (`NAMES` at line 15), `README.md` (table row, repo map, count), `AGENTS.md` (row, "What this is" list)
 
 **Interfaces:**
 - Produces: page shell with `.tabs button[data-tab]` (`quest`, `fire`, `guide`), `window.PROGRESS={key:"rust-quest-v1",name:"Rust Quest"}`, `shared/*` css and js including `how`, `nav`, `progress`, `theme`.
 
 - [ ] **Step 1:** Add `'rust'` to `NAMES` in `tests/smoke.mjs`. Run `node tests/smoke.mjs`; expected: the `rust-quest` tests FAIL (404).
-- [ ] **Step 2:** Create the shell by copying the shape of `net-quest/index.html`. `app.js` only switches tabs for now.
-- [ ] **Step 3:** Landing card in `index.html` with `data-key="rust-quest-v1"`, `.go` and `.xp`; README table row, repo-map entries for `rust-quest/` and `tests/rust/`, the quest count set to the number at merge time, `AGENTS.md` "Where things go" row and "What this is" list.
+- [ ] **Step 2:** Create the shell by copying the shape of `programming/net-quest/index.html`. `app.js` only switches tabs for now.
+- [ ] **Step 3:** Landing card in `index.html` with `data-key="rust-quest-v1"`, `.go` and `.xp`; README table row, repo-map entries for `programming/rust-quest/` and `tests/rust/`, the quest count set to the number at merge time, `AGENTS.md` "Where things go" row and "What this is" list.
 - [ ] **Step 4:** Run `npm run check` and `node tests/smoke.mjs`. Expected: all pass, including `rust-quest loads cleanly` and `progress survives export, wipe and import`.
 - [ ] **Step 5: Commit** `feat(rust): scaffold Rust Quest`.
 
 #### 2.2 Saved state, codes and ranks (`content/state.js`, `content/tiers.js`)
 
 **Files:**
-- Create: `rust-quest/content/state.js`, `tests/rust/harness.mjs`, `tests/rust/state.test.mjs`
+- Create: `programming/rust-quest/content/state.js`, `tests/rust/harness.mjs`, `tests/rust/state.test.mjs`
 
 **Interfaces:**
 - Produces on `RQ`: `state.fresh()`, `state.load(raw, chapters) -> S`, `state.serialize(S) -> string`, `state.xpFor(done) -> number`. `S.codes` maps `'<ch>.<mi>'` to learner code, capped per mission.
-- Produces in `harness.mjs`: `loadRust() -> RQ` (fresh `vm` context, loads `shared/how.js`, then `rust-quest/engine/*.js` and `content/*.js` in `index.html` order).
+- Produces in `harness.mjs`: `loadRust() -> RQ` (fresh `vm` context, loads `shared/how.js`, then `programming/rust-quest/engine/*.js` and `content/*.js` in `index.html` order).
 
 - [ ] **Step 1: Failing tests** in `state.test.mjs`: (1) a fresh serialized state satisfies the pristine predicate copied from `shared/progress.js:44` (comment names the line); (2) after one done mission, serialized `xp` is a number greater than 0; (3) a tampered `xp` is replaced by `xpFor`; (4) a `codes` entry over the cap is cut to the cap; (5) the export round trip (serialize, load) keeps `codes`; (6) wrong shapes (`'{"done":5,"xp":"x"}'`, non-JSON, `null`) load without throwing; (7) unknown mission keys in `done` and `codes` are dropped (**Review Focus 4**).
 - [ ] **Step 2:** Run `node --test tests/rust/state.test.mjs`. Expected: FAIL (files missing).
-- [ ] **Step 3:** Implement. Per-field fallback, as `net-quest/app.js:20-31` does.
+- [ ] **Step 3:** Implement. Per-field fallback, as `programming/net-quest/app.js:20-31` does.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(rust): add saved state with capped learner code`.
 
 #### 2.3 Lexer and parser (`engine/lex.js`, `engine/parse.js`)
 
 **Files:**
-- Create: `rust-quest/engine/lex.js`, `rust-quest/engine/parse.js`, `tests/rust/lex.test.mjs`, `tests/rust/parse.test.mjs`
+- Create: `programming/rust-quest/engine/lex.js`, `programming/rust-quest/engine/parse.js`, `tests/rust/lex.test.mjs`, `tests/rust/parse.test.mjs`
 
 **Interfaces:**
 - Produces on `RQ`: `lex(src) -> tokens[]` with line and column; `parse(tokens) -> {ast, errors[], unsupported[]}`. AST nodes carry stable node ids. The parser accepts the full subset grammar; anything outside the subset parses, then reports `unsupported` with the feature name and line.
@@ -132,7 +132,7 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 #### 2.4 Minimal checker, interpreter, diagnostics and `RQ.run` (`engine/check.js`, `interp.js`, `std.js`, `diag.js`, `index.js`)
 
 **Files:**
-- Create: `rust-quest/engine/types.js`, `check.js`, `interp.js`, `std.js`, `diag.js`, `index.js`, `tests/rust/run.test.mjs`, `tests/rust/internal.test.mjs`
+- Create: `programming/rust-quest/engine/types.js`, `check.js`, `interp.js`, `std.js`, `diag.js`, `index.js`, `tests/rust/run.test.mjs`, `tests/rust/internal.test.mjs`
 
 **Interfaces:**
 - Consumes: `lex`, `parse`.
@@ -163,7 +163,7 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 #### 2.6 Mission model and chapter 1 (`content/`)
 
 **Files:**
-- Create: `rust-quest/content/model.js`, `ch-01-hello.js`, `extras.js`, `tests/rust/content.test.mjs`, `teach.test.mjs`, `codestyle.test.mjs`
+- Create: `programming/rust-quest/content/model.js`, `ch-01-hello.js`, `extras.js`, `tests/rust/content.test.mjs`, `teach.test.mjs`, `codestyle.test.mjs`
 
 **Interfaces:**
 - Produces: `RQ.CH: Chapter[]` where `Chapter = {name, badge, intro, toolbox, learned[], missions[]}` (chapters register by push from `content/ch-*.js`, loaded in order); `Mission = {title, goal, how: string[], explain, hint, kind: 'write'|'fix'|'predict'|'choose', starter?, harness?, answer, wrong[], lazy[], defines[], previews[], check(c) -> true|string}`; `RQ.runMission(m, input) -> true|string`. `RQ.RANKS`, quick-fire and guide seeds in `extras.js`.
@@ -177,8 +177,8 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 #### 2.7 UI and editor (`ui.js`, `editor.js`, `app.js`)
 
 **Files:**
-- Create: `rust-quest/ui.js`, `rust-quest/editor.js`
-- Modify: `rust-quest/app.js`, `rust-quest/style.css`, `rust-quest/index.html` (script order: `shared/*`, `engine/*` in harness order, `content/*`, `ui.js`, `editor.js`, `app.js`), `tests/smoke.mjs`
+- Create: `programming/rust-quest/ui.js`, `programming/rust-quest/editor.js`
+- Modify: `programming/rust-quest/app.js`, `programming/rust-quest/style.css`, `programming/rust-quest/index.html` (script order: `shared/*`, `engine/*` in harness order, `content/*`, `ui.js`, `editor.js`, `app.js`), `tests/smoke.mjs`
 
 **Interfaces:**
 - Consumes: `RQ.CH`, `RQ.run`, `RQ.runMission`, `RQ.state`, `HowSteps.html`.
@@ -186,7 +186,7 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 
 - [ ] **Step 1: Failing browser tests** in `tests/smoke.mjs`: after a clean load the stored `rust-quest-v1` JSON has `xp === 0`; finishing mission 0.0 changes the XP text exactly once even after running again; seeding `localStorage['rust-quest-v1']` with `'{"done":5,"xp":"x"}'` loads with no console errors; typed code survives a reload; "reset to starter" restores the starter; the Playground link href contains no learner code.
 - [ ] **Step 2:** Run `node tests/smoke.mjs`; expect the new tests to FAIL.
-- [ ] **Step 3:** Implement the DOM files and styles (reuse variables and classes of `net-quest/style.css`; no new fonts). Verify `tools/build.py` discovers the folder without a list edit; verify the 1000×700 sticky check.
+- [ ] **Step 3:** Implement the DOM files and styles (reuse variables and classes of `programming/net-quest/style.css`; no new fonts). Verify `tools/build.py` discovers the folder without a list edit; verify the 1000×700 sticky check.
 - [ ] **Step 4:** Run `npm run check && npm run test:engine && npm run test:browser`. Expected: all pass, no console errors. `tests/rust/` runs locally only (`node --test "tests/rust/*.test.mjs"`) until P3.
 - [ ] **Step 5:** Playtest (`playtest` skill) at 390, 1000 and 1440 wide; note what you saw in the PR.
 - [ ] **Step 6:** Measure the bundle size (`npm run build` output size of `rust-quest`) and record it in the PR body (D14, first of two measurements).
@@ -200,14 +200,14 @@ Branch off `main` after P1 merges. Sub-tasks run in order; each ends with a comm
 
 ### Task 3: Wire `rust-quest` into the checks (P3, #64)
 
-Opened and merged right after P2. Branch off `main`. Build on #54 (Agent CI wiring): if #54 has merged, rebase onto it; if not, include its loop additions (`tests/fixtures/*.js` in the `AGENTS.md:17` and `pre-pr-check` loops, `ds-quest/*.js` in the `pre-pr-check` loop).
+Opened and merged right after P2. Branch off `main`. Build on #54 (Agent CI wiring): if #54 has merged, rebase onto it; if not, include its loop additions (`tests/fixtures/*.js` in the `AGENTS.md:17` and `pre-pr-check` loops, `programming/ds-quest/*.js` in the `pre-pr-check` loop).
 
 **Files:**
 - Modify: `package.json` (line 13, `test:engine`), `.github/workflows/ci.yml` (line 32), `.claude/skills/pre-pr-check/SKILL.md` (line 11), `AGENTS.md` (line 17)
 
-- [ ] **Step 1: Verify the gap first.** Run `npm run test:engine`. Expected: no `tests/rust` test appears in the output. Also read `ci.yml:32`: none of the `rust-quest/` globs is in the syntax loop.
+- [ ] **Step 1: Verify the gap first.** Run `npm run test:engine`. Expected: no `tests/rust` test appears in the output. Also read `ci.yml:32`: none of the `programming/rust-quest/` globs is in the syntax loop.
 - [ ] **Step 2:** `package.json:13`: add `"tests/rust/*.test.mjs"` to `test:engine`. Recheck the line against `main`.
-- [ ] **Step 3:** `ci.yml:32`: add `rust-quest/*.js rust-quest/engine/*.js rust-quest/content/*.js tests/rust/*.mjs` (`*/app.js` already matches `rust-quest/app.js`). Adjust to the final layout from P2. `ci.yml:32` already has `tests/fixtures/*.js`, so only the rust globs are added there; the #54 additions (`tests/fixtures/*.js`, `ds-quest/*.js`) apply to the `pre-pr-check` and `AGENTS.md:17` loops.
+- [ ] **Step 3:** `ci.yml:32`: add `programming/rust-quest/*.js programming/rust-quest/engine/*.js programming/rust-quest/content/*.js tests/rust/*.mjs` (`*/app.js` already matches `programming/rust-quest/app.js`). Adjust to the final layout from P2. `ci.yml:32` already has `tests/fixtures/*.js`, so only the rust globs are added there; the #54 additions (`tests/fixtures/*.js`, `programming/ds-quest/*.js`) apply to the `pre-pr-check` and `AGENTS.md:17` loops.
 - [ ] **Step 4:** `AGENTS.md:17` and `pre-pr-check` line 11: add the same globs. The sandbox may deny agent writes under `.claude/skills`; if so, the owner makes that edit by hand. `pages.yml` needs no edit (it calls `ci.yml`).
 - [ ] **Step 5: Verify.** `npm run test:engine` now runs `tests/rust`; run the `ci.yml` syntax loop locally and expect exit 0; `npm run check` exits 0. Done when every local loop lists the same files as `ci.yml`.
 - [ ] **Step 6:** Open the PR titled `ci: wire rust-quest into checks`, "Part of #47", closes #64.
@@ -309,5 +309,5 @@ Each later PR starts from `main` after the previous merges and appends only. Cha
 - **Touchpoints checked:** P2 landing card, `tests/smoke.mjs:15` `NAMES`, README table row, repo map and count, `AGENTS.md` row and "What this is" list, `xp === 0` smoke assertion. P3 `package.json:13`, `ci.yml:32`, `pre-pr-check` glob, `AGENTS.md:17` loop, `tests/fixtures/*.js`. `tools/build.py` and `commitlint.yml` need no edit (verify the first in 2.1).
 - **Naming consistency:** `RQ.compile`, `RQ.run`, `RQ.CH`, `RQ.runMission`, `RQ.state`, `RQ.RANKS`; statuses `ok`, `error`, `unsupported`, `internal`, `panic`, `limit`, `exit`; snapshot states `uninit`, `owned`, `moved`, `dropped`, `shared`, `mutBorrowed`.
 - **Conflicts to recheck:** P0 and P2 against sibling quest PRs on `commitlint.config.mjs`, `CONTRIBUTING.md`, `README.md`, `tests/smoke.mjs`, `index.html` and `AGENTS.md`; P3 against #54 on `package.json:13`, `ci.yml:32` and `AGENTS.md:17`.
-- **Unverified until P2:** every Rust fact (codes, lints, panic format, exit codes, edition 2024, `f64` formatting), `tools/build.py` discovery of `rust-quest/`, the 1000×700 sticky layout, and the bundle size.
+- **Unverified until P2:** every Rust fact (codes, lints, panic format, exit codes, edition 2024, `f64` formatting), `tools/build.py` discovery of `programming/rust-quest/`, the 1000×700 sticky layout, and the bundle size.
 - **Out of scope here:** Go (#48), a live "check with real rustc" mode, the `new-playground` skill fix (#59), a rustup CI step (D10).
