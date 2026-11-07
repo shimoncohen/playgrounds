@@ -1,5 +1,5 @@
 // Harbor Quest: every mission's reference answer passes its own check, replayed in chapter order on one world (missions build on each other),
-// and a lazy line does not.
+// and a lazy line does not. A mission with steps is solved one step at a time, in order.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadContent } from '../content-loader.mjs';
@@ -55,10 +55,11 @@ for (const [ci, ch] of CH.entries()) {
         if (ch.files) ensureFiles(ch.files);
         if (ch.setup) ch.setup();
       }
-      assert.ok(m.ans !== undefined, 'mission has no reference answer');
-      const lazy = okOf(m, run('echo lazy'));
+      const parts = m.steps || [m];
+      for (const p of parts) assert.ok(p.ans !== undefined, 'mission has no reference answer');
+      const lazy = okOf(parts[0], run('echo lazy'));
       // Assert the probe after solving, so a failing probe does not skip the replay and cascade into later missions.
-      assert.equal(solve(m), true);
+      for (const p of parts) assert.equal(solve(p), true);
       assert.equal(lazy, false, 'check already true before the learner acts');
     });
   }
