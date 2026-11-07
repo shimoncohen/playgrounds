@@ -131,7 +131,7 @@ The page note repeats the landing page's: progress lives in this browser, and ea
 ## Entry points
 
 - **Landing header**: a button "🏆 Level n" next to the existing header buttons, linking to `trophy-room/`. Level 1 with no progress still shows, so the room is discoverable.
-- **Shared bar** (`shared/nav.js`): the same button after "← All playgrounds", using the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` loads `shared/catalog.js` and `shared/trophies.js` itself, only on pages where it shows the button, so no quest page changes.
+- **Shared bar** (`shared/nav.js`): a button after "← All playgrounds". On the Programming and Math hubs it reads "🏆 Level n". On quest pages it shows only "🏆", with "Trophy Room, level n" as its accessible name and tooltip, because a label pushed some quest headers onto a second row at about 1280px. It uses the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` loads `shared/catalog.js` and `shared/trophies.js` itself, only on pages where it shows the button, so no quest page changes.
 
 ## Accessibility
 
