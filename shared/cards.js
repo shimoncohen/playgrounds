@@ -2,9 +2,9 @@
    localStorage, so this just reads it. A data-subject card takes its keys from shared/catalog.js. */
 const keysOf = card => card.dataset.subject
   ? window.Catalog ? Catalog.QUESTS.filter(q => q.subject === card.dataset.subject).map(q => q.key) : []
-  : card.dataset.keys ? card.dataset.keys.split(' ') : [card.dataset.key];
+  : [card.dataset.key];
 
-document.querySelectorAll('.card[data-key], .card[data-keys], .card[data-subject]').forEach(card => {
+document.querySelectorAll('.card[data-key], .card[data-subject]').forEach(card => {
   let xp = 0;
   for (const key of keysOf(card)) {
     try {
