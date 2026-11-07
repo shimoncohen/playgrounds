@@ -162,10 +162,13 @@ test('trophy room links back to the landing page', async () => {
   await ctx.close();
 });
 
-for (const pg of ['programming/', 'programming/python-quest/', 'math/algebra/']) {
+// Quest headers are full, so there the button is only the trophy and the level lives in its name and tooltip.
+for (const [pg, text] of [['programming/', '🏆 Level 3'], ['programming/python-quest/', '🏆'], ['math/algebra/', '🏆']]) {
   test(`trophy room button on ${pg} shows the level and opens the room`, async () => {
     const { ctx, page, errors } = await open(`${base}/${pg}`, {}, c => c.addInitScript(TROPHY_SEED));
-    await page.waitForFunction(() => document.querySelector('.nv-trophy .lvl')?.textContent === 'Level 3');
+    await page.waitForFunction(() => document.querySelector('.nv-trophy')?.getAttribute('aria-label') === 'Trophy Room, level 3');
+    assert.equal((await page.textContent('.nv-trophy')).trim(), text);
+    assert.equal(await page.getAttribute('.nv-trophy', 'title'), 'Trophy Room, level 3');
     await page.click('.nv-trophy');
     await page.waitForSelector('#lv-h');
     assert.equal(new URL(page.url()).pathname, '/trophy-room/');
@@ -178,7 +181,7 @@ test('trophy room button keeps its plain label when its scripts fail to load', a
   const { ctx, page, errors } = await open(`${base}/programming/python-quest/`, {}, c => c.route('**/shared/trophies.js', r => r.abort()));
   await page.waitForSelector('.nv-trophy');
   await page.waitForTimeout(500);
-  assert.equal(await page.textContent('.nv-trophy .lvl'), 'Trophy Room');
+  assert.equal(await page.getAttribute('.nv-trophy', 'aria-label'), 'Trophy Room');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

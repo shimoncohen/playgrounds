@@ -29,10 +29,19 @@
     const home = link('nv-home', root + page, icon('← '), 'All playgrounds');
     host.prepend(home);
     if (at[1] !== 'trophy-room/') {
-      const lvl = document.createElement('span');
-      lvl.className = 'lvl';
-      lvl.textContent = 'Trophy Room';
-      const trophy = link('nv-trophy trophy-btn', root + 'trophy-room/' + page, icon('🏆 '), lvl);
+      const href = root + 'trophy-room/' + page;
+      let trophy;
+      if (at[1] === 'programming/' || at[1] === 'math/') {
+        const lvl = document.createElement('span');
+        lvl.className = 'lvl';
+        lvl.textContent = 'Trophy Room';
+        trophy = link('nv-trophy trophy-btn', href, icon('🏆 '), lvl);
+      } else {
+        // A quest header has no room for a label: it would push the header onto a second row.
+        trophy = link('nv-trophy trophy-btn', href, icon('🏆'));
+        trophy.setAttribute('aria-label', 'Trophy Room');
+        trophy.title = 'Trophy Room';
+      }
       home.after(trophy);
       // Quest pages don't load the catalog, so fetch the two small scripts only where this button is shown.
       const load = src => new Promise((done, fail) => {

@@ -91,8 +91,10 @@
     let storage = null;
     try { storage = root.localStorage; } catch (e) { /* storage blocked: level 1 */ }
     const n = summary(storage, root.Catalog).level.n;
-    a.querySelector('.lvl').textContent = 'Level ' + n;
+    const lvl = a.querySelector('.lvl');
+    if (lvl) lvl.textContent = 'Level ' + n;
     a.setAttribute('aria-label', 'Trophy Room, level ' + n);
+    a.title = 'Trophy Room, level ' + n;
   }
 
   root.Trophies = { readSave, questStats, level, subjectStats, achievements, summary, labelButton };
