@@ -18,6 +18,8 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
 | ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
 
+**Trophy Room** ([`trophy-room/`](trophy-room/)) shows your playground level, worked out from the XP of every playground, your progress per subject and playground, and achievements such as Playground Master. It reads the progress already saved in your browser.
+
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page), `programming/<name>-quest/index.html` or `math/index.html` in a browser. There is no build step, no server and no database.
 
 ## 🧭 How a quest works
@@ -107,7 +109,7 @@ The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math
 
 ```
 index.html              landing page (a card per section)
-shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, landing.css + cards.js (landing and hub cards)
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements)
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
   script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
@@ -122,7 +124,8 @@ math/track.js           the app every track page shares (rail, mission card, sce
 math/arithmetic/ math/algebra/ math/geometry/ math/trigonometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math/vendor/            committed third-party scripts for Math (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
-tests/                  engine tests (Node; shell/, ds/, net/, math/ and agent/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
+trophy-room/            the Trophy Room: index.html + style.css + app.js, rendered from shared/trophies.js
+tests/                  engine tests (Node; shell/, ds/, net/, math/, agent/ and trophy/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates

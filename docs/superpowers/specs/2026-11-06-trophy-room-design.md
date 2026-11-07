@@ -29,7 +29,7 @@ The first PR (this spec and the plan) changes docs only.
 
 ```
 shared/
-  catalog.js       DOM-free: the list of quests (window.Catalog and an ES export for tests)
+  catalog.js       DOM-free: the list of quests (window.Catalog; tests load it with node:vm, like shared/tiers.js)
   trophies.js      DOM-free: read saves, derive stats, level, achievements
 trophy-room/
   index.html       the page: header, level, subjects, quests, achievements
@@ -79,7 +79,7 @@ Total today is about 9,860 XP. Quirks the reader must handle:
 - `sep` is the done-key separator (`'-'` for Script and C++).
 - `href` is relative to the site root; each page resolves it against its own depth.
 - `subject` is `programming` or `math`. Subject names and order live here too: `SUBJECTS = [{id:'programming', name:'Programming', href:'programming/'}, {id:'math', name:'Math', href:'math/'}]`.
-- The landing page cards and the Programming hub cards stop hard-coding `data-keys` and take their keys from the catalog by subject or by key. `shared/cards.js` keeps its behaviour (sum XP, show "Continue →").
+- The landing Programming and Math cards use `data-subject` and take their keys from the catalog; the Programming hub's quest cards keep `data-key`. `shared/cards.js` keeps its behaviour (sum XP, show "Continue →").
 
 ## `shared/trophies.js`
 
@@ -131,7 +131,7 @@ The page note repeats the landing page's: progress lives in this browser, and ea
 ## Entry points
 
 - **Landing header**: a button "🏆 Level n" next to the existing header buttons, linking to `trophy-room/`. Level 1 with no progress still shows, so the room is discoverable.
-- **Shared bar** (`shared/nav.js`): the same button after "← All playgrounds", using the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` gets the level from `shared/trophies.js` and `shared/catalog.js`, which every quest page then loads.
+- **Shared bar** (`shared/nav.js`): the same button after "← All playgrounds", using the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` loads `shared/catalog.js` and `shared/trophies.js` itself, only on pages where it shows the button, so no quest page changes.
 
 ## Accessibility
 
