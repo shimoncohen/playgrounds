@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const COURSE = '^shell-quest full course';
+// shared/catalog.js repeats every quest's chapter counts, so any quest change re-checks it.
+const CATALOG = 'tests/trophy/catalog.test.mjs';
 // Sections that live in a top-level folder of their own instead of programming/<name>-quest/.
 const SECTIONS = ['math'];
 // Changes here cannot affect a page or a test.
@@ -21,7 +23,7 @@ export function scope(files) {
   for (const f of files) {
     if (IGNORED.some(r => r.test(f))) continue;
     const m = f.match(/^(?:programming\/)?([a-z]+)-quest\//) || f.match(new RegExp(`^(${SECTIONS.join('|')})/`)) || f.match(/^tests\/([a-z]+)\//);
-    if (!m || m[1] === 'fixtures' || m[1] === 'tools') return null;
+    if (!m || m[1] === 'fixtures' || m[1] === 'tools' || m[1] === 'trophy') return null;
     quests.add(m[1]);
   }
   return [...quests].sort();
@@ -33,9 +35,9 @@ export function plan(files, { all, withTests, browser = {} }) {
   const shell = picked === null || picked.includes('shell');
   const jobs = [];
   if (picked === null) jobs.push({ name: 'engine tests', args: ['--run', 'test:engine'], browser: false });
-  else {
+  else if (picked.length) {
     const dirs = picked.filter(q => withTests.includes(q));
-    if (dirs.length) jobs.push({ name: `engine tests (${dirs.join(', ')})`, args: ['--test', ...dirs.map(q => `tests/${q}/*.test.mjs`)], browser: false });
+    jobs.push({ name: `engine tests (${[...dirs, 'catalog'].join(', ')})`, args: ['--test', ...dirs.map(q => `tests/${q}/*.test.mjs`), CATALOG], browser: false });
   }
   if (picked !== null && !picked.length) return jobs;
   const others = picked === null ? [] : all.filter(q => !picked.includes(q));
