@@ -1547,7 +1547,7 @@ test('shell-quest script mission: Type it for me opens the editor pre-filled; wr
   assert.match(await card(), /scripts\/hi\.sh/, 'file path shown on the card');
   assert.doesNotMatch(await card(), /Challenge/, 'a script mission is not tagged Challenge');
   await page.click('[data-act="hint"]');
-  assert.match(await page.textContent('#hintBox'), /Use nano scripts\/hi\.sh to write it, then run it with bash scripts\/hi\.sh\./);
+  assert.match(await page.textContent('#hintBox'), /Use nano scripts\/hi\.sh to write it, then try it with bash scripts\/hi\.sh\./);
   assert.equal(await xp(), '0 XP');
   // Type it for me: the editor opens on the mission file, pre-filled with the answer, nothing saved yet
   await page.click('[data-act="fill"]');
@@ -1862,14 +1862,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
         await page.click('#edClose');
       } else {
         assert.equal(await page.inputValue('#cmd'), m.answer, `Type it for me fills ${key} ${m.title}`);
-        const n0 = await page.$$eval('#screen .line', els => els.length);
         await page.press('#cmd', 'Enter');
-        if (m.title === 'Treasure hunt') { // two steps: the find prints the path, the learner cats it
-          const path = l => l.startsWith('./') && l.endsWith('/gold.txt'); // a printed path, not the prompt line that typed the find
-          await page.waitForFunction(n => [...document.querySelectorAll('#screen .line')].slice(n).some(e => /^\.\/.*\/gold\.txt$/.test(e.textContent.trim())), n0);
-          const found = (await page.$$eval('#screen .line', (els, n) => els.slice(n).map(e => e.textContent.trim()), n0)).find(path);
-          await type(`cat ${found}`);
-        }
         if (m.steps.length) { // a multi-step mission: one step is ticked off, the mission stays open until the last one
           for (const a of m.steps.slice(1)) {
             assert.equal(await page.evaluate(k => !!window.SQ.S.done[k], key), false, `${key} ${m.title}: one step must not complete the mission`);

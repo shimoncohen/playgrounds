@@ -139,7 +139,7 @@ const BACKUP={title:'Capstone: backup script',kind:'challenge',file:'scripts/bac
     {label:'names with spaces',args:['trip'],files:TRIP,expectOut:'backed up 2 files',expectFiles:{'backup/day one.txt':TRIP['trip/day one.txt'],'backup/day two.txt':TRIP['trip/day two.txt']}}],
   world:backupWorld, /* the check and the Save & run failure line (SQ.missionVerdict) both judge this world */
   check:c=>backupWorld(()=>c.scriptPasses(BACKUP).ok),
-  hint:`Start from the starter's four steps. Loop with <code>for f in "$1"/*.txt</code>, skip the pattern itself when nothing matched (<code>[ -e "$f" ] || continue</code>), and count with <code>n=$((n + 1))</code>. Save it, then run <code>bash scripts/backup.sh docs</code> and <code>bash scripts/backup.sh drafts</code>.`,
+  hint:`Start from the starter's four steps. Loop with <code>for f in "$1"/*.txt</code>, skip the pattern itself when nothing matched (<code>[ -e "$f" ] || continue</code>), and count with <code>n=$((n + 1))</code>. Save it, then try it with <code>bash scripts/backup.sh docs</code> and <code>bash scripts/backup.sh drafts</code>.`,
   explain:`This puts the whole Advanced tier together: a test on <code>$1</code> with a usage line on stderr and <code>exit 1</code>, <code>mkdir -p</code> (no error when the folder is already there), a loop over a wildcard and a running count. When a folder has no <code>.txt</code> files the pattern matches nothing and stays as it is, so the loop sees the text <code>drafts/*.txt</code> once: the <code>[ -e "$f" ]</code> test skips it. The wildcard hands the loop each name whole, spaces and all, while <code>for f in $(ls …)</code> would cut <code>day one.txt</code> in two. Always write <code>"$f"</code> with quotes: bash splits an unquoted variable at its spaces and expands any wildcard in it. Each time you save, the script is tried on a world with no <code>backup/</code>: on <code>docs</code>, the empty <code>drafts</code>, a missing folder, no argument, a second run over an old copy and names with spaces. The originals must stay in <code>docs</code>: copy with <code>cp</code>, do not move them.`};
 
 /* a here-document (<<WORD, <<-WORD, <<'WORD') outside comments; <<< is a here-string, not a here-document.
@@ -206,7 +206,7 @@ echo exists
 if [ -d "$1" ]; then echo exists; else echo missing; fi
 `],
   tests:[{label:'a file',args:['journal.txt'],expectOut:'exists'},{label:'nothing there',args:['ghost.txt'],expectOut:'missing'},{label:'a folder',args:['village'],expectOut:'exists'}],
-  hint:`Write an <code>if</code> around <code>[ -e "$1" ]</code> with an <code>else</code>. Save it, then run <code>bash scripts/exists.sh journal.txt</code> and <code>bash scripts/exists.sh ghost.txt</code>.`,
+  hint:`Write an <code>if</code> around <code>[ -e "$1" ]</code> with an <code>else</code>. Save it, then try it with <code>bash scripts/exists.sh journal.txt</code> and <code>bash scripts/exists.sh ghost.txt</code>.`,
   explain:`In the editor panel, Save writes the file, Save &amp; run also runs it, and the Arguments box holds what you would type after the script name. The first line <code>#!/bin/bash</code> names the program that runs the file, and lines that start with <code>#</code> are comments that bash ignores. Inside a script, <code>$1</code> is the first argument. Write it as <code>"$1"</code> in a test, with the quotes, so a name with spaces stays one word. <code>-e</code> is true for files and folders alike, while <code>-f</code> would say <code>missing</code> for <code>village</code>. Each time you save, the script is tried with a file, a missing name and a folder; Save &amp; run also tells you which one failed.`}
  ]},
 {tier:'advanced',name:'Loops & numbers',badge:'Looper',intro:'Loops repeat work until a test says stop, and $(( )) lets bash do sums. Together they count, add things up and walk through a file one line at a time.',
@@ -257,7 +257,7 @@ done
 echo "$sum"
 `],
   tests:[{label:'three numbers',args:['1','2','3'],expectOut:'6'},{label:'two numbers',args:['10','20'],expectOut:'30'},{label:'no arguments',args:[],expectOut:'0'}],
-  hint:`Use the running total from mission 3, but loop over <code>"$@"</code>. Save it, then run <code>bash scripts/sum.sh 1 2 3</code>.`,
+  hint:`Use the running total from mission 3, but loop over <code>"$@"</code>. Save it, then try it with <code>bash scripts/sum.sh 1 2 3</code>.`,
   explain:`<code>"$@"</code> is every argument, each kept whole, so <code>for n in "$@"</code> visits them in turn. With no arguments the loop body never runs and the total stays 0. Each time you save, the script is tried with <code>1 2 3</code>, <code>10 20</code> and nothing.`}
  ]},
 {tier:'advanced',name:'Functions & arguments',badge:'Function Maker',intro:'A function gives a few commands one name, so you can run them again with different arguments. Inside it, <code>$1</code>, <code>$#</code> and "<code>$@</code>" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
@@ -405,7 +405,7 @@ EOF
   check:c=>usesHereDoc(c.read('~/scripts/mkconf.sh'))&&c.scriptPasses(MKCONF).ok,
   checkFail:'The file is right, but write it with a here-document: cat > app.conf <<EOF, the two lines, then EOF.',
   tests:[{label:'a first run',expectFiles:{'app.conf':'name=quest\nmode=fast'}},{label:'running it a second time',files:{'app.conf':'name=quest\nmode=fast'},expectFiles:{'app.conf':'name=quest\nmode=fast'}}],
-  hint:`Write <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, run <code>bash scripts/mkconf.sh</code> twice, then <code>cat app.conf</code>.`,
+  hint:`Write <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, then try it with <code>bash scripts/mkconf.sh</code> (twice) and <code>cat app.conf</code>.`,
   explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in <code>scripts</code>: this practice shell runs one typed line at a time.`},
  {title:'Script: count lines',kind:'script',file:'scripts/loglines.sh',
   goal:`Write <code>scripts/loglines.sh</code>: for every <code>.log</code> file in <code>logs/</code>, it prints the file's name and its number of lines, like <code>app.log: 4</code>, in name order.`,
@@ -428,7 +428,7 @@ done
 `],
   tests:[{label:'the logs here',files:under('logs',LOGS15),expectOut:'app.log: 4\ndb.log: 2\nweb.log: 3'},
     {label:'other logs',files:LOG_CASE2,expectOut:'app.log: 1\ncache.log: 3\ndb.log: 5\nweb.log: 2'}],
-  hint:`Loop with <code>for f in logs/*.log</code>. Inside, <code>n=$(wc -l &lt; "$f")</code> and <code>echo "$(basename "$f"): $n"</code>. Save it, then run <code>bash scripts/loglines.sh</code>.`,
+  hint:`Loop with <code>for f in logs/*.log</code>. Inside, <code>n=$(wc -l &lt; "$f")</code> and <code>echo "$(basename "$f"): $n"</code>. Save it, then try it with <code>bash scripts/loglines.sh</code>.`,
   explain:`<code>wc -l &lt; "$f"</code> prints just the number, because <code>wc</code> reads its input and never sees a file name; <code>wc -l "$f"</code> would print <code>4 logs/app.log</code>. <code>$( )</code> captures the number, and <code>basename</code> drops the folder. A wildcard lists names in order, so the lines come out sorted. Each time you save, the script is tried on the logs here and on a different set of logs.`},
  BACKUP
  ]}
