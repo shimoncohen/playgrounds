@@ -25,6 +25,7 @@ const traced=(c,pred)=>{
 const reached=t=>!!t&&t.hops.length>0&&t.hops.at(-1).reached;
 const toServer=t=>t.ip===SERVER&&reached(t);
 const looped=t=>!!t&&t.hops.length>=5&&!t.hops[4].reached&&t.hops[1].from&&t.hops[1].from===t.hops[3].from&&t.hops[2].from&&t.hops[2].from===t.hops[4].from;
+const ROUTE_ADD=/^\s*ip\s+(r|route)\s+(add|replace|change)\s/;
 const ROUTE=[['ip','cmd','network settings tool'],['route','arg','the routing table']];
 const DEFAULT_ADD=[...ROUTE,['add','arg','put a route in the table'],['default','arg','the catch-all route'],['via','arg','the gateway comes next'],['192.168.1.1','arg','the gateway']];
 
@@ -58,7 +59,8 @@ NQ.CH.push({name:'Routing and the gateway',badge:'Pathfinder',
     const r=c.route('printer',FAR);
     if(!r)return 'The printer still has no default route. Add one with <code>ip route add default via 192.168.1.1</code>.';
     if(r.via!==gw(c))return 'The printer has a default route, but its gateway is not the office router. The router is at <code>192.168.1.1</code>.';
-    return c.ping('printer',SERVER).delivered?true:'The printer still cannot reach the server. Check that the gateway is the router\'s address, <code>192.168.1.1</code>.';}},
+    if(!c.ping('printer',SERVER).delivered)return 'The printer still cannot reach the server. Check that the gateway is the router\'s address, <code>192.168.1.1</code>.';
+    return c.inOrder(ROUTE_ADD,NQ.pingTo('172.16.0.10'))?true:'The route is in. Now run <code>ping -c 1 172.16.0.10</code> to prove it.';}},
  {title:'The wrong gateway',scenario:'office',setup:[{dev:'laptop',cmd:'ip route del default'},{dev:'laptop',cmd:'ip route add default via 192.168.1.2'}],
   goal:'The laptop has a default route, but someone typed its gateway wrong. Run <code>ping -c 1 172.16.0.10</code> and watch it fail with <code>Destination Host Unreachable</code>. Then open the packet panel and look at the ARP request: the laptop is not asking who has the server\'s address. It is asking for the <b>gateway\'s</b> MAC, because the frame must go to the router, and nobody answers. Fix the default route with <code>ip route del default</code> and then <code>ip route add default via</code> the real router, <code>192.168.1.1</code>, and run the same <code>ping</code> again.',
   anat:[...ROUTE,['del','arg','remove a route'],['default','arg','the catch-all route'],['add','arg','put a route in the table'],['via','arg','the gateway comes next'],['192.168.1.1','arg','the real gateway']],
@@ -73,7 +75,8 @@ NQ.CH.push({name:'Routing and the gateway',badge:'Pathfinder',
     const r=c.route('laptop',FAR);
     if(!r)return 'The laptop has no default route now. Add one with <code>ip route add default via 192.168.1.1</code>.';
     if(r.via!==gw(c))return 'The laptop\'s gateway is still not the router. In the packet panel, the ARP request asks for the gateway and nobody answers: use the router\'s address, <code>192.168.1.1</code>.';
-    return c.ping('laptop',SERVER).delivered?true:'The laptop still cannot reach the server. Compare its gateway in <code>ip route</code> with the router\'s address.';}},
+    if(!c.ping('laptop',SERVER).delivered)return 'The laptop still cannot reach the server. Compare its gateway in <code>ip route</code> with the router\'s address.';
+    return c.inOrder(ROUTE_ADD,NQ.pingTo('172.16.0.10'))?true:'The gateway is right. Now run <code>ping -c 1 172.16.0.10</code> to prove it.';}},
  {title:'Follow the hops',scenario:'office',
   goal:'Each router a packet passes through is one <b>hop</b>. <code>traceroute</code> lists them by sending probes with a growing TTL. The first probe gets TTL 1, so the first router lowers it to 0, throws the packet away (<b>TTL expiry</b>) and sends back a "time exceeded" message that reveals its address. The next probe gets TTL 2, and so on until the server itself answers. Run <code>traceroute 172.16.0.10</code>, then type the address that answers on hop 2.',
   anat:[['traceroute','cmd','list the routers on the way'],['172.16.0.10','arg','the server']],
@@ -102,7 +105,8 @@ NQ.CH.push({name:'Routing and the gateway',badge:'Pathfinder',
     if(c.route('r1',FAR))return 'r1 now has a catch-all route. That reaches the server, but <code>r2</code> would hand every unknown address straight back to <code>r1</code>. Add a route for just the server\'s network, <code>172.16.0.0/24</code>.';
     if(!c.route('r1',SERVER))return 'r1 still has no route that covers the server. Add one for <code>172.16.0.0/24</code> with <code>ip route add</code>.';
     if(!c.ping('laptop',SERVER).delivered)return 'The laptop still cannot reach the server. The gateway of the new route must be <code>r2</code>\'s address on the middle wire, <code>10.0.1.2</code>.';
-    return c.ping('server',addrOf(c,'laptop')).delivered?true:'The server cannot answer the laptop. Check the route\'s gateway with <code>ip route</code>.';}},
+    if(!c.ping('server',addrOf(c,'laptop')).delivered)return 'The server cannot answer the laptop. Check the route\'s gateway with <code>ip route</code>.';
+    return c.inOrder(ROUTE_ADD,NQ.pingTo('172.16.0.10'))?true:'The route is in. Now run <code>ping -c 1 172.16.0.10</code> to prove it.';}},
  {title:'Round and round',scenario:'office',setup:[{dev:'r1',cmd:'ip route add default via 10.0.1.2'}],
   goal:'Someone gave <code>r1</code> a default route that hands unknown addresses to <code>r2</code>, but <code>r2</code>\'s default route already hands them back to <code>r1</code>. A packet for an address neither knows would bounce between them: a <b>routing loop</b>. Only its TTL stops it. Run <code>traceroute 8.8.8.8</code> from the laptop (an address outside the office that no route covers) and read the list: the same addresses keep answering. Then type the address that answers on hop 3 and again on hop 5.',
   anat:[['traceroute','cmd','list the routers on the way'],['8.8.8.8','arg','an address outside the office']],
