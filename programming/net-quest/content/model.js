@@ -11,6 +11,9 @@ NQ.KINDS={cmd:'command',opt:'option',arg:'argument',op:'operator'}; // anatomy c
    word's trailing . ! ? is dropped, so "Ethernet → IPv4 → ICMP", "ethernet ipv4 icmp" and "Ethernet, IPv4, ICMP." are
    equal. Dots and colons inside a word stay, so addresses and MACs compare exactly. */
 NQ.norm=s=>String(s??'').toLowerCase().split(/[\s,;|\/>→=-]+/).map(w=>w.replace(/[.!?]+$/,'')).filter(Boolean).join(',');
+NQ.PING=/^\s*ping(\s|$)/;
+// the verifying ping must hit the host the mission names: a nearby host such as the gateway answers as soon as the fix is in
+NQ.pingTo=ip=>new RegExp('^\\s*ping\\s(.*\\s)?'+ip.replace(/\./g,'\\.')+'\\s*$');
 NQ.ASK='Now type your answer in the box under the question.'; // runMission's "check passed, waiting for the answer"
 /* the check context. history: [{line, code, entries}] the learner ran, entries being the log slice that line added
    (net.exec's r.entries); answered: their answer to the question, or null. lastPing() is the
@@ -23,7 +26,9 @@ NQ.makeCtx=(net,history,answered)=>({
   addr:dev=>Object.fromEntries(Object.entries(net.devices[dev].ifaces).map(([k,i])=>[k,i.ip])),
   last:pred=>{for(let i=net.log.length-1;i>=0;i--)if(pred(net.log[i]))return net.log[i];return null;},
   layers:e=>NQ.pkt.layerNames(e.packet),
-  lastPing:()=>(history||[]).filter(h=>/^\s*ping(\s|$)/.test(h.line)).at(-1)||null
+  lastPing:()=>(history||[]).filter(h=>NQ.PING.test(h.line)).at(-1)||null,
+  // exit-0 lines only, matched in order as a subsequence: other lines may sit between
+  inOrder:(...res)=>{let i=0;for(const h of history||[])if(i<res.length&&h.code===0&&res[i].test(h.line))i++;return i===res.length;}
 });
 /* build the mission's network, run the lines on its terminal device (m.dev, else the scenario's own), then check.
    A question is asked only once the check passes; question.accept(ctx) may list more accepted answers. Returns true,

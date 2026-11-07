@@ -10,8 +10,6 @@ const unit = (m) => (m.steps ? m.steps[0] : m);
 const verdict = (SQ, m, line) => SQ.missionVerdict(unit(m), SQ.ctxFor(line)).good;
 const decode = (s) => s.replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 const ucFirst = (s) => s.replace(/^[a-z]/, (c) => c.toUpperCase());
-// Same two-step mission as solvability.test.mjs: the answer only finds the path, a later `cat` solves it.
-const TWO_STEP = { 'Treasure hunt': true };
 
 // Examples written in a mission's text that may complete it, because they teach the same lesson as its answer. Any other example that
 // completes a mission is a check that is too loose (echo village/logs/day?.log is the ? lesson, not the * one; echo $HOME is not the variable you stored).
@@ -97,7 +95,7 @@ describe('a command-not-found line never completes a mission', () => {
       ch.missions.forEach((m, mi) => {
         if (isScript(m)) return;
         let SQ = worldBefore(idx, mi);
-        const solve = TWO_STEP[m.title] ? `cat ${run(SQ, m.answer).out.split('\n').find((l) => l.trim()).trim()}` : m.answer;
+        const solve = m.answer;
         run(SQ, solve);
         assert.equal(SQ.rt.log.some((e) => e.nf), false, `"${m.title}": its own answer reports command not found`);
         assert.equal(verdict(SQ, SQ.content.chapters[idx].missions[mi], solve), true, `"${m.title}": answer does not pass`);
@@ -106,10 +104,9 @@ describe('a command-not-found line never completes a mission', () => {
         const bg = /(?<!&)&(?!&)/.test(solve);
         const variants = bg ? [`nosuchcmd; ${solve}`] : [`nosuchcmd | ${solve}`, `${solve}; nosuchcmd`];
         // a typo'd background command that is killed before it ever ran (Sleep 100 & kill %1) is not seen as not found: known gap
-        if (!bg && word && SQ.CMDS && SQ.CMDS[word[1]] && !TWO_STEP[m.title]) variants.push(ucFirst(solve));
+        if (!bg && word && SQ.CMDS && SQ.CMDS[word[1]]) variants.push(ucFirst(solve));
         for (const v of variants) {
           SQ = worldBefore(idx, mi);
-          if (TWO_STEP[m.title]) run(SQ, m.answer);
           run(SQ, v);
           assert.ok(SQ.rt.log.some((e) => e.nf), `"${m.title}": ${JSON.stringify(v)} was meant to hit a command not found`);
           assert.equal(verdict(SQ, SQ.content.chapters[idx].missions[mi], v), false, `"${m.title}": completed by ${JSON.stringify(v)}`);
@@ -126,7 +123,7 @@ describe('examples in a mission text complete it only when they teach the same l
     it(`chapter ${idx + 1}`, () => {
       const ch = loadShell().content.chapters[idx];
       ch.missions.forEach((m, mi) => {
-        if (isScript(m) || TWO_STEP[m.title]) return;
+        if (isScript(m)) return;
         const text = [m.goal, m.explain, m.hint].filter(Boolean).join(' ');
         const snippets = [...new Set([...text.matchAll(/<code>(.*?)<\/code>/g)].map((x) => decode(x[1]).replace(/<[^>]+>/g, '')))].filter((s) => s !== m.answer && s !== m.answer.split(/\s/)[0] && /^[a-z]/.test(s)); // the bare command name is a mention, not an example
         for (const s of snippets) {
@@ -148,7 +145,7 @@ function worldBefore(idx, mi) {
   c.setup();
   for (const p of c.missions.slice(0, mi)) {
     if (isScript(p)) SQ.writeFile(SQ.norm(p.file, SQ.HOME), p.answer, false, p.file);
-    else if (!TWO_STEP[p.title]) run(SQ, p.answer);
+    else run(SQ, p.answer);
   }
   return SQ;
 }
