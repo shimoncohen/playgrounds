@@ -15,7 +15,6 @@ const plain = x => JSON.parse(JSON.stringify(x));
 const SUBJECTS = [{ id: 'programming', name: 'Programming', href: 'programming/', unit: 'quests', icon: '💻' }, { id: 'math', name: 'Math', href: 'math/', unit: 'tracks', icon: '📐' }];
 const Q = (key, subject, missions, sep = '.') => ({ key, name: key, subject, href: key + '/', sep, missions });
 const store = data => ({ getItem: k => (k in data ? (typeof data[k] === 'string' ? data[k] : JSON.stringify(data[k])) : null) });
-// The fields achievements() reads, with nothing done.
 const st = (subject, o = {}) => ({ subject, missionsDone: 0, chaptersDone: 0, started: false, complete: false, ...o });
 const ach = (stats, id) => plain(T.achievements(stats, SUBJECTS)).find(a => a.id === id);
 
@@ -32,7 +31,7 @@ test('stats count done missions with either separator and a 1 or true value', ()
 });
 
 test('stats ignore junk, out-of-range, padded and wrong-separator keys', () => {
-  const s = plain(T.questStats(Q('a', 'math', [2]), { done: { '5.0': 1, '0.9': 1, 'a.b': 1, '00.0': 1, '0.0.0': 1, '0-0': 1 } }));
+  const s = plain(T.questStats(Q('a', 'math', [2]), { done: { '5.0': 1, '0.9': 1, 'a.b': 1, '00.0': 1, '0.0.0': 1, '0-0': 1, '-1.0': 1, ...JSON.parse('{"__proto__": 1}') } }));
   assert.equal(s.missionsDone, 0);
   assert.equal(s.started, false);
 });
