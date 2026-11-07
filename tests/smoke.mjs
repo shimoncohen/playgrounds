@@ -93,13 +93,22 @@ test('programming hub links back to the landing page', async () => {
   await ctx.close();
 });
 
-test('landing page links to GitHub and the feature request form', async () => {
+test('landing page links to the Trophy Room, GitHub and the feature request form', async () => {
   const { ctx, page, errors } = await open(base + '/');
   const hrefs = await page.$$eval('a.btn', a => a.map(x => x.getAttribute('href')));
   assert.deepEqual(hrefs, [
+    'trophy-room/',
     'https://github.com/shimoncohen/playgrounds',
     'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml',
   ]);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('landing page Trophy Room button shows the playground level', async () => {
+  const { ctx, page, errors } = await open(base + '/', {}, c => c.addInitScript(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 85 }))));
+  assert.equal(await page.textContent('.trophy-btn .lvl'), 'Level 3');
+  assert.equal(await page.getAttribute('.trophy-btn', 'aria-label'), 'Trophy Room, level 3');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

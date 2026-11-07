@@ -48,3 +48,4 @@ header{padding:36px 0 8px}
 .note{margin-top:32px;padding:16px 18px;border:1.5px dashed var(--line);border-radius:12px;color:var(--muted);font-size:14.5px;max-width:78ch}
 .note b{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
