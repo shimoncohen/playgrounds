@@ -1,0 +1,758 @@
+[
+  {
+    "id": "hello",
+    "src": "fn main() {\n    println!(\"Hello, Rust!\");\n}\n",
+    "expect": "ok", "out": "Hello, Rust!\n", "err": "", "exit": 0,
+    "why": "println! prints its string and a newline", "pr": "P2"
+  },
+  {
+    "id": "hole-sum",
+    "src": "fn main() {\n    println!(\"{}\", 1 + 2);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "a {} hole is filled with the next argument", "pr": "P2"
+  },
+  {
+    "id": "holes-two",
+    "src": "fn main() {\n    println!(\"{} and {}\", 1, \"two\");\n}\n",
+    "expect": "ok", "out": "1 and two\n", "err": "", "exit": 0,
+    "why": "holes take their arguments in order", "pr": "P2"
+  },
+  {
+    "id": "holes-numbered",
+    "src": "fn main() {\n    println!(\"{1}-{0}-{1}\", 1, 2);\n}\n",
+    "expect": "ok", "out": "2-1-2\n", "err": "", "exit": 0,
+    "why": "a numbered hole picks an argument by position", "pr": "P2"
+  },
+  {
+    "id": "holes-named",
+    "src": "fn main() {\n    println!(\"{n}\", n = 7);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "a named hole picks a named argument", "pr": "P2"
+  },
+  {
+    "id": "holes-captured",
+    "src": "fn main() {\n    let who = 'x';\n    println!(\"<{who}> {{}}\");\n}\n",
+    "expect": "ok", "out": "<x> {}\n", "err": "", "exit": 0,
+    "why": "a hole can name a variable, and doubled braces print one brace each", "pr": "P2"
+  },
+  {
+    "id": "print-and-eprint",
+    "src": "fn main() {\n    print!(\"a\");\n    print!(\"b\");\n    println!();\n    eprintln!(\"oops\");\n}\n",
+    "expect": "ok", "out": "ab\n", "err": "oops\n", "exit": 0,
+    "why": "print! adds no newline, println!() prints an empty line, eprintln! writes to stderr", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x);\n    x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0384", "line": 4 }, "pair": "immutable-assign-mut",
+    "why": "assigning twice to an immutable variable is E0384", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign-mut",
+    "src": "fn main() {\n    let mut x = 5;\n    println!(\"{}\", x);\n    x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n6\n", "err": "", "exit": 0,
+    "why": "mut allows the second assignment", "pr": "P2"
+  },
+  {
+    "id": "immutable-assign-shadow",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x);\n    let x = 6;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n6\n", "err": "", "exit": 0,
+    "why": "a second let shadows instead of assigning", "pr": "P2"
+  },
+  {
+    "id": "immutable-compound",
+    "src": "fn main() {\n    let x = 5;\n    x += 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0384", "line": 3 }, "pair": "immutable-compound-mut",
+    "why": "a compound assignment to an immutable variable is E0384 too", "pr": "P2"
+  },
+  {
+    "id": "immutable-compound-mut",
+    "src": "fn main() {\n    let mut x = 5;\n    x += 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "mut allows the compound assignment", "pr": "P2"
+  },
+  {
+    "id": "immutable-param",
+    "src": "fn bump(n: i32) -> i32 {\n    n = n + 1;\n    n\n}\n\nfn main() {\n    println!(\"{}\", bump(1));\n}\n",
+    "expect": { "code": "E0384", "line": 2 }, "pair": "immutable-param-mut",
+    "why": "a parameter is immutable unless declared mut", "pr": "P2"
+  },
+  {
+    "id": "immutable-param-mut",
+    "src": "fn bump(mut n: i32) -> i32 {\n    n = n + 1;\n    n\n}\n\nfn main() {\n    println!(\"{}\", bump(1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "mut on the parameter allows the assignment", "pr": "P2"
+  },
+  {
+    "id": "shadow-new-type",
+    "src": "fn main() {\n    let x = \"five\";\n    let x = 5;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "shadowing may change the type", "pr": "P2"
+  },
+  {
+    "id": "shadow-block",
+    "src": "fn main() {\n    let x = 1;\n    {\n        let x = 2;\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n1\n", "err": "", "exit": 0,
+    "why": "a shadowing let in an inner block ends with the block", "pr": "P2"
+  },
+  {
+    "id": "const-and-fn",
+    "src": "const MAX: i32 = 10;\n\nfn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\nfn main() {\n    println!(\"{}\", add(2, MAX));\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "const items and functions with scalar parameters and a tail value", "pr": "P2"
+  },
+  {
+    "id": "bool-and-char",
+    "src": "fn main() {\n    println!(\"{} {}\", true, 'x');\n}\n",
+    "expect": "ok", "out": "true x\n", "err": "", "exit": 0,
+    "why": "bool and char print as their text", "pr": "P2"
+  },
+  {
+    "id": "int-division",
+    "src": "fn main() {\n    println!(\"{} {} {}\", 7 / 2, -7 / 2, -7 % 3);\n}\n",
+    "expect": "ok", "out": "3 -3 -1\n", "err": "", "exit": 0,
+    "why": "integer division truncates toward zero and the remainder takes the sign of the left side", "pr": "P2"
+  },
+  {
+    "id": "u8-sum",
+    "src": "fn main() {\n    let a: u8 = 200;\n    let b: u8 = 55;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "typed integers add inside their range", "pr": "P2"
+  },
+  {
+    "id": "early-return",
+    "src": "fn early(n: u8) -> u8 {\n    return n + 1;\n}\n\nfn main() {\n    println!(\"{}\", early(4));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "return leaves the function with a value", "pr": "P2"
+  },
+  {
+    "id": "dup-fn",
+    "src": "fn f() {}\n\nfn f() {}\n\nfn main() {\n    f();\n    f();\n}\n",
+    "expect": { "code": "E0428", "line": 3 }, "pair": "dup-fn-renamed",
+    "why": "two functions with one name are E0428, reported at the second", "pr": "P2"
+  },
+  {
+    "id": "dup-fn-renamed",
+    "src": "fn f() {}\n\nfn g() {}\n\nfn main() {\n    f();\n    g();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "distinct names are fine", "pr": "P2"
+  },
+  {
+    "id": "dup-const",
+    "src": "const N: i32 = 1;\nconst N: i32 = 2;\n\nfn main() {\n    println!(\"{}\", N);\n}\n",
+    "expect": { "code": "E0428", "line": 2 }, "pair": "dup-const-renamed",
+    "why": "two constants with one name are E0428", "pr": "P2"
+  },
+  {
+    "id": "dup-const-renamed",
+    "src": "const N: i32 = 1;\nconst M: i32 = 2;\n\nfn main() {\n    println!(\"{}\", N);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "distinct names are fine", "pr": "P2"
+  },
+  {
+    "id": "dup-param",
+    "src": "fn pick(a: i32, a: i32) -> i32 {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(1, 2));\n}\n",
+    "expect": { "code": "E0415", "line": 1 }, "pair": "dup-param-renamed",
+    "why": "a parameter name used twice is E0415", "pr": "P2"
+  },
+  {
+    "id": "dup-param-renamed",
+    "src": "fn pick(a: i32, b: i32) -> i32 {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(1, 2));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "distinct parameter names are fine", "pr": "P2"
+  },
+  {
+    "id": "order-by-code-point",
+    "src": "fn main() {\n    println!(\"{} {}\", '\\u{10000}' > '\\u{E000}', \"\\u{10000}\" > \"\\u{E000}\");\n}\n",
+    "expect": "ok", "out": "true true\n", "err": "", "exit": 0,
+    "why": "chars and text order by code point, so U+10000 is above U+E000", "pr": "P2"
+  },
+  {
+    "id": "lint-arith-let",
+    "src": "fn main() {\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 }, "pair": "lint-arith-let-ok",
+    "why": "a sum rustc can work out that does not fit its type is arithmetic_overflow", "pr": "P4"
+  },
+  {
+    "id": "lint-arith-let-ok",
+    "src": "fn main() {\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "255 fits a u8", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-u8",
+    "src": "fn main() {\n    let x: u8 = 256;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "overflowing_literals", "line": 2 }, "pair": "lint-literal-u8-ok",
+    "why": "a literal outside its type is overflowing_literals", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-u8-ok",
+    "src": "fn main() {\n    let x: u8 = 255;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "255 is the largest u8", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-negative",
+    "src": "fn main() {\n    let x: i8 = -129;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "overflowing_literals", "line": 2 }, "pair": "lint-literal-negative-ok",
+    "why": "a negated literal is judged as a whole: -129 is below the smallest i8", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-negative-ok",
+    "src": "fn main() {\n    let x: i8 = -128;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-128\n", "err": "", "exit": 0,
+    "why": "-128 is the smallest i8, although 128 alone would not fit", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-default",
+    "src": "fn main() {\n    let x = 3000000000;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "overflowing_literals", "line": 2 }, "pair": "lint-literal-default-ok",
+    "why": "an untyped literal defaults to i32, which cannot hold 3000000000", "pr": "P4"
+  },
+  {
+    "id": "lint-literal-default-ok",
+    "src": "fn main() {\n    let x: i64 = 3000000000;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "3000000000\n", "err": "", "exit": 0,
+    "why": "an i64 holds 3000000000", "pr": "P4"
+  },
+  {
+    "id": "lint-const-literal",
+    "src": "const N: u8 = 300;\n\nfn main() {\n}\n",
+    "expect": { "lint": "overflowing_literals", "line": 1 }, "pair": "lint-const-literal-ok",
+    "why": "a const literal is range-checked even if nothing reads it", "pr": "P4"
+  },
+  {
+    "id": "lint-const-literal-ok",
+    "src": "const N: u8 = 30;\n\nfn main() {\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "30 fits a u8", "pr": "P4"
+  },
+  {
+    "id": "lint-div-zero",
+    "src": "fn main() {\n    println!(\"{}\", 1 / 0);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 2 }, "pair": "lint-div-zero-ok",
+    "why": "dividing by a literal zero is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "lint-div-zero-ok",
+    "src": "fn main() {\n    println!(\"{}\", 1 / 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "dividing by one is fine", "pr": "P4"
+  },
+  {
+    "id": "lint-div-zero-var",
+    "src": "fn main() {\n    let z = 0;\n    println!(\"{}\", 5 / z);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 3 }, "pair": "lint-div-zero-var-ok",
+    "why": "a single-assignment let that holds zero is folded", "pr": "P4"
+  },
+  {
+    "id": "lint-div-zero-var-ok",
+    "src": "fn main() {\n    let z = 1;\n    println!(\"{}\", 5 / z);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the same division by a non-zero value", "pr": "P4"
+  },
+  {
+    "id": "lint-index-literal",
+    "src": "fn main() {\n    println!(\"{}\", [1, 2, 3][5]);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 2 }, "pair": "lint-index-literal-ok",
+    "why": "a constant index past the end of an array is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "lint-index-literal-ok",
+    "src": "fn main() {\n    println!(\"{}\", [1, 2, 3][2]);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "index 2 is the last place of a 3-array", "pr": "P4"
+  },
+  {
+    "id": "lint-index-var",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let i = 5;\n    println!(\"{}\", a[i]);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 4 }, "pair": "lint-index-var-ok",
+    "why": "an index held in a single-assignment let is folded", "pr": "P4"
+  },
+  {
+    "id": "lint-index-var-ok",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let i = 2;\n    println!(\"{}\", a[i]);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the same index in range", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-let",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 3 }, "pair": "lint-fold-let-ok",
+    "why": "probe f: a single-assignment let is folded into the sum", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-let-ok",
+    "src": "fn main() {\n    let x: u8 = 254;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same sum that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-mut",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 4 }, "pair": "lint-fold-mut-ok",
+    "why": "probe g: a let mut is folded along straight-line code that cannot trap", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-mut-ok",
+    "src": "fn main() {\n    let mut x: u8 = 254;\n    x = x;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-uncalled-arith",
+    "src": "fn f() {\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n\nfn main() {\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 }, "pair": "lint-uncalled-arith-ok",
+    "why": "probe c: every fn body is linted, called or not", "pr": "P4"
+  },
+  {
+    "id": "lint-uncalled-arith-ok",
+    "src": "fn f() {\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n\nfn main() {\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an uncalled fn that is clean is fine", "pr": "P4"
+  },
+  {
+    "id": "lint-uncalled-literal",
+    "src": "fn f() {\n    let x: u8 = 256;\n    println!(\"{}\", x);\n}\n\nfn main() {\n}\n",
+    "expect": { "lint": "overflowing_literals", "line": 2 }, "pair": "lint-uncalled-literal-ok",
+    "why": "probe d: a literal out of range in an uncalled fn", "pr": "P4"
+  },
+  {
+    "id": "lint-uncalled-literal-ok",
+    "src": "fn f() {\n    let x: u8 = 255;\n    println!(\"{}\", x);\n}\n\nfn main() {\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an uncalled fn with a literal that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-infer-i32",
+    "src": "fn main() {\n    let x = 2147483647;\n    let y = x + 1;\n    let z: i32 = y;\n    println!(\"{}\", z);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 3 }, "pair": "lint-infer-i64",
+    "why": "x is an i32 because z is, so the sum overflows", "pr": "P4"
+  },
+  {
+    "id": "lint-infer-i64",
+    "src": "fn main() {\n    let x = 2147483647;\n    let y = x + 1;\n    let z: i64 = y;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "2147483648\n", "err": "", "exit": 0,
+    "why": "a later use makes x an i64, so there is no overflow", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-after-return",
+    "src": "fn main() {\n    return;\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "probe a: code after return is not linted", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-short-or",
+    "src": "fn main() {\n    let t = true;\n    if t || { let y: u8 = 255 + 1; y > 0 } {\n        println!(\"a\");\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "probe b: the right side of || is skipped when the left is a known true", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-short-and",
+    "src": "fn main() {\n    let f = false;\n    if f && { let y: u8 = 255 + 1; y > 0 } {\n        println!(\"a\");\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the right side of && is skipped when the left is a known false", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-index-after-return",
+    "src": "fn main() {\n    return;\n    let a = [1, 2, 3];\n    println!(\"{}\", a[5]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "probe e: an index after return is not linted", "pr": "P4"
+  },
+  {
+    "id": "panic-add",
+    "src": "fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!(\"before\");\n    println!(\"{}\", add(250, 10));\n}\n",
+    "expect": "ok", "out": "before\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to add with overflow\n", "exit": 101,
+    "why": "probe h: a parameter is never folded; the sum overflows at run time and the earlier output stays", "pr": "P4"
+  },
+  {
+    "id": "panic-add-ok",
+    "src": "fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!(\"before\");\n    println!(\"{}\", add(250, 5));\n}\n",
+    "expect": "ok", "out": "before\n255\n", "err": "", "exit": 0,
+    "why": "the same call with a sum that fits", "pr": "P4"
+  },
+  {
+    "id": "panic-sub",
+    "src": "fn sub(a: u8, b: u8) -> u8 {\n    a - b\n}\n\nfn main() {\n    println!(\"{}\", sub(1, 2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to subtract with overflow\n", "exit": 101,
+    "why": "an unsigned subtraction below zero panics", "pr": "P4"
+  },
+  {
+    "id": "panic-neg",
+    "src": "fn neg(a: i8) -> i8 {\n    -a\n}\n\nfn main() {\n    println!(\"{}\", neg(-128));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "negating the smallest i8 panics", "pr": "P4"
+  },
+  {
+    "id": "panic-div-zero",
+    "src": "fn div(a: i32, b: i32) -> i32 {\n    a / b\n}\n\nfn main() {\n    println!(\"{}\", div(7, 0));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to divide by zero\n", "exit": 101,
+    "why": "dividing a parameter by zero panics at run time", "pr": "P4"
+  },
+  {
+    "id": "panic-div-ok",
+    "src": "fn div(a: i32, b: i32) -> i32 {\n    a / b\n}\n\nfn main() {\n    println!(\"{}\", div(7, 1));\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "the same call with a non-zero divisor", "pr": "P4"
+  },
+  {
+    "id": "panic-div-overflow",
+    "src": "fn div(a: i8, b: i8) -> i8 {\n    a / b\n}\n\nfn main() {\n    println!(\"{}\", div(-128, -1));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to divide with overflow\n", "exit": 101,
+    "why": "the smallest i8 divided by -1 overflows", "pr": "P4"
+  },
+  {
+    "id": "panic-index",
+    "src": "fn at(i: usize) -> i32 {\n    let a = [1, 2, 3];\n    a[i]\n}\n\nfn main() {\n    println!(\"{}\", at(7));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:5:\nindex out of bounds: the len is 3 but the index is 7\n", "exit": 101,
+    "why": "an index that is only known at run time can be out of bounds", "pr": "P4"
+  },
+  {
+    "id": "panic-index-ok",
+    "src": "fn at(i: usize) -> i32 {\n    let a = [1, 2, 3];\n    a[i]\n}\n\nfn main() {\n    println!(\"{}\", at(1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the same call in range", "pr": "P4"
+  },
+  {
+    "id": "panic-in-loop",
+    "src": "fn count(n: u8) {\n    let mut i = n;\n    loop {\n        println!(\"{}\", i);\n        i -= 1;\n    }\n}\n\nfn main() {\n    count(3);\n}\n",
+    "expect": "ok", "out": "3\n2\n1\n0\n", "err": "\nthread 'main' panicked at src/main.rs:5:9:\nattempt to subtract with overflow\n", "exit": 101,
+    "why": "a panic keeps what the loop printed, and a compound assignment panics at its target", "pr": "P4"
+  },
+  {
+    "id": "type-let-mismatch",
+    "src": "fn main() {\n    let x: i32 = \"a\";\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-let-mismatch-ok",
+    "why": "a let annotation against its init", "pr": "P4"
+  },
+  {
+    "id": "type-let-mismatch-ok",
+    "src": "fn main() {\n    let x: i32 = 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "init and annotation agree", "pr": "P4"
+  },
+  {
+    "id": "type-float-for-int",
+    "src": "fn main() {\n    let x: f64 = 5;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-float-for-int-ok",
+    "why": "a whole-number literal is not an f64", "pr": "P4"
+  },
+  {
+    "id": "type-float-for-int-ok",
+    "src": "fn main() {\n    let x: f64 = 5.0;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "5.0 is an f64", "pr": "P4"
+  },
+  {
+    "id": "type-call-arg",
+    "src": "fn f(a: i32) {\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "code": "E0308", "line": 5 }, "pair": "type-call-arg-ok",
+    "why": "a call argument against its parameter", "pr": "P4"
+  },
+  {
+    "id": "type-call-arg-ok",
+    "src": "fn f(a: i32) {\n}\n\nfn main() {\n    f(1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the argument has the parameter's type", "pr": "P4"
+  },
+  {
+    "id": "type-tail",
+    "src": "fn f() -> i32 {\n    \"a\"\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-tail-ok",
+    "why": "the tail expression against the declared return type", "pr": "P4"
+  },
+  {
+    "id": "type-tail-ok",
+    "src": "fn f() -> i32 {\n    5\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the tail has the declared type", "pr": "P4"
+  },
+  {
+    "id": "type-return",
+    "src": "fn f() -> i32 {\n    return true;\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-return-ok",
+    "why": "a return expression against the declared return type", "pr": "P4"
+  },
+  {
+    "id": "type-return-ok",
+    "src": "fn f() -> i32 {\n    return 1;\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the returned value has the declared type", "pr": "P4"
+  },
+  {
+    "id": "type-tail-semicolon",
+    "src": "fn f() -> i32 {\n    5;\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": { "code": "E0308", "line": 1 }, "pair": "type-tail-semicolon-ok",
+    "why": "a body that ends in a semicolon returns nothing; rustc points at the return type", "pr": "P4"
+  },
+  {
+    "id": "type-tail-semicolon-ok",
+    "src": "fn f() -> i32 {\n    5\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "without the semicolon the 5 is returned", "pr": "P4"
+  },
+  {
+    "id": "type-if-arms",
+    "src": "fn main() {\n    let x = if true { 1 } else { \"a\" };\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-if-arms-ok",
+    "why": "if and else arms that differ", "pr": "P4"
+  },
+  {
+    "id": "type-if-arms-ok",
+    "src": "fn main() {\n    let x = if true { 1 } else { 2 };\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "both arms are integers", "pr": "P4"
+  },
+  {
+    "id": "type-condition",
+    "src": "fn main() {\n    if 1 {\n    }\n}\n",
+    "expect": { "code": "E0308", "line": 2 }, "pair": "type-condition-ok",
+    "why": "a condition that is not a bool", "pr": "P4"
+  },
+  {
+    "id": "type-condition-ok",
+    "src": "fn main() {\n    if true {\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a bool condition", "pr": "P4"
+  },
+  {
+    "id": "type-compare-ints",
+    "src": "fn main() {\n    let a: i32 = 1;\n    let b: i64 = 2;\n    println!(\"{}\", a < b);\n}\n",
+    "expect": { "code": "E0308", "line": 4 }, "pair": "type-compare-ints-ok",
+    "why": "two different concrete int types in one comparison", "pr": "P4"
+  },
+  {
+    "id": "type-compare-ints-ok",
+    "src": "fn main() {\n    let a: i32 = 1;\n    let b: i32 = 2;\n    println!(\"{}\", a < b);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "the same type on both sides", "pr": "P4"
+  },
+  {
+    "id": "type-after-return",
+    "src": "fn main() {\n    return;\n    let x: i32 = \"a\";\n}\n",
+    "expect": { "code": "E0308", "line": 3 }, "pair": "type-after-return-ok",
+    "why": "code after return is still type-checked", "pr": "P4"
+  },
+  {
+    "id": "type-after-return-ok",
+    "src": "fn main() {\n    return;\n    let x: i32 = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same unreachable code with matching types", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-var",
+    "src": "fn main() {\n    let x = 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": { "code": "E0425", "line": 3 }, "pair": "name-unknown-var-ok",
+    "why": "an unknown variable", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-var-ok",
+    "src": "fn main() {\n    let x = 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the name exists", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-fn",
+    "src": "fn helper() {\n}\n\nfn main() {\n    helpr();\n}\n",
+    "expect": { "code": "E0425", "line": 5 }, "pair": "name-unknown-fn-ok",
+    "why": "a call to a function that does not exist", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-fn-ok",
+    "src": "fn helper() {\n}\n\nfn main() {\n    helper();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the function exists", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-in-format",
+    "src": "fn main() {\n    let x = 1;\n    println!(\"{y}\");\n}\n",
+    "expect": { "code": "E0425", "line": 3 }, "pair": "name-unknown-in-format-ok",
+    "why": "a name inside a format string is looked up too", "pr": "P4"
+  },
+  {
+    "id": "name-unknown-in-format-ok",
+    "src": "fn main() {\n    let x = 1;\n    println!(\"{x}\");\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the name in the format string exists", "pr": "P4"
+  },
+  {
+    "id": "float-basic",
+    "src": "fn main() {\n    let x = 2.5;\n    let y = x * 2.0;\n    println!(\"{} {:?} {:.2}\", y, y, y);\n}\n",
+    "expect": "ok", "out": "5 5.0 5.00\n", "err": "", "exit": 0,
+    "why": "Display drops a useless .0, Debug keeps it, {:.2} pads", "pr": "P4"
+  },
+  {
+    "id": "float-sum",
+    "src": "fn main() {\n    let a = 0.1;\n    let b = 0.2;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "0.30000000000000004\n", "err": "", "exit": 0,
+    "why": "the shortest digits that read back as the same double", "pr": "P4"
+  },
+  {
+    "id": "float-exponent",
+    "src": "fn main() {\n    let a = 1e21;\n    let b = 1e-7;\n    println!(\"{} {:?} {} {:?}\", a, a, b, b);\n}\n",
+    "expect": "ok", "out": "1000000000000000000000 1e21 0.0000001 1e-7\n", "err": "", "exit": 0,
+    "why": "Display never uses an exponent, Debug does for very large and very small values", "pr": "P4"
+  },
+  {
+    "id": "float-special",
+    "src": "fn main() {\n    let z = 0.0;\n    let n = -0.0;\n    println!(\"{} {} {:?} {} {:?}\", z / z, 1.0 / z, -1.0 / z, n, n);\n}\n",
+    "expect": "ok", "out": "NaN inf -inf -0 -0.0\n", "err": "", "exit": 0,
+    "why": "NaN, the infinities and negative zero", "pr": "P4"
+  },
+  {
+    "id": "float-ties",
+    "src": "fn main() {\n    println!(\"{:.0} {:.0} {:.0} {:.1} {:.2}\", 0.5, 1.5, 2.5, 0.25, 2.675);\n}\n",
+    "expect": "ok", "out": "0 2 2 0.2 2.67\n", "err": "", "exit": 0,
+    "why": "precision rounds the exact binary value, ties to even", "pr": "P4"
+  },
+  {
+    "id": "float-positional-named",
+    "src": "fn main() {\n    let x = 3.14159;\n    println!(\"{0:?} {0:.2} {x:.1}\", x);\n}\n",
+    "expect": "ok", "out": "3.14159 3.14 3.1\n", "err": "", "exit": 0,
+    "why": "a spec works on a positional and on an inline named hole", "pr": "P4"
+  },
+  {
+    "id": "fmt-debug-tuple-array",
+    "src": "fn main() {\n    println!(\"{:?} {:?}\", (1, 2.0, 'a', \"s\"), [1, 2, 3]);\n}\n",
+    "expect": "ok", "out": "(1, 2.0, 'a', \"s\") [1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "Debug of a tuple and an array", "pr": "P4"
+  },
+  {
+    "id": "fmt-width",
+    "src": "fn main() {\n    println!(\"[{:>5}] [{:>5}] [{:>5}]\", 'c', \"ab\", 42);\n}\n",
+    "expect": "ok", "out": "[    c] [   ab] [   42]\n", "err": "", "exit": 0,
+    "why": "{:>N} pads char, str and int on the left", "pr": "P4"
+  },
+  {
+    "id": "cast-numbers",
+    "src": "fn main() {\n    let f = 3.99;\n    let n = -1;\n    let big = 300;\n    println!(\"{} {} {} {}\", f as i32, n as u8, big as u8, 'a' as u32);\n}\n",
+    "expect": "ok", "out": "3 255 44 97\n", "err": "", "exit": 0,
+    "why": "float to int truncates, int to a smaller type wraps, char to int", "pr": "P4"
+  },
+  {
+    "id": "cast-saturate",
+    "src": "fn main() {\n    let h = 1e20;\n    let l = -5.5;\n    let z = 0.0;\n    println!(\"{} {} {}\", h as i32, l as u8, (z / z) as i32);\n}\n",
+    "expect": "ok", "out": "2147483647 0 0\n", "err": "", "exit": 0,
+    "why": "float to int saturates and NaN becomes 0", "pr": "P4"
+  },
+  {
+    "id": "cast-bool-char",
+    "src": "fn main() {\n    println!(\"{} {}\", true as i32, 97u8 as char);\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "bool to int and u8 to char", "pr": "P4"
+  },
+  {
+    "id": "tuple-array-index",
+    "src": "fn main() {\n    let t = (1, 2.5, 'x');\n    let a = [[1, 2], [3, 4]];\n    println!(\"{} {} {} {}\", t.0, t.1, t.2, a[1][0]);\n}\n",
+    "expect": "ok", "out": "1 2.5 x 3\n", "err": "", "exit": 0,
+    "why": "tuple fields and nested array indexing", "pr": "P4"
+  },
+  {
+    "id": "flow-if-value",
+    "src": "fn pick(n: i32) -> i32 {\n    if n > 5 { 10 } else { 0 }\n}\n\nfn main() {\n    println!(\"{} {}\", pick(7), pick(2));\n}\n",
+    "expect": "ok", "out": "10 0\n", "err": "", "exit": 0,
+    "why": "an if and else pair gives a value", "pr": "P4"
+  },
+  {
+    "id": "flow-loop-break-value",
+    "src": "fn main() {\n    let mut n = 1;\n    let found = loop {\n        if n * n > 50 {\n            break n;\n        }\n        n = n + 1;\n    };\n    println!(\"{}\", found);\n}\n",
+    "expect": "ok", "out": "8\n", "err": "", "exit": 0,
+    "why": "break carries a value out of a loop", "pr": "P4"
+  },
+  {
+    "id": "flow-while-continue",
+    "src": "fn main() {\n    let mut i = 0;\n    let mut s = 0;\n    while i < 5 {\n        i += 1;\n        if i == 2 {\n            continue;\n        }\n        s += i;\n    }\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "13\n", "err": "", "exit": 0,
+    "why": "while and continue", "pr": "P4"
+  },
+  {
+    "id": "flow-for-ranges",
+    "src": "fn main() {\n    for i in 0..3 {\n        print!(\"{} \", i);\n    }\n    for i in 1..=3 {\n        print!(\"{} \", i);\n    }\n    println!();\n}\n",
+    "expect": "ok", "out": "0 1 2 1 2 3 \n", "err": "", "exit": 0,
+    "why": "0..3 stops before 3 and 1..=3 includes it", "pr": "P4"
+  },
+  {
+    "id": "flow-return-in-loop",
+    "src": "fn first_big(n: i32) -> i32 {\n    for i in 0..10 {\n        if i * i > n {\n            return i;\n        }\n    }\n    0\n}\n\nfn main() {\n    println!(\"{}\", first_big(3));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "return leaves the function from inside a loop", "pr": "P4"
+  },
+  {
+    "id": "fn-uncalled-clean",
+    "src": "fn spare() {\n}\n\nfn main() {\n    println!(\"hi\");\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "an uncalled function with nothing wrong is fine", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-known-if-return",
+    "src": "fn main() {\n    let t = true;\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "probe s: a known-true if whose branch returns makes the rest unreachable, so it is not linted", "pr": "P4"
+  },
+  {
+    "id": "lint-skip-literal-if-return",
+    "src": "fn main() {\n    if true {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "probe s2: the same with a literal condition", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-tuple",
+    "src": "fn main() {\n    let t = (255u8, 1u8);\n    let y = t.0 + t.1;\n    println!(\"{}\", y);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 3 }, "pair": "lint-fold-tuple-ok",
+    "why": "probe t: tuple fields fold", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-tuple-ok",
+    "src": "fn main() {\n    let t = (254u8, 1u8);\n    let y = t.0 + t.1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same sum that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-array",
+    "src": "fn main() {\n    let a = [255u8];\n    let y = a[0] + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 3 }, "pair": "lint-fold-array-ok",
+    "why": "probe u: array elements fold", "pr": "P4"
+  },
+  {
+    "id": "lint-fold-array-ok",
+    "src": "fn main() {\n    let a = [254u8];\n    let y = a[0] + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same sum that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-after-loop-break",
+    "src": "fn main() {\n    let mut n = 0;\n    loop {\n        n += 1;\n        if n > 2 {\n            break;\n        }\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 9 }, "pair": "lint-after-loop-break-ok",
+    "why": "probe v2: a loop with a real break leaves the code after it reachable", "pr": "P4"
+  },
+  {
+    "id": "lint-after-loop-break-ok",
+    "src": "fn main() {\n    let mut n = 0;\n    loop {\n        n += 1;\n        if n > 2 {\n            break;\n        }\n    }\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same sum that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-mut-cond-reassigned",
+    "src": "fn main() {\n    let mut t = true;\n    t = false;\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 7 }, "pair": "lint-mut-cond-reassigned-ok",
+    "why": "probe x2: a let mut set to false before the if makes the return dead, so the code after it is linted", "pr": "P4"
+  },
+  {
+    "id": "lint-mut-cond-reassigned-ok",
+    "src": "fn main() {\n    let mut t = true;\n    t = false;\n    if t {\n        return;\n    }\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same sum that fits", "pr": "P4"
+  },
+  {
+    "id": "lint-param-cond-return",
+    "src": "fn f(t: bool) {\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 5 }, "pair": "lint-param-cond-return-ok",
+    "why": "probe x4: a parameter is never folded, so the code after the if is reachable and linted", "pr": "P4"
+  },
+  {
+    "id": "lint-param-cond-return-ok",
+    "src": "fn f(t: bool) {\n    if t {\n        return;\n    }\n    let x: u8 = 254 + 1;\n    println!(\"{}\", x);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same sum that fits; the call returns before printing", "pr": "P4"
+  }
+]

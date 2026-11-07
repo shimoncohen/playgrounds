@@ -16,6 +16,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`programming/ds-quest/`](programming/ds-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
+| 🦀 | **Rust Quest** | Rust from `println!` and `let` onwards, run by a small Rust checker whose error codes are checked against a real `rustc` for the programs the quest supports; anything else is reported as unsupported | [`programming/rust-quest/`](programming/rust-quest/) |
 | ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
 
 **Trophy Room** ([`trophy-room/`](trophy-room/)) shows your playground level, worked out from the XP of every playground, your progress per subject and playground, and achievements such as Playground Master. It reads the progress already saved in your browser.
@@ -116,6 +117,7 @@ programming/            the Programming section: index.html (hub with a card per
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
+  rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js
   shell-quest/          split by job (below)
 math/                   the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
 math/scene/             the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html
@@ -125,7 +127,7 @@ math/arithmetic/ math/algebra/ math/geometry/ math/trigonometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math/vendor/            committed third-party scripts for Math (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
 trophy-room/            the Trophy Room: index.html + style.css + app.js, rendered from shared/trophies.js
-tests/                  engine tests (Node; shell/, ds/, net/, math/, agent/ and trophy/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
+tests/                  engine tests (Node; shell/, ds/, net/, math/, agent/, rust/ and trophy/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates

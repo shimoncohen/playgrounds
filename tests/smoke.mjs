@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
@@ -385,6 +385,202 @@ for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
     await ctx.close();
   });
 }
+
+const RUST_KEY = 'rust-quest-v1';
+const RUST_HELLO = 'fn main() {\n    println!("Hello, Rust!");\n}\n';
+
+test('rust-quest writes a pristine state on a clean load', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const s = JSON.parse(await read(page, RUST_KEY));
+  assert.equal(s.xp, 0);
+  assert.deepEqual(s.done, {});
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: finishing mission 0.0 changes the XP text exactly once, even after running again', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  await page.fill('#code', RUST_HELLO);
+  await page.click('#bRun');
+  await page.waitForFunction(() => document.getElementById('xpText').textContent.trim() === '10 XP');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await page.click('#bRun');
+  await page.waitForTimeout(200);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.equal(JSON.parse(await read(page, RUST_KEY)).xp, 10);
+  assert.match(await page.textContent('#result'), /Hello, Rust!/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a bad saved shape loads with no console errors', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, {}, ctx => ctx.addInitScript(k => { if (!localStorage.getItem(k)) localStorage.setItem(k, '{"done":5,"xp":"x"}'); }, RUST_KEY));
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.equal(JSON.parse(await read(page, RUST_KEY)).xp, 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: typed code survives a reload and reset restores the starter', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const starter = await page.inputValue('#code');
+  assert.match(starter, /fn main/);
+  await page.fill('#code', 'fn main() {\n    println!("typed");\n}\n');
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.waitForSelector('#mission');
+  assert.match(await page.inputValue('#code'), /typed/);
+  await page.click('#bReset');
+  assert.equal(await page.inputValue('#code'), starter);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the Playground link never carries learner code', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  const hrefs = await page.$$eval('a[href*="play.rust-lang.org"]', as => as.map(a => a.getAttribute('href')));
+  assert.ok(hrefs.length >= 2);
+  for (const h of hrefs) assert.equal(h, 'https://play.rust-lang.org/');
+  for (const h of await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')))) assert.ok(!/unsafe|fn%20main|fn main/.test(h), h);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the extra keys row inserts symbols at the caret', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 800 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', '');
+  await page.click('#keys button:has-text("<>")');
+  assert.equal(await page.inputValue('#code'), '<>');
+  assert.equal(await page.evaluate(() => document.getElementById('code').selectionStart), 1);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  for (const b of await page.$$('#keys button')) {
+    const box = await b.boundingBox();
+    assert.ok(box.width >= 44 && box.height >= 44, `a key is ${box.width}x${box.height}`);
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', RUST_HELLO);
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback .msg.win');
+  await page.fill('#code', 'fn main() {\n    let x = 1;\n    x = 2;\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0384/);
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#feedback')).trim(), '');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: missions 1.1 to 1.6 give XP once each, wrong tries give a hint and no XP, the last one earns the badge', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const ms = await page.evaluate(() => RQ.CH[0].missions.map(m => ({ answer: m.answer, wrong: m.wrong[0].src })));
+  assert.equal(ms.length, 6);
+  const xp = async () => (await page.textContent('#xpText')).trim();
+  for (let i = 0; i < ms.length; i++) {
+    await page.fill('#code', ms[i].wrong);
+    await page.click('#bRun');
+    await page.waitForSelector('#feedback .msg.tip, #result .diag');
+    assert.equal(await xp(), `${i * 10} XP`);
+    assert.equal(await page.$('#feedback .msg.win'), null);
+    await page.fill('#code', ms[i].answer);
+    await page.click('#bRun');
+    await page.waitForSelector('#feedback .msg.win');
+    assert.equal(await xp(), `${(i + 1) * 10} XP`);
+    assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+    const badge = /Badge earned: First Steps/.test(await page.textContent('#feedback'));
+    assert.equal(badge, i === ms.length - 1);
+    await page.click('#bRun');
+    await page.waitForTimeout(100);
+    assert.equal(await xp(), `${(i + 1) * 10} XP`);
+    if (i < ms.length - 1) await page.click('#feedback [data-act="next"]');
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the unsupported card names the feature and the line; the internal-error card links no learner code', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  assert.match(await page.textContent('#result .card2 h4'), /`?unsafe`?.*line 2|unsafe.*\(line 2\)/);
+  assert.equal(await page.locator('#result a[href*="feature-request"]').count(), 1);
+  await page.evaluate(() => { RQ.interp = () => { throw new Error('boom'); }; });
+  await page.fill('#code', 'fn main() {\n    println!("SECRET-LEARNER-CODE");\n}\n');
+  await page.click('#bRun');
+  await page.waitForFunction(() => /bug, not your code/.test(document.getElementById('result').textContent));
+  assert.match(await page.textContent('#result'), /nothing was counted/);
+  const hrefs = await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')));
+  assert.equal(hrefs.length, 1);
+  assert.match(hrefs[0], /feature-request/);
+  assert.ok(!/SECRET|println/i.test(hrefs[0]));
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a panic shows its output, the header and exit code 101, gives feedback, and the panic mission still completes', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!("before");\n    println!("{}", add(250, 10));\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .stderr');
+  const result = await page.textContent('#result');
+  assert.match(result, /before/);
+  assert.match(result, /panicked at src\/main\.rs/);
+  assert.match(result, /Exit code 101/);
+  assert.match(await page.textContent('#feedback'), /Not quite yet[\s\S]*stopped with a panic: attempt to add with overflow/);
+  for (const h of await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')))) assert.ok(!/add|fn%20|fn /.test(h), h);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  await page.click('.chap[data-ch="1"]');
+  await page.click('.dot[data-mi="7"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  await page.click('#bRun');
+  await page.waitForTimeout(100);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a lint card shows the lint id, the line and a tip, and does not complete the mission', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    let x: u8 = 255 + 1;\n    println!("{}", x);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result .diag .id'), /arithmetic_overflow · line 2/);
+  assert.ok((await page.textContent('#result .diag .note')).trim().length > 10);
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
 
 test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
   const { ctx, page, errors } = await open(`${base}/math/algebra/`);

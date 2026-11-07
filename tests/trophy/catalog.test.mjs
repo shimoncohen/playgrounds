@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { loadShell } from '../shell/harness.mjs';
 import { loadNet } from '../net/harness.mjs';
 import { loadAgent } from '../agent/harness.mjs';
+import { loadRust } from '../rust/harness.mjs';
 import { loadMath } from '../math/harness.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -44,6 +45,7 @@ const CHAPTERS = {
   },
   'net-quest-v1': () => loadNet().CH,
   'agent-quest-v1': () => loadAgent().CH,
+  'rust-quest-v1': () => loadRust().CH,
   'math-arithmetic-v1': math('arithmetic'),
   'math-algebra-v1': math('algebra'),
   'math-geometry-v1': math('geometry'),
