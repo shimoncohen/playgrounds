@@ -32,8 +32,11 @@ const phoneUp=(c,miss,off,stuck)=>{
   if(dups(c).length)return 'Another device already has that address. Give the phone one nobody uses, on the laptop\'s wire: it starts <code>10.0.0.</code> and ends <code>/24</code>.';
   if(reserved(c,'phone','laptop'))return NOT_HOST(p,'10.0.0.0','10.0.0.255');
   if(!c.ping('phone',addrOf(c,'laptop')).delivered)return stuck;
-  return c.ping('laptop',p).delivered?true:off;
+  if(!c.ping('laptop',p).delivered)return off;
+  return c.inOrder(ADDR_ADD,NQ.pingTo('10.0.0.2'))?true:PROVE;
 };
+const ADDR_ADD=/^\s*ip\s+(a|addr|address)\s+add\s/;
+const PROVE='The address is in. Now prove it: <code>ping -c 1 10.0.0.2</code>.';
 const SET=(ip)=>[{dev:'phone',cmd:'ip addr del 10.0.0.3/24 dev eth0'},...(ip?[{dev:'phone',cmd:'ip addr add '+ip+' dev eth0'}]:[])];
 const IP_ADDR=[['ip','cmd','network settings tool'],['addr','arg','the addresses']];
 
@@ -110,9 +113,10 @@ NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
     if(dups(c).length)return 'Two devices still share an address. Give the printer one nobody uses (the router has <code>192.168.1.1</code>, the laptop <code>192.168.1.10</code>).';
     if(reserved(c,'printer','laptop'))return NOT_HOST(p,'192.168.1.0','192.168.1.255');
     if(!c.ping('printer',addrOf(c,'laptop')).delivered)return 'The printer cannot reach the laptop. Keep it on the same wire: an address starting <code>192.168.1.</code> and ending <code>/24</code>.';
-    return c.ping('laptop',p).delivered?true:'The laptop cannot reach the printer at its new address. Keep it on the same wire: an address starting <code>192.168.1.</code> and ending <code>/24</code>.';}},
+    if(!c.ping('laptop',p).delivered)return 'The laptop cannot reach the printer at its new address. Keep it on the same wire: an address starting <code>192.168.1.</code> and ending <code>/24</code>.';
+    return c.inOrder(ADDR_ADD,NQ.pingTo('192.168.1.1'))?true:'The printer has its own address now. Prove it with <code>ping -c 1 192.168.1.1</code>.';}},
  {title:'Tiny subnets',scenario:'pair',
-  goal:'When you used <code>ipcalc</code> on a <code>/26</code>, two addresses were lost to the subnet\'s name and the broadcast address. Two special prefixes bend that rule. A <code>/31</code> subnet holds only two addresses, which would leave none after losing two, and a <code>/32</code> holds exactly one. Run <code>ipcalc 10.0.0.0/31</code> and <code>ipcalc 10.0.0.1/32</code>, then add up the two <code>Hosts/Net</code> numbers.',
+  goal:'When you used <code>ipcalc</code> on a <code>/26</code>, two addresses were lost to the subnet\'s name and the broadcast address. Two special prefixes bend that rule. A <code>/31</code> subnet holds only two addresses, which would leave none after losing two, and a <code>/32</code> holds exactly one. Run <code>ipcalc 10.0.0.0/31</code>, then <code>ipcalc 10.0.0.1/32</code>, then add up the two <code>Hosts/Net</code> numbers.',
   anat:[['ipcalc','cmd','subnet calculator'],['10.0.0.0/31','arg','a subnet of two addresses'],['10.0.0.1/32','arg','a subnet of one address']],
   how:['<code>ipcalc 10.0.0.0/31</code> and <code>ipcalc 10.0.0.1/32</code> show how the smallest subnets count their hosts, so you can compare them with the rule you used for the <code>/26</code>.',
    '<code>ipcalc</code> is the same calculator as before, and each argument is an address, a slash and a prefix. Run it twice, once for each prefix.',
@@ -121,7 +125,7 @@ NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
   explain:'Normally a subnet loses its first and last address. A cable with two ends has no use for a subnet name or a broadcast address, so on a <code>/31</code> both addresses go to machines. A <code>/32</code> is a subnet of one, used when a single device needs a name of its own with no neighbours.',
   hint:'Run <code>ipcalc 10.0.0.0/31</code>, then <code>ipcalc 10.0.0.1/32</code>, read both <code>Hosts/Net</code> lines and add the numbers.',
   answer:['ipcalc 10.0.0.0/31','ipcalc 10.0.0.1/32'],
-  check:c=>ran(c,31)&&ran(c,32)?true:'Run <code>ipcalc</code> once with a <code>/31</code> and once with a <code>/32</code>, for example <code>ipcalc 10.0.0.0/31</code> and <code>ipcalc 10.0.0.1/32</code>.',
+  check:c=>ran(c,31)&&ran(c,32)&&c.inOrder(/^\s*ipcalc\s+\S+\/31\s*$/,/^\s*ipcalc\s+\S+\/32\s*$/)?true:'Run <code>ipcalc</code> with a <code>/31</code>, then with a <code>/32</code>, for example <code>ipcalc 10.0.0.0/31</code> and <code>ipcalc 10.0.0.1/32</code>.',
   question:{ask:'What do the two <code>Hosts/Net</code> numbers add up to?',expect:c=>{const a=hosts(c,31),b=hosts(c,32);return a===null||b===null?'':String(a+b);}}}
  ]});
 })();
