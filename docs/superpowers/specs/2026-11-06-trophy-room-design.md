@@ -83,17 +83,17 @@ Total today is about 9,860 XP. Quirks the reader must handle:
 
 ## `shared/trophies.js`
 
-Pure functions. The only browser access is `readAll(storage)`, which takes `localStorage` as a parameter so tests pass a fake.
+Pure functions that take `localStorage` as a parameter, so tests pass a fake. The one DOM function is `labelButton(a)`, which writes the level into a Trophy Room button.
 
 - `questStats(entry, save)` returns `{ key, xp, missionsDone, missionsTotal, chaptersDone, chaptersTotal, started, complete }`.
   - Missions done: count done keys that parse to a valid `chapter`/`mission` inside the catalog's counts and have a truthy value. Unknown or out-of-range keys are ignored, so a stale save never shows more than 100%.
   - `xp`: the saved `xp` if it is a finite number ≥ 0, else 0.
   - `started`: `missionsDone > 0`. `complete`: `missionsDone === missionsTotal`.
-- `readAll(storage)`: for each catalog entry, read and parse its key. A missing key, invalid JSON, a non-object, a blocked storage (throws) or a Harbor save failing its own validity check give an empty save. It never throws.
-- `subjectStats(stats)`: per subject, quests complete, quests started, chapters done, XP.
+- `readSave(storage, entry)`: read and parse one entry's key. A missing key, invalid JSON, a non-object, a blocked storage (throws) or a Harbor save failing its own validity check give an empty save. It never throws.
+- `subjectStats(stats, subjects)`: per subject, quests complete, quests started, chapters done, XP.
 - `level(xp)`: `n = floor(sqrt(xp / 20)) + 1`. Returns `{ n, title, lo, hi }` where `lo = 20·(n−1)²` and `hi = 20·n²`. Titles: 1–4 Visitor, 5–9 Explorer, 10–14 Regular, 15–19 Veteran, 20+ Legend. Today's full completion (about 9,860 XP) is level 23. As content grows the top level grows; there is no cap.
-- `achievements(stats)`: returns the list below, each `{ id, name, icon, earned, condition, progress? }`, where `progress` is `{ have, need }` for counted ones.
-- `summary(storage)`: everything the page needs in one object.
+- `achievements(stats, subjects)`: returns the list below, each `{ id, name, icon, earned, condition, progress? }`, where `progress` is `{ have, need }` for counted ones while there is something left to reach.
+- `summary(storage, catalog)`: everything the page needs in one object.
 
 ## Achievements
 
