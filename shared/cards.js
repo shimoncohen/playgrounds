@@ -1,7 +1,7 @@
 /* Show saved XP on each card, and the playground level on the Trophy Room button. Playgrounds on the same origin share
    localStorage, so this just reads it. A data-subject card takes its keys from shared/catalog.js. */
-const keysOf = card => card.dataset.subject && window.Catalog
-  ? Catalog.QUESTS.filter(q => q.subject === card.dataset.subject).map(q => q.key)
+const keysOf = card => card.dataset.subject
+  ? window.Catalog ? Catalog.QUESTS.filter(q => q.subject === card.dataset.subject).map(q => q.key) : []
   : card.dataset.keys ? card.dataset.keys.split(' ') : [card.dataset.key];
 
 document.querySelectorAll('.card[data-key], .card[data-keys], .card[data-subject]').forEach(card => {
