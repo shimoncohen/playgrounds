@@ -4,7 +4,7 @@
 
 **Goal:** Harbor Quest runs on `shared/tiers.js` and `shared/tiers.css`, following `docs/tiers-guideline.md` §9 steps 1 to 6, the §9 step 10 bundle test and the step 8 import test. Nothing a learner saves changes. The only visible change is that the rail gains a "Beginner" tier header. Mission, hint and guide text, XP, ranks and the save format are unchanged.
 
-**Architecture:** `harbor-quest/app.js` (1505 lines, one IIFE) is split into per-file IIFEs on a global `HQ` namespace (guideline §8, §9 step 3), as Shell, Net and DS Quest do. `engine/` and `content/` are DOM-free and are loaded in Node by a strict loader. The refactor is behaviour-preserving, guarded by a browser golden transcript and save fixture captured before any code moves.
+**Architecture:** `programming/harbor-quest/app.js` (1505 lines, one IIFE) is split into per-file IIFEs on a global `HQ` namespace (guideline §8, §9 step 3), as Shell, Net and DS Quest do. `engine/` and `content/` are DOM-free and are loaded in Node by a strict loader. The refactor is behaviour-preserving, guarded by a browser golden transcript and save fixture captured before any code moves.
 
 **Tech Stack:** Vanilla JS (classic scripts), Playwright and `node:test` (`npm test`), `tools/build.py` for the artifact bundle.
 
@@ -24,7 +24,7 @@ Only Task 1 runs before PR A merges. Tasks 3 onward start after PR A merges.
 
 ## Acceptance Criteria
 
-**AC1.** Harbor loads `../shared/tiers.css` and `../shared/tiers.js`. A `window.Tiers.create` call lives in `harbor-quest/content/tiers.js`. All 12 chapters carry `tier:'beginner'`.
+**AC1.** Harbor loads `../../shared/tiers.css` and `../../shared/tiers.js`. A `window.Tiers.create` call lives in `programming/harbor-quest/content/tiers.js`. All 12 chapters carry `tier:'beginner'`.
 
 **AC2.** `RANKS` (`:1240`), the hand-built rank walk in `renderXP` (`:1275`), and the literals `10` and `25` are gone.
 - Mission XP, badge XP and rank come from `tiers.missionXp(S.ch)`, `tiers.chapterBadgeXp` and `tiers.rankFor(S.xp)`.
@@ -41,9 +41,9 @@ Only Task 1 runs before PR A merges. Tasks 3 onward start after PR A merges.
 **AC4.** The rail uses `Tiers.renderRail`. The chapter button markup is unchanged. The "Docker" and "Kubernetes" labels are kept.
 
 **AC5.** Harbor is split into `engine/`, `content/`, `ui.js` and `app.js` on the guideline's namespace.
-- Each file is `(function (HQ) { 'use strict'; … })(window.HQ = window.HQ || {});`, with the body unindented as in `shell-quest/ui.js`. Nothing sits outside the wrapper.
+- Each file is `(function (HQ) { 'use strict'; … })(window.HQ = window.HQ || {});`, with the body unindented as in `programming/shell-quest/ui.js`. Nothing sits outside the wrapper.
 - The only globals are `HQ`, `Tiers`, `__hq` and the existing shared ones.
-- Names cross files only through `HQ`. Names from earlier files are destructured at the top (`const {a,b}=HQ;`, as `shell-quest/ui.js:2-4` does). Names from later files, and cross-file mutable state, are read at call time as `HQ.x`.
+- Names cross files only through `HQ`. Names from earlier files are destructured at the top (`const {a,b}=HQ;`, as `programming/shell-quest/ui.js:2-4` does). Names from later files, and cross-file mutable state, are read at call time as `HQ.x`.
 - `S` is a stable object, `HQ.S`, reset in place.
 - Bodies are moved verbatim (rule 8). Every line that is not verbatim is on a written exception list (Task 5).
 - `engine/` and `content/` are DOM-free, enforced by the Node loader, which gives them no `document`.
@@ -61,7 +61,7 @@ The ticket's "Done when" bullet 1 is AC1+AC3. Bullets 2 and 3 are AC7.
 
 **In**
 - §9 steps 1 to 6, step 10 (bundle smoke test) and the old-save import test (step 8).
-- The `harbor-quest/` split on `HQ`.
+- The `programming/harbor-quest/` split on `HQ`.
 - The Node loader and the tests that depend on the old single-file layout.
 - A golden for transcript, XP, rank, UI probes and reset.
 - Docs and the `package.json` `test:browser` wiring.
@@ -102,7 +102,7 @@ The ticket's "Done when" bullet 1 is AC1+AC3. Bullets 2 and 3 are AC7.
 
 ## File Structure
 
-### `harbor-quest/app.js` split
+### `programming/harbor-quest/app.js` split
 
 The split follows the `/* ---------- … */` markers. Lines 4 to 22 are the header helpers.
 
@@ -124,7 +124,7 @@ The split follows the `/* ---------- … */` markers. Lines 4 to 22 are the head
 
 The coder may merge or split engine files at function boundaries.
 
-New file: `harbor-quest/content/tiers.js` (the `Tiers.create` call, loaded after `tier-beginner`).
+New file: `programming/harbor-quest/content/tiers.js` (the `Tiers.create` call, loaded after `tier-beginner`).
 
 ### Lines that change
 
@@ -178,11 +178,11 @@ Found by grep, at the pin.
 
 ### Other Harbor files
 
-- `harbor-quest/index.html`:
-  - Stylesheets are at `:12-16`. Add `../shared/tiers.css` after `:16`.
+- `programming/harbor-quest/index.html`:
+  - Stylesheets are at `:12-16`. Add `../../shared/tiers.css` after `:16`.
   - Scripts are at `:87-92`: the inline `window.PROGRESS` at `:87`, shared scripts at `:88-91`, and `app.js` at `:92`.
-  - New order after `how.js`: `../shared/tiers.js`, then `engine/*`, then `content/*` (`pictures`, `tier-beginner`, `quickfire`, `puzzles`, `guide`, `tiers`), then `ui.js`, then `app.js`.
-- `harbor-quest/style.css:59-68, 138-139, 210-211`: `.chapters`, `.chap`, `.rail-lbl`. The theme vars `tiers.css` needs already exist (`style.css:4-20`). Likely no CSS change.
+  - New order after `how.js`: `../../shared/tiers.js`, then `engine/*`, then `content/*` (`pictures`, `tier-beginner`, `quickfire`, `puzzles`, `guide`, `tiers`), then `ui.js`, then `app.js`.
+- `programming/harbor-quest/style.css:59-68, 138-139, 210-211`: `.chapters`, `.chap`, `.rail-lbl`. The theme vars `tiers.css` needs already exist (`style.css:4-20`). Likely no CSS change.
 
 ### Shared (read-only)
 
@@ -210,7 +210,7 @@ Found by grep, at the pin.
 - `package.json:14`: `test:browser` becomes `node tests/smoke.mjs && node tests/shell-golden.mjs && node tests/harbor-golden.mjs`. Done in the golden commit. The `test:engine` glob already covers `tests/harbor/*.test.mjs`.
 - `.github/workflows/ci.yml` is **not touched in PR B** (PR C).
   - The loop is `ci.yml:32`, run by `node --check "$f" || exit 1` at `:33`. It already ends with `tests/fixtures/*.js`.
-  - PR C adds `harbor-quest/*.js harbor-quest/engine/*.js harbor-quest/content/*.js`.
+  - PR C adds `programming/harbor-quest/*.js programming/harbor-quest/engine/*.js programming/harbor-quest/content/*.js`.
   - PR C targets `main` and opens only when the gate in Task 10 holds.
 - `AGENTS.md:17` gains the Harbor globs and `tests/fixtures/*.js`.
 - `.claude/skills/pre-pr-check/SKILL.md:11` gets the same loop edit, made by the manager or user.
@@ -221,7 +221,7 @@ Found by grep, at the pin.
 - `AGENTS.md`:
   - `:7`.
   - The "Where things go" table: add a "Change Harbor Quest" row and adjust the "Change another quest's course" row.
-  - Rule 6 (`:29`) extends to `harbor-quest/engine/` and `harbor-quest/content/`.
+  - Rule 6 (`:29`) extends to `programming/harbor-quest/engine/` and `programming/harbor-quest/content/`.
 - `docs/tiers-guideline.md` §9: a note that Harbor is done and how `HQ` holds `S`, `HIT`, `insideLost` and `pendingEdit`. Step 3 (`:312`) says "byte-identical"; the note says the golden is the proof.
 - `.claude/skills/add-mission/SKILL.md:11`, edited by the manager or user.
 - `docs/superpowers/plans/2026-11-01-harbor-quest-tiers.md` (this file, PR A).
@@ -348,7 +348,7 @@ At this commit `app.js` still holds the UI and boot. They sit in their own wrapp
   - `HQ.skip` and `HQ.skewBy`;
   - the XP, rank and rail sites (Task 7).
 - [ ] **Loader** `loadHarborQuest()` in `tests/content-loader.mjs`:
-  - It reads the `<script src>` list from `harbor-quest/index.html` and keeps `../shared/tiers.js`, `engine/*` and `content/*`.
+  - It reads the `<script src>` list from `programming/harbor-quest/index.html` and keeps `../../shared/tiers.js`, `engine/*` and `content/*`.
   - It evaluates each file with `new Function('window','localStorage',src)` against one shared stub `window`, and returns `window.HQ`.
   - It runs strict: `window.HQ` is a Proxy that throws on any read of an absent key while files load, and is turned off afterwards.
   - It passes no `document`, so DOM use in `engine/` or `content/` throws.
@@ -402,20 +402,20 @@ A small commit: `refactor(harbor): move the UI and boot to their own files`.
 
 ### Task 10: UI QA, PR B, tickets, PR C [manager]
 
-- [ ] Drive `playwright-cli` on `harbor-quest/` at desktop and 390 px, light and dark. Check the rail with tier header and group labels, mobile scrolling, the XP bar, a chapter click, a reset, and an old-save import. Attach screenshots.
+- [ ] Drive `playwright-cli` on `programming/harbor-quest/` at desktop and 390 px, light and dark. Check the rail with tier header and group labels, mobile scrolling, the XP bar, a chapter click, a reset, and an old-save import. Attach screenshots.
 - [ ] Edit `.claude/skills/pre-pr-check/SKILL.md:11` and `.claude/skills/add-mission/SKILL.md:11`.
 - [ ] Open PR B from `feat/42-harbor-tiers` against the base branch. Title `feat(harbor): adopt the shared tier model`. Body `Refs #42`.
 - [ ] Fill `.github/pull_request_template.md` completely, with a QA checklist:
   - [ ] `npm run check`.
   - [ ] `npm test`.
   - [ ] Import `tests/fixtures/harbor-progress-complete.json`; expect the golden rank and XP and 12 stars.
-  - [ ] Open `harbor-quest/` at 390 px and desktop, light and dark; the rail shows "Beginner 12/12" (0/12 on a fresh save), the Docker and Kubernetes labels, and no console errors.
+  - [ ] Open `programming/harbor-quest/` at 390 px and desktop, light and dark; the rail shows "Beginner 12/12" (0/12 on a fresh save), the Docker and Kubernetes labels, and no console errors.
   - [ ] Complete one mission and one chapter; the messages read "+10 XP" and "+25 XP".
   - [ ] Use "Reset all progress" in the guide; XP is 0 and chapter 1 starts again.
   - [ ] Open `dist/harbor-quest.html` and run `docker ps`.
 - [ ] Create the tickets after user approval (see "Tickets to create").
-- [ ] **PR C gate.** Open PR C only when, after `git fetch`, `git ls-tree origin/main harbor-quest/engine` and `git ls-tree origin/main harbor-quest/content` both list files. That happens when B has reached `main`, either because `#45` merged after B, or because B was retargeted. "B merged" alone is not enough, since B targets the `#45` branch. Otherwise the new globs match nothing on `main`, and CI (no `nullglob`, `ci.yml:30-34`) passes the literal glob to `node --check` and fails.
-- [ ] PR C: `ci: syntax-check the harbor engine and content files`, against `main`, flagged as a CI change. It adds `harbor-quest/*.js harbor-quest/engine/*.js harbor-quest/content/*.js` to the loop at `ci.yml:32`.
+- [ ] **PR C gate.** Open PR C only when, after `git fetch`, `git ls-tree origin/main programming/harbor-quest/engine` and `git ls-tree origin/main programming/harbor-quest/content` both list files. That happens when B has reached `main`, either because `#45` merged after B, or because B was retargeted. "B merged" alone is not enough, since B targets the `#45` branch. Otherwise the new globs match nothing on `main`, and CI (no `nullglob`, `ci.yml:30-34`) passes the literal glob to `node --check` and fails.
+- [ ] PR C: `ci: syntax-check the harbor engine and content files`, against `main`, flagged as a CI change. It adds `programming/harbor-quest/*.js programming/harbor-quest/engine/*.js programming/harbor-quest/content/*.js` to the loop at `ci.yml:32`.
 
 Security-reviewer: not needed (see "Review needs").
 
@@ -450,7 +450,7 @@ Check 4 script (the CI loop at `ci.yml:32` plus the Harbor globs):
 set -u
 cd "$(git rev-parse --show-toplevel)"
 shopt -s nullglob
-for f in */app.js ds-quest/*.js harbor-quest/*.js harbor-quest/engine/*.js harbor-quest/content/*.js shell-quest/*.js shell-quest/engine/*.js shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs net-quest/*.js net-quest/engine/*.js net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/fixtures/*.js; do
+for f in */app.js programming/ds-quest/*.js programming/harbor-quest/*.js programming/harbor-quest/engine/*.js programming/harbor-quest/content/*.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/fixtures/*.js; do
   node --check "$f" || exit 1
 done
 echo "syntax ok"
@@ -466,7 +466,7 @@ echo "syntax ok"
 
 ## Risks and assumptions
 
-1. Per-file IIFEs on `HQ`, with `S` held as a stable object reset in place. `shell-quest/ui.js:2-4` uses the same idiom.
+1. Per-file IIFEs on `HQ`, with `S` held as a stable object reset in place. `programming/shell-quest/ui.js:2-4` uses the same idiom.
 2. Behaviour is proved by tests, not by byte-identical moves. A rarely-run engine branch the probes miss could break silently. The coverage run in Task 4 reduces this and does not remove it.
 3. The golden is not yet run. If it is not byte-identical under three timezones, the plan stops.
 4. `ui.js` and `app.js` are never loaded in Node. Only the golden and smoke run them.
