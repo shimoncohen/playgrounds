@@ -29,7 +29,7 @@
 <section class="box" aria-labelledby="sb-h">
   <h2 id="sb-h">Subjects</h2>
   ${S.subjects.map(s => `<div class="subject">
-    <div class="row"><a href="../${s.href}">${esc(s.name)}</a><span class="muted">${s.complete} of ${s.quests} ${esc(s.unit)} finished · ${s.chaptersDone} chapters</span></div>
+    <div class="row"><a href="../${s.href}">${esc(s.name)}</a><span class="muted">${s.complete} of ${s.quests} ${esc(s.unit)} finished · ${s.chaptersDone} ${s.chaptersDone === 1 ? 'chapter' : 'chapters'}</span></div>
     ${bar(`${s.name}: ${s.complete} of ${s.quests} ${s.unit} finished`, s.complete, s.quests)}
   </div>`).join('')}
 </section>
