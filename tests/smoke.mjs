@@ -125,6 +125,7 @@ test('trophy room with no progress shows level 1, every achievement locked, and 
   assert.match(await page.textContent('#lv-h'), /Level 1 · Visitor/);
   assert.equal(await page.locator('.ach .a.off').count(), 9);
   assert.match(await page.textContent('.empty'), /Finish a mission/);
+  assert.deepEqual(await page.$$eval('.empty a', a => a.map(x => x.getAttribute('href'))), ['../programming/', '../math/']);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -133,6 +134,13 @@ for (const width of [1280, 390]) {
   test(`trophy room works out level, playgrounds and achievements from saved progress at ${width}px`, async () => {
     const { ctx, page, errors } = await open(`${base}/trophy-room/`, { viewport: { width, height: 900 } }, c => c.addInitScript(TROPHY_SEED));
     assert.match(await page.textContent('#lv-h'), /Level 3 · Visitor/);
+    assert.match(await page.textContent('.level'), /160 XP/);
+    assert.match(await page.textContent('.level'), /20 XP to Level 4/);
+    const lvl = page.locator('#room [role=progressbar]').first();
+    assert.equal(await lvl.getAttribute('aria-valuenow'), '80');
+    assert.equal(await lvl.getAttribute('aria-valuemax'), '100');
+    assert.ok(await lvl.getAttribute('aria-label'));
+    assert.ok((await page.$$eval('.a.off .cond', c => c.map(x => x.textContent))).every(t => t.startsWith('Locked: ')));
     assert.match(await page.textContent('#ac-h'), /3 of 9/);
     assert.deepEqual(await page.$$eval('.ach .a:not(.off) b', b => b.map(x => x.textContent)), ['First Steps', 'Finisher', 'Polymath']);
     assert.match(await page.textContent('.quests li:has(a[href="../math/trigonometry/"])'), /Done/);
@@ -165,6 +173,15 @@ for (const pg of ['programming/', 'programming/python-quest/', 'math/algebra/'])
     await ctx.close();
   });
 }
+
+test('trophy room button keeps its plain label when its scripts fail to load', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/python-quest/`, {}, c => c.route('**/shared/trophies.js', r => r.abort()));
+  await page.waitForSelector('.nv-trophy');
+  await page.waitForTimeout(500);
+  assert.equal(await page.textContent('.nv-trophy .lvl'), 'Trophy Room');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
 
 test('programming hub shows saved XP and the landing page sums it', async () => {
   const { ctx, page } = await open(`${base}/programming/`);
@@ -958,6 +975,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.goto('http://bundle.test/shell-quest.html');
   await page.waitForSelector('#mission');
+  assert.equal(await page.locator('.nv-trophy').count(), 0);
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   assert.match(heads[0], /^Beginner/);
