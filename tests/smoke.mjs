@@ -113,6 +113,47 @@ test('landing page Trophy Room button shows the playground level', async () => {
   await ctx.close();
 });
 
+// 160 XP is level 3. Trigonometry is complete (one chapter of 5); Python has its first chapter of 6 done.
+const TROPHY_SEED = () => {
+  const first = n => Object.fromEntries(Array.from({ length: n }, (_, i) => ['0.' + i, true]));
+  localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 85, done: first(6) }));
+  localStorage.setItem('math-trigonometry-v1', JSON.stringify({ xp: 75, done: first(5) }));
+};
+
+test('trophy room with no progress shows level 1, every achievement locked, and where to start', async () => {
+  const { ctx, page, errors } = await open(`${base}/trophy-room/`);
+  assert.match(await page.textContent('#lv-h'), /Level 1 · Visitor/);
+  assert.equal(await page.locator('.ach .a.off').count(), 9);
+  assert.match(await page.textContent('.empty'), /Finish a mission/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const width of [1280, 390]) {
+  test(`trophy room works out level, playgrounds and achievements from saved progress at ${width}px`, async () => {
+    const { ctx, page, errors } = await open(`${base}/trophy-room/`, { viewport: { width, height: 900 } }, c => c.addInitScript(TROPHY_SEED));
+    assert.match(await page.textContent('#lv-h'), /Level 3 · Visitor/);
+    assert.match(await page.textContent('#ac-h'), /3 of 9/);
+    assert.deepEqual(await page.$$eval('.ach .a:not(.off) b', b => b.map(x => x.textContent)), ['First Steps', 'Finisher', 'Polymath']);
+    assert.match(await page.textContent('.quests li:has(a[href="../math/trigonometry/"])'), /Done/);
+    assert.match(await page.textContent('.quests li:has(a[href="../programming/python-quest/"])'), /1 \/ 9 chapters · 85 XP/);
+    assert.match(await page.textContent('.quests li:has(a[href="../programming/net-quest/"])'), /Not started/);
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('trophy room links back to the landing page', async () => {
+  const { ctx, page, errors } = await open(`${base}/trophy-room/`);
+  assert.equal(await page.$('.nv-trophy'), null, 'the room does not link to itself');
+  await page.click('header.top a.nv-home');
+  await page.waitForSelector('a.card[href="programming/"]');
+  assert.equal(new URL(page.url()).pathname, '/');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('programming hub shows saved XP and the landing page sums it', async () => {
   const { ctx, page } = await open(`${base}/programming/`);
   await page.evaluate(() => {
