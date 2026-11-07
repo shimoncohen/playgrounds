@@ -93,13 +93,95 @@ test('programming hub links back to the landing page', async () => {
   await ctx.close();
 });
 
-test('landing page links to GitHub and the feature request form', async () => {
+test('landing page links to the Trophy Room, GitHub and the feature request form', async () => {
   const { ctx, page, errors } = await open(base + '/');
   const hrefs = await page.$$eval('a.btn', a => a.map(x => x.getAttribute('href')));
   assert.deepEqual(hrefs, [
+    'trophy-room/',
     'https://github.com/shimoncohen/playgrounds',
     'https://github.com/shimoncohen/playgrounds/issues/new?template=feature-request.yml',
   ]);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('landing page Trophy Room button shows the playground level', async () => {
+  const { ctx, page, errors } = await open(base + '/', {}, c => c.addInitScript(() => localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 85 }))));
+  assert.equal(await page.textContent('.trophy-btn .lvl'), 'Level 3');
+  assert.equal(await page.getAttribute('.trophy-btn', 'aria-label'), 'Trophy Room, level 3');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+// 160 XP is level 3. Trigonometry is complete (one chapter of 5); Python has its first chapter of 6 done.
+const TROPHY_SEED = () => {
+  const first = n => Object.fromEntries(Array.from({ length: n }, (_, i) => ['0.' + i, true]));
+  localStorage.setItem('python-quest-v1', JSON.stringify({ xp: 85, done: first(6) }));
+  localStorage.setItem('math-trigonometry-v1', JSON.stringify({ xp: 75, done: first(5) }));
+};
+
+test('trophy room with no progress shows level 1, every achievement locked, and where to start', async () => {
+  const { ctx, page, errors } = await open(`${base}/trophy-room/`);
+  assert.match(await page.textContent('#lv-h'), /Level 1 · Visitor/);
+  assert.equal(await page.locator('.ach .a.off').count(), 9);
+  assert.match(await page.textContent('.empty'), /Finish a mission/);
+  assert.deepEqual(await page.$$eval('.empty a', a => a.map(x => x.getAttribute('href'))), ['../programming/', '../math/']);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const width of [1280, 390]) {
+  test(`trophy room works out level, playgrounds and achievements from saved progress at ${width}px`, async () => {
+    const { ctx, page, errors } = await open(`${base}/trophy-room/`, { viewport: { width, height: 900 } }, c => c.addInitScript(TROPHY_SEED));
+    assert.match(await page.textContent('#lv-h'), /Level 3 · Visitor/);
+    assert.match(await page.textContent('.level'), /160 XP/);
+    assert.match(await page.textContent('.level'), /20 XP to Level 4/);
+    const lvl = page.locator('#room [role=progressbar]').first();
+    assert.equal(await lvl.getAttribute('aria-valuenow'), '80');
+    assert.equal(await lvl.getAttribute('aria-valuemax'), '100');
+    assert.ok(await lvl.getAttribute('aria-label'));
+    assert.ok((await page.$$eval('.a.off .cond', c => c.map(x => x.textContent))).every(t => t.startsWith('Locked: ')));
+    assert.match(await page.textContent('#ac-h'), /3 of 9/);
+    assert.deepEqual(await page.$$eval('.ach .a:not(.off) b', b => b.map(x => x.textContent)), ['First Steps', 'Finisher', 'Polymath']);
+    assert.match(await page.textContent('.quests li:has(a[href="../math/trigonometry/"])'), /Done/);
+    assert.match(await page.textContent('.quests li:has(a[href="../programming/python-quest/"])'), /1 \/ 9 chapters · 85 XP/);
+    assert.match(await page.textContent('.quests li:has(a[href="../programming/net-quest/"])'), /Not started/);
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('trophy room links back to the landing page', async () => {
+  const { ctx, page, errors } = await open(`${base}/trophy-room/`);
+  assert.equal(await page.$('.nv-trophy'), null, 'the room does not link to itself');
+  await page.click('header.top a.nv-home');
+  await page.waitForSelector('a.card[href="programming/"]');
+  assert.equal(new URL(page.url()).pathname, '/');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+// Quest headers are full, so there the button is only the trophy and the level lives in its name and tooltip.
+for (const [pg, text] of [['programming/', '🏆 Level 3'], ['programming/python-quest/', '🏆'], ['math/algebra/', '🏆']]) {
+  test(`trophy room button on ${pg} shows the level and opens the room`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, {}, c => c.addInitScript(TROPHY_SEED));
+    await page.waitForFunction(() => document.querySelector('.nv-trophy')?.getAttribute('aria-label') === 'Trophy Room, level 3');
+    assert.equal((await page.textContent('.nv-trophy')).trim(), text);
+    assert.equal(await page.getAttribute('.nv-trophy', 'title'), 'Trophy Room, level 3');
+    await page.click('.nv-trophy');
+    await page.waitForSelector('#lv-h');
+    assert.equal(new URL(page.url()).pathname, '/trophy-room/');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('trophy room button keeps its plain label when its scripts fail to load', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/python-quest/`, {}, c => c.route('**/shared/trophies.js', r => r.abort()));
+  await page.waitForSelector('.nv-trophy');
+  await page.waitForTimeout(500);
+  assert.equal(await page.getAttribute('.nv-trophy', 'aria-label'), 'Trophy Room');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -896,6 +978,7 @@ test('shell-quest artifact bundle (dist/shell-quest.html) works as a single inli
   await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.goto('http://bundle.test/shell-quest.html');
   await page.waitForSelector('#mission');
+  assert.equal(await page.locator('.nv-trophy').count(), 0);
   assert.equal(await page.locator('.tierhead').count(), await railTiers(page));
   const heads = await page.$$eval('.tierhead', hs => hs.map(h => h.textContent.replace(/\s+/g, ' ').trim()));
   assert.match(heads[0], /^Beginner/);
@@ -1590,7 +1673,7 @@ test('shell-quest script mission: Type it for me opens the editor pre-filled; wr
   assert.match(await card(), /scripts\/hi\.sh/, 'file path shown on the card');
   assert.doesNotMatch(await card(), /Challenge/, 'a script mission is not tagged Challenge');
   await page.click('[data-act="hint"]');
-  assert.match(await page.textContent('#hintBox'), /Use nano scripts\/hi\.sh to write it, then run it with bash scripts\/hi\.sh\./);
+  assert.match(await page.textContent('#hintBox'), /Use nano scripts\/hi\.sh to write it, then try it with bash scripts\/hi\.sh\./);
   assert.equal(await xp(), '0 XP');
   // Type it for me: the editor opens on the mission file, pre-filled with the answer, nothing saved yet
   await page.click('[data-act="fill"]');
@@ -1905,14 +1988,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
         await page.click('#edClose');
       } else {
         assert.equal(await page.inputValue('#cmd'), m.answer, `Type it for me fills ${key} ${m.title}`);
-        const n0 = await page.$$eval('#screen .line', els => els.length);
         await page.press('#cmd', 'Enter');
-        if (m.title === 'Treasure hunt') { // two steps: the find prints the path, the learner cats it
-          const path = l => l.startsWith('./') && l.endsWith('/gold.txt'); // a printed path, not the prompt line that typed the find
-          await page.waitForFunction(n => [...document.querySelectorAll('#screen .line')].slice(n).some(e => /^\.\/.*\/gold\.txt$/.test(e.textContent.trim())), n0);
-          const found = (await page.$$eval('#screen .line', (els, n) => els.slice(n).map(e => e.textContent.trim()), n0)).find(path);
-          await type(`cat ${found}`);
-        }
         if (m.steps.length) { // a multi-step mission: one step is ticked off, the mission stays open until the last one
           for (const a of m.steps.slice(1)) {
             assert.equal(await page.evaluate(k => !!window.SQ.S.done[k], key), false, `${key} ${m.title}: one step must not complete the mission`);

@@ -15,6 +15,7 @@ on:
       - 'shared/**'
       - 'programming/**'
       - 'math/**'
+      - 'trophy-room/**'
       - '*-quest/**'
       - 'tools/publish_site.sh'
       - '.github/workflows/pr-preview.yml'

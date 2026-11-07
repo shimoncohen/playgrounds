@@ -210,13 +210,15 @@ function missionVerdict(m,c,why){const isScript=m.kind==='script'||m.kind==='cha
     return {good,failed}}
   if(isScript&&m.file){const r=world(()=>c.scriptPasses(m));return {good:!!r.ok,failed:r.failed||null}}
   return {good:false,failed:null}}
-/* Multi-step missions: m.steps=[{goal,answer,check,hint?,anat?,how?}], done in any order; the mission passes when every step has.
+/* Multi-step missions: m.steps=[{goal,answer,check,hint?,anat?,how?}], done in the order given; the mission passes when every step has.
    Progress lives in S.steps['<ch>.<mi>'] (indexes of the steps done). It is created lazily, so old saves and a finished course export look as they did, and it is dropped when the mission completes. */
 const stepsDone=key=>(S.steps&&S.steps[key])||[];
 const stepNext=(m,key)=>{const d=stepsDone(key);return m.steps.findIndex((s,i)=>!d.includes(i))};
-/* judge the line just typed against every open step: {newly: indexes done by this line, all: the mission is complete} */
+/* judge the line just typed against the next open step only: {newly: indexes done by this line, all: the mission is complete}.
+   One line finishes at most one step: a check sees which commands ran on the line, not their order, so `b; a` would otherwise pass as a then b.
+   Old saves may hold out-of-order indexes; the next open step is still the first one missing. */
 function stepsApply(m,key,c){const d=stepsDone(key).slice(),newly=[];
-  m.steps.forEach((s,i)=>{if(!d.includes(i)&&missionVerdict(s,c,false).good){d.push(i);newly.push(i)}});
+  const i=stepNext(m,key);if(i>=0&&missionVerdict(m.steps[i],c,false).good){d.push(i);newly.push(i)}
   if(d.length>=m.steps.length){if(S.steps){delete S.steps[key];if(!Object.keys(S.steps).length)delete S.steps}return {newly,all:true}}
   if(newly.length){S.steps=S.steps||{};S.steps[key]=d}
   return {newly,all:false}}

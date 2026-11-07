@@ -59,10 +59,10 @@ There are four kinds:
 
 Rules: step 1 is one plain sentence about the whole line (what goes in, what comes out); later steps go left to right, one part each, and say how the part changes the whole; end with what the learner will see or one common slip; 3 to 5 steps; never an unexplained term (introduce it, or link it to something taught earlier); variables stay quoted and inside `<code>`. A chip's third element is a short meaning (a few words) that replaces the bare kind label; use it for options, operators and arguments whose role is not obvious. Every quest renders `m.how` (Harbor Quest reads `how` on its `{t,i,g,a,h,ans,ok}` missions too), so the same field works everywhere. It is optional in the data so old missions keep rendering, but new and changed missions must have it, and `tests/shell/how.test.mjs` requires it for every Beginner mission.
 
-**Multi-step missions.** When one line cannot teach the idea (`find -type d` and `find -type f` only make sense side by side), give the mission `steps` instead of `answer`/`check`:
+**Multi-step missions.** When a mission asks for more than one command on separate lines (`find -type d` and `find -type f` side by side, or a change followed by the command that shows it worked), give the mission `steps` instead of `answer`/`check`. A goal that says "then run X" without a step for X lets the learner skip X, because the check passes on the earlier command:
 
 ```js
-{ title: 'Find by type', goal: 'Ask <code>find</code> for folders, then for files. Do both, in either order.',
+{ title: 'Find by type', goal: 'Ask <code>find</code> for folders, then for files. Do both, in that order: folders first, then files.',
   steps: [
     { goal: 'List only the folders: <code>find . -type d</code>', answer: 'find . -type d', check: c => ..., anat, how, hint? },
     { goal: 'List only the files: <code>find . -type f</code>',   answer: 'find . -type f', check: c => ..., anat, how },
@@ -71,11 +71,12 @@ Rules: step 1 is one plain sentence about the whole line (what goes in, what com
   explain: '...' }
 ```
 
-- Each step is a small command mission: its own `goal`, `answer` and `check` (the same helpers as section 3). Steps are done **in any order**; the mission completes, pays its XP once and moves on only when every step has been done. A step done on an earlier line stays done.
+- Each step is a small command mission: its own `goal`, `answer` and `check` (the same helpers as section 3). Steps are done **in order**: only the first open step is judged, a step done before the ones above it does not count, and one typed line finishes at most one step (a check sees which commands ran on a line, not their order). The mission completes, pays its XP once and moves on only when every step has been done. A step done on an earlier line stays done.
 - The card shows the steps as a tick-off list inside the goal box. The hint, the chips and the "How it works" list follow the first open step (`step.hint`, `step.anat`, `step.how`, falling back to the mission's), and "Type it for me" types that step's `answer`.
 - Progress is `S.steps['<ch>.<mi>']` (indexes done), created lazily and dropped on completion, so old saves load unchanged and a finished course exports as before. Never reuse it for anything else.
 - Rules: two to four steps; every step is its own goal the learner can name; do not use steps to chop a one-line idea into pieces. The mission-level `answer` must equal the first step's (the solvability test asserts it). Add steps to a **shipped** mission only as a reviewed behaviour change: the golden fixture records its transcript, so say so in the PR (Beginner 6.4 "Find by type" is the example, and its golden record was re-recorded in a commit of its own).
-- Only Shell Quest supports `steps` so far.
+- Shell Quest and Harbor Quest support `steps`. Harbor's steps use its own field names (`{g,a,h,ans,ok}`), and the mission keeps only its overall `g`. Network Quest replays the whole session, so its checks require the commands in order with `c.inOrder(re1, re2, ...)` instead.
+- Script missions are checked by their hidden tests when saved, so their cards suggest runs ("try it with ...") rather than ask for them.
 
 The check context is built per line by `SQ.ctxFor(line)` in `programming/shell-quest/engine/exec.js`. The real helpers:
 
