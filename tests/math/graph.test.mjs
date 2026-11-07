@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { loadMath, FILES_GRAPH } from './harness.mjs';
 
 const MQ = loadMath(FILES_GRAPH);
@@ -80,8 +81,11 @@ test('labelLines wraps on a word boundary and truncates with an ellipsis', () =>
 });
 
 test('landing card keys match the tracks', () => {
-  const html = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'index.html'), 'utf8');
-  const m = html.match(/<a class="card" href="math\/"[^>]*data-keys="([^"]*)"/);
-  assert.ok(m, 'math card with data-keys');
-  assert.equal(m[1], G.tracks.map(t => t.key).join(' '));
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.ok(/<a class="card" href="math\/"[^>]*data-subject="math"/.test(html), 'math card with data-subject');
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(root, 'shared/catalog.js'), 'utf8'), sandbox);
+  assert.deepEqual(plain(sandbox.Catalog.QUESTS.filter(q => q.subject === 'math').map(q => q.key)), plain(G.tracks.map(t => t.key)));
 });

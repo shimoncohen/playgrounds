@@ -19,6 +19,8 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🦀 | **Rust Quest** | Rust from `println!` and `let` onwards, run by a small Rust checker whose error codes are checked against a real `rustc` for the programs the quest supports; anything else is reported as unsupported | [`programming/rust-quest/`](programming/rust-quest/) |
 | ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
 
+**Trophy Room** ([`trophy-room/`](trophy-room/)) shows your playground level, worked out from the XP of every playground, your progress per subject and playground, and achievements such as Playground Master. It reads the progress already saved in your browser.
+
 Prefer your own machine? Every playground is a static page. Open `index.html` (the landing page), `programming/<name>-quest/index.html` or `math/index.html` in a browser. There is no build step, no server and no database.
 
 ## 🧭 How a quest works
@@ -108,7 +110,7 @@ The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math
 
 ```
 index.html              landing page (a card per section)
-shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, landing.css + cards.js (landing and hub cards)
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements)
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
   script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
@@ -124,7 +126,8 @@ math/track.js           the app every track page shares (rail, mission card, sce
 math/arithmetic/ math/algebra/ math/geometry/ math/trigonometry/
                         a track each: index.html + content.js (DOM-free chapters, quick-fire, guide) + app.js
 math/vendor/            committed third-party scripts for Math (KaTeX, math.js, MathLive, three.js), made only by tools/vendor-math.sh
-tests/                  engine tests (Node; shell/, ds/, net/, math/, agent/ and rust/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
+trophy-room/            the Trophy Room: index.html + style.css + app.js, rendered from shared/trophies.js
+tests/                  engine tests (Node; shell/, ds/, net/, math/, agent/, rust/ and trophy/), browser smoke + golden tests (Playwright), math scene and working-area browser tests
 tools/                  build.py (artifact bundler), publish_site.sh (gh-pages), vendor-math.sh (rebuilds math/vendor/)
 docs/                   guidelines, design specs, implementation plans
 .github/                CI, Pages deploy, PR previews, issue and PR templates
@@ -156,7 +159,7 @@ Then, in a Claude session with the Artifact tool, ask Claude to publish `dist/<n
 ### CI and deployment
 
 - `ci.yml` runs on every pull request: the bundle check and `node --check` on every script, then, in parallel jobs, the engine and browser tests for the parts the PR changes. `tools/ci-plan.mjs` picks them: a change inside one `<name>-quest/` or `tests/<name>/` folder tests that quest, docs-only changes skip the tests, and anything else (shared code, tools, fixtures, config) tests everything. The `checks` job is the one status to require.
-- `pages.yml` runs on every push to `main`: it calls CI, and only if that passes publishes the site (`index.html`, `shared/` and the `*-quest/` folders) to the root of the `gh-pages` branch.
+- `pages.yml` runs on every push to `main`: it calls CI, and only if that passes publishes the site (`index.html`, `shared/`, `programming/`, `math/` and `trophy-room/`) to the root of the `gh-pages` branch.
 - `pr-preview.yml` publishes a live preview of a pull request to `pr-preview/pr-<number>/` and comments the link on the PR. It only runs for PRs from branches in this repo; **PRs from forks and Dependabot get no preview** (run the page locally instead).
 
 Both publishing workflows use `tools/publish_site.sh`, which maintains the `gh-pages` branch. Don't edit that branch by hand. Previews share the live site's origin, so they read and write the same saved progress; test them in a private window if you don't want your own progress touched.
