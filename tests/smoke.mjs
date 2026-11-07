@@ -154,6 +154,18 @@ test('trophy room links back to the landing page', async () => {
   await ctx.close();
 });
 
+for (const pg of ['programming/', 'programming/python-quest/', 'math/algebra/']) {
+  test(`trophy room button on ${pg} shows the level and opens the room`, async () => {
+    const { ctx, page, errors } = await open(`${base}/${pg}`, {}, c => c.addInitScript(TROPHY_SEED));
+    await page.waitForFunction(() => document.querySelector('.nv-trophy .lvl')?.textContent === 'Level 3');
+    await page.click('.nv-trophy');
+    await page.waitForSelector('#lv-h');
+    assert.equal(new URL(page.url()).pathname, '/trophy-room/');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
 test('programming hub shows saved XP and the landing page sums it', async () => {
   const { ctx, page } = await open(`${base}/programming/`);
   await page.evaluate(() => {

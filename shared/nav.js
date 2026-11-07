@@ -24,8 +24,27 @@
   // Pages one folder deeper (a Math track, a quest in programming/) climb one more level to get home.
   const at = /\/((?:programming\/)?\w+-quest\/(?:\w+\/)?|math\/(?:\w+\/)?|programming\/|trophy-room\/)(?:index\.html)?$/.exec(location.pathname);
   if (at) {
-    const up = '../'.repeat(at[1].split('/').length - 2) + (location.protocol === 'file:' ? '../index.html' : '../');
-    host.prepend(link('nv-home', up, icon('← '), 'All playgrounds'));
+    const root = '../'.repeat(at[1].split('/').length - 1);
+    const page = location.protocol === 'file:' ? 'index.html' : '';
+    const home = link('nv-home', root + page, icon('← '), 'All playgrounds');
+    host.prepend(home);
+    if (at[1] !== 'trophy-room/') {
+      const lvl = document.createElement('span');
+      lvl.className = 'lvl';
+      lvl.textContent = 'Trophy Room';
+      const trophy = link('nv-trophy trophy-btn', root + 'trophy-room/' + page, icon('🏆 '), lvl);
+      home.after(trophy);
+      // Quest pages don't load the catalog, so fetch the two small scripts only where this button is shown.
+      const load = src => new Promise((done, fail) => {
+        const s = document.createElement('script');
+        s.src = root + 'shared/' + src;
+        s.onload = done;
+        s.onerror = fail;
+        document.head.append(s);
+      });
+      (window.Trophies ? Promise.resolve() : load('catalog.js').then(() => load('trophies.js')))
+        .then(() => window.Trophies.labelButton(trophy), () => { /* scripts did not load: keep the plain label */ });
+    }
   }
 
   const idea = link('nv-idea', REPO + '/issues/new?template=feature-request.yml', 'Open a feature request');
