@@ -9,11 +9,17 @@ RQ.compile=src=>{
   const r=RQ.parse(RQ.lex(src));
   if(r.errors.length)return {ast:null,diags:r.errors,unsupported:[]};
   const ck=RQ.check(r.ast);
-  let diags=ck.errors;
+  let diags=ck.errors,loans=[];
   const unsupported=[...r.unsupported,...ck.unsupported];
+  // E0384 is a borrowck error in rustc, so the pass still runs when it is the only thing the checker found
+  if(!unsupported.length&&diags.every(e=>e.code==='E0384')){
+    const b=RQ.borrow(r.ast,ck.info);
+    diags=[...diags,...b.errors].sort((a,b)=>a.line-b.line||a.col-b.col);
+    unsupported.push(...b.unsupported);loans=b.loans;
+  }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
   if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}
-  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,
+  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
