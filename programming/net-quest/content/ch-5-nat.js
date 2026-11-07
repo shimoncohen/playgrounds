@@ -112,7 +112,8 @@ NQ.CH.push({name:'NAT and public networks',badge:'NAT Navigator',
     if(!r)return '<code>home</code> still has no route towards the internet. Add the default route with <code>ip route add default via 203.0.113.6</code>.';
     if(r.via!==addrOf(c,'isp'))return 'The default route does not point at the provider\'s router. Its address on the wire to <code>home</code> is <code>203.0.113.6</code>.';
     if(!home(c).nat)return 'The route is back, but NAT is off on <code>home</code>. Switch it on with <code>nat on</code>.';
-    return c.ping('laptop',WEB).delivered?true:'The laptop still cannot reach the web server. Compare the gateway in <code>ip route</code> with <code>203.0.113.6</code>.';}},
+    if(!c.ping('laptop',WEB).delivered)return 'The laptop still cannot reach the web server. Compare the gateway in <code>ip route</code> with <code>203.0.113.6</code>.';
+    return c.inOrder(/^\s*ip\s+(r|route)\s+(add|replace|change)\s/,NQ.pingTo('198.51.100.10'))?true:'The route is back. Now run <code>ping -c 1 198.51.100.10</code> to prove it.';}},
  {title:'A packet nobody wants',scenario:'home',setup:[{dev:'home',cmd:'nat off'}],
   goal:'Someone switched NAT off on <code>home</code>. Run <code>traceroute 198.51.100.10</code> from the laptop. Hop 1 answers, and then there are only stars, <code>* * *</code>: nothing comes back. Open the packet panel. <code>home</code> now forwards the laptop\'s packet with its private source address unchanged, and a router on the public side throws it away without sending any error. Providers do this on purpose, because a private source address can never be answered over the internet. Find the dropped entry that mentions the private source address and type the name of the device that dropped the packet.',
   anat:[...TRACE,[WEB,'arg','the web server']],
@@ -140,6 +141,7 @@ NQ.CH.push({name:'NAT and public networks',badge:'NAT Navigator',
   check:c=>{
     if(!home(c).nat)return 'NAT is still off on <code>home</code>. Switch it on with <code>nat on</code>.';
     if(!c.ping('laptop',WEB).delivered)return 'NAT is on, but the laptop still cannot reach the web server. Check the default route with <code>ip route</code>.';
-    return c.ping('phone',WEB).delivered?true:'The laptop gets through, but the phone does not. Look at <code>home</code> with <code>ip route</code> and <code>nat</code>.';}}
+    if(!c.ping('phone',WEB).delivered)return 'The laptop gets through, but the phone does not. Look at <code>home</code> with <code>ip route</code> and <code>nat</code>.';
+    return c.inOrder(/^\s*nat\s*$/,/^\s*nat\s+on\s*$/)?true:'NAT is on. The goal asks you to look first: run <code>nat</code> to see its status, then <code>nat on</code>.';}}
  ]});
 })();
