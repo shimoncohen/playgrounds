@@ -29,7 +29,7 @@ The first PR (this spec and the plan) changes docs only.
 
 ```
 shared/
-  catalog.js       DOM-free: the list of quests (window.Catalog and an ES export for tests)
+  catalog.js       DOM-free: the list of quests (window.Catalog; tests load it with node:vm, like shared/tiers.js)
   trophies.js      DOM-free: read saves, derive stats, level, achievements
 trophy-room/
   index.html       the page: header, level, subjects, quests, achievements
@@ -79,21 +79,21 @@ Total today is about 9,860 XP. Quirks the reader must handle:
 - `sep` is the done-key separator (`'-'` for Script and C++).
 - `href` is relative to the site root; each page resolves it against its own depth.
 - `subject` is `programming` or `math`. Subject names and order live here too: `SUBJECTS = [{id:'programming', name:'Programming', href:'programming/'}, {id:'math', name:'Math', href:'math/'}]`.
-- The landing page cards and the Programming hub cards stop hard-coding `data-keys` and take their keys from the catalog by subject or by key. `shared/cards.js` keeps its behaviour (sum XP, show "Continue →").
+- The landing Programming and Math cards use `data-subject` and take their keys from the catalog; the Programming hub's quest cards keep `data-key`. `shared/cards.js` keeps its behaviour (sum XP, show "Continue →").
 
 ## `shared/trophies.js`
 
-Pure functions. The only browser access is `readAll(storage)`, which takes `localStorage` as a parameter so tests pass a fake.
+Pure functions that take `localStorage` as a parameter, so tests pass a fake. The one DOM function is `labelButton(a)`, which writes the level into a Trophy Room button.
 
 - `questStats(entry, save)` returns `{ key, xp, missionsDone, missionsTotal, chaptersDone, chaptersTotal, started, complete }`.
   - Missions done: count done keys that parse to a valid `chapter`/`mission` inside the catalog's counts and have a truthy value. Unknown or out-of-range keys are ignored, so a stale save never shows more than 100%.
   - `xp`: the saved `xp` if it is a finite number ≥ 0, else 0.
   - `started`: `missionsDone > 0`. `complete`: `missionsDone === missionsTotal`.
-- `readAll(storage)`: for each catalog entry, read and parse its key. A missing key, invalid JSON, a non-object, a blocked storage (throws) or a Harbor save failing its own validity check give an empty save. It never throws.
-- `subjectStats(stats)`: per subject, quests complete, quests started, chapters done, XP.
+- `readSave(storage, entry)`: read and parse one entry's key. A missing key, invalid JSON, a non-object, a blocked storage (throws) or a Harbor save failing its own validity check give an empty save. It never throws.
+- `subjectStats(stats, subjects)`: per subject, quests complete, quests started, chapters done, XP.
 - `level(xp)`: `n = floor(sqrt(xp / 20)) + 1`. Returns `{ n, title, lo, hi }` where `lo = 20·(n−1)²` and `hi = 20·n²`. Titles: 1–4 Visitor, 5–9 Explorer, 10–14 Regular, 15–19 Veteran, 20+ Legend. Today's full completion (about 9,860 XP) is level 23. As content grows the top level grows; there is no cap.
-- `achievements(stats)`: returns the list below, each `{ id, name, icon, earned, condition, progress? }`, where `progress` is `{ have, need }` for counted ones.
-- `summary(storage)`: everything the page needs in one object.
+- `achievements(stats, subjects)`: returns the list below, each `{ id, name, icon, earned, condition, progress? }`, where `progress` is `{ have, need }` for counted ones while there is something left to reach.
+- `summary(storage, catalog)`: everything the page needs in one object.
 
 ## Achievements
 
@@ -131,7 +131,7 @@ The page note repeats the landing page's: progress lives in this browser, and ea
 ## Entry points
 
 - **Landing header**: a button "🏆 Level n" next to the existing header buttons, linking to `trophy-room/`. Level 1 with no progress still shows, so the room is discoverable.
-- **Shared bar** (`shared/nav.js`): the same button after "← All playgrounds", using the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` gets the level from `shared/trophies.js` and `shared/catalog.js`, which every quest page then loads.
+- **Shared bar** (`shared/nav.js`): a button after "← All playgrounds". On the Programming and Math hubs it reads "🏆 Level n". On quest pages it shows only "🏆", with "Trophy Room, level n" as its accessible name and tooltip, because a label pushed some quest headers onto a second row at about 1280px. It uses the same path rule as the back link, so it appears only on the deployed site and never in a bundled quest. `nav.js` loads `shared/catalog.js` and `shared/trophies.js` itself, only on pages where it shows the button, so no quest page changes.
 
 ## Accessibility
 

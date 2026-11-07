@@ -3,7 +3,7 @@ export default {
   rules: {
     'scope-enum': [2, 'always', [
       'script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'math',
-      'landing', 'shared', 'progress', 'engine', 'content', 'release',
+      'landing', 'shared', 'progress', 'engine', 'content', 'release', 'trophy',
       'tests', 'ci', 'deps', 'docs', 'tools', 'skills',
     ]],
     'subject-case': [0],
