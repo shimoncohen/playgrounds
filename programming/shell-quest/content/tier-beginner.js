@@ -150,7 +150,7 @@ const CH=[
  {title:'Find every text file',goal:`From home: <code>find . -name "*.txt"</code>`,anat:[['find','cmd'],['.','arg'],['-name','opt','match by name'],['"*.txt"','arg']],
   how:[`<code>find . -name "*.txt"</code> searches here, and in every folder inside here, for files whose names end in .txt.`,`<code>find</code> is the command: search for files by their properties.`,`<code>.</code> is where to start: this folder.`,`<code>-name</code> is an option: only keep names that match the pattern after it.`,`<code>"*.txt"</code> is the pattern. The quotes keep the star for <code>find</code> to use, instead of bash swapping it first.`],answer:'find . -name "*.txt"',
   explain:`<code>find</code> walks through a folder and every folder inside it. <code>.</code> means start here. Quote the pattern so the star reaches <code>find</code> instead of being swapped for matching file names by the shell first.`,check:c=>c.ran('find',e=>e.args.includes('-name')||e.args.includes('-iname'))},
- {title:'Find by type',goal:`Ask <code>find</code> for folders, then for files. Do both, in either order.`,
+ {title:'Find by type',goal:`Ask <code>find</code> for folders, then for files. Do both, in that order: folders first, then files.`,
   steps:[
    {goal:`List only the folders: <code>find . -type d</code>`,anat:[['find','cmd'],['.','arg'],['-type d','opt','folders only']],
     how:[`<code>find . -type d</code> lists every folder under this one.`,`<code>find</code> is the command: search for files by their properties.`,`<code>.</code> is where to start: this folder.`,`<code>-type d</code> is an option and its value together: only keep <b>d</b>irectories.`],
@@ -160,10 +160,17 @@ const CH=[
     answer:'find . -type f',check:c=>c.ran('find',e=>typeOf(e)==='f'&&e.code===0)}],
   answer:'find . -type d', /* the first step's answer: the replay harnesses (differential corpus) read m.answer */
   explain:`<code>-type d</code> keeps only directories and <code>-type f</code> keeps only files. Run both and compare the two lists with the map: the folders in one, the files in the other.`},
- {title:'Treasure hunt',goal:`A file named <code>gold.txt</code> is hidden somewhere in your world. Find it, then read it with <code>cat</code>.`,anat:[['find','cmd'],['.','arg'],['-name','opt','match by name'],['gold.txt','arg']],
-  how:[`This takes two commands: <code>find</code> says <b>where</b> the file is, then <code>cat</code> shows <b>what</b> is in it.`,`<code>find . -name gold.txt</code> searches from here for a file with exactly that name, and prints its path.`,`Then type <code>cat</code>, a space, and that path to read the file. Press <kbd>Tab</kbd> to save typing.`,`The secret word inside completes the mission.`],answer:'find . -name gold.txt',
+ {title:'Treasure hunt',goal:`A file named <code>gold.txt</code> is hidden somewhere in your world. Find it, then read it with <code>cat</code>, in that order.`,
+  steps:[
+   {goal:`Find it: <code>find . -name gold.txt</code>`,anat:[['find','cmd'],['.','arg'],['-name','opt','match by name'],['gold.txt','arg']],
+    how:[`<code>find . -name gold.txt</code> searches from here for a file with exactly that name, and prints its path.`,`<code>find</code> says <b>where</b> the file is.`,`<code>-name</code> is an option: only keep names that match the pattern after it.`],
+    answer:'find . -name gold.txt',check:c=>c.ran('find',e=>e.args.includes('gold.txt')&&/gold\.txt/.test(e.out))},
+   {goal:`Read it: <code>cat</code>, a space, and the path <code>find</code> printed`,anat:[['cat','cmd'],['forest/cave/deeper/chest/gold.txt','arg']],
+    how:[`<code>cat</code> shows <b>what</b> is in the file.`,`Type <code>cat</code>, a space, and that path. Press <kbd>Tab</kbd> to save typing.`,`The secret word inside completes the mission.`],
+    answer:'cat forest/cave/deeper/chest/gold.txt',check:c=>c.ran('cat',e=>/PENGUIN/.test(e.out))}],
+  answer:'find . -name gold.txt', /* the first step's answer: the replay harnesses (differential corpus) read m.answer */
   hint:`From home, run <code>find . -name gold.txt</code>. It prints the path. Then type <code>cat</code>, a space, and that path. Use <kbd>Tab</kbd> to save typing.`,
-  explain:`Two steps, two commands: <code>find</code> tells you <b>where</b>, <code>cat</code> shows you <b>what</b>. Reading the secret word completes the mission.`,check:c=>c.ran('cat',e=>/PENGUIN/.test(e.out))},
+  explain:`Two steps, two commands: <code>find</code> tells you <b>where</b>, <code>cat</code> shows you <b>what</b>. Reading the secret word completes the mission.`},
  {title:'Clear old logs',goal:`<code>rm village/logs/*.log</code>`,anat:[['rm','cmd'],['village/logs/*.log','arg']],
   how:[`<code>rm village/logs/*.log</code> deletes every .log file in <code>village/logs</code> in one go.`,`<code>rm</code> is the command: remove.`,`<code>village/logs/*.log</code> is the argument. Bash swaps the star for every matching name, and <code>rm</code> removes each of them.`,`Good habit: run <code>ls</code> with the same pattern first, check the list, then swap in <code>rm</code>.`],answer:'rm village/logs/*.log',
   explain:`Wildcards make bulk work fast, and bulk mistakes fast too. A good habit: run <code>ls</code> with the same pattern first, check the list, then swap <code>ls</code> for <code>rm</code>.`,

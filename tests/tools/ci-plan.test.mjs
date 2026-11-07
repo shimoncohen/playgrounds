@@ -15,24 +15,26 @@ test('quest folders and their test folders select that quest', () => {
 });
 
 test('shared code, tools, fixtures, config and unknown files select everything', () => {
-  for (const f of ['shared/how.js', 'index.html', 'programming/index.html', 'tools/build.py', 'tests/fixtures/shell-corpus.json', 'tests/smoke.mjs', 'tests/tools/x.test.mjs', 'package.json', '.github/workflows/ci.yml', 'commitlint.config.mjs'])
+  for (const f of ['shared/how.js', 'index.html', 'programming/index.html', 'tools/build.py', 'tests/fixtures/shell-corpus.json', 'tests/smoke.mjs', 'tests/tools/x.test.mjs', 'package.json', '.github/workflows/ci.yml', 'commitlint.config.mjs', 'tests/trophy/trophies.test.mjs', 'trophy-room/app.js'])
     assert.equal(scope(['programming/net-quest/app.js', f]), null, f);
 });
 
-test('a non-shell quest skips the other quests and every shell-only job', () => {
+test('a non-shell quest skips the other quests and every shell-only job, and re-checks the catalog', () => {
   const jobs = plan(['programming/net-quest/app.js'], repo);
-  assert.deepEqual(names(jobs), ['engine tests (net)', 'browser smoke tests (net)']);
-  assert.deepEqual(jobs[0].args, ['--test', 'tests/net/*.test.mjs']);
+  assert.deepEqual(names(jobs), ['engine tests (net, catalog)', 'browser smoke tests (net)']);
+  assert.deepEqual(jobs[0].args, ['--test', 'tests/net/*.test.mjs', 'tests/trophy/catalog.test.mjs']);
   assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|shell)[- ]', 'tests/smoke.mjs']);
 });
 
-test('a quest without an engine test folder gets only the browser job', () => {
-  assert.deepEqual(names(plan(['programming/ds-quest/app.js'], repo)), ['browser smoke tests (ds)']);
+test('a quest without an engine test folder gets the catalog check and the browser job', () => {
+  const jobs = plan(['programming/ds-quest/app.js'], repo);
+  assert.deepEqual(names(jobs), ['engine tests (catalog)', 'browser smoke tests (ds)']);
+  assert.deepEqual(jobs[0].args, ['--test', 'tests/trophy/catalog.test.mjs']);
 });
 
 test('shell changes add the full course and golden jobs, and the smoke job leaves the course to them', () => {
   const jobs = plan(['programming/shell-quest/engine/interp.js'], repo);
-  assert.deepEqual(names(jobs), ['engine tests (shell)', 'browser smoke tests (shell)', 'shell-quest full course', 'shell-quest golden']);
+  assert.deepEqual(names(jobs), ['engine tests (shell, catalog)', 'browser smoke tests (shell)', 'shell-quest full course', 'shell-quest golden']);
   assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^(cpp|ds|net)[- ]', '--test-skip-pattern=^shell-quest full course', 'tests/smoke.mjs']);
   assert.deepEqual(jobs[2].args, ['--test-name-pattern=^shell-quest full course', 'tests/smoke.mjs']);
 });

@@ -232,7 +232,7 @@
       "find . -type d",
       "find . -type f",
       "find . -name gold.txt",
-      "cat ./forest/cave/deeper/chest/gold.txt",
+      "cat forest/cave/deeper/chest/gold.txt",
       "rm village/logs/*.log",
       "mkdir -p backup && cp *.txt backup/",
       "NAME=\"Ada\"",
