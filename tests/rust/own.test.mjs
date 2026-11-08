@@ -107,11 +107,29 @@ describe('snapshots', () => {
     assert.equal(deep.frames[1].fn, 'f');
     assert.deepEqual(deep.frames[1].vars[0].leaves.map((l) => [l.path, l.text, l.heap]), [['n', '1', undefined], ['t', undefined, 1]]);
   });
-  it('stop at 2000 snapshots', () => {
+  it('stop at 2000 snapshots but keep the last slot for the end of the run', () => {
     const c = run('let mut i = 0;', 'while i < 5000 {', '    i += 1;', '}');
     assert.equal(c.snaps.length, 2000);
+    assert.equal(c.snaps[1999].end, true);
   });
-});
+  it('flag an empty String, whose box has no heap memory yet', () => {
+    const c = run('let mut s = String::new();', 'let t = String::from("");', 'let u = String::from("a");', 's.push_str("x");', 'println!("{}", s);');
+    assert.deepEqual(c.events.filter((e) => e.t === 'alloc').map((e) => e.empty), [true, true, false]);
+    assert.deepEqual(c.snaps[3].heap.map((h) => h.content), ['', '', 'a']);
+    assert.equal(c.snaps[4].heap[0].content, 'x');
+  });
+  it('an owned temporary passed to a print is freed at the end of the statement', () => {
+    const c = run('println!("{}", String::from("a"));', 'let n = 1;');
+    assert.equal(c.snaps[1].heap.length, 0);
+    assert.deepEqual(c.events.filter((e) => e.t === 'free').length, 1);
+  });
+  it('point self of a Drop::drop frame at the value being dropped', () => {
+    const c = RQ.run(prog('let a = make(1);', 'println!("x");'), { snap: true });
+    const deep = c.snaps.find((s) => s.frames.length === 2 && s.frames[1].fn === 'drop');
+    const [host, self] = deep.frames[1].vars;
+    assert.equal(host.name, 'a');
+    assert.deepEqual([self.leaves[0].to, self.leaves[0].toName], [host.uid, 'a']);
+  });});
 
 describe('the state at the error point', () => {
   it('names the variables in scope, the moved one, and the loans that reach the line', () => {
@@ -122,6 +140,10 @@ describe('the state at the error point', () => {
     assert.equal(d.view.error.code, 'E0502');
     assert.deepEqual(d.view.loans, [{ kind: 'shared', place: 'a', from: 3, to: 5 }]);
     assert.equal(d.view.vars.find((v) => v.name === 'a').state, 'shared');
+  });
+  it('marks a variable that moved on to another variable, not only the one the error names', () => {
+    const c = RQ.run(P('fn main() {', '    let a = String::from("a");', '    let b = a;', '    let c = b;', '    println!("{}", b);', '}'), { snap: true });
+    assert.deepEqual(c.view.vars.map((v) => [v.name, v.state]), [['a', 'moved'], ['b', 'moved'], ['c', 'owned']]);
   });
   it('is absent unless snapshots are asked for, and for a run that compiles', () => {
     assert.equal(RQ.run(P('fn main() {', '    let a = 1;', '    a = 2;', '}')).view, null);

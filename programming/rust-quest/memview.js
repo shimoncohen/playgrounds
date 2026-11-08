@@ -1,7 +1,3 @@
-/* The memory view: a step slider over the interpreter's snapshots (stack on one side, heap on the other, solid arrows for
-   ownership, dashed blue and red arrows for & and &mut), a static "state at the error point" for a program that does not
-   compile, and a gutter beside the editor that shows how many lines each loan spans. Everything learner-made reaches the page as
-   textContent, never as markup. */
 (()=>{
 'use strict';
 const UI=window.RQUI=window.RQUI||{};
@@ -13,14 +9,14 @@ const badge=v=>v.state==='shared'?'borrowed'+(v.n>1?' x'+v.n:''):BADGE[v.state]|
 
 function sentence(e){
   const n=e.name?'The variable '+e.name:'A temporary value';
-  if(e.t==='alloc')return 'A '+e.kind+' was made on the heap (#'+e.id+').';
+  if(e.t==='alloc')return e.empty?'An empty '+e.kind+' was made (#'+e.id+'). It takes no heap memory until it grows.':'A '+e.kind+' was made on the heap (#'+e.id+').';
   if(e.t==='move')return n+' moved, so it cannot be used any more.';
   if(e.t==='drop')return e.part?null:n+' was dropped'+(e.ty==='String'?'.':' ('+e.ty+').');
   if(e.t==='free')return 'Heap #'+e.id+' was freed.';
   return null;
 }
 
-function slot(leaf,v,snap){
+function slot(leaf,snap){
   if(leaf.ref){
     const loan=snap.loans.find(l=>l.id===leaf.loan),live=!loan||loan.live;
     const s=h('span','mv-slot mv-ref '+(leaf.mut?'mut':'shared')+(live?'':' ended'));
@@ -48,7 +44,7 @@ function varRow(v,snap){
   if(b)head.append(h('span','mv-badge',b));
   row.append(head);
   const slots=h('div','mv-slots');
-  for(const l of v.leaves)slots.append(slot(l,v,snap));
+  for(const l of v.leaves)slots.append(slot(l,snap));
   if(!v.leaves.length)slots.append(h('span','mv-slot empty','empty'));
   row.append(slots);
   return row;
@@ -57,7 +53,8 @@ function varRow(v,snap){
 function heapBox(o){
   const b=h('div','mv-box');
   b.dataset.heap=o.id;
-  b.append(h('span','mv-id','#'+o.id),h('span','mv-kind',o.kind),h('q',null,o.content));
+  b.append(h('span','mv-id','#'+o.id),h('span','mv-kind',o.kind));
+  if(o.content==='')b.append(h('em','mv-empty','empty, no heap memory yet'));else b.append(h('q',null,o.content));
   b.append(h('small',null,o.owner?'owner: '+o.owner:'no owner'));
   return b;
 }

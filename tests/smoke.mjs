@@ -471,6 +471,39 @@ test('rust-quest: the extra keys row inserts symbols at the caret', async () => 
   await ctx.close();
 });
 
+test('rust-quest: the memory view steps through mission 4.1 and shows the error point of its starter', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="3"]');
+  const m = await page.evaluate(() => ({ answer: RQ.CH[3].missions[0].answer, starter: RQ.CH[3].missions[1].starter }));
+  assert.equal(await page.isVisible('#memPanel'), false);
+  await page.fill('#code', m.answer);
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  assert.equal(steps, 4);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 2);
+  assert.match(await page.textContent('#memory .mv-heap'), /#1String\s*hello, Rustowner: s/);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-own', { state: 'attached' });
+  assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-own', p => p.length), 1);
+  const [stack, heap] = await page.$$eval('#memory .mv-stack, #memory .mv-heap', els => els.map(e => e.getBoundingClientRect().top));
+  assert.ok(heap > stack, 'stack and heap stack vertically on a phone');
+  await page.click('#memory button:has-text("Next")');
+  assert.match(await page.textContent('#memory .mv-step'), /Step 4 of 4/);
+  await page.fill('#code', 'fn main() {\n    let s = String::new();\n    println!("{}", s);\n}\n');
+  await page.click('#bRun');
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 1);
+  assert.match(await page.textContent('#memory .mv-heap'), /empty, no heap memory yet/);
+  await page.fill('#code', m.starter);
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#memory'), /E0382/);
+  assert.match(await page.textContent('#memory'), /the error is here/);
+  assert.equal(await page.$('#memory input[type=range]'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

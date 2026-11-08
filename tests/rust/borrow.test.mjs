@@ -16,7 +16,7 @@ describe('RQ.borrow: the API', () => {
   it('gives errors, unsupported, loans and the names of the fns it analysed', () => {
     const c = RQ.compile(SIMPLE('let s = String::new();'));
     const b = RQ.borrow(c.ast, c.info);
-    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], analysed: ['main'] });
+    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], moves: [], analysed: ['main'] });
   });
   it('a Copy-only fn is not analysed', () => {
     const c = RQ.compile(SIMPLE('let x = 1;', 'let y = x;', 'let z = x;'));

@@ -9,22 +9,20 @@ RQ.compile=src=>{
   const r=RQ.parse(RQ.lex(src));
   if(r.errors.length)return {ast:null,diags:r.errors,unsupported:[]};
   const ck=RQ.check(r.ast);
-  let diags=ck.errors,loans=[];
+  let diags=ck.errors,loans=[],moves=[];
   const unsupported=[...r.unsupported,...ck.unsupported];
   // E0384 is a borrowck error in rustc, so the pass still runs when it is the only thing the checker found
   if(!unsupported.length&&diags.every(e=>e.code==='E0384')){
     const b=RQ.borrow(r.ast,ck.info);
     diags=[...diags,...b.errors].sort((a,b)=>a.line-b.line||a.col-b.col);
-    unsupported.push(...b.unsupported);loans=b.loans;
+    unsupported.push(...b.unsupported);loans=b.loans;moves=b.moves;
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
   if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}
-  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,
+  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,moves,
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
-// The static "state at the error point" for a program that does not compile: the variables in scope on the error's line,
-// which of them moved or are borrowed there, and the loans (with the lines they span) that reach it.
 const lastLine=n=>{let hi=n.line;RQ.walk(n,m=>{if(m.line>hi)hi=m.line;});return hi;};
 function errorView(c){
   const e=c.diags.find(d=>d.code||d.lint);
@@ -48,6 +46,7 @@ function errorView(c){
   const loans=(c.loans||[]).filter(l=>l.span&&!l.implicit&&l.span[0]<=e.line&&e.line<=l.span[1]);
   // the same name can be declared twice (shadowing); the newest one is the one the error names
   const byName=n=>{for(let i=vars.length-1;i>=0;i--)if(vars[i].name===n)return vars[i];return null;};
+  for(const mv of c.moves||[]){const v=mv.line<e.line&&byName(mv.name);if(v&&v.state==='owned')v.state='moved';}
   const target=named&&byName(named);
   if(target&&e.code==='E0382')target.state='moved';
   if(target&&e.code==='E0381')target.state='uninit';

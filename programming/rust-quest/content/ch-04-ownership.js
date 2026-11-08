@@ -144,10 +144,10 @@ RQ.CH.push({
       starter:prog(TWO+'    println!("{} {}", first, second);\n    // free first here\n    println!("done");\n'),
       answer:prog(TWO+'    println!("{} {}", first, second);\n    drop(first);\n    println!("done");\n'),
       alts:[prog(TWO+'    print!("{} ", first);\n    println!("{}", second);\n    drop(first);\n    println!("done");\n'),prog(TWO+'    let size = second.len();\n    println!("{} {}", first, second);\n    drop(first);\n    println!("done");\n')],
-      wrong:[{src:prog(TWO+'    println!("{} {}", first, second);\n    drop(second);\n    println!("done");\n'),wrongWhy:'check'},{src:prog(TWO+'    drop(first);\n    println!("{} {}", first, second);\n    println!("done");\n'),wrongWhy:'E0382'}],
+      wrong:[{src:prog(TWO+'    println!("{} {}", first, second);\n    drop(second);\n    println!("done");\n'),wrongWhy:'check'},{src:prog(TWO+'    drop(first);\n    println!("{} {}", first, second);\n    println!("done");\n'),wrongWhy:'E0382'},{src:prog(TWO+'    println!("{} {}", first, second);\n    println!("done");\n    drop(first);\n'),wrongWhy:'check'}],
       lazy:[{src:prog('    let second = String::from("two");\n    let first = String::from("one");\n    println!("{} {}", first, second);\n    println!("done");\n'),wrongWhy:'check'},{src:prog(TWO+'    println!("{} {}", first, second);\n    println!("done");\n'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='one two\ndone\n'?'The program has to print `one two` and then `done`.':c.calls('drop')<1?'Free `first` yourself with `drop(first);`.':c.dropOrder().join(',')!=='first,second'?'`first` has to be freed before `second`. Call `drop(first);` before the program ends.':true
+      check:c=>c.out()!=='one two\ndone\n'?'The program has to print `one two` and then `done`.':c.calls('drop')<1?'Free `first` yourself with `drop(first);`.':c.dropOrder().join(',')!=='first,second'?'`first` has to be freed before `second`. Call `drop(first);` before the program ends.':c.events.findIndex(e=>e.t==='drop'&&e.name==='first')>c.events.map(e=>e.t).lastIndexOf('print')?'Free `first` before `done` is printed, not after.':true
     }
   ]
 });

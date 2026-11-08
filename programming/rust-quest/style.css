@@ -214,7 +214,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .mv-ref.mut{border-color:var(--err);color:var(--err);border-style:dashed}
 .mv-ref.ended{opacity:.55}
 .mv-var[data-state="moved"],.mv-var[data-state="dropped"]{opacity:.55}
-.mv-var[data-state="moved"] .mv-name,.mv-var[data-state="dropped"] .mv-name{text-decoration:line-through}
+.mv-empty{color:var(--muted);font-size:13px}
+.mv-var[data-state="moved"] .mv-name,.mv-var[data-state="dropped"] .mv-name,.mv-var[data-state="moved"] .mv-slot,.mv-var[data-state="dropped"] .mv-slot{text-decoration:line-through}
 .mv-var[data-state="uninit"] .mv-name{font-style:italic}
 .mv-var[data-state="shared"]{border-color:var(--blue)}
 .mv-var[data-state="mutBorrowed"]{border-color:var(--err)}
