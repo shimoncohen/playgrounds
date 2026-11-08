@@ -6,13 +6,14 @@ const AQ=globalThis.AQ=globalThis.AQ||{};
 const skipOf=(o,target)=>o.steps.find(s=>s.type==='skip'&&s.target===target);
 
 AQ.CH.push({
-  name:'Personal MCP',badge:'Inbox Keeper',tier:'personal',
-  intro:'Your notes, your mail and your calendar can be reached by the agent only through the tools you connect. In this chapter you connect the notes tools a job calls, let the agent read your mail without ever sending it, and ask the calendar itself to prove that an event was really added.',
+  name:'Personal MCP',badge:'Calendar Entry',tier:'personal',
+  story:'Connect the notebook, read the mail without sending, find the calendar entry for your dentist visit.',
+  intro:'Dana\'s notebook, mail and calendar sit on the kitchen table, and Cog may read them but never send. Your notes, your mail and your calendar can be reached by the agent only through the tools you connect. In this chapter you connect the notes tools a job calls, let the agent read your mail without ever sending it, and ask the calendar itself to prove that an event was really added.',
   learned:['Connecting your own apps','Reading without sending','Proving a change with a read-back'],
   missions:[
     {
       title:'Connect your notes',scenario:'notesApp',kind:'config',prompt:'Goal: save a note about the dentist visit',facts:['mcp'],
-      goal:'The agent will search your notes for the dentist visit and then add a note about it, with the tools <code>notes.search</code> and <code>notes.add</code>. But no notes server is connected: <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect a notes server with the tools the job calls.',
+      goal:'Your notebook and Dana\'s mail sit on the kitchen table. The agent will search your notes for the dentist visit and then add a note about it, with the tools <code>notes.search</code> and <code>notes.add</code>. But no notes server is connected: <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect a notes server with the tools the job calls.',
       how:[
         'The line <code>notes: search, add</code> in <code>.claude/mcp.txt</code> connects a server named <code>notes</code> with two tools, which the agent calls as <code>notes.search</code> and <code>notes.add</code>. The <code>calendar</code> line can stay.',
         'As in mission 13.1, one line is one server: its name, a colon and its tools, separated by commas.',
@@ -20,7 +21,7 @@ AQ.CH.push({
         'The tools have to be the ones the agent calls. A notes server with only <code>read</code> is connected, but <code>search</code> and <code>add</code> still are not.'
       ],
       explain:'Your notes are reachable only through the tools a server lists. Leave one out and the agent skips that call and carries on, so a note may be searched but never saved. This practice only matches names. It does not start a server or log in to your notes app, as a real connection does.',
-      hint:'Add one line for a server called <code>notes</code>, with the two tools the job calls.',
+      hint:'Put Dana\'s notebook on the rack: add one line for a server called <code>notes</code>, with the two tools the job calls.',
       answer:{files:{'.claude/mcp.txt':'calendar: list\nnotes: search, add\n'}},
       wrong:{files:{'.claude/mcp.txt':'calendar: list\nnotes: read\n'}},
       lazy:{files:{}},
@@ -32,7 +33,7 @@ AQ.CH.push({
     },
     {
       title:'Read the mail, never send it',scenario:'inboxApp',kind:'config',prompt:"Goal: summarise today's mail",facts:['mcp','permissions'],
-      goal:'The agent will summarise today\'s mail. It reads the mail with <code>mail.read</code>, and it also plans to answer a message with <code>mail.send</code>, which you never want without checking. <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect the mail tools the job needs, and make sure the agent cannot send.',
+      goal:'Cog will summarise today\'s mail from Dana\'s table. It reads the mail with <code>mail.read</code>, and it also plans to answer a message with <code>mail.send</code>, which you never want without checking. <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect the mail tools the job needs, and make sure the agent cannot send.',
       how:[
         'The line <code>mail: read, search</code> in <code>.claude/mcp.txt</code> connects the tools that read and search the mail and leaves <code>send</code> out. The agent reads the mail, and <code>mail.send</code> is skipped because it is not connected.',
         'You may keep <code>send</code> on the line if you stop it another way: <code>deny call mail.send</code> in <code>.claude/permissions.txt</code> does it, and so does <code>do not call mail.send</code> in the root <code>CLAUDE.md</code>.',
@@ -55,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'Prove the event is there',scenario:'agenda',kind:'config',prompt:'Goal: put the dentist visit on my calendar\nDone when: call calendar.list',facts:['mcp'],
-      goal:'The agent will read <code>notes/dentist.md</code> and put the dentist visit on your calendar with <code>calendar.create</code>. A call that returns is not proof, so the job ends with the check <code>call calendar.list</code>, which looks for the event on the calendar. But <code>.claude/mcp.txt</code> connects only <code>list</code>. Connect what the job needs, so the event is made and the check finds it.',
+      goal:'Cog will read <code>notes/dentist.md</code> and put the dentist visit on your calendar with <code>calendar.create</code>. A call that returns is not proof, so the job ends with the check <code>call calendar.list</code>, which looks for the event on the calendar. But <code>.claude/mcp.txt</code> connects only <code>list</code>. Connect what the job needs, so the event is made and the check finds it.',
       how:[
         'The line <code>calendar: list, create</code> in <code>.claude/mcp.txt</code> connects the tool that adds the event as well as the one the check calls. Both calls are made, and the check finds the dentist visit.',
         'The check is a tool call, as in mission 13.2. If <code>calendar.list</code> is not connected it is skipped, nothing proved the event is there, and the run ends <code>unverified</code>.',

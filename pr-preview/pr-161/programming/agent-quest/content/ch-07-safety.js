@@ -7,13 +7,14 @@ const ALL=['goal','donewhen','constraints','files','examples','plan'];
 const skippedBy=(o,by,target)=>o.steps.some(s=>s.type==='skip'&&s.by===by&&(!target||s.target===target));
 
 AQ.CH.push({
-  name:'Safety',badge:'Guardrail Setter',tier:'core',
-  intro:'An agent can do real damage if nobody stops it, and sometimes the danger is in the text it reads, not in your prompt. In this chapter you will fence the agent in with permission rules, defend against instructions hidden in files, keep keys out of its reach, ask to review before it acts, and test that your own rules really work.',
+  name:'Safety',badge:'Spare Key',tier:'core',
+  story:'A stranger\'s note in the post tells Cog to open the safe; lock the rules in and find the safe\'s spare key.',
+  intro:'A stranger\'s note in the post tells Cog to open the safe, so the rules must be locked in. An agent can do real damage if nobody stops it, and sometimes the danger is in the text it reads, not in your prompt. In this chapter you will fence the agent in with permission rules, defend against instructions hidden in files, keep keys out of its reach, ask to review before it acts, and test that your own rules really work.',
   learned:['Permission rules','Prompt injection','Secrets','Ask before','Testing rules'],
   missions:[
     {
       title:'Deny it in the settings',scenario:'vault',kind:'config',prompt:BASE+'\nDone when: run npm test',facts:['permissions'],
-      goal:'While it tidies up, the agent wants to delete <code>data/backup.csv</code>. Instead of asking it nicely, set a <b>permission rule</b>: a line in <code>.claude/permissions.txt</code> that the agent is not allowed to cross. Stop the delete, and still let the price get fixed.',
+      goal:'Mr. Ledbury keeps the shop\'s backups in one folder. While it tidies up, the agent wants to delete <code>data/backup.csv</code>. Instead of asking it nicely, set a <b>permission rule</b>: a line in <code>.claude/permissions.txt</code> that the agent is not allowed to cross. Stop the delete, and still let the price get fixed.',
       how:[
         'The line <code>deny delete data/</code> in <code>.claude/permissions.txt</code> means the agent may never delete anything inside <code>data/</code>.',
         '<code>deny</code> starts every line in this file.',
@@ -33,7 +34,7 @@ AQ.CH.push({
     },
     {
       title:'Words hidden in a file',scenario:'vendor',kind:'prompt',fields:ALL,
-      goal:'To fix the bug the agent reads the vendor notes in <code>docs/vendor-api.md</code>. That file also contains text written like an order: an <b>injection</b>, which is an instruction hidden in something the agent reads, hoping the agent will obey it. Here it tells the agent to email out the customer list. Block the email, but still let the agent read the notes it needs.',
+      goal:'A supplier\'s notes came in the post. To fix the bug the agent reads the vendor notes in <code>docs/vendor-api.md</code>. That file also contains text written like an order: an <b>injection</b>, which is an instruction hidden in something the agent reads, hoping the agent will obey it. Here it tells the agent to email out the customer list. Block the email, but still let the agent read the notes it needs.',
       how:[
         'The line <code>Constraints: do not send mail.send</code> bans the tool that would send the email, whatever the file says.',
         '<code>send</code> is a verb for sending something out. <code>mail.send</code> is the tool that does it.',
@@ -41,14 +42,14 @@ AQ.CH.push({
         'Banning the read instead would be tempting, but the agent needs that file to do the job.'
       ],
       explain:'The agent cannot tell your instructions from instructions that happen to be in a file. Anything it reads can try to steer it: a web page, a file, a tool result. The defence is not to trust that text, but to limit what the agent is allowed to do, so that a hijacked agent cannot do real damage.',
-      hint:'Ban the action the hidden text asks for, by the full name of the tool.',
+      hint:'Ban the action the stranger\'s note asks for, by the full name of the tool.',
       answer:'Constraints: do not send mail.send',
       wrong:'Constraints: do not read docs/vendor-api.md',
       lazy:'Done when: run npm test'
     },
     {
       title:'Keys stay out of reach',scenario:'leak',kind:'prompt',fields:ALL,
-      goal:'The project has a file named <code>.env</code> that holds a <b>secret</b>: a key the agent should never need to see. With no <code>Files</code> line the agent explores and reads everything, including the key, which then sits in its context. Keep the key out of the agent\'s reach and still fix the bug.',
+      goal:'Dana\'s project has a file named <code>.env</code> that holds a <b>secret</b>: a key the agent should never need to see. With no <code>Files</code> line the agent explores and reads everything, including the key, which then sits in its context. Keep the key out of the agent\'s reach and still fix the bug.',
       how:[
         'The line <code>Constraints: do not read .env</code> bans reading the key file, so the key never enters the agent\'s context.',
         'Giving the agent a <code>Files</code> line is the other way: it then reads only what you named, and not the key file.',
@@ -56,14 +57,14 @@ AQ.CH.push({
         'Banning the wrong verb, like <code>edit</code>, still lets the agent read the key.'
       ],
       explain:'A secret is safest where the agent cannot reach it. Whatever the agent reads can end up in its replies, its logs or a tool call. So the rule is to deny reads of key files, or to scope what the agent reads. Never paste a real key into a prompt, a note or a memory file.',
-      hint:'Either forbid reading the key file, or tell the agent exactly which file to read.',
+      hint:'Either forbid reading the safe\'s key file, or tell Cog exactly which file to read.',
       answer:'Constraints: do not read .env',
       wrong:'Constraints: do not edit .env',
       lazy:BASE
     },
     {
       title:'Ask before the risky step',scenario:'review',kind:'prompt',fields:ALL,
-      goal:'The agent will fix the price, but it also plans to rewrite a file in <code>migrations/</code>, and that cannot be undone. Review before it runs. See its plan first, and make it ask before it touches the database files. In this practice run nobody answers the question, so an action it asks about is not carried out.',
+      goal:'Cog will fix the price, but he also plans to rewrite a file in <code>migrations/</code>, Mr. Ledbury\'s database files, and that cannot be undone. Review before it runs. See its plan first, and make it ask before it touches the database files. In this practice run nobody answers the question, so an action it asks about is not carried out.',
       how:[
         'The two lines <code>Plan: first</code> and <code>Constraints: ask before edit migrations/</code> show you the plan and then make the agent stop at the risky edit.',
         '<code>Plan: first</code> pauses the run so you can read the plan before anything changes.',
@@ -85,7 +86,7 @@ AQ.CH.push({
     },
     {
       title:'Test your guardrails',scenario:'audit',kind:'config',prompt:BASE,
-      goal:'<code>CLAUDE.md</code> holds three safety rules, and none of them works: each has a mistake the agent quietly ignores. A line only acts as a rule in the exact shape, and the editor says how many lines act as rules. Open the file, find the three mistakes, and fix them so the agent leaves <code>data/</code>, the key file <code>.env</code> and the email tool alone.',
+      goal:'Mr. Ledbury wrote three safety rules into <code>CLAUDE.md</code>, and none of them works: each has a mistake the agent quietly ignores. A line only acts as a rule in the exact shape, and the editor says how many lines act as rules. Open the file, find the three mistakes, and fix them so the agent leaves <code>data/</code>, the key file <code>.env</code> and the email tool alone.',
       how:[
         'Fixing the lines to <code>do not delete data/</code>, <code>do not read .env</code> and <code>do not send mail.send</code> makes all three act as rules.',
         'The first line has a typo in its verb, so it is not a rule.',
