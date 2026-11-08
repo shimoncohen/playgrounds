@@ -195,7 +195,7 @@ const DEFAULT_HINT='Rust Quest does not model this yet.';
 RQ.diag={
   ERRORS,
   UNSUPPORTED:HINTS,
-  hint:feature=>HINTS[feature]||DEFAULT_HINT,
+  hint:feature=>Object.hasOwn(HINTS,feature)?HINTS[feature]:DEFAULT_HINT,
   panicText,
   make:(id,line,col,o)=>{const d=ERRORS[id],msg=d?d.msg(o||{}):id;return d&&d.lint?{lint:id,line,col,msg}:{code:id,line,col,msg};},
   tip:id=>(ERRORS[id]&&ERRORS[id].tip)||'',

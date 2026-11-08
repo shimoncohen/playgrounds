@@ -355,6 +355,7 @@ RQ.check=ast=>{
           I(e).sig={params:ts,ret:T.unit};
           return T.unit;
         }
+        if(!f&&(n==='Some'||n==='Ok'||n==='Err'))return unsup(n==='Some'?'Option':'Result',e.line);
         if(!f)return unknown(n,e.callee);
         if(ts.length!==f.params.length)return unsup('wrong argument count',e.line);
         ts.forEach((t,i)=>coerce(t,f.params[i].ty,e.args[i]));
