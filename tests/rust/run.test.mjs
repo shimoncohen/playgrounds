@@ -169,6 +169,12 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(feature('fn main() {\n    println!("{:#?}", 1);\n}'), 'format spec@2');
     assert.equal(RQ.run('fn main() {\n    if true { }\n    let x = 2.5;\n    println!("{:?} {}", 1, x);\n}').out(), '1 2.5\n');
   });
+  it('an unannotated Some, Ok or Err call is unsupported, not E0425', () => {
+    assert.equal(feature('fn main() {\n    let x = Some(1);\n}'), 'Option@2');
+    assert.equal(feature('fn main() {\n    let x = Ok(1);\n}'), 'Result@2');
+    assert.equal(feature('fn main() {\n    let e = 1;\n    let x = Err(e);\n}'), 'Result@3');
+    assert.equal(RQ.run('fn main() {\n    let x = Nope(1);\n}').onlyError('E0425'), true);
+  });
   it('unsupported wins over an error found in the same program, and over a syntax-valid E0384', () => {
     assert.equal(RQ.run('struct S;\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
   });
@@ -185,6 +191,7 @@ describe('RQ.run: unsupported is not an error', () => {
   it('every feature the engine can report has a hint in the diag catalog', () => {
     for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES, ...RQ.BORROW_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
     assert.ok(RQ.diag.hint('anything else').length > 0);
+    for (const f of ['constructor', 'toString', '__proto__']) assert.equal(RQ.diag.hint(f), RQ.diag.hint('anything else'), f);
   });
 });
 

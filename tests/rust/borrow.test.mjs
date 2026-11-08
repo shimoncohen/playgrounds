@@ -380,6 +380,11 @@ describe('E0597: a borrowed local goes out of scope', () => {
     assert.equal(diags(P('fn main() {', '    let z = 0;', '    let mut r = &z;', '    for i in 0..2 {', '        r = &i;', '    }', '    println!("{}", r);', '}')), 'E0597@5');
     assert.equal(diags(P('fn f(c: bool) {', '    let y = 1;', '    let mut r = &y;', '    loop {', '        let x = 5;', '        r = &x;', '        if c {', '            continue;', '        }', '        return;', '    }', '}', 'fn main() {', '    f(true);', '}')), '');
   });
+  it('a loan ends when the local it borrows is declared again, dies or is assigned', () => {
+    assert.equal(diags(P('fn main() {', '    let a = 1;', '    let mut r = &a;', '    loop {', '        let x = 5;', '        println!("{}", r);', '        r = &x;', '    }', '}')), 'E0597@7');
+    assert.equal(diags(P('fn main() {', '    let a = 1;', '    let mut r = &a;', '    for i in 0..2 {', '        println!("{}", r);', '        r = &i;', '    }', '}')), 'E0597@6');
+    assert.equal(diags(P('fn main() {', '    let mut x = 5;', '    let r = &x;', '    x = 6;', '    x = 7;', '    println!("{}", r);', '}')), 'E0506@4');
+  });
   it('a block value that holds a loan to a block local', () => {
     assert.equal(diags(P('fn main() {', '    let r = {', '        let x = 5;', '        &x', '    };', '    println!("{}", r);', '}')), 'E0597@4');
   });
