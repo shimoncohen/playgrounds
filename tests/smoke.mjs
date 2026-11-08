@@ -1770,7 +1770,7 @@ test('shell-quest capstone: with a leftover backup/, a script that never makes i
   assert.equal(await xp(), 0);
   await page.fill('#edText', m.answer);
   await page.click('#edRun');
-  await waitScreen(/Mission complete: Capstone: backup script/);
+  await waitScreen(/Mission complete: Capstone: the backup chest script/);
   await page.click('#edClose');
   await page.click('#mission button[data-mi="4"]');
   await type('nano scripts/mkconf.sh');

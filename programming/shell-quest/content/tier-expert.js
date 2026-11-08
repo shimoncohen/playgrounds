@@ -38,7 +38,7 @@ fi
 awk -F, 'NR == 1 && $2 !~ /^[0-9]/ {next} {printf "%-8s %7.2f\\n", $1, $2*$3}' "$1"
 `;
 const HEADER_CSV='name,qty,price\nlamp,2,7.5\noil,10,1.25';
-const REPORT={title:'Script: report',kind:'script',file:'scripts/report.sh',
+const REPORT={title:'The watchtower report script',kind:'script',file:'scripts/report.sh',
   goal:`The watchtower keeper wants a tidy report of Mira's takings. Write <code>scripts/report.sh</code>: given a CSV file (comma-separated values) of <code>name,quantity,price</code> rows, it prints each name and its total (quantity times price) with <code>printf "%-8s %7.2f\\n"</code>. A first row that is a header (<code>name,qty,price</code>) is skipped. A file it cannot read gives <code>report.sh: cannot read FILE</code> on stderr and exit status 1. Try <code>bash scripts/report.sh village/sales.csv</code>.`,
   anat:[['[ ! -r "$1" ]','cmd'],['>&2','op'],['exit 1','kw'],['awk','cmd'],['-F,','opt'],["'NR == 1 && $2 !~ /^[0-9]/ {next}","arg"],['{printf "%-8s %7.2f\\n", $1, $2*$3}\'','arg'],['"$1"','var']],
   answer:REPORT_ANSWER,
@@ -78,7 +78,7 @@ wait
 /* outside comments, a background & (not &&, >&, &>) and a wait command */
 const codeLines=t=>t.split('\n').map(l=>l.replace(/(^|\s)#.*$/,''));
 const bgAndWait=t=>{const L=codeLines(t);return L.some(l=>/(^|[^&>|])&(?![&>])/.test(l.replace(/'[^']*'|"[^"]*"/g,'""')))&&L.some(l=>/(^|[;&|({]|\bthen|\bdo)\s*wait\b/.test(l))};
-const FANOUT={title:'Script: fan out',kind:'script',file:'scripts/fanout.sh',
+const FANOUT={title:'The bell-ringer fan-out script',kind:'script',file:'scripts/fanout.sh',
   goal:`The tower bells ring on timers, and the keeper starts them all at once. Write <code>scripts/fanout.sh</code>: for every argument N it starts a background job that sleeps N seconds and then prints <code>N done</code>, and it waits until all of them have finished. <code>bash scripts/fanout.sh 3 1 2</code> prints <code>1 done</code>, <code>2 done</code>, <code>3 done</code> after 3 seconds, not 6. With no arguments it prints <code>usage: fanout.sh SECONDS...</code> on stderr and exits with 1.`,
   anat:[['[ "$#" -eq 0 ]','cmd'],['>&2','op'],['exit 1','kw'],['for','kw'],['n','var'],['in "$@"','arg'],['(sleep "$n"; echo "$n done")','cmd'],['&','op'],['done','kw'],['wait','cmd']],
   answer:FANOUT_ANSWER,
@@ -127,7 +127,7 @@ fi
 awk '{print $1}' "$1" | sort | uniq -c | sort -k1,1nr -k2,2 | head -n "$2" | awk '{print $1, $2}'
 `;
 const FRUIT='pear\nfig\npear\napple\nfig\nkiwi';
-const TOPN={title:'Script: top N',kind:'script',file:'scripts/topn.sh',
+const TOPN={title:'The top-visitors script',kind:'script',file:'scripts/topn.sh',
   goal:`The watchtower keeper wants the busiest visitors in the gate's access log. Write <code>scripts/topn.sh FILE N</code>: it prints the N most frequent first fields of FILE as <code>COUNT VALUE</code>, the biggest count first, and values with the same count in sort order. <code>bash scripts/topn.sh village/logs/access.log 2</code> prints <code>4 10.0.0.5</code> and <code>3 10.0.0.7</code>. A file it cannot read gives <code>topn.sh: cannot read FILE</code> on stderr and status 1; not exactly two arguments gives <code>usage: topn.sh FILE N</code> on stderr and status 2.`,
   anat:[['[ "$#" -ne 2 ]','cmd'],['exit 2','kw'],['[ ! -r "$1" ]','cmd'],["awk '{print $1}' \"$1\"",'cmd'],['|','op'],['sort | uniq -c','cmd'],['sort -k1,1nr -k2,2','cmd'],['head -n "$2"','cmd'],["awk '{print $1, $2}'",'cmd']],
   answer:TOPN_ANSWER,
@@ -194,7 +194,7 @@ echo "Hello, $name!"
 /* getopts as a command, outside comments */
 const usesGetopts=t=>codeLines(t).some(l=>/(^|[\s;&|({])getopts\s/.test(l));
 const OPTS_USAGE='usage: opts.sh [-v] -n NAME',OPTS_RE='usage: opts\\.sh \\[-v\\] -n NAME';
-const OPTS={title:'Script: options',kind:'script',file:'scripts/opts.sh',
+const OPTS={title:'The vault guard\'s options script',kind:'script',file:'scripts/opts.sh',
   goal:`The vault guard's greeter takes its orders as option letters. Write <code>scripts/opts.sh</code> and read its options with <code>getopts "vn:"</code>: <code>-n NAME</code> prints <code>Hello, NAME!</code>, and <code>-v</code> prints <code>verbose on</code> before it. <code>-v -n Ada</code> and <code>-vn Ada</code> both work. No name, an unknown option or <code>-n</code> without a name prints <code>${OPTS_USAGE}</code> on stderr and exits with 2. Try <code>bash scripts/opts.sh -v -n Ada</code>.`,
   anat:[['usage()','kw'],['while','kw'],['getopts "vn:" opt','cmd'],['case "$opt" in','kw'],['v)','kw'],['n) name="$OPTARG"','var'],['*) usage','kw'],['[ -z "$name" ]','cmd'],['echo "Hello, $name!"','cmd']],
   answer:OPTS_ANSWER,
@@ -261,7 +261,7 @@ const usesExitTrap=t=>codeLines(t).some(l=>/(^|[\s;&|({])trap\s+\S.*\s(EXIT|0)(\
 const robust=t=>{const code=codeLines(t).join('\n'),on=setOpts(code);
   return on.has('errexit')&&on.has('nounset')&&on.has('pipefail')&&usesGetopts(t)&&/(^|[\s;&|($])mktemp\b/.test(code)&&usesExitTrap(t)};
 const ALL_FILES={'village/logs/all.log':V.ALLLOG},TMP=['/tmp'];
-const LOGTOOL={title:'Capstone: a robust log tool',kind:'challenge',file:'scripts/logtool.sh',
+const LOGTOOL={title:'Capstone: the vault guard\'s log tool',kind:'challenge',file:'scripts/logtool.sh',
   goal:`The vault guard needs a log tool that never leaves a mess behind. Write <code>scripts/logtool.sh [-l LEVEL] [-n N] FILE</code>. It prints the top N source addresses (field 1) of the lines of FILE that contain LEVEL, as <code>COUNT IP</code> (an IP is an address such as <code>10.0.0.5</code>), the biggest count first and a tie in sort order, like <code>topn.sh</code>. The defaults are <code>ERROR</code> and 3. Make it robust: <code>set -euo pipefail</code>, the options read with <code>getopts</code>, and a <code>mktemp</code> work file that a <code>trap … EXIT</code> removes on every way out. A file it cannot read gives <code>error: cannot read FILE</code> on stderr and status 1; a bad option gives <code>${LOGTOOL_USAGE}</code> on stderr and status 2. Try <code>bash scripts/logtool.sh village/logs/all.log</code>.`,
   anat:[['set -euo pipefail','cmd'],['getopts "l:n:" opt','cmd'],['shift $((OPTIND - 1))','cmd'],['[ ! -r "$file" ]','cmd'],['tmp=$(mktemp)','var'],["trap 'rm -f \"$tmp\"' EXIT",'cmd'],['grep -- "$level" "$file" > "$tmp" || true','cmd'],['awk | sort | uniq -c | sort | head','cmd']],
   answer:LOGTOOL_ANSWER,

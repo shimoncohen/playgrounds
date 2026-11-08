@@ -262,7 +262,7 @@ describe('chapter 12 (Decisions) checks', () => {
     no(D12, 5, '[[ "$USER" == root* ]] && echo matches');
     no(D12, 5, '[[ -f journal.txt ]] && echo matches');
   });
-  it('12.7 Script: exists? (answer, an alternative, wrong ones)', () => {
+  it('12.7 The lodge door script (answer, an alternative, wrong ones)', () => {
     const SQ = loadShell();
     const ch = SQ.content.chapters[D12], m = ch.missions[6];
     SQ.setupChapter(ch);
@@ -336,7 +336,7 @@ describe('chapter 13 (Loops & numbers) checks', () => {
     no(L13, 5, 'while read line; do echo "got: $line"; done < readme.txt');
     no(L13, 5, 'while read line; do echo "got: $line"; done < journal.txt | head -n 3');
   });
-  it('13.7 Script: sum (answer, alternatives, wrong ones)', () => {
+  it('13.7 The supply sum script (answer, alternatives, wrong ones)', () => {
     const SQ = loadShell();
     const ch = SQ.content.chapters[L13], m = ch.missions[6];
     SQ.setupChapter(ch);
@@ -599,7 +599,7 @@ describe('chapter 14 (Functions & arguments) checks', () => {
     no(F14, 5, 'NAME=Ada', 'echo "${NAME:-stranger}"; echo stranger');
     no(F14, 5, 'echo "${NAME:-stranger}" stranger');
   });
-  it('14.7 Script: greeter (answer, alternatives, wrong ones, failure lines)', () => {
+  it('14.7 Ada\'s guest greeter script (answer, alternatives, wrong ones, failure lines)', () => {
     const { m, ok, why } = scriptJudge(F14, 6);
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\nif [ "$#" -eq 0 ]; then\n  echo "usage: greet.sh NAME" 1>&2\n  exit 1\nfi\necho "Hello, $1!"\n'), true, '$# test, 1>&2');
@@ -640,7 +640,7 @@ describe('chapter 15 (Real scripts) checks', () => {
     no(R15, 1, 'source lib/strings.sh; shout bye');
     no(R15, 1, 'bash lib/strings.sh; shout hello');
   });
-  it('15.3 Script: exit codes', () => {
+  it('15.3 The lodge exit-code script', () => {
     const { m, ok, why } = scriptJudge(R15, 2);
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\n[ -f "$1" ] && exit 0\necho "not a file: $1" >&2\nexit 1\n'), true, 'one-line test');
@@ -657,7 +657,7 @@ describe('chapter 15 (Real scripts) checks', () => {
     assert.ok(m.wrong.includes(withE));
     assert.equal(why(withE), 'Test 3 (a folder, not a file) failed: expected "/village/", got ""');
   });
-  it('15.4 Script: ask a question', () => {
+  it('15.4 The lodge question script', () => {
     const { m, ok } = scriptJudge(R15, 3);
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\nread -r who\necho "Hello, $who!"\n'), true, 'read -r');
@@ -667,7 +667,7 @@ describe('chapter 15 (Real scripts) checks', () => {
     assert.equal(ok('#!/bin/bash\necho "Hello, $1!"\n'), false, 'argument, not stdin');
     assert.equal(ok('#!/bin/bash\necho "Hello, Ada!"\n'), false, 'hardcoded');
   });
-  it('15.5 Script: write a config', () => {
+  it('15.5 The lodge config script', () => {
     const { SQ, m, ok, why } = scriptJudge(R15, 4);
     assert.equal(ok(m.answer), true);
     assert.equal(ok("#!/bin/bash\ncat <<'END' > app.conf\nname=quest\nmode=fast\nEND\n"), true, 'quoted delimiter, redirect after');
@@ -696,7 +696,7 @@ describe('chapter 15 (Real scripts) checks', () => {
     run(SQ, 'bash scripts/mkconf.sh');
     assert.equal(run(SQ, 'cat app.conf').out, 'name=quest\nmode=fast');
   });
-  it('15.6 Script: count lines', () => {
+  it('15.6 The lodge line-count script', () => {
     const { SQ, m, ok } = scriptJudge(R15, 5);
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\nfor f in logs/*.log; do\n  echo "${f##*/}: $(cat "$f" | wc -l)"\ndone\n'), true, '${f##*/} and cat | wc');
@@ -710,7 +710,7 @@ describe('chapter 15 (Real scripts) checks', () => {
     put(SQ, m, m.answer);
     assert.equal(run(SQ, 'bash scripts/loglines.sh').out, m.tests[0].expectOut, 'the seeded logs, through the terminal');
   });
-  it('15.7 Capstone: backup script', () => {
+  it('15.7 Capstone: the backup chest script', () => {
     const { SQ, m, ok, why } = scriptJudge(R15, 6);
     assert.equal(typeof m.check, 'function');
     assert.equal(ok(m.answer), true);

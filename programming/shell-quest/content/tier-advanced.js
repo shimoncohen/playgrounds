@@ -117,7 +117,7 @@ const LOG_CASE2={'logs/app.log':'started','logs/cache.log':'hit\nmiss\nhit','log
 const TRIP={'trip/day one.txt':'Left the village at dawn.','trip/day two.txt':'Crossed the river.','trip/route.md':'north, then east'};
 const DOCS_COPIED=Object.assign(under('backup',{'ideas.txt':DOCS['ideas.txt'],'notes.txt':DOCS['notes.txt'],'todo.txt':DOCS['todo.txt']}),
   {'backup/readme.md':'(missing)'},under('docs',DOCS)); /* scriptPasses reports an absent file as (missing): the .md must not be copied; the originals must stay (mv fails) */
-const BACKUP={title:'Capstone: backup script',kind:'challenge',file:'scripts/backup.sh',
+const BACKUP={title:'Capstone: the backup chest script',kind:'challenge',file:'scripts/backup.sh',
   goal:`Ada's lodge papers need a safe copy before the hunt goes on. Write <code>scripts/backup.sh</code>. Given a folder, it creates <code>backup/</code> if it is missing, copies every <code>.txt</code> file of that folder into it and prints <code>backed up N files</code>. With no argument, or one that is not a folder, it prints a usage line on stderr and exits with 1. Try <code>bash scripts/backup.sh docs</code>.`,
   anat:[['[ -d "$1" ]','cmd'],['>&2','op'],['exit 1','kw'],['mkdir -p backup','cmd'],['for','kw'],['f','var'],['in "$1"/*.txt','arg'],['cp "$f" backup/','cmd'],['n=$((n + 1))','var'],['echo "backed up $n files"','cmd']],
   answer:BACKUP_ANSWER,
@@ -181,7 +181,7 @@ const CH=[
   anat:[['[[','kw'],['"$USER"','var'],['==','op'],['exp*','arg'],[']]','kw'],['&&','op'],['echo matches','cmd']],answer:'[[ "$USER" == exp* ]] && echo matches',
   explain:`Inside <code>[[ ]]</code>, an unquoted <code>*</code> or <code>?</code> on the right of <code>==</code> is a wildcard, so <code>exp*</code> means "starts with exp". Quote it as <code>"exp*"</code> and it only matches the exact text exp*. <code>[[</code> is part of bash itself, not a separate command like <code>[</code>.`,
   check:c=>c.log.some(e=>e.name==='[['&&e.code===0)&&/\[\[[^\]]*\s(==?|!=)\s[^\]]*[*?]/.test(c.line)&&said(c)==='matches'},
- {title:'Script: exists?',kind:'script',file:'scripts/exists.sh',
+ {title:'The lodge door script',kind:'script',file:'scripts/exists.sh',
   goal:`Ada wants a doorkeeper script for the lodge. Write <code>scripts/exists.sh</code>: it prints <code>exists</code> when the path given as its first argument is there, a file or a folder, and <code>missing</code> when it is not. Open it with <code>nano scripts/exists.sh</code> (<code>nano</code> is a small text editor that opens in a panel beside the terminal), save, then try <code>bash scripts/exists.sh village</code> (<code>bash</code> followed by a file name runs that file as a script, no <code>chmod</code> needed).`,
   anat:[['if','kw'],['[ -e "$1" ]','cmd'],['then','kw'],['echo exists','cmd'],['else','kw'],['echo missing','cmd'],['fi','kw']],
   answer:EXISTS_ANSWER,
@@ -237,7 +237,7 @@ if [ -d "$1" ]; then echo exists; else echo missing; fi
   explain:`<code>&lt; journal.txt</code> feeds the file to the whole loop. Each turn, <code>read</code> puts the next line into <code>line</code>; at the end of the file it fails and the loop stops. Add <code>-r</code> to keep backslashes as they are. Try the same loop on <code>numbers.txt</code> and add the numbers up.`,
   check:c=>{const want=c.read('~/journal.txt').split('\n').map(s=>s.trim()).filter(Boolean).map(l=>'got: '+l).join('\n');
     return !!want&&c.ran('read')&&looped(c)&&said(c)===want}},
- {title:'Script: sum',kind:'script',file:'scripts/sum.sh',
+ {title:'The supply sum script',kind:'script',file:'scripts/sum.sh',
   goal:`Ada's shopping runs need a script that adds up any list of supplies. Write <code>scripts/sum.sh</code>: it prints the sum of all its arguments, so <code>bash scripts/sum.sh 1 2 3</code> prints <code>6</code>, and with no arguments at all it prints <code>0</code>.`,
   anat:[['sum=0','var'],['for','kw'],['n','var'],['in "$@"','arg'],['do','kw'],['sum=$((sum + n))','var'],['done','kw'],['echo "$sum"','cmd']],
   answer:SUM_ANSWER,
@@ -289,7 +289,7 @@ echo "$sum"
   explain:`<code>\${NAME:-stranger}</code> gives the value of NAME, or the word after <code>:-</code> when NAME is unset or empty. NAME itself does not change. Set it with <code>NAME=Ada</code> and the same line prints Ada. In a script, <code>\${1:-world}</code> gives the first argument a default.`,
   check:c=>{const m=/\$\{([A-Za-z_]\w*):-([^}]*)\}/.exec(c.line);if(!m)return false;const v=Object.prototype.hasOwnProperty.call(SQ.S.vars,m[1])?SQ.S.vars[m[1]]:'';const want=v?String(v):m[2].replace(/^["']|["']$/g,'');
     return !!want&&said(c)===want}},
- {title:'Script: greeter',kind:'script',file:'scripts/greet.sh',
+ {title:'Ada\'s guest greeter script',kind:'script',file:'scripts/greet.sh',
   goal:`Ada wants a greeter script that welcomes every guest to the lodge. Write <code>scripts/greet.sh</code>: <code>bash scripts/greet.sh Ada</code> prints <code>Hello, Ada!</code>. Run with no name, it prints <code>usage: greet.sh NAME</code> on stderr (the error stream from chapter 10, written <code>&gt;&amp;2</code>) and exits with 1 (<code>exit 1</code> ends the script with that status). Open it with <code>nano scripts/greet.sh</code>.`,
   anat:[['if','kw'],['[ -z "$1" ]','cmd'],['then','kw'],['echo "usage: greet.sh NAME"','cmd'],['>&2','op'],['exit 1','kw'],['fi','kw'],['echo "Hello, $1!"','cmd']],
   answer:GREET_ANSWER,
@@ -335,7 +335,7 @@ done
   check:c=>{const F=SQ.S.fns||{},lib=c.read('~/lib/strings.sh');
     const sourced=c.log.some(e=>(e.name==='source'||e.name==='.')&&e.code===0&&e.args.some(a=>/(^|\/)lib\/strings\.sh$/.test(a)));
     return said(c)==='HELLO'&&!!F.shout&&lib.includes(F.shout)&&fnsCalled(c).includes('shout')&&(sourced||!c.ran('(fn)'))}},
- {title:'Script: exit codes',kind:'script',file:'scripts/check.sh',
+ {title:'The lodge exit-code script',kind:'script',file:'scripts/check.sh',
   goal:`The lodge door needs a checker that tells whether a visitor's paper is a real file. Write <code>scripts/check.sh</code>: it exits with 0 when its argument is a file. Otherwise it prints a message naming it on stderr and exits with 1. Try <code>bash scripts/check.sh journal.txt; echo $?</code>.`,
   anat:[['if','kw'],['[ -f "$1" ]','cmd'],['then','kw'],['exit 0','kw'],['fi','kw'],['echo "check.sh: $1 is not a file"','cmd'],['>&2','op'],['exit 1','kw']],
   answer:CHECK_ANSWER,
@@ -358,7 +358,7 @@ exit 1
     {label:'a folder, not a file',args:['village'],files:{'village/shop.txt':'apple 2'},expectErrMatch:'village',expectCode:1}],
   hint:`The checker answers with its exit status. Use <code>[ -f "$1" ]</code> and <code>exit 0</code>, then <code>echo … &gt;&amp;2</code> and <code>exit 1</code>. Save it, then try <code>bash scripts/check.sh ghost; echo $?</code>.`,
   explain:`Every command ends with an <b>exit status</b>, and a script's status is the number given to <code>exit</code>, or else that of its last command. 0 means success and anything else failure, and that is what <code>if</code>, <code>&amp;&amp;</code> and <code>||</code> read: <code>bash scripts/check.sh ghost || echo no file</code>. Messages for people go to stderr, so a caller that only wants the status can drop them with <code>2&gt;/dev/null</code>.`},
- {title:'Script: ask a question',kind:'script',file:'scripts/ask.sh',
+ {title:'The lodge question script',kind:'script',file:'scripts/ask.sh',
   goal:`The lodge door asks each visitor for a name. Write <code>scripts/ask.sh</code>: it reads a name from its input and prints <code>Hello, NAME!</code>. Try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>, or type the name in the editor's input box and use Save &amp; run.`,
   anat:[['read','cmd'],['name','var'],['echo "Hello, $name!"','cmd']],
   answer:ASK_ANSWER,
@@ -376,7 +376,7 @@ echo "Hello, name!"
   tests:[{label:'Ada on stdin',stdin:'Ada\n',expectOut:'Hello, Ada!'},{label:'Grace on stdin',stdin:'Grace\n',expectOut:'Hello, Grace!'}],
   hint:`The lodge door only listens. One <code>read name</code>, then an <code>echo</code> with <code>"$name"</code> in it. Save it, then try <code>bash scripts/ask.sh &lt;&lt;&lt; Ada</code>.`,
   explain:`read takes the next line of the script's input (stdin): whatever is piped or redirected into the script, or what you put in the editor's input box. That is not the same as arguments: <code>$1</code> is typed after the script's name, input arrives on its own. Each time you save, the script is given Ada and then Grace as input.`},
- MKCONF={title:'Script: write a config',kind:'script',file:'scripts/mkconf.sh',
+ MKCONF={title:'The lodge config script',kind:'script',file:'scripts/mkconf.sh',
   goal:`The lodge settings file should be written by a script, not by hand. Write <code>scripts/mkconf.sh</code>: with a here-document, it writes <code>app.conf</code> holding the two lines <code>name=quest</code> and <code>mode=fast</code>. Running it again must leave the same file.`,
   anat:[['cat','cmd'],['> app.conf','op'],['<<EOF','op'],['name=quest','arg'],['mode=fast','arg'],['EOF','kw']],
   answer:MKCONF_ANSWER,
@@ -407,7 +407,7 @@ EOF
   tests:[{label:'a first run',expectFiles:{'app.conf':'name=quest\nmode=fast'}},{label:'running it a second time',files:{'app.conf':'name=quest\nmode=fast'},expectFiles:{'app.conf':'name=quest\nmode=fast'}}],
   hint:`The settings file is written the same way every time. Write <code>cat &gt; app.conf &lt;&lt;EOF</code> on one line, the two settings on the next two, and <code>EOF</code> alone on the last. Save it, then try it with <code>bash scripts/mkconf.sh</code> (twice) and <code>cat app.conf</code>.`,
   explain:`A <b>here-document</b> feeds the lines after the command, up to a line holding only the end word (EOF here), to the command as its input. With <code>cat &gt; app.conf</code> they land in the file. <code>&gt;</code> starts the file afresh each time, so a second run leaves the same two lines, while <code>&gt;&gt;</code> would add them again. Variables inside are expanded; write <code>&lt;&lt;'EOF'</code> to keep a <code>$</code> as it is. Here-documents go in <code>scripts</code>: this practice shell runs one typed line at a time.`},
- {title:'Script: count lines',kind:'script',file:'scripts/loglines.sh',
+ {title:'The lodge line-count script',kind:'script',file:'scripts/loglines.sh',
   goal:`Ada wants to know how long each of her service logs has grown. Write <code>scripts/loglines.sh</code>: for every <code>.log</code> file in <code>logs/</code>, it prints the file's name and its number of lines, like <code>app.log: 4</code>, in name order.`,
   anat:[['for','kw'],['f','var'],['in logs/*.log','arg'],['n=$(wc -l < "$f")','var'],['echo "$(basename "$f"): $n"','cmd'],['done','kw']],
   answer:LOGLINES_ANSWER,
