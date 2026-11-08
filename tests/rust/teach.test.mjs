@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { loadRust } from './harness.mjs';
 
 const RQ = loadRust();
+// the course has 13 chapters in the plan; a preview may name one that is not written yet
+const CHAPTERS_IN_PLAN = 13;
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 const flat = [];
 RQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, m })));
@@ -33,7 +35,8 @@ describe('previews', () => {
       assert.ok(m.how.some((h) => h.includes(p.wording)) || m.explain.includes(p.wording), 'the preview wording must appear on the mission card');
       if (p.home) {
         assert.match(plain(p.wording), new RegExp(`Chapter ${p.home}\\b`));
-        assert.ok(RQ.CH[p.home - 1] && p.home - 1 > ci, 'the home chapter must exist and come later');
+        assert.ok(p.home - 1 > ci && p.home <= CHAPTERS_IN_PLAN, 'the home chapter must come later in the planned course');
+        if (RQ.CH.length >= CHAPTERS_IN_PLAN) assert.ok(RQ.CH[p.home - 1], 'the home chapter must exist once the course is complete');
       } else assert.match(plain(p.wording), /macro/);
     });
   }

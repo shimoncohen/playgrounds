@@ -193,6 +193,7 @@ RQ.lint=(ast,info)=>{
         return i&&i.k==='int'&&part(a,Number(i.v),i.amb);
       }
       case 'Tuple':case 'Array':return {k:'agg',els:e.elems.map(ev)};
+      case 'StructLit':for(const f of e.fields)ev(f.expr);return null;
       case 'ArrayRepeat':return {k:'agg',els:Array(Number(e.len.v)).fill(ev(e.elem))};
       case 'Field':return part(ev(e.expr),Number(e.name));
       case 'Block':return block(e);

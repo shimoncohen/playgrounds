@@ -117,7 +117,7 @@ programming/            the Programming section: index.html (hub with a card per
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
-  rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js
+  rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js + memview.js
   shell-quest/          split by job (below)
 math/                   the hub: index.html + style.css + app.js (map and progress rings), graph.js (DOM-free prerequisite graph)
 math/scene/             the scene layer: model.js (DOM-free), view.js, svg2d.js, three3d.js, palette.js, scene.css; the test page is tests/math/pages/scenes.html

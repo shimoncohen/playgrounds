@@ -16,7 +16,7 @@ describe('RQ.borrow: the API', () => {
   it('gives errors, unsupported, loans and the names of the fns it analysed', () => {
     const c = RQ.compile(SIMPLE('let s = String::new();'));
     const b = RQ.borrow(c.ast, c.info);
-    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], analysed: ['main'] });
+    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], moves: [], analysed: ['main'] });
   });
   it('a Copy-only fn is not analysed', () => {
     const c = RQ.compile(SIMPLE('let x = 1;', 'let y = x;', 'let z = x;'));
@@ -221,7 +221,7 @@ describe('RQ.compile loans', () => {
   const nodes = (ast, t) => { const out = []; RQ.walk(ast, (n) => { if (n.t === t) out.push(n); }); return out; };
   it('has the id, the borrow node, the local, mut, the line and the nodes where it is live', () => {
     const c = RQ.compile(SI('let r = &s;', 'println!("{}", r);'));
-    assert.deepEqual(c.loans, [{ id: 0, ast: nodes(c.ast, 'Ref')[0].id, local: 's', mut: false, line: 3, live: [nodes(c.ast, 'Macro')[0].id] }]);
+    assert.deepEqual(c.loans, [{ id: 0, ast: nodes(c.ast, 'Ref')[0].id, local: 's', mut: false, implicit: false, line: 3, span: [3, 4], live: [nodes(c.ast, 'Macro')[0].id] }]);
   });
   it('a &mut loan from a call argument, and ids that run on across fns', () => {
     const c = RQ.compile(P('fn f(a: &mut String) {', '    a.push_str("x");', '}', '', 'fn main() {', '    let mut s = String::new();', '    f(&mut s);', '    s.push_str("y");', '}'));

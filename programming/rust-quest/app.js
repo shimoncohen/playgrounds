@@ -29,22 +29,26 @@ const chapterDone=ci=>totalDone(ci)===CH[ci].missions.length;
 const missionEl=$('#mission'),chaptersEl=$('#chapters'),fbEl=$('#feedback'),resultEl=$('#result'),ta=$('#code');
 ta.maxLength=state.CAP;
 RQUI.editor({ta,keys:$('#keys'),onRun:run});
+const gutter=RQUI.gutter($('#gutter'),ta),mem=RQUI.memview({root:$('#memory'),gutter}),memPanel=$('#memPanel');
+const showMem=ev=>{mem.show(ev);memPanel.hidden=$('#memory').hidden;};
 
 let won=false,ran=false;
 function loadCode(){
   const m=sessionMission(),saved=S.codes[codeKey()];
   ta.value=saved!==undefined?saved:m.starter;
 }
-ta.addEventListener('input',()=>{S.codes[codeKey()]=ta.value.slice(0,state.CAP);save();});
+ta.addEventListener('input',()=>{S.codes[codeKey()]=ta.value.slice(0,state.CAP);save();gutter.clear();});
 function startSession(message){
   won=false;ran=false;loadCode();
+  mem.clear();memPanel.hidden=true;
   resultEl.textContent='';const p=document.createElement('p');p.className='note';p.textContent=message||'Press Run to see what your program prints, or what the compiler says.';resultEl.append(p);
   renderFeedback(null);
 }
 function run(){
-  const m=sessionMission(),ev=RQ.evalMission(m,ta.value);
+  const m=sessionMission(),ev=RQ.evalMission(m,ta.value,{snap:true});
   ran=true;
   RQUI.result(resultEl,ev);
+  showMem(ev);
   if(!curMission())return;
   if(ev.result===true)complete();
   else renderFeedback(ev.c&&(ev.c.status==='ok'||ev.c.status==='panic')?{tip:ev.result}:null);

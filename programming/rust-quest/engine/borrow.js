@@ -1,7 +1,7 @@
 /* The move, initialisation and loan analyses over the CFG that mir.js lowers. RQ.borrow(ast, info) gives {errors, unsupported, loans, analysed}:
    errors are E0381 (use of an uninitialised local), E0382 (use after a move), E0384 on a deferred let, and E0499, E0502, E0505 and E0506
    from the loans; unsupported also carries what mir.js reported, and the analysis is skipped when it did; analysed names the lowered fns;
-   loans is [{id, ast (the borrow node), local (name, null for a temp), mut, line, live (ast ids of the instrs where it is live)}]. DOM-free.
+   moves is [{name, line}] for every by-value move of a named local. loans is [{id, ast (the borrow node), local (name, null for a temp), mut, line, implicit (made by the compiler for a print argument or a method receiver, not written by the learner), span ([first, last] line where it is live), live (ast ids of the instrs where it is live)}]. DOM-free.
    Per local a forward may-dataflow tracks MOVED, UNINIT and EVER (assigned on some path). A use is any operand or borrow of the local;
    the destination of an assign and `dead` are not uses. A move reaching a use is E0382, else a missing initialisation is E0381. Blocks
    with no path from the entry are skipped, because the edges out of them stay in succ.
@@ -111,7 +111,7 @@ function loanPass(F,errors,un,loans){
   const B=F.blocks,L=F.locals,n=L.length;
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
-  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,live:new Set()});}
+  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,live:new Set(),span:[i.line,i.line]});}
   const onS=L.map(()=>0n),onM=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(k));
   lo.forEach((x,k)=>{(x.mut?onM:onS)[x.l]|=lb[k];});
 
@@ -193,7 +193,11 @@ function loanPass(F,errors,un,loans){
     b.instrs.forEach((i,j)=>{
       lm=0n;
       for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l])lm|=s[l];
-      if(lm)lo.forEach((x,k)=>{if(lm&lb[k])x.live.add(i.ast);});
+      if(lm)lo.forEach((x,k)=>{
+        if(!(lm&lb[k]))return;
+        x.live.add(i.ast);
+        x.span=[Math.min(x.span[0],i.line),Math.max(x.span[1],i.line)];
+      });
       uses(i,(l,_mv,kind)=>access(l,kind,i));
       if(i.op==='store'&&i.ref.k!=='const')access(i.ref.l,'write',i,true);
       if(i.op==='dead'){
@@ -211,18 +215,19 @@ function loanPass(F,errors,un,loans){
     });
   }
   // a print's `&r` of a reference local guards r for the call; it is not a borrow the user wrote
-  for(const x of lo)if(!refy(L[x.l].ty))loans.push({id:loans.length,ast:x.i.ast,local:L[x.l].name,mut:x.mut,line:x.i.line,live:[...x.live].sort((a,b)=>a-b)});
+  for(const x of lo)if(!refy(L[x.l].ty))loans.push({id:loans.length,ast:x.i.ast,local:L[x.l].name,mut:x.mut,implicit:x.implicit,line:x.i.line,span:x.span,live:[...x.live].sort((a,b)=>a-b)});
   return true;
 }
 
 RQ.borrow=(ast,info)=>{
-  const m=RQ.mir(ast,info),errors=[],loans=[],unsupported=[...m.unsupported],seen=new Set();
+  const m=RQ.mir(ast,info),errors=[],loans=[],moves=[],unsupported=[...m.unsupported],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
   if(!unsupported.length)for(const F of m.fns){
     const ok=analyse(F,errors);
+    for(const b of F.blocks)if(!b.unreachable)for(const i of b.instrs)uses(i,(l,mv)=>{if(mv&&F.locals[l].name!==null)moves.push({name:F.locals[l].name,line:i.line});});
     if(ok)mutability(F,errors);
     if(!ok||!loanPass(F,errors,un,loans)){unsupported.push({feature:'program too large',line:F.line});break;}
   }
-  return {errors,unsupported,loans,analysed:m.fns.map(f=>f.name)};
+  return {errors,unsupported,loans,moves,analysed:m.fns.map(f=>f.name)};
 };
 })();

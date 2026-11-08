@@ -1,7 +1,13 @@
-/* Values are {k:'int',v:BigInt,ty}, {k:'float',v:Number}, {k:'bool'|'char'|'str',v}, {k:'tuple'|'array',v:[values]} and
-   {k:'unit'}. A String is {k:'String',v} and never changes: push_str puts a new one in the variable's cell. A reference is
-   {k:'ref',cell,mut}, where cell is the {val} of the variable it borrows (val is null until a deferred let is set).
+/* Values are {k:'int',v:BigInt,ty}, {k:'float',v:Number}, {k:'bool'|'char'|'str',v}, {k:'tuple'|'array',v:[values]},
+   {k:'struct',name,fields:[{name,val}]} (declaration order) and {k:'unit'}. A String is {k:'String',v,id} and never changes:
+   push_str puts a new one with the same heap id in the variable's cell. A reference is {k:'ref',cell,mut,loan}, where cell is
+   the {val} of the variable it borrows (val is null until a deferred let is set) and loan is the node id of the borrow.
    The checker gives every literal its final type (opts.info), so a value always carries a concrete type.
+   Ownership is tracked as Rust does: a cell is moved when its non-Copy value is passed on, and what is still owned is dropped
+   at the end of its scope in reverse declaration order (also while a panic unwinds), a temporary at the end of its statement.
+   Dropping a struct runs its `Drop::drop` first, then drops its fields in declaration order.
+   events: {t:'alloc',kind,id,line} {t:'free',id,line} {t:'move',name,line} {t:'drop',name,ty,line,part?} (part: a field or element) {t:'print',name,line}.
+   With opts.snap it also records a snapshot before every statement and one at the end; opts.loans are the borrow pass's loans.
    Deterministic: no clock, no randomness. DOM-free. */
 (()=>{
 'use strict';
@@ -13,6 +19,7 @@ class Brk{constructor(v){this.v=v;}}
 class Cont{}
 class Panic{constructor(msg,e){this.msg=msg;this.line=e.line;this.col=e.col;}}
 const UNIT={k:'unit'};
+const MAX_EVENTS=200000,MAX_SNAPS=2000;
 const bool=v=>({k:'bool',v});
 const OPNAME={'+':'add','-':'subtract','*':'multiply'};
 // Rust orders text by UTF-8 bytes, which is code point order; JS < compares UTF-16 units and puts U+10000 and up before U+E000
@@ -30,18 +37,33 @@ const utf8Len=s=>{let n=0;for(const c of s){const p=c.codePointAt(0);n+=p<0x80?1
 RQ.interp=(ast,opts)=>{
   opts=opts||{};
   const maxSteps=opts.maxSteps??100000,maxDepth=opts.maxDepth??64,info=opts.info||new Map();
-  const {fits,INT,wrap}=RQ.types;
+  const {fits,INT,wrap,isCopy,res,show}=RQ.types;
   let steps=0,depth=0,out='',err='';
-  const fns=new Map(),consts=new Map(),cval=new Map();
-  for(const it of ast.items){if(it.t==='Fn')fns.set(it.name,it);else if(it.t==='Const')consts.set(it.name,it);}
+  const fns=new Map(),consts=new Map(),cval=new Map(),decls=new Map(),dropImpl=new Map();
+  for(const it of ast.items){
+    if(it.t==='Fn')fns.set(it.name,it);else if(it.t==='Const')consts.set(it.name,it);
+    else if(it.t==='Struct')decls.set(it.name,it);
+    else if(it.t==='Impl'&&it.trait)dropImpl.set(it.selfTy.segs[0].name,it.items[0]);
+  }
+  const events=[],heap=new Map(),temps=[],frames=[],snaps=[],loanOf=new Map((opts.loans||[]).map(l=>[l.ast,l])),idSets=new Map();
+  let nextId=1,lastEv=0;
   const tick=()=>{if(++steps>maxSteps)throw new Limit('steps');};
   const bug=what=>{throw new Error('interpreter: '+what);};
   const find=(env,n)=>{for(let i=env.length-1;i>=0;i--)if(env[i].has(n))return env[i].get(n);return null;};
   const int=(v,ty)=>({k:'int',v,ty});
-  const checked=(v,ty,msg,e)=>{if(!fits(v,ty))throw new Panic(msg,e);return int(v,ty);};
+  const checked=(v,ty,msg,e)=>{if(!fits(v,ty))throw panic(msg,e);return int(v,ty);};
   const unref=v=>RQ.std.unref(v);
   const read=(cell,line)=>{if(cell.val===null)throw new Unsup('deferred initialization',line);return cell.val;};
-  const string=s=>{if(s.length>MAX_STRING)throw new Limit('string size');return {k:'String',v:s};};
+  const note=o=>{events.push(o);if(events.length>MAX_EVENTS)throw new Limit('steps');};
+  const string=(s,id,line)=>{
+    if(s.length>MAX_STRING)throw new Limit('string size');
+    if(id===undefined){id=nextId++;note({t:'alloc',kind:'String',id,empty:s==='',line:line||0});heap.set(id,{id,kind:'String',v:s});}
+    else heap.get(id).v=s;
+    return {k:'String',v:s,id};
+  };
+  const panic=(msg,e)=>{const p=new Panic(msg,e);err+=RQ.diag.panicText(p);return p;};
+  const typeOf=e=>{const o=info.get(e);return o&&o.ty;};
+  const isPlace=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   function cellOf(e,env){
     e=peel(e);
     if(e.t==='Deref')return cellOf(e.expr,env);
@@ -55,11 +77,11 @@ RQ.interp=(ast,opts)=>{
     switch(op){
       case '+':case '-':case '*':return checked(op==='+'?a.v+b.v:op==='-'?a.v-b.v:a.v*b.v,ty,'attempt to '+OPNAME[op]+' with overflow',e);
       case '/':
-        if(b.v===0n)throw new Panic('attempt to divide by zero',e);
+        if(b.v===0n)throw panic('attempt to divide by zero',e);
         return checked(a.v/b.v,ty,'attempt to divide with overflow',e);
       case '%':
-        if(b.v===0n)throw new Panic('attempt to calculate the remainder with a divisor of zero',e);
-        if(a.v===INT[ty][0]&&b.v===-1n&&ty[0]==='i')throw new Panic('attempt to calculate the remainder with overflow',e);
+        if(b.v===0n)throw panic('attempt to calculate the remainder with a divisor of zero',e);
+        if(a.v===INT[ty][0]&&b.v===-1n&&ty[0]==='i')throw panic('attempt to calculate the remainder with overflow',e);
         return int(a.v%b.v,ty);
       case '&':return int(a.v&b.v,ty);
       case '|':return int(a.v|b.v,ty);
@@ -126,6 +148,8 @@ RQ.interp=(ast,opts)=>{
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
+    // an owned value that no variable holds is a temporary of the statement
+    [...e.args.slice(1),...e.named.map(x=>x.expr)].forEach((x,i)=>{const v=i<pos.length?pos[i]:named.get(e.named[i-pos.length].name);if(owns(v)&&!isPlace(x))temps.push({v,line:e.line});});
     let s='';
     try{
       for(const p of parts){
@@ -144,6 +168,8 @@ RQ.interp=(ast,opts)=>{
       if(x instanceof RQ.std.Over)throw new Limit('output size');
       throw x;
     }
+    if(e.name==='format')return string(s,undefined,e.line);
+    note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
   }
   function constVal(n){
@@ -154,31 +180,131 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(x instanceof Panic)throw new Unsup('const initializer',c.line);throw x;}
     return cval.get(n);
   }
+  const owns=v=>v.k==='String'||v.k==='struct'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
+  function guard(work,cleanup){
+    let r;
+    try{r=work();}
+    catch(x){if(!(x instanceof Limit||x instanceof Unsup))cleanup();throw x;}
+    cleanup();return r;
+  }
+  function dropValue(v,name,line,part){
+    if(!owns(v))return;
+    switch(v.k){
+      case 'String':
+        note({t:'drop',name,ty:'String',line,part});
+        heap.delete(v.id);note({t:'free',id:v.id,line});
+        break;
+      case 'struct':{
+        note({t:'drop',name,ty:v.name,line,part});
+        const d=dropImpl.get(v.name);
+        if(d)runDrop(d,v,line,name);
+        for(const f of v.fields)dropValue(f.val,name&&name+'.'+f.name,line,true);
+        break;
+      }
+      default:
+        note({t:'drop',name,ty:v.k,line,part});
+        v.v.forEach((x,i)=>dropValue(x,name&&name+(v.k==='array'?'['+i+']':'.'+i),line,true));
+    }
+  }
+  function dropScope(scope){
+    for(let i=scope.own.length-1;i>=0;i--){
+      const c=scope.own[i];
+      if(c.val!==null&&!c.moved&&!c.dropped)dropValue(c.val,c.name,c.line);
+    }
+  }
+  const dropTemps=mark=>{while(temps.length>mark){const t=temps.pop();dropValue(t.v,null,t.line);}};
+  function declare(scope,name,cell){scope.set(name,cell);scope.own.push(cell);}
+  const newScope=()=>{const m=new Map();m.own=[];return m;};
+  const tyName=n=>{const o=info.get(n);return o&&o.ty?show(o.ty):'';};
+  // a by-value use of a local moves a non-Copy value out of it (a reference is reborrowed, never moved)
+  function mv(e,env){
+    const x=peel(e);
+    if(x.t==='Path'){
+      const c=find(env,x.segs[0].name),t=typeOf(x);
+      if(c){
+        const v=read(c,x.line);
+        if(t&&!isCopy(t)&&res(t).k!=='ref'){c.moved=true;note({t:'move',name:c.name,line:x.line});}
+        return v;
+      }
+    }
+    return ev(e,env);
+  }
+  // operands that end up owned together: if a later one panics, the earlier ones drop while it unwinds
+  function mvAll(es,env){
+    const vals=[];
+    try{for(const e of es)vals.push(mv(e,env));}
+    catch(x){if(x instanceof Panic)for(let i=vals.length-1;i>=0;i--)dropValue(vals[i],null,es[i].line);throw x;}
+    return vals;
+  }
+  function runDrop(f,v,line,name){
+    tick();
+    if(depth+1>maxDepth)throw new Limit('depth');
+    depth++;
+    const fenv=[newScope()];
+    const host={val:v,name:name||'a temporary',ty:v.name,line};
+    declare(fenv[0],'self',{val:{k:'ref',cell:host,mut:true},name:'self',ty:'&mut '+v.name,line});
+    frames.push({fn:'drop',env:fenv,stmt:null,host});
+    try{block(f.body,fenv);}finally{depth--;frames.pop();}
+  }
   function callFn(f,args,line){
     tick();
     if(depth+1>maxDepth)throw new Limit('depth');
     depth++;
-    const fenv=[new Map()];
-    f.params.forEach((p,i)=>fenv[0].set(p.pat.name,{val:args[i]}));
-    let r;
+    const fenv=[newScope()];
+    f.params.forEach((p,i)=>declare(fenv[0],p.pat.name,{val:args[i],name:p.pat.name,ty:tyName(p.pat),line:p.pat.line}));
+    frames.push({fn:f.name,env:fenv,stmt:null});
+    let r,abandon=false;
     try{r=block(f.body,fenv);}
-    catch(x){if(x instanceof Ret)r=x.v;else throw x;}
-    finally{depth--;}
+    catch(x){
+      if(x instanceof Ret)r=x.v;
+      else{if(x instanceof Limit||x instanceof Unsup)abandon=true;throw x;}
+    }
+    finally{
+      if(!abandon)dropScope(fenv[0]);
+      depth--;frames.pop();
+    }
     return r;
   }
+  function stmt(s,env,scope){
+    if(s.t==='Let'){
+      const pt=s.pat;
+      if(pt.t==='IdentPat'){
+        const cell={val:s.init?mv(s.init,env):null,name:pt.name,ty:tyName(pt),line:pt.line};
+        declare(scope,pt.name,cell);
+      }else if(s.init){
+        const v=ev(s.init,env);
+        if(!isPlace(s.init))dropValue(v,null,s.line);
+      }
+    }else if(s.t==='ExprStmt'){
+      const x=peel(s.expr),v=x.t==='Path'?mv(x,env):ev(s.expr,env);
+      if(x.t!=='Field'&&x.t!=='Index'&&x.t!=='Deref')dropValue(v,null,s.line);
+    }else throw new Unsup(s.t,s.line);
+  }
   function block(b,env){
-    env.push(new Map());
+    const scope=newScope(),fr=frames[frames.length-1];
+    env.push(scope);
+    let abandon=false;
     try{
       for(const s of b.stmts){
         tick();
-        if(s.t==='Let'){
-          const v=s.init?ev(s.init,env):null;
-          if(s.pat.t==='IdentPat')env[env.length-1].set(s.pat.name,{val:v});
-        }else if(s.t==='ExprStmt')ev(s.expr,env);
-        else throw new Unsup(s.t,s.line);
+        if(fr)fr.stmt=s;
+        snapshot(s.line);
+        const mark=temps.length;
+        guard(()=>stmt(s,env,scope),()=>dropTemps(mark));
       }
-      return b.tail?ev(b.tail,env):UNIT;
-    }finally{env.pop();}
+      if(!b.tail)return UNIT;
+      if(fr)fr.stmt=b.tail;
+      snapshot(b.tail.line);
+      const mark=temps.length;
+      // a temporary of the tail expression drops before the block's locals (edition 2024)
+      return guard(()=>mv(b.tail,env),()=>dropTemps(mark));
+    }catch(x){
+      if(x instanceof Limit||x instanceof Unsup)abandon=true;
+      throw x;
+    }finally{
+      env.pop();
+      if(!abandon)dropScope(scope);
+    }
   }
   function body(b,env,box){
     try{block(b,env);}
@@ -188,6 +314,64 @@ RQ.interp=(ast,opts)=>{
     }
     return false;
   }
+  const clip=t=>t.length>40?t.slice(0,39)+'…':t;
+  const scalar=v=>{
+    try{return v.k==='char'?"'"+v.v+"'":v.k==='str'?'"'+clip(v.v)+'"':v.k==='unit'?'()':RQ.std.display(v);}
+    catch(x){return '?';}
+  };
+  function leaves(v,path,out,live){
+    switch(v.k){
+      case 'String':out.push({path,heap:live?v.id:null});break;
+      case 'ref':out.push({path,ref:true,mut:v.mut,loan:v.loan,cell:v.cell});break;
+      case 'struct':for(const f of v.fields)leaves(f.val,path?path+'.'+f.name:f.name,out,live);break;
+      case 'tuple':case 'array':
+        v.v.slice(0,8).forEach((x,i)=>leaves(x,path+(v.k==='array'?'['+i+']':(path?'.':'')+i),out,live));
+        if(v.v.length>8)out.push({path:path+'…',text:'… '+(v.v.length-8)+' more'});
+        break;
+      default:out.push({path,text:scalar(v)});
+    }
+  }
+  const idsOf=n=>{
+    let set=idSets.get(n);
+    if(!set){set=new Set();RQ.walk(n,m=>{set.add(m.id);});idSets.set(n,set);}
+    return set;
+  };
+  function snapshot(line,end){
+    if(!opts.snap)return;
+    if(snaps.length>=MAX_SNAPS-(end?0:1))return;
+    const recs=new Map(),owners=new Map(),frs=[];
+    for(const f of frames){
+      const vars=[],cells=[];
+      if(f.host)cells.push(f.host);
+      for(const sc of f.env)cells.push(...sc.own||[]);
+      for(const c of cells){
+        const live=c.val!==null&&!c.moved&&!c.dropped;
+        const rec={uid:recs.size,name:c.name,ty:c.ty||'',state:c.val===null?'uninit':c.dropped?'dropped':c.moved?'moved':'owned',leaves:[]};
+        if(c.val!==null)leaves(c.val,'',rec.leaves,live);
+        for(const l of rec.leaves)if(l.heap!=null)owners.set(l.heap,c.name+(l.path?'.'+l.path:''));
+        recs.set(c,rec);vars.push(rec);
+      }
+      frs.push({fn:f.fn,vars});
+    }
+    const loans=[],seen=new Set();
+    for(const rec of recs.values())for(const l of rec.leaves){
+      if(!l.ref)continue;
+      const to=recs.get(l.cell),st=loanOf.get(l.loan);
+      // without the borrow pass's region a loan is shown as live
+      const live=!st||frames.some(f=>f.stmt&&st.live.some(id=>idsOf(f.stmt).has(id)));
+      loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:rec.name+(l.path?'.'+l.path:''),place:to?to.name:null,live,line:st?st.line:0});
+      if(to&&live&&!seen.has(to)){seen.add(to);to.n=0;}
+      if(to&&live){to.n++;if(to.state==='owned')to.state=l.mut?'mutBorrowed':'shared';}
+      l.to=to?to.uid:null;l.toName=to?to.name:null;
+    }
+    for(const rec of recs.values())for(const l of rec.leaves){delete l.cell;if(l.ref&&l.to===undefined){l.to=null;l.toName=null;}}
+    snaps.push({step:steps,line,end:!!end,frames:frs,
+      heap:[...heap.values()].map(h=>({id:h.id,kind:h.kind,content:h.v,owner:owners.get(h.id)||null})),
+      loans,events:events.slice(lastEv)});
+    lastEv=events.length;
+  }
+
+  function cond(c,env){const mark=temps.length;return guard(()=>ev(c,env).v,()=>dropTemps(mark));}
   function ev(e,env){
     switch(e.t){
       case 'Lit':{
@@ -228,16 +412,23 @@ RQ.interp=(ast,opts)=>{
           cell=rv.cell;
         }else throw new Unsup('assignment target',e.line);
         if(!cell)return bug('assign');
-        let r=ev(e.rhs,env);
+        let r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
         if(e.op!=='=')r=binop(e.op.slice(0,-1),read(cell,e.line),r,e);
-        cell.val=r;return UNIT;
+        else if(cell.val!==null&&!cell.moved&&!cell.dropped)dropValue(cell.val,cell.name,e.line);
+        cell.val=r;cell.moved=false;cell.dropped=false;return UNIT;
       }
       case 'Call':{
         const sg=e.callee.t==='Path'?e.callee.segs:[],f=sg.length===1&&fns.get(sg[0].name);
-        if(f)return callFn(f,e.args.map(a=>ev(a,env)),e.line);
-        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='new')return {k:'String',v:''};
-        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='from')return {k:'String',v:unref(ev(e.args[0],env)).v};
-        if(sg.length===1&&sg[0].name==='drop'&&e.args.length===1){ev(e.args[0],env);return UNIT;}
+        if(f)return callFn(f,mvAll(e.args,env),e.line);
+        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='new')return string('',undefined,e.line);
+        if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='from')return string(unref(ev(e.args[0],env)).v,undefined,e.line);
+        if(sg.length===2&&sg[0].name==='Clone'&&sg[1].name==='clone')return string(unref(ev(e.args[0],env)).v,undefined,e.line);
+        if(sg.length===1&&sg[0].name==='drop'&&e.args.length===1){
+          const a=peel(e.args[0]),c=a.t==='Path'&&find(env,a.segs[0].name),v=mv(a,env);
+          dropValue(v,c?c.name:null,e.line);
+          if(c&&c.moved)c.dropped=true;
+          return UNIT;
+        }
         throw new Unsup('call',e.line);
       }
       case 'Ref':{
@@ -245,8 +436,8 @@ RQ.interp=(ast,opts)=>{
         if(x.t==='Field'||x.t==='Index')throw new Unsup('borrow of a field',e.line);
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
-        if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut};}
-        return {k:'ref',cell:{val:ev(x,env)},mut:e.mut};
+        if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
+        return {k:'ref',cell:{val:ev(x,env)},mut:e.mut,loan:e.id};
       }
       case 'Deref':{
         const v=ev(e.expr,env);
@@ -259,27 +450,36 @@ RQ.interp=(ast,opts)=>{
           const r=peel(e.recv);
           if(r.t==='Field'||r.t==='Index')throw new Unsup('borrow of a field',e.line);
           const c=cellOf(r,env),add=unref(ev(e.args[0],env)).v;
-          c.val=string(c.val.v+add);return UNIT;
+          c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
-        const s=unref(ev(e.recv,env)).v;
+        const rv=ev(e.recv,env),s=unref(rv).v;
+        if(rv.k==='String'&&!isPlace(e.recv))temps.push({v:rv,line:e.line});
         if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
-        return {k:e.name==='clone'?'String':'str',v:s};
+        if(e.name==='as_str')return {k:'str',v:s};
+        return string(s,undefined,e.line);
       }
       case 'Macro':return macro(e,env);
       case 'Block':return block(e,env);
-      case 'Return':throw new Ret(e.expr?ev(e.expr,env):UNIT);
-      case 'Tuple':return e.elems.length?{k:'tuple',v:e.elems.map(x=>ev(x,env))}:UNIT;
-      case 'Array':return {k:'array',v:e.elems.map(x=>ev(x,env))};
+      case 'Return':throw new Ret(e.expr?mv(e.expr,env):UNIT);
+      case 'Tuple':return e.elems.length?{k:'tuple',v:mvAll(e.elems,env)}:UNIT;
+      case 'Array':return {k:'array',v:mvAll(e.elems,env)};
+      case 'StructLit':{
+        const d=decls.get(e.path.segs[0].name),vals=mvAll(e.fields.map(f=>f.expr),env),by=new Map(e.fields.map((f,i)=>[f.name,vals[i]]));
+        return {k:'struct',name:d.name,fields:d.fields.map(f=>({name:f.name,val:by.get(f.name)}))};
+      }
       case 'ArrayRepeat':{const v=ev(e.elem,env);return {k:'array',v:Array(Number(e.len.v)).fill(v)};}
       case 'Index':{
         const a=ev(e.expr,env),i=ev(e.index,env);
-        if(i.v>=BigInt(a.v.length))throw new Panic('index out of bounds: the len is '+a.v.length+' but the index is '+i.v,e);
+        if(i.v>=BigInt(a.v.length))throw panic('index out of bounds: the len is '+a.v.length+' but the index is '+i.v,e);
         return a.v[Number(i.v)];
       }
-      case 'Field':return ev(e.expr,env).v[Number(e.name)];
+      case 'Field':{
+        const b=unref(ev(e.expr,env));
+        return b.k==='struct'?b.fields.find(f=>f.name===e.name).val:b.v[Number(e.name)];
+      }
       case 'Cast':return cast(ev(e.expr,env),e.ty,e);
       case 'If':
-        if(ev(e.cond,env).v)return block(e.then,env);
+        if(cond(e.cond,env))return block(e.then,env);
         return e.els?e.els.t==='If'?ev(e.els,env):block(e.els,env):UNIT;
       case 'Loop':{
         const box={v:UNIT};
@@ -287,35 +487,37 @@ RQ.interp=(ast,opts)=>{
       }
       case 'While':{
         const box={v:UNIT};
-        for(;;){tick();if(!ev(e.cond,env).v||body(e.body,env,box))return UNIT;}
+        for(;;){tick();if(!cond(e.cond,env)||body(e.body,env,box))return UNIT;}
       }
       case 'For':{
         const r=peel(e.iter),from=ev(r.from,env),to=ev(r.to,env),box={v:UNIT},end=r.inclusive?to.v+1n:to.v;
         for(let i=from.v;i<end;i++){
           tick();
-          env.push(new Map());
-          if(e.pat.t==='IdentPat')env[env.length-1].set(e.pat.name,{val:int(i,from.ty)});
+          const sc=newScope();env.push(sc);
+          if(e.pat.t==='IdentPat')declare(sc,e.pat.name,{val:int(i,from.ty),name:e.pat.name,ty:from.ty,line:e.line});
           try{if(body(e.body,env,box))return UNIT;}finally{env.pop();}
         }
         return UNIT;
       }
-      case 'Break':throw new Brk(e.expr?ev(e.expr,env):UNIT);
+      case 'Break':throw new Brk(e.expr?mv(e.expr,env):UNIT);
       case 'Continue':throw new Cont();
       default:throw new Unsup(e.t,e.line);
     }
   }
 
+  const extra=()=>({events,snaps});
   try{
     // rustc range-checks every const; the lint pass reports an overflow, so a const only fails here on a shape it cannot model
     for(const n of consts.keys())constVal(n);
     callFn(fns.get('main'),[],1);
-    return {status:'ok',stdout:out,stderr:err,exit:0};
+    snapshot(snaps.length?snaps[snaps.length-1].line:1,true);
+    return {status:'ok',stdout:out,stderr:err,exit:0,...extra()};
   }catch(x){
-    if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out.slice(0,MAX_OUTPUT),stderr:err.slice(0,MAX_OUTPUT),exit:null};
-    if(x instanceof Unsup)return {status:'unsupported',unsupported:{feature:x.feature,line:x.line},stdout:out,stderr:err,exit:null};
+    if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out.slice(0,MAX_OUTPUT),stderr:err.slice(0,MAX_OUTPUT),exit:null,...extra()};
+    if(x instanceof Unsup)return {status:'unsupported',unsupported:{feature:x.feature,line:x.line},stdout:out,stderr:err,exit:null,...extra()};
     if(x instanceof Panic){
-      const panic={msg:x.msg,line:x.line,col:x.col};
-      return {status:'panic',stdout:out,stderr:err+RQ.diag.panicText(panic),exit:101,panic};
+      snapshot(x.line,true);
+      return {status:'panic',stdout:out,stderr:err,exit:101,panic:{msg:x.msg,line:x.line,col:x.col},...extra()};
     }
     throw x;
   }
