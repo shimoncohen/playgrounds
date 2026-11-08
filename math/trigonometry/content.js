@@ -108,7 +108,7 @@
           scene: tri({ byAdj: true, ask: 'opp' }), at: { ang: 30, adj: 8 }, reveal: tri({ byAdj: true }),
           answer: '4.6', wrong: '13.9', lazy: '8*tan(30)', check: rounded('8*tan(30)', 1) },
         { title: 'Find the angle', kind: 'number', question: 'asin(5/10)', tex: '\\sin\\theta = \\frac{5}{10} \\;\\text{, so }\\; \\theta = \\sin^{-1}\\!\\left(\\frac{5}{10}\\right)',
-          goal: 'Gust has moved the ladder, so its triangle with the wall now has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees? The scene opens at 45°: you can also drag the angle until the opposite side reads 5.',
+          goal: 'Gust leans a different, 10 long ladder against the wall, so its triangle with the wall has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees? The scene opens at 45°: you can also drag the angle until the opposite side reads 5.',
           how: [
             'Now you know the sides and want the angle. <code>sin θ = opp ÷ hyp = 5 ÷ 10</code>, which is 0.5.',
             'The <b>inverse sine</b> undoes the sine: it takes the ratio and gives back the angle. It is written <code>sin⁻¹</code> or <code>asin</code>. Your step is <code>asin(5/10)</code> (type <code>asin(5/10)</code>).',
