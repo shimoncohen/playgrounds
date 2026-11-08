@@ -9,13 +9,14 @@ const HEAD='# before VERB TARGET\n';
 const skippedBy=(o,by)=>o.steps.some(s=>s.type==='skip'&&s.by===by);
 
 AQ.CH.push({
-  name:'Hooks, plugins and subagents',badge:'Toolsmith',tier:'core',
-  intro:'Memory and skills ask the agent to behave. A <b>hook</b> does not ask: it is checked on every action, outside the agent\'s choice. A <b>subagent</b> is a helper with its own model, which lets you spend a big model only where it counts. A <b>plugin</b> is a bundle of such pieces that you install in one step. Here you will aim hooks, and split the model cost between helpers.',
+  name:'Hooks, plugins and subagents',badge:'Door Bell',tier:'core',
+  story:'A turnstile at the back door stops what Cog must not do whatever he says; hire the right-sized helper and find the door bell.',
+  intro:'A turnstile at the back door stops what Cog must not do, whatever he says, and the bell by the door calls the right-sized helper. Memory and skills ask the agent to behave. A <b>hook</b> does not ask: it is checked on every action, outside the agent\'s choice. A <b>subagent</b> is a helper with its own model, which lets you spend a big model only where it counts. A <b>plugin</b> is a bundle of such pieces that you install in one step. Here you will aim hooks, and split the model cost between helpers.',
   learned:['Hooks','before VERB TARGET','Subagent models','Plugins'],
   missions:[
     {
       title:'A rule the agent cannot argue with',scenario:'deploy',kind:'config',prompt:CHECKED,facts:['hooks'],
-      goal:'The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
+      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
       how:[
         'The line <code>before run npm run deploy</code> in <code>.claude/hooks.txt</code> stops the agent from running that command, whatever its plan says.',
         '<code>before</code> means the check happens ahead of the action.',
@@ -23,7 +24,7 @@ AQ.CH.push({
         '<code>npm run deploy</code> is the target. A target also covers commands that carry more words after it.'
       ],
       explain:'A hook is checked on every action before it happens, and an action it blocks is simply skipped. Real hooks run a small program that can allow or stop an action, and the simulator keeps only the blocking kind. Unlike a note in memory, a hook does not depend on the agent noticing it. One line per hook, in the shape <code>before</code>, a verb and a target.',
-      hint:'Open <code>.claude/hooks.txt</code> and add a line below the heading. Name the exact command the agent wants to run.',
+      hint:'Open the turnstile list, <code>.claude/hooks.txt</code>, and add a line below the heading. Name the exact command the agent wants to run.',
       answer:{files:{'.claude/hooks.txt':HEAD+'before run npm run deploy\n'}},
       wrong:{files:{'.claude/hooks.txt':HEAD+'before run npm run lint\n'}},
       lazy:{files:{}},
@@ -35,7 +36,7 @@ AQ.CH.push({
     },
     {
       title:'Block the risk, not the check',scenario:'guards',kind:'config',prompt:CHECKED,
-      goal:'Now the agent also wants to delete <code>data/backup.csv</code>. Add one hook for each risky action, and aim each one as narrowly as you can. A hook that is too wide would also stop the agent from running <code>npm test</code>, and then nothing checks its work.',
+      goal:'Now Cog also wants to delete <code>data/backup.csv</code>. Add one hook for each risky action, and aim each one as narrowly as you can. A hook that is too wide would also stop the agent from running <code>npm test</code>, and then nothing checks its work.',
       how:[
         'The two lines <code>before run npm run deploy</code> and <code>before delete data/</code> stop the deploy and the delete, and leave every other action alone.',
         'Each hook is its own line, with its own verb and target.',
@@ -43,7 +44,7 @@ AQ.CH.push({
         'The run ends with <code>npm test</code>, so it has to stay allowed.'
       ],
       explain:'A hook is only as good as its aim. Too narrow and the risk slips past. Too wide and it blocks the actions you need, like the check that proves the work. Name the exact action you want to stop.',
-      hint:'One line for the command, one for the folder. Make sure <code>npm test</code> can still run.',
+      hint:'One line for the command, one for Mr. Ledbury\'s backup folder. Make sure <code>npm test</code> can still run.',
       answer:{files:{'.claude/hooks.txt':HEAD+'before run npm run deploy\nbefore delete data/\n'}},
       wrong:{files:{'.claude/hooks.txt':HEAD+'before run npm run deploy\n'}},
       lazy:{files:{}},
@@ -57,7 +58,7 @@ AQ.CH.push({
     },
     {
       title:'Before it reads anything',scenario:'earlytrap',kind:'config',prompt:BASE,
-      goal:'This time the agent heads for the old code in <code>src/legacy/</code> straight away, before it has read anything. A memory file inside <code>src/</code> would not be loaded yet. A hook has no such wait, because it is checked on every action from the very first. Stop the edit with a hook, and still fix <code>src/price.js</code>.',
+      goal:'This time Cog heads for Mr. Ledbury\'s old code in <code>src/legacy/</code> straight away, before it has read anything. A memory file inside <code>src/</code> would not be loaded yet. A hook has no such wait, because it is checked on every action from the very first. Stop the edit with a hook, and still fix <code>src/price.js</code>.',
       how:[
         'The line <code>before edit src/legacy/</code> in <code>.claude/hooks.txt</code> stops every edit in the old folder from the first action on.',
         '<code>edit</code> is the verb, and <code>src/legacy/</code> covers the folder and everything inside it.',
@@ -77,7 +78,7 @@ AQ.CH.push({
     },
     {
       title:'Spend the big model where it counts',scenario:'crew',kind:'config',prompt:CHECKED,facts:['subagents','plugins'],
-      goal:'Two subagents help the main agent: <code>finder</code> looks things up in the code, and <code>architect</code> makes design decisions. Both are set to <code>large</code>, at 10 units each. Keep both, and bring the total cost down to '+CEILING+' units or fewer. Not every job can use the smallest model.',
+      goal:'Two subagents help Cog, the main agent: <code>finder</code> looks things up in the code, and <code>architect</code> makes design decisions. Both are set to <code>large</code>, at 10 units each. Keep both, and bring the total cost down to '+CEILING+' units or fewer. Not every job can use the smallest model.',
       how:[
         'Setting <code>finder</code> to <code>model: small</code> and <code>architect</code> to <code>model: standard</code> costs 1 and 3 units, which is 4 in total and under the limit.',
         '<code>finder</code> only searches, so the smallest model does it well.',

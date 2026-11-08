@@ -274,8 +274,9 @@
     track: 'geometry',
     ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace'], [200, 'Right-Angle Pro'], [300, 'Geometer']],
     chapters: [{
-      id: 'geometry.area', name: 'Area and perimeter', badge: 'Area Builder',
-      intro: 'The <b>area</b> of a flat shape is how much space it covers, counted in 1 by 1 squares, like floor tiles. Its <b>perimeter</b> is the distance all the way round its edge, like a fence. In the scene every grid square is 1 by 1. The bottom side of the rectangle is its <b>base</b> <code>b</code>, and its <b>height</b> <code>h</code> goes straight up. Drag a corner, or move a slider, and the shapes, the formulas and the numbers change together.',
+      id: 'geometry.area', name: 'Area and perimeter', badge: 'Floor Plan',
+      story: 'Tessa\'s plan shows floors and rooms of the great floor in tiles, so you count the tiles each covers and the edge each has to find the floor plan.',
+      intro: 'Mistress Tessa laid the mosaic of the great floor in sections and left her plan behind. The plan shows each floor and room in tiles. The <b>area</b> of a flat shape is how much space it covers, counted in 1 by 1 squares, like floor tiles. Its <b>perimeter</b> is the distance all the way round its edge, like a fence. In the scene every grid square is 1 by 1. The bottom side of the rectangle is its <b>base</b> <code>b</code>, and its <b>height</b> <code>h</code> goes straight up. Drag a corner, or move a slider, and the shapes, the formulas and the numbers change together.',
       scene: shapes,
       missions: [
         { title: 'Cover the floor', kind: 'number', question: '12*7', tex: 'A = b \\times h \\;\\text{ with }\\; b = 12,\\ h = 7',
@@ -340,8 +341,9 @@
           } },
       ],
     }, {
-      id: 'geometry.angles', name: 'Angles', badge: 'Angle Ace',
-      intro: 'An <b>angle</b> is the amount of turn between two lines that meet at a point. It is measured in <b>degrees</b>, written with a small circle: <code>90°</code> is a quarter turn, a <b>right angle</b>, like the corner of a page. A full turn is <code>360°</code>, so half a turn, a straight line, is <code>180°</code>. You can type an answer with or without the <code>°</code>. In the scene, two <b>rays</b>, lines that start at a point and go on in one direction, split a straight line into three angles. Drag a ray and watch the angles and their sum.',
+      id: 'geometry.angles', name: 'Angles', badge: 'Glass Wedge',
+      story: 'The angle gallery\'s glass wedges must fit round each corner, so you work out each missing turn to find the glass wedge that fits.',
+      intro: 'The plan leads to the angle gallery, where wedge-shaped glass must fit round each corner and Bram keeps cutting it wrong. An <b>angle</b> is the amount of turn between two lines that meet at a point. It is measured in <b>degrees</b>, written with a small circle: <code>90°</code> is a quarter turn, a <b>right angle</b>, like the corner of a page. A full turn is <code>360°</code>, so half a turn, a straight line, is <code>180°</code>. You can type an answer with or without the <code>°</code>. In the scene, two <b>rays</b>, lines that start at a point and go on in one direction, split a straight line into three angles. Drag a ray and watch the angles and their sum.',
       scene: rays,
       missions: [
         { title: 'On a straight line', kind: 'number', question: '180-47', tex: '47^\\circ + x = 180^\\circ',
@@ -378,14 +380,14 @@
           hint: 'Add the two angles you know, then take that away from <code>180°</code>.', scene: triangle, at: { a: 58, b: 71 },
           answer: '51', wrong: '231', lazy: '180-58-71', check: angle(51) },
         { title: 'Opposite angles', kind: 'number', question: '76/2', tex: '\\text{two opposite angles: } x + x = 76^\\circ',
-          goal: 'Two straight lines cross like an open pair of scissors, making four angles. The angle between the blades and the one opposite it, between the handles, add up to <code>76°</code>. How big is one of them, <code>x</code>?',
+          goal: 'Two straight lines cross like an open pair of glass shears, making four angles. The angle between the blades and the one opposite it, between the handles, add up to <code>76°</code>. How big is one of them, <code>x</code>?',
           how: [
             'Where two straight lines cross, the two angles opposite each other are always the same size. They are called <b>vertically opposite</b> angles.',
             'Why: each of them sits on a straight line next to the same neighbour, so each is <code>180°</code> take away that neighbour.',
             'So <code>76°</code> is two equal angles together: <code>76 ÷ 2</code> (type <code>76/2</code>) is 38.',
             'Check it: the neighbour is <code>180 − 38 = 142</code>, and <code>38 + 142</code> is 180, a straight line. 104, which is 180 − 76, mixes the two angles up.',
           ],
-          explain: 'Open and close a pair of scissors: the angle between the blades and the angle between the handles grow and shrink together.',
+          explain: 'Open and close a pair of shears: the angle between the blades and the angle between the handles grow and shrink together.',
           hint: 'The two opposite angles are equal. What is half of <code>76°</code>?', scene: crossing,
           answer: '38', wrong: '104', lazy: '76/2', check: angle(38) },
         { title: 'Three equal slices', kind: 'scene',
@@ -402,8 +404,9 @@
           check: ({ derived: { a, b, c } }) => a === b && b === c ? ok : { ok: false, why: `The angles are ${a}°, ${b}° and ${c}° now. Make all three the same.` } },
       ],
     }, {
-      id: 'geometry.pythagoras', name: 'Pythagoras', badge: 'Right-Angle Pro',
-      intro: 'A <b>right triangle</b> has one right angle, a <code>90°</code> corner like the corner of a page. The two sides that make the right angle are the <b>legs</b>, <code>a</code> and <code>b</code>. The longest side, across from the right angle, is the <b>hypotenuse</b>, <code>c</code>. Draw a square on each side: the two small squares together cover exactly as much area as the big one. This is <b>Pythagoras\' theorem</b>: <code>a² + b² = c²</code>, where <code>a²</code> means <code>a × a</code>. To go back from <code>c²</code> to <code>c</code> you take the <b>square root</b>, written <code>sqrt(…)</code> when you type it: <code>sqrt(25)</code> is 5, because <code>5 × 5 = 25</code>. Drag a leg, or move a slider, and watch the three areas.',
+      id: 'geometry.pythagoras', name: 'Pythagoras', badge: 'Roof Beam',
+      story: 'A diagonal beam has to span the hall corner to corner, so you work out its length from the two sides to find the roof beam.',
+      intro: 'The glass wedge reveals a note about the diagonal beams of the roof, each of which must span the hall from corner to corner. A <b>right triangle</b> has one right angle, a <code>90°</code> corner like the corner of a page. The two sides that make the right angle are the <b>legs</b>, <code>a</code> and <code>b</code>. The longest side, across from the right angle, is the <b>hypotenuse</b>, <code>c</code>. Draw a square on each side: the two small squares together cover exactly as much area as the big one. This is <b>Pythagoras\' theorem</b>: <code>a² + b² = c²</code>, where <code>a²</code> means <code>a × a</code>. To go back from <code>c²</code> to <code>c</code> you take the <b>square root</b>, written <code>sqrt(…)</code> when you type it: <code>sqrt(25)</code> is 5, because <code>5 × 5 = 25</code>. Drag a leg, or move a slider, and watch the three areas.',
       scene: squares(8),
       missions: [
         { title: 'The long side', kind: 'number', question: 'sqrt(3^2+4^2)', tex: 'c = \\sqrt{3^2 + 4^2}',
@@ -465,23 +468,24 @@
             : d.c === 5 ? { ok: false, why: 'c is 5. Find a triangle with a different whole-number hypotenuse.' } : ok },
       ],
     }, {
-      id: 'geometry.circles', name: 'Circles', badge: 'Circle Master',
-      intro: 'A circle is all the points at the same distance from its <b>centre</b>. That distance is the <b>radius</b> <code>r</code>. The <b>diameter</b> <code>d</code> goes straight across, through the centre, so <code>d = 2r</code>. The <b>circumference</b> <code>C</code> is the distance round the edge, and the <b>area</b> <code>A</code> is the space inside. Both depend on <b>pi</b>, written <code>π</code>: the number you get when you divide any circle\'s circumference by its diameter. It is about <code>3.14</code> and its digits never end, so answers are rounded. Type it as <code>pi</code>. Drag the radius tip, or move the slider, and watch <code>d</code>, <code>C</code> and <code>A</code> change.',
+      id: 'geometry.circles', name: 'Circles', badge: 'Last Tile',
+      story: 'The fountain court is round, so you measure how far round and how much it covers to lay the Last Tile at its centre.',
+      intro: 'The last clue points to the round fountain court, where Pebble the snail has marked the spot for the golden tile. A circle is all the points at the same distance from its <b>centre</b>. That distance is the <b>radius</b> <code>r</code>. The <b>diameter</b> <code>d</code> goes straight across, through the centre, so <code>d = 2r</code>. The <b>circumference</b> <code>C</code> is the distance round the edge, and the <b>area</b> <code>A</code> is the space inside. Both depend on <b>pi</b>, written <code>π</code>: the number you get when you divide any circle\'s circumference by its diameter. It is about <code>3.14</code> and its digits never end, so answers are rounded. Type it as <code>pi</code>. Drag the radius tip, or move the slider, and watch <code>d</code>, <code>C</code> and <code>A</code> change.',
       scene: circle(0.5),
       missions: [
-        { title: 'Round the pond', kind: 'number', round: 1, question: '2*pi*5', tex: 'C = 2 \\times \\pi \\times r \\;\\text{ with }\\; r = 5',
-          goal: 'A round pond has a radius of 5. How far is it round its edge? Work out the circumference <code>C = 2 × π × r</code>, rounded to 1 decimal place.',
+        { title: 'Round the fountain', kind: 'number', round: 1, question: '2*pi*5', tex: 'C = 2 \\times \\pi \\times r \\;\\text{ with }\\; r = 5',
+          goal: 'The round fountain has a radius of 5. How far is it round its edge? Work out the circumference <code>C = 2 × π × r</code>, rounded to 1 decimal place.',
           how: [
             '<code>C = 2 × π × r</code>: the distance round is a little more than 3 diameters, and <code>2 × r</code> is the diameter.',
             'Put in <code>r = 5</code>: your first step is <code>2*pi*5</code>.',
             'A calculator gives <code>31.415…</code>. The next digit after the 4 is 1, less than 5, so the 4 stays: 31.4.',
             'Leaving out the 2 gives 15.7, which is only half of the way round.',
           ],
-          explain: 'The scene opens on this pond, radius 5: read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
+          explain: 'The scene opens on this fountain, radius 5: read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
           hint: 'Two times pi times the radius. Type pi as <code>pi</code>.', scene: circle(0.5, radiusOnly), reveal: true, at: { r: 5 },
           answer: '31.4', wrong: '15.7', lazy: '2*pi*5', check: finalRounded('2*pi*5', 1) },
         { title: 'Covering a circle', kind: 'number', round: 1, question: 'pi*3^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = 3',
-          goal: 'A round rug has a radius of 3. How much floor does it cover? Work out the area <code>A = π × r²</code>, rounded to 1 decimal place.',
+          goal: 'A round carpet has a radius of 3. How much floor does it cover? Work out the area <code>A = π × r²</code>, rounded to 1 decimal place.',
           how: [
             '<code>A = π × r²</code>, where <code>r²</code> means <code>r × r</code>.',
             '<code>3^2</code> is 9, so your first step is <code>pi*3^2</code>.',
@@ -503,7 +507,7 @@
           hint: 'Halve the diameter to get the radius, then use <code>π × r²</code>.', scene: tableTop,
           answer: '153.9', wrong: '615.8', lazy: 'pi*(14/2)^2', check: finalRounded('pi*(14/2)^2', 1) },
         { title: 'Back to the radius', kind: 'number', round: 1, question: '30/(2*pi)', tex: 'r = \\frac{C}{2 \\times \\pi} \\;\\text{ with }\\; C = 30',
-          goal: 'A circular track is 30 long all the way round. What is its radius, rounded to 1 decimal place?',
+          goal: 'A ring path round the court is 30 long all the way round. What is its radius, rounded to 1 decimal place?',
           how: [
             '<code>C = 2 × π × r</code>, and you know <code>C</code>. Dividing undoes multiplying, so <code>r = C ÷ (2 × π)</code>.',
             'Put <code>C = 30</code> in: <code>30/(2*pi)</code>. The brackets make 2 × π the bottom of the fraction.',
