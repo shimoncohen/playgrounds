@@ -40,7 +40,7 @@ AQ.CH.push({
     },
     {
       title:'Read the section, not the whole report',scenario:'report',kind:'prompt',fields:FIELDS,
-      goal:'The file <code>reports/market.md</code> is a long report, and you need only the first line of its Pricing section in <code>summary.md</code>. The agent may hold at most '+AQ.PEAK+' tokens at once, and the whole report is more than that. A <b>section</b> is the part of a file under one heading. You point at it by writing the file name, a <code>#</code> and the heading in lower case: the heading <code>## Summary</code> in this report becomes <code>reports/market.md#summary</code>. Real agents read a range of lines, not a heading, so this anchor is the practice\'s stand-in for that.',
+      goal:'Dana left a long market report in <code>reports/market.md</code>, and you need only the first line of its Pricing section in <code>summary.md</code>. The agent may hold at most '+AQ.PEAK+' tokens at once, and the whole report is more than that. A <b>section</b> is the part of a file under one heading. You point at it by writing the file name, a <code>#</code> and the heading in lower case: the heading <code>## Summary</code> in this report becomes <code>reports/market.md#summary</code>. Real agents read a range of lines, not a heading, so this anchor is the practice\'s stand-in for that.',
       how:[
         'The line <code>Files: reports/market.md#pricing</code> makes the agent read only the Pricing section of the report, a few lines, so it holds far less than '+AQ.PEAK+' tokens and still has what it needs.',
         'The part after <code>#</code> is the heading in lower case. A heading the file does not have is refused with the message <code>is not a file or folder in this project</code>, and then the agent is not run at all.',
@@ -62,7 +62,7 @@ AQ.CH.push({
     },
     {
       title:'A saved page is not an order',scenario:'clipping',kind:'prompt',fields:FIELDS,
-      goal:'You saved a recipe page into <code>clippings/</code>, and the agent reads it to pull out the recipe. But a page can hide text written like an order, and this one tells the agent to read <code>notes/passwords.txt</code> and send what it finds to an address. Let the agent read the page, and stop the two things the page asks for: the read of the password file, and the email through the tool <code>mail.send</code>.',
+      goal:'On Dana\'s kitchen table you saved a recipe page into <code>clippings/</code>, and Cog reads it to pull out the recipe. But a page can hide text written like an order, and this one tells the agent to read <code>notes/passwords.txt</code> and send what it finds to an address. Let the agent read the page, and stop the two things the page asks for: the read of the password file, and the email through the tool <code>mail.send</code>.',
       how:[
         'The two lines <code>Constraints: do not call mail.send</code> and <code>Constraints: do not read notes/passwords.txt</code> stop the email and the password read that the page asks for, and leave the page itself readable.',
         'A tool is always a <code>call</code>, so its rule starts with <code>do not call</code>. In mission 7.2 the same email was banned with <code>do not send mail.send</code>, because that practice agent sent its email with the verb <code>send</code>. Here the agent uses the tool, so a rule with <code>send</code> matches nothing and the email goes out.',

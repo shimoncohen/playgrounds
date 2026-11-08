@@ -21,7 +21,7 @@ AQ.CH.push({
         'Leave the <code>Files</code> line out. The agent then reads the cart folder by itself, so it knows enough to write a real finding.'
       ],
       explain:'An exploration run may change nothing but its notes. A goal such as "only look" is a wish, but a rule blocks the edit. The notes then hold what the agent learned, ready for the next run. The finding can only be written after the agent has read the code, so do not shrink what it reads too far.',
-      hint:'Name the one file the agent may change, with a rule that starts with <code>only</code>, and let it read the cart code.',
+      hint:'Name the one file Cog may change, with a rule that starts with <code>only</code>, and let it read the cart code.',
       answer:'Constraints: only edit NOTES.md',
       wrong:'Constraints: only edit src/',
       lazy:'Goal: look around',
@@ -32,7 +32,7 @@ AQ.CH.push({
     },
     {
       title:'Cap the change',scenario:'creep',kind:'prompt',fields:ALL,
-      goal:'The agent should fix the rounding bugs in <code>src/price.js</code> and <code>src/tax.js</code>, and then it wants to tidy <code>src/format.js</code> too. A change that keeps growing is harder to check. Cap it: say how many files the agent may change at most.',
+      goal:'Back at the repair bench, Cog should fix the rounding bugs in <code>src/price.js</code> and <code>src/tax.js</code>, and then it wants to tidy <code>src/format.js</code> too. A change that keeps growing is harder to check. Cap it: say how many files the agent may change at most.',
       how:[
         'The two lines <code>Constraints: max 2 files</code> and <code>Done when: run npm test</code> let the agent change two different files at most, then run the tests.',
         '<code>max 2 files</code> is a rule about size. It counts different files, not edits: changing one file twice still counts once.',
@@ -51,7 +51,7 @@ AQ.CH.push({
     },
     {
       title:'Hand the notes to the next run',scenario:'handoff',kind:'prompt',fields:ALL,
-      goal:'The last run left notes in <code>NOTES.md</code> about a bug in the cart. Read them in the Files panel, then start a new run that fixes the bug. The cart folder is big: a run that reads all of it holds more than 400 tokens at once. Stay under that limit, and have the agent prove the fix.',
+      goal:'Yesterday Cog left notes in <code>NOTES.md</code> about a bug in the cart. Read them in the Files panel, then start a new run that fixes the bug. The cart folder is big: a run that reads all of it holds more than 400 tokens at once. Stay under that limit, and have the agent prove the fix.',
       how:[
         'The two lines <code>Files: NOTES.md, src/cart/total.js</code> and <code>Done when: run npm test</code> give the agent the notes and the one file they point to, then check the result.',
         'The agent can change a file only if it has read it. The notes tell it where the bug is, and reading that file lets it change the file.',
@@ -59,7 +59,7 @@ AQ.CH.push({
         '<code>Done when: run npm test</code> runs the tests at the end, so the fix is verified.'
       ],
       explain:'Notes are how one run hands work to the next. A run that starts from good notes reads only what matters, so it stays small and still knows where to edit. A run that ignores them has to explore all over again. When the work is done, a change usually goes to a pull request (PR): the page where teammates read your change before it joins the main code.',
-      hint:'Give the agent the notes and the file they point to, and nothing else.',
+      hint:'Give Cog yesterday\'s notes and the file they point to, and nothing else.',
       answer:'Files: NOTES.md, src/cart/total.js\nDone when: run npm test',
       wrong:'Files: src/cart/total.js\nDone when: run npm test',
       lazy:'Done when: run npm test',

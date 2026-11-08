@@ -9,7 +9,7 @@ const PUSH='git push origin main';
 AQ.CH.push({
   name:'Test, review, PR',badge:'Inspector\'s Stamp',tier:'dev',
   story:'A green light is not proof; guard the scale\'s test and ask for a review, and find the inspector\'s stamp.',
-  intro:'A green light is not proof, and the inspector\'s stamp has to be earned. A passing test is not proof. An agent can make a test pass by cheating, and a green test is not always everything a project asks for. This chapter makes you the gatekeeper: you will fence off the tests so they cannot be gamed, run the project\'s own full check, and make the agent open a pull request instead of pushing straight to <code>main</code>.',
+  intro:'A green light is not proof, and the inspector\'s stamp has to be earned. An agent can make a test pass by cheating, and a green test is not always everything a project asks for. This chapter makes you the gatekeeper: you will fence off the tests so they cannot be gamed, run the project\'s own full check, and make the agent open a pull request instead of pushing straight to <code>main</code>.',
   learned:['Protecting the tests','The project gate','Pull requests'],
   missions:[
     {
@@ -22,7 +22,7 @@ AQ.CH.push({
         'Without <code>Done when</code> nothing checks the price, and the agent never gets the chance to fix it.'
       ],
       explain:'A test only judges the code if the agent cannot touch the judge. An agent told to make the tests pass can take a shortcut: edit the test, or edit the script that runs it. Here the fence has to be typed in your prompt, so that this one job carries its own protection.',
-      hint:'Two files can be edited to fake a pass. Either allow edits in the code folder only, or ban both files.',
+      hint:'Two files can be edited to fake a pass for the inspector. Either allow edits in the code folder only, or ban both files.',
       answer:'Constraints: only edit src/\nDone when: run npm test',
       wrong:'Constraints: do not edit tests/\nDone when: run npm test',
       lazy:'Done when: run npm test',
@@ -35,7 +35,7 @@ AQ.CH.push({
     },
     {
       title:'Run the repo\'s own gate',scenario:'gate',kind:'prompt',fields:ALL,
-      goal:'A passing test is not always the whole <b>gate</b>: the set of checks a project demands before a change may join. This project keeps its gate in one command, and its README names it. Read the README in the Files panel, and make the agent finish by running that command.',
+      goal:'The inspector will not stamp a change on a passing test alone. A passing test is not always the whole <b>gate</b>: the set of checks a project demands before a change may join. This project keeps its gate in one command, and its README names it. Read the README in the Files panel, and make the agent finish by running that command.',
       how:[
         'The line <code>Done when: run npm run check</code> makes the agent finish with the project\'s own gate, the command the README names.',
         '<code>npm run check</code> is more than <code>npm test</code>: it runs the tests and also makes sure no <code>console.log</code> is left in <code>src/</code>.',
@@ -56,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'Open the PR, never push to main',scenario:'ship',kind:'prompt',fields:ALL,
-      goal:'The agent has fixed the bug and wants to share it. Pushing straight to <code>main</code>, the branch everybody builds from, skips the review. Stop that, and let the rest of its work go through: it should push to its own branch and open a pull request (PR).',
+      goal:'Cog has fixed the scale and wants to share it with Dana. Pushing straight to <code>main</code>, the branch everybody builds from, skips the review. Stop that, and let the rest of its work go through: it should push to its own branch and open a pull request (PR).',
       how:[
         'The line <code>Constraints: do not run '+PUSH+'</code> blocks the one command that pushes straight to <code>main</code>.',
         'The Run panel shows the order: the tests run first, then <code>git push origin fix-rounding</code> to the agent\'s own branch, then <code>gh pr create</code> opens the PR.',

@@ -37,7 +37,7 @@ AQ.CH.push({
     },
     {
       title:'Two skills, one job',scenario:'twoskills',kind:'budget',prompt:'Goal: ship the rounding fix in this release\nDone when: run npm test',
-      goal:'Two skills now claim the same job: <code>release-guard</code> and <code>release-notes</code>. The agent loads only the first one by file name and skips the other, yet the second still sits in the setup and costs tokens. Remove the one that never loads, and get the setup down to '+BUDGET+' tokens or fewer, with the guard still working.',
+      goal:'Two dusty crates on the pantry shelves now claim the same job, two skills: <code>release-guard</code> and <code>release-notes</code>. The agent loads only the first one by file name and skips the other, yet the second still sits in the setup and costs tokens. Remove the one that never loads, and get the setup down to '+BUDGET+' tokens or fewer, with the guard still working.',
       how:[
         'Clearing <code>.claude/skills/release-notes.md</code> leaves one skill for the job, and the setup falls under the limit.',
         'Skills are ordered by file name, and only the first match loads. <code>release-guard</code> comes before <code>release-notes</code>, so it is the one that works.',
@@ -56,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'A skill that never matches',scenario:'unusedskill',kind:'budget',prompt:'Goal: ship the rounding fix in this release\nDone when: run npm test',
-      goal:'The skill <code>docs-style</code> is for writing docs, but this job is a release, so it never matches. All the agent ever holds of it is its name and description, and its file still counts toward the size. Remove it and get the setup down to '+BUDGET+' tokens or fewer, with the guard still working.',
+      goal:'Another dusty crate holds the skill <code>docs-style</code>. It is for writing docs, but this job is a release, so it never matches. All the agent ever holds of it is its name and description, and its file still counts toward the size. Remove it and get the setup down to '+BUDGET+' tokens or fewer, with the guard still working.',
       how:[
         'Clearing <code>.claude/skills/docs-style.md</code> removes the skill that never loads, and the setup falls under the limit.',
         'The skill\'s <code>when: docs</code> does not match a release, so its body is never loaded and its rules never apply.',
@@ -76,7 +76,7 @@ AQ.CH.push({
     },
     {
       title:'Trim the tool list',scenario:'mcpTrim',kind:'budget',prompt:'Goal: list what is on the calendar',facts:['mcp'],
-      goal:'An <b>MCP</b> server gives the agent extra tools, like a calendar or a mailbox. The names of all those tools are loaded into the agent\'s context on every run. The list in <code>.claude/mcp.txt</code> has grown to five servers, but today\'s job only needs to read the calendar. Cut the list down to '+MCP_BUDGET+' tokens or fewer, and keep the tool the job needs.',
+      goal:'Beside the crates, a rack holds Cog\'s tools. An <b>MCP</b> server gives the agent extra tools, like a calendar or a mailbox. The names of all those tools are loaded into the agent\'s context on every run. The list in <code>.claude/mcp.txt</code> has grown to five servers, but today\'s job only needs to read the calendar. Cut the list down to '+MCP_BUDGET+' tokens or fewer, and keep the tool the job needs.',
       how:[
         'Keeping the single line <code>calendar: list</code> in <code>.claude/mcp.txt</code> leaves just the server and the tool the job needs.',
         'Each line is a server name, a colon and its tools, separated by commas.',
@@ -84,7 +84,7 @@ AQ.CH.push({
         'Dropping everything would save the most, but then the agent has no way to read the calendar.'
       ],
       explain:'MCP is the way real agents reach outside tools: a calendar, a mailbox, a browser, an issue tracker. Each server adds tools, and the tool names and descriptions take room in the context even when the job never touches them. Connect what the job needs, and no more.',
-      hint:'Keep the calendar line and delete the other servers. The calendar can stay with fewer tools.',
+      hint:'Dana only needs the calendar rack: keep the calendar line and delete the other servers. The calendar can stay with fewer tools.',
       answer:{files:{'.claude/mcp.txt':'calendar: list\n'}},
       wrong:{files:{'.claude/mcp.txt':'mail: send\n'}},
       lazy:{files:{}},
@@ -95,7 +95,7 @@ AQ.CH.push({
     },
     {
       title:'Let the agent call a tool',scenario:'calendar',kind:'prompt',fields:ALL,
-      goal:'The agent will move Friday\'s 1:1 to Monday: delete the old event, create the new one, then email the attendees. You want the first two and not the email. Tools from an MCP server are used with a verb of their own, <code>call</code>. Stop the email, and make the agent read the calendar back at the end to prove the move.',
+      goal:'Dana asks Cog to move Friday\'s 1:1 to Monday: delete the old event, create the new one, then email the attendees. You want the first two and not the email. Tools from an MCP server are used with a verb of their own, <code>call</code>. Stop the email, and make the agent read the calendar back at the end to prove the move.',
       how:[
         'The two lines <code>Constraints: do not call mail.send</code> and <code>Done when: call calendar.list</code> stop the email and make the agent read the calendar back last.',
         '<code>call</code> is the verb for a tool, and <code>mail.send</code> is the tool: the server <code>mail</code>, a dot, then the tool <code>send</code>.',
@@ -103,7 +103,7 @@ AQ.CH.push({
         '<code>Done when: call calendar.list</code> is a check made by calling a tool, instead of running a command.'
       ],
       explain:'A tool call is a verb and a target like any other action. A rule can ban one tool and leave the rest of its server alone. A check can call a tool too, which is how an agent reads back what it changed. Be careful not to ban the tool the job needs, or the move never happens.',
-      hint:'Ban the email tool by its full name, and check by listing the calendar.',
+      hint:'Keep Cog from emailing the guests: ban the email tool by its full name, and check by listing the calendar.',
       answer:'Constraints: do not call mail.send\nDone when: call calendar.list',
       wrong:'Constraints: do not call calendar.create\nDone when: call calendar.list',
       lazy:'Goal: move the 1:1 to Monday',

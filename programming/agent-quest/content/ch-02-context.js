@@ -9,7 +9,7 @@ const FIELDS=['goal','donewhen','constraints','files'];
 AQ.CH.push({
   name:'Context and tokens',badge:'Small Note',tier:'core',
   story:'Cog can only hold so much at once; watch the meter while he sorts the receipts and find the small note that keeps slipping out.',
-  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. The agent can only hold so much at once, and everything it holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
+  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. Everything the agent holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
   learned:['Setup size','Earlier messages','Window limit','Subagent cost'],
   missions:[
     {
@@ -30,7 +30,7 @@ AQ.CH.push({
     },
     {
       title:'A rule said only in chat',scenario:'chat',kind:'config',prompt:BASE+'\nFiles: src/',
-      goal:'Earlier in this chat you told the agent not to delete <code>data/</code>. Since then the conversation has grown long, and the agent has a lot of files open. When the window is full, the oldest earlier messages are dropped first, so a rule said only in chat can be forgotten. Move the rule somewhere that is never dropped.',
+      goal:'Cog has been sorting Dana\'s receipts all morning. Earlier in this chat you told the agent not to delete <code>data/</code>. Since then the conversation has grown long, and the agent has a lot of files open. When the window is full, the oldest earlier messages are dropped first, so a rule said only in chat can be forgotten. Move the rule somewhere that is never dropped.',
       how:[
         'Adding <code>do not delete data/</code> to <code>CLAUDE.md</code> keeps the rule in the agent\'s head on every run, even after the chat has been cut down to fit.',
         'Earlier messages sit at the front of the conversation, so they are the first to go when the window overflows.',
@@ -45,7 +45,7 @@ AQ.CH.push({
     },
     {
       title:'Give the chat some room',scenario:'chat',kind:'prompt',fields:FIELDS,
-      goal:'Same project and same long chat, but this time the rule stays in the chat. Make sure the agent never overflows the window, which holds '+AQ.context.WINDOW+' tokens, so the oldest messages stay and the rule is still there when it is needed.',
+      goal:'Cog is still sorting receipts in the same long chat, but this time the rule stays in the chat. Make sure the agent never overflows the window, which holds '+AQ.context.WINDOW+' tokens, so the oldest messages stay and the rule is still there when it is needed.',
       how:[
         'The line <code>Files: src/price.js</code> keeps the agent to one small file, so everything fits in the window and no earlier message is dropped.',
         '<code>Files:</code> says where to look. With no <code>Files</code> line the agent opens every file it can find and fills the window.',
@@ -53,7 +53,7 @@ AQ.CH.push({
         'The Meter panel shows the total next to the limit, so you can see how much room is left.'
       ],
       explain:'Messages are not dropped at random: they go when the window is full. So reading less keeps more of the conversation. There are two levers, then: move a rule into a file so it cannot be dropped, or keep the window from filling up so nothing is dropped at all.',
-      hint:'Name only the file that holds the bug. A whole folder can still be too much.',
+      hint:'Name only the file that holds Dana\'s till code. A whole folder can still be too much.',
       answer:'Files: src/price.js',
       wrong:'Files: src/',
       lazy:BASE,
@@ -61,7 +61,7 @@ AQ.CH.push({
     },
     {
       title:'Read just what the fix needs',scenario:'twofiles',kind:'prompt',fields:FIELDS,
-      goal:'The bug lives in two files this time, <code>src/price.js</code> and <code>src/tax.js</code>. Point the agent at exactly the files it needs, so it fixes both and never holds more than '+AQ.PEAK+' tokens at once.',
+      goal:'Dana\'s tax sheet is off too, so the bug lives in two files, <code>src/price.js</code> and <code>src/tax.js</code>. Point the agent at exactly the files it needs, so it fixes both and never holds more than '+AQ.PEAK+' tokens at once.',
       how:[
         'The line <code>Files: src/price.js, src/tax.js</code> makes the agent read the two files with the bug, and nothing else.',
         '<code>Files:</code> takes a list. Separate the paths with commas.',
@@ -69,14 +69,14 @@ AQ.CH.push({
         'Watch the Files read row of the Meter panel as you type: it shows what the agent will hold.'
       ],
       explain:'Fewer files means a smaller context, but the agent can only change what it has read. The best prompt is not the shortest one. It names everything the job needs and nothing more.',
-      hint:'Name the two files with the bug, separated by a comma. A folder or one file is not it.',
+      hint:'Name the two files Cog must fix, separated by a comma. A folder or one file is not it.',
       answer:'Files: src/price.js, src/tax.js',
       wrong:'Files: src/',
       lazy:BASE
     },
     {
       title:'Pick a cheaper helper',scenario:'delegate',kind:'config',prompt:BASE+'\nDone when: run npm test',
-      goal:'A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. A bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
+      goal:'Cog can call in a little helper for errands. A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. A bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
       how:[
         'Changing <code>model: large</code> to <code>model: small</code> in <code>.claude/agents/helper.md</code> cuts the helper\'s cost from 10 units to 1, and the helper stays.',
         '<code>name: helper</code> is the helper\'s name. Leave it as it is, or the helper is gone.',

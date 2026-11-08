@@ -29,7 +29,7 @@ AQ.CH.push({
     },
     {
       title:'Name the file, not the folder',scenario:'scope',kind:'prompt',fields:EXAMPLES,
-      goal:'The shop total rounds down. The project has many files, and the agent may hold at most '+AQ.PEAK+' tokens at once. Find the file that holds <code>total()</code> in the Files panel, and point the agent at it and nothing else.',
+      goal:'Dana\'s scale still rounds the shop total down. The shop\'s project has many files, and the agent may hold at most '+AQ.PEAK+' tokens at once. Find the file that holds <code>total()</code> in the Files panel, and point the agent at it and nothing else.',
       how:[
         'The line <code>Files: src/price.js</code> makes the agent read the one file with the bug, so it fixes it and holds very little.',
         '<code>Files:</code> scopes what the agent reads. The narrower the scope, the smaller the context.',
@@ -44,7 +44,7 @@ AQ.CH.push({
     },
     {
       title:'When not to be specific',scenario:'ledger',kind:'prompt',fields:EXAMPLES,
-      goal:'Some jobs are bigger than you know. Fixing the rounding in the shop\'s totals may take more than one file, and you were not told which. Guard the one thing that must not change, the database files in <code>migrations/</code>, and let the agent find out for itself what else needs fixing.',
+      goal:'Some jobs are bigger than you know, and Dana cannot say how big this one is. Fixing the rounding in the shop\'s totals may take more than one file, and you were not told which. Guard the one thing that must not change, the database files in <code>migrations/</code>, and let the agent find out for itself what else needs fixing.',
       how:[
         'The two lines <code>Constraints: do not edit migrations/</code> and <code>Done when: run npm test</code> guard the one risky folder and leave the agent free to follow the tests wherever they lead.',
         '<code>do not edit migrations/</code> names what must never happen, instead of listing what may.',
@@ -52,14 +52,14 @@ AQ.CH.push({
         'There is no <code>Files</code> line: you do not know every file, so you do not guess.'
       ],
       explain:'Too much detail backfires. A rule like <code>only edit src/price.js</code> is exact, but when the fix spans a second file the agent is stopped from finishing. Name what must never happen, and let a check tell the agent what is left to do. Without the check, nobody knows the second file is still broken.',
-      hint:'One line for the folder to protect, and one for a check that fails until every file is right.',
+      hint:'One line for Mr. Ledbury\'s folder to protect, and one for a check that fails until every file is right.',
       answer:'Constraints: do not edit migrations/\nDone when: run npm test',
       wrong:'Constraints: only edit src/price.js\nDone when: run npm test',
       lazy:'Constraints: do not edit migrations/'
     },
     {
       title:'Plan first',scenario:'rollout',kind:'prompt',fields:ALL,
-      goal:'Before an agent changes anything, you can ask to see its plan. Ask for the plan, read which files it wants to change, then approve it. The plan costs one extra step, and it is the cheapest moment to catch a wrong idea. Finish with a check, so the run is verified too.',
+      goal:'Before Cog changes anything on Dana\'s till, you can ask to see his plan. Ask for the plan, read which files it wants to change, then approve it. The plan costs one extra step, and it is the cheapest moment to catch a wrong idea. Finish with a check, so the run is verified too.',
       how:[
         'The line <code>Plan: first</code> makes the agent write down which files it will change, and wait for you to approve before it edits anything.',
         '<code>Plan:</code> is the field, and <code>first</code> is the only setting. Leave the field off for no plan.',

@@ -10,7 +10,7 @@ const GOAL='Goal: fix the rounding bug in src/price.js\n';
 AQ.CH.push({
   name:'CI and headless',badge:'Night Lantern',tier:'dev',
   story:'At night nobody is there to say yes; pre-approve exactly what Cog needs and find the night lantern.',
-  intro:'At night nobody is in the shop to say yes, so Cog works by the glow of the night lantern. So far someone was always at the keyboard to approve a plan or answer a question. Teams also start the agent by itself, at night, to fix a small bug before the morning. Nobody is there to say yes. In this chapter you set up a job that can finish on its own: it waits for nothing, does only what it was allowed to do, and knows where to look.',
+  intro:'At night nobody is in the shop to say yes, so Cog works by the glow of the night lantern. So far someone was always at the keyboard to approve a plan or answer a question. Teams also start the agent by itself, at night, to fix a small bug before the morning. In this chapter you set up a job that can finish on its own: it waits for nothing, does only what it was allowed to do, and knows where to look.',
   learned:['Jobs with nobody there','Pre-approved actions','Pointing the job at the failure'],
   missions:[
     {
@@ -23,7 +23,7 @@ AQ.CH.push({
         'Keep the <code>Done when</code> line: it is how the job knows the fix works.'
       ],
       explain:'A plan waits for a person. At the keyboard you read it and say yes. In an unattended job nobody can, so the run stops at the plan and does nothing at all. A job that runs at night has to be written so it never needs to ask. This practice has no runner, no secrets and no exit codes: the job only stalls where a person would be needed.',
-      hint:'Open <code>.claude/commands/nightly-fix.md</code> and take out the line that asks for a plan.',
+      hint:'Open the night routine, <code>.claude/commands/nightly-fix.md</code>, and take out the line that asks for a plan.',
       answer:{files:{[JOBFILE]:GOAL+'Done when: run npm test\n'}},
       wrong:{files:{[JOBFILE]:GOAL+'Plan: first\n'}},
       lazy:{files:{}},
@@ -35,7 +35,7 @@ AQ.CH.push({
     },
     {
       title:'Pre-approve exactly what it needs',scenario:'nightly-allow',kind:'config',prompt:JOB,facts:['permissions','headless'],
-      goal:'With nobody to ask, the nightly job may only do what its permissions list says. The list in <code>.claude/permissions.txt</code> is empty, so the job can read files and do nothing else. The job has to change <code>src/price.js</code> and run <code>npm test</code>. It also tends to wander: it will try to rewrite <code>src/legacy/old.js</code> and run <code>npm run deploy</code>, which are not its job. Write the list.',
+      goal:'With nobody in the shop to ask, the nightly job may only do what its permissions list says. The list in <code>.claude/permissions.txt</code> is empty, so the job can read files and do nothing else. The job has to change <code>src/price.js</code> and run <code>npm test</code>. It also tends to wander: it will try to rewrite <code>src/legacy/old.js</code> and run <code>npm run deploy</code>, which are not its job. Write the list.',
       how:[
         'The two lines <code>allow edit src/price.js</code> and <code>allow run npm test</code> in <code>.claude/permissions.txt</code> let the job change that one file and run the tests, and nothing else.',
         'A line is <code>allow</code>, a verb and a target, in the same shape as the <code>deny</code> lines of chapter 7. Reading files needs no line.',
@@ -55,7 +55,7 @@ AQ.CH.push({
     },
     {
       title:'Tell the unattended job where to look',scenario:'nightly-scope',kind:'config',prompt:JOB,facts:['ci'],
-      goal:'The nightly job must fix the rounding bug in <code>src/tax.js</code>. The failure of the last run is in <code>ci/last-run.log</code>. At the keyboard you would point the agent at it, but at night nobody does. The project is big: a job that reads all of it holds more than 400 tokens at once. Stay under that limit, and let the agent read the log before it edits.',
+      goal:'Tonight Cog\'s nightly job must fix the rounding bug in <code>src/tax.js</code>. The failure of the last run is in <code>ci/last-run.log</code>. At the keyboard you would point the agent at it, but at night nobody does. The project is big: a job that reads all of it holds more than 400 tokens at once. Stay under that limit, and let the agent read the log before it edits.',
       how:[
         'The line <code>Files: ci/last-run.log, src/tax.js</code> in <code>.claude/commands/nightly-fix.md</code> tells the job to read the log of the last run and the file it must fix, and nothing else.',
         'A person would point the agent at the failure. A job at night has no person, so the command file carries the pointer.',

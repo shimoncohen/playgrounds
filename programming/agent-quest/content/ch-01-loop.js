@@ -33,7 +33,7 @@ AQ.CH.push({
     },
     {
       title:'Every action is a tool call',scenario:'tidy',kind:'prompt',fields:['goal','donewhen','constraints'],facts:['tool-use'],
-      goal:'While it fixes the bug, the agent also wants to tidy up by deleting <code>data/backup.csv</code>. Add a rule so it keeps the data safe, and still gets the bug fixed.',
+      goal:'While Cog fixes the scale, he also wants to tidy the back room by deleting <code>data/backup.csv</code>, Mr. Ledbury\'s backup. Add a rule so the agent keeps the data safe, and still gets the bug fixed.',
       how:[
         'The line <code>Constraints: do not delete data/</code> tells the agent it must never delete anything inside the <code>data/</code> folder.',
         '<code>Constraints:</code> is the field for rules. Write one rule on each line.',
@@ -41,14 +41,14 @@ AQ.CH.push({
         '<code>data/</code> is the target: the file, folder or command the verb acts on. A folder ends with a slash and covers everything inside it.'
       ],
       explain:'Every step an agent takes is a <b>tool call</b>: a verb and a target, like <code>edit src/price.js</code>. It can do nothing else, so a rule about verbs and targets covers everything it can do. The Run panel lists each call. A call your rule blocks is skipped, which is safe. A call nothing blocks just happens. Real agents understand ordinary sentences, but here only lines in this exact shape act, so a line like "be careful" is ignored.',
-      hint:'Write <code>do not</code>, then the verb, then the target. A rule about the wrong verb, or the wrong folder, leaves the real danger open.',
+      hint:'Cog obeys one shape: write <code>do not</code>, then the verb, then the target. A rule about the wrong verb, or the wrong folder, leaves the real danger open.',
       answer:'Constraints: do not delete data/',
       wrong:'Constraints: do not edit src/',
       lazy:'Constraints: be careful and don\'t delete anything'
     },
     {
       title:'What the agent can see',scenario:'bigrepo',kind:'prompt',fields:['goal','donewhen','constraints','files'],
-      goal:'This project is bigger. Tell the agent to look only at <code>src/price.js</code>, so it fixes the bug without filling its head with every other file. The most it may hold at once is '+AQ.PEAK+' tokens (small chunks of text, about four characters each).',
+      goal:'The back-room shelves are crowded with other files. Tell Cog to look only at <code>src/price.js</code>, so it fixes the bug without filling its head with every other file. The most it may hold at once is '+AQ.PEAK+' tokens (small chunks of text, about four characters each).',
       how:[
         'The line <code>Files: src/price.js</code> tells the agent to read just that one file before it starts.',
         '<code>Files:</code> is the field that says where to look. List paths separated by commas.',
@@ -56,14 +56,14 @@ AQ.CH.push({
         'The Meter panel adds up what the agent holds. It shows an estimate, not an exact count.'
       ],
       explain:'The agent can only change what it has read, and it can only hold so much at once. Everything it holds in mind is its <b>context</b>: your prompt, its instructions and each file it reads. The meter measures that context in <b>tokens</b>. With no <code>Files</code> line the agent explores, reads every file and fills its context. With the wrong file it never sees <code>src/price.js</code>, so it cannot edit it and the bug stays.',
-      hint:'Name the file the bug lives in: <code>Files: src/price.js</code>. A file nearby is not the right one, and a whole folder is too much.',
+      hint:'Name the file where Dana\'s till code lives: <code>Files: src/price.js</code>. A file nearby is not the right one, and a whole folder is too much.',
       answer:'Files: src/price.js',
       wrong:'Files: tests/price.test.js',
       lazy:BASE
     },
     {
       title:'Rules the agent always sees',scenario:'tidy',kind:'config',facts:['memory-files'],prompt:BASE,
-      goal:'Instead of repeating a rule in every prompt, write it once in <code>CLAUDE.md</code>, a file the agent reads at the start of every run. This mission sends its own prompt, so open <code>CLAUDE.md</code> in the Files panel and make it keep <code>data/</code> safe.',
+      goal:'Dana is tired of repeating the same rule to Cog. Instead of repeating a rule in every prompt, write it once in <code>CLAUDE.md</code>, a file the agent reads at the start of every run. This mission sends its own prompt, so open <code>CLAUDE.md</code> in the Files panel and make it keep <code>data/</code> safe.',
       how:[
         'The line <code>do not delete data/</code> in <code>CLAUDE.md</code> works like the same rule under <code>Constraints</code>, but it applies to every run, not only this one.',
         '<code>CLAUDE.md</code> is the agent\'s memory file. It is loaded into its context each time, so whatever you write there costs tokens each time.',
@@ -78,7 +78,7 @@ AQ.CH.push({
     },
     {
       title:'Trim the memory file',scenario:'bloated',kind:'budget',prompt:BASE,
-      goal:'<code>CLAUDE.md</code> has grown to about 600 tokens of old meeting notes, and the agent pays that cost on every run. Cut it down to '+BUDGET+' tokens or fewer, and still keep the agent from deleting <code>data/</code>.',
+      goal:'Over the years the shop\'s <code>CLAUDE.md</code> has grown to about 600 tokens of old meeting notes, and Cog pays that cost on every run. Cut it down to '+BUDGET+' tokens or fewer, and still keep the agent from deleting <code>data/</code>.',
       how:[
         'Cutting <code>CLAUDE.md</code> down to the single line <code>do not delete data/</code> keeps the rule that matters and drops the notes that only cost tokens.',
         'The notes are lines the agent reads but never obeys, so removing them changes nothing the agent does.',

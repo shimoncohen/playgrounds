@@ -32,7 +32,7 @@ AQ.CH.push({
     },
     {
       title:'Pay only for the helpers you use',scenario:'team',kind:'prompt',fields:DEV,facts:['subagents'],
-      goal:'The project keeps three helpers: <code>scout</code> (small), <code>analyst</code> (standard) and <code>architect</code> (large). The setup lists the price of all three, but a run pays only for the helpers it hands work to. Hand the search to a helper that fits, and keep what the run pays for helpers at '+MOST+' units or fewer.',
+      goal:'The shop keeps three helpers on call: <code>scout</code> (small), <code>analyst</code> (standard) and <code>architect</code> (large). The setup lists the price of all three, but a run pays only for the helpers it hands work to. Hand the search to a helper that fits, and keep what the run pays for helpers at '+MOST+' units or fewer.',
       how:[
         'The line <code>Use: scout</code> hands the search to the small helper, which costs 1 unit this run. The other two helpers stay idle and cost nothing.',
         'Every helper you name in <code>Use</code> costs its price, even if it finds nothing: small is 1 unit, standard 3 and large 10.',
@@ -48,7 +48,7 @@ AQ.CH.push({
     },
     {
       title:'Split a huge search',scenario:'huge',kind:'prompt',fields:DEV,facts:['subagents','worktrees'],
-      goal:'This project is so big that one helper cannot hold everything it reads. A helper has a window of '+AQ.context.WINDOW+' tokens too, and past it the helper loses track of files. Split the search over two small helpers, <code>scout</code> and <code>scout2</code>, and keep what the run pays for helpers at '+MOST+' units or fewer.',
+      goal:'Mr. Ledbury\'s ledger is so big that one helper cannot hold everything it reads. A helper has a window of '+AQ.context.WINDOW+' tokens too, and past it the helper loses track of files. Split the search over two small helpers, <code>scout</code> and <code>scout2</code>, and keep what the run pays for helpers at '+MOST+' units or fewer.',
       how:[
         'The line <code>Use: scout, scout2</code> hands the search to two helpers. The Run panel shows each helper and how many tokens it held.',
         'The files are shared out in order, so <code>scout</code> takes the first three of the five and <code>scout2</code> the last two. Each share fits a window.',

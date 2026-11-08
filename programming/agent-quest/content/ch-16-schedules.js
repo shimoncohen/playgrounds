@@ -53,7 +53,7 @@ AQ.CH.push({
     },
     {
       title:'A job that runs every day adds up',scenario:'digestDaily',kind:'config',prompt:'Use: weekly-digest',facts:['ci'],
-      goal:'The digest only has to run once a week, on Monday. But the line in <code>.claude/schedule.txt</code> says <code>daily</code>, so it runs seven times a week. Every run costs tokens, and nobody is there to notice the bill grow: a week costs about the tokens of one run times the number of runs. Keep a week of the digest under '+AQ.WEEK+' tokens.',
+      goal:'Dana wants Cog\'s digest only once a week, on Monday. But the line in <code>.claude/schedule.txt</code> says <code>daily</code>, so it runs seven times a week. Every run costs tokens, and nobody is there to notice the bill grow: a week costs about the tokens of one run times the number of runs. Keep a week of the digest under '+AQ.WEEK+' tokens.',
       how:[
         'The line <code>monday 07:30 use weekly-digest</code> in <code>.claude/schedule.txt</code> starts the digest once a week, on Monday, in place of every day.',
         'The first word says on which days a line starts the job: <code>daily</code> is seven days, <code>weekdays</code> is five and a day name such as <code>monday</code> is one. Each of those days is one run.',
@@ -80,7 +80,7 @@ AQ.CH.push({
     },
     {
       title:'Ready to run with nobody there',scenario:'remind',kind:'config',prompt:'Use: morning-reminder',facts:['permissions','ci'],
-      goal:'Every morning at 08:00 a scheduled job should add a reminder for today\'s plan to your calendar. The job is the saved command <code>morning-reminder</code> in <code>.claude/commands</code>, and <code>.claude/schedule.txt</code> already starts it every day. But the command asks for a plan first, and nobody is there to approve one. Fix the command so the job can finish, and give it permission to add the event. It also tries to delete an event, which is not its job.',
+      goal:'Every morning at 08:00 Dana\'s kitchen clock should start a scheduled job to add a reminder for today\'s plan to your calendar. The job is the saved command <code>morning-reminder</code> in <code>.claude/commands</code>, and <code>.claude/schedule.txt</code> already starts it every day. But the command asks for a plan first, and nobody is there to approve one. Fix the command so the job can finish, and give it permission to add the event. It also tries to delete an event, which is not its job.',
       how:[
         'Two changes make the job finish: delete the line <code>Plan: first</code> from <code>.claude/commands/morning-reminder.md</code>, and add <code>allow call calendar.create</code> to <code>.claude/permissions.txt</code>.',
         'The schedule starts the job with nobody at the keyboard, so the run is unattended. A plan waits for a person, and none comes: the job stalls at the plan and does nothing.',

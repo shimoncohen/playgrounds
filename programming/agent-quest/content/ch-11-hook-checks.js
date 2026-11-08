@@ -34,7 +34,7 @@ AQ.CH.push({
     },
     {
       title:'A hook that fixes the file',scenario:'messy',kind:'config',prompt:BASE,facts:['hooks'],
-      goal:'The agent\'s edit leaves tabs in <code>src/price.js</code>, and <code>npm run lint</code> rejects tabs. A <b>formatter</b> is a command that rewrites a file into the project\'s style by itself, so nobody has to repair it by hand. Add a hook that runs the formatter, <code>npm run format</code>, after the edit, so the agent has nothing to repair.',
+      goal:'Cog\'s edit leaves tabs in <code>src/price.js</code>, and <code>npm run lint</code> rejects tabs. A <b>formatter</b> is a command that rewrites a file into the project\'s style by itself, so nobody has to repair it by hand. Add a hook that runs the formatter, <code>npm run format</code>, after the edit, so the agent has nothing to repair.',
       how:[
         'The line <code>after edit src/ run npm run format</code> runs the formatter after every edit under <code>src/</code>, and the file comes out in the project\'s style.',
         'A formatter changes the file mechanically. A lint check only reports a problem, and then the agent has to repair the file itself.',
@@ -55,7 +55,7 @@ AQ.CH.push({
     },
     {
       title:'Stop it, then check it',scenario:'both',kind:'config',prompt:BASE,facts:['hooks'],
-      goal:'The agent also wants to run <code>npm run deploy</code>, which nobody asked for, and its fix still leaves a stray <code>console.log</code>. Use both kinds of hook: one that stops the deploy before it happens, and one that checks the lint after every edit in <code>src/</code>.',
+      goal:'Cog also wants to run <code>npm run deploy</code>, which Dana did not ask for, and his fix still leaves a stray <code>console.log</code>. Use both kinds of hook: one that stops the deploy before it happens, and one that checks the lint after every edit in <code>src/</code>.',
       how:[
         'The two lines <code>before run npm run deploy</code> and <code>after edit src/ run npm run lint</code> stop the deploy and check each edit.',
         '<code>before</code> keeps an action from happening at all. That suits a risk, like a deploy, that cannot be undone.',

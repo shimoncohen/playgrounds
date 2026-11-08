@@ -22,7 +22,7 @@ AQ.CH.push({
         'A pattern that is too wide stops the draft as well: <code>downloads/*</code> covers the draft, so it is never moved. Writing each PDF out by name also keeps these two, but it is not the one rule this mission is about, and the next PDF would be deleted.'
       ],
       explain:'A star saves you from listing files one by one, and it keeps working when new files arrive. It also reaches across folders, so the pattern decides how much it covers: too narrow and a PDF slips through, too wide and the draft cannot be moved either. The practice refuses a pattern that matches no file in the project, so a typo shows up before the agent runs.',
-      hint:'Write a rule against deleting, and end the target with the part every PDF shares, <code>.pdf</code>.',
+      hint:'To keep Dana\'s PDFs, write a rule against deleting, and end the target with the part every PDF shares, <code>.pdf</code>.',
       answer:'Constraints: do not delete downloads/*.pdf',
       wrong:'Constraints: do not delete downloads/*.txt',
       lazy:'',
@@ -36,7 +36,7 @@ AQ.CH.push({
     },
     {
       title:'Lock every signed copy',scenario:'contracts',kind:'config',prompt:'Goal: tidy up documents/',
-      goal:'The folder <code>documents/</code> holds a lease and a will. Each has a draft you may still change and a signed copy you must never touch. The agent is tidying the folder, and it wants to rewrite and then delete every file in it, signed copies included. Stop it changing or deleting any signed copy, and let it tidy the drafts. New contracts will arrive, so write the rules once, by the part of the name that every signed copy shares.',
+      goal:'Dana\'s kitchen drawer, the folder <code>documents/</code>, holds a lease and a will. Each has a draft you may still change and a signed copy you must never touch. The agent is tidying the folder, and it wants to rewrite and then delete every file in it, signed copies included. Stop it changing or deleting any signed copy, and let it tidy the drafts. New contracts will arrive, so write the rules once, by the part of the name that every signed copy shares.',
       how:[
         'The two lines <code>deny edit *-signed.txt</code> and <code>deny delete *-signed.txt</code> in <code>.claude/permissions.txt</code> stop the agent changing or deleting any file whose name ends in <code>-signed.txt</code>, and leave the drafts alone.',
         '<code>deny</code> starts each line, <code>edit</code> and <code>delete</code> are the two verbs, and <code>*-signed.txt</code> is the target: any text, then <code>-signed.txt</code>.',
@@ -56,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'Try the batch on three first',scenario:'stamp',kind:'prompt',fields:FIELDS,
-      goal:'The folder <code>notes/</code> holds eight weekly notes, and the agent will stamp each one as reviewed. A stamp is a small change, but if it were wrong, eight notes would carry it. Try the batch on three first: say how many files the agent may change at most, and check the first few before you let it do the rest.',
+      goal:'The folder <code>notes/</code> on Dana\'s desk holds eight weekly notes, and Cog will stamp each one as reviewed. A stamp is a small change, but if it were wrong, eight notes would carry it. Try the batch on three first: say how many files the agent may change at most, and check the first few before you let it do the rest.',
       how:[
         'The line <code>Constraints: max 3 files</code> lets the agent change three different files at most, and then it stops.',
         '<code>max 3 files</code> is a rule about size. It counts different files, not edits: changing one file twice counts once.',
