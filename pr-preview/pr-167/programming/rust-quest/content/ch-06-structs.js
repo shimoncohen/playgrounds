@@ -23,26 +23,28 @@ RQ.CH.push({
   missions:[
     {
       title:'Name the parts with a struct',kind:'write',
-      goal:'Write a <code>struct</code> called <code>Pet</code> with a <code>name</code> (a <code>String</code>) and an <code>age</code> (a <code>u32</code>). In <code>main</code>, build a <code>Pet</code> called <code>Pip</code> who is <code>3</code>, and print <code>Pip is 3</code> by reading the two fields back.',
+      goal:'Write a <code>struct</code> called <code>Pet</code> with a <code>name</code> (a <code>String</code>) and an <code>age</code> (a <code>u32</code>). In <code>main</code>, build a <code>Pet</code> called <code>Pip</code> who is <code>5</code>, and print <code>Pip is 5</code> by reading the two fields back.',
       how:[
         'The whole program describes a pet, builds one, and reads its parts back. A <code>struct</code> is a type you design yourself: a group of fields, each with a name and a type. A tuple keeps values together by position, and a <code>struct</code> gives every part a name.',
         '<code>struct Pet { name: String, age: u32 }</code> declares it. Each field is a name, a <code>:</code> and a type, and the fields are separated by commas.',
-        '<code>Pet { name: String::from("Pip"), age: 3 }</code> builds one. Every field gets a value, in any order.',
+        '<code>Pet { name: String::from("Pip"), age: 5 }</code> builds one. Every field gets a value, in any order.',
         '<code>pet.name</code> and <code>pet.age</code> read the fields with a <code>.</code>, like the <code>.0</code> on a tuple, but with names.'
       ],
       explain:'A <code>struct</code> is a new type made of other types. The <code>Pet</code> owns its <code>String</code>, so when the <code>Pet</code> goes away, its text is freed with it. Press Run and step to the last line: the memory view shows <code>pet</code> with both of its fields, and its <code>name</code> pointing to the <code>String</code> on the heap. Two shorter forms exist too: <code>struct Meters(u32);</code> has fields numbered like a tuple, read as <code>m.0</code>, and <code>struct Marker;</code> has no fields at all.',
       hint:'Declare the <code>struct</code> above <code>main</code>. Then build it with <code>Pet { name: ..., age: ... }</code> and print <code>pet.name</code> and <code>pet.age</code> with two <code>{}</code> holes.',
       starter:L(PET.trim(),'','fn main() {','    // build a Pet and print it','}'),
-      answer:L(PET.trim(),'','fn main() {','    let pet = Pet {','        name: String::from("Pip"),','        age: 3,','    };','    println!("{} is {}", pet.name, pet.age);','}'),
-      alts:[L('struct Pet {','    age: u32,','    name: String,','}','','fn main() {','    let p = Pet { age: 3, name: String::from("Pip") };','    println!("{} is {}", p.name, p.age);','}'),
-        L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 3 };','    print!("{} is ", pet.name);','    println!("{}", pet.age);','}')],
+      answer:L(PET.trim(),'','fn main() {','    let pet = Pet {','        name: String::from("Pip"),','        age: 5,','    };','    println!("{} is {}", pet.name, pet.age);','}'),
+      alts:[L('struct Pet {','    age: u32,','    name: String,','}','','fn main() {','    let p = Pet { age: 5, name: String::from("Pip") };','    println!("{} is {}", p.name, p.age);','}'),
+        L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 5 };','    print!("{} is ", pet.name);','    println!("{}", pet.age);','}')],
       wrong:[{src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 4 };','    println!("{} is {}", pet.name, pet.age);','}'),wrongWhy:'check'},
-        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 3 };','    println!("{} is {}", pet.age, pet.name);','}'),wrongWhy:'check'}],
-      lazy:[{src:L(PET.trim(),'','fn main() {','    println!("Pip is 3");','}'),wrongWhy:'check'},
-        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 3 };','    println!("Pip is {}", pet.age);','}'),wrongWhy:'check'},
-        {src:L('fn main() {','    println!("{} is {}", "Pip", 3);','}'),wrongWhy:'check'}],
+        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 5 };','    println!("{} is {}", pet.age, pet.name);','}'),wrongWhy:'check'}],
+      lazy:[{src:L(PET.trim(),'','fn main() {','    println!("Pip is 5");','}'),wrongWhy:'check'},
+        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 5 };','    println!("Pip is {}", pet.age);','}'),wrongWhy:'check'},
+        {src:L('fn main() {','    println!("{} is {}", "Pip", 5);','}'),wrongWhy:'check'},
+        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 5 };','    println!("{} is {}", pet.name, pet.name.len());','}'),wrongWhy:'check'},
+        {src:L(PET.trim(),'','fn main() {','    let pet = Pet { name: String::from("Pip"), age: 5 };','    println!("{} is {}", pet.name, pet.name.len() + 2);','}'),wrongWhy:'check'}],
       defines:['struct'],previews:[],
-      check:c=>c.out()!=='Pip is 3\n'?'The program has to print `Pip is 3` on one line, with the name first and then the age.':c.count('struct')<1?'Declare a `struct` called `Pet` above `main`.':c.fieldsPrinted()<2?'Build a `Pet`, then print its `name` and `age` into two `{}` holes by reading them with a dot, instead of typing them again.':true
+      check:c=>c.out()!=='Pip is 5\n'?'The program has to print `Pip is 5` on one line, with the name first and then the age.':c.count('struct')<1?'Declare a `struct` called `Pet` above `main`.':c.fieldsPrinted()<2||!c.fieldRead('age')?'Build a `Pet`, then print its `name` and `age` into two `{}` holes by reading them with a dot, instead of typing them again.':true
     },
     {
       title:'Fields change only on a mut variable',kind:'fix',

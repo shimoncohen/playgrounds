@@ -1,6 +1,6 @@
 /* Which values a match leaves out, found the way rustc finds them (usefulness over a pattern matrix), so the witnesses printed in E0004
    and E0005 are the ones rustc prints. DOM-free.
-   Types: {k:'bool'} {k:'int',lo,hi,ty,open} (open: usize and isize, shown with a half-open range) {k:'char'} {k:'opaque'} (a string or a float: only `_` covers it)
+   Types: {k:'bool'} {k:'int',lo,hi,ty,open} (open: usize and isize, which rustc never lets `MIN..=MAX` cover: one step past MAX, and for isize one before MIN, is a value only a half-open range matches) {k:'char'} {k:'opaque'} (a string or a float: only `_` covers it)
    {k:'enum',prefix,variants:[{name,kind,names,tys()}]} {k:'struct',name,kind,names,tys()} {k:'tuple',tys()} {k:'ref',to()}.
    Patterns: WILD, {or:[pat]}, {c:'v',i,args}, {c:'single',args}, {c:'bool',v}, {c:'range',lo,hi} (BigInt, inclusive), {c:'opaque'}.
    Two rules are rustc's and look odd: a column with a missing constructor reports only the missing ones (the present ones are not dug
@@ -15,7 +15,8 @@ const CHAR_SEGS=[[0n,0xD7FFn],[0xE000n,0x10FFFFn]];
 class Limit extends Error{}
 
 const fieldTys=(ty,c)=>ty.k==='enum'?ty.variants[c.i].tys():ty.k==='struct'||ty.k==='tuple'?ty.tys():ty.k==='ref'?[ty.to()]:[];
-const segs=ty=>ty.k==='char'?CHAR_SEGS:[[ty.lo,ty.hi]];
+const bounds=ty=>ty.k==='char'?[0n,0x10FFFFn]:[ty.open&&ty.lo<0n?ty.lo-1n:ty.lo,ty.open?ty.hi+1n:ty.hi];
+const segs=ty=>ty.k==='char'?CHAR_SEGS:[bounds(ty)];
 
 function splitRanges(ty,heads){
   const cuts=new Set();
@@ -72,7 +73,7 @@ function search(rows,tys,top,st){
   rows=expand(rows);
   const ty=tys[0],rest=tys.slice(1);
   if(ty.k==='int'||ty.k==='char'){
-    const [mn,mx]=ty.k==='char'?[0n,0x10FFFFn]:[ty.lo,ty.hi];
+    const [mn,mx]=bounds(ty);
     rows=rows.map(r=>r.c[0].c==='range'&&(r.c[0].lo===null||r.c[0].hi===null)?{c:[{...r.c[0],lo:r.c[0].lo??mn,hi:r.c[0].hi??mx},...r.c.slice(1)],g:r.g}:r);
   }
   const heads=rows.map(r=>r.c[0]).filter(h=>!h.w);
@@ -84,7 +85,7 @@ function search(rows,tys,top,st){
   if(missing.length){
     const sub=search(rows.filter(r=>r.c[0].w).map(r=>({c:r.c.slice(1),g:r.g})),rest,false,st);
     if(sub.length){
-      const individual=top&&ty.k!=='int'&&ty.k!=='char'||present.length>0;
+      const individual=top||present.length>0;
       const shown=individual&&ty.k!=='opaque'?missing.map(c=>({ty,c,args:fieldTys(ty,c).map(()=>WILD)})):[WILD];
       return shown.flatMap(p=>sub.map(w=>[p,...w]));
     }
@@ -110,11 +111,12 @@ const esc=cp=>{
 
 function range(ty,lo,hi){
   if(ty.k==='char')return lo===hi?"'"+esc(lo)+"'":"'"+esc(lo)+"'..='"+esc(hi)+"'";
-  const s=ty.ty,signed=s[0]==='i',atMin=lo===ty.lo,atMax=hi===ty.hi;
-  const L=signed&&atMin?(ty.open?'':s+'::MIN'):lo+'_'+s,H=atMax?(ty.open?'':s+'::MAX'):hi+'_'+s;
-  if(lo===hi)return lo+'_'+s;
-  if(ty.open)return (signed&&atMin?'':L)+(atMax?'..':'..='+H);
-  return L+'..='+H;
+  const s=ty.ty,signed=s[0]==='i',below=ty.open&&signed&&lo<ty.lo,above=ty.open&&hi>ty.hi;
+  const N=v=>signed&&v===ty.lo?s+'::MIN':v===ty.hi?s+'::MAX':v+'_'+s;
+  if(below&&above)return '_';
+  if(below)return hi<ty.lo?'..'+s+'::MIN':'..='+N(hi);
+  if(above)return (lo>=ty.hi?s+'::MAX':N(lo))+'..';
+  return lo===hi?N(lo):N(lo)+'..='+N(hi);
 }
 
 function show(p){

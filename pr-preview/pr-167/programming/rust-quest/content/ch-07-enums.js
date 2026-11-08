@@ -215,9 +215,9 @@ RQ.CH.push({
       answer:OPT('if let Some(n) = o {','    println!("got {}", n);','}'),
       alts:[OPT('if let Some(n) = o {','    println!("got {}", n);','} else {','}'),OPT('if let Some(value) = o {','    println!("got {}", value);','}')],
       wrong:[{src:OPT('if let Some(n) = o {','    println!("{}", n);','}'),wrongWhy:'check'},{src:OPT('if let Some(n) = o {','    println!("got {}", n);','} else {','    println!("got nothing");','}'),wrongWhy:'check'}],
-      lazy:[{src:OPT('match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'},{src:OPT('println!("got 7");'),wrongWhy:'check'}],
+      lazy:[{src:OPT('match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'},{src:OPT('println!("got 7");'),wrongWhy:'check'},{src:OPT('if let Some(_) = Some(1u32) {','}','match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'}],
       defines:['if-let'],previews:[],
-      check:c=>c.out()!=='got 7\ngot 3\n'?'`show` has to print `got` and the number when it holds one, and nothing when it is empty, so the program prints `got 7` and then `got 3`.':c.count('iflet')<1?'Use `if let` to look inside the `Option`.':true
+      check:c=>c.out()!=='got 7\ngot 3\n'?'`show` has to print `got` and the number when it holds one, and nothing when it is empty, so the program prints `got 7` and then `got 3`.':c.matchOn('iflet','show','o')<1?'Use `if let` on `o` inside `show` to look inside the `Option`.':true
     },
     {
       title:'while let: keep going until it runs out',kind:'write',
@@ -235,9 +235,9 @@ RQ.CH.push({
       answer:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    println!("{}", n);','    n = next;','}'),
       alts:[MAIN('let mut n = 3;','while let Some(m) = step(n) {','    println!("{}", n);','    n = m;','}')],
       wrong:[{src:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    n = next;','    println!("{}", n);','}'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    println!("{}", n);','    n = next;','}','println!("{}", n);'),wrongWhy:'check'}],
-      lazy:[{src:MAIN('println!("3");','println!("2");','println!("1");'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'}],
+      lazy:[{src:MAIN('println!("3");','println!("2");','println!("1");'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'},{src:MAIN('while let Some(_) = step(0) {','}','let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'}],
       defines:['while-let'],previews:[],
-      check:c=>c.out()!=='3\n2\n1\n'?'The program has to print `3`, `2` and `1`, one per line, and stop when `step` says `None`.':c.count('whilelet')<1?'Use `while let` to keep going for as long as `step` gives a value.':c.calls('step')<1?'Ask `step` for the next number instead of counting yourself.':true
+      check:c=>c.out()!=='3\n2\n1\n'?'The program has to print `3`, `2` and `1`, one per line, and stop when `step` says `None`.':c.matchOn('whilelet','main','step',true)<1?'Use `while let` on what `step` gives back, and print `n` inside its block, to keep going for as long as `step` gives a value.':true
     },
     {
       title:'let else: leave early',kind:'write',
@@ -255,9 +255,9 @@ RQ.CH.push({
       answer:PLUS('let Some(v) = o else {','    return 0;','};','v + 1'),
       alts:[PLUS('let Some(number) = o else {','    return 0;','};','return number + 1;')],
       wrong:[{src:PLUS('let Some(v) = o else {','    return 0;','};','v'),wrongWhy:'check'},{src:PLUS('let Some(v) = o else {','    return 1;','};','v + 1'),wrongWhy:'check'}],
-      lazy:[{src:PLUS('match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'},{src:PLUS('if let Some(v) = o {','    return v + 1;','}','0'),wrongWhy:'check'}],
+      lazy:[{src:PLUS('match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'},{src:PLUS('if let Some(v) = o {','    return v + 1;','}','0'),wrongWhy:'check'},{src:PLUS('let Some(_) = Some(1) else {','    return 0;','};','match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'}],
       defines:['let-else'],previews:[],
-      check:c=>c.out()!=='5\n0\n10\n'?'`plus_one` has to give `5` for `Some(4)`, `0` for `None` and `10` for `Some(9)`, so the program prints `5`, `0` and `10`.':c.count('letelse')<1?'Use `let ... else` to leave early when there is no number.':true
+      check:c=>c.out()!=='5\n0\n10\n'?'`plus_one` has to give `5` for `Some(4)`, `0` for `None` and `10` for `Some(9)`, so the program prints `5`, `0` and `10`.':c.matchOn('letelse','plus_one','o')<1?'Use `let ... else` on `o` inside `plus_one` to leave early when there is no number.':true
     },
     {
       title:'Take a pair apart with let',kind:'write',
@@ -275,9 +275,9 @@ RQ.CH.push({
       answer:SWAP('let (a, b) = p;','(b, a)'),
       alts:[SWAP('let (x, y) = p;','(y, x)'),SWAP('let (a, b) = p;','return (b, a);')],
       wrong:[{src:SWAP('let (a, b) = p;','(a, a)'),wrongWhy:'check'},{src:SWAP('let (a, b) = p;','(a, b)'),wrongWhy:'check'}],
-      lazy:[{src:SWAP('(p.1, p.0)'),wrongWhy:'check'},{src:SWAP('(2, 1)'),wrongWhy:'check'}],
+      lazy:[{src:SWAP('(p.1, p.0)'),wrongWhy:'check'},{src:SWAP('(2, 1)'),wrongWhy:'check'},{src:SWAP('let (_x, _y) = (0, 0);','(p.1, p.0)'),wrongWhy:'check'}],
       defines:['destructure'],previews:[],
-      check:c=>c.out()!=='2 1\n9 3\n'?'`swap` has to give the pair the other way round, so the program prints `2 1` and then `9 3`.':c.count('destructure')<3?'Take the pair apart with a pattern, `let (a, b) = p;`, instead of reading `p.0` and `p.1`.':true
+      check:c=>c.out()!=='2 1\n9 3\n'?'`swap` has to give the pair the other way round, so the program prints `2 1` and then `9 3`.':c.matchOn('let','swap','p')<1?'Take the pair apart with a pattern, `let (a, b) = p;`, instead of reading `p.0` and `p.1`.':true
     }
   ]
 });

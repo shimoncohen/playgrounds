@@ -80,6 +80,12 @@ RQ.lint=(ast,info)=>{
     return r===undefined?null:boolv(r,amb2(a,b));
   }
 
+  // the arm of a desugared destructuring let holds the rest of the block, so it is straight-line code
+  function destructure(p,v,fresh){
+    if(p.t==='IdentPat'){const bd=!p.sub&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
+    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i,false),fresh));
+  }
+
   function block(b){
     for(const s of b.stmts){
       if(div)return null;
@@ -227,6 +233,11 @@ RQ.lint=(ast,info)=>{
         return null;
       }
       case 'Match':{
+        if(e.kind==='let'){
+          const before=barriers,v=ev(e.scrut);
+          destructure(e.arms[0].pat,v,barriers===before);
+          return ev(e.arms[0].body);
+        }
         ev(e.scrut);barrier();
         const base=snap();
         let all=e.arms.length>0;

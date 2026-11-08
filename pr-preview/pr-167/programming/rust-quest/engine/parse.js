@@ -196,8 +196,8 @@ RQ.parse=tokens=>{
   function patNoOr(){
     const x=T();
     if(x.k==='ident'&&x.v==='_'&&!isP('::',pk())){p++;return mk('Wild',x);}
-    if(isP('..')&&!(pk().k==='int'||pk().k==='char'||pk().k==='float')){p++;return mk('Rest',x);}
-    if(isP('..=')){p++;return mk('RangePat',x,{lo:null,hi:rangeEnd(),inclusive:true});}
+    if(isP('..')&&!(['int','char','float'].includes(pk().k)||isP('-',pk())||pk().k==='ident'&&isP('::',pk(2)))){p++;return mk('Rest',x);}
+    if(isP('..=')||isP('..')){const inclusive=isP('..=');p++;return mk('RangePat',x,{lo:null,hi:rangeEnd(),inclusive});}
     if(isP('&')||isP('&&')){
       const dbl=isP('&&');p++;const mut=!!eatK('mut');let r=mk('RefPat',x,{mut,pat:patNoOr()});
       if(dbl)r=mk('RefPat',x,{mut:false,pat:r});return r;
