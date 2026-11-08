@@ -137,7 +137,7 @@ const CH=[
   how:[`<code>grep -i wolf journal.txt &gt; wolves.txt</code> saves only the wolf lines into a new file.`,`<code>grep -i wolf journal.txt</code> is the same search as before.`,`<code>&gt;</code> sends its results into a file instead of the screen.`,`<code>wolves.txt</code> is the file that receives them. Check it with <code>cat wolves.txt</code>.`],answer:'grep -i wolf journal.txt > wolves.txt',
   explain:`Now you have a file of only the wolf sightings. Check it with <code>cat wolves.txt</code>.`,check:c=>/wolf/i.test(c.read('~/wolves.txt'))}
  ]},
-{tier:'beginner',name:'Wildcards & search',badge:'Tracker',story:'A rumour says gold is hidden somewhere in your world; match patterns, search every folder and find gold.txt in the chest.',intro:'A rumour in the village says gold is hidden somewhere in your world. Work with many files at once, and find anything, anywhere.',
+{tier:'beginner',name:'Wildcards & search',badge:'Tracker',story:'A rumour says gold is hidden somewhere in your world; match patterns, search every folder and find <code>gold.txt</code> in the chest.',intro:'A rumour in the village says gold is hidden somewhere in your world. Work with many files at once, and find anything, anywhere.',
  learned:['*','?','find -name','find -type','&&'],
  setup(){for(const k in LOGS)ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/forest/cave/deeper/chest/gold.txt',GOLD);ensureFile('~/readme.txt',README);ensureFile('~/journal.txt',JOURNAL)},
  missions:[
