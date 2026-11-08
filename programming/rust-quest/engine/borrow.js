@@ -1,4 +1,4 @@
-/* The move, initialisation and loan analyses over the CFG that mir.js lowers. RQ.borrow(ast, info) gives {errors, unsupported, loans, analysed}:
+/* The move, initialisation and loan analyses over the CFG that mir.js lowers. RQ.borrow(ast, info) gives {errors, unsupported, loans, moves, maxLive, analysed}:
    errors are E0381 (use of an uninitialised local), E0382 (use after a move), E0384 on a deferred let, and E0499, E0502, E0505 and E0506
    from the loans; unsupported also carries what mir.js reported, and the analysis is skipped when it did; analysed names the lowered fns;
    moves is [{name, line}] for every by-value move of a named local. loans is [{id, ast (the borrow node), local (name, null for a temp), mut, line, implicit (made by the compiler for a print argument or a method receiver, not written by the learner), span ([first, last] line where it is live), live (ast ids of the instrs where it is live)}]. DOM-free.
@@ -107,7 +107,7 @@ function mutability(F,errors){
 const bit=k=>1n<<BigInt(k);
 const refy=t=>t.k==='ref'||t.k==='str';
 
-function loanPass(F,errors,un,loans){
+function loanPass(F,errors,un,loans,stats){
   const B=F.blocks,L=F.locals,n=L.length;
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
@@ -115,14 +115,15 @@ function loanPass(F,errors,un,loans){
   const onS=L.map(()=>0n),onM=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(k));
   lo.forEach((x,k)=>{(x.mut?onM:onS)[x.l]|=lb[k];});
 
+  // the loans the value assigned by i carries; a call gives back its `from` argument's, a slice of a reference its base's
+  const val=(s,i)=>{
+    const r=i.rv,from=r.k==='call'&&r.from>=0?r.args[r.from]:null;
+    return r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:from&&from.k!=='const'?s[from.l]:0n;
+  };
   // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
   const hold=(s,i)=>{
     if(i.op!=='decl'&&i.op!=='assign'&&i.op!=='dead')return;
-    let v=0n;
-    if(i.op==='assign'){
-      const r=i.rv;
-      v=r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:0n;
-    }
+    const v=i.op==='assign'?val(s,i):0n;
     const kill=~(onS[i.l]|onM[i.l]);
     for(let k=0;k<n;k++)s[k]&=kill;
     if(i.op!=='dead')s[i.l]=v&kill;
@@ -192,12 +193,27 @@ function loanPass(F,errors,un,loans){
     const s=inn[b.id].slice();
     b.instrs.forEach((i,j)=>{
       lm=0n;
-      for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l])lm|=s[l];
-      if(lm)lo.forEach((x,k)=>{
-        if(!(lm&lb[k]))return;
-        x.live.add(i.ast);
-        x.span=[Math.min(x.span[0],i.line),Math.max(x.span[1],i.line)];
-      });
+      for(let l=0;l<n;l++)if(s[l]&&lv[j]&nb[l]&&!L[l].ret)lm|=s[l];
+      if(lm){
+        const cnt=new Map();
+        lo.forEach((x,k)=>{
+          if(!(lm&lb[k]))return;
+          x.live.add(i.ast);
+          x.span=[Math.min(x.span[0],i.line),Math.max(x.span[1],i.line)];
+          if(x.implicit||refy(L[x.l].ty))return;
+          const key=x.l+(x.mut?'m':'s'),c=(cnt.get(key)||0)+1,kind=x.mut?'mut':'shared';
+          cnt.set(key,c);
+          if(c>stats[kind])stats[kind]=c;
+        });
+      }
+      if(i.op==='assign'&&L[i.l].ret){
+        const held=val(s,i);
+        const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty));
+        if(k>=0){
+          const key='E0515@'+i.line+':'+i.col;
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param}));}
+        }
+      }
       uses(i,(l,_mv,kind)=>access(l,kind,i));
       if(i.op==='store'&&i.ref.k!=='const')access(i.ref.l,'write',i,true);
       if(i.op==='dead'){
@@ -220,14 +236,14 @@ function loanPass(F,errors,un,loans){
 }
 
 RQ.borrow=(ast,info)=>{
-  const m=RQ.mir(ast,info),errors=[],loans=[],moves=[],unsupported=[...m.unsupported],seen=new Set();
+  const m=RQ.mir(ast,info),errors=[],loans=[],moves=[],maxLive={shared:0,mut:0},unsupported=[...m.unsupported],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
   if(!unsupported.length)for(const F of m.fns){
     const ok=analyse(F,errors);
     for(const b of F.blocks)if(!b.unreachable)for(const i of b.instrs)uses(i,(l,mv)=>{if(mv&&F.locals[l].name!==null)moves.push({name:F.locals[l].name,line:i.line});});
     if(ok)mutability(F,errors);
-    if(!ok||!loanPass(F,errors,un,loans)){unsupported.push({feature:'program too large',line:F.line});break;}
+    if(!ok||!loanPass(F,errors,un,loans,maxLive)){unsupported.push({feature:'program too large',line:F.line});break;}
   }
-  return {errors,unsupported,loans,moves,analysed:m.fns.map(f=>f.name)};
+  return {errors,unsupported,loans,moves,maxLive,analysed:m.fns.map(f=>f.name)};
 };
 })();

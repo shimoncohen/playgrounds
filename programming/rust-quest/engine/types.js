@@ -1,5 +1,5 @@
 /* Checker types are plain objects: {k:'int',ty}, 'float' (f64), 'bool', 'char', 'str' (a &str), 'String', 'unit', 'never', 'any',
-   tuple {els}, array {el,n}, struct {name}, ref {mut,to,rg} (rg is a number the checker makes new for every reference type it creates), and
+   tuple {els}, array {el,n}, slice {el} (only ever behind a ref), struct {name}, ref {mut,to,rg} (rg is a number the checker makes new for every reference type it creates), and
    the inference variables ivar and fvar, which stand for an int or float literal whose type is still open and get bound by
    unify. DOM-free. */
 (()=>{
@@ -11,7 +11,7 @@ const isInt=n=>Object.prototype.hasOwnProperty.call(INT,n);
 const bitsOf=ty=>ty.endsWith('size')?64:+ty.slice(1);
 const T={
   int:ty=>({k:'int',ty}),float:{k:'float'},bool:{k:'bool'},char:{k:'char'},str:{k:'str'},string:{k:'String'},unit:{k:'unit'},never:{k:'never'},any:{k:'any'},
-  ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n}),
+  ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n}),slice:el=>({k:'slice',el}),
   ref:(mut,to,rg)=>({k:'ref',mut,to,rg}),struct:name=>({k:'struct',name})
 };
 const res=t=>{while(t.ref)t=t.ref;return t;};
@@ -44,6 +44,7 @@ function unify(a,b){
   if(a.k==='int')return a.ty===b.ty;
   if(a.k==='tuple')return a.els.length===b.els.length&&a.els.every((x,i)=>unify(x,b.els[i]));
   if(a.k==='array')return a.n===b.n&&unify(a.el,b.el);
+  if(a.k==='slice')return unify(a.el,b.el);
   if(a.k==='ref')return a.mut===b.mut&&unify(a.to,b.to);
   if(a.k==='struct')return a.name===b.name;
   return true;
@@ -59,6 +60,7 @@ function show(t){
     case 'unit':return '()';
     case 'tuple':return '('+t.els.map(show).join(', ')+(t.els.length===1?',':'')+')';
     case 'array':return '['+show(t.el)+'; '+t.n+']';
+    case 'slice':return '['+show(t.el)+']';
     case 'ref':return '&'+(t.mut?'mut ':'')+show(t.to);
     case 'struct':return t.name;
     default:return t.k;

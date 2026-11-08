@@ -16,7 +16,7 @@ describe('RQ.borrow: the API', () => {
   it('gives errors, unsupported, loans and the names of the fns it analysed', () => {
     const c = RQ.compile(SIMPLE('let s = String::new();'));
     const b = RQ.borrow(c.ast, c.info);
-    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], moves: [], analysed: ['main'] });
+    assert.deepEqual(b, { errors: [], unsupported: [], loans: [], moves: [], maxLive: { shared: 0, mut: 0 }, analysed: ['main'] });
   });
   it('a Copy-only fn is not analysed', () => {
     const c = RQ.compile(SIMPLE('let x = 1;', 'let y = x;', 'let z = x;'));
@@ -410,7 +410,7 @@ describe('the unsupported list, end to end through RQ.run', () => {
   const sweepAll = (rows) => rows.forEach(([src, feature, line]) => sweep(src, feature, line));
   it('checker triggers', () => sweepAll([
     [P("fn f(s: &'a str) {}", 'fn main() {', '}'), 'explicit lifetime', 1],
-    [P('fn f() -> &str {', '    "a"', '}', 'fn main() {', '}'), 'lifetime elision', 1],
+    [P('fn f(x: &mut i32) -> &mut i32 {', '    x', '}', 'fn main() {', '}'), 'lifetime elision', 1],
     [SIMPLE('let x = 1;', 'let r = &x;', 'let rr = &r;'), 'reference to reference', 4],
     [SIMPLE('let mut s = String::new();', 'let r: &String = &mut s;'), 'reference coercion', 3],
     [SIMPLE('let mut s = String::new();', 'let r = &mut s;', 'let t = r.as_str();'), 'reborrow', 4],

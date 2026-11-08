@@ -86,7 +86,7 @@ function quoted(s,q,room){
   }
   return o+q;
 }
-const unref=v=>{while(v.k==='ref')v=v.cell.val;return v;};
+const unref=v=>{while(v.k==='ref'){const t=v.cell.val;v=v.range?{k:'array',v:t.v.slice(v.range[0],v.range[1])}:t;}return v;};
 function display(v){
   v=unref(v);
   switch(v.k){

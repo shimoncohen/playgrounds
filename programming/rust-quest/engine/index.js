@@ -9,17 +9,17 @@ RQ.compile=src=>{
   const r=RQ.parse(RQ.lex(src));
   if(r.errors.length)return {ast:null,diags:r.errors,unsupported:[]};
   const ck=RQ.check(r.ast);
-  let diags=ck.errors,loans=[],moves=[];
+  let diags=ck.errors,loans=[],moves=[],maxLive={shared:0,mut:0};
   const unsupported=[...r.unsupported,...ck.unsupported];
   // E0384 is a borrowck error in rustc, so the pass still runs when it is the only thing the checker found
   if(!unsupported.length&&diags.every(e=>e.code==='E0384')){
     const b=RQ.borrow(r.ast,ck.info);
     diags=[...diags,...b.errors].sort((a,b)=>a.line-b.line||a.col-b.col);
-    unsupported.push(...b.unsupported);loans=b.loans;moves=b.moves;
+    unsupported.push(...b.unsupported);loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
   if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}
-  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,moves,
+  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,moves,maxLive,
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
@@ -105,7 +105,7 @@ function context(d,ast,counts){
   const errors=d.errors||[];
   const c={
     status:d.status,errors,view:d.view||null,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
-    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],
+    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],maxLive:kind=>(d.maxLive||{})[kind]||0,
     compiles:()=>c.status!=='error'&&c.status!=='unsupported'&&c.status!=='internal',
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
     onlyError:id=>errors.length===1&&(errors[0].code===id||errors[0].lint===id),
@@ -114,6 +114,17 @@ function context(d,ast,counts){
     allocs:kind=>c.events.filter(e=>e.t==='alloc'&&(kind===undefined||e.kind===kind)).length,
     dropOrder:()=>c.events.filter(e=>e.t==='drop'&&e.name&&!e.part).map(e=>e.name),
     usesMacro:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Macro'&&m.name===name)n++;});return n;},
+    paramIsRef:(fn,i,kind)=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];
+      return !!p&&p.ty.t==='Ref'&&(kind==='mut'?p.ty.mut:kind==='shared'?!p.ty.mut:true);
+    },
+    usesParam:(fn,i)=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];
+      let n=0;
+      if(p&&p.pat.name)RQ.walk(f.body,m=>{if(m.t==='Path'&&m.segs.length===1&&m.segs[0].name===p.pat.name||m.t==='Macro'&&m.args&&m.args[0]&&m.args[0].kind==='str'&&RQ.std.parseFormat(m.args[0].v).parts.some(q=>q.name===p.pat.name))n++;});
+      return n>0;
+    },
+    methodIn:(fn,name)=>{let n=0;const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);if(f)RQ.walk(f,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},
     count:kind=>{
@@ -145,7 +156,7 @@ RQ.run=(src,opts)=>{
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
     if(c.diags.length)return context({status:'error',errors:c.diags,view:opts.snap?errorView(c):null},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context({...RQ.interp(c.ast,{...opts,info:c.info,loans:c.loans}),loans:c.loans},ast,c.counts);
+    return context({...RQ.interp(c.ast,{...opts,info:c.info,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
   }catch(e){
     return context({status:'internal',message:String(e&&e.message||e)},ast);
   }

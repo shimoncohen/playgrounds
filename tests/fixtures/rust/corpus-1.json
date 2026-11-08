@@ -1420,5 +1420,437 @@
     "src": "struct N {\n    id: i32,\n}\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.id);\n    }\n}\n\nfn make(id: i32) -> N {\n    N { id }\n}\n\nfn look(n: &N) -> i32 {\n    n.id\n}\n\nfn main() {\n    let a = make(1);\n    let b = make(2);\n    let r = &b;\n    drop(a);\n    println!(\"{} {}\", look(r), b.id);\n}\n",
     "expect": "ok", "out": "drop 1\n2 2\ndrop 2\n", "err": "", "exit": 0,
     "why": "the accepted twin of struct-move-while-borrowed", "pr": "P6"
+  },
+  {
+    "id": "slice-str-range",
+    "src": "fn main() {\n    let s = String::from(\"hello world\");\n    let a = &s[0..5];\n    let b = &s[6..11];\n    println!(\"{} {}\", a, b);\n}\n",
+    "expect": "ok", "out": "hello world\n", "err": "", "exit": 0,
+    "why": "a text slice is a &str that points into the String", "pr": "P7"
+  },
+  {
+    "id": "slice-str-forms",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    println!(\"{} {} {} {}\", &s[..2], &s[3..], &s[..], &s[1..=2]);\n}\n",
+    "expect": "ok", "out": "he lo hello el\n", "err": "", "exit": 0,
+    "why": "the open ends and the inclusive end of a text range", "pr": "P7"
+  },
+  {
+    "id": "slice-str-var-bounds",
+    "src": "fn main() {\n    let s = String::from(\"hello world\");\n    let n = s.len();\n    let mid = 5;\n    println!(\"[{}] [{}]\", &s[..mid], &s[mid + 1..n]);\n}\n",
+    "expect": "ok", "out": "[hello] [world]\n", "err": "", "exit": 0,
+    "why": "bounds are ordinary usize values", "pr": "P7"
+  },
+  {
+    "id": "slice-str-of-str",
+    "src": "fn tail(s: &str) -> &str {\n    &s[1..]\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    println!(\"{}\", tail(tail(&s)));\n}\n",
+    "expect": "ok", "out": "llo\n", "err": "", "exit": 0,
+    "why": "a slice of a &str is a &str, and it can be sliced again", "pr": "P7"
+  },
+  {
+    "id": "slice-str-of-ref-string",
+    "src": "fn head(s: &String) -> &str {\n    &s[..3]\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    println!(\"{}\", head(&s));\n}\n",
+    "expect": "ok", "out": "hel\n", "err": "", "exit": 0,
+    "why": "a &String can be sliced like the String", "pr": "P7"
+  },
+  {
+    "id": "slice-str-literal",
+    "src": "fn main() {\n    let s = \"hello\";\n    let t = &s[1..3];\n    println!(\"{} {}\", s, t);\n}\n",
+    "expect": "ok", "out": "hello el\n", "err": "", "exit": 0,
+    "why": "a literal is already a &str and slices the same way", "pr": "P7"
+  },
+  {
+    "id": "slice-str-empty",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    println!(\"[{}] [{}]\", &s[2..2], &s[5..]);\n}\n",
+    "expect": "ok", "out": "[] []\n", "err": "", "exit": 0,
+    "why": "an empty range at the end is fine", "pr": "P7"
+  },
+  {
+    "id": "slice-str-oob",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let n = 10;\n    println!(\"{}\", &s[0..n]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:22:\nend byte index 10 is out of bounds for string of length 5\n", "exit": 101,
+    "why": "an end past the length panics at run time", "pr": "P7"
+  },
+  {
+    "id": "slice-str-begin-end",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let a = 4;\n    let b = 2;\n    println!(\"{}\", &s[a..b]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:22:\nbyte range starts at 4 but ends at 2\n", "exit": 101,
+    "why": "a start after the end panics at run time", "pr": "P7"
+  },
+  {
+    "id": "slice-str-from-oob",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let a = 7;\n    println!(\"{}\", &s[a..]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:22:\nstart byte index 7 is out of bounds for string of length 5\n", "exit": 101,
+    "why": "an open range that starts past the length panics at run time", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-basic",
+    "src": "fn main() {\n    let a = [10, 20, 30, 40, 50];\n    let b = &a[1..4];\n    println!(\"{:?} {}\", b, b.len());\n}\n",
+    "expect": "ok", "out": "[20, 30, 40] 3\n", "err": "", "exit": 0,
+    "why": "an array slice prints like an array and knows its length", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-forms",
+    "src": "fn main() {\n    let a = [1, 2, 3, 4];\n    println!(\"{:?} {:?} {:?} {:?}\", &a[..2], &a[2..], &a[..], &a[1..=2]);\n}\n",
+    "expect": "ok", "out": "[1, 2] [3, 4] [1, 2, 3, 4] [2, 3]\n", "err": "", "exit": 0,
+    "why": "the same range forms on an array", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-param",
+    "src": "fn sum(xs: &[i32]) -> i32 {\n    let mut i = 0;\n    let mut t = 0;\n    while i < xs.len() {\n        t += xs[i];\n        i += 1;\n    }\n    t\n}\n\nfn main() {\n    let a = [1, 2, 3, 4];\n    println!(\"{} {} {}\", sum(&a), sum(&a[1..3]), sum(&a[2..]));\n}\n",
+    "expect": "ok", "out": "10 5 7\n", "err": "", "exit": 0,
+    "why": "one function takes a whole array or any part of it", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-of-slice",
+    "src": "fn mid(xs: &[i32]) -> &[i32] {\n    &xs[1..3]\n}\n\nfn main() {\n    let a = [1, 2, 3, 4, 5];\n    println!(\"{:?}\", mid(mid(&a)));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:8:\nrange end index 3 out of range for slice of length 2\n", "exit": 101,
+    "why": "a slice of a slice counts from the start of the inner slice", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-len-array",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", a.len());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "len works on an array too", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-end-oob",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let n = 5;\n    println!(\"{:?}\", &a[1..n]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:24:\nrange end index 5 out of range for slice of length 3\n", "exit": 101,
+    "why": "an array slice end past the length panics", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-order",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let i = 2;\n    let j = 1;\n    println!(\"{:?}\", &a[i..j]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:24:\nslice index starts at 2 but ends at 1\n", "exit": 101,
+    "why": "an array slice that starts after it ends panics", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-start-oob",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let i = 5;\n    println!(\"{:?}\", &a[i..]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:24:\nrange start index 5 out of range for slice of length 3\n", "exit": 101,
+    "why": "an open array slice that starts past the length panics", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-index-oob",
+    "src": "fn get(xs: &[i32], i: usize) -> i32 {\n    xs[i]\n}\n\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", get(&a[1..], 2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 2 but the index is 2\n", "exit": 101,
+    "why": "indexing a slice checks against the slice length, not the array", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-const-oob",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let b = &a[1..9];\n    println!(\"{:?}\", b);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:15:\nrange end index 9 out of range for slice of length 3\n", "exit": 101,
+    "why": "a constant range past an array is a run-time panic, not a lint", "pr": "P7"
+  },
+  {
+    "id": "slice-str-const-oob",
+    "src": "fn main() {\n    let s = \"hello\";\n    println!(\"{}\", &s[2..9]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:22:\nend byte index 9 is out of bounds for string of length 5\n", "exit": 101,
+    "why": "a constant range past a literal is a run-time panic, not a lint", "pr": "P7"
+  },
+  {
+    "id": "slice-of-slice-index-oob",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let b = &a[..];\n    println!(\"{}\", b[5]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nindex out of bounds: the len is 3 but the index is 5\n", "exit": 101,
+    "why": "indexing through a slice is checked at run time, so no lint fires", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-strings",
+    "src": "fn main() {\n    let a = [String::from(\"x\"), String::from(\"y\")];\n    let b = &a[..1];\n    println!(\"{:?} {}\", b, b.len());\n}\n",
+    "expect": "ok", "out": "[\"x\"] 1\n", "err": "", "exit": 0,
+    "why": "slicing an array of Strings only borrows", "pr": "P7"
+  },
+  {
+    "id": "elide-one-param",
+    "src": "fn pick(s: &str) -> &str {\n    s\n}\n\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", pick(&s));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "one reference parameter: the result borrows from it", "pr": "P7"
+  },
+  {
+    "id": "elide-string-ref",
+    "src": "fn same(s: &String) -> &String {\n    s\n}\n\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", same(&s));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the same elision for a &String", "pr": "P7"
+  },
+  {
+    "id": "elide-extra-owned",
+    "src": "fn pick(s: &str, n: usize) -> &str {\n    &s[..n]\n}\n\nfn main() {\n    println!(\"{}\", pick(\"hello\", 2));\n}\n",
+    "expect": "ok", "out": "he\n", "err": "", "exit": 0,
+    "why": "an owned parameter next to the one reference does not matter", "pr": "P7"
+  },
+  {
+    "id": "elide-static",
+    "src": "fn name(a: &str, b: &str) -> &'static str {\n    \"fixed\"\n}\n\nfn main() {\n    println!(\"{}\", name(\"a\", \"b\"));\n}\n",
+    "expect": "ok", "out": "fixed\n", "err": "", "exit": 0,
+    "why": "&'static str needs no elision, whatever the parameters", "pr": "P7"
+  },
+  {
+    "id": "elide-two-ok",
+    "src": "fn pick(a: &str, b: i32) -> &str {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(\"a\", 1));\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the accepted twin of elide-two", "pr": "P7"
+  },
+  {
+    "id": "elide-none",
+    "src": "fn dangle() -> &String {\n    let s = String::from(\"hi\");\n    &s\n}\n\nfn main() {\n    dangle();\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "elide-none-ok",
+    "why": "no parameter to borrow from", "pr": "P7"
+  },
+  {
+    "id": "elide-none-ok",
+    "src": "fn dangle() -> String {\n    let s = String::from(\"hi\");\n    s\n}\n\nfn main() {\n    dangle();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the accepted twin of elide-none: return the String itself", "pr": "P7"
+  },
+  {
+    "id": "elide-two",
+    "src": "fn pick(a: &str, b: &str) -> &str {\n    a\n}\n\nfn main() {\n    println!(\"{}\", pick(\"a\", \"b\"));\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "elide-two-ok",
+    "why": "two reference parameters: Rust cannot tell which one the result borrows", "pr": "P7"
+  },
+  {
+    "id": "elide-slice-of-refs",
+    "src": "fn pick(xs: &[&str]) -> &str {\n    xs[0]\n}\n\nfn main() {\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "elide-slice-of-refs-ok",
+    "why": "a &[&str] holds two lifetimes, so the result has no single one to borrow from", "pr": "P7"
+  },
+  {
+    "id": "elide-slice-of-refs-ok",
+    "src": "fn pick(xs: &[i32]) -> i32 {\n    xs[0]\n}\n\nfn main() {\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the accepted twin of elide-slice-of-refs", "pr": "P7"
+  },
+  {
+    "id": "elide-owned-param",
+    "src": "fn pick(s: String) -> &str {\n    \"x\"\n}\n\nfn main() {\n    println!(\"{}\", pick(String::new()));\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "elide-owned-param-ok",
+    "why": "an owned parameter gives nothing to borrow from", "pr": "P7"
+  },
+  {
+    "id": "elide-owned-param-ok",
+    "src": "fn pick(s: String) -> &'static str {\n    \"x\"\n}\n\nfn main() {\n    println!(\"{}\", pick(String::new()));\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "the accepted twin of elide-owned-param", "pr": "P7"
+  },
+  {
+    "id": "ret-local-ref",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    &t\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": {"code": "E0515", "line": 3}, "pair": "ret-local-ref-ok",
+    "why": "a reference to a local cannot leave the function", "pr": "P7"
+  },
+  {
+    "id": "ret-local-ref-ok",
+    "src": "fn make(s: &str) -> String {\n    let t = s.to_owned();\n    t\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-local-ref", "pr": "P7"
+  },
+  {
+    "id": "ret-local-slice",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    &t[0..1]\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": {"code": "E0515", "line": 3}, "pair": "ret-local-slice-ok",
+    "why": "a slice of a local is still a borrow of the local", "pr": "P7"
+  },
+  {
+    "id": "ret-local-slice-ok",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    &s[0..1]\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": "ok", "out": "h\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-local-slice: the slice borrows from the parameter", "pr": "P7"
+  },
+  {
+    "id": "ret-local-as-str",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    t.as_str()\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": {"code": "E0515", "line": 3}, "pair": "ret-local-as-str-ok",
+    "why": "as_str borrows the local String", "pr": "P7"
+  },
+  {
+    "id": "ret-local-as-str-ok",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    t.as_str();\n    s\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-local-as-str", "pr": "P7"
+  },
+  {
+    "id": "ret-param-ref",
+    "src": "fn make(s: &str, t: String) -> &str {\n    &t\n}\n\nfn main() {\n    println!(\"{}\", make(\"a\", String::new()));\n}\n",
+    "expect": {"code": "E0515", "line": 2}, "pair": "ret-param-ref-ok",
+    "why": "an owned parameter is freed when the function returns", "pr": "P7"
+  },
+  {
+    "id": "ret-param-ref-ok",
+    "src": "fn make(s: &str, t: String) -> &str {\n    s\n}\n\nfn main() {\n    println!(\"{}\", make(\"a\", String::new()));\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-param-ref", "pr": "P7"
+  },
+  {
+    "id": "ret-local-via-var",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    let r = &t;\n    r\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": {"code": "E0515", "line": 4}, "pair": "ret-local-via-var-ok",
+    "why": "the returned reference still points at the local", "pr": "P7"
+  },
+  {
+    "id": "ret-local-via-var-ok",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    let r = s;\n    r\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-local-via-var", "pr": "P7"
+  },
+  {
+    "id": "ret-local-early",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    if s.len() > 1 {\n        return &t;\n    }\n    s\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": {"code": "E0515", "line": 4}, "pair": "ret-local-early-ok",
+    "why": "an early return of a local reference", "pr": "P7"
+  },
+  {
+    "id": "ret-local-early-ok",
+    "src": "fn make(s: &str) -> &str {\n    let t = s.to_owned();\n    if s.len() > 1 {\n        return s;\n    }\n    s\n}\n\nfn main() {\n    println!(\"{}\", make(\"hi\"));\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ret-local-early", "pr": "P7"
+  },
+  {
+    "id": "slice-then-push",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    s.push_str(\"!\");\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 8}, "pair": "slice-then-push-ok",
+    "why": "the returned slice keeps the String borrowed", "pr": "P7"
+  },
+  {
+    "id": "slice-then-push-ok",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    s.push_str(\"!\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hello!\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-then-push: the slice is not used after the change", "pr": "P7"
+  },
+  {
+    "id": "slice-then-push-order",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    println!(\"{}\", w);\n    s.push_str(\"!\");\n}\n",
+    "expect": "ok", "out": "he\n", "err": "", "exit": 0,
+    "why": "the slice is used up first, then the String changes", "pr": "P7"
+  },
+  {
+    "id": "slice-then-move",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    let w = first(&s);\n    drop(s);\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0505", "line": 8}, "pair": "slice-then-move-ok",
+    "why": "a String cannot move while a slice of it is in use", "pr": "P7"
+  },
+  {
+    "id": "slice-then-move-ok",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    let w = first(&s);\n    drop(s);\n    println!(\"{}\", 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-then-move: the slice is not used after the move", "pr": "P7"
+  },
+  {
+    "id": "slice-then-move-order",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let s = String::from(\"hello\");\n    let w = first(&s);\n    println!(\"{}\", w);\n    drop(s);\n}\n",
+    "expect": "ok", "out": "he\n", "err": "", "exit": 0,
+    "why": "the slice is used up first, then the String moves", "pr": "P7"
+  },
+  {
+    "id": "slice-then-assign",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    s = String::from(\"bye\");\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0506", "line": 8}, "pair": "slice-then-assign-ok",
+    "why": "assigning to a String while a slice of it is in use", "pr": "P7"
+  },
+  {
+    "id": "slice-then-assign-ok",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    s = String::from(\"bye\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "bye\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-then-assign: the slice is not used after the assignment", "pr": "P7"
+  },
+  {
+    "id": "slice-then-assign-order",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(&s);\n    println!(\"{}\", w);\n    s = String::from(\"bye\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "he\nbye\n", "err": "", "exit": 0,
+    "why": "the slice is used up first, then the String is assigned", "pr": "P7"
+  },
+  {
+    "id": "slice-local-then-push",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let w = &s[0..2];\n    s.push_str(\"!\");\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "slice-local-then-push-ok",
+    "why": "a slice written in place keeps the String borrowed", "pr": "P7"
+  },
+  {
+    "id": "slice-local-then-push-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let w = &s[0..2];\n    s.push_str(\"!\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hello!\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-local-then-push", "pr": "P7"
+  },
+  {
+    "id": "slice-local-then-push-order",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let w = &s[0..2];\n    println!(\"{}\", w);\n    s.push_str(\"!\");\n}\n",
+    "expect": "ok", "out": "he\n", "err": "", "exit": 0,
+    "why": "the slice is used up before the String changes", "pr": "P7"
+  },
+  {
+    "id": "slice-chain-then-push",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(first(&s));\n    s.push_str(\"!\");\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 8}, "pair": "slice-chain-then-push-ok",
+    "why": "a slice of a slice still borrows the String", "pr": "P7"
+  },
+  {
+    "id": "slice-chain-then-push-ok",
+    "src": "fn first(s: &str) -> &str {\n    &s[0..2]\n}\n\nfn main() {\n    let mut s = String::from(\"hello\");\n    let w = first(first(&s));\n    s.push_str(\"!\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hello!\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-chain-then-push", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-assign",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let s = &a[1..];\n    a = [4, 5, 6];\n    println!(\"{:?}\", s);\n}\n",
+    "expect": {"code": "E0506", "line": 4}, "pair": "slice-arr-assign-ok",
+    "why": "assigning to an array while a slice of it is in use", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-assign-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let s = &a[1..];\n    a = [4, 5, 6];\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[4, 5, 6]\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-arr-assign", "pr": "P7"
+  },
+  {
+    "id": "slice-arr-assign-order",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let s = &a[1..];\n    println!(\"{:?}\", s);\n    a = [4, 5, 6];\n}\n",
+    "expect": "ok", "out": "[2, 3]\n", "err": "", "exit": 0,
+    "why": "the slice is used up before the array is assigned", "pr": "P7"
+  },
+  {
+    "id": "slice-scope-end",
+    "src": "fn main() {\n    let w: &str;\n    {\n        let t = String::from(\"hi\");\n        w = &t[..];\n    }\n    println!(\"{}\", w);\n}\n",
+    "expect": {"code": "E0597", "line": 5}, "pair": "slice-scope-end-ok",
+    "why": "the slice outlives the String it points into", "pr": "P7"
+  },
+  {
+    "id": "slice-scope-end-ok",
+    "src": "fn main() {\n    let w: &str;\n    {\n        let t = String::from(\"hi\");\n        w = &t[..];\n        println!(\"{}\", w);\n    }\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-scope-end", "pr": "P7"
+  },
+  {
+    "id": "ref-shared-to-mut",
+    "src": "fn grow(s: &mut String) {\n    s.push_str(\"!\");\n}\n\nfn main() {\n    let mut s = String::from(\"hi\");\n    grow(&s);\n    println!(\"{}\", s);\n}\n",
+    "expect": {"code": "E0308", "line": 7}, "pair": "ref-shared-to-mut-ok",
+    "why": "a & loan never stands in for a &mut one", "pr": "P7"
+  },
+  {
+    "id": "ref-shared-to-mut-ok",
+    "src": "fn grow(s: &mut String) {\n    s.push_str(\"!\");\n}\n\nfn main() {\n    let mut s = String::from(\"hi\");\n    grow(&mut s);\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hi!\n", "err": "", "exit": 0,
+    "why": "the accepted twin of ref-shared-to-mut", "pr": "P7"
+  },
+  {
+    "id": "slice-two-readers",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let a = &s[..2];\n    let b = &s[2..];\n    let c = &s;\n    println!(\"{} {} {}\", a, b, c);\n}\n",
+    "expect": "ok", "out": "he llo hello\n", "err": "", "exit": 0,
+    "why": "many shared borrows of one String at once", "pr": "P7"
+  },
+  {
+    "id": "slice-reader-writer",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let a = &s[..2];\n    let m = &mut s;\n    m.push_str(\"!\");\n    println!(\"{}\", a);\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "slice-reader-writer-ok",
+    "why": "a slice and a &mut of the same String cannot overlap", "pr": "P7"
+  },
+  {
+    "id": "slice-reader-writer-ok",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let a = &s[..2];\n    let m = &mut s;\n    m.push_str(\"!\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "hello!\n", "err": "", "exit": 0,
+    "why": "the accepted twin of slice-reader-writer", "pr": "P7"
+  },
+  {
+    "id": "slice-reader-writer-order",
+    "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let a = &s[..2];\n    println!(\"{}\", a);\n    let m = &mut s;\n    m.push_str(\"!\");\n}\n",
+    "expect": "ok", "out": "he\n", "err": "", "exit": 0,
+    "why": "the slice is used up before the &mut starts", "pr": "P7"
   }
 ]

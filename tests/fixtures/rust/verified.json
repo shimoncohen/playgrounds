@@ -2,10 +2,10 @@
   "rustc": "1.99.1",
   "edition": "2024",
   "date": "2026-11-08",
-  "inputsHash": "62ee8cd2048779be810ed338f74e435dfda3d6f8c0a2c1f89b9f820831313453",
-  "resultsHash": "e6da4b9986788166b33d66c05d7569fe1a284ac9279123194220155896377f48",
+  "inputsHash": "64a1349bdf35a7e32b13394a05e8db74e892a9d40de4e52b67e4573601a3500c",
+  "resultsHash": "5ef45f29b8cd5f38813552c5fb70e6ab1e0faa34cea3ed0e7acde85dbd3912f9",
   "counts": {
-    "corpus": 237,
-    "missions": 254
+    "corpus": 309,
+    "missions": 345
   }
 }

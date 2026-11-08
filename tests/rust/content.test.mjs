@@ -12,7 +12,8 @@ const DIR = path.join(ROOT, 'programming', 'rust-quest');
 const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why can\'t I change it?', 'Lose a life', 'Same name, new variable'],
   ['Say what kind of number', 'Numbers with a decimal point', 'Change a type with as', 'Keep values together in a tuple', 'Line values up in an array', 'A value that never changes', 'A number too big for its type', 'When a program panics'],
   ['Write your own function', 'The semicolon that ate the value', 'Choose with if and else', 'An if that gives back a value', 'Repeat until you break out', 'Count down with while', 'Walk through a range with for', 'A typo in a name'],
-  ['Put text on the heap', 'One owner at a time', 'Numbers just copy', 'Copy a String on purpose', 'Take it in, give it back', 'Free a String early']];
+  ['Put text on the heap', 'One owner at a time', 'Numbers just copy', 'Copy a String on purpose', 'Take it in, give it back', 'Free a String early'],
+  ['Lend instead of give', 'Borrow it to change it', 'Many readers at once', 'Readers first, then the writer', 'Take a slice', 'A function that hands back a slice', 'A slice keeps its String borrowed', 'Which input does it borrow from?', 'A reference to something that is gone']];
 const want = (m) => m.expect || 'ok';
 
 describe('chapter and mission ids are append only', () => {
@@ -123,7 +124,7 @@ describe('extras', () => {
   });
   it('the guide explains every new error and lint id and panics', () => {
     const text = RQ.GUIDE.map((g) => g.c + g.what).join(' ');
-    for (const w of ['E0308', 'E0425', 'E0382', 'arithmetic_overflow', 'overflowing_literals', 'unconditional_panic', 'panic']) assert.ok(text.includes(w), w);
+    for (const w of ['E0308', 'E0425', 'E0382', 'E0502', 'E0596', 'E0106', 'E0515', 'arithmetic_overflow', 'overflowing_literals', 'unconditional_panic', 'panic']) assert.ok(text.includes(w), w);
   });
 });
 
