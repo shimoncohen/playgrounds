@@ -27,7 +27,7 @@ RQ.compile=src=>{
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
   if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}
-  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,loans,moves,maxLive,
+  return {ast:r.ast,diags,unsupported:unsupported.sort((a,b)=>a.line-b.line),info:ck.info,adts:ck.adts,loans,moves,maxLive,
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
@@ -164,7 +164,7 @@ RQ.run=(src,opts)=>{
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
     if(c.diags.length)return context({status:'error',errors:c.diags,view:opts.snap?errorView(c):null},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context({...RQ.interp(c.ast,{...opts,info:c.info,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
+    return context({...RQ.interp(c.ast,{...opts,info:c.info,adts:c.adts,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
   }catch(e){
     return context({status:'internal',message:String(e&&e.message||e)},ast);
   }

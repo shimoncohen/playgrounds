@@ -50,13 +50,11 @@ function analyse(F,errors,un){
   const deferred=new Set(),found=[],binds=new Map();
   for(const b of B)for(const i of b.instrs){
     if(i.op==='decl'&&i.uninit)deferred.add(i.l);
-    // the paths a match moves into its names
     if(i.grp!==undefined&&i.op==='assign'&&i.rv.k==='use'&&i.rv.x.k==='move'&&L[i.rv.x.l].path){
       if(!binds.has(i.grp))binds.set(i.grp,new Set());
       binds.get(i.grp).add(i.rv.x.l);
     }
   }
-  // what is wrong with l at this point: moved (it or an ancestor), partially moved (a descendant), or not yet initialised
   const bad=(s,l)=>{
     if(s[l]&MOVED)return {code:'E0382',at:l};
     for(const a of A[l])if(s[a]&MOVED)return {code:'E0382',at:a};

@@ -506,10 +506,10 @@ RQ.parse=tokens=>{
     if(isK('enum')){
       p++;const n=ident(),gs=generics();where();expP('{');const variants=[];
       while(!isP('}')){
-        attrs();const v=ident();let kind='unit',fields=[],disc=null;
+        const vat=attrs(),v=ident();let kind='unit',fields=[],disc=null;
         if(isP('(')){kind='tuple';fields=fieldsTuple();}else if(isP('{')){kind='named';fields=fieldsNamed();}
         if(eatP('='))disc=expr(false);
-        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc}));
+        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat}));
         if(!eatP(','))break;
       }
       expP('}');return mk('Enum',x,{name:n.v,generics:gs,variants,attrs:at,pub});
@@ -539,9 +539,9 @@ RQ.parse=tokens=>{
       return mk('TypeAlias',x,{name:n.v,generics:gs,bounds:bs,ty:t,pub});
     }
     if(isK('use')){
-      p++;let depth=0;
-      while(T().k!=='eof'&&!(depth===0&&isP(';'))){const z=T();if(z.k==='punct'){if(z.v==='{')depth++;else if(z.v==='}')depth--;}if(z.k==='ident'&&OUT.has(z.v))feat(z.v,z.line);p++;}
-      semi();return mk('Use',x,{pub});
+      p++;let depth=0;const txt=[];
+      while(T().k!=='eof'&&!(depth===0&&isP(';'))){const z=T();if(z.k==='punct'){if(z.v==='{')depth++;else if(z.v==='}')depth--;}if(z.k==='ident'&&OUT.has(z.v))feat(z.v,z.line);txt.push(z.v);p++;}
+      semi();return mk('Use',x,{pub,txt:txt.join(' ')});
     }
     if(isK('mod')){
       p++;const n=ident();
