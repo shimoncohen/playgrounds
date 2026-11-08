@@ -82,19 +82,19 @@ describe('lowering: the instructions', () => {
     assert.deepEqual(dump(mfn(S + '    let n = 5;\n    println!("{} {n}", s);')), [
       'decl s', 's = String::new()', 'decl n', 'n = const', '_2 = &s', '_3 = &n', 'println!(copy _2, copy _3)', 'dead n', 'dead s', 'return']);
   });
-  it('a println! of a reference local borrows it like an owned one, and so does a Field or Index argument its root', () => {
+  it('a println! of a reference local borrows it like an owned one, a Field argument borrows just that field and an Index its root', () => {
     assert.deepEqual(dump(mfn('    let x = 1;\n    let r = &x;\n    let t = (1, 2);\n    let a = [1, 2];\n    let i = 0;\n    println!("{} {} {}", r, t.0, a[i]);')), [
       'decl x', 'x = const', 'decl r', 'r = &x', 'decl t', 't = agg(const, const)', 'decl a', 'a = agg(const, const)', 'decl i', 'i = const',
-      '_5 = &r', '_6 = &t', 'op(copy i)', '_7 = &a', 'println!(copy _5, copy _6, copy _7)', 'dead i', 'dead a', 'dead t', 'dead r', 'dead x', 'return']);
+      '_5 = &r', '_7 = &t.0', 'op(copy i)', '_8 = &a', 'println!(copy _5, copy _7, copy _8)', 'dead i', 'dead a', 'dead t', 'dead r', 'dead x', 'return']);
   });
   it('Copy and non-Copy operands are classified by type, a tuple holding a String moves', () => {
     const f = mfn('', 'fn f(p: (String, i32), q: (i32, i32)) { let a = p; let b = q; }', 'f');
     assert.deepEqual(dump(f), ['decl a', 'a = move p', 'decl b', 'b = copy q', 'dead b', 'dead a', 'dead q', 'dead p', 'return']);
     assert.deepEqual(f.locals.map((l) => [l.name, l.param, l.mut]), [['p', true, false], ['q', true, false], ['a', false, false], ['b', false, false]]);
   });
-  it('reading a Field or Index is a copy of the root, and the index is a use', () => {
+  it('reading a Field is a copy of that field, an Index a copy of the root, and the index is a use', () => {
     assert.deepEqual(dump(mfn(S + '    let t = (1, 2);\n    let a = [1, 2];\n    let i = 0;\n    let x = t.0;\n    let y = a[i];')).slice(8), [
-      'decl x', 'x = copy t', 'decl y', 'y = op(copy a, copy i)', 'dead y', 'dead x', 'dead i', 'dead a', 'dead t', 'dead s', 'return']);
+      'decl x', 'x = copy t.0', 'decl y', 'y = op(copy a, copy i)', 'dead y', 'dead x', 'dead i', 'dead a', 'dead t', 'dead s', 'return']);
   });
   it('a String local moves into a call, a &T copies, a &mut passed to a call or method is a use and not a move', () => {
     assert.deepEqual(dump(mfn(S + '    let t = s;\n    drop(t);')).slice(2, 6), ['decl t', 't = move s', 'drop(move t)', 'dead t']);
@@ -193,7 +193,7 @@ describe('lowering: control flow', () => {
 
 describe('what the mir pass leaves unsupported', () => {
   it('reports the trigger with its line, in an analysed fn', () => {
-    assert.equal(un('    let t = (1, 2);\n    let r = &t.0;'), 'borrow of a field@4');
+    assert.equal(un('    let a = [1, 2];\n    let r = &a[1];'), 'borrow of a field@4');
     assert.equal(un('    let a = [1, 2];\n    let r = &a[0];'), 'borrow of a field@4');
     assert.equal(un('    let r = &5;'), 'temporary borrow@3');
     assert.equal(un('    let r = &String::new();'), 'temporary borrow@3');
@@ -201,7 +201,6 @@ describe('what the mir pass leaves unsupported', () => {
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    let r2: &mut i32 = r;'), 'reborrow@5');
     assert.equal(un('    let x = 1;\n    let r = &x;\n    let r2 = &*r;'), 'reborrow@5');
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    let r2 = &mut *r;'), 'reborrow@5');
-    assert.equal(un('    let t = (String::from("a"), 1);\n    let s = t.0;'), 'partial move@4');
     assert.equal(un('    let a = [String::new()];\n    let s = a[0];'), 'partial move@4');
     assert.equal(un('    let s = String::new();\n    let r = &s;\n    let t = *r;'), 'move out of reference@5');
     assert.equal(un('    let mut s = String::from("a");\n    s.push_str(&s);'), 'two-phase borrow@4');

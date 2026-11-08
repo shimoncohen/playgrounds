@@ -4,7 +4,7 @@ const RQ=globalThis.RQ=globalThis.RQ||{};
 const MAX_PAD=1000;
 class Unmodeled extends Error{}
 class Over extends Error{}
-const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],
+const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],[/^#\?$/,()=>({debug:true,pretty:true,prec:null,width:null})],
   [/^\.(\d{1,3})$/,m=>({debug:false,prec:+m[1],width:null})],[/^>(\d{1,3})$/,m=>({debug:false,prec:null,width:+m[1]})]];
 const fmtOf=s=>{for(const [re,mk] of SPECS){const m=re.exec(s);if(m)return mk(m);}return null;};
 // `spec` is set for a `:` spec outside {:?} {:.N} {:>N}, which is not modeled
@@ -99,24 +99,34 @@ function display(v){
 }
 // tick is called once per value printed, so a big array counts against the step budget
 // room is how many chars the text may still have; past it Over is thrown, so a nested value never builds far beyond the output cap
-function debug(v,tick,room=Infinity){
+// pretty is {:#?}: one item per line, each indented by four spaces, with a trailing comma
+function debug(v,tick,room=Infinity,pretty=false){
   if(tick)tick();
   let used=0;
-  const sub=x=>{const s=debug(x,tick,room-used);used+=s.length+2;if(used>room)throw new Over();return s;};
+  const sub=x=>{const s=debug(x,tick,room-used,pretty);used+=s.length+2;if(used>room)throw new Over();return s;};
+  const wrap=(head,open,close,items,spaced)=>pretty
+    ?head+open+'\n'+items.map(x=>'    '+x.replace(/\n/g,'\n    ')+',\n').join('')+close
+    :head+open+(spaced?' ':'')+items.join(', ')+(spaced?' ':'')+close;
   v=unref(v);
   switch(v.k){
     case 'float':return f64(v.v,'?');
     case 'char':return quoted(v.v,"'",room);
     case 'str':case 'String':return quoted(v.v,'"',room);
     case 'unit':return '()';
-    case 'tuple':return '('+v.v.map(sub).join(', ')+(v.v.length===1?',':'')+')';
-    case 'array':return '['+v.v.map(sub).join(', ')+']';
+    case 'tuple':{const items=v.v.map(sub);return !pretty&&items.length===1?'('+items[0]+',)':wrap('','(',')',items,false);}
+    case 'array':return v.v.length?wrap('','[',']',v.v.map(sub),false):'[]';
+    case 'struct':case 'enum':{
+      const nm=v.k==='struct'?v.name:v.variant;
+      const items=v.fields.map(f=>v.kind==='named'?f.name+': '+sub(f.val):sub(f.val));
+      if(!items.length)return nm;
+      return v.kind==='named'?wrap(nm+' ','{','}',items,true):wrap(nm,'(',')',items,false);
+    }
     default:return display(v);
   }
 }
 // width counts characters, as Rust does
 function render(v,fmt,tick,room){
-  const s=fmt.debug?debug(v,tick,room):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
+  const s=fmt.debug?debug(v,tick,room,fmt.pretty):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
   if(fmt.width===null)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }

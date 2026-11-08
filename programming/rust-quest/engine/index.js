@@ -5,17 +5,25 @@
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
 
+const BORROWCK=['E0384','E0594','E0596','E0507'];
 RQ.compile=src=>{
   const r=RQ.parse(RQ.lex(src));
   if(r.errors.length)return {ast:null,diags:r.errors,unsupported:[]};
   const ck=RQ.check(r.ast);
-  let diags=ck.errors,loans=[],moves=[],maxLive={shared:0,mut:0};
+  // rustc skips borrowck for a body whose typeck failed, and still runs it on the others
+  const typeck=ck.errors.filter(e=>!BORROWCK.includes(e.code));
+  const bad=[];
+  RQ.walk(r.ast,n=>{if(n.t==='Fn'&&n.body&&typeck.some(e=>n.line<=e.line&&e.line<=lastLine(n)))bad.push([n.line,lastLine(n)]);});
+  const inBad=e=>bad.some(([a,z])=>a<=e.line&&e.line<=z);
+  const global=typeck.some(e=>!inBad(e));
+  let diags=global?typeck:ck.errors.filter(e=>!(BORROWCK.includes(e.code)&&inBad(e))),loans=[],moves=[],maxLive={shared:0,mut:0};
   const unsupported=[...r.unsupported,...ck.unsupported];
-  // E0384 is a borrowck error in rustc, so the pass still runs when it is the only thing the checker found
-  if(!unsupported.length&&diags.every(e=>e.code==='E0384')){
-    const b=RQ.borrow(r.ast,ck.info);
-    diags=[...diags,...b.errors].sort((a,b)=>a.line-b.line||a.col-b.col);
-    unsupported.push(...b.unsupported);loans=b.loans;moves=b.moves;maxLive=b.maxLive;
+  // E0384, E0594 and a shared-reference E0596 are borrowck errors in rustc, so the pass still runs when the checker found only those, or typeck errors confined to other fns
+  if(!unsupported.length&&!global){
+    const live=n=>!(n.t==='Fn'&&n.body&&inBad(n));
+    const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
+    diags=[...diags,...b.errors.filter(e=>!inBad(e))].sort((a,b)=>a.line-b.line||a.col-b.col);
+    unsupported.push(...b.unsupported.filter(u=>!inBad(u)));loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
   if(!diags.length&&!unsupported.length){const l=RQ.lint(r.ast,ck.info);diags=l.errors;unsupported.push(...l.unsupported);}

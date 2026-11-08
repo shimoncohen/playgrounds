@@ -267,7 +267,7 @@ RQ.parse=tokens=>{
       if(pr===undefined||pr<min)return l;
       p++;
       const r=bin(pr+1,ns);
-      l=mk('Binary',x,{op:x.v,lhs:l,rhs:r,line:l.line,col:l.col});
+      l=mk('Binary',x,{op:x.v,lhs:l,rhs:r,line:l.line,col:l.col,oline:x.line,ocol:x.col});
     }
   }
   function unary(ns){
@@ -288,12 +288,12 @@ RQ.parse=tokens=>{
       if(isP('.')){
         p++;const n=T();
         if(isK('await')){p++;feat('async',n.line);e=mk('Await',n,{expr:e});continue;}
-        if(n.k==='int'){p++;e=mk('Field',n,{expr:e,name:n.v,line:e.line,col:e.col});continue;}
+        if(n.k==='int'){p++;e=mk('Field',n,{expr:e,name:n.v,line:e.line,col:e.col,nline:n.line});continue;}
         if(n.k==='float'&&/^\d+\.\d+$/.test(n.v)){p++;for(const part of n.v.split('.'))e=mk('Field',n,{expr:e,name:part,line:e.line,col:e.col});continue;}
         const id=ident();let targs=null;
         if(isP('::')&&isP('<',pk())){p+=2;targs=genericArgs();}
-        if(isP('(')){p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col});}
-        else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col});
+        if(isP('(')){p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});}
+        else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col,nline:id.line});
         continue;
       }
       return e;
