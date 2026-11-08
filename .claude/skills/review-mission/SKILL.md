@@ -19,4 +19,6 @@ For each changed mission, in order:
 
 9. **Dependency and flow**: list every term, command, option and concept the mission's text and question use, and name the earlier mission (by key) that taught each. Anything not taught before it, and not defined in place, is a finding (guideline section 6, "Teach before use"). Check the chapter intro, hint, `explain`, quick-fire and guide entries too, and read the first three missions as a day-one learner with no outside knowledge.
 
+10. **On the story**: the mission fits its chapter's `story` line and the playground's `story.js` (world, places, cast). Generic text (`foo`, `bar`, `test.txt`, `x = 5`, a plain topic lesson with no world in it), a new world or a one-off character, or a story sentence that replaces the explanation or uses an untaught term, is a finding (`docs/story-guideline.md` section 4).
+
 Output: findings list, most severe first, each with mission id, the exact input that breaks it, and the fix. Say "no findings" only after trying step 2.

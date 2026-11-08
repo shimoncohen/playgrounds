@@ -1,6 +1,6 @@
 # Tiers guideline
 
-How to add difficulty tiers (Beginner, Intermediate, ...) to a playground, and how to write missions that hold up. Shell Quest is the reference implementation; every claim here is checked against its code. The design is in `docs/superpowers/specs/2026-10-19-shell-quest-tiers-design.md`.
+How to add difficulty tiers (Beginner, Intermediate, ...) to a playground, and how to write missions that hold up. Shell Quest is the reference implementation; every claim here is checked against its code. The design is in `docs/superpowers/specs/2026-10-19-shell-quest-tiers-design.md`. The treasure-hunt story every playground follows (world, cast, one leg per chapter) is in [story-guideline.md](story-guideline.md).
 
 ## 1. The tier model
 
