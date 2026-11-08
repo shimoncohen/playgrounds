@@ -37,7 +37,6 @@ describe('structs: named, tuple and unit', () => {
     assert.equal(feature(P('struct P {', '    o: Option<P>,', '}', 'fn main() {}')), 'struct@1');
     assert.equal(feature(P('struct P(i32);', 'fn P() {}', 'fn main() {}')), 'struct@1');
     assert.equal(feature(P(...PT, 'fn main() {', '    let a = Pt { x: 1, y: 2 };', '    let b = Pt { x: 5, ..a };', '}')), 'struct literal@8');
-    assert.equal(feature(P(...PT, 'fn main() {', '    let Pt { x, y } = Pt { x: 1, y: 2 };', '}')), 'pattern@7');
   });
 });
 
@@ -116,12 +115,7 @@ describe('enums, match and exhaustiveness', () => {
     assert.equal(ids(c), 'E0507@9');
     assert.equal(c.errors[0].msg, 'cannot move out of `w.e` as enum variant `A` which is behind a shared reference');
   });
-  it('a guard, an or-pattern, a literal scrutinee, a nested pattern and a &mut scrutinee are unsupported', () => {
-    const run = (arm, scrut = 'Shape::Dot') => P(...SHAPE, 'fn main() {', `    let s = ${scrut};`, '    match s {', arm, '        _ => {}', '    }', '}');
-    assert.equal(feature(run('        Shape::Circle(r) if r > 1 => {}')), 'match guard@8');
-    assert.equal(feature(run('        Shape::Dot | Shape::Circle(_) => {}')), 'pattern@9');
-    assert.equal(feature(run('        Shape::Circle(1) => {}')), 'pattern@9');
-    assert.equal(feature(P('fn main() {', '    match 1 {', '        _ => {}', '    }', '}')), 'match@2');
+  it('a &mut scrutinee is unsupported', () => {
     assert.equal(feature(P(...SHAPE, 'fn main() {', '    let mut s = Shape::Dot;', '    match &mut s {', '        _ => {}', '    }', '}')), 'match@8');
   });
   it('a variant with a number after it is unsupported, and an enum that holds itself too', () => {
@@ -182,7 +176,7 @@ describe('inherent impls and method resolution', () => {
     assert.equal(ids(c), 'E0599@24');
     assert.equal(c.errors[0].msg, 'no method named `nothing` found for struct `C` in the current scope');
     assert.equal(ids(RQ.run(P(...C, 'fn main() {', '    let c = C::make(1);', '}'))), 'E0599@23');
-    assert.equal(RQ.run(P('enum E {', '    A,', '}', 'fn main() {', '    let e = E::B;', '}')).errors[0].msg, 'no variant or associated item named `B` found for enum `E` in the current scope');
+    assert.equal(RQ.run(P('enum E {', '    A,', '}', 'fn main() {', '    let e = E::B;', '}')).errors[0].msg, 'no variant, associated function, or constant named `B` found for enum `E` in the current scope');
   });
   it('a &mut self method needs a mutable place: E0596 behind a & and on an immutable variable', () => {
     assert.equal(ids(RQ.run(P(...C, 'fn f(c: &C) {', '    c.bump();', '}', 'fn main() {}'))), 'E0596@23');
@@ -356,8 +350,10 @@ describe('review fixes', () => {
     assert.equal(ids(RQ.run(P(...E2, 'fn main() {', '    let e = E::A;', '    let A = e;', '}'))), 'E0170@7');
     assert.equal(out(P('enum E {', '    A,', '    B(i32),', '}', 'fn main() {', '    let e = E::A;', '    let r = match e {', '        E::A => 1,', '        B => 2,', '    };', '    println!("{}", r);', '}')), '1\n');
   });
-  it('a bare Some, Ok or Err in a pattern is unsupported (rustc: E0530)', () => {
-    assert.equal(feature(main('let o = Some(1);', 'match o {', '    Some => 1,', '    None => 2,', '};')), 'pattern@4');
+  it('a bare Some, Ok or Err in a pattern is E0530', () => {
+    const c = RQ.run(main('let o = Some(1);', 'match o {', '    Some => 1,', '    None => 2,', '};'));
+    assert.equal(ids(c), 'E0530@4');
+    assert.equal(c.errors[0].msg, 'match bindings cannot shadow tuple variants');
   });
   it('the size of a struct or enum counts its fields, so nested arrays cannot slip past the array limit', () => {
     const src = P('struct A {', '    v: [i32; 10000],', '}', 'struct B {', '    a: [A; 10000],', '}', 'fn main() {}');

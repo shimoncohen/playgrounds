@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIR = path.join(ROOT, 'programming', 'rust-quest');
-export const FILES = ['../../shared/how.js', 'engine/lex.js', 'engine/parse.js', 'engine/types.js', 'engine/check.js', 'engine/lint.js', 'engine/mir.js', 'engine/borrow.js', 'engine/interp.js',
-  'engine/std.js', 'engine/diag.js', 'engine/index.js', 'content/state.js', 'content/model.js', 'content/ch-01-hello.js', 'content/ch-02-types.js', 'content/ch-03-functions.js', 'content/ch-04-ownership.js', 'content/ch-05-borrowing.js', 'content/extras.js', 'content/verified.js'];
+export const FILES = ['../../shared/how.js', 'engine/lex.js', 'engine/parse.js', 'engine/types.js', 'engine/exhaust.js', 'engine/check.js', 'engine/lint.js', 'engine/mir.js', 'engine/borrow.js', 'engine/interp.js',
+  'engine/std.js', 'engine/diag.js', 'engine/index.js', 'content/state.js', 'content/model.js', 'content/ch-01-hello.js', 'content/ch-02-types.js', 'content/ch-03-functions.js', 'content/ch-04-ownership.js', 'content/ch-05-borrowing.js', 'content/ch-06-structs.js', 'content/ch-07-enums.js', 'content/extras.js', 'content/verified.js'];
 
 export function loadRust(files = FILES) {
   const sandbox = {};

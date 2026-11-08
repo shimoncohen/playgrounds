@@ -13,7 +13,9 @@ const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why ca
   ['Say what kind of number', 'Numbers with a decimal point', 'Change a type with as', 'Keep values together in a tuple', 'Line values up in an array', 'A value that never changes', 'A number too big for its type', 'When a program panics'],
   ['Write your own function', 'The semicolon that ate the value', 'Choose with if and else', 'An if that gives back a value', 'Repeat until you break out', 'Count down with while', 'Walk through a range with for', 'A typo in a name'],
   ['Put text on the heap', 'One owner at a time', 'Numbers just copy', 'Copy a String on purpose', 'Take it in, give it back', 'Free a String early'],
-  ['Lend instead of give', 'Borrow it to change it', 'Many readers at once', 'Readers first, then the writer', 'Take a slice', 'A function that hands back a slice', 'A slice keeps its String borrowed', 'Which input does it borrow from?', 'A reference to something that is gone']];
+  ['Lend instead of give', 'Borrow it to change it', 'Many readers at once', 'Readers first, then the writer', 'Take a slice', 'A function that hands back a slice', 'A slice keeps its String borrowed', 'Which input does it borrow from?', 'A reference to something that is gone'],
+  ['Name the parts with a struct', 'Fields change only on a mut variable', 'Print a whole struct', 'A function that belongs to a type', 'A method that reads its struct', 'A method that changes its struct', 'A method that takes self'],
+  ['Name the choices with an enum', 'A match must cover every variant', 'Variants that carry data', 'Option: a value that might be missing', 'Ranges and a last arm', 'A number match needs a last arm', 'A guard adds a test', 'Match a pair', 'if let: when only one case matters', 'while let: keep going until it runs out', 'let else: leave early', 'Take a pair apart with let']];
 const want = (m) => m.expect || 'ok';
 
 describe('chapter and mission ids are append only', () => {

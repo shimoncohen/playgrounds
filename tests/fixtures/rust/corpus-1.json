@@ -2962,5 +2962,437 @@
     "src": "#[derive(Default)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P::default();\n    println!(\"{}\", p.n);\n}\n",
     "expect": "ok", "out": "0\n", "err": "", "exit": 0,
     "why": "with Default derived the call works", "pr": "P8"
+  },
+  {
+    "id": "exh-int-range",
+    "src": "fn main() {\n    let n: u8 = 5;\n    match n {\n        0..=9 => println!(\"a\"),\n        10..=99 => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-int-range-ok",
+    "why": "the ranges stop at 99, so 100 to 255 has no arm", "pr": "P9"
+  },
+  {
+    "id": "exh-int-range-ok",
+    "src": "fn main() {\n    let n: u8 = 5;\n    match n {\n        0..=9 => println!(\"a\"),\n        10.. => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the last range runs to the top of u8", "pr": "P9"
+  },
+  {
+    "id": "exh-bool",
+    "src": "fn main() {\n    let b = true;\n    match b {\n        true => println!(\"t\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-bool-ok",
+    "why": "false has no arm", "pr": "P9"
+  },
+  {
+    "id": "exh-bool-ok",
+    "src": "fn main() {\n    let b = true;\n    match b {\n        true | false => println!(\"t\"),\n    }\n}\n",
+    "expect": "ok", "out": "t\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-option-some",
+    "src": "fn main() {\n    let o = Some(3);\n    match o {\n        None => println!(\"n\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-option-some-ok",
+    "why": "Some has no arm", "pr": "P9"
+  },
+  {
+    "id": "exh-option-some-ok",
+    "src": "fn main() {\n    let o = Some(3);\n    match o {\n        _ => println!(\"n\"),\n    }\n}\n",
+    "expect": "ok", "out": "n\n", "err": "", "exit": 0,
+    "why": "a last arm covers Some", "pr": "P9"
+  },
+  {
+    "id": "exh-nested-option",
+    "src": "fn main() {\n    let o = Some(Some(3));\n    match o {\n        Some(Some(_)) => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-nested-option-ok",
+    "why": "Some(None) is not covered", "pr": "P9"
+  },
+  {
+    "id": "exh-nested-option-ok",
+    "src": "fn main() {\n    let o = Some(Some(3));\n    match o {\n        Some(_) => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "Some(_) covers the inside whatever it is", "pr": "P9"
+  },
+  {
+    "id": "exh-tuple-bool",
+    "src": "fn main() {\n    let t = (true, false);\n    match t {\n        (true, _) => println!(\"a\"),\n        (false, true) => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-tuple-bool-ok",
+    "why": "(false, false) is not covered", "pr": "P9"
+  },
+  {
+    "id": "exh-tuple-bool-ok",
+    "src": "fn main() {\n    let t = (true, false);\n    match t {\n        (true, _) => println!(\"a\"),\n        (false, _) => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-guard-not-counted",
+    "src": "fn main() {\n    let o = Some(3);\n    match o {\n        Some(n) if n>0 => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-guard-not-counted-ok",
+    "why": "an arm with a guard does not count as covering its pattern", "pr": "P9"
+  },
+  {
+    "id": "exh-guard-not-counted-ok",
+    "src": "fn main() {\n    let o = Some(3);\n    match o {\n        Some(n) => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "without the guard the arm covers every Some", "pr": "P9"
+  },
+  {
+    "id": "exh-char-range",
+    "src": "fn main() {\n    let c = 'k';\n    match c {\n        '\\0'..='z' => println!(\"a\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-char-range-ok",
+    "why": "chars above 'z' have no arm", "pr": "P9"
+  },
+  {
+    "id": "exh-char-range-ok",
+    "src": "fn main() {\n    let c = 'k';\n    match c {\n        '\\0'.. => println!(\"a\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the open range covers every char", "pr": "P9"
+  },
+  {
+    "id": "exh-str",
+    "src": "fn main() {\n    let s = \"a\";\n    match s {\n        \"a\" => println!(\"a\"),\n        \"b\" => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-str-ok",
+    "why": "text literals never cover every string", "pr": "P9"
+  },
+  {
+    "id": "exh-str-ok",
+    "src": "fn main() {\n    let s = \"a\";\n    match s {\n        \"a\" => println!(\"a\"),\n        _ => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-signed-gap",
+    "src": "fn main() {\n    let n: i8 = 0;\n    match n {\n        i8::MIN..=-1 => println!(\"a\"),\n        1..=127 => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-signed-gap-ok",
+    "why": "zero is left out", "pr": "P9"
+  },
+  {
+    "id": "exh-signed-gap-ok",
+    "src": "fn main() {\n    let n: i8 = 0;\n    match n {\n        i8::MIN..=-1 => println!(\"a\"),\n        0..=127 => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-ref-option",
+    "src": "fn main() {\n    let o = Some(1);\n    match &o {\n        Some(_) => println!(\"a\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-ref-option-ok",
+    "why": "&None is not covered", "pr": "P9"
+  },
+  {
+    "id": "exh-ref-option-ok",
+    "src": "fn main() {\n    let o = Some(1);\n    match &o {\n        Some(_) | None => println!(\"a\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-struct-field",
+    "src": "struct P {\n    a: bool,\n    b: u8,\n}\n\nfn main() {\n    let p = P { a: true, b: 1 };\n    match p {\n        P { a: true, .. } => println!(\"a\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 8}, "pair": "exh-struct-field-ok",
+    "why": "P { a: false, .. } is not covered", "pr": "P9"
+  },
+  {
+    "id": "exh-struct-field-ok",
+    "src": "struct P {\n    a: bool,\n    b: u8,\n}\n\nfn main() {\n    let p = P { a: true, b: 1 };\n    match p {\n        P { a: _, .. } => println!(\"a\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "exh-enum-data",
+    "src": "enum E {\n    A(bool),\n    B,\n}\n\nfn main() {\n    let e = E::B;\n    match e {\n        E::A(true) => println!(\"a\"),\n        E::B => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 8}, "pair": "exh-enum-data-ok",
+    "why": "E::A(false) is not covered", "pr": "P9"
+  },
+  {
+    "id": "exh-enum-data-ok",
+    "src": "enum E {\n    A(bool),\n    B,\n}\n\nfn main() {\n    let e = E::B;\n    match e {\n        E::A(_) => println!(\"a\"),\n        E::B => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "refutable-let",
+    "src": "fn main() {\n    let o = Some(5);\n    let Some(n) = o;\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0005", "line": 3}, "pair": "refutable-let-ok",
+    "why": "a plain let needs a pattern that always fits", "pr": "P9"
+  },
+  {
+    "id": "refutable-let-ok",
+    "src": "fn main() {\n    let o = Some(5);\n    let n = 5;\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a name always fits", "pr": "P9"
+  },
+  {
+    "id": "arms-types",
+    "src": "fn main() {\n    let n = 3;\n    let s = match n {\n        1 => \"a\",\n        _ => 2,\n    };\n}\n",
+    "expect": {"code": "E0308", "line": 5}, "pair": "arms-types-ok",
+    "why": "the arms give different types", "pr": "P9"
+  },
+  {
+    "id": "arms-types-ok",
+    "src": "fn main() {\n    let n = 3;\n    let s = match n {\n        1 => \"a\",\n        _ => \"b\",\n    };\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "let-else-diverges",
+    "src": "fn main() {\n    let o = Some(5);\n    let Some(n) = o else { 5 };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "let-else-diverges-ok",
+    "why": "the else block of let-else has to leave", "pr": "P9"
+  },
+  {
+    "id": "let-else-diverges-ok",
+    "src": "fn main() {\n    let o = Some(5);\n    let Some(n) = o else { return };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "return leaves", "pr": "P9"
+  },
+  {
+    "id": "iflet-no-else-value",
+    "src": "fn main() {\n    let o = Some(5);\n    if let Some(v) = o { v }\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "iflet-no-else-value-ok",
+    "why": "an if let without else gives ()", "pr": "P9"
+  },
+  {
+    "id": "iflet-no-else-value-ok",
+    "src": "fn main() {\n    let o = Some(5);\n    if let Some(v) = o { v; }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "with the missing case covered it compiles", "pr": "P9"
+  },
+  {
+    "id": "literal-type",
+    "src": "fn main() {\n    let n = 5;\n    match n {\n        \"five\" => println!(\"a\"),\n        _ => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 4}, "pair": "literal-type-ok",
+    "why": "a text pattern cannot match a number", "pr": "P9"
+  },
+  {
+    "id": "literal-type-ok",
+    "src": "fn main() {\n    let n = 5;\n    match n {\n        5 => println!(\"a\"),\n        _ => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "a number pattern matches a number", "pr": "P9"
+  },
+  {
+    "id": "bare-some",
+    "src": "fn main() {\n    let o = Some(1);\n    match o {\n        Some => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0530", "line": 4}, "pair": "bare-some-ok",
+    "why": "Some without its part is a binding that shadows the variant", "pr": "P9"
+  },
+  {
+    "id": "bare-some-ok",
+    "src": "fn main() {\n    let o = Some(1);\n    match o {\n        Some(_) => println!(\"a\"),\n        None => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "Some(_) is the variant pattern", "pr": "P9"
+  },
+  {
+    "id": "destructure-moved",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let (x, _) = t;\n    println!(\"{} {}\", x, t.0);\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "destructure-moved-ok",
+    "why": "the first half moved into x", "pr": "P9"
+  },
+  {
+    "id": "destructure-moved-ok",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let (x, _) = t;\n    println!(\"{} {}\", x, t.1);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "the second half was never moved", "pr": "P9"
+  },
+  {
+    "id": "iflet-moved",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    if let Some(s) = o {\n        println!(\"{}\", s);\n    }\n    println!(\"{:?}\", o);\n}\n",
+    "expect": {"code": "E0382", "line": 6}, "pair": "iflet-moved-ok",
+    "why": "if let moved the String out of o", "pr": "P9"
+  },
+  {
+    "id": "iflet-moved-ok",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    if let Some(s) = &o {\n        println!(\"{}\", s);\n    }\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "a\nSome(\"a\")\n", "err": "", "exit": 0,
+    "why": "matching on &o only borrows", "pr": "P9"
+  },
+  {
+    "id": "letelse-moved",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    let Some(s) = o else { return };\n    println!(\"{} {:?}\", s, o);\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "letelse-moved-ok",
+    "why": "let-else moved the String out of o", "pr": "P9"
+  },
+  {
+    "id": "letelse-moved-ok",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    let Some(s) = &o else { return };\n    println!(\"{} {:?}\", s, o);\n}\n",
+    "expect": "ok", "out": "a Some(\"a\")\n", "err": "", "exit": 0,
+    "why": "let-else on &o only borrows", "pr": "P9"
+  },
+  {
+    "id": "match-nested-move",
+    "src": "fn main() {\n    let o = Some((String::from(\"a\"), 1));\n    match o {\n        Some((s, _)) => println!(\"{}\", s),\n        None => {}\n    }\n    println!(\"{:?}\", o);\n}\n",
+    "expect": {"code": "E0382", "line": 7}, "pair": "match-nested-move-ok",
+    "why": "the String inside the tuple moved out of o", "pr": "P9"
+  },
+  {
+    "id": "match-nested-move-ok",
+    "src": "fn main() {\n    let o = Some((String::from(\"a\"), 1));\n    match &o {\n        Some((s, _)) => println!(\"{}\", s),\n        None => {}\n    }\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "a\nSome((\"a\", 1))\n", "err": "", "exit": 0,
+    "why": "a & scrutinee binds by reference", "pr": "P9"
+  },
+  {
+    "id": "pat-int-ranges",
+    "src": "fn main() {\n    for n in 0..8 {\n        let s = match n {\n            0 => \"zero\",\n            1 | 2 => \"small\",\n            3..=5 => \"mid\",\n            _ => \"big\",\n        };\n        println!(\"{} {}\", n, s);\n    }\n}\n",
+    "expect": "ok", "out": "0 zero\n1 small\n2 small\n3 mid\n4 mid\n5 mid\n6 big\n7 big\n", "err": "", "exit": 0,
+    "why": "literals, or-patterns, ranges and a last arm", "pr": "P9"
+  },
+  {
+    "id": "pat-exclusive-range",
+    "src": "fn main() {\n    let n = 9;\n    match n {\n        0..5 => println!(\"a\"),\n        5..10 => println!(\"b\"),\n        _ => println!(\"c\"),\n    }\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "an exclusive range stops before its end", "pr": "P9"
+  },
+  {
+    "id": "pat-signed-ranges",
+    "src": "fn main() {\n    let x: i8 = -3;\n    match x {\n        i8::MIN..=-1 => println!(\"neg\"),\n        0 => println!(\"zero\"),\n        1..=i8::MAX => println!(\"pos\"),\n    }\n}\n",
+    "expect": "ok", "out": "neg\n", "err": "", "exit": 0,
+    "why": "MIN and MAX name the ends of an integer type", "pr": "P9"
+  },
+  {
+    "id": "pat-guard-order",
+    "src": "fn main() {\n    let n = 7;\n    match n {\n        x if x % 2 == 0 => println!(\"even {}\", x),\n        x if x > 5 => println!(\"big odd {}\", x),\n        _ => println!(\"other\"),\n    }\n}\n",
+    "expect": "ok", "out": "big odd 7\n", "err": "", "exit": 0,
+    "why": "the first arm that fits and passes its guard wins", "pr": "P9"
+  },
+  {
+    "id": "pat-guard-string",
+    "src": "fn main() {\n    let o = Some(String::from(\"hi\"));\n    match o {\n        Some(s) if s.len() > 3 => println!(\"long {}\", s),\n        Some(s) => println!(\"short {}\", s),\n        None => println!(\"none\"),\n    }\n}\n",
+    "expect": "ok", "out": "short hi\n", "err": "", "exit": 0,
+    "why": "a guard only reads the String, which moves out when the arm is taken", "pr": "P9"
+  },
+  {
+    "id": "pat-at-binding",
+    "src": "fn main() {\n    let n = 5;\n    match n {\n        small @ 1..=5 => println!(\"small {}\", small),\n        big @ 6..=10 => println!(\"big {}\", big),\n        other => println!(\"other {}\", other),\n    }\n}\n",
+    "expect": "ok", "out": "small 5\n", "err": "", "exit": 0,
+    "why": "name @ pattern binds the value the pattern matched", "pr": "P9"
+  },
+  {
+    "id": "pat-nested-option",
+    "src": "fn main() {\n    let o = Some(Some(3));\n    match o {\n        Some(Some(n)) => println!(\"n={}\", n),\n        Some(None) => println!(\"inner none\"),\n        None => println!(\"none\"),\n    }\n}\n",
+    "expect": "ok", "out": "n=3\n", "err": "", "exit": 0,
+    "why": "patterns nest", "pr": "P9"
+  },
+  {
+    "id": "pat-tuple-table",
+    "src": "fn main() {\n    for n in 1..=15 {\n        match (n % 3, n % 5) {\n            (0, 0) => println!(\"FizzBuzz\"),\n            (0, _) => println!(\"Fizz\"),\n            (_, 0) => println!(\"Buzz\"),\n            _ => println!(\"{}\", n),\n        }\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n", "err": "", "exit": 0,
+    "why": "a tuple scrutinee reads as a table", "pr": "P9"
+  },
+  {
+    "id": "pat-enum-struct-variant",
+    "src": "enum Shape {\n    Dot,\n    Square(u32),\n    Rect { w: u32, h: u32 },\n}\n\nfn show(s: &Shape) {\n    match s {\n        Shape::Dot => println!(\"dot\"),\n        Shape::Square(n) => println!(\"sq {}\", n),\n        Shape::Rect { w: 2, h } => println!(\"two by {}\", h),\n        Shape::Rect { .. } => println!(\"rect\"),\n    }\n}\n\nfn main() {\n    let a = Shape::Square(3);\n    let b = Shape::Rect { w: 2, h: 5 };\n    let c = Shape::Rect { w: 3, h: 5 };\n    let d = Shape::Dot;\n    show(&a);\n    show(&b);\n    show(&c);\n    show(&d);\n}\n",
+    "expect": "ok", "out": "sq 3\ntwo by 5\nrect\ndot\n", "err": "", "exit": 0,
+    "why": "tuple and struct variants behind a reference, a literal inside a field, and ..", "pr": "P9"
+  },
+  {
+    "id": "pat-str-literal",
+    "src": "fn main() {\n    let s = \"x\";\n    match s {\n        \"a\" => println!(\"a\"),\n        \"x\" => println!(\"x\"),\n        _ => println!(\"?\"),\n    }\n    let o = Some(\"hi\");\n    match o {\n        Some(\"hi\") => println!(\"hi!\"),\n        Some(other) => println!(\"{}\", other),\n        None => println!(\"none\"),\n    }\n}\n",
+    "expect": "ok", "out": "x\nhi!\n", "err": "", "exit": 0,
+    "why": "text literals match &str", "pr": "P9"
+  },
+  {
+    "id": "pat-char-ranges",
+    "src": "fn main() {\n    let c = 'k';\n    match c {\n        'a'..='j' => println!(\"first\"),\n        'k'..='z' => println!(\"second\"),\n        _ => println!(\"other\"),\n    }\n}\n",
+    "expect": "ok", "out": "second\n", "err": "", "exit": 0,
+    "why": "char ranges", "pr": "P9"
+  },
+  {
+    "id": "pat-ref-scrutinee",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), 5);\n    let r = &t;\n    match r {\n        (s, n) => println!(\"{} {}\", s, n),\n    }\n    let (s2, n2) = &t;\n    println!(\"{} {} {}\", s2, n2, t.0);\n}\n",
+    "expect": "ok", "out": "a 5\na 5 a\n", "err": "", "exit": 0,
+    "why": "matching a reference binds by reference, so t is still whole", "pr": "P9"
+  },
+  {
+    "id": "pat-partial-move-ok",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let (s, _) = t;\n    println!(\"{}\", s);\n    let (_, u) = t;\n    println!(\"{}\", u);\n}\n",
+    "expect": "ok", "out": "a\nb\n", "err": "", "exit": 0,
+    "why": "the second String was never moved, so the second let may take it", "pr": "P9"
+  },
+  {
+    "id": "pat-wild-keeps-value",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    match o {\n        Some(_) => println!(\"s\"),\n        None => {}\n    }\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "s\nSome(\"a\")\n", "err": "", "exit": 0,
+    "why": "an underscore binds nothing, so nothing moves", "pr": "P9"
+  },
+  {
+    "id": "iflet-else-chain",
+    "src": "fn main() {\n    let o = Some(4);\n    let p: Option<i32> = None;\n    if let Some(n) = p {\n        println!(\"p {}\", n);\n    } else if let Some(m) = o {\n        println!(\"o {}\", m);\n    } else {\n        println!(\"none\");\n    }\n}\n",
+    "expect": "ok", "out": "o 4\n", "err": "", "exit": 0,
+    "why": "if let chains through else if let", "pr": "P9"
+  },
+  {
+    "id": "iflet-value",
+    "src": "fn main() {\n    let o = Some(3);\n    let n = if let Some(v) = o { v * 2 } else { 0 };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "if let is an expression", "pr": "P9"
+  },
+  {
+    "id": "whilelet-countdown",
+    "src": "fn step(n: u32) -> Option<u32> {\n    if n == 0 { None } else { Some(n - 1) }\n}\n\nfn main() {\n    let mut n = 3;\n    while let Some(next) = step(n) {\n        if n == 2 {\n            n = next;\n            continue;\n        }\n        println!(\"{}\", n);\n        n = next;\n    }\n    println!(\"end {}\", n);\n}\n",
+    "expect": "ok", "out": "3\n1\nend 0\n", "err": "", "exit": 0,
+    "why": "while let with continue", "pr": "P9"
+  },
+  {
+    "id": "whilelet-break",
+    "src": "fn next(i: u32) -> Option<u32> {\n    if i < 5 { Some(i * 10) } else { None }\n}\n\nfn main() {\n    let mut i = 0;\n    while let Some(n) = next(i) {\n        if n == 20 {\n            break;\n        }\n        println!(\"{}\", n);\n        i += 1;\n    }\n    println!(\"end {}\", i);\n}\n",
+    "expect": "ok", "out": "0\n10\nend 2\n", "err": "", "exit": 0,
+    "why": "break leaves a while let", "pr": "P9"
+  },
+  {
+    "id": "letelse-happy",
+    "src": "fn main() {\n    let o = Some(5);\n    let Some(n) = o else {\n        println!(\"none\");\n        return;\n    };\n    println!(\"n={}\", n);\n}\n",
+    "expect": "ok", "out": "n=5\n", "err": "", "exit": 0,
+    "why": "let-else binds when the pattern fits", "pr": "P9"
+  },
+  {
+    "id": "letelse-else",
+    "src": "fn main() {\n    let o: Option<i32> = None;\n    let Some(n) = o else {\n        println!(\"none\");\n        return;\n    };\n    println!(\"n={}\", n);\n}\n",
+    "expect": "ok", "out": "none\n", "err": "", "exit": 0,
+    "why": "let-else runs the else block when it does not", "pr": "P9"
+  },
+  {
+    "id": "destructure-tuple",
+    "src": "fn main() {\n    let t = (1, String::from(\"a\"), 2.5);\n    let (a, b, c) = t;\n    println!(\"{} {} {}\", a, b, c);\n}\n",
+    "expect": "ok", "out": "1 a 2.5\n", "err": "", "exit": 0,
+    "why": "let takes a tuple apart", "pr": "P9"
+  },
+  {
+    "id": "destructure-struct",
+    "src": "struct Pt {\n    x: i32,\n    y: i32,\n}\n\nfn main() {\n    let p = Pt { x: 1, y: 2 };\n    let Pt { x, y } = p;\n    println!(\"{} {}\", x, y);\n    let Pt { x: a, .. } = Pt { x: 9, y: 8 };\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "1 2\n9\n", "err": "", "exit": 0,
+    "why": "let takes a struct apart", "pr": "P9"
+  },
+  {
+    "id": "drop-iflet-then",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn make() -> Option<D> {\n    Some(D(String::from(\"a\")))\n}\n\nfn main() {\n    if let Some(d) = make() {\n        println!(\"in {}\", d.0);\n    } else {\n        println!(\"else\");\n    }\n    println!(\"after\");\n}\n",
+    "expect": "ok", "out": "in a\ndrop a\nafter\n", "err": "", "exit": 0,
+    "why": "the bound value drops at the end of the if let block", "pr": "P9"
+  },
+  {
+    "id": "drop-iflet-none",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn none() -> Option<D> {\n    None\n}\n\nfn main() {\n    if let Some(d) = none() {\n        println!(\"in {}\", d.0);\n    } else {\n        println!(\"else\");\n    }\n    println!(\"after\");\n}\n",
+    "expect": "ok", "out": "else\nafter\n", "err": "", "exit": 0,
+    "why": "nothing to drop when the pattern does not fit", "pr": "P9"
+  },
+  {
+    "id": "drop-destructure-wild",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn main() {\n    let (a, _) = (D(String::from(\"a\")), D(String::from(\"b\")));\n    println!(\"after\");\n}\n",
+    "expect": "ok", "out": "drop b\nafter\ndrop a\n", "err": "", "exit": 0,
+    "why": "the half the pattern leaves behind drops at the end of the let statement", "pr": "P9"
+  },
+  {
+    "id": "drop-destructure-both",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn main() {\n    let (a, b) = (D(String::from(\"a\")), D(String::from(\"b\")));\n    println!(\"after\");\n}\n",
+    "expect": "ok", "out": "after\ndrop b\ndrop a\n", "err": "", "exit": 0,
+    "why": "both halves move into names and drop in reverse order at the end of the block", "pr": "P9"
+  },
+  {
+    "id": "drop-letelse",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn make() -> Option<D> {\n    Some(D(String::from(\"a\")))\n}\n\nfn main() {\n    let Some(a) = make() else {\n        println!(\"none\");\n        return;\n    };\n    println!(\"got {}\", a.0);\n}\n",
+    "expect": "ok", "out": "got a\ndrop a\n", "err": "", "exit": 0,
+    "why": "let-else keeps the value in the name until the block ends", "pr": "P9"
+  },
+  {
+    "id": "drop-whilelet",
+    "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn nth(i: u32) -> Option<D> {\n    if i < 2 { Some(D(String::from(\"x\"))) } else { None }\n}\n\nfn main() {\n    let mut i = 0;\n    while let Some(d) = nth(i) {\n        println!(\"body {}\", d.0);\n        i += 1;\n    }\n    println!(\"done\");\n}\n",
+    "expect": "ok", "out": "body x\ndrop x\nbody x\ndrop x\ndone\n", "err": "", "exit": 0,
+    "why": "each round drops its value at the end of the round", "pr": "P9"
   }
 ]

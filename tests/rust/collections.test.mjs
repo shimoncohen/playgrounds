@@ -313,7 +313,7 @@ describe('derives: PartialOrd, Ord, Default, Hash', () => {
     assert.equal(feature(P('struct A;', '#[derive(Default)]', 'struct B {', '    a: A,', '}', 'fn main() {}')), 'derive@3');
     const c = RQ.run(P('struct S {', '    n: i32,', '}', 'fn main() {', '    let s = S::default();', '}'));
     assert.equal(ids(c), 'E0599@5');
-    assert.equal(c.errors[0].msg, 'no function or associated item named `default` found for struct `S` in the current scope');
+    assert.equal(c.errors[0].msg, 'no associated function or constant named `default` found for struct `S` in the current scope');
   });
   it('a user fn named default wins over the derive\'s, and a derived struct is a HashMap key', () => {
     assert.equal(out(P('#[derive(Default)]', 'struct S {', '    n: i32,', '}', 'impl S {', '    fn default() -> S {', '        S { n: 7 }', '    }', '}', 'fn main() {', '    let s = S::default();', '    println!("{}", s.n);', '}')), '7\n');

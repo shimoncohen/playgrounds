@@ -25,7 +25,7 @@ const RQ=globalThis.RQ=globalThis.RQ||{};
 const MACRO_NAMES='format panic assert assert_eq assert_ne debug_assert debug_assert_eq vec write writeln todo unimplemented unreachable'.split(' ');
 RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static','type alias','use','mod','generics','method','nested item','closure','match',
   'method call','field access','slice','reference','dereference','cast','try operator','struct literal','qualified path',
-  'fn pointer','impl Trait','inferred type','pattern','let else','deferred initialization','format spec','assignment target','type checking',
+  'fn pointer','impl Trait','inferred type','pattern','deferred initialization','format spec','assignment target','type checking',
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
@@ -58,7 +58,7 @@ RQ.check=ast=>{
     itemNames.add(it.name);return true;
   };
   const peel=e=>e.t==='Paren'?peel(e.expr):e;
-  const mism=(want,got,n)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got)}));
+  const mism=(want,got,n,what)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got),what}));
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
   // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
   // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
@@ -326,7 +326,7 @@ RQ.check=ast=>{
   }
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
-  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[],keyChecks=[];
+  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[],keyChecks=[],patLits=[],exChecks=[];
   // a fn declared `-> &'static str` may only give back string literals: any other leaf could borrow from a parameter, which rustc
   // rejects, and the quest does not model lifetimes. Block tails and if branches are looked through; return/break/continue have their own check.
   function staticLeaves(e){
@@ -387,7 +387,13 @@ RQ.check=ast=>{
       else if(f.fmt.prec!==null&&r.k!=='float'&&r.k!=='any')unsup('format spec',f.line);
     }
     for(const [k,line] of keyChecks)if(!isOpen(k)&&(!has(k,'Eq')||!has(k,'Hash')))unsup('hash key',line);
-    vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];
+    for(const [l,line] of patLits){const r=res(l.ty);if(r.k!=='int'||!fits(l.v,r.ty))unsup('pattern',line);}
+    for(const x of exChecks){
+      const miss=RQ.exhaust.missing(exDesc(x.st),x.rows);
+      if(miss===null)unsup('pattern',x.e.line);
+      else if(miss.length)errors.push(RQ.diag.make(x.e.kind==='let'?'E0005':'E0004',x.e.scrut.line,x.e.scrut.col,{missing:miss}));
+    }
+    vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
 
   function slice(e,x){
@@ -413,7 +419,6 @@ RQ.check=ast=>{
         const pt=s.pat;
         const named=pt.t==='IdentPat'&&!pt.sub&&!pt.byRef;
         if(!named&&pt.t!=='Wild')unsup('pattern',pt.line);
-        if(s.els)unsup('let else',s.line);
         if(!s.init){
           // without a type the variable's type would have to be worked out from a later assignment
           if(!s.ty)unsup('deferred initialization',s.line);
@@ -616,94 +621,229 @@ RQ.check=ast=>{
     return m.ret;
   }
 
-  function armPat(p,base,vs,mode,s,viaRef,cov,scrut){
-    // one E0507 per match: the scrutinee is what the names move out of
-    const moveOut=variant=>{
-      if(cov.err)return;
-      cov.err=true;
-      const x=peel(scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
-      errors.push(RQ.diag.make('E0507',scrut.line,scrut.col,{name:ch?ch.text:'value',variant,mut:!!via&&via.mut}));
-    };
-    const bind=(sp,f,variant)=>{
-      if(sp.t==='Wild')return;
-      if(sp.t!=='IdentPat'||sp.sub||sp.byRef||scopes[scopes.length-1].has(sp.name)||consts.has(sp.name)||structs.has(sp.name)){unsup('pattern',sp.line);return;}
-      const bt=mode==='ref'?mkRef(false,f.ty):f.ty;
-      if(mode==='move'&&!isCopy(f.ty)){
-        if(viaRef)moveOut(variant);
-        else cov.moves=true;
-      }
-      bindVar(sp.name,sp.mut,'let',bt,sp);
-      I(sp).sel=variant+'.'+f.name;
-    };
+  // Each binding gets bpath (its path below the scrutinee) and bmode ('move' or 'ref') for mir.js and interp.js. Any pattern but a name or `_`
+  // looks through a `&` on the scrutinee, and everything below it binds by reference; a `&` met further down is not modeled.
+  const WILD=RQ.exhaust.WILD;
+  const wrapRef=(ir,n)=>{for(let i=0;i<n;i++)ir={c:'single',args:[ir]};return ir;};
+  function patLit(n){
+    let neg=false;
+    while(n.t==='Unary'&&n.op==='-'){neg=!neg;n=n.expr;}
+    if(n.t==='Path'&&n.segs.length===2&&isInt(n.segs[0].name)&&(n.segs[1].name==='MIN'||n.segs[1].name==='MAX')&&!neg&&!nameTaken(n.segs[0].name)){
+      return {kind:'int',v:RQ.types.INT[n.segs[0].name][n.segs[1].name==='MIN'?0:1],ty:T.int(n.segs[0].name),line:n.line};
+    }
+    if(n.t!=='Lit')return null;
+    if(n.kind==='int'){
+      if(n.suffix&&!isInt(n.suffix))return null;
+      const v=BigInt(n.v);
+      return {kind:'int',v:neg?-v:v,ty:n.suffix?T.int(n.suffix):ivar(),line:n.line};
+    }
+    if(neg)return null;
+    if(n.kind==='char')return {kind:'char',v:BigInt(n.v.codePointAt(0)),ty:T.char,line:n.line};
+    if(n.kind==='bool')return {kind:'bool',v:n.v,ty:T.bool,line:n.line};
+    if(n.kind==='str')return {kind:'str',ty:T.str,line:n.line};
+    return null;
+  }
+  function peelPat(p,t,mode,path){
+    let wraps=0;
+    t=res(t);
+    while(t.k==='ref'){
+      if(t.mut||path.length){unsup('pattern',p.line);return null;}
+      mode='ref';wraps++;t=res(t.to);
+    }
+    return {t,mode,wraps};
+  }
+  const hasBinding=n=>{let b=false;RQ.walk(n,x=>{if(x.t==='IdentPat'&&x.name!=='None')b=true;});return b;};
+  const nameTaken=n=>fns.has(n)||consts.has(n)||structs.has(n)||enums.has(n);
+  const patPath=n=>({t:'Path',segs:[{name:n,args:null,fn:null}],global:false});
+  function bindPat(p,t,mode,path,st){
+    const n=p.name;
+    if(p.byRef||p.mut&&mode==='ref'||p.sub&&hasBinding(p.sub)||st.names.has(n)){unsup('pattern',p.line);return WILD;}
+    st.names.add(n);st.binds++;
+    if(mode==='move'&&!isCopy(t)){
+      const last=path[path.length-1];
+      if(st.viaRef){
+        if(path.length!==1||!last.variant){unsup('move out of reference',p.line);return WILD;}
+        if(!st.cov.err){
+          st.cov.err=true;
+          const x=peel(st.scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
+          errors.push(RQ.diag.make('E0507',st.scrut.line,st.scrut.col,{name:ch?ch.text:'value',variant:last.variant,mut:!!via&&via.mut}));
+        }
+      }else st.cov.moves=true;
+    }
+    bindVar(n,p.mut,'let',mode==='ref'?mkRef(false,t):t,p);
+    const o=I(p);o.bpath=path;o.bmode=mode;
+    return p.sub?walkPat(p.sub,t,mode,path,st):WILD;
+  }
+  function subPats(p,pats,fields,mode,path,st,variant,vi){
+    const ri=pats.findIndex(x=>x.t==='Rest');
+    if(pats.filter(x=>x.t==='Rest').length>1||(ri<0?pats.length!==fields.length:pats.length-1>fields.length)){unsup('pattern',p.line);return null;}
+    const args=fields.map(()=>WILD);
+    pats.forEach((sp,i)=>{
+      if(sp.t==='Rest')return;
+      const fi=ri>=0&&i>ri?fields.length-(pats.length-i):i,f=fields[fi];
+      args[fi]=walkPat(sp,f.ty,mode,[...path,{sel:(variant?variant+'.':'')+f.name,f:f.name,ty:f.ty,variant}],st);
+    });
+    return args;
+  }
+  function walkPat(p,t,mode,path,st){
+    t=res(t);
+    const bad=()=>{unsup('pattern',p.line);return WILD;};
+    if(t.k==='any'||t.k==='never'){
+      RQ.walk(p,x=>{if(x.t==='IdentPat'&&!st.names.has(x.name)&&x.name!=='None'){st.names.add(x.name);bindVar(x.name,x.mut,'let',T.any,x);I(x).bpath=path;I(x).bmode='move';}});
+      return WILD;
+    }
     switch(p.t){
-      case 'Wild':return 'all';
+      case 'Wild':return WILD;
       case 'IdentPat':{
-        const vi=base.builtin?vs.findIndex(v=>v.name===p.name&&v.kind==='unit'):-1;
-        if(vi>=0&&!p.sub&&!p.byRef){I(p).variant=vi;return vi;}
-        if(p.sub||p.byRef||consts.has(p.name)||structs.has(p.name)||p.name==='Some'||p.name==='Ok'||p.name==='Err'){unsup('pattern',p.line);return 'all';}
-        if(mode==='move'&&!isCopy(s)){if(viaRef){unsup('move out of reference',p.line);return 'all';}cov.moves=true;}
-        bindVar(p.name,p.mut,'let',s,p);I(p).sel='';
-        return 'all';
+        const n=p.name;
+        if(!p.sub&&!p.byRef&&(consts.has(n)||structs.has(n)))return bad();
+        if((n==='Some'||n==='Ok'||n==='Err')&&!nameTaken(n)&&!p.sub&&!p.byRef){
+          errors.push(RQ.diag.make('E0530',p.line,p.col,{name:n}));return WILD;
+        }
+        if(n==='None'&&!nameTaken(n)&&!p.sub&&!p.byRef){I(p).tests=path;return walkPat({...p,t:'PathPat',path:patPath(n)},t,mode,path,st);}
+        return bindPat(p,t,mode,path,st);
       }
-      case 'PathPat':{
-        const vi=variantIndex(base,p.path);
-        if(vi<0||vs[vi].kind!=='unit'){unsup('pattern',p.line);return 'all';}
-        I(p).variant=vi;return vi;
+      case 'Or':{
+        const before=st.binds,alts=p.alts.map(a=>walkPat(a,t,mode,path,st));
+        if(st.binds!==before)return bad();
+        return {or:alts};
       }
-      case 'TupleStructPat':case 'StructPat':{
-        const vi=variantIndex(base,p.path),v=vs[vi];
-        if(vi<0||v.kind!==(p.t==='StructPat'?'named':'tuple')){unsup('pattern',p.line);return 'all';}
-        I(p).variant=vi;
+      case 'LitPat':case 'RangePat':{
+        const q=peelPat(p,t,mode,path);
+        if(!q)return WILD;
+        let ends,ir;
+        if(p.t==='LitPat'){
+          const l=patLit(p.lit);
+          if(!l)return bad();
+          ends=[l];
+          ir=l.kind==='str'?{c:'single',args:[{c:'opaque'}]}:l.kind==='bool'?{c:'bool',v:l.v}:{c:'range',lo:l.v,hi:l.v};
+        }else{
+          const lo=p.lo&&patLit(p.lo),hi=p.hi&&patLit(p.hi);
+          if(!lo&&!hi||p.lo&&!lo||p.hi&&!hi||[lo,hi].some(x=>x&&x.kind!=='int'&&x.kind!=='char'))return bad();
+          const hv=hi?(p.inclusive?hi.v:hi.v-1n):null;
+          if(lo&&hi&&lo.v>hv)return bad();
+          ends=[lo,hi].filter(Boolean);
+          ir={c:'range',lo:lo?lo.v:null,hi:hv};
+        }
+        for(const l of ends){
+          if(!unify(l.ty,q.t)){mism(q.t,l.ty,p);return WILD;}
+          if(l.kind==='int')patLits.push([l,p.line]);
+        }
+        I(p).tests=path;
+        return wrapRef(ir,q.wraps);
+      }
+      case 'TuplePat':{
+        const q=peelPat(p,t,mode,path);
+        if(!q)return WILD;
+        const els=q.t.k==='tuple'?q.t.els:q.t.k==='unit'?[]:null;
+        if(!els){mism(q.t,T.tuple(p.pats.map(()=>T.tvar())),p);return WILD;}
+        const args=subPats(p,p.pats,els.map((ty,i)=>({name:String(i),ty})),q.mode,path,st,null);
+        return args?wrapRef({c:'single',args},q.wraps):WILD;
+      }
+      case 'PathPat':case 'TupleStructPat':case 'StructPat':{
+        const q=peelPat(p,t,mode,path);
+        if(!q)return WILD;
+        const u=q.t,kind=p.t==='PathPat'?'unit':p.t==='StructPat'?'named':'tuple';
+        let v,vi=null;
+        if(u.k==='enum'){
+          vi=variantIndex(u,p.path);
+          if(vi<0){
+            const sg=p.path.segs;
+            if(p.t!=='StructPat'&&!u.builtin&&sg.length===2&&noArgs(p.path)&&(sg[0].name===u.name||sg[0].name==='Self'&&curSelf===u.name)&&!(methods.get(u.name)&&methods.get(u.name).has(sg[1].name))){
+              errors.push(RQ.diag.make('E0599',p.line,p.col,{what:'item',name:sg[1].name,type:u.name,kind:'enum'}));
+              return WILD;
+            }
+            return bad();
+          }
+          v=variantsOf(u)[vi];
+        }else if(u.k==='struct'){
+          const ct=ctorOf(p.path);
+          if(!ct||ct.vi!==null||ct.name!==u.name)return bad();
+          v=ct;
+        }else return bad();
+        if(v.kind!==kind)return bad();
+        const vname=u.k==='enum'?v.name:null;
+        let args;
         if(p.t==='StructPat'){
           const seen=new Set();
+          args=v.fields.map(()=>WILD);
           for(const f of p.fields){
-            const fd=v.fields.find(x=>x.name===f.name);
-            if(!fd||seen.has(f.name)){unsup('pattern',p.line);return vi;}
-            seen.add(f.name);bind(f.pat,fd,v.name);
+            const fi=v.fields.findIndex(x=>x.name===f.name);
+            if(fi<0||seen.has(f.name))return bad();
+            seen.add(f.name);
+            args[fi]=walkPat(f.pat,v.fields[fi].ty,q.mode,[...path,{sel:(vname?vname+'.':'')+f.name,f:f.name,ty:v.fields[fi].ty,variant:vname}],st);
           }
-          if(!p.rest&&seen.size!==v.fields.length)unsup('pattern',p.line);
-        }else{
-          const ri=p.pats.findIndex(x=>x.t==='Rest');
-          if(p.pats.filter(x=>x.t==='Rest').length>1||(ri<0?p.pats.length!==v.fields.length:p.pats.length-1>v.fields.length)){unsup('pattern',p.line);return vi;}
-          p.pats.forEach((sp,i)=>{
-            if(sp.t==='Rest')return;
-            const fi=ri>=0&&i>ri?v.fields.length-(p.pats.length-i):i;
-            bind(sp,v.fields[fi],v.name);
-          });
-        }
-        return vi;
+          if(!p.rest&&seen.size!==v.fields.length)return bad();
+        }else if(p.t==='TupleStructPat'){
+          args=subPats(p,p.pats,v.fields,q.mode,path,st,vname);
+          if(!args)return WILD;
+        }else args=[];
+        if(u.k==='enum')I(p).tests=path;
+        return wrapRef(u.k==='enum'?{c:'v',i:vi,args}:{c:'single',args},q.wraps);
       }
-      default:unsup('pattern',p.line);return 'all';
+      default:return bad();
+    }
+  }
+  function exDesc(t){
+    t=res(t);
+    switch(t.k){
+      case 'bool':return {k:'bool'};
+      case 'char':return {k:'char'};
+      case 'int':{const r=RQ.types.INT[t.ty];return {k:'int',lo:r[0],hi:r[1],ty:t.ty,open:t.ty.endsWith('size')};}
+      case 'str':return {k:'ref',to:()=>({k:'opaque'})};
+      case 'ref':return {k:'ref',to:()=>exDesc(t.to)};
+      case 'unit':return {k:'tuple',tys:()=>[]};
+      case 'tuple':return {k:'tuple',tys:()=>t.els.map(exDesc)};
+      case 'struct':{
+        const r=structs.get(t.name);
+        return {k:'struct',name:t.name,kind:r.kind,names:r.fields.map(f=>f.name),tys:()=>r.fields.map(f=>exDesc(f.ty))};
+      }
+      case 'enum':return {k:'enum',prefix:t.builtin?'':t.name+'::',variants:variantsOf(t).map(v=>({name:v.name,kind:v.kind,names:v.fields.map(f=>f.name),tys:()=>v.fields.map(f=>exDesc(f.ty))}))};
+      default:return {k:'opaque'};
     }
   }
   function matchExpr(e){
-    const st=ex(e.scrut),s=res(st);
-    if(e.arms.some(a=>a.guard))return unsup('match guard',e.line);
-    if(s.k==='any'||s.k==='never')return T.any;
-    const mode=s.k==='ref'?'ref':'move',base=s.k==='ref'?res(s.to):s;
-    if(base.k!=='enum'||s.k==='ref'&&s.mut)return unsup('match',e.line);
-    const vs=variantsOf(base),sc=peel(e.scrut),ch=chainOf(sc);
+    let st=ex(e.scrut);
+    if(e.annot){const a=tyOf(e.annot);coerce(st,a,e.scrut);st=a;}
+    const s=res(st),broken=s.k==='any'||s.k==='never';
+    if(s.k==='ref'&&s.mut)return unsup('match',e.line);
+    const sc=peel(e.scrut),ch=chainOf(sc);
     const viaRef=sc.t==='Deref'||!!(ch&&ch.via);
-    const covered=new Set(),cov={moves:false};
-    let all=false,rt=null;
+    const cov={moves:false,err:false},rows=[];
+    const nodeFor=a=>e.kind==='letelse'&&a===e.arms[1];
+    let rt=null;
     for(const a of e.arms){
       scopes.push(new Map());
-      const c=armPat(a.pat,base,vs,mode,s,viaRef,cov,e.scrut);
-      if(c==='all')all=true;else covered.add(c);
+      const ps={cov,viaRef,scrut:e.scrut,names:new Set(),binds:0};
+      const ir=walkPat(a.pat,st,'move',[],ps);
+      if(a.guard)expect(ex(a.guard),T.bool,a.guard);
+      rows.push({p:ir,g:!!a.guard});
       const bt=ex(a.body);
       scopes.pop();
-      if(res(bt).k==='never')continue;
+      if(nodeFor(a)){
+        if(!['never','any'].includes(res(bt).k))errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:'letelse',expected:'!',found:show(bt)}));
+        continue;
+      }
+      if(res(bt).k==='never'||e.noElse&&a===e.arms[1])continue;
       if(rt===null)rt=bt;
       else if(!unify(rt,bt)){
         if(!clashes(bt,rt))return unsup('reference coercion',a.body.line);
-        mism(rt,bt,endNode(a.body));
+        errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:e.kind==='iflet'?'else':'match',expected:show(rt),found:show(bt)}));
       }
     }
-    if(!all&&vs.some((v,i)=>!covered.has(i))){
-      const miss=vs.filter((v,i)=>!covered.has(i)).map(v=>(base.builtin?'':base.name+'::')+v.name+(v.kind==='tuple'?'('+v.fields.map(()=>'_').join(', ')+')':v.kind==='named'?' { .. }':''));
-      errors.push(RQ.diag.make('E0004',e.scrut.line,e.scrut.col,{missing:miss}));
+    if(!broken)exChecks.push({e,st,rows});
+    I(e).match={ref:s.k==='ref',place:!!placeChain(sc)||sc.t==='Deref',bindsMoved:cov.moves};
+    if(e.kind==='whilelet'){
+      if(rt&&!['unit','never','any'].includes(res(rt).k))unsup('type checking',e.line);
+      return T.unit;
     }
-    I(e).match={mode,place:placeChain(sc)||sc.t==='Deref',bindsMoved:cov.moves};
+    if(e.noElse){
+      if(rt&&!['unit','never','any'].includes(res(rt).k)){
+        if(['int','ivar','float','fvar','bool','char','str','String'].includes(res(rt).k)){const n=endNode(e.arms[0].body);errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:'()',found:show(rt)}));}
+        else unsup('type checking',e.line);
+      }
+      return T.unit;
+    }
     return rt||T.never;
   }
 
@@ -999,7 +1139,7 @@ RQ.check=ast=>{
         if(!unify(a,b)){
           // rustc coerces each arm to an annotation the arms are not yet checked against, so a clash between references is not a verdict
           if(!clashes(b,a))return unsup('reference coercion',e.line);
-          mism(a,b,endNode(e.els));return a;
+          mism(a,b,endNode(e.els),'else');return a;
         }
         return res(a).k==='never'?b:a;
       }

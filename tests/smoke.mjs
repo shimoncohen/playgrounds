@@ -547,6 +547,34 @@ test('rust-quest: the memory view shows an enum variant with its payload, a fiel
   await ctx.close();
 });
 
+test('rust-quest: chapters 6 and 7 play through: a struct shows its fields, an if let shows its Some, a missing arm is E0004', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  const last = (n) => page.$eval('#memory input[type=range]', (e, v) => { e.value = e.max - v; e.dispatchEvent(new Event('input')); }, n);
+  await page.click('[data-ch="5"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Pet\s*name\s*pointer to #1\s*age\s*3/);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-ch="6"]');
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0004[\s\S]*Light::Green/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("o"))'), /Option<u32>\s*Some\s*Some\.0\s*3/);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: the memory view shows a Vec on the heap with its elements and owner, and says a moved field is a field', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
   await page.waitForSelector('#mission');

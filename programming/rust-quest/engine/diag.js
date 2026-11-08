@@ -21,13 +21,23 @@ const ERRORS={
     msg:o=>o.assign?'assign to part of moved value: `'+o.name+'`':(o.borrow?'borrow':'use')+' of '+(o.partial?'partially moved':'moved')+' value: `'+o.name+'`',
     tip:'A `String` has one owner. Passing it on, or writing `let t = s;`, moves it, and the old name stops working. A field moves on its own too: after `let n = p.name;` the rest of `p` still works, but `p` as a whole does not. Make a copy with `.clone()`, or lend it with `&`.'
   },
+  E0005:{
+    title:'a pattern can fail',
+    msg:()=>'refutable pattern in local binding',
+    tip:'A plain `let` needs a pattern that matches every value. Use `let ... else { ... }` for the other case, or `if let`, or `match`.'
+  },
+  E0530:{
+    title:'a pattern name is also a variant',
+    msg:o=>'match bindings cannot shadow tuple variants',
+    tip:'`Some`, `Ok` and `Err` hold a value, so write the part in parentheses, like `Some(x)`. A bare name in a pattern is a new variable, and it may not reuse a variant\'s name.'
+  },
   E0004:{
     title:'a match leaves some cases out',
     msg:o=>{
       const m=o.missing.map(x=>'`'+x+'`'),n=m.length;
       return 'non-exhaustive patterns: '+(n===1?m[0]:n<=3?m.slice(0,-1).join(', ')+' and '+m[n-1]:m.slice(0,3).join(', ')+' and '+(n-3)+' more')+' not covered';
     },
-    tip:'A `match` has to handle every variant of the `enum`. Add an arm for each missing one, or a last arm with `_` to catch the rest.'
+    tip:'A `match` has to handle every possible value. Add an arm for each case the message lists, or a last arm with `_` to catch the rest.'
   },
   E0170:{
     title:'a pattern name is also a variant',
@@ -61,7 +71,7 @@ const ERRORS={
   },
   E0599:{
     title:'no such method or item',
-    msg:o=>o.what==='bounds'?'the method `'+o.name+'` exists for struct `'+o.type+'`, but its trait bounds were not satisfied':o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant or associated item':'function or associated item')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
+    msg:o=>o.what==='bounds'?'the method `'+o.name+'` exists for struct `'+o.type+'`, but its trait bounds were not satisfied':o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant, associated function, or constant':'associated function or constant')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
     tip:'Rust cannot find that name on this type. Check the spelling, that it is defined in an `impl` block for the type, and that a method has `self` as its first parameter. `.clone()` also needs `#[derive(Clone)]` on the type.'
   },
   E0499:{
@@ -117,7 +127,11 @@ const ERRORS={
   E0308:{
     title:'mismatched types',
     // rustc names a number literal's open type in words, without backticks
-    msg:o=>{const q=t=>t==='integer'||t==='floating-point number'?t:'`'+t+'`';return 'mismatched types: expected '+q(o.expected)+', found '+q(o.found);},
+    msg:o=>{
+      const q=t=>t==='integer'||t==='floating-point number'?t:'`'+t+'`';
+      const head={match:'`match` arms have incompatible types',else:'`if` and `else` have incompatible types',letelse:'`else` clause of `let...else` does not diverge'}[o.what]||'mismatched types';
+      return head+': expected '+q(o.expected)+', found '+q(o.found);
+    },
     tip:'Every value has one type, and the two sides here have to agree. Change the value to the type the other side expects, or change the type you wrote.'
   },
   E0425:{
@@ -186,11 +200,11 @@ const HINTS={
   struct:'A `struct` is modeled with named, tuple or unit fields that own their value (no `&`) and no generics. A tuple or unit `struct` cannot share its name with a `fn` or a `const`.',
   enum:'An `enum` is modeled with variants written as `Name`, `Name(T)` or `Name { field: T }`, no generics, and no `= value` numbers on the variants.',
   derive:'Only `#[derive(...)]` of `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Default` and `Hash` is modeled. Every field must have the trait too. `Copy` needs `Clone`, `Eq` and `PartialOrd` need `PartialEq`, and `Ord` needs `PartialOrd` and `Eq`. An `enum` derives `Default` from the one unit variant marked `#[default]`.',
-  'match guard':'A `match` arm with an `if` guard is not modeled. Put the condition inside the arm instead.',
+  'match guard':'A `match` guard that moves a name its arm binds, like `Some(s) if eat(s)`, is not modeled (rustc reports `E0507`). Make the guard only read the name.',
   impl:'Only `impl Name { ... }` with plain methods and associated functions (no generics, attributes or constants), and `impl Drop for Name` whose `drop` only prints with `println!`, are modeled.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
   'type alias':LATER,use:'The only `use` modeled is `use std::collections::HashMap;` once at the top of the file. The missions otherwise use what Rust gives every program.',mod:LATER,generics:LATER,
   method:'A method takes `self`, `&self` or `&mut self` as its first parameter. A receiver with a type written out, like `self: Box<Self>`, is not modeled.','nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,
-  match:'A `match` is modeled on an `enum`, or a `&` to one, only. Use `if` for other values.',
+  match:'A `match` on a `&mut` reference is not modeled. Match on the value itself, or on a `&` reference.',
   'method call':'Modeled for now: `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on a `String` (and `len`, `to_string` and `to_owned` on a `&str`); the methods you write in an `impl`; `clone` on a type that derives `Clone`; `is_some`, `is_none`, `is_ok`, `is_err`, `unwrap`, `expect` and `unwrap_or` on `Option` and `Result`; `len`, `is_empty` and `clone` on a `Vec` or `HashMap`, `push` on a `Vec` and `insert` on a `HashMap`.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled for now. An `enum` has no fields: use a `match`.',
   'field of a temporary':'Reading a field of a value that is not in a variable, like `make().id`, is not modeled. Put the value in a variable first.',slice:'A bare slice type `[T]` has no size, so it only appears behind a `&`, as `&[T]`.',
   'slice of non-ASCII text':'Slicing text with accented letters, emoji or other non-English characters is not modeled, because one letter can take several bytes. Use plain English letters for now.',
@@ -213,8 +227,7 @@ const HINTS={
   'program too large':'This function is too big for the borrow checker in Rust Quest. Split it into smaller functions.',
   cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':LATER,'struct literal':'Write every field of the `struct` exactly once, as `Name { field: value, ... }`, with no `..` base.','qualified path':LATER,
   'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out, like `let x: Option<i32> = None;`. Rust Quest does not infer a type behind `_`, or for a `None` that nothing else gives a type.',
-  pattern:'A `let` takes a plain name (or `_`), `mut name` included. A `match` arm takes a variant like `Shape::Circle(r)` whose parts are plain names or `_`, a `_`, or a name that catches the rest.',
-  'let else':LATER,
+  pattern:'Modeled patterns: a name or `_`, literals, ranges like `1..=5`, `|` between patterns that bind nothing, tuples, `struct` and `enum` variants (`Shape::Rect { w, h }`, `Some(n)`), and `n @ 1..=5`. Not modeled yet: `ref`, `&` patterns, slices, constants, floats, a `&` met inside a tuple or `struct`, a wrong field list, and a name that repeats.',
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
   'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
   'assignment target':'Only a plain variable name can be assigned to for now.',
@@ -224,7 +237,8 @@ const HINTS={
   'const folding':'Rust Quest cannot tell whether the compiler would catch this overflow before the program runs. Pass the value in as a function parameter, or use numbers that cannot overflow.',
   'range expression':'A range like `0..5` is modeled only right after `for ... in`, or inside `&text[0..5]` to take a slice.',
   'for iterable':'`for` loops over a range like `0..5` or `1..=5` for now.',
-  'let condition':'`if let` and `while let` are not modeled yet. Use a plain `if` with a condition that is true or false.',
+  'let condition':'A `let` inside an `if` or `while` condition next to other tests, like `if x > 0 && let Some(n) = o`, is not modeled. Use `if let` or `while let` on its own, and put the other test inside the block.',
+  nesting:'Code nested this deeply, in a pattern, an expression or a type, is not modeled. Split it into smaller pieces.',
   'array length':'Write the array length as a plain number, like `[i32; 3]`, no bigger than 10000.',
   'break outside loop':'`break` and `continue` only work inside a loop.',
   'main signature':'`main` takes no parameters and returns nothing in this quest. Write `fn main() { ... }`.',

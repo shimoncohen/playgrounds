@@ -49,6 +49,11 @@ function errorView(c){
         return;
       }
     }
+    const t=b.tail;
+    if(t&&t.t==='Match'&&(t.kind==='let'||t.kind==='letelse')&&t.line<e.line&&e.line<=lastLine(t)){
+      RQ.walk(t.arms[0].pat,n=>{if(n.t==='IdentPat'&&n.line<e.line&&c.info.get(n)&&c.info.get(n).bpath)vars.push({name:n.name,ty:tyOf(n),state:'owned'});});
+      inBlock(t.arms[0].body);
+    }
   };
   inBlock(fn.body);
   const loans=(c.loans||[]).filter(l=>l.span&&!l.implicit&&l.span[0]<=e.line&&e.line<=l.span[1]);
@@ -92,7 +97,7 @@ RQ.features=src=>{
       case 'Enum':tags.add('enum');if(n.attrs.some(a=>/^derive\b/.test(a)))tags.add('derive');break;
       case 'Impl':tags.add(n.trait?'trait-impl':'impl');break;
       case 'Trait':tags.add('trait-decl');break;
-      case 'Match':tags.add('match');break;
+      case 'Match':tags.add({iflet:'if-let',whilelet:'while-let',letelse:'let-else',let:'destructure'}[n.kind]||'match');break;
       case 'If':case 'LetCond':tags.add('if');break;
       case 'Loop':case 'While':case 'For':tags.add('loop');break;
       case 'Cast':tags.add('cast');break;
@@ -133,6 +138,8 @@ function context(d,ast,counts){
       return n>0;
     },
     methodIn:(fn,name)=>{let n=0;const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);if(f)RQ.walk(f,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
+    selfOf:name=>{let r=null;if(ast)RQ.walk(ast,m=>{if(m.t==='Impl'&&!m.trait)for(const f of m.items)if(r===null&&f.name===name&&f.selfParam)r=f.selfParam.ref?(f.selfParam.mut?'&mut':'&'):'val';});return r;},
+    fieldsPrinted:()=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Macro'&&PRINTS.includes(m.name)&&m.args)for(const a of m.args.slice(1))RQ.walk(a,x=>{if(x.t==='Field')n++;});});return n;},
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},
     count:kind=>{
@@ -145,10 +152,19 @@ function context(d,ast,counts){
         RQ.walk(ast,m=>{if(m.t==='Path'&&m.segs.length===1&&names.has(m.segs[0].name))k++;});
         return k;
       }
+      const arms=pick=>{let k=0;RQ.walk(ast,m=>{if(m.t==='Match'&&!m.kind)for(const a of m.arms)if(pick(a))k++;});return k;};
+      if(kind==='arm')return arms(()=>true);
+      if(kind==='guard')return arms(a=>a.guard);
+      if(kind==='catch-all')return arms(a=>a.pat.t==='Wild'||a.pat.t==='IdentPat'&&!a.pat.sub&&a.pat.name!=='None');
+      const KIND={iflet:'iflet',whilelet:'whilelet',letelse:'letelse',destructure:'let'}[kind];
       const T={let:'Let',assign:'Assign',macro:'Macro',fn:'Fn',const:'Const',op:'Binary',cast:'Cast',tuple:'Tuple',array:'Array',index:'Index',field:'Field',
-        if:'If',loop:'Loop',while:'While',for:'For',break:'Break',return:'Return'}[kind];
+        if:'If',loop:'Loop',while:'While',for:'For',break:'Break',return:'Return',struct:'Struct',enum:'Enum',impl:'Impl'}[kind];
       let n=0;
-      RQ.walk(ast,m=>{if(kind==='mut'?(m.t==='IdentPat'&&m.mut):kind==='annot'?(m.t==='Let'&&m.ty):m.t===T)n++;});
+      if(kind==='match')RQ.walk(ast,m=>{if(m.t==='Match'&&!m.kind)n++;});
+      else if(kind==='derive')RQ.walk(ast,m=>{if((m.t==='Struct'||m.t==='Enum')&&m.attrs.some(a=>/^derive\b/.test(a)))n++;});
+      else if(KIND)RQ.walk(ast,m=>{if(m.t==='Match'&&m.kind===KIND)n++;});
+      else if(kind==='method'||kind==='assoc')RQ.walk(ast,m=>{if(m.t==='Impl'&&!m.trait)for(const f of m.items)if(f.t==='Fn'&&!!f.selfParam===(kind==='method'))n++;});
+      else RQ.walk(ast,m=>{if(kind==='mut'?(m.t==='IdentPat'&&m.mut):kind==='annot'?(m.t==='Let'&&m.ty):m.t===T)n++;});
       return n;
     }
   };
@@ -166,6 +182,8 @@ RQ.run=(src,opts)=>{
     if(opts.testFault)opts.testFault();
     return context({...RQ.interp(c.ast,{...opts,info:c.info,adts:c.adts,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
   }catch(e){
+    // source nested thousands deep overflows a recursive pass; that is the learner's code, not a bug
+    if(e instanceof RangeError&&!ast)return context({status:'unsupported',unsupported:{feature:'nesting',line:1},unsupportedAll:[{feature:'nesting',line:1}]},null);
     return context({status:'internal',message:String(e&&e.message||e)},ast);
   }
 };
