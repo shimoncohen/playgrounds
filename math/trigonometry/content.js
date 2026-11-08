@@ -66,12 +66,13 @@
     track: 'trigonometry',
     ranks: [[0, 'Sketcher'], [25, 'Sine Scout'], [50, 'Ratio Whiz'], [75, 'Navigator']],
     chapters: [{
-      id: 'trigonometry.ratios', name: 'Sine, cosine and tangent', badge: 'Trig Navigator',
-      intro: 'A <b>right triangle</b> has one square corner of <code>90°</code>. Its longest side, across from that corner, is the <b>hypotenuse</b>. Pick one of the other two corners and call its angle <code>θ</code>, the Greek letter theta. The side across from θ, not touching it, is the <b>opposite</b>. The other side that touches θ is the <b>adjacent</b>, which means next to it. A <b>ratio</b> compares two lengths by dividing one by the other. For a fixed angle the ratios of a right triangle\'s sides never change, however big the triangle is, and the three useful ones have names: <b>sine</b> is <code>opp ÷ hyp</code>, <b>cosine</b> is <code>adj ÷ hyp</code> and <b>tangent</b> is <code>opp ÷ adj</code>, written <code>sin</code>, <code>cos</code> and <code>tan</code>. The memory aid <b>SOH CAH TOA</b> spells them: <b>S</b>ine = <b>O</b>pposite over <b>H</b>ypotenuse, <b>C</b>osine = <b>A</b>djacent over <b>H</b>ypotenuse, <b>T</b>angent = <b>O</b>pposite over <b>A</b>djacent. Type <code>sin(35)</code> for the sine of 35°: angles are always in degrees here. Some answers ask you to <b>round to 1 decimal place</b>: keep one digit after the point, and look at the next digit, where 5 or more rounds up, so 5.736 becomes 5.7. In the scene, drag the dot to turn the angle, or move the slider to change the hypotenuse, and watch the three ratios.' + sketch,
+      id: 'trigonometry.ratios', name: 'Sine, cosine and tangent', badge: 'Brass Spyglass',
+      story: 'Ilse\'s spyglass is tied to the top of the watchtower, so you use the ramp, the ladder and a look from the ground, with an angle and one known side, to find how high it hangs and reach it.',
+      intro: 'On Windwhistle Hill, kite-keeper Ilse tied her brass spyglass to the top of the old watchtower and left a sketch of ramps and ladders to reach it. A <b>right triangle</b> has one square corner of <code>90°</code>. Its longest side, across from that corner, is the <b>hypotenuse</b>. Pick one of the other two corners and call its angle <code>θ</code>, the Greek letter theta. The side across from θ, not touching it, is the <b>opposite</b>. The other side that touches θ is the <b>adjacent</b>, which means next to it. A <b>ratio</b> compares two lengths by dividing one by the other. For a fixed angle the ratios of a right triangle\'s sides never change, however big the triangle is, and the three useful ones have names: <b>sine</b> is <code>opp ÷ hyp</code>, <b>cosine</b> is <code>adj ÷ hyp</code> and <b>tangent</b> is <code>opp ÷ adj</code>, written <code>sin</code>, <code>cos</code> and <code>tan</code>. The memory aid <b>SOH CAH TOA</b> spells them: <b>S</b>ine = <b>O</b>pposite over <b>H</b>ypotenuse, <b>C</b>osine = <b>A</b>djacent over <b>H</b>ypotenuse, <b>T</b>angent = <b>O</b>pposite over <b>A</b>djacent. Type <code>sin(35)</code> for the sine of 35°: angles are always in degrees here. Some answers ask you to <b>round to 1 decimal place</b>: keep one digit after the point, and look at the next digit, where 5 or more rounds up, so 5.736 becomes 5.7. In the scene, drag the dot to turn the angle, or move the slider to change the hypotenuse, and watch the three ratios.' + sketch,
       scene: triangle,
       missions: [
         { title: 'Find the opposite side', kind: 'number', round: 1, question: '10*sin(35)', tex: '\\text{opp} = \\text{hyp} \\times \\sin\\theta \\;\\text{ with }\\; \\text{hyp} = 10,\\ \\theta = 35^\\circ',
-          goal: 'A ramp is 10 long (the hypotenuse) and rises at an angle of <code>35°</code>. How high does it climb? That is the opposite side. Work it out and round to 1 decimal place.',
+          goal: 'Ilse\'s kite-launch ramp is 10 long (the hypotenuse) and rises at an angle of <code>35°</code>. How high does it climb? That is the opposite side. Work it out and round to 1 decimal place.',
           how: [
             '<code>sin θ = opp ÷ hyp</code> (SOH). Multiply both sides by <code>hyp</code> and you get <code>opp = hyp × sin θ</code>.',
             'Putting in <code>hyp = 10</code> and <code>θ = 35°</code> gives your first step, <code>10 × sin(35)</code> (type <code>10*sin(35)</code>).',
@@ -83,7 +84,7 @@
           scene: tri({ ask: 'opp' }), at: { ang: 35, hyp: 10 }, reveal: true,
           answer: '5.7', wrong: '8.2', lazy: '10*sin(35)', check: rounded('10*sin(35)', 1) },
         { title: 'Find the adjacent side', kind: 'number', round: 1, question: '12*cos(40)', tex: '\\text{adj} = \\text{hyp} \\times \\cos\\theta \\;\\text{ with }\\; \\text{hyp} = 12,\\ \\theta = 40^\\circ',
-          goal: 'A 12 long ladder leans so that it makes an angle of <code>40°</code> with the ground. How far along the ground is its foot from the wall? That is the adjacent side. Round to 1 decimal place.',
+          goal: 'Kit holds a 12 long ladder that leans so that it makes an angle of <code>40°</code> with the ground. How far along the ground is its foot from the wall? That is the adjacent side. Round to 1 decimal place.',
           how: [
             'You know the hypotenuse, 12, and want the adjacent side. <code>cos θ = adj ÷ hyp</code> (CAH) joins those two.',
             'Multiply both sides by <code>hyp</code>: <code>adj = hyp × cos θ</code>. Your first step is <code>12 × cos(40)</code> (type <code>12*cos(40)</code>).',
@@ -95,7 +96,7 @@
           scene: tri({ hypMax: 12, ask: 'adj' }), at: { ang: 40, hyp: 12 }, reveal: tri({ hypMax: 12 }),
           answer: '9.2', wrong: '7.7', lazy: '12*cos(40)', check: rounded('12*cos(40)', 1) },
         { title: 'Use the tangent', kind: 'number', round: 1, question: '8*tan(30)', tex: '\\text{opp} = \\text{adj} \\times \\tan\\theta \\;\\text{ with }\\; \\text{adj} = 8,\\ \\theta = 30^\\circ',
-          goal: 'You stand 8 from the foot of a tower and look at its top at an angle of <code>30°</code> above the ground. The 8 is the adjacent side. How tall is the tower, the opposite side? Round to 1 decimal place.',
+          goal: 'You stand 8 from the foot of Ilse\'s watchtower and look at the spyglass on its top at an angle of <code>30°</code> above the ground. The 8 is the adjacent side. How tall is the tower, the opposite side? Round to 1 decimal place.',
           how: [
             'This time the sides are the adjacent (8) and the opposite (the height). <code>tan θ = opp ÷ adj</code> (TOA) joins them, and there is no hypotenuse in it.',
             'Multiply both sides by <code>adj</code>: <code>opp = adj × tan θ</code>. Your first step is <code>8 × tan(30)</code> (type <code>8*tan(30)</code>).',
@@ -107,7 +108,7 @@
           scene: tri({ byAdj: true, ask: 'opp' }), at: { ang: 30, adj: 8 }, reveal: tri({ byAdj: true }),
           answer: '4.6', wrong: '13.9', lazy: '8*tan(30)', check: rounded('8*tan(30)', 1) },
         { title: 'Find the angle', kind: 'number', question: 'asin(5/10)', tex: '\\sin\\theta = \\frac{5}{10} \\;\\text{, so }\\; \\theta = \\sin^{-1}\\!\\left(\\frac{5}{10}\\right)',
-          goal: 'A right triangle has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees? The scene opens at 45°: you can also drag the angle until the opposite side reads 5.',
+          goal: 'Gust has moved the ladder, so its triangle with the wall now has an opposite side of 5 and a hypotenuse of 10. How big is the angle <code>θ</code>, in degrees? The scene opens at 45°: you can also drag the angle until the opposite side reads 5.',
           how: [
             'Now you know the sides and want the angle. <code>sin θ = opp ÷ hyp = 5 ÷ 10</code>, which is 0.5.',
             'The <b>inverse sine</b> undoes the sine: it takes the ratio and gives back the angle. It is written <code>sin⁻¹</code> or <code>asin</code>. Your step is <code>asin(5/10)</code> (type <code>asin(5/10)</code>).',
