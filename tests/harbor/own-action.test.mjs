@@ -18,12 +18,12 @@ const stub = () => {
   });
   return p;
 };
-function boot(saved) {
+function boot(saved, resetEl) {
   const store = new Map(saved ? [['harbor-quest-v1', JSON.stringify(saved)]] : []);
   const dom = stub();
   const win = { __hq: null, getSelection: () => ({ toString: () => '' }), addEventListener() {}, matchMedia: () => dom };
   const ctx = vm.createContext({
-    window: win, document: dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
+    window: win, document: resetEl ? new Proxy(dom, { get: (t, k) => k === 'querySelector' ? q => q === '#resetWorld' ? resetEl : dom : t[k] }) : dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
     localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     navigator: {}, requestAnimationFrame() {}, Image: stub(), URL, Blob, console, HowSteps: stub(), location: { hash: '' },
   });
@@ -104,14 +104,86 @@ test('from a fresh jump, each answer counts the first time it is typed', () => {
   assert.deepEqual(bad, []);
 });
 
-test('the setup for a jumped mission never completes it, earns XP or touches history', () => {
+const counters = h => JSON.stringify([h.S.done, h.S.xp, h.S.hist.length, h.S.steps, h.S.flag.fwdHits, h.S.flag.fwdPods, h.S.badges]);
+
+test('the setup for a jumped mission never completes it, earns XP, or touches steps, history or counters', () => {
+  const played = boot();
+  CH.forEach((ch, c) => {
+    if (c > 0) played.goChapter(c);
+    for (let i = 0; i < ch.missions.length; i++) for (let k = 0; k < 4 && !played.S.done[c + '.' + i]; k++) play(played, c, i);
+  });
   const bad = [];
   for (const { ci, mi, key } of all) {
-    const h = boot();
-    jump(h, ci, mi);
-    if (h.S.done[key] || h.S.xp || h.S.hist.length) bad.push(key);
+    const fromFresh = boot();
+    const inBox = boot();
+    inBox.run('docker run -it --name tmpbox alpine sh');
+    const s = JSON.parse(JSON.stringify(played.S));
+    delete s.done[key]; delete s.badges[ci]; delete s.steps;
+    const fromPlayed = boot(s);
+    for (const [name, h] of [['fresh', fromFresh], ['played', fromPlayed], ['inside', inBox]]) {
+      const before = counters(h);
+      h.goChapter(ci); h.S.mi = mi;
+      if (name !== 'inside') h.S.inside = null;
+      h.land();
+      if (counters(h) !== before) bad.push(`${key} ${name}`);
+    }
   }
   assert.deepEqual(bad, []);
+});
+
+test('setup fires once per landing: removing what it made does not bring it back', () => {
+  const h = boot();
+  jump(h, 2, 1);
+  assert.ok(h.S.d.containers.some(c => c.name === 'web'));
+  h.run('docker rm -f web');
+  h.run('docker ps');
+  assert.ok(!h.S.d.containers.some(c => c.name === 'web'));
+  assert.equal(h.setups.length, 1);
+});
+
+test('revisiting a finished mission does no setup', () => {
+  const h = boot();
+  jump(h, 2, 1);
+  play(h, 2, 1);
+  assert.ok(h.S.done['2.1']);
+  h.run('docker rm -f web');
+  const n = h.setups.length;
+  h.S.mi = 1; h.land();
+  assert.equal(h.setups.length, n);
+  assert.ok(!h.S.d.containers.some(c => c.name === 'web'));
+});
+
+test('Reset world does not fire the current mission setup', () => {
+  const handlers = [];
+  const classes = new Set();
+  const el = { classList: { add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c) }, addEventListener: (_, f) => handlers.push(f), textContent: '' };
+  const h = boot(undefined, el);
+  jump(h, 2, 1);
+  const n = h.setups.length;
+  assert.equal(n, 1);
+  handlers[0]({ currentTarget: el });
+  handlers[0]({ currentTarget: el });
+  assert.ok(!h.S.d.containers.some(c => c.name === 'web'));
+  assert.equal(h.setups.length, n);
+});
+
+test('Spot the newcomer passes on its answer right after landing', () => {
+  const { ci, mi, key } = all.find(x => x.m.t === 'Spot the newcomer');
+  const h = boot();
+  jump(h, ci, mi);
+  h.run(stepAns(h, h.CH[ci].missions[mi], ci, mi));
+  assert.ok(h.S.done[key]);
+});
+
+test('an unnamed container never reuses the name of an existing one', () => {
+  const h = boot();
+  const A = ['brave', 'calm', 'eager', 'jolly', 'keen', 'proud', 'quirky', 'zen', 'happy', 'gentle'];
+  const B = ['turing', 'hopper', 'lovelace', 'curie', 'tesla', 'noether', 'ritchie', 'torvalds', 'hamilton', 'shannon'];
+  h.run('docker run -d --name zz alpine');
+  for (const a of A) for (const b of B) if (a + '_' + b !== 'eager_curie') h.S.d.containers.push({ ...h.S.d.containers[0], id: a + b, name: a + '_' + b, status: 'exited' });
+  h.run('docker run -d alpine');
+  const names = h.S.d.containers.map(c => c.name);
+  assert.equal(new Set(names).size, names.length);
 });
 
 test('playing the whole course in order never prints a setup line', () => {

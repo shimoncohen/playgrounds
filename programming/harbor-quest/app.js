@@ -344,7 +344,8 @@ function boxExec(box,argv,redir){const v=vfs(box);const cwd=box.cwd||'/';const a
 function newC(o){const id=hex(64);const c=Object.assign({id,name:o.name,image:o.image,imgKey:o.img.key,kind:o.img.kind,ver:o.img.ver,os:o.img.os,shell:o.img.shell,runtime:o.img.runtime,
   status:'created',code:0,ports:o.ports||[],env:o.env||{},mounts:o.mounts||[],net:o.net||'bridge',ip:'',cmd:o.cmd||[],created:now(),started:0,finished:0,fs:baseFs(o.img),logs:[],rm:!!o.rm,alias:o.alias||'',project:o.project||'',cwd:'/'},{});
   D().containers.push(c);return c}
-const autoName=()=>pickA(['brave','calm','eager','jolly','keen','proud','quirky','zen','happy','gentle'])+'_'+pickA(['turing','hopper','lovelace','curie','tesla','noether','ritchie','torvalds','hamilton','shannon']);
+const pickName=()=>pickA(['brave','calm','eager','jolly','keen','proud','quirky','zen','happy','gentle'])+'_'+pickA(['turing','hopper','lovelace','curie','tesla','noether','ritchie','torvalds','hamilton','shannon']);
+const autoName=()=>{let n;for(let i=0;i<1000;i++){n=pickName();if(!D().containers.some(c=>c.name===n))break}return n};
 function pickA(a){return a[Math.random()*a.length|0]}
 function startC(c){const out=[];
   for(const [h] of c.ports){if(portUsed(h)){c.status='created';return {err:`docker: Error response from daemon: driver failed programming external connectivity on endpoint ${c.name} (${hex(64)}): Bind for 0.0.0.0:${h} failed: port is already allocated.`}}}
@@ -1006,7 +1007,7 @@ const Img=k=>!!D().images[k];
 const inside=()=>insideBox();
 function ensureFiles(names){let n=0;for(const f of names)if(S.files[f]==null){S.files[f]=FILES[f];n++}return n}
 function ensureWebDep(img){let d=Dep('web');if(!d){newDep({name:'web',ns:'default',replicas:3,image:img||'nginx:1.26',cname:'nginx'});return 1}return 0}
-/* Mission pre() returns the simulator commands (or thunks yielding one) for state the mission needs and the learner may lack; ensureNeeds runs them quietly on landing */
+/* pre() returns commands, or thunks yielding one, that create only what the mission is missing */
 const WEB=()=>Crun('web')?[]:[C('web')?'docker start web':'docker run -d --name web nginx'];
 const IN_WEB=()=>[...WEB(),...(inside()?.name==='web'?[]:['docker exec -it web sh'])];
 const PORT8080=()=>portUsed(8080)?[]:C('web')?.ports.some(p=>p[0]===8080)?['docker start web']:[`docker run -d --name ${C('web')?'web-8080':'web'} -p 8080:80 nginx`];
@@ -1020,8 +1021,9 @@ const SHOP=()=>[...BUILD('1.0'),...(Crun('shop')?[]:[C('shop')?'docker start sho
 const UP=()=>Crun('shop-web-1')&&Crun('shop-cache-1')?[]:['docker compose up -d'];
 const WEBDEP=()=>Dep('web')?[]:['kubectl create deployment web --image=nginx:1.26 --replicas=3'];
 const SVC=()=>K().svcs['default/web']?[]:['kubectl expose deployment web --port=80 --type=NodePort'];
-// port-forward refuses a pod that is not Running yet, so let the simulated clock catch up first
-const FWD=()=>K().fwd[9090]?[]:[()=>{skew+=30000;tick();skew+=30000;tick();return ''},'kubectl port-forward svc/web 9090:80'];
+// pods take ~90 simulated seconds to settle (port-forward refuses a pod that is not Running)
+const SETTLE=()=>{for(let i=0;i<3;i++){skew+=30000;tick()}return ''};
+const FWD=()=>K().fwd[9090]?[]:[SETTLE,'kubectl port-forward svc/web 9090:80'];
 const BAD_ROLLOUT=()=>{const i=Dep('web')?.image;return i==='nginx:1.99'?[]:[...WEBDEP(),...(i==='nginx:1.27'?[]:['kubectl set image deployment/web nginx=nginx:1.27']),'kubectl set image deployment/web nginx=nginx:1.99']};
 const NS=()=>K().nss.shop?[]:['kubectl create namespace shop'];
 const SHOP_APPLIED=()=>[...NS(),...(Dep('shop','shop')?[]:['kubectl apply -f shop.yaml'])];
@@ -1119,7 +1121,7 @@ const CH=[
  {t:'Check the deployment',i:'List deployments. READY shows how many of the wanted pods are up.',g:'Type <code>kubectl get deployments</code>',a:[['kubectl','cmd'],['get','sub'],['deployments','arg']],h:'deploy is a short form: kubectl get deploy',ans:'kubectl get deployments',ok:c=>has(c,/^(kubectl|k) get (deployments|deployment|deploy)/),after:'3/3 means three wanted, three ready.'},
  {t:'Where did they land?',i:'<code>-o wide</code> adds the pod IP and the node.',g:'Type <code>kubectl get pods -o wide</code>',a:[['kubectl','cmd'],['get','sub'],['pods','arg'],['-o wide','opt']],h:'-o wide at the end',ans:'kubectl get pods -o wide',ok:c=>has(c,/^(kubectl|k) get (pods|pod|po) .*-o ?wide|^(kubectl|k) get (pods|po) -owide/),after:'Each pod has its own IP inside the cluster. Notice the names: web-, then a short code for the pod recipe, then a random bit.'},
  {t:'Break one on purpose',pre:()=>WEBDEP(),i:'Delete one of the web pods. Click a web pod in the live view to fill in its name.',g:'Type <code>kubectl delete pod web-…</code> with a real pod name',a:[['kubectl','cmd'],['delete','sub'],['pod','arg'],['web-xxxxxxxxxx-xxxxx','arg']],h:'Click any web pod on the right, then press Enter.',ans:()=>{const p=Pods('web')[0];return p?'kubectl delete pod '+p.name:'kubectl get pods'},ok:c=>S.flag.lastDeleted&&S.flag.lastDeleted.dep==='web'&&has(c,/delete/),fill:{pod:p=>`kubectl delete pod ${p.name}${p.ns!=='default'?' -n '+p.ns:''}`},after:'Watch the live view: as soon as the count dropped to 2, Kubernetes created a replacement.'},
- {t:'Spot the newcomer',pre:()=>[...WEBDEP(),...(S.flag.lastDeleted?.dep==='web'?[]:[()=>'kubectl delete pod '+(Pods('web')[0]?.name||'web')])],i:'List the pods again and look at the AGE column.',g:'Type <code>kubectl get pods</code>',a:[['kubectl','cmd'],['get','sub'],['pods','arg']],h:'kubectl get pods',ans:'kubectl get pods',ok:c=>has(c,/^(kubectl|k) get (pods|pod|po)/)&&S.flag.lastDeleted&&Pods('web').length>=3,after:'One pod is only seconds old, with a new name. That is self-healing: you describe what you want, and the cluster keeps it true.'},
+ {t:'Spot the newcomer',pre:()=>[...WEBDEP(),...(S.flag.lastDeleted?.dep==='web'?[]:[SETTLE,()=>'kubectl delete pod '+(Pods('web')[0]?.name||'web'),SETTLE])],i:'List the pods again and look at the AGE column.',g:'Type <code>kubectl get pods</code>',a:[['kubectl','cmd'],['get','sub'],['pods','arg']],h:'kubectl get pods',ans:'kubectl get pods',ok:c=>has(c,/^(kubectl|k) get (pods|pod|po)/)&&S.flag.lastDeleted&&Pods('web').length>=3,after:'One pod is only seconds old, with a new name. That is self-healing: you describe what you want, and the cluster keeps it true.'},
  {t:'Scale up',pre:()=>WEBDEP(),i:'More visitors? Ask for more copies.',g:'Type <code>kubectl scale deployment web --replicas=5</code>',a:[['kubectl','cmd'],['scale','sub'],['deployment web','arg'],['--replicas=5','opt']],h:'kubectl scale deployment web --replicas=5',ans:'kubectl scale deployment web --replicas=5',ok:c=>hasCmd(c,/^(kubectl|k) scale\b/)&&Dep('web')&&Dep('web').replicas===5,after:'Two more pods start. The scheduler puts them on the less busy worker.'},
  {t:'Scale down',pre:()=>WEBDEP(),i:'Quiet night. Go down to 2.',g:'Type <code>kubectl scale deployment web --replicas=2</code>',a:[['kubectl','cmd'],['scale','sub'],['deployment web','arg'],['--replicas=2','opt']],h:'Same command, smaller number.',ans:'kubectl scale deployment web --replicas=2',ok:c=>hasCmd(c,/^(kubectl|k) scale\b/)&&Dep('web')&&Dep('web').replicas===2,after:'Extra pods terminate until exactly 2 are left.'},
  {t:'The layer in between',i:'A deployment does not create pods itself. It manages a <b>ReplicaSet</b>, and the ReplicaSet keeps the pod count.',g:'Type <code>kubectl get rs</code>',a:[['kubectl','cmd'],['get','sub'],['rs','arg']],h:'rs is short for replicasets',ans:'kubectl get rs',ok:c=>has(c,/^(kubectl|k) get (rs|replicasets?)/),after:'One ReplicaSet, named after the deployment plus the template hash, the same hash that appears in each pod name.'},
@@ -1379,14 +1381,14 @@ function renderView(fresh){const mode=viewMode();$('#vDocker').setAttribute('ari
   const r=mode==='docker'?dockerView(fresh):k8sView(fresh);$('#view').innerHTML=r.html;known=r.ids;HIT=null}
 function onTick(){if(!$('#tab-quest').hidden)renderView(true);if(insideLost){insideLost=false;addLine(esc('(The pod you were inside was deleted, so you are back on your laptop.)'),'sys');renderPrompt();renderWhere();scrollDown()}}
 let landed=null;const setups=[];
-function ensureNeeds(){const key=S.ch+'.'+S.mi;if(key===landed)return;landed=key;const m=CH[S.ch]?.missions[S.mi];if(!m)return;
+function ensureNeeds(){const key=S.ch+'.'+S.mi;if(key===landed)return;landed=key;const m=CH[S.ch]?.missions[S.mi];if(!m||S.done[key])return;
   const miss=(m.files||[]).filter(f=>S.files[f]==null);ensureFiles(miss);
   const lines=m.pre?m.pre():[];const ran=[];
-  const keep=S.inside;S.inside=null;
+  const keep=S.inside,was=insideBox()?.name;S.inside=null;
   for(const l of lines){const c=typeof l==='function'?l():l;if(c){ran.push(c);execLine(c)}tick()}
   if(!S.inside)S.inside=keep;
   if(miss.length)addLine(esc(`(New file${miss.length>1?'s':''} in your folder: ${miss.join(', ')}.)`),'sys');
-  if(ran.length){const msg=`(Set up for this mission, as if you had run: ${ran.join('; ')}.)`;setups.push(msg);addLine(esc(msg),'sys')}}
+  if(ran.length){const msg=`(Set up for this mission${was&&S.inside!==keep?`: left the ${was} shell, then ran`:', as if you had run'}: ${ran.join('; ')}.)`;setups.push(msg);addLine(esc(msg),'sys')}}
 function renderAll(){ensureNeeds();renderPrompt();renderWhere();renderChapters();renderMission();renderXP();renderView(true)}
 function setupChapter(i){const ch=CH[i];const msgs=[];if(ch.files){const n=ensureFiles(ch.files);if(n)msgs.push(`(New file${n>1?'s':''} in your folder: ${ch.files.join(', ')}.)`)}if(ch.setup){const m=ch.setup();if(m)msgs.push(m)}return msgs}
 function goChapter(i){S.ch=i;hintOpen=false;S.view='auto';const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;
@@ -1462,7 +1464,7 @@ $('#view').addEventListener('click',e=>{const m=CH[S.ch].missions[S.mi]||{};cons
   const f=e.target.closest('[data-fill]');if(f)fill(f.dataset.fill)});
 $('#vseg').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(!b)return;const v=b.dataset.v;S.view=v===CH[S.ch].view?'auto':v;known=null;renderView(false);save()});
 let armT=null;$('#resetWorld').addEventListener('click',e=>{const b=e.currentTarget;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to wipe all containers, images and the cluster';clearTimeout(armT);armT=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset world'},4000);return}
-  b.classList.remove('armed');b.textContent='Reset world';const f=fresh();S.d=f.d;S.k=f.k;S.files={};S.inside=null;S.flag={};landed=null;const msgs=setupChapter(S.ch);screen.innerHTML='';addLine(esc('(World reset: no containers, no images, a fresh cluster. Your XP and badges are kept.)'),'sys');msgs.forEach(m=>addLine(esc(m),'sys'));known=null;renderAll();save()});
+  b.classList.remove('armed');b.textContent='Reset world';const f=fresh();S.d=f.d;S.k=f.k;S.files={};S.inside=null;S.flag={};landed=S.ch+'.'+S.mi;const msgs=setupChapter(S.ch);screen.innerHTML='';addLine(esc('(World reset: no containers, no images, a fresh cluster. Your XP and badges are kept.)'),'sys');msgs.forEach(m=>addLine(esc(m),'sys'));known=null;renderAll();save()});
 /* tabs */
 const TABS=['quest','fire','puz','guide'];
 function showTab(t){for(const id of TABS){$('#tab-'+id).hidden=id!==t;$('#t-'+id).setAttribute('aria-selected',String(id===t))}if(t==='quest'){renderView(false);if(matchMedia('(pointer:fine)').matches)setTimeout(()=>cmdIn.focus(),0)}if(t!=='fire')stopFire(false);else if(!QS)fireIdle();if(t==='puz')renderPuz();if(t==='guide')renderGuide()}
