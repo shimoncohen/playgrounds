@@ -86,7 +86,8 @@ RQ.interp=(ast,opts)=>{
       if(hi>len)throw panic('end byte index '+shown+' is out of bounds for string of length '+len,at0);
       if(lo>hi)throw panic('byte range starts at '+lo+' but ends at '+hi,at0);
       const base=bv.k==='ref'||bv.k==='str';
-      return {k:'str',v:src.slice(lo,hi),cell:base?bv.cell:own||null,loan:base?bv.loan:e.id};
+      const sv=unref(bv);
+      return {k:'str',v:src.slice(lo,hi),cell:base?bv.cell:own||null,loan:base?bv.loan:e.id,heap:sv.k==='String'?sv.id:bv.heap,off:(bv.k==='str'?bv.off||0:0)+lo};
     }
     if(lo>len)throw panic('range start index '+lo+' out of range for slice of length '+len,at0);
     if(hi>len)throw panic('range end index '+shown+' out of range for slice of length '+len,at0);
@@ -350,7 +351,7 @@ RQ.interp=(ast,opts)=>{
     catch(x){return '?';}
   };
   function leaves(v,path,out,live){
-    if(v.k==='str'&&v.cell){out.push({path,ref:true,mut:false,loan:v.loan,cell:v.cell,text:scalar(v)});return;}
+    if(v.k==='str'&&v.cell){out.push({path,ref:true,mut:false,loan:v.loan,cell:v.cell,text:scalar(v),into:v.heap,range:v.heap!=null?[v.off,v.off+v.v.length]:undefined});return;}
     switch(v.k){
       case 'String':out.push({path,heap:live?v.id:null});break;
       case 'ref':out.push({path,ref:true,mut:v.mut,loan:v.loan,cell:v.cell,text:v.range?'['+v.range[0]+'..'+v.range[1]+']':undefined});break;

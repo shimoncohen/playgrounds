@@ -118,6 +118,12 @@ function context(d,ast,counts){
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];
       return !!p&&p.ty.t==='Ref'&&(kind==='mut'?p.ty.mut:kind==='shared'?!p.ty.mut:true);
     },
+    usesParam:(fn,i)=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];
+      let n=0;
+      if(p&&p.pat.name)RQ.walk(f.body,m=>{if(m.t==='Path'&&m.segs.length===1&&m.segs[0].name===p.pat.name||m.t==='Macro'&&m.args&&m.args[0]&&m.args[0].kind==='str'&&RQ.std.parseFormat(m.args[0].v).parts.some(q=>q.name===p.pat.name))n++;});
+      return n>0;
+    },
     methodIn:(fn,name)=>{let n=0;const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);if(f)RQ.walk(f,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},

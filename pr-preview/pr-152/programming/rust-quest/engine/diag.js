@@ -58,7 +58,7 @@ const ERRORS={
   },
   E0515:{
     title:'a function returns a reference to its own local',
-    msg:o=>'cannot return a reference to local variable `'+o.name+'`',
+    msg:o=>'cannot return '+(o.direct?'reference to ':'value referencing ')+(o.param?'function parameter':'local variable')+' `'+o.name+'`',
     tip:'A local variable is freed when the function ends, so a reference to it would point at nothing. Return the value itself (for text, a `String`) so the caller becomes its owner.'
   },
   E0428:{

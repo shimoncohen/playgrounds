@@ -81,9 +81,9 @@ RQ.check=ast=>{
   };
 
   // a reference type with no lifetime written: in a return type that needs lifetime elision (E0106/E0515), which is not modeled
-  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'?bareRef(n.ty):false;
-  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):n.t==='Tuple'?n.tys.map(firstBare).find(Boolean)||null:n.t==='Array'?firstBare(n.ty):null;
-  const countRefs=n=>n.t==='Ref'?1+countRefs(n.ty):n.t==='Tuple'?n.tys.reduce((a,x)=>a+countRefs(x),0):n.t==='Array'?countRefs(n.ty):0;
+  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'||n.t==='Slice'?bareRef(n.ty):false;
+  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):n.t==='Tuple'?n.tys.map(firstBare).find(Boolean)||null:n.t==='Array'||n.t==='Slice'?firstBare(n.ty):null;
+  const countRefs=n=>n.t==='Ref'?1+countRefs(n.ty):n.t==='Tuple'?n.tys.reduce((a,x)=>a+countRefs(x),0):n.t==='Array'||n.t==='Slice'?countRefs(n.ty):0;
   // `top` is set only for a fn's whole return type (and a const's type): that is the one place `&'static str` is checked against its leaves
   function tyOf(n,top){
     if(n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn){

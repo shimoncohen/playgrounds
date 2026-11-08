@@ -20,6 +20,12 @@ function slot(leaf,snap){
   if(leaf.ref){
     const loan=snap.loans.find(l=>l.id===leaf.loan),live=!loan||loan.live;
     const s=h('span','mv-slot mv-ref '+(leaf.mut?'mut':'shared')+(live?'':' ended'));
+    if(leaf.into!=null&&leaf.range){
+      if(leaf.path)s.append(h('i',null,leaf.path+' '));
+      s.append(document.createTextNode('['+leaf.range[0]+'..'+leaf.range[1]+'] '+leaf.text+(live?'':' (borrow ended)')));
+      s.dataset.sliceHeap=leaf.into;s.dataset.live=live?'1':'';
+      return s;
+    }
     if(leaf.path)s.append(h('i',null,leaf.path+' '));
     s.append(document.createTextNode((leaf.mut?'&mut':'&')+' to '+(leaf.toName||'a temporary')+(leaf.text?' '+leaf.text:'')+(live?'':' (borrow ended)')));
     if(leaf.to!==null)s.dataset.refTo=leaf.to;
@@ -83,6 +89,10 @@ function arrows(cols,svg){
   for(const s of cols.querySelectorAll('.mv-ptr')){
     const t=cols.querySelector('.mv-box[data-heap="'+s.dataset.heap+'"]');
     if(t)draw(s,t,'own',true);
+  }
+  for(const s of cols.querySelectorAll('.mv-ref[data-slice-heap]')){
+    const t=cols.querySelector('.mv-box[data-heap="'+s.dataset.sliceHeap+'"]');
+    if(t)draw(s,t,'shared',!!s.dataset.live);
   }
   for(const s of cols.querySelectorAll('.mv-ref[data-ref-to]')){
     const t=cols.querySelector('.mv-var[data-uid="'+s.dataset.refTo+'"] .mv-head');
