@@ -284,7 +284,7 @@ RQ.parse=tokens=>{
       const x=T();
       if(isP('?')){p++;e=mk('Try',x,{expr:e,line:e.line,col:e.col});continue;}
       if(isP('(')){p++;const args=exprList(')');e=mk('Call',x,{callee:e,args,line:e.line,col:e.col});continue;}
-      if(isP('[')){p++;const i=expr(false);expP(']');e=mk('Index',x,{expr:e,index:i,line:e.line,col:e.col});continue;}
+      if(isP('[')){p++;const i=expr(false);expP(']');e=mk('Index',x,{expr:e,index:i,line:e.line,col:e.col,bline:x.line,bcol:x.col});continue;}
       if(isP('.')){
         p++;const n=T();
         if(isK('await')){p++;feat('async',n.line);e=mk('Await',n,{expr:e});continue;}

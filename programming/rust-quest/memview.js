@@ -21,7 +21,7 @@ function slot(leaf,snap){
     const loan=snap.loans.find(l=>l.id===leaf.loan),live=!loan||loan.live;
     const s=h('span','mv-slot mv-ref '+(leaf.mut?'mut':'shared')+(live?'':' ended'));
     if(leaf.path)s.append(h('i',null,leaf.path+' '));
-    s.append(document.createTextNode((leaf.mut?'&mut':'&')+' to '+(leaf.toName||'a temporary')+(live?'':' (borrow ended)')));
+    s.append(document.createTextNode((leaf.mut?'&mut':'&')+' to '+(leaf.toName||'a temporary')+(leaf.text?' '+leaf.text:'')+(live?'':' (borrow ended)')));
     if(leaf.to!==null)s.dataset.refTo=leaf.to;
     s.dataset.mut=leaf.mut?'1':'';s.dataset.live=live?'1':'';
     return s;

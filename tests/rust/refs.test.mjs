@@ -134,7 +134,7 @@ describe('coercion', () => {
     assert.equal(un('    let mut s = String::new();\n    let r: &String = &mut s;'), 'reference coercion@4');
     assert.equal(un('    let mut s = String::new();\n    let r: &str = &mut s;'), 'reference coercion@4');
     assert.equal(un('    let mut x = 1;\n    let r: &i32 = &mut x;'), 'reference coercion@4');
-    assert.equal(un('    let x = 1;\n    let r: &mut i32 = &x;'), 'reference coercion@4');
+    assert.equal(code('    let x = 1;\n    let r: &mut i32 = &x;'), 'E0308@4');
     assert.equal(un('    let s = "a";\n    let r: &String = s;'), 'reference coercion@4');
   });
   it('a reference to a &str is reference to reference, not E0308', () => {
@@ -150,11 +150,11 @@ describe('checker-stage unsupported triggers', () => {
     assert.equal(un('', "fn f(s: &'static String) {}"), 'explicit lifetime@1');
     assert.equal(un('', "fn f(s: &'a str) -> &'a str { s }"), 'explicit lifetime@1');
   });
-  it('lifetime elision: a returned reference without a lifetime, which also closes the base false accept', () => {
-    assert.equal(un('', 'fn f() -> &str { "a" }'), 'lifetime elision@1');
-    assert.equal(un('', 'fn f(s: &String) -> &String { s }'), 'lifetime elision@1');
+  it('lifetime elision: only a shared reference tied to one shared parameter is modeled', () => {
     assert.equal(un('', 'fn f(x: &mut i32) -> &mut i32 { x }'), 'lifetime elision@1');
     assert.equal(un('', 'fn f(s: &String) -> (i32, &str) { (1, "a") }'), 'lifetime elision@1');
+    assert.equal(un('', 'fn f(x: &mut String) -> &String { x }'), 'lifetime elision@1,reference coercion@1');
+    assert.equal(un('', 'fn f(s: &String) -> &String { s }'), '');
   });
   it('reborrow: as_str on a &mut String', () => {
     assert.equal(un('    let mut s = String::new();\n    let r = &mut s;\n    let t = r.as_str();'), 'reborrow@5');

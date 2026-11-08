@@ -504,6 +504,31 @@ test('rust-quest: the memory view steps through mission 4.1 and shows the error 
   await ctx.close();
 });
 
+
+test('rust-quest: a slice is drawn as a dashed arrow to the String it borrows, with a loan bar beside the editor', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 1000, height: 800 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="4"]');
+  await page.click('#mission .dot[data-mi="4"]');
+  const answer = await page.evaluate(() => RQ.CH[4].missions[4].answer);
+  await page.fill('#code', answer);
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 3);
+  const slots = await page.$$eval('#memory .mv-ref', els => els.map(e => e.textContent));
+  assert.deepEqual(slots, ['& to s "hello"', '& to s "world"']);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-shared', p => p.length), 2);
+  assert.equal(await page.$$eval('#gutter .gt-bar.shared', b => b.length), 2);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.fill('#code', await page.evaluate(() => RQ.CH[4].missions[8].starter));
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0515/);
+  assert.equal(await page.$('#memory input[type=range]'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

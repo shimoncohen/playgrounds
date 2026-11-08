@@ -11,8 +11,8 @@
        dead   {l}             StorageDead of a named local, in reverse declaration order. Temps get none.
        branch {x}             the block has two succ: then, else (loop body, loop exit)
        return {x}             x is null for a unit fn
-     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args} | {k:'method',name,recv,args} | {k:'op',args}
-            | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l; a method call on an owned String
+     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args,from} | {k:'method',name,recv,args} | {k:'op',args}
+            | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l (`&l[a..b]` of an owned l too); from is the argument index a returned reference borrows from, or -1; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
      operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call or a method
             is an implicit reborrow, not a move (except std drop): {k:'copy',l,reb:true,sh} (sh: the callee takes `&`). Reading a Field or Index is a copy of the root local. */
@@ -86,7 +86,7 @@ function lowerFn(f,info,un,userDrop){
   };
   const kill=(ids,nd)=>{for(let j=ids.length-1;j>=0;j--)emit('dead',nd,{l:ids[j]});};
   const deads=(from,nd)=>{for(let i=scopes.length-1;i>=from;i--)kill(scopes[i],nd);};
-  const retDest=ty=>retL===undefined?(retL=temp(ty)):retL;
+  const retDest=ty=>{if(retL===undefined){retL=temp(ty);L[retL].ret=true;}return retL;};
 
   // a Path argument or receiver: a `&mut` local is reborrowed here, not moved; sh: the callee takes `&`, so the reborrow is shared
   const argOp=(x,sh)=>{
@@ -180,6 +180,16 @@ function lowerFn(f,info,un,userDrop){
       args=seq(e.args,x=>argOp(x,true));
     }
     return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
+  }
+
+  // `&base[a..b]`: a shared loan on an owned base; a base that is already a reference is passed on, so the slice carries its loans
+  function slice(e,x,dest){
+    const rg=peel(x.index),b=peel(x.expr),l=b.t==='Path'?lid(b):-1;
+    if(l<0){un(b.t==='Field'||b.t==='Index'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
+    const bounds=[rg.from,rg.to].filter(Boolean).map(y=>ex(y));
+    if(bounds.length)emit('eval',e,{rv:{k:'op',args:bounds}});
+    const t=L[l].ty;
+    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false},e,dest,tyOf(e));
   }
 
   function assign(e){
@@ -316,11 +326,13 @@ function lowerFn(f,info,un,userDrop){
         if(c.t!=='Path'){un('call',e);return fin(NIL,e,dest);}
         const fn=c.segs.map(s=>s.name).join('::');
         rebTwice(e.args,e);
-        return put({k:'call',fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp)},e,dest,tyOf(e));
+        const sig=(info.get(e)||{}).sig;
+        return put({k:'call',fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1},e,dest,tyOf(e));
       }
       case 'MethodCall':return method(e,dest);
       case 'Ref':{
         const x=peel(e.expr);
+        if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,dest);
         if(x.t==='Path'&&lid(x)>=0)return put({k:'ref',l:lid(x),mut:e.mut},e,dest,tyOf(e));
         un(x.t==='Field'||x.t==='Index'?'borrow of a field':x.t==='Deref'?'reborrow':'temporary borrow',e);
         return fin(NIL,e,dest);

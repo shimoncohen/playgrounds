@@ -64,6 +64,36 @@ RQ.interp=(ast,opts)=>{
   const panic=(msg,e)=>{const p=new Panic(msg,e);err+=RQ.diag.panicText(p);return p;};
   const typeOf=e=>{const o=info.get(e);return o&&o.ty;};
   const isPlace=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
+  const view=v=>{
+    const r=v.k==='ref'&&v.range;
+    const arr=(v.k==='ref'?v.cell.val:v).v;
+    return r?{arr,off:r[0],len:r[1]-r[0]}:{arr,off:0,len:arr.length};
+  };
+  function slice(e,x,env){
+    const rg=peel(x.index),px=peel(x.expr),own=px.t==='Path'&&find(env,px.segs[0].name);
+    const bv=ev(px,env),at=n=>Number(unref(ev(n,env)).v);
+    const lo=rg.from?at(rg.from):0;
+    let hi=rg.to?at(rg.to)+(rg.inclusive?1:0):null;
+    const text=info.get(e).slice==='str';
+    const src=text?unref(bv).v:null;
+    const len=text?src.length:view(bv).len;
+    if(hi===null)hi=len;
+    // rustc points an overloaded index at its `[`, and reports an inclusive end as written
+    const at0={line:x.bline,col:x.bcol},shown=rg.inclusive?hi-1:hi;
+    if(text){
+      if(/[^\x00-\x7f]/.test(src))throw new Unsup('slice of non-ASCII text',e.line);
+      if(lo>len)throw panic('start byte index '+lo+' is out of bounds for string of length '+len,at0);
+      if(hi>len)throw panic('end byte index '+shown+' is out of bounds for string of length '+len,at0);
+      if(lo>hi)throw panic('byte range starts at '+lo+' but ends at '+hi,at0);
+      const base=bv.k==='ref'||bv.k==='str';
+      return {k:'str',v:src.slice(lo,hi),cell:base?bv.cell:own||null,loan:base?bv.loan:e.id};
+    }
+    if(lo>len)throw panic('range start index '+lo+' out of range for slice of length '+len,at0);
+    if(hi>len)throw panic('range end index '+shown+' out of range for slice of length '+len,at0);
+    if(lo>hi)throw panic('slice index starts at '+lo+' but ends at '+hi,at0);
+    const v=view(bv);
+    return {k:'ref',cell:bv.k==='ref'?bv.cell:own,mut:false,loan:bv.k==='ref'?bv.loan:e.id,range:[v.off+lo,v.off+hi]};
+  }
   function cellOf(e,env){
     e=peel(e);
     if(e.t==='Deref')return cellOf(e.expr,env);
@@ -320,9 +350,10 @@ RQ.interp=(ast,opts)=>{
     catch(x){return '?';}
   };
   function leaves(v,path,out,live){
+    if(v.k==='str'&&v.cell){out.push({path,ref:true,mut:false,loan:v.loan,cell:v.cell,text:scalar(v)});return;}
     switch(v.k){
       case 'String':out.push({path,heap:live?v.id:null});break;
-      case 'ref':out.push({path,ref:true,mut:v.mut,loan:v.loan,cell:v.cell});break;
+      case 'ref':out.push({path,ref:true,mut:v.mut,loan:v.loan,cell:v.cell,text:v.range?'['+v.range[0]+'..'+v.range[1]+']':undefined});break;
       case 'struct':for(const f of v.fields)leaves(f.val,path?path+'.'+f.name:f.name,out,live);break;
       case 'tuple':case 'array':
         v.v.slice(0,8).forEach((x,i)=>leaves(x,path+(v.k==='array'?'['+i+']':(path?'.':'')+i),out,live));
@@ -433,6 +464,7 @@ RQ.interp=(ast,opts)=>{
       }
       case 'Ref':{
         const x=peel(e.expr);
+        if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,env);
         if(x.t==='Field'||x.t==='Index')throw new Unsup('borrow of a field',e.line);
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
@@ -452,7 +484,9 @@ RQ.interp=(ast,opts)=>{
           const c=cellOf(r,env),add=unref(ev(e.args[0],env)).v;
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
-        const rv=ev(e.recv,env),s=unref(rv).v;
+        const rv=ev(e.recv,env);
+        if(e.name==='len'&&(rv.k==='array'||rv.k==='ref'&&rv.cell.val.k==='array'))return int(BigInt(view(rv).len),'usize');
+        const s=unref(rv).v;
         if(rv.k==='String'&&!isPlace(e.recv))temps.push({v:rv,line:e.line});
         if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
         if(e.name==='as_str')return {k:'str',v:s};
@@ -469,9 +503,9 @@ RQ.interp=(ast,opts)=>{
       }
       case 'ArrayRepeat':{const v=ev(e.elem,env);return {k:'array',v:Array(Number(e.len.v)).fill(v)};}
       case 'Index':{
-        const a=ev(e.expr,env),i=ev(e.index,env);
-        if(i.v>=BigInt(a.v.length))throw panic('index out of bounds: the len is '+a.v.length+' but the index is '+i.v,e);
-        return a.v[Number(i.v)];
+        const a=view(ev(e.expr,env)),i=ev(e.index,env);
+        if(i.v>=BigInt(a.len))throw panic('index out of bounds: the len is '+a.len+' but the index is '+i.v,e);
+        return a.arr[a.off+Number(i.v)];
       }
       case 'Field':{
         const b=unref(ev(e.expr,env));
