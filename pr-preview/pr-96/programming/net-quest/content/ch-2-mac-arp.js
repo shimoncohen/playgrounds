@@ -14,6 +14,7 @@ const sent=(c,h,pred)=>(h.entries||[]).some(e=>e.dev===c.net.me&&e.dir==='tx'&&p
 const asked=(c,h)=>sent(c,h,arpReq);
 // the ping commands (with their position in the history) that put an echo request on the wire
 const pingRuns=c=>c.history.map((h,i)=>({h,i})).filter(r=>isPing(r.h.line)&&sent(c,r.h,e=>ic(e,'echo-request')));
+const NEIGH_FIX=/^\s*ip\s+(neigh|neighbor|n)\s+(del|delete|add|replace|change)\s+10\.0\.0\.3(\s|$)/;
 const NEIGH_ADD=/^\s*ip\s+(neigh|neighbor|n)\s+add\s+10\.0\.0\.3(\s|$)/;
 const PHONE='10.0.0.3',WRONG='02:00:00:00:00:99';
 const phoneMac=c=>c.net.devices.phone.ifaces.eth0.mac;
@@ -88,7 +89,8 @@ NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
   check:c=>{
     const mac=c.net.devices[c.net.me].neigh[PHONE];
     if(mac&&mac!==phoneMac(c))return 'The laptop still remembers a MAC the phone does not have. Compare <code>ip neigh</code> with what <code>arping 10.0.0.3</code> prints, then delete or rewrite the entry.';
-    return c.ping(c.net.me,PHONE).delivered?true:'The laptop still cannot reach the phone. Look at what it remembers with <code>ip neigh</code>, and ask the phone itself with <code>arping 10.0.0.3</code>.';}},
+    if(!c.ping(c.net.me,PHONE).delivered)return 'The laptop still cannot reach the phone. Look at what it remembers with <code>ip neigh</code>, and ask the phone itself with <code>arping 10.0.0.3</code>.';
+    return c.inOrder(NEIGH_FIX,NQ.pingTo('10.0.0.3'))?true:'The entry is fixed. Now prove it: <code>ping -c 1 10.0.0.3</code>.';}},
  {title:'What the switch learns',scenario:'office',
   goal:'This is a bigger wire: the laptop, a printer and a router all plug into one switch. The switch has no terminal and no IP address, but it keeps a table of its own. Every frame that arrives teaches it which <b>port</b> (a socket on the switch) the sender\'s MAC is behind, so it can send later frames out of one port instead of all of them. Ping the printer with <code>ping -c 1 192.168.1.20</code>, then use the packet panel to work out which device keeps that table.',
   anat:[['ping','cmd'],['-c','opt','count'],['1','arg','how many'],['192.168.1.20','arg','the printer']],
