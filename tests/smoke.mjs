@@ -3179,3 +3179,56 @@ test('agent-quest: long lines and unresolved paths show inline errors, and learn
   assert.deepEqual(o.errors, []);
   await o.ctx.close();
 });
+
+// A mission is completed by the learner's own input, never by state left over from other missions or a replay.
+test('script-quest: after the whole chapter is built, an unrelated input completes no mission, and each mission\'s own answer still does', async () => {
+  const hook = 'window.__t={CH,S,setChapter,goMission,runShell,submit,cmd,mk,INITIAL_FILES,openFile,saveFile,ed,get MODE(){return MODE},clearRun(){RUN=null}};})();';
+  const prep = ctx => ctx.route('**/script-quest/app.js', async r => {
+    const body = (await r.fetch()).text();
+    await r.fulfill({ contentType: 'text/javascript', body: (await body).replace(/\}\)\(\);\s*$/, hook) });
+  });
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, {}, prep);
+  const bad = await page.evaluate(async () => {
+    const { CH, S, setChapter, goMission, runShell, submit, cmd, mk, INITIAL_FILES, openFile, saveFile, ed } = window.__t;
+    const alt = { '2.1': ['let a = 1, coins = 0', 'let coins\ncoins = 0'], '6.1': ['const { bag } = { bag: ["a", "b"] }'], '8.4': ['Object.defineProperty(performer, "act", { value: "tightrope", enumerable: true })'] };
+    const bad = [], tick = () => new Promise(r => setTimeout(r, 50));
+    const play = async m => {
+      if (window.__t.MODE !== 'sh') { cmd.value = m.code; await submit(); return; }
+      if (!m.editFile) { runShell(m.code); return; }
+      if (m.editFile === 'package.json') return;
+      openFile(m.editFile); ed.value = m.code; saveFile();
+      if (m.run) runShell(m.run);
+    };
+    for (let c = 0; c < CH.length; c++) {
+      S.done = {}; S.cur = {}; setChapter(c);
+      const sh = window.__t.MODE === 'sh';
+      if (sh) { S.files = { ...INITIAL_FILES }; S.pkgs = []; }
+      const reset = () => { S.done = {}; S.cur = {}; setChapter(c); if (sh) { S.files = { ...INITIAL_FILES }; S.pkgs = []; } };
+      for (const m of CH[c].missions) await play(m);
+      for (let j = 0; j < CH[c].missions.length; j++) {
+        const m = CH[c].missions[j];
+        for (const input of sh ? ['ls', 'node -v', 'node -e "1"', 'npm -v'] : ['true']) {
+          if (m.code.startsWith(input.slice(0, 7))) continue;
+          S.done = {}; S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+          cmd.value = input; await submit();
+          if (S.done[mk(c, j)]) bad.push(`${c + 1}.${j + 1} ${m.title}: unrelated input ${input} completed it`);
+        }
+        for (const code of [m.code, ...(alt[`${c + 1}.${j + 1}`] || [])]) {
+        reset();
+        for (const p of CH[c].missions.slice(0, j)) await play(p);
+        S.done = {}; S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+        await play({ ...m, code });
+        for (let w = 0; w < 80 && !S.done[mk(c, j)]; w++) await tick();
+        // the code of the package.json mission is a fragment to paste in, not a whole file, so play() skips it
+        if (!S.done[mk(c, j)] && m.editFile !== 'package.json') bad.push(`${c + 1}.${j + 1} ${m.title}: answer ${JSON.stringify(code)} did not complete it`);
+        }
+        reset();
+        for (const p of CH[c].missions) await play(p);
+      }
+    }
+    return bad;
+  });
+  assert.deepEqual(bad, []);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
