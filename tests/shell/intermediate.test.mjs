@@ -196,9 +196,9 @@ describe('round 2: tighter checks', () => {
     yes(T9, 7, 'grep zzz journal.txt; echo $?');
     yes(T9, 7, 'ls nothing; echo "$?"');
   });
-  it('9.6 text tells you to export first', () => {
+  it('9.6 sets up the export when jumped to', () => {
     const m = loadShell().content.chapters[T9].missions[5];
-    assert.match(m.goal + (m.note || ''), /export GREETING/);
+    assert.match(m.pre.join(), /export GREETING/);
   });
 });
 

@@ -347,7 +347,7 @@ const CH=[
   explain:`<code>&amp;</code> at the end runs the command as a background <b>job</b>. bash prints the job number in brackets and the process's PID, like <code>[1] 1235</code>, and gives the prompt back while the job runs. Without the <code>&amp;</code>, <code>sleep 30</code> holds the prompt until it ends. The clock here is virtual: <code>sleep 30</code> moves it on by 30 seconds at once, and every line you type adds 1 second.`,
   check:c=>{const s=startedHere(c);return s.length===1&&s[0].state==='Running'}},
  {title:'List the jobs',goal:`Check that the bell timer is still ticking. With the sleep from the last mission still running, list your jobs: <code>jobs</code>`,
-  note:`Jumped straight here, or did the job end? Start one first with <code>sleep 30 &amp;</code>, or do both on one line: <code>sleep 30 &amp; jobs</code>.`,
+  need:c=>myJobs(c).some(j=>j.state==='Running'),pre:['sleep 30 &'],made:'started a 30-second sleep in the background',
   anat:[['jobs','cmd']],answer:'jobs',
   explain:`<code>jobs</code> lists the background jobs of this shell: the job number, <code>+</code> for the most recent job and <code>-</code> for the one before, the state and the command. <code>Running</code> means it has not finished yet. A job that ends is reported once as <code>Done</code> and then leaves the list. <code>jobs -l</code> adds each job's PID.`,
   check:c=>myJobs(c).some(j=>j.state==='Running')&&c.ran('jobs',e=>e.code===0&&/Running\s+.*\bsleep \d+.*&\s*$/m.test(e.out))},
