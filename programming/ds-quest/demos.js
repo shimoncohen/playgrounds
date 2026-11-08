@@ -26,7 +26,7 @@ const ARRAY={id:'array',ch:0,title:'Array: a row of numbered boxes',name:'row',
 /* ---------- stacks ---------- */
 const slab=t=>`<span class="slab">${t}</span>`;
 const STACK={id:'stack',ch:1,title:'Stack: last in, first out',name:'stack',
- about:'A pile of plates. You only ever touch the <b>top</b>. The last thing you put on is the first thing you take off.',
+ about:'A pile of hat boxes. You only ever touch the <b>top</b>. The last thing you put on is the first thing you take off.',
  init:()=>[3,7],
  render:s=>`<div class="stackviz">${slab('top')}${s.v.map((x,i)=>`<div class="sbox" data-i="${i}">${x}</div>`).reverse().join('')||'<span class="empty">empty stack</span>'}<div class="sbase"></div></div>`,
  ops:[
@@ -37,7 +37,7 @@ const STACK={id:'stack',ch:1,title:'Stack: last in, first out',name:'stack',
 
 /* ---------- queues ---------- */
 const QUEUE={id:'queue',ch:2,title:'Queue: first in, first out',name:'queue',
- about:'A line at the shop. New people join at the <b>back</b>. The person at the <b>front</b> is served first, so things leave in the same order they arrived.',
+ about:'A line at the claim desk. New people join at the <b>back</b>. The person at the <b>front</b> is served first, so things leave in the same order they arrived.',
  init:()=>[5,2,9],
  render:s=>`<div class="queueviz">${slab('front →')}${s.v.map((x,i)=>`<div class="sbox" data-i="${i}">${x}</div>`).join('')||'<span class="empty">empty queue</span>'}${slab('← back')}</div>`,
  ops:[
