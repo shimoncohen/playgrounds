@@ -3,6 +3,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const MAX_PAD=1000;
 class Unmodeled extends Error{}
+const ORDER='hash order'; // printing a HashMap of two or more entries: rustc's order changes from run to run
 class Over extends Error{}
 const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],[/^#\?$/,()=>({debug:true,pretty:true,prec:null,width:null})],
   [/^\.(\d{1,3})$/,m=>({debug:false,prec:+m[1],width:null})],[/^>(\d{1,3})$/,m=>({debug:false,prec:null,width:+m[1]})]];
@@ -114,7 +115,10 @@ function debug(v,tick,room=Infinity,pretty=false){
     case 'str':case 'String':return quoted(v.v,'"',room);
     case 'unit':return '()';
     case 'tuple':{const items=v.v.map(sub);return !pretty&&items.length===1?'('+items[0]+',)':wrap('','(',')',items,false);}
-    case 'array':return v.v.length?wrap('','[',']',v.v.map(sub),false):'[]';
+    case 'array':case 'vec':return v.v.length?wrap('','[',']',v.v.map(sub),false):'[]';
+    case 'map':
+      if(v.v.length>1)throw new Unmodeled(ORDER);
+      return v.v.length?wrap('','{','}',v.v.map(e=>sub(e.key)+': '+sub(e.val)),false):'{}';
     case 'struct':case 'enum':{
       const nm=v.k==='struct'?v.name:v.variant;
       const items=v.fields.map(f=>v.kind==='named'?f.name+': '+sub(f.val):sub(f.val));
@@ -141,5 +145,5 @@ const methods=new Map([
   ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
   ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
 ]);
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled,Over,methods,unref};
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,ORDER,Over,methods,unref};
 })();

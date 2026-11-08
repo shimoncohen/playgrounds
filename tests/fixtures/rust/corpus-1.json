@@ -2662,5 +2662,305 @@
     "src": "fn first(r: &Option<String>) {\n    match r {\n        Some(s) => println!(\"{}\", s),\n        None => {}\n    }\n}\n\nfn main() {\n    let o = Some(String::from(\"a\"));\n    first(&o);\n}\n",
     "expect": "ok", "out": "a\n", "err": "", "exit": 0,
     "why": "matching the reference binds a reference to the String", "pr": "P8"
+  },
+  {
+    "id": "vec-push-len",
+    "src": "fn main() {\n    let mut v = Vec::new();\n    v.push(1);\n    v.push(2);\n    println!(\"{:?} {}\", v, v.len());\n}\n",
+    "expect": "ok", "out": "[1, 2] 2\n", "err": "", "exit": 0,
+    "why": "a Vec grows by push, and its element type is fixed by the first value", "pr": "P8"
+  },
+  {
+    "id": "vec-forms",
+    "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![0; 2];\n    let c: Vec<String> = vec![];\n    let d = vec![String::from(\"x\"); 2];\n    println!(\"{:?} {:?} {:?} {:?} {}\", a, b, c, d, c.is_empty());\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [0, 0] [] [\"x\", \"x\"] true\n", "err": "", "exit": 0,
+    "why": "the three forms of vec! and an annotation on an empty one", "pr": "P8"
+  },
+  {
+    "id": "vec-params",
+    "src": "fn count(v: &Vec<i32>) -> usize {\n    v.len()\n}\n\nfn add(v: &mut Vec<i32>, x: i32) {\n    v.push(x);\n}\n\nfn main() {\n    let mut v = Vec::new();\n    add(&mut v, 4);\n    add(&mut v, 5);\n    println!(\"{} {:?}\", count(&v), v);\n}\n",
+    "expect": "ok", "out": "2 [4, 5]\n", "err": "", "exit": 0,
+    "why": "a Vec is passed by & to read and by &mut to push", "pr": "P8"
+  },
+  {
+    "id": "vec-debug-pretty",
+    "src": "#[derive(Debug)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let v = vec![P { n: 1 }, P { n: 2 }];\n    println!(\"{:?}\", v);\n    println!(\"{:#?}\", v);\n}\n",
+    "expect": "ok", "out": "[P { n: 1 }, P { n: 2 }]\n[\n    P {\n        n: 1,\n    },\n    P {\n        n: 2,\n    },\n]\n", "err": "", "exit": 0,
+    "why": "Debug of a Vec prints its elements, one per line when pretty", "pr": "P8"
+  },
+  {
+    "id": "vec-clone-independent",
+    "src": "fn main() {\n    let mut v = vec![String::from(\"a\")];\n    let w = v.clone();\n    v.push(String::from(\"b\"));\n    println!(\"{:?} {:?} {}\", v, w, v == w);\n}\n",
+    "expect": "ok", "out": "[\"a\", \"b\"] [\"a\"] false\n", "err": "", "exit": 0,
+    "why": "clone copies every element, so the two Vecs change on their own", "pr": "P8"
+  },
+  {
+    "id": "vec-drop-order",
+    "src": "struct N {\n    id: i32,\n}\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.id);\n    }\n}\n\nfn main() {\n    let mut v = Vec::new();\n    v.push(N { id: 1 });\n    v.push(N { id: 2 });\n    println!(\"made\");\n}\n",
+    "expect": "ok", "out": "made\ndrop 1\ndrop 2\n", "err": "", "exit": 0,
+    "why": "a Vec drops its elements in order when it goes out of scope", "pr": "P8"
+  },
+  {
+    "id": "vec-move-drops-once",
+    "src": "struct N {\n    id: i32,\n}\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.id);\n    }\n}\n\nfn eat(v: Vec<N>) {\n    println!(\"eat\");\n}\n\nfn main() {\n    let v = vec![N { id: 1 }];\n    eat(v);\n    println!(\"after\");\n}\n",
+    "expect": "ok", "out": "eat\ndrop 1\nafter\n", "err": "", "exit": 0,
+    "why": "a Vec passed by value is dropped by the callee, once", "pr": "P8"
+  },
+  {
+    "id": "vec-order",
+    "src": "fn main() {\n    let a = vec![1, 2];\n    let b = vec![1, 2, 0];\n    let c = vec![1, 3];\n    println!(\"{} {} {}\", a < b, b < c, c > a);\n}\n",
+    "expect": "ok", "out": "true true true\n", "err": "", "exit": 0,
+    "why": "Vecs compare element by element, and a shorter prefix is smaller", "pr": "P8"
+  },
+  {
+    "id": "hashmap-insert-old",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut m = HashMap::new();\n    let a = m.insert(String::from(\"k\"), 1);\n    let b = m.insert(String::from(\"k\"), 2);\n    println!(\"{:?} {:?} {} {:?}\", a, b, m.len(), m);\n}\n",
+    "expect": "ok", "out": "None Some(1) 1 {\"k\": 2}\n", "err": "", "exit": 0,
+    "why": "insert returns the old value, and a map with one entry prints", "pr": "P8"
+  },
+  {
+    "id": "hashmap-eq-clone",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut a = HashMap::new();\n    let mut b = HashMap::new();\n    a.insert(1, 10);\n    a.insert(2, 20);\n    b.insert(2, 20);\n    b.insert(1, 10);\n    let c = a.clone();\n    b.insert(3, 30);\n    println!(\"{} {} {}\", a == c, a == b, c.len());\n}\n",
+    "expect": "ok", "out": "true false 2\n", "err": "", "exit": 0,
+    "why": "maps compare without caring about the order of their entries", "pr": "P8"
+  },
+  {
+    "id": "hashmap-struct-key",
+    "src": "use std::collections::HashMap;\n\n#[derive(PartialEq, Eq, Hash, Debug)]\nstruct K {\n    id: u32,\n    tag: String,\n}\n\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(K { id: 1, tag: String::from(\"a\") }, 1);\n    let old = m.insert(K { id: 1, tag: String::from(\"a\") }, 2);\n    println!(\"{:?} {}\", old, m.len());\n}\n",
+    "expect": "ok", "out": "Some(1) 1\n", "err": "", "exit": 0,
+    "why": "a struct that derives PartialEq, Eq and Hash is a key", "pr": "P8"
+  },
+  {
+    "id": "hashmap-empty-debug",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let m: HashMap<i32, i32> = HashMap::new();\n    println!(\"{:?} {}\", m, m.is_empty());\n}\n",
+    "expect": "ok", "out": "{} true\n", "err": "", "exit": 0,
+    "why": "an empty map prints as {}", "pr": "P8"
+  },
+  {
+    "id": "derive-ord-struct",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]\nstruct Ver {\n    major: i32,\n    minor: i32,\n}\n\nfn main() {\n    let a = Ver { major: 1, minor: 9 };\n    let b = Ver { major: 2, minor: 0 };\n    let c = Ver { major: 2, minor: 1 };\n    println!(\"{} {} {} {} {}\", a < b, b < c, c <= c, a > c, b >= c);\n}\n",
+    "expect": "ok", "out": "true true true false false\n", "err": "", "exit": 0,
+    "why": "a derived order compares the fields in declaration order", "pr": "P8"
+  },
+  {
+    "id": "derive-ord-enum",
+    "src": "#[derive(PartialEq, PartialOrd)]\nenum E {\n    Low,\n    Mid(i32),\n    High { n: i32 },\n}\n\nfn main() {\n    println!(\"{} {} {}\", E::Low < E::Mid(0), E::Mid(5) < E::Mid(6), E::High { n: 0 } < E::Mid(9));\n}\n",
+    "expect": "ok", "out": "true true false\n", "err": "", "exit": 0,
+    "why": "a derived order compares the variants in declaration order first", "pr": "P8"
+  },
+  {
+    "id": "derive-ord-nan",
+    "src": "#[derive(PartialEq, PartialOrd)]\nstruct F(f64);\n\nfn main() {\n    let n = F(0.0 / 0.0);\n    let o = F(1.0);\n    println!(\"{} {} {} {}\", n < o, n > o, n <= o, o < F(2.0));\n}\n",
+    "expect": "ok", "out": "false false false true\n", "err": "", "exit": 0,
+    "why": "a float field makes the order partial: NaN is not less, greater or equal", "pr": "P8"
+  },
+  {
+    "id": "option-result-order",
+    "src": "fn main() {\n    let a: Option<i32> = None;\n    let b = Some(1);\n    let c: Result<i32, i32> = Ok(5);\n    let d: Result<i32, i32> = Err(0);\n    println!(\"{} {} {} {}\", a < b, b < Some(2), c < d, Some(3) > None);\n}\n",
+    "expect": "ok", "out": "true true true true\n", "err": "", "exit": 0,
+    "why": "None is before Some and Ok before Err", "pr": "P8"
+  },
+  {
+    "id": "derive-default-struct",
+    "src": "#[derive(Debug, Default)]\nstruct Inner(u8, bool);\n\n#[derive(Debug, Default)]\nstruct Cfg {\n    n: i32,\n    f: f64,\n    s: String,\n    o: Option<Inner>,\n    v: Vec<i32>,\n    t: (i32, bool),\n    a: [i32; 3],\n    i: Inner,\n}\n\nfn main() {\n    println!(\"{:?}\", Cfg::default());\n}\n",
+    "expect": "ok", "out": "Cfg { n: 0, f: 0.0, s: \"\", o: None, v: [], t: (0, false), a: [0, 0, 0], i: Inner(0, false) }\n", "err": "", "exit": 0,
+    "why": "Default gives zero, false, the empty string, None and an empty Vec", "pr": "P8"
+  },
+  {
+    "id": "derive-default-enum",
+    "src": "#[derive(Debug, Default)]\nenum E {\n    A,\n    #[default]\n    B,\n}\n\nfn main() {\n    println!(\"{:?}\", E::default());\n}\n",
+    "expect": "ok", "out": "B\n", "err": "", "exit": 0,
+    "why": "an enum derives Default from its #[default] variant", "pr": "P8"
+  },
+  {
+    "id": "derive-default-over-user-fn",
+    "src": "#[derive(Default)]\nstruct S {\n    n: i32,\n}\n\nimpl S {\n    fn default() -> S {\n        S { n: 7 }\n    }\n}\n\nfn main() {\n    let s = S::default();\n    println!(\"{}\", s.n);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "a method called default in the impl is the one called", "pr": "P8"
+  },
+  {
+    "id": "vec-clone-ref",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![K(1)];\n    let r = &v;\n    let q = r.clone();\n    println!(\"{}\", q.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "clone on a reference to a Vec of a type that is not Clone copies the reference", "pr": "P8"
+  },
+  {
+    "id": "vec-moved-use",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let w = v;\n    println!(\"{} {}\", v.len(), w.len());\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "vec-moved-use-ok",
+    "why": "a Vec moves on assignment, so the old name is dead", "pr": "P8"
+  },
+  {
+    "id": "vec-moved-use-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let w = v.clone();\n    println!(\"{} {}\", v.len(), w.len());\n}\n",
+    "expect": "ok", "out": "2 2\n", "err": "", "exit": 0,
+    "why": "a clone leaves the old Vec usable", "pr": "P8"
+  },
+  {
+    "id": "vec-push-immutable",
+    "src": "fn main() {\n    let v = Vec::new();\n    v.push(1);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": {"code": "E0596", "line": 3}, "pair": "vec-push-immutable-ok",
+    "why": "push needs a Vec that is declared mut", "pr": "P8"
+  },
+  {
+    "id": "vec-push-immutable-ok",
+    "src": "fn main() {\n    let mut v = Vec::new();\n    v.push(1);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a mut Vec can push", "pr": "P8"
+  },
+  {
+    "id": "vec-push-borrowed",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let r = &v;\n    v.push(2);\n    println!(\"{}\", r.len());\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "vec-push-borrowed-ok",
+    "why": "push borrows the Vec mutably, while r still borrows it", "pr": "P8"
+  },
+  {
+    "id": "vec-push-borrowed-ok",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let r = &v;\n    v.push(2);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "once r is not used again, the push is fine", "pr": "P8"
+  },
+  {
+    "id": "vec-push-moved-string",
+    "src": "fn main() {\n    let mut v = Vec::new();\n    let s = String::from(\"a\");\n    v.push(s);\n    println!(\"{} {}\", v.len(), s);\n}\n",
+    "expect": {"code": "E0382", "line": 5}, "pair": "vec-push-moved-string-ok",
+    "why": "push moves the String into the Vec", "pr": "P8"
+  },
+  {
+    "id": "vec-push-moved-string-ok",
+    "src": "fn main() {\n    let mut v = Vec::new();\n    let s = String::from(\"a\");\n    v.push(s.clone());\n    println!(\"{} {}\", v.len(), s);\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "pushing a clone keeps the original", "pr": "P8"
+  },
+  {
+    "id": "vec-debug-element",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![K(1)];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 5}, "pair": "vec-debug-element-ok",
+    "why": "a Vec is Debug only when its elements are", "pr": "P8"
+  },
+  {
+    "id": "vec-debug-element-ok",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![1];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1]\n", "err": "", "exit": 0,
+    "why": "a Vec of numbers prints", "pr": "P8"
+  },
+  {
+    "id": "vec-eq-element",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![K(1)];\n    let w = vec![K(1)];\n    println!(\"{}\", v == w);\n}\n",
+    "expect": {"code": "E0369", "line": 6}, "pair": "vec-eq-element-ok",
+    "why": "a Vec is PartialEq only when its elements are", "pr": "P8"
+  },
+  {
+    "id": "vec-eq-element-ok",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![1];\n    let w = vec![1];\n    println!(\"{}\", v == w);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "two Vecs of numbers compare", "pr": "P8"
+  },
+  {
+    "id": "vec-clone-element",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![K(1)];\n    let w = v.clone();\n    println!(\"{}\", w.len());\n}\n",
+    "expect": {"code": "E0599", "line": 5}, "pair": "vec-clone-element-ok",
+    "why": "a Vec is Clone only when its elements are", "pr": "P8"
+  },
+  {
+    "id": "vec-clone-element-ok",
+    "src": "struct K(i32);\n\nfn main() {\n    let v = vec![1];\n    let w = v.clone();\n    println!(\"{}\", w.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a Vec of numbers clones", "pr": "P8"
+  },
+  {
+    "id": "vec-display",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    println!(\"{}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "vec-display-ok",
+    "why": "a Vec has no Display, only Debug", "pr": "P8"
+  },
+  {
+    "id": "vec-display-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "{:?} prints a Vec", "pr": "P8"
+  },
+  {
+    "id": "vec-repeat-count",
+    "src": "fn main() {\n    let n: i32 = 2;\n    let v = vec![0; n];\n    println!(\"{}\", v.len());\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "vec-repeat-count-ok",
+    "why": "the count in vec![x; n] is a usize", "pr": "P8"
+  },
+  {
+    "id": "vec-repeat-count-ok",
+    "src": "fn main() {\n    let n: usize = 2;\n    let v = vec![0; n];\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a usize count works", "pr": "P8"
+  },
+  {
+    "id": "vec-push-wrong-type",
+    "src": "fn main() {\n    let mut v: Vec<i32> = Vec::new();\n    v.push(1.5);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "vec-push-wrong-type-ok",
+    "why": "push takes the element type of the Vec", "pr": "P8"
+  },
+  {
+    "id": "vec-push-wrong-type-ok",
+    "src": "fn main() {\n    let mut v: Vec<i32> = Vec::new();\n    v.push(15);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "an i32 pushes", "pr": "P8"
+  },
+  {
+    "id": "hashmap-key-float",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut m: HashMap<f64, i32> = HashMap::new();\n    m.insert(1.0, 2);\n    println!(\"{}\", m.len());\n}\n",
+    "expect": {"code": "E0599", "line": 5}, "pair": "hashmap-key-float-ok",
+    "why": "a float is not Eq or Hash, so it is no key", "pr": "P8"
+  },
+  {
+    "id": "hashmap-key-float-ok",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 2);\n    println!(\"{}\", m.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "an integer key works", "pr": "P8"
+  },
+  {
+    "id": "hashmap-key-no-hash",
+    "src": "use std::collections::HashMap;\n\n#[derive(PartialEq, Eq)]\nstruct K(i32);\n\nfn main() {\n    let mut m: HashMap<K, i32> = HashMap::new();\n    m.insert(K(1), 2);\n    println!(\"{}\", m.len());\n}\n",
+    "expect": {"code": "E0599", "line": 8}, "pair": "hashmap-key-no-hash-ok",
+    "why": "a key needs Hash beside Eq", "pr": "P8"
+  },
+  {
+    "id": "hashmap-key-no-hash-ok",
+    "src": "use std::collections::HashMap;\n\n#[derive(PartialEq, Eq, Hash)]\nstruct K(i32);\n\nfn main() {\n    let mut m: HashMap<K, i32> = HashMap::new();\n    m.insert(K(1), 2);\n    println!(\"{}\", m.len());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "with Hash derived the key works", "pr": "P8"
+  },
+  {
+    "id": "hashmap-eq-key",
+    "src": "use std::collections::HashMap;\n\n#[derive(PartialEq, Hash)]\nstruct K(i32);\n\nfn main() {\n    let a: HashMap<K, i32> = HashMap::new();\n    let b: HashMap<K, i32> = HashMap::new();\n    println!(\"{}\", a == b);\n}\n",
+    "expect": {"code": "E0369", "line": 9}, "pair": "hashmap-eq-key-ok",
+    "why": "comparing two maps needs a key that is Eq and Hash", "pr": "P8"
+  },
+  {
+    "id": "hashmap-eq-key-ok",
+    "src": "use std::collections::HashMap;\n\n#[derive(PartialEq, Eq, Hash)]\nstruct K(i32);\n\nfn main() {\n    let a: HashMap<K, i32> = HashMap::new();\n    let b: HashMap<K, i32> = HashMap::new();\n    println!(\"{}\", a == b);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "with Eq derived the maps compare", "pr": "P8"
+  },
+  {
+    "id": "compare-no-partialord",
+    "src": "#[derive(PartialEq)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = P { n: 2 };\n    if a < b {\n        println!(\"less\");\n    }\n}\n",
+    "expect": {"code": "E0369", "line": 9}, "pair": "compare-no-partialord-ok",
+    "why": "< needs PartialOrd, which == does not give", "pr": "P8"
+  },
+  {
+    "id": "compare-no-partialord-ok",
+    "src": "#[derive(PartialEq)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = P { n: 2 };\n    if a.n < b.n {\n        println!(\"less\");\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "comparing the numbers inside is fine", "pr": "P8"
+  },
+  {
+    "id": "default-not-derived",
+    "src": "#[derive(Debug)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P::default();\n    println!(\"{}\", p.n);\n}\n",
+    "expect": {"code": "E0599", "line": 7}, "pair": "default-not-derived-ok",
+    "why": "default exists only for a type that derives Default", "pr": "P8"
+  },
+  {
+    "id": "default-not-derived-ok",
+    "src": "#[derive(Default)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P::default();\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "with Default derived the call works", "pr": "P8"
   }
 ]

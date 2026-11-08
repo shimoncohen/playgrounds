@@ -67,10 +67,10 @@ describe('derive', () => {
     assert.equal(ids(q('', 'println!("{p}");')), 'E0277@7');
     assert.equal(ids(q('', 'let b = p == q;')), 'E0369@7');
     assert.equal(ids(q('', 'let c = p.clone();')), 'E0599@7');
-    assert.equal(RQ.run(main('let o = Some(5);', 'println!("{}", o);')).errors[0].msg, '`Option<i32>` doesn\'t implement `std::fmt::Display`');
+    assert.equal(RQ.run(main('let o = Some(5);', 'println!("{}", o);')).errors[0].msg, '`Option<{integer}>` doesn\'t implement `std::fmt::Display`');
   });
   it('a derive the type cannot honor, or one that is not modeled, is unsupported', () => {
-    assert.equal(feature(P('#[derive(Hash)]', 'struct P {', '    n: i32,', '}', 'fn main() {}')), 'derive@2');
+    assert.equal(feature(P('#[derive(Ord)]', 'struct P {', '    n: i32,', '}', 'fn main() {}')), 'derive@2');
     assert.equal(feature(P('#[derive(PartialOrd)]', 'struct P {', '    n: i32,', '}', 'fn main() {}')), 'derive@2');
     assert.equal(feature(P('#[derive(Clone, Copy)]', 'struct P {', '    s: String,', '}', 'fn main() {}')), 'derive@2');
     assert.equal(feature(P('#[derive(Copy)]', 'struct P {', '    n: i32,', '}', 'fn main() {}')), 'derive@2');
@@ -318,7 +318,7 @@ describe('type forms meet the checks that walk types', () => {
   it('a reference inside an Option or a generic argument of the wrong count is not a struct field or a type', () => {
     assert.equal(feature(P('fn f(o: Option<i32, i32>) {}', 'fn main() {}')), 'Option@1');
     assert.equal(feature(P('fn f(o: Result<i32>) {}', 'fn main() {}')), 'Result@1');
-    assert.equal(feature(P('fn f(o: Vec<i32>) {}', 'fn main() {}')), 'Vec@1');
+    assert.equal(feature(P('fn f(o: Vec<i32, i32>) {}', 'fn main() {}')), 'Vec@1');
     assert.equal(feature(P('struct S;', 'fn f(o: S<i32>) {}', 'fn main() {}')), 'generics@2');
   });
   it('an array or a tuple of structs and enums copies by the element type and prints by it', () => {

@@ -334,8 +334,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     emit('assign',e,{l,rv:compound?{k:'op',args:[opnd(l),v]}:{k:'use',x:v}});
   }
 
-  // The scrutinee is read once (a peek), then each arm moves or copies what its names bind out of it. A name bound in a variant is a path below the
-  // scrutinee place, so a match arm that moves a String leaves the enum partially moved, as in Rust. Through a reference the names are copies of the reference.
+  // A name bound in a variant is a path below the scrutinee place, so an arm that moves a String leaves the enum partially moved, as in Rust
   function matchEx(e,dest){
     const mi=info.get(e).match,t=tyOf(e);
     if(dest===undefined&&!isUnit(t))dest=temp(t);
@@ -534,6 +533,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       case 'StructLit':return put({k:'agg',args:seq(e.fields.map(f=>f.expr),ex)},e,dest,tyOf(e));
       case 'ArrayRepeat':return put({k:'agg',args:[ex(e.elem)]},e,dest,tyOf(e));
       case 'Macro':{
+        if(e.name==='vec'&&e.args)return put({k:'agg',args:seq(e.repeat?[...e.args,e.repeat]:e.args,ex)},e,dest,tyOf(e));
         if(!(PRINT.has(e.name)||e.name==='format')||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
         const args=seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
         const caps=e.args[0]&&info.get(e.args[0])&&info.get(e.args[0]).caps||[];

@@ -10,6 +10,7 @@ const badge=v=>v.state==='shared'?'borrowed'+(v.n>1?' x'+v.n:''):BADGE[v.state]|
 function sentence(e){
   const n=e.name?'The variable '+e.name:'A temporary value';
   if(e.t==='alloc')return e.empty?'An empty '+e.kind+' was made (#'+e.id+'). It takes no heap memory until it grows.':'A '+e.kind+' was made on the heap (#'+e.id+').';
+  if(e.t==='move'&&e.name&&e.name.includes('.'))return 'A field of '+e.name.split('.')[0]+' moved ('+e.name+'), so it cannot be used any more.';
   if(e.t==='move')return n+' moved, so it cannot be used any more.';
   if(e.t==='drop')return e.part?null:n+' was dropped'+(e.ty==='String'?'.':' ('+e.ty+').');
   if(e.t==='free')return 'Heap #'+e.id+' was freed.';
@@ -50,8 +51,9 @@ function varRow(v,snap){
   if(b)head.append(h('span','mv-badge',b));
   row.append(head);
   const slots=h('div','mv-slots');
-  for(const l of v.leaves)slots.append(slot(l,snap));
-  if(!v.leaves.length)slots.append(h('span','mv-slot empty','empty'));
+  const shown=v.leaves.filter(l=>!l.hidden);
+  for(const l of shown)slots.append(slot(l,snap));
+  if(!shown.length)slots.append(h('span','mv-slot empty','empty'));
   row.append(slots);
   return row;
 }
