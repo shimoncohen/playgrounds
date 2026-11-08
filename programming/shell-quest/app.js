@@ -29,7 +29,7 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
     else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
   SQ.ui.setPop();landOn()}
 
-function landOn(){const m=CH[S.ch].missions[S.mi];if(m&&SQ.ensureNeeds(m))addLine(renderText(`(Set up for this mission: ${m.made}.)`),'sys')}
+function landOn(){const made=SQ.landOn();if(made)addLine(renderText(`(Set up for this mission: ${made}.)`),'sys')}
 
 /* One typed or generated line: echo it (unless echo:false), run it (optional stdin text), show the output, check the mission.
    opts.feedback is for script missions (a failed test case is explained); the typed prompt never sets it. */
@@ -103,7 +103,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
   clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.resetProcs();SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
-  addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
+  addLine('World reset to its starting state. Your progress and XP are kept.','sys');landOn();renderAll();save();scrollDown()});
 
 /* tabs */
 function showTab(t){for(const id of ['quest','fire','guide']){$('#tab-'+id).hidden=id!==t;$('#t-'+id).setAttribute('aria-selected',String(id===t))}

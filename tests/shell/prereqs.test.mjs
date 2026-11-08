@@ -38,7 +38,7 @@ describe('a mission opened out of order sets up what it needs', () => {
     for (const ch of chapters) for (const m of ch.missions) if (m.need || m.pre || m.made) {
       assert.equal(typeof m.need, 'function', m.title);
       assert.ok(Array.isArray(m.pre) && m.pre.length, m.title);
-      assert.match(m.made, /^(made|exported|started) /, m.title);
+      assert.match(m.made, /^(created|added|exported|linked|started) /, m.title);
     }
   });
 
@@ -79,5 +79,51 @@ describe('a mission opened out of order sets up what it needs', () => {
     run(SQ, 'echo mine > camp/diary.txt');
     assert.ok(!SQ.ensureNeeds(m));
     assert.equal(SQ.getNode(SQ.norm('~/camp/diary.txt')).content, 'mine');
+  });
+
+  const mission = (title) => chapters.flatMap((c) => c.missions).find((x) => x.title === title);
+
+  it('an unexported GREETING the learner set keeps its value', () => {
+    land(8, 0);
+    run(SQ, 'GREETING=hello');
+    assert.ok(SQ.ensureNeeds(mission('See the environment')));
+    assert.equal(SQ.S.vars.GREETING, 'hello');
+    assert.ok(SQ.S.exp.GREETING);
+  });
+
+  it('a regular file called today.log is left alone', () => {
+    land(9, 0);
+    run(SQ, 'echo mine > today.log');
+    assert.ok(!SQ.ensureNeeds(mission('Follow the shortcut')));
+    assert.equal(SQ.getNode(SQ.norm('~/today.log')).content, 'mine');
+  });
+
+  it('setup does not move the clock or age a running job', () => {
+    land(16, 0);
+    run(SQ, 'sleep 3 &');
+    const clock = SQ.rt.clock, jobs = SQ.ctxFor('').jobs().map((j) => j.state);
+    assert.ok(SQ.ensureNeeds(mission('Run your script')));
+    assert.equal(SQ.rt.clock, clock);
+    assert.deepEqual(SQ.ctxFor('').jobs().map((j) => j.state), jobs);
+  });
+
+  describe('landOn (the app calls it on every landing)', () => {
+    const at = (i, j) => { land(i, j); SQ.S.mi = j; };
+    it('sets up the open mission and names what it made', () => {
+      at(1, 1);
+      assert.equal(SQ.landOn(), 'created the ~/camp folder');
+      assert.equal(SQ.landOn(), '');
+    });
+    it('does nothing for a finished mission', () => {
+      at(1, 1);
+      SQ.S.done['1.1'] = 1;
+      assert.equal(SQ.landOn(), '');
+      assert.ok(!SQ.getNode(SQ.norm('~/camp')));
+    });
+    it('does nothing past the last mission', () => {
+      at(1, 0);
+      SQ.S.mi = chapters[1].missions.length;
+      assert.equal(SQ.landOn(), '');
+    });
   });
 });
