@@ -980,20 +980,20 @@ const CH=[
   check:c=>c.ok&&/Hello/.test(c.out)},
  {title:'Make it yours',goal:'The plate asks who is knocking: change the text so the program prints <code>Hello, </code> followed by your name.',keep:true,
   explain:`Text inside double quotes is a <b>string</b>. The program prints it exactly as written, letter for letter, but without the quotes. Change only what is between the quotes, and keep both <code>"</code> marks.`,
-  start:P(R`cout << "Hello, Tick Tower!" << endl;`),ans:P(R`cout << "Hello, Ada!" << endl;`),hint:'Replace World with your name, inside the quotes.',
+  start:P(R`cout << "Hello, Tick Tower!" << endl;`),ans:P(R`cout << "Hello, Ada!" << endl;`),hint:'Replace Tick Tower with your name, inside the quotes.',
   check:c=>c.ok&&/hello/i.test(c.out)&&!/Hello, Tick Tower!/.test(c.out)},
  {title:'Two lines',goal:'The plate wants one more line: add a second <code>cout</code> line that prints <code>I am learning C++</code>.',keep:true,
   anat:[['cout','name'],['<<','op'],['"I am learning C++"','val'],['<<','op'],['endl','name'],[';','op']],
   explain:`<code>endl</code> means <b>end line</b>: the next output starts on a fresh line. Try deleting the first <code>&lt;&lt; endl</code> and running again: both texts squash onto one line.`,
-  start:P(R`cout << "Hello, Ada!" << endl;`),ans:P(R`cout << "Hello, Ada!" << endl;
+  start:P(R`cout << "The tower clock is ticking" << endl;`),ans:P(R`cout << "The tower clock is ticking" << endl;
 cout << "I am learning C++" << endl;`),hint:'Copy the first cout line, paste it underneath, and change the text.',
   check:c=>c.ok&&c.lines.length>=2&&c.count(/\bcout\b/)>=2},
  {title:'The \\n shortcut',goal:'Let the clock tick and tock: print two lines, <code>Tick</code> then <code>Tock</code>, with a <b>single</b> <code>cout</code>, using <code>\\n</code> inside the text.',
   anat:[['"Line one\\nLine two"','val']],
   explain:`<code>\\n</code> is an <b>escape sequence</b>: a backslash plus a letter that stands for a character you can't type into a string directly. <code>\\n</code> is a new line, <code>\\t</code> is a tab, <code>\\"</code> is a double quote and <code>\\\\</code> is a backslash. Lines that start with <code>//</code> (like the one in the starter code) are <b>comments</b>: notes for humans that the computer skips.`,
   start:P(R`// One cout, two lines of output
-cout << "Tick" << endl;`),ans:P(R`cout << "Tick\nTock\n";`),hint:'Put \\n between the two pieces of text: "Tick\\nTock\\n"',
-  check:c=>c.ok&&c.lines.length>=2&&c.count(/\bcout\b/)===1&&/"[^"\n]*\\n[^"\n]*"/.test(c.code)},
+cout << "Tick" << endl;`),ans:P(R`cout << "Tick\nTock\n";`),hint:'Put \\n between the two pieces of text: "Tick\\nTock\\n". The first line must be Tick and the second Tock.',
+  check:c=>c.ok&&c.lines[0]==='Tick'&&c.lines[1]==='Tock'&&c.count(/\bcout\b/)===1&&/"[^"\n]*\\n[^"\n]*"/.test(c.code)},
  {title:'Bug hunt: the missing semicolon',goal:'The workshop door sticks: press Run, read the error, then fix the program.',
   explain:`<code>main.cpp:5:30: error</code> means file <b><code>main.cpp</code></b>, line <b>5</b>, column <b>30</b>. The compiler reports the spot where it got confused, and with a missing <code>;</code> that is usually the end of the line <i>before</i> the next line of code. Fix the first error first: one mistake often causes several messages.`,
   start:P(R`cout << "Winding gears 1..." << endl
@@ -1281,7 +1281,7 @@ switch (choice) {
         cout << "Unknown choice" << endl;
 }`),hint:'Add case 2:, case 3: and default: blocks, each ending in break;',test:['2'],
   check:c=>c.ok&&c.count(/\bcase\b/)>=3&&c.has(/\bdefault\s*:/)&&c.count(/\bbreak\b/)>=3},
- {title:'Mini game: Rock, Paper, Scissors',goal:'Tock challenges you to a game. The player types 0 (rock), 1 (paper) or 2 (scissors). The computer picks randomly. Print both choices and who <b>wins</b>, <b>loses</b> or <b>ties</b>.',
+ {title:"Tock's challenge: Rock, Paper, Scissors",goal:'Tock challenges you to a game. The player types 0 (rock), 1 (paper) or 2 (scissors). The computer picks randomly. Print both choices and who <b>wins</b>, <b>loses</b> or <b>ties</b>.',
   explain:`Plan before you code. A tie is when both are equal. The player wins when they beat the computer: paper (1) beats rock (0), scissors (2) beat paper (1), rock (0) beats scissors (2). Notice the pattern: the player wins when <code>(player + 3 - computer) % 3 == 1</code> (adding 3 first keeps the number from going negative before <code>%</code>). Any other case is a loss.`,
   start:P(R`srand(time(0));
 int player;
@@ -1535,7 +1535,7 @@ int crank(int turns) {
     countdown(n - 1);
 }`}),hint:'if (n == 0) { cout << "Bong!"; return; }  cout << n << endl;  countdown(n - 1);',
   check:c=>c.ok&&c.recursed.length>0&&/bong/i.test(c.out)},
- {title:'Game tool: rollDice',goal:'Tock needs dice for the day\'s order: write <code>int rollDice(int sides)</code> that returns a random number from 1 to sides. Roll two six-sided dice and print the total.',
+ {title:"Tock's dice: rollDice",goal:'Tock needs dice for the day\'s order: write <code>int rollDice(int sides)</code> that returns a random number from 1 to sides. Roll two six-sided dice and print the total.',
   explain:`Good functions do one job and have a clear name. Now rolling dice is one readable line anywhere in your game: <code>rollDice(20)</code> for a 20-sided die, <code>rollDice(6) + rollDice(6)</code> for two six-sided dice. You'll reuse this in the final battle.`,
   start:P(R`srand(time(0));
 // roll two dice and add them
@@ -1654,7 +1654,7 @@ for (int row = 0; row < 3; row++) {
 }`),hint:"board[1][1] = 'X'; then a row loop with a col loop inside.",
   check:c=>c.ok&&c.v('board')&&c.v('board').v[1][1]==='X'&&c.lines.filter(l=>l.includes('|')).length>=3}
  ]},
-{name:'Structs',badge:'Figure Blueprint',story:'The parade figures on the clock face each have a name and strength; build their blueprints and make them march, and find the figure blueprint.',intro:'The parade figures on the clock face each have a name and a strength. Bundle related data into your own types. Build the figures, then make them duel.',
+{name:'Structs',badge:'Figure Blueprint',story:'The parade figures on the clock face each have a name and strength; build their blueprints and make them march, and find the figure blueprint.',intro:'The parade figures on the clock face each have a name and a strength. Bundle related data into your own types. Build the figures, then make them march.',
  learned:['struct','.field','{ } init','const &','vector<Struct>'],
  missions:[
  {title:'Design a Figure',goal:'Finish <code>struct Figure</code> with a <code>string name</code>, <code>int wind</code> and <code>int strength</code>. Create <code>tilly</code>, fill in its fields, and print them.',
@@ -1772,7 +1772,7 @@ cout << "Total wind: " << total << endl;`,{inc:['vector'],pre:R`struct Figure {
 };`}),hint:'for (const Figure& p : parade) { cout << p.name << endl; total += p.wind; }',
   check:c=>c.ok&&c.v('parade')&&c.v('parade').v.length>=3&&c.v('total')&&c.v('total').v===c.v('parade').v.reduce((s,p)=>s+p.wind,0)&&c.v('parade').v.every(p=>c.out.includes(p.name))},
  {title:'Tilly versus Rustwick',goal:'Make Tilly and Baron Rustwick\'s figure take turns winding each other down with random loss until one of them reaches 0 wind. Print each round, then announce who <b>wins</b>.',
-  explain:`Everything comes together: a struct for fighters, functions for actions, random numbers for luck, a loop for rounds, and ifs to stop at the right moment. Check after <b>each</b> strength: if the boss figure runs down from Tilly's hit, it shouldn't get to hit back.`,
+  explain:`Everything comes together: a struct for fighters, functions for actions, random numbers for luck, a loop for rounds, and ifs to stop at the right moment. Check after <b>each</b> hit: if the boss figure runs down from Tilly's hit, it shouldn't get to hit back.`,
   start:P(R`srand(time(0));
 Figure tilly = {"Tilly", 100, 12};
 Figure boss = {"Baron Rustwick", 120, 10};
@@ -1843,7 +1843,7 @@ cout << "gears lives at " << &gears << endl;`),hint:'cout << &gears << endl;',
   check:c=>c.ok&&/0x[0-9a-f]+/.test(c.out)&&c.has(/&\s*gears/)},
  {title:'A pointer stores an address',goal:'Create <code>int* p = &amp;gears;</code>. Print <code>p</code>, then print <code>*p</code>.',
   anat:[['int*','type'],['p','name'],['=','op'],['&gears','name']],
-  explain:`A <b>pointer</b> is a variable whose value is an address. <code>int*</code> means "pointer to an int". In Memory, p's box holds gears's address and draws an arrow to it. Putting <code>*</code> in front of a pointer <b>follows the arrow</b>: <code>*p</code> reads the value at that address, 42.`,
+  explain:`A <b>pointer</b> is a variable whose value is an address. <code>int*</code> means "pointer to an int". In Memory, p's box holds the address of <code>gears</code> and draws an arrow to it. Putting <code>*</code> in front of a pointer <b>follows the arrow</b>: <code>*p</code> reads the value at that address, 42.`,
   start:P(R`int gears = 42;
 // make p point at gears
 `),ans:P(R`int gears = 42;

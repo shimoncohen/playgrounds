@@ -7,6 +7,6 @@
       { name: 'Tock', role: 'the tower mouse who runs the errands' },
       { name: 'Baron Rustwick', role: 'the rival who hid the clock\'s heart' },
     ],
-    treasure: 'The Midnight Chime, the golden pocket watch behind the clock face; its engraving matches the plate on the tower door from chapter 1.',
+    treasure: 'The Midnight Chime, the golden pocket watch behind the clock face; its engraving matches the plate on the tower door from chapter 0.',
   };
 })(typeof window !== 'undefined' ? window : globalThis);
