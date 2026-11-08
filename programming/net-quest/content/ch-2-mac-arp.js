@@ -22,8 +22,8 @@ const switchOf=c=>Object.values(c.net.devices).find(d=>d.kind==='switch');
 const keeper=c=>Object.values(c.net.devices).filter(d=>d.kind==='switch'&&Object.keys(d.macTable).length).map(d=>d.id)[0]||''; // the switch that has learned a MAC
 const PING1=[['ping','cmd'],['-c','opt','count'],['1','arg','how many'],[PHONE,'arg','who to ping']];
 
-NQ.CH.push({name:'MAC and ARP',badge:'Neighbour Book',
- story:'Tally has scratched a wrong name into the cottage address book, so you read it, wipe it, fix it and see which socket the switch sends to, to find the neighbours\' book.',
+NQ.CH.push({name:'MAC and ARP',badge:'Address Book',
+ story:'Tally has scratched a wrong name into the cottage address book, so you read it, wipe it, fix it and see which socket the switch sends to, to find the address book with Wren\'s next note.',
  intro:'Tally the ferry cat sits on the switch box and has scratched a wrong name into the cottage address book, where Wren\'s next note is hidden. Last chapter the laptop learned the phone\'s <b>MAC address</b> with ARP and kept it in a list, the one <code>ip neigh</code> prints. This chapter is about that list and about the switch in the middle. You will see the laptop ask once and then remember, make it forget on purpose, write an entry by hand (and break the network with a bad one), and find out which device in the middle keeps a table of MACs of its own.',
  learned:['ip neigh del','ip neigh add','PERMANENT','MAC table','flooding'],
  missions:[
