@@ -7,9 +7,10 @@ description: Use when adding or changing a mission, chapter, quick-fire question
 
 Goal: a mission that teaches one thing, can be solved, and cannot be passed by a lazy answer.
 
-1. **Read first**: `AGENTS.md`, then `docs/tiers-guideline.md` sections 3 (mission kinds, check helpers), 4 (save compatibility), 6 (pitfalls). Look at two neighbouring missions in the target chapter and copy their style.
+1. **Read first**: `AGENTS.md`, the playground's `story.js` and `docs/story-guideline.md`, then `docs/tiers-guideline.md` sections 3 (mission kinds, check helpers), 4 (save compatibility), 6 (pitfalls). Look at two neighbouring missions in the target chapter and copy their style.
 2. **Place it.** Shell Quest: `programming/shell-quest/content/tier-<tier>.js`. Append to the **end** of a chapter; never insert or renumber (saves are keyed `'<chapter>.<mission>'`). Other quests: the `CH` array in that quest's `app.js`.
 3. **Write the mission**: `{ title, goal, anat, how, answer, explain, check, hint? }`.
+   - **On the trail.** The mission advances its chapter's leg of the treasure hunt (the chapter's `story` line, `docs/story-guideline.md`). Use the world's names and values for files, hosts, variables and numbers, never `foo`/`bar`. The story sets up the task; it never replaces the `how` steps.
    - `goal`: one friendly sentence, one concrete task. `answer`: the reference solution. `explain`: factual (test every claim against the engine).
    - `how`: ordered steps, **whole first, then the parts**. Step 1: one plain sentence on what the whole line does. Then one step per part (command, option, argument, operator), each tied back to step 1. Optionally a last step on what the learner will see. 3 to 5 steps. Give unclear `anat` chips a short meaning as a third element (`['-i','opt','ignore case']`). `explain` then holds only the extra fact or gotcha. Example in `docs/tiers-guideline.md` section 3.
    - Prefer an **outcome** check (file content, mode, variable) over "output contains X". Derive expected values from the world, accept sensible alternatives, quote variables in all learner-facing text.

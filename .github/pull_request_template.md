@@ -28,6 +28,7 @@
 - [ ] No `localStorage` key renamed; shipped missions not renumbered or reordered
 - [ ] No new dependency or build step
 - [ ] Learner-facing text is friendly, concrete and factual
+- [ ] New or changed missions follow the playground's story (`story.js`, the chapter's `story` line, world names instead of foo/bar; `docs/story-guideline.md`)
 
 ## Made with an agent?
 
