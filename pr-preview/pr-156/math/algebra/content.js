@@ -246,8 +246,9 @@
     track: 'algebra',
     ranks: [[0, 'Letter Learner'], [30, 'Box Builder'], [75, 'Volume Master'], [150, 'Bracket Opener'], [225, 'Balance Keeper'], [300, 'Factor Finder'], [375, 'Root Hunter']],
     chapters: [{
-      id: 'algebra.expressions', name: 'Expressions and volume', badge: 'Volume Master',
-      intro: 'In algebra, letters stand for numbers. A <b>variable</b> is a letter, like <code>a</code>, whose number can change. The box on this page has length <code>a</code>, width <code>b</code> and height <code>c</code>. Its <b>volume</b>, how many 1 by 1 by 1 cubes fit inside, is <code>V = a · b · c</code>, where the dot <code>·</code> means ×. A line made of numbers, letters and operations is an <b>expression</b>. Move the sliders and watch the box, the formula and the numbers change together.',
+      id: 'algebra.expressions', name: 'Expressions and volume', badge: 'Crate Label',
+      story: 'A crate marked with letters sits in the crate store, so you put its sizes in for the letters and work out its volume to find the crate\'s label.',
+      intro: 'In the windmill workshop, Tinker Odd packed her strongbox into a crate and left its sizes as letters. In algebra, letters stand for numbers. A <b>variable</b> is a letter, like <code>a</code>, whose number can change. The crate on this page, drawn as a box, has length <code>a</code>, width <code>b</code> and height <code>c</code>. Its <b>volume</b>, how many 1 by 1 by 1 cubes fit inside, is <code>V = a · b · c</code>, where the dot <code>·</code> means ×. A line made of numbers, letters and operations is an <b>expression</b>. Move the sliders and watch the box, the formula and the numbers change together.',
       scene: box,
       missions: [
         { title: 'Letters for numbers', kind: 'number', scene: { ...box, live: 'V = {a}·{b}·{c} = ?' }, at: { a: 10, b: 5, c: 3 }, reveal: true, question: '10*5*3', tex: 'a \\cdot b \\cdot c \\;\\text{ with }\\; a = 10,\\ b = 5,\\ c = 3',
@@ -262,7 +263,7 @@
           hint: 'Swap each letter for its number: <code>10 · 5 · 3</code>. Then multiply.',
           answer: '150', wrong: '18', lazy: '10*5*3', check: finalNumber(150) },
         { title: 'One number in front', kind: 'expr', vars: ['c'], question: '5*2*c',
-          goal: 'Another box is 5 long and 2 wide, but its height <code>c</code> can be anything. Its volume is <code>5 · 2 · c</code>. Write it with only one number in front of <code>c</code>.',
+          goal: 'Another crate in the store is 5 long and 2 wide, but its height <code>c</code> can be anything. Its volume is <code>5 · 2 · c</code>. Write it with only one number in front of <code>c</code>.',
           how: [
             '<code>5 · 2 · c</code> multiplies three things: the two numbers can be multiplied now, and <code>c</code> waits until you know it.',
             '<code>5 · 2</code> is 10: numbers combine even with a letter next to them.',
@@ -278,7 +279,7 @@
             return MQ.math.full.parse(v).filter(n => n.isConstantNode).length === 1 ? ok : { ok: false, why: 'That is equal, but it still has more than one number. Multiply the numbers together.' };
           } },
         { title: 'Double the length', kind: 'expr', at: { a: 1 }, vars: ['a', 'b', 'c'], question: '(2a*b*c)/(a*b*c)', tex: '\\frac{(2a) \\cdot b \\cdot c}{a \\cdot b \\cdot c}',
-          goal: 'Make the box twice as long: its length becomes <code>2a</code>. How many times bigger is the new volume? The question divides the new volume by the old one: cancel until no division is left.',
+          goal: 'Odd could have made her crate twice as long: its length becomes <code>2a</code>. How many times bigger is the new volume? The question divides the new volume by the old one: cancel until no division is left.',
           how: [
             'The question is a <b>fraction</b>, the top divided by the bottom: the new volume, <code>(2a) · b · c</code>, over the old one, <code>a · b · c</code>. Its value says how many old boxes fit in the new one.',
             '<code>a</code>, <code>b</code> and <code>c</code> are on the top and on the bottom. Anything divided by itself is 1, like <code>6 ÷ 6</code>, so each pair <b>cancels</b>: you can cross it out.',
@@ -303,7 +304,7 @@
           check: s => s.params.a !== 4 ? { ok: false, why: 'Keep the length a at 4.' }
             : s.derived.V === 64 ? ok : { ok: false, why: `V is ${s.derived.V} now. You need 64.` } },
         { title: 'Add like terms', kind: 'expr', scene: likeTerms, vars: ['a'], question: '2a+3a',
-          goal: 'Two boxes stand side by side. Both are 1 wide and 1 tall; one is <code>2a</code> long and the other <code>3a</code>. Together their volume is <code>2a + 3a</code>. Write it as one number times <code>a</code>.',
+          goal: 'Two crates stand side by side. Both are 1 wide and 1 tall; one is <code>2a</code> long and the other <code>3a</code>. Together their volume is <code>2a + 3a</code>. Write it as one number times <code>a</code>.',
           how: [
             '<code>2a + 3a</code> is two lots of <code>a</code> plus three more lots of <code>a</code>, like 2 apples and 3 apples.',
             '<code>2a</code> means <code>2 · a</code> and <code>3a</code> means <code>3 · a</code>: both count lots of the same thing, <code>a</code>.',
@@ -316,12 +317,13 @@
           check: v => MQ.check.expr(v, '5a', { vars: ['a'], form: 'product' }) },
       ],
     }, {
-      id: 'algebra.expanding', name: 'Expanding brackets', badge: 'Bracket Opener',
-      intro: 'A bracket groups a sum so it can be multiplied as one piece: <code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>. <b>Expanding</b> means multiplying out until no bracket is left around a sum: <code>3(x + 2) = 3x + 6</code>. The rectangle on this page shows why it works. Its sides are <code>a + b</code> and <code>c + d</code>, so it splits into four smaller rectangles, and its area is the sum of theirs: <code>ac + ad + bc + bd</code>, where two letters side by side, like <code>ac</code>, mean <code>a · c</code>. Each part has the same color in the picture and in the formula.',
+      id: 'algebra.expanding', name: 'Expanding brackets', badge: 'Plank Plan',
+      story: 'Odd\'s bench plans are written inside brackets, so you multiply them out at the carpentry bench to read the plank lengths and find the plank plan.',
+      intro: 'At the carpentry bench, Odd\'s plans for the planks are written inside brackets. A bracket groups a sum so it can be multiplied as one piece: <code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>. <b>Expanding</b> means multiplying out until no bracket is left around a sum: <code>3(x + 2) = 3x + 6</code>. The rectangle on this page shows why it works. Its sides are <code>a + b</code> and <code>c + d</code>, so it splits into four smaller rectangles, and its area is the sum of theirs: <code>ac + ad + bc + bd</code>, where two letters side by side, like <code>ac</code>, mean <code>a · c</code>. Each part has the same color in the picture and in the formula.',
       scene: rect('area-split', 'A rectangle split into four parts', [2, 1, 3, 2]),
       missions: [
         { title: 'One number times a bracket', kind: 'expr', scene: bracket, vars: ['x'], question: '3(x+2)',
-          goal: 'A rectangle is 3 tall and <code>x + 2</code> wide, so its area is <code>3(x + 2)</code>. Write that area with no brackets left.',
+          goal: 'A bench board is a rectangle 3 tall and <code>x + 2</code> wide, so its area is <code>3(x + 2)</code>. Write that area with no brackets left.',
           how: [
             '<code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>: a number right before a bracket multiplies everything inside it.',
             'Split the rectangle where <code>x</code> meets 2. One part is 3 by <code>x</code>, with area <code>3x</code>; the other is 3 by 2, with area 6.',
@@ -343,7 +345,7 @@
           hint: 'Two multiplications: <code>−2 · x</code> and <code>−2 · (−4)</code>. What is a minus times a minus?',
           answer: '-2x+8', wrong: '-2x-8', lazy: '-2(x-4)', check: finalExpr('-2x+8', ['expanded', 'collected']) },
         { title: 'Two brackets', kind: 'expr', at: { a: 2, b: 1, c: 2, d: 3 }, vars: ['x'], question: '(x+1)(x+3)',
-          goal: 'A rectangle is <code>x + 1</code> tall and <code>x + 3</code> wide. Expand <code>(x + 1)(x + 3)</code> into one sum, and add up the like terms.',
+          goal: 'A bigger bench board is a rectangle <code>x + 1</code> tall and <code>x + 3</code> wide. Expand <code>(x + 1)(x + 3)</code> into one sum, and add up the like terms.',
           how: [
             '<code>(x + 1)(x + 3)</code> multiplies every part of the first bracket by every part of the second: like the scene, the rectangle splits into four smaller ones.',
             '<code>x</code> times <code>x</code> is written <code>x²</code>, said "x squared" (type <code>x^2</code>). <code>x</code> times 3 is <code>3x</code>.',
@@ -382,8 +384,9 @@
           } },
       ],
     }, {
-      id: 'algebra.linear', name: 'Linear equations', badge: 'Balance Keeper',
-      intro: 'An <b>equation</b> says that two sides are equal, like <code>2x + 3 = 11</code>. <b>Solving</b> it means finding the number <code>x</code> stands for that makes it true: that number is the <b>solution</b>. The one rule is to do the same thing to both sides, so they stay equal, just as a balance scale stays level when you take the same weight off each side. Each line of your working is a new, simpler equation with the same solution, and your last line reads <code>x =</code> and a number. These are <b>linear</b> equations: <code>x</code> appears only on its own, never as <code>x²</code>.',
+      id: 'algebra.linear', name: 'Linear equations', badge: 'Brass Weight',
+      story: 'The workshop scale in the balance room must stay level while a hidden weight is found, so you do the same to both sides to find the brass weight.',
+      intro: 'In the balance room, the workshop scale holds a hidden brass weight, and Sprocket the hedgehog keeps tipping it. An <b>equation</b> says that two sides are equal, like <code>2x + 3 = 11</code>. <b>Solving</b> it means finding the number <code>x</code> stands for that makes it true: that number is the <b>solution</b>. The one rule is to do the same thing to both sides, so they stay equal, just as a balance scale stays level when you take the same weight off each side. Each line of your working is a new, simpler equation with the same solution, and your last line reads <code>x =</code> and a number. These are <b>linear</b> equations: <code>x</code> appears only on its own, never as <code>x²</code>.',
       scene: balance(3),
       missions: [
         { title: 'Undo the steps', kind: 'equation', question: '2x+3=11', work: 'required',
@@ -438,7 +441,7 @@
           scene: balance(5 / 3), at: { bl: 3, ul: 2, br: 0, ur: 7 },
           answer: 'x=5/3', wrong: 'x=3', lazy: '3x+2=7', check: MQ.check.final.solved('5/3') },
         { title: 'Keep it level', kind: 'scene',
-          goal: 'The scale shows <code>2x + 3 = 9</code>: two boxes and 3 weights on the left, 9 weights on the right, and it is level. Every box weighs the same unknown amount, <code>x</code>, and each weight is 1. Change both sides the same way until one box sits alone on the left and the scale is level again.',
+          goal: 'The workshop scale shows <code>2x + 3 = 9</code>: two boxes and 3 weights on the left, 9 weights on the right, and it is level. Every box weighs the same unknown amount, <code>x</code>, and each weight is 1. Change both sides the same way until one box sits alone on the left and the scale is level again.',
           how: [
             'A level scale is an equation: the left side weighs the same as the right. The sliders <code>p</code>, <code>q</code>, <code>r</code> and <code>s</code> count what sits on each side.',
             'Take one weight off the left and the scale tips. Take one off the right too, and it is level again: the same change to both sides keeps it level.',
@@ -456,8 +459,9 @@
           } },
       ],
     }, {
-      id: 'algebra.factoring', name: 'Factoring', badge: 'Factor Finder',
-      intro: '<b>Factoring</b> is expanding run backwards. You start with a sum, like <code>x² + 5x + 6</code>, and write it as a product, like <code>(x + 2)(x + 3)</code>. Each thing being multiplied is a <b>factor</b>: 2 and 3 are factors of 6, and <code>x + 2</code> is a factor of <code>x² + 5x + 6</code>. Remember that <code>x²</code> means <code>x · x</code>. In the scene you know the four parts of the rectangle, and you look for its sides.',
+      id: 'algebra.factoring', name: 'Factoring', badge: 'Strongbox Key',
+      story: 'Fen has a heap of cut pieces to share into equal rows in the factor yard, so you write each sum as brackets to find the key to the strongbox.',
+      intro: 'In the factor yard, Fen has a heap of cut planks to share into equal rows, and the strongbox key hangs on the right arrangement. <b>Factoring</b> is expanding run backwards. You start with a sum, like <code>x² + 5x + 6</code>, and write it as a product, like <code>(x + 2)(x + 3)</code>. Each thing being multiplied is a <b>factor</b>: 2 and 3 are factors of 6, and <code>x + 2</code> is a factor of <code>x² + 5x + 6</code>. Remember that <code>x²</code> means <code>x · x</code>. In the scene you know the four parts of the rectangle, and you look for its sides.',
       scene: rect('area-backwards', 'Find the sides from the four parts', [1, 1, 1, 1]),
       missions: [
         { title: 'Take out a common factor', kind: 'expr', scene: commonFactor, vars: ['x'], question: '6x+9',
@@ -530,8 +534,9 @@
           } },
       ],
     }, {
-      id: 'algebra.quadratics', name: 'Quadratic equations', badge: 'Root Hunter',
-      intro: 'A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
+      id: 'algebra.quadratics', name: 'Quadratic equations', badge: 'Strongbox',
+      story: 'The arch of the bridge over the mill stream touches the water in two places, so you solve for both spots to find the strongbox.',
+      intro: 'The key fits a strongbox hidden under the arch of the bridge over the mill stream. A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
       scene: parabola([-6, 6, -7, 10], 0),
       missions: [
         { title: 'Factor, then split', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: 5, c: 6 }, reveal: true, question: 'x^2+5x+6=0',
@@ -580,7 +585,7 @@
           hint: 'Factor it the way you factored <code>x² − 4x + 4</code>.',
           answer: 'x=3', wrong: 'x=-3', lazy: 'x^2-6x+9=0', check: MQ.check.final.roots([3]) },
         { title: 'Roots on the curve', kind: 'scene',
-          goal: 'Move <code>b</code> and <code>c</code> until the curve crosses the x-axis at <code>x = 1</code> and <code>x = 4</code>.',
+          goal: 'Move <code>b</code> and <code>c</code> until the bridge arch, the curve, crosses the x-axis at <code>x = 1</code> and <code>x = 4</code>.',
           how: [
             'The curve crosses the x-axis where <code>x² + bx + c = 0</code>, so its crossing points are the solutions of that equation.',
             'You want the solutions 1 and 4, so the equation is <code>(x − 1)(x − 4) = 0</code>: each bracket is 0 at one of them.',
