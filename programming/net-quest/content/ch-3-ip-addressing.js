@@ -40,8 +40,9 @@ const PROVE='The address is in. Now prove it: <code>ping -c 1 10.0.0.2</code>.';
 const SET=(ip)=>[{dev:'phone',cmd:'ip addr del 10.0.0.3/24 dev eth0'},...(ip?[{dev:'phone',cmd:'ip addr add '+ip+' dev eth0'}]:[])];
 const IP_ADDR=[['ip','cmd','network settings tool'],['addr','arg','the addresses']];
 
-NQ.CH.push({name:'IP addressing',badge:'Address Keeper',
- intro:'A MAC address only matters on one wire. The <b>IP address</b> is the name you use for a device from anywhere, so a network is only as healthy as its addresses. This chapter is about giving devices addresses and mending them when they go wrong. You will hand the phone its address back, repair a typo, count how many devices fit on a network with a small calculator, sort addresses into the kinds the internet uses, and catch two devices fighting over one address.',
+NQ.CH.push({name:'IP addressing',badge:'Street Map',
+ story:'Skerry says some house numbers are lost, mistyped or doubled, so you give them back, count how many fit, and sort them, to find the island street map.',
+ intro:'Skerry the postboy says some house numbers on the island are lost, mistyped or doubled, and the street map is waiting in the signal office. A MAC address only matters on one wire. The <b>IP address</b> is the name you use for a device from anywhere, so a network is only as healthy as its addresses. This chapter is about giving devices addresses and mending them when they go wrong. You will hand the phone its address back, repair a typo, count how many devices fit on a network with a small calculator, sort addresses into the kinds the internet uses, and catch two devices fighting over one address.',
  learned:['ip addr add','ip addr del','prefix','subnet','mask','ipcalc','usable hosts','private address','public address','duplicate address','/31 and /32'],
  missions:[
  {title:'Give the phone an address',scenario:'pair',dev:'phone',setup:SET(),

@@ -29,12 +29,13 @@ const ROUTE_ADD=/^\s*ip\s+(r|route)\s+(add|replace|change)\s/;
 const ROUTE=[['ip','cmd','network settings tool'],['route','arg','the routing table']];
 const DEFAULT_ADD=[...ROUTE,['add','arg','put a route in the table'],['default','arg','the catch-all route'],['via','arg','the gateway comes next'],['192.168.1.1','arg','the gateway']];
 
-NQ.CH.push({name:'Routing and the gateway',badge:'Pathfinder',
- intro:'So far every conversation stayed on one wire. Real networks are many wires joined by routers, and this chapter is about leaving your own wire: how a device decides where to send a packet bound for somewhere else, what breaks when those directions are missing or wrong, and how to follow a packet through the routers on its way. You will read directions, mend them on a printer, a laptop and a router, and catch a packet running in circles.',
+NQ.CH.push({name:'Routing and the gateway',badge:'Ferry Pass',
+ story:'The next note is past the ferry gate, so you read the directions, mend the missing ones and follow the hops, to find the ferry pass.',
+ intro:'The next note is past the ferry gate, so you need directions to get there. So far every conversation stayed on one wire. Real networks are many wires joined by routers, and this chapter is about leaving your own wire: how a device decides where to send a packet bound for somewhere else, what breaks when those directions are missing or wrong, and how to follow a packet through the routers on its way. You will read directions, mend them on a printer, a laptop and a router, and catch a packet running in circles.',
  learned:['ip route','routing table','default route','gateway','ip route add','ip route del','static route','traceroute','hop','TTL expiry','routing loop'],
  missions:[
  {title:'Read the routing table',scenario:'office',
-  goal:'Every device keeps a list of rules for where to send a packet, called its <b>routing table</b>, and each rule is a <b>route</b>. Run <code>ip route</code> on the laptop to print its table. One route says that addresses on the laptop\'s own wire are delivered straight to their owner. Another starts with the word <code>default</code>: the <b>default route</b>, the rule for every address that no other route fits. It names a <b>gateway</b>, the router the laptop hands those packets to. Type the gateway\'s address.',
+  goal:'Wren\'s next note is past the ferry gate. Every device keeps a list of rules for where to send a packet, called its <b>routing table</b>, and each rule is a <b>route</b>. Run <code>ip route</code> on the laptop to print its table. One route says that addresses on the laptop\'s own wire are delivered straight to their owner. Another starts with the word <code>default</code>: the <b>default route</b>, the rule for every address that no other route fits. It names a <b>gateway</b>, the router the laptop hands those packets to. Type the gateway\'s address.',
   anat:[...ROUTE],
   how:['<code>ip route</code> prints the laptop\'s routing table, one route per line, so you can see where it sends packets for each destination.',
    '<code>ip</code> is the command you know from <code>ip addr</code> and <code>ip neigh</code>; <code>route</code> says you want the routes. On its own it only lists them.',

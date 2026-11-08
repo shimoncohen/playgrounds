@@ -22,11 +22,12 @@ const switchOf=c=>Object.values(c.net.devices).find(d=>d.kind==='switch');
 const keeper=c=>Object.values(c.net.devices).filter(d=>d.kind==='switch'&&Object.keys(d.macTable).length).map(d=>d.id)[0]||''; // the switch that has learned a MAC
 const PING1=[['ping','cmd'],['-c','opt','count'],['1','arg','how many'],[PHONE,'arg','who to ping']];
 
-NQ.CH.push({name:'MAC and ARP',badge:'Neighbourhood Watch',
- intro:'Last chapter the laptop learned the phone\'s <b>MAC address</b> with ARP and kept it in a list, the one <code>ip neigh</code> prints. This chapter is about that list and about the switch in the middle. You will see the laptop ask once and then remember, make it forget on purpose, write an entry by hand (and break the network with a bad one), and find out which device in the middle keeps a table of MACs of its own.',
+NQ.CH.push({name:'MAC and ARP',badge:'Neighbour Book',
+ story:'Tally has scratched a wrong name into the cottage address book, so you read it, wipe it, fix it and see which socket the switch sends to, to find the neighbours\' book.',
+ intro:'Tally the ferry cat sits on the switch box and has scratched a wrong name into the cottage address book, where Wren\'s next note is hidden. Last chapter the laptop learned the phone\'s <b>MAC address</b> with ARP and kept it in a list, the one <code>ip neigh</code> prints. This chapter is about that list and about the switch in the middle. You will see the laptop ask once and then remember, make it forget on purpose, write an entry by hand (and break the network with a bad one), and find out which device in the middle keeps a table of MACs of its own.',
  learned:['ip neigh del','ip neigh add','PERMANENT','MAC table','flooding'],
  missions:[
- {title:'Ask once, remember',goal:'The first time the laptop talks to the phone it asks for the phone\'s MAC address with an ARP request, and then it remembers the answer in its neighbour list (the list <code>ip neigh</code> prints). Run <code>ping -c 1 10.0.0.3</code>, look in the packet panel for the ARP request, then run the very same line a second time and see whether the laptop asks again.',
+ {title:'Ask once, remember',goal:'Tally the ferry cat sits on the switch box, and the laptop keeps an address book of its neighbours. The first time the laptop talks to the phone it asks for the phone\'s MAC address with an ARP request, and then it remembers the answer in its neighbour list (the list <code>ip neigh</code> prints). Run <code>ping -c 1 10.0.0.3</code>, look in the packet panel for the ARP request, then run the very same line a second time and see whether the laptop asks again.',
   anat:PING1,
   how:['<code>ping -c 1 10.0.0.3</code>, run twice, sends one echo request each time, but only the first run starts with an ARP request: after that the laptop remembers the phone\'s MAC.',
    '<code>ping -c 1 10.0.0.3</code> is the line to run both times. <code>-c 1</code> sends a single echo request, so each run adds only a few rows to the packet panel.',
