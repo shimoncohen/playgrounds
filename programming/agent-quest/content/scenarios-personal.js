@@ -55,7 +55,7 @@ const voice={
   task:'Write a thank-you note to Dana in drafts/thanks.md.',
   vfs:{
     'CLAUDE.md':'# Home notes\nMy letters live in drafts/.\n',
-    'drafts/sample-thanks.md':'Hi Dana, thank you for the tea! It made my whole afternoon.\nSee you Friday, Sam\n',
+    'drafts/sample-thanks.md':'Hi Dana, thank you for the tea! It made my whole afternoon.\nSee you Friday!\n',
     'drafts/old-formal.md':'Dear Ms. Dana, I write to thank you for the refreshments you provided.\nYours sincerely, S. Cohen\n',
     'drafts/thanks.md':''
   },

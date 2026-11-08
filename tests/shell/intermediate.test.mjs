@@ -22,7 +22,7 @@ describe('intermediate content shape', () => {
     assert.deepEqual([...ch.slice(0, 7).map((c) => c.tier)], Array(7).fill('beginner'));
     assert.deepEqual([...ch.slice(7, 11).map((c) => c.missions.length)], [7, 8, 7, 7]);
     assert.deepEqual([...ch.slice(7, 11).map((c) => c.tier)], Array(4).fill('intermediate'));
-    assert.deepEqual([...ch.slice(7, 11).map((c) => c.badge)], ['Textsmith', 'Quoter', 'Gatekeeper', 'Streamer']);
+    assert.deepEqual([...ch.slice(7, 11).map((c) => c.badge)], ["Mira's Ledger", 'Gatehouse Sign', 'Locked Secrets', 'Complaint Tally']);
   });
   it('setup seeds the data files without overwriting learner work', () => {
     const SQ = loadShell();

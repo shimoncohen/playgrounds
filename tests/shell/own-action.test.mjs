@@ -148,12 +148,12 @@ describe('the forms a learner may type still complete the mission', () => {
     });
   }
 
-  it('the log janitor report counts when written after a cd and a ../', () => {
+  it('the gate-log capstone report counts when written after a cd and a ../', () => {
     SQ.resetState(SQ.fresh());
     enter(10);
     const l = "cd village; grep ERROR logs/all.log | cut -d' ' -f1 | sort | uniq -c > ../report.txt; cd ..";
     run(SQ, l);
-    assert.ok(verdict(at('Capstone: log janitor'), l));
+    assert.ok(verdict(at('Capstone: sweep the gate log'), l));
   });
 
   describe('the two "second" missions need a real second entry', () => {
