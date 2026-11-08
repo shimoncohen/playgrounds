@@ -154,7 +154,7 @@ const codePart=l=>{let q=null;
 const usesHereDoc=text=>text.split('\n').some(l=>/(^|[^<])<<-?\s*['"]?[A-Za-z_]\w*/.test(codePart(l)));
 let MKCONF;
 const CH=[
-{tier:'advanced',name:'Decisions',badge:'Decider',intro:'Scripts have to choose: do this if a file is there, that if it is not. Every choice starts with a test, a command that answers yes or no through its exit code.',
+{tier:'advanced',name:'Decisions',badge:'Lodge Key',story:'Ada\'s lodge door only opens for the right visitor; ask yes-or-no questions about files and names to find the Lodge Key.',intro:'Ada\'s lodge door only opens for the right visitor. Scripts have to choose: do this if a file is there, that if it is not. Every choice starts with a test, a command that answers yes or no through its exit code.',
  learned:['[ -f file ]','test','if … then … else … fi','-gt -lt -eq','case … esac','[[ == pattern ]]'],setup:seedAdvanced,
  missions:[
  {title:'Test a file',goal:`Ask whether <code>journal.txt</code> is a file, and say yes if it is: <code>[ -f journal.txt ] &amp;&amp; echo yes</code>`,note:HOME_NOTE,
@@ -209,7 +209,7 @@ if [ -d "$1" ]; then echo exists; else echo missing; fi
   hint:`Write an <code>if</code> around <code>[ -e "$1" ]</code> with an <code>else</code>. Save it, then try it with <code>bash scripts/exists.sh journal.txt</code> and <code>bash scripts/exists.sh ghost.txt</code>.`,
   explain:`In the editor panel, Save writes the file, Save &amp; run also runs it, and the Arguments box holds what you would type after the script name. The first line <code>#!/bin/bash</code> names the program that runs the file, and lines that start with <code>#</code> are comments that bash ignores. Inside a script, <code>$1</code> is the first argument. Write it as <code>"$1"</code> in a test, with the quotes, so a name with spaces stays one word. <code>-e</code> is true for files and folders alike, while <code>-f</code> would say <code>missing</code> for <code>village</code>. Each time you save, the script is tried with a file, a missing name and a folder; Save &amp; run also tells you which one failed.`}
  ]},
-{tier:'advanced',name:'Loops & numbers',badge:'Looper',intro:'Loops repeat work until a test says stop, and $(( )) lets bash do sums. Together they count, add things up and walk through a file one line at a time.',
+{tier:'advanced',name:'Loops & numbers',badge:'Supply Tally',story:'Ada\'s numbers.txt lists supplies; count up, add them up and read the journal one line at a time to find the Supply Tally.',intro:'Ada\'s numbers.txt lists the lodge supplies, and the journal is waiting. Loops repeat work until a test says stop, and $(( )) lets bash do sums. Together they count, add things up and walk through a file one line at a time.',
  learned:['while','$(( ))','until','break','while read line','"$@"'],setup:seedAdvanced,
  missions:[
  {title:'Count up',goal:`Count from 1 to 3 with a loop that runs while a test passes: <code>i=1; while [ "$i" -le 3 ]; do echo "$i"; i=$((i+1)); done</code>`,
@@ -260,7 +260,7 @@ echo "$sum"
   hint:`Use the running total from mission 3, but loop over <code>"$@"</code>. Save it, then try it with <code>bash scripts/sum.sh 1 2 3</code>.`,
   explain:`<code>"$@"</code> is every argument, each kept whole, so <code>for n in "$@"</code> visits them in turn. With no arguments the loop body never runs and the total stays 0. Each time you save, the script is tried with <code>1 2 3</code>, <code>10 20</code> and nothing.`}
  ]},
-{tier:'advanced',name:'Functions & arguments',badge:'Function Maker',intro:'A function gives a few commands one name, so you can run them again with different arguments. Inside it, <code>$1</code>, <code>$#</code> and "<code>$@</code>" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
+{tier:'advanced',name:'Functions & arguments',badge:'Ada\'s Spellbook',story:'Ada left spells in the lodge; give a few commands one name, greet each guest even when no name is given and find Ada\'s Spellbook.',intro:'Ada left spells in the lodge: short names that do a lot of work. A function gives a few commands one name, so you can run them again with different arguments. Inside it, <code>$1</code>, <code>$#</code> and "<code>$@</code>" describe the call, local keeps its variables to itself, and its exit status answers yes or no.',
  learned:['name() { … }','$1 and $#','"$@"','return status','local','${VAR:-default}'],setup:seedAdvanced,
  missions:[
  {title:'Define and call',goal:`Give a group of commands a name, then use it: <code>greet() { echo "Hello, $1!"; }; greet Ada</code>`,
@@ -320,7 +320,7 @@ done
   hint:`Test for a missing name with <code>[ -z "$1" ]</code>, print the usage line with <code>&gt;&amp;2</code> at the end and stop with <code>exit 1</code>. Save it, then try <code>bash scripts/greet.sh Ada</code> and <code>bash scripts/greet.sh; echo $?</code>.`,
   explain:`<code>&gt;&amp;2</code> sends <code>echo</code>'s text to <b>stderr</b>, the error stream: a pipe or <code>&gt; file</code> passes it by and it still reaches the screen. <code>exit 1</code> ends the script with status 1, which tells the caller something went wrong: <code>bash scripts/greet.sh || echo failed</code>. Each time you save, the script is tried with <code>Ada</code>, with nothing, and with <code>"Ada Lovelace"</code>, one argument with a space that must stay whole.`}
  ]},
-{tier:'advanced',name:'Real scripts',badge:'Scripter',intro:'Real <code>scripts</code> read input, share code through libraries, write files and report success or failure through their exit status. The chapter ends with a capstone: a <code>backup</code> script you could use for real.',
+{tier:'advanced',name:'Real scripts',badge:'Backup Chest',story:'Ada\'s lodge papers need a safe copy; share a library, read input and write a backup script that fills the Backup Chest.',intro:'Ada\'s lodge papers need a safe copy before the hunt goes on. Real <code>scripts</code> read input, share code through libraries, write files and report success or failure through their exit status. The chapter ends with a capstone: a <code>backup</code> script you could use for real.',
  learned:['read <<< string','source','exit status','read from stdin','here-documents','wc -l < file','the backup capstone'],setup:seedReal,
  missions:[
  {title:'Read from a string',goal:`Split a string into variables with read and a here-string: <code>read first rest &lt;&lt;&lt; "alpha beta gamma"; echo "$rest"</code>`,

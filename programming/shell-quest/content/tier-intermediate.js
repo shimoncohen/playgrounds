@@ -40,7 +40,7 @@ function wantCounts(text){const m={};for(const l of text.split('\n'))if(l.includ
 function reportCounts(text){const m={};let n=0;for(const l of text.split('\n')){if(!l.trim())continue;const r=/^\s*(\d+)\s+(\S+)\s*$/.exec(l);if(!r)return null;m[r[2]]=(m[r[2]]||0)+ +r[1];n++}return {m,n}}
 const argLine=e=>e.args.join(' ');
 const CH=[
-{tier:'intermediate',name:'Text tools',badge:'Textsmith',intro:'Files are mostly text, and a few small tools can cut, swap and reshape it. Learn them and you can pull out or reshape exactly the bit you need.',
+{tier:'intermediate',name:'Text tools',badge:'Mira\'s Ledger',story:'In the village, Mira\'s sales ledger is a mess; pull out columns, swap words and find which item sold most in Mira\'s Ledger.',intro:'In the village, Mira\'s sales ledger is a mess. Files are mostly text, and a few small tools can cut, swap and reshape it. Learn them and you can pull out or reshape exactly the bit you need.',
  learned:['cut','tr','sed s///','sed -n','tee','sort -t -k'],setup:seedVillage,
  missions:[
  {title:'Pick a column',goal:`The file <code>village/sales.csv</code> has columns split by commas. Print only the first column: <code>cut -d, -f1 village/sales.csv</code>`,
@@ -78,7 +78,7 @@ const CH=[
     if(!c.log.some(e=>e.name==='sort'&&c.flag(e,'n')))return false;const cut=c.ran('cut');
     return c.log.some(e=>{const t=e.out.trim();return (e.name==='head'||e.name==='tail'||e.name==='sort')&&(t===top.join(',')||(e.name==='sort'&&t.split('\n')[0]===top.join(','))||(cut&&t===top[1]))})}}
  ]},
-{tier:'intermediate',name:'Substitution & quoting',badge:'Quoter',intro:'Bash can paste the output of one command into another, and quotes decide what it is allowed to touch. Then you will hand values on to <code>scripts</code>.',
+{tier:'intermediate',name:'Substitution & quoting',badge:'Gatehouse Sign',story:'The gatehouse sign needs today\'s date and the wolf count; paste command results into a sentence, hand a greeting on to a helper and find the finished Gatehouse Sign.',intro:'The sign at the gatehouse needs today\'s date and the wolf count. Bash can paste the output of one command into another, and quotes decide what it is allowed to touch. Then you will hand values on to <code>scripts</code>.',
  learned:['$(command)','"double" vs \'single\'','export','env','$?'],setup:seedVillage,
  missions:[
  {title:'Capture output',goal:`Insert a command's output into a sentence: <code>echo "Today is $(date)"</code>`,
@@ -117,7 +117,7 @@ const CH=[
   explain:`<code>$?</code> holds the exit code of the last command. <code>0</code> means success and anything else means failure. Scripts use it to decide what to do next.`,
   check:c=>/\$\?/.test(c.line)&&c.log.some((e,k)=>{if(e.name!=='echo')return false;const code=k>0?c.log[k-1].code:SQ.rt.prevLast;return !!code&&e.out.trim()===String(code)})}
  ]},
-{tier:'intermediate',name:'Permissions & links',badge:'Gatekeeper',intro:'Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
+{tier:'intermediate',name:'Permissions & links',badge:'Vault Code',story:'Behind the gate, Ada\'s secrets.txt must stay private; lock it down, add a shortcut to day one\'s log and read the Vault Code inside.',intro:'Behind the gate, Ada\'s secrets.txt must stay private. Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
  learned:['ls -l','chmod 600','chmod u+x','chmod a=r','ln -s','stat'],setup:seedPerms,
  missions:[
  {title:'Read the permissions',goal:`Show the details of each file, including its permissions: <code>ls -l</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
@@ -151,7 +151,7 @@ const CH=[
   explain:`<code>stat</code> prints the size, the kind of file and the mode in both forms, number and letters, such as <code>0600/-rw-------</code>.`,
   check:c=>c.ran('stat',e=>e.code===0&&/Mode:/.test(e.out))}
  ]},
-{tier:'intermediate',name:'Streams & xargs',badge:'Streamer',intro:'A command has an output stream and an error stream, and you can send each one somewhere different. Then you will turn lists into arguments and finish with a small cleanup job.',
+{tier:'intermediate',name:'Streams & xargs',badge:'Complaint Tally',story:'The gate log is full of complaints; send errors aside, sweep the scratch folder and find the Complaint Tally of ERRORs per visitor.',intro:'The gate log is full of complaints, and the scratch folder is a mess. A command has an output stream and an error stream, and you can send each one somewhere different. Then you will turn lists into arguments and finish with a small cleanup job.',
  learned:['2>','2>/dev/null','2>&1','xargs','diff','sort | uniq -c'],setup:seedStreams,
  missions:[
  {title:'Silence errors',goal:`Run a command that fails and hide its error message: <code>ls missing 2&gt;/dev/null</code>`,

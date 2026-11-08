@@ -298,7 +298,7 @@ const LOGTOOL={title:'Capstone: a robust log tool',kind:'challenge',file:'script
   explain:`This puts the whole tier together. <code>set -euo pipefail</code> stops the script at the first error, on an unset variable and on a failing pipeline, so it never carries on with half its data. <code>getopts</code> reads <code>-l</code> and <code>-n</code>, and <code>shift $((OPTIND - 1))</code> leaves the file in <code>$1</code>. The read test comes before any work, so a missing file gets a clear message and status 1. <code>mktemp</code> creates a new empty file in <code>/tmp</code>, and <code>trap 'rm -f "$tmp"' EXIT</code> removes it however the script ends: a normal end, an <code>exit</code> or a stop by <code>set -e</code>. <code>grep</code> exits with 1 when no line matches, which <code>set -e</code> treats as an error: without <code>|| true</code> an unknown level would end the script with status 1 instead of printing nothing. (<code>true</code> is a command that does nothing and succeeds, so the line counts as a success.) The <code>--</code> in <code>grep -- "$level"</code> means options end here, so a level that starts with a dash is still just text. Each time you save, the script is tried on <code>all.log</code> with the defaults, with <code>-l WARN -n 1</code>, with <code>-n 2</code>, with a level that has no lines, on a missing file and with a bad option, and <code>/tmp</code> must be empty after every run.`};
 
 const CH=[
-{tier:'expert',name:'awk & sed craft',badge:'Text Wrangler',intro:'<code>awk</code> reads text one line at a time, splits each line into fields and runs a small program on them. <code>sed -i</code> edits a file where it lies. Together they turn raw data into reports.',
+{tier:'expert',name:'awk & sed craft',badge:'Lamp Switch',story:'From the watchtower the visitor log shows who came each night; split columns, total the sales and flip the lamp setting in config.ini to find the Lamp Switch.',intro:'From the watchtower above the cave, the visitor log shows who came each night. <code>awk</code> reads text one line at a time, splits each line into fields and runs a small program on them. <code>sed -i</code> edits a file where it lies. Together they turn raw data into reports.',
  learned:["awk '{print $1}'",'awk -F,','pattern {action}','END {…}','awk arrays','sed -i','printf in awk'],setup:seedExpert,
  missions:[
  {title:'First column',goal:`Print the first field of every line of the access log: <code>awk '{print $1}' village/logs/access.log</code>`,note:HOME_NOTE,
@@ -335,7 +335,7 @@ const CH=[
     return c.read('~/config.ini')===want&&c.ran('sed',e=>e.code===0&&e.args.some(x=>/^-[a-zA-Z]*i/.test(x)||x.startsWith('--in-place'))&&e.args.some(a=>/true/.test(a)))}},
  REPORT
  ]},
-{tier:'expert',name:'Processes & jobs',badge:'Job Controller',intro:'Every running program is a process with a number, its PID. Run a command in the background with & and the prompt comes straight back; jobs, wait and kill keep track of it. Time here is virtual: sleep 30 moves the clock, not your afternoon.',
+{tier:'expert',name:'Processes & jobs',badge:'Bell Rope',story:'The tower bells ring on their own; start timers in the background, keep track of them and stop the one that never ends to find the Bell Rope.',intro:'The tower bells ring on their own, and one of them never stops. Every running program is a process with a number, its PID. Run a command in the background with & and the prompt comes straight back; jobs, wait and kill keep track of it. Time here is virtual: sleep 30 moves the clock, not your afternoon.',
  learned:['ps','sleep','command &','jobs','wait','kill %1','$!'],setup:seedExpert,
  missions:[
  {title:'See the processes',goal:`List the processes running in this terminal: <code>ps</code>`,
@@ -370,7 +370,7 @@ const CH=[
   check:c=>{const b=SQ.rt.bang;return b!=null&&said(c)==='finished '+b&&/\$\{?!/.test(c.line)&&c.ran('wait',e=>e.code===0)&&!myJobs(c).some(j=>String(j.pid)===String(b)&&j.state==='Running')}},
  FANOUT
  ]},
-{tier:'expert',name:'Pipeline mastery',badge:'Pipeline Architect',intro:'Small commands get strong when you chain them. find <code>-exec</code> and <code>xargs</code> run a command on every file you find, <( ) hands a command\'s output over as if it were a file, and a pipeline of sort, <code><code>uniq</code></code> and <code>head</code> turns a log into a report.',
+{tier:'expert',name:'Pipeline mastery',badge:'Visitor Ranking',story:'The inbox of letters is piled high; run a command on every match, compare two lists without saving copies and rank the top visitors in the Visitor Ranking.',intro:'The inbox of letters is piled high, and the gatekeeper wants to know who writes most. Small commands get strong when you chain them. find <code>-exec</code> and <code>xargs</code> run a command on every file you find, <( ) hands a command\'s output over as if it were a file, and a pipeline of sort, <code><code>uniq</code></code> and <code>head</code> turns a log into a report.',
  learned:['find -exec','xargs -I{}','xargs -n1 -P3','<( )','done < <( )','sort | uniq -c | sort -rn','sort -k1,1nr -k2,2'],setup:seedExpert,
  missions:[
  {title:'Run a command on every match',goal:`Count the lines of every <code>.txt</code> file in <code>inbox</code>, one <code>wc -l</code> per file: <code>find inbox -name '*.txt' -exec wc -l {} \\;</code>`,note:HOME_NOTE,
@@ -413,7 +413,7 @@ const CH=[
     return counted&&new Set(got.map(m=>m[2])).size===k&&got.every((m,i)=>cnt[m[2]]===+m[1]&&+m[1]===vals[i])}},
  TOPN
  ]},
-{tier:'expert',name:'Safe, debuggable scripts',badge:'Toolsmith',intro:'A script that carries on after an error can do real damage. set <code>-e</code>, set <code>-u</code> and set <code>-o</code> pipefail make it stop instead, set <code>-x</code> shows every step, trap cleans up on the way out, and <code>getopts</code> reads options the way real tools do.',
+{tier:'expert',name:'Safe, debuggable scripts',badge:'Ada\'s Vault',story:'The vault guard must stop at the first mistake; make scripts fail loudly, watch each step and clean up, then open Ada\'s Vault.',intro:'The vault guard must stop at the first mistake, or the treasure stays locked. A script that carries on after an error can do real damage. set <code>-e</code>, set <code>-u</code> and set <code>-o</code> pipefail make it stop instead, set <code>-x</code> shows every step, trap cleans up on the way out, and <code>getopts</code> reads options the way real tools do.',
  learned:['bash -c','set -e','set -u','set -o pipefail','set -x','trap … EXIT','getopts','mktemp'],setup:seedExpert,
  missions:[
  {title:'Stop on error',note:`Typed <code>set -e</code> at the prompt? It stays on: a command that fails stops the rest of every line you type until you run <code>set +e</code> (here a chapter switch or Reset world turns it off too; a real terminal would close).`,goal:`Make a small script stop at the first command that fails. Run it with <code>bash -c</code>, then print its exit status: <code>bash -c 'set -e; false; echo after'; echo $?</code>`,

@@ -960,7 +960,7 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   assert.equal((await page.textContent('#xpText')).trim(), '1890 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Automator');
   // chapter 15 is no longer the last chapter: its card shows the badge, and the next chapter is the first Expert one
-  assert.match(await page.textContent('#mission h2'), /Badge earned: Scripter/);
+  assert.match(await page.textContent('#mission h2'), /Badge earned: Backup Chest/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -1979,7 +1979,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
     const last = await page.$$eval('#screen .line.win', els => els.map(e => e.textContent).filter(s => /Mission complete/.test(s)).pop() || '');
     assert.match(last, new RegExp(`Mission complete: ${esc(title)}\\s+\\+25 XP`));
   };
-  const BADGES = { 15: 'Text Wrangler', 16: 'Job Controller', 17: 'Pipeline Architect', 18: 'Toolsmith' };
+  const BADGES = { 15: 'Lamp Switch', 16: 'Bell Rope', 17: 'Visitor Ranking', 18: "Ada's Vault" };
   const x0 = await xp();
   for (const ci of [15, 16, 17, 18]) {
     await page.click(`.chap[data-ch="${ci}"]`);

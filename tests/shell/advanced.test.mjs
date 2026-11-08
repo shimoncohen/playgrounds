@@ -121,7 +121,7 @@ describe('advanced chapters 12 and 13: shape', () => {
     assert.deepEqual([...ch.slice(7, 11).map((c) => c.missions.length)], [7, 8, 7, 7]);
     assert.deepEqual([...ch.slice(11, 13).map((c) => c.tier)], ['advanced', 'advanced']);
     assert.deepEqual([...ch.slice(11, 13).map((c) => c.name)], ['Decisions', 'Loops & numbers']);
-    assert.deepEqual([...ch.slice(11, 13).map((c) => c.badge)], ['Decider', 'Looper']);
+    assert.deepEqual([...ch.slice(11, 13).map((c) => c.badge)], ['Lodge Key', 'Supply Tally']);
     assert.deepEqual([...ch.slice(11, 13).map((c) => c.missions.length)], [7, 7]);
     assert.equal(SQ.tiers.tierOf(11).id, 'advanced');
     assert.equal(SQ.tiers.missionXp(12), 20);
@@ -411,7 +411,7 @@ describe('advanced chapters 14 and 15: shape', () => {
     assert.equal(ch.length, 15 + ch.filter((c) => c.tier === 'expert').length, 'only Expert chapters come after chapter 15');
     assert.deepEqual([...ch.slice(11, 15).map((c) => c.tier)], Array(4).fill('advanced'));
     assert.deepEqual([...ch.slice(13, 15).map((c) => c.name)], ['Functions & arguments', 'Real scripts']);
-    assert.deepEqual([...ch.slice(13, 15).map((c) => c.badge)], ['Function Maker', 'Scripter']);
+    assert.deepEqual([...ch.slice(13, 15).map((c) => c.badge)], ["Ada's Spellbook", 'Backup Chest']);
     assert.deepEqual([...ch.slice(11, 15).map((c) => c.missions.length)], [7, 7, 7, 7]);
     assert.equal(SQ.tiers.missionXp(14), 20);
   });

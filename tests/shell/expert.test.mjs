@@ -44,7 +44,7 @@ describe('expert chapters: shape', () => {
   it('sit at indexes 15 and 16, tier expert, 7 missions each, 25 XP per mission', () => {
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.tier)], ['expert', 'expert']);
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.name)], ['awk & sed craft', 'Processes & jobs']);
-    assert.deepEqual([...ch.slice(15, 17).map((c) => c.badge)], ['Text Wrangler', 'Job Controller']);
+    assert.deepEqual([...ch.slice(15, 17).map((c) => c.badge)], ['Lamp Switch', 'Bell Rope']);
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.missions.length)], [7, 7]);
     for (const i of EXPERT) {
       assert.equal(SQ.tiers.tierOf(i).id, 'expert');
@@ -55,7 +55,7 @@ describe('expert chapters: shape', () => {
     assert.equal(ch.length, 19);
     assert.deepEqual([...ch.slice(17, 19).map((c) => c.tier)], ['expert', 'expert']);
     assert.deepEqual([...ch.slice(17, 19).map((c) => c.name)], ['Pipeline mastery', 'Safe, debuggable scripts']);
-    assert.deepEqual([...ch.slice(17, 19).map((c) => c.badge)], ['Pipeline Architect', 'Toolsmith']);
+    assert.deepEqual([...ch.slice(17, 19).map((c) => c.badge)], ['Visitor Ranking', "Ada's Vault"]);
     assert.deepEqual([...ch.slice(15, 19).map((c) => c.missions.length)], [7, 7, 7, 7]);
   });
   it('all 28 Expert missions exist: cumulativeXp("expert") is 1890 + 28*25 + 4*25, the rank Shell Wizard, Advanced still 1890', () => {
