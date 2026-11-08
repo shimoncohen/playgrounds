@@ -44,7 +44,7 @@ describe('expert chapters: shape', () => {
   it('sit at indexes 15 and 16, tier expert, 7 missions each, 25 XP per mission', () => {
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.tier)], ['expert', 'expert']);
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.name)], ['awk & sed craft', 'Processes & jobs']);
-    assert.deepEqual([...ch.slice(15, 17).map((c) => c.badge)], ['Text Wrangler', 'Job Controller']);
+    assert.deepEqual([...ch.slice(15, 17).map((c) => c.badge)], ['Lamp Switch', 'Bell Rope']);
     assert.deepEqual([...ch.slice(15, 17).map((c) => c.missions.length)], [7, 7]);
     for (const i of EXPERT) {
       assert.equal(SQ.tiers.tierOf(i).id, 'expert');
@@ -55,7 +55,7 @@ describe('expert chapters: shape', () => {
     assert.equal(ch.length, 19);
     assert.deepEqual([...ch.slice(17, 19).map((c) => c.tier)], ['expert', 'expert']);
     assert.deepEqual([...ch.slice(17, 19).map((c) => c.name)], ['Pipeline mastery', 'Safe, debuggable scripts']);
-    assert.deepEqual([...ch.slice(17, 19).map((c) => c.badge)], ['Pipeline Architect', 'Toolsmith']);
+    assert.deepEqual([...ch.slice(17, 19).map((c) => c.badge)], ['Visitor Ranking', "Ada's Vault"]);
     assert.deepEqual([...ch.slice(15, 19).map((c) => c.missions.length)], [7, 7, 7, 7]);
   });
   it('all 28 Expert missions exist: cumulativeXp("expert") is 1890 + 28*25 + 4*25, the rank Shell Wizard, Advanced still 1890', () => {
@@ -299,7 +299,7 @@ describe('chapter 16 (awk & sed craft) checks', () => {
     go("sed -i 's/debug=false/debug=true/' config.ini");
     assert.equal(SQ.ctxFor('').read('~/config.ini'), '[village]\nname=Oakford\nport=8080\ndebug=true\n\n[shop]\nopen=09:00\nclose=18:00');
   });
-  it('16.7 Script: report (answer, alternatives, wrong ones, failure lines)', () => {
+  it('16.7 The watchtower report script (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(A16, 6);
     assert.equal(ok(m.answer), true);
     assert.equal(ok('#!/bin/bash\n[ -r "$1" ] || { echo "report.sh: cannot read $1" >&2; exit 1; }\nawk -F, \'NR > 1 || $2 ~ /^[0-9]/ {printf "%-8s %7.2f\\n", $1, $2 * $3}\' "$1"\n'), true, 'NR > 1 || a number on line 1');
@@ -423,7 +423,7 @@ describe('chapter 17 (Processes & jobs) checks', () => {
     const { go } = world(P17);
     assert.equal(go('sleep 2 & pid=$!; wait $pid; echo "finished $pid"').c.out(), 'finished 1235');
   });
-  it('17.7 Script: fan out (answer, alternatives, wrong ones, failure lines)', () => {
+  it('17.7 The bell-ringer fan-out script (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(P17, 6);
     // fix round 1: output alone is not enough (a check asks for & and wait), and wait %1 fails on the 1 3 case
     assert.equal(typeof m.check, 'function');
@@ -771,7 +771,7 @@ describe('chapter 18 (Pipeline mastery) checks', () => {
     no(PM18, 5, "echo '4 10.0.0.5'; echo '3 10.0.0.9'; echo '3 10.0.0.7'");
     no(PM18, 5, "awk '{print $1}' village/sales.csv | sort | uniq -c | sort -rn | head -3");
   });
-  it('18.7 Script: top N (answer, alternatives, wrong ones, failure lines)', () => {
+  it('18.7 The top-visitors script (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(PM18, 6);
     assert.equal(m.check, undefined, 'the cases use files no answer can hard-code');
     assert.equal(ok(m.answer), true);
@@ -890,7 +890,7 @@ describe('chapter 19 (Safe, debuggable scripts) checks', () => {
     no(SS19, 4, "bash -c \"trap 'echo bye' EXIT; echo hi\"; echo extra");
     no(SS19, 4, "bash -c \"trap 'echo hi' EXIT; echo bye\"");
   });
-  it('19.6 Script: options (answer, alternatives, wrong ones, failure lines)', () => {
+  it('19.6 The vault guard\'s options script (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(SS19, 5);
     assert.equal(ok(m.answer), true);
     // the silent form: a leading colon, no message of getopts' own
@@ -920,7 +920,7 @@ describe('chapter 19 (Safe, debuggable scripts) checks', () => {
     assert.equal(SQ.S.last, 2);
     assert.equal(run(SQ, 'bash scripts/opts.sh -n').out, 'scripts/opts.sh: option requires an argument -- n\nusage: opts.sh [-v] -n NAME');
   });
-  it('19.7 Capstone: a robust log tool (answer, alternatives, wrong ones, failure lines)', () => {
+  it('19.7 Capstone: the vault guard\'s log tool (answer, alternatives, wrong ones, failure lines)', () => {
     const { SQ, m, ok, why } = scriptJudge(SS19, 6);
     assert.equal(m.kind, 'challenge');
     assert.ok(m.tests.every((t) => JSON.stringify(t.expectEmpty) === '["/tmp"]'), 'expectEmpty /tmp on every case');
