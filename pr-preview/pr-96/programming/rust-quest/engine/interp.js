@@ -1,6 +1,7 @@
 /* Values are {k:'int',v:BigInt,ty}, {k:'float',v:Number}, {k:'bool'|'char'|'str',v}, {k:'tuple'|'array',v:[values]},
-   {k:'struct',name,kind,fields:[{name,val}]} (declaration order; kind is named, tuple or unit), {k:'enum',name,variant,kind,fields} (Option and Result are enums too)
-   and {k:'unit'}. A field or an enum payload that was moved out holds MOVED ({k:'moved'}), set in place: only a value that is not Copy is ever partly moved, and
+   {k:'struct',name,kind,fields:[{name,val}]} (declaration order; kind is named, tuple or unit), {k:'enum',name,variant,kind,fields} (Option and Result are enums too),
+   {k:'vec',v:[values],id,ty} and {k:'map',v:[{key,val}],id,ty} (a HashMap keeps its entries in insertion order, which the program can never see: printing one with two or more
+   entries, or dropping one whose values have a Drop impl, is unsupported; ty is the type as text) and {k:'unit'}. A field or an enum payload that was moved out holds MOVED ({k:'moved'}), set in place: only a value that is not Copy is ever partly moved, and
    it has one owner. Writing a field makes a new struct along the path, so a Copy struct that two variables share is never changed through one of them. A String is {k:'String',v,id} and never changes:
    push_str puts a new one with the same heap id in the variable's cell. A reference is {k:'ref',cell,mut,loan}, where cell is
    the {val} of the variable it borrows (val is null until a deferred let is set) and loan is the node id of the borrow.
@@ -40,7 +41,7 @@ const utf8Len=s=>{let n=0;for(const c of s){const p=c.codePointAt(0);n+=p<0x80?1
 RQ.interp=(ast,opts)=>{
   opts=opts||{};
   const maxSteps=opts.maxSteps??100000,maxDepth=opts.maxDepth??64,info=opts.info||new Map();
-  const {fits,INT,wrap,isCopy,res,show}=RQ.types;
+  const {fits,INT,wrap,isCopy,res,show}=RQ.types,adts=opts.adts;
   let steps=0,depth=0,out='',err='';
   const fns=new Map(),consts=new Map(),cval=new Map(),decls=new Map(),dropImpl=new Map(),enumDecl=new Map(),methodFns=new Map();
   for(const it of ast.items){
@@ -161,7 +162,11 @@ RQ.interp=(ast,opts)=>{
         case '>=':return bool(x>=y);
       }
     }
-    if((a.k==='struct'||a.k==='enum')&&(op==='=='||op==='!='))return bool(eqv(a,b)===(op==='=='));
+    if(['struct','enum','vec','map'].includes(a.k)&&(op==='=='||op==='!='))return bool(eqv(a,b)===(op==='=='));
+    if(op==='<'||op==='>'||op==='<='||op==='>='){
+      const c=cmpv(a,b);
+      return bool(c!==null&&(op==='<'?c<0:op==='>'?c>0:op==='<='?c<=0:c>=0));
+    }
     return bug('operator '+op+' on '+a.k+' and '+b.k);
   }
 
@@ -213,13 +218,27 @@ RQ.interp=(ast,opts)=>{
         if(out.length+err.length+s.length>MAX_OUTPUT)break;
       }
     }catch(x){
-      if(x instanceof RQ.std.Unmodeled)throw new Unsup('format spec',e.line);
+      if(x instanceof RQ.std.Unmodeled)throw new Unsup(x.message===RQ.std.ORDER?'hash map order':'format spec',e.line);
       if(x instanceof RQ.std.Over)throw new Limit('output size');
       throw x;
     }
     if(e.name==='format')return string(s,undefined,e.line);
     note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
+  }
+  function vecMacro(e,env){
+    if(!e.repeat){
+      const vals=mvAll(e.args,env);
+      return coll('vec',vals,tyName(e),e.line,!vals.length);
+    }
+    const x=mv(e.args[0],env),n=Number(unref(ev(e.repeat,env)).v);
+    // the copies are counted before they are made, so a huge count stops at the step limit instead of filling memory
+    steps+=n;
+    if(steps>maxSteps)throw new Limit('steps');
+    const items=[];
+    for(let i=1;i<n;i++)items.push(cloneVal(x,e.line));
+    if(n>0)items.push(x);else dropValue(x,null,e.line);
+    return coll('vec',items,tyName(e),e.line,!n);
   }
   function constVal(n){
     if(cval.has(n)){const v=cval.get(n);if(v)return v;throw new Unsup('const initializer',consts.get(n).line);}
@@ -229,12 +248,26 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(x instanceof Panic)throw new Unsup('const initializer',c.line);throw x;}
     return cval.get(n);
   }
-  const owns=v=>v.k==='String'||v.k==='struct'||v.k==='enum'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
+  const owns=v=>v.k==='String'||v.k==='struct'||v.k==='enum'||v.k==='vec'||v.k==='map'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
+  const hasDrop=v=>{
+    switch(v.k){
+      case 'struct':return dropImpl.has(v.name)||v.fields.some(f=>hasDrop(f.val));
+      case 'enum':return v.fields.some(f=>hasDrop(f.val));
+      case 'tuple':case 'array':case 'vec':return v.v.some(hasDrop);
+      case 'map':return v.v.some(en=>hasDrop(en.key)||hasDrop(en.val));
+      default:return false;
+    }
+  };
   function guard(work,cleanup){
     let r;
     try{r=work();}
     catch(x){if(!(x instanceof Limit||x instanceof Unsup))cleanup();throw x;}
     cleanup();return r;
+  }
+  // a map's entries in key-text order: the view must not claim the insertion order, which a real HashMap does not keep
+  function entries(m){
+    if(m.k!=='map')return m.v;
+    return m.v.map(en=>({en,t:RQ.std.debug(en.key)})).sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:0).map(x=>x.en);
   }
   function dropValue(v,name,line,part){
     if(!owns(v))return;
@@ -257,6 +290,16 @@ RQ.interp=(ast,opts)=>{
       case 'enum':
         if(!v.fields.some(f=>f.val.k==='moved'))note({t:'drop',name,ty:v.name,line,part});
         for(const f of v.fields)dropValue(f.val,name&&name+'.'+f.name,line,true);
+        break;
+      case 'vec':case 'map':
+        // a map drops its entries in an order rustc does not fix, which a Drop impl that prints would show
+        if(v.k==='map'&&v.v.length>1&&v.v.some(en=>hasDrop(en.key)||hasDrop(en.val)))throw new Unsup('hash map order',line);
+        note({t:'drop',name,ty:v.ty,line,part});
+        entries(v).forEach((x,i)=>{
+          if(v.k==='vec')dropValue(x,name&&name+'['+i+']',line,true);
+          else{dropValue(x.key,name&&name+'[key '+i+']',line,true);dropValue(x.val,name&&name+'[value '+i+']',line,true);}
+        });
+        heap.delete(v.id);note({t:'free',id:v.id,line});
         break;
       default:
         if(!v.v.some(x=>x.k==='moved'))note({t:'drop',name,ty:v.k,line,part});
@@ -289,7 +332,6 @@ RQ.interp=(ast,opts)=>{
     if(val.k==='tuple'){const i=Number(h);return {...val,v:val.v.map((x,k)=>k===i?setAt(x,t,nv):x)};}
     return {...val,fields:val.fields.map(f=>f.name===h?{name:f.name,val:setAt(f.val,t,nv)}:f)};
   }
-  // a cell for the field at path below cell, for a reference to point at; it reads and writes through the owner
   function fieldCell(cell,path){
     if(!path.length)return cell;
     return {proxy:true,parent:cell.proxy?cell.parent:cell,label:(cell.proxy?cell.label+'.':'')+path.join('.'),
@@ -314,11 +356,62 @@ RQ.interp=(ast,opts)=>{
       case 'unit':return true;
       case 'int':case 'float':case 'bool':case 'char':return a.v===b.v;
       case 'str':case 'String':return a.v===b.v;
-      case 'tuple':case 'array':return a.v.length===b.v.length&&a.v.every((x,i)=>eqv(x,b.v[i]));
+      case 'tuple':case 'array':case 'vec':return a.v.length===b.v.length&&a.v.every((x,i)=>eqv(x,b.v[i]));
+      case 'map':return a.v.length===b.v.length&&a.v.every(en=>{const o=mapFind(b,en.key);return !!o&&eqv(en.val,o.val);});
       case 'struct':return a.fields.every((f,i)=>eqv(f.val,b.fields[i].val));
       case 'enum':return a.variant===b.variant&&a.fields.every((f,i)=>eqv(f.val,b.fields[i].val));
     }
     return bug('equality of '+a.k);
+  }
+  const mapFind=(m,key)=>m.v.find(en=>eqv(en.key,key));
+  const variantIndex=v=>BVARS[v.name]?BVARS[v.name].findIndex(x=>x[0]===v.variant):enumDecl.get(v.name).variants.findIndex(x=>x.name===v.variant);
+  // -1, 0 or 1; null when a NaN makes the two unordered, which makes every comparison false
+  function cmpv(a,b){
+    tick();
+    a=unref(a);b=unref(b);
+    const ord=(x,y)=>x<y?-1:x>y?1:0;
+    const seq=(xs,ys)=>{
+      for(let i=0;i<Math.min(xs.length,ys.length);i++){const c=cmpv(xs[i],ys[i]);if(c!==0)return c;}
+      return ord(xs.length,ys.length);
+    };
+    switch(a.k){
+      case 'unit':return 0;
+      case 'int':case 'bool':return ord(a.v,b.v);
+      case 'float':return Number.isNaN(a.v)||Number.isNaN(b.v)?null:ord(a.v,b.v);
+      case 'char':case 'str':case 'String':return Math.sign(cmpCodePoints(a.v,b.v));
+      case 'tuple':case 'array':case 'vec':return seq(a.v,b.v);
+      case 'struct':return seq(a.fields.map(f=>f.val),b.fields.map(f=>f.val));
+      case 'enum':{
+        const x=variantIndex(a),y=variantIndex(b);
+        return x!==y?ord(x,y):seq(a.fields.map(f=>f.val),b.fields.map(f=>f.val));
+      }
+    }
+    return bug('ordering of '+a.k);
+  }
+  // empty: it has never held an element, so it owns no heap memory yet
+  function coll(k,items,ty,line,empty){
+    const id=nextId++,v={k,v:items,id,ty};
+    note({t:'alloc',kind:k==='vec'?'Vec':'HashMap',id,empty,line:line||0});
+    heap.set(id,{id,kind:k==='vec'?'Vec':'HashMap',val:v});
+    return v;
+  }
+  function defaultVal(t,line){
+    tick();
+    t=res(t);
+    switch(t.k){
+      case 'int':return int(0n,t.ty);
+      case 'float':return {k:'float',v:0};
+      case 'bool':return bool(false);
+      case 'char':return {k:'char',v:'\0'};
+      case 'str':return {k:'str',v:''};
+      case 'String':return string('',undefined,line);
+      case 'tuple':return {k:'tuple',v:t.els.map(x=>defaultVal(x,line))};
+      case 'array':return {k:'array',v:Array.from({length:t.n},()=>defaultVal(t.el,line))};
+      case 'coll':return coll(t.name==='Vec'?'vec':'map',[],show(t),line,true);
+      case 'enum':return ctorVal({adt:t.name,variant:t.builtin?0:adts.enums.get(t.name).defaultVi},[]);
+      case 'struct':return ctorVal({adt:t.name,variant:null},adts.structs.get(t.name).fields.map(f=>defaultVal(f.ty,line)));
+      default:return UNIT;
+    }
   }
   function cloneVal(v,line){
     tick();
@@ -327,6 +420,11 @@ RQ.interp=(ast,opts)=>{
       case 'String':return string(v.v,undefined,line);
       case 'tuple':case 'array':return {...v,v:v.v.map(x=>cloneVal(x,line))};
       case 'struct':case 'enum':return {...v,fields:v.fields.map(f=>({name:f.name,val:f.val.k==='ref'||f.val.k==='str'?f.val:cloneVal(f.val,line)}))};
+      case 'vec':case 'map':{
+        const c=coll(v.k,[],v.ty,line,v.v.length===0);
+        for(const x of v.v)c.v.push(v.k==='vec'?cloneVal(x,line):{key:cloneVal(x.key,line),val:cloneVal(x.val,line)});
+        return c;
+      }
       default:return v;
     }
   }
@@ -456,6 +554,19 @@ RQ.interp=(ast,opts)=>{
         out.push({path,text:v.variant});
         for(const f of v.fields)leaves(f.val,(path?path+'.':'')+v.variant+'.'+f.name,out,live);
         break;
+      case 'vec':case 'map':
+        out.push({path,heap:live?v.id:null});
+        // the elements are one type, so if the first owns no heap memory none does and the walk is skipped
+        if(v.v.length&&(v.k==='vec'?owns(v.v[0]):owns(v.v[0].key)||owns(v.v[0].val)))entries(v).forEach((x,i)=>{
+          const inner=[];
+          if(v.k==='vec')leaves(x,path+'['+i+']',inner,live);
+          else{
+            const k=x.key,at=['int','bool','char','String'].includes(k.k)?'key '+(k.k==='String'?'"'+clip(k.v)+'"':scalar(k)):'entry '+i;
+            leaves(k,path+'['+at+']',inner,live);leaves(x.val,path+'[value of '+at+']',inner,live);
+          }
+          for(const l of inner)out.push({...l,hidden:true});
+        });
+        break;
       case 'moved':out.push({path,text:'moved'});break;
       case 'tuple':case 'array':
         v.v.slice(0,8).forEach((x,i)=>leaves(x,path+(v.k==='array'?'['+i+']':(path?'.':'')+i),out,live));
@@ -464,11 +575,31 @@ RQ.interp=(ast,opts)=>{
       default:out.push({path,text:scalar(v)});
     }
   }
+  // what a Vec or HashMap box holds: an element that owns heap memory is a pointer to it
+  function inline(x){
+    switch(x.k){
+      case 'String':case 'vec':case 'map':return 'pointer to #'+x.id;
+      case 'struct':case 'enum':{
+        const nm=x.k==='struct'?x.name:x.variant,fs=x.fields.map(f=>(x.kind==='named'?f.name+': ':'')+inline(f.val));
+        return !fs.length?nm:x.kind==='named'?nm+' { '+fs.join(', ')+' }':nm+'('+fs.join(', ')+')';
+      }
+      case 'tuple':case 'array':return (x.k==='tuple'?'(':'[')+x.v.slice(0,8).map(inline).join(', ')+(x.v.length>8?', …':'')+(x.k==='tuple'?')':']');
+      case 'moved':return 'moved';
+      default:return scalar(x);
+    }
+  }
+  function collText(c){
+    if(!c.v.length)return '';
+    const items=entries(c).slice(0,8).map(x=>c.k==='vec'?inline(x):inline(x.key)+': '+inline(x.val));
+    const shown=items.join(', ')+(c.v.length>8?', … '+(c.v.length-8)+' more':'');
+    return c.k==='vec'?'['+shown+']':'{'+shown+'}';
+  }
   const idsOf=n=>{
     let set=idSets.get(n);
     if(!set){set=new Set();RQ.walk(n,m=>{set.add(m.id);});idSets.set(n,set);}
     return set;
   };
+  const at=(name,path)=>!path?name:path[0]==='['?name+path:name+'.'+path;
   function snapshot(line,end){
     if(!opts.snap)return;
     if(snaps.length>=MAX_SNAPS-(end?0:1))return;
@@ -481,7 +612,7 @@ RQ.interp=(ast,opts)=>{
         const live=c.val!==null&&!c.moved&&!c.dropped;
         const rec={uid:recs.size,name:c.name,ty:c.ty||'',state:c.val===null?'uninit':c.dropped?'dropped':c.moved?'moved':'owned',leaves:[]};
         if(c.val!==null)leaves(c.val,'',rec.leaves,live);
-        for(const l of rec.leaves)if(l.heap!=null)owners.set(l.heap,c.name+(l.path?'.'+l.path:''));
+        for(const l of rec.leaves)if(l.heap!=null)owners.set(l.heap,at(c.name,l.path));
         recs.set(c,rec);vars.push(rec);
       }
       frs.push({fn:f.fn,vars});
@@ -492,7 +623,7 @@ RQ.interp=(ast,opts)=>{
       const px=!!l.cell.proxy,to=recs.get(px?l.cell.parent:l.cell),st=loanOf.get(l.loan);
       // without the borrow pass's region a loan is shown as live
       const live=!st||frames.some(f=>f.stmt&&st.live.some(id=>idsOf(f.stmt).has(id)));
-      loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:rec.name+(l.path?'.'+l.path:''),place:to?to.name+(px?'.'+l.cell.label:''):null,live,line:st?st.line:0});
+      loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:at(rec.name,l.path),place:to?to.name+(px?'.'+l.cell.label:''):null,live,line:st?st.line:0});
       // a borrow of one field does not make the whole variable look borrowed
       if(to&&live&&!px&&!seen.has(to)){seen.add(to);to.n=0;}
       if(to&&live&&!px){to.n++;if(to.state==='owned')to.state=l.mut?'mutBorrowed':'shared';}
@@ -500,7 +631,7 @@ RQ.interp=(ast,opts)=>{
     }
     for(const rec of recs.values())for(const l of rec.leaves){delete l.cell;if(l.ref&&l.to===undefined){l.to=null;l.toName=null;}}
     snaps.push({step:steps,line,end:!!end,frames:frs,
-      heap:[...heap.values()].map(h=>({id:h.id,kind:h.kind,content:h.v,owner:owners.get(h.id)||null})),
+      heap:[...heap.values()].map(h=>({id:h.id,kind:h.kind,content:h.val?collText(h.val):h.v,owner:owners.get(h.id)||null})),
       loans,events:events.slice(lastEv)});
     lastEv=events.length;
   }
@@ -527,6 +658,24 @@ RQ.interp=(ast,opts)=>{
     const at={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
     if(key==='Clone::clone'||key.endsWith('::clone'))return cloneVal(rv,e.line);
+    if(key.startsWith('Vec::')||key.startsWith('HashMap::')){
+      const c=unref(rv);
+      switch(key.slice(key.indexOf('::')+2)){
+        case 'len':return int(BigInt(c.v.length),'usize');
+        case 'is_empty':return bool(!c.v.length);
+        case 'push':c.v.push(args[0]);return UNIT;
+        case 'insert':{
+          const old=mapFind(c,args[0]);
+          if(!old){c.v.push({key:args[0],val:args[1]});return ctorVal({adt:'Option',variant:0},[]);}
+          // the map keeps its first key and drops the new one
+          const prev=old.val;
+          old.val=args[1];
+          dropValue(args[0],null,e.line);
+          return ctorVal({adt:'Option',variant:1},[prev]);
+        }
+      }
+      return bug('method '+key);
+    }
     const v=unref(rv),opt=key.startsWith('Option::');
     const ok=opt?v.variant==='Some':v.variant==='Ok';
     switch(key.slice(key.indexOf('::')+2)){
@@ -547,8 +696,6 @@ RQ.interp=(ast,opts)=>{
     }
     return bug('method '+key);
   }
-  // the first arm whose variant is the value's runs, with its names bound to the payload: moved out of the scrutinee place or temporary, or, behind a
-  // reference, references to the payload
   function matchEx(e,env){
     const mi=info.get(e).match,sc=peel(e.scrut);
     let val,cell,ref=null,base=null;
@@ -662,10 +809,12 @@ RQ.interp=(ast,opts)=>{
       case 'Call':{
         const o=info.get(e)||{};
         if(o.ctor)return ctorVal(o.ctor,mvAll(e.args,env));
+        if(o.dflt)return defaultVal(o.dflt,e.line);
         if(o.sig&&o.sig.key)return callFn(methodFns.get(o.sig.key),mvAll(e.args,env),e.line,o.sig.key);
         const sg=e.callee.t==='Path'?e.callee.segs:[],f=sg.length===1&&fns.get(sg[0].name);
         if(f)return callFn(f,mvAll(e.args,env),e.line);
         if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='new')return string('',undefined,e.line);
+        if(sg.length===2&&sg[1].name==='new'&&(sg[0].name==='Vec'||sg[0].name==='HashMap'))return coll(sg[0].name==='Vec'?'vec':'map',[],tyName(e),e.line,true);
         if(sg.length===2&&sg[0].name==='String'&&sg[1].name==='from')return string(unref(ev(e.args[0],env)).v,undefined,e.line);
         if(sg.length===2&&sg[0].name==='Clone'&&sg[1].name==='clone')return string(unref(ev(e.args[0],env)).v,undefined,e.line);
         if(sg.length===1&&sg[0].name==='drop'&&e.args.length===1){
@@ -713,7 +862,7 @@ RQ.interp=(ast,opts)=>{
         if(e.name==='as_str')return {k:'str',v:s};
         return string(s,undefined,e.line);
       }
-      case 'Macro':return macro(e,env);
+      case 'Macro':return e.name==='vec'?vecMacro(e,env):macro(e,env);
       case 'Block':return block(e,env);
       case 'Return':throw new Ret(e.expr?mv(e.expr,env):UNIT);
       case 'Tuple':return e.elems.length?{k:'tuple',v:mvAll(e.elems,env)}:UNIT;
@@ -770,6 +919,8 @@ RQ.interp=(ast,opts)=>{
     snapshot(snaps.length?snaps[snaps.length-1].line:1,true);
     return {status:'ok',stdout:out,stderr:err,exit:0,...extra()};
   }catch(x){
+    // a value nested thousands deep overflows the JS stack in drop, clone, == or Debug
+    if(x instanceof RangeError)x=new Limit('nesting');
     if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out.slice(0,MAX_OUTPUT),stderr:err.slice(0,MAX_OUTPUT),exit:null,...extra()};
     if(x instanceof Unsup)return {status:'unsupported',unsupported:{feature:x.feature,line:x.line},stdout:out,stderr:err,exit:null,...extra()};
     if(x instanceof Panic){

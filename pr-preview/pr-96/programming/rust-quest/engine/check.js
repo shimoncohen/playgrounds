@@ -15,7 +15,8 @@
      match a Match: {mode:'move'|'ref', place, bindsMoved}; arms: IdentPat nodes carry sel (the path below the scrutinee) and bty
      rty, alen  the resolved literal type and array length, as before
    Structs are `struct Name { f: T }`, `struct Name(T)` and `struct Name;`; enums have unit, tuple and struct variants. Neither is generic and no field is a
-   reference. #[derive] takes Debug, Clone, Copy, PartialEq and Eq. Option and Result are builtin generic enums. The impls are inherent `impl Name { ... }`
+   reference. #[derive] takes Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default and Hash. Option and Result are builtin generic enums; Vec<T> and
+   HashMap<K, V> are builtin collections (kind coll) whose elements are never references. `use std::collections::HashMap;` is the one `use` that is modeled. The impls are inherent `impl Name { ... }`
    (methods and associated fns, no generics) and `impl Drop for Name { fn drop(&mut self) { prints } }`. A match takes an enum or a shared reference to one,
    with unit, tuple and struct variant patterns whose parts are names or `_`. */
 (()=>{
@@ -28,7 +29,7 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'String','Vec','HashMap','Option','Result','Box','str',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
+  'String','Vec','HashMap','Option','Result','Box','str','collection method','hash key','hash map order','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
@@ -37,6 +38,8 @@ const TYPE_NODE={Slice:'slice',FnPtr:'fn pointer',ImplTrait:'impl Trait',QPath:'
 const COMPARE=new Set(['==','!=','<','>','<=','>=']);
 const ARITH=new Set(['+','-','*','/','%']);
 const MAX_ARRAY=10000;
+const COLL={Vec:1,HashMap:2};
+const STD_TRAITS=['Debug','Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Hash'];
 
 RQ.check=ast=>{
   const {T,unify,isInt,res,show,fits,isCopy,has,hasRef}=RQ.types;
@@ -73,17 +76,20 @@ RQ.check=ast=>{
     const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
+    // rustc checks `vec![..]` against the annotation element by element and points at the element, which is not modeled
+    if(g.k==='coll'&&w.k==='coll'&&g.name===w.name){unsup('type checking',n.line);return false;}
     // a shared reference never coerces to a &mut one; the other way round is a reborrow, which is not modeled
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&w.mut||clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
     return false;
   }
   const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
   const endNode=n=>n.t==='Block'&&n.tail?endNode(n.tail):n;
-  // the number of values a type holds, so nested arrays cannot multiply into a print or a clone that freezes the page
+  // the number of values a type holds, so nested arrays cannot multiply into a print or a clone that freezes the page.
+  // A Vec or HashMap counts as one: its elements are made by steps that are counted, and a recursive type such as `Vec<Node>` would not end
   const weight=t=>{
     t=res(t);
     const sum=fs=>fs.reduce((s,f)=>s+weight(f.ty||f),0);
-    return t.k==='array'?t.n*weight(t.el):t.k==='tuple'?sum(t.els):t.k==='struct'?sum(structs.get(t.name).fields):t.k==='enum'?sum(t.builtin?t.args:enums.get(t.name).variants.flatMap(v=>v.fields)):1;
+    return t.k==='coll'?1:t.k==='array'?t.n*weight(t.el):t.k==='tuple'?sum(t.els):t.k==='struct'?sum(structs.get(t.name).fields):t.k==='enum'?sum(t.builtin?t.args:enums.get(t.name).variants.flatMap(v=>v.fields)):1;
   };
   // rustc gives a bare literal under a cast the cast's type, so the checker has to see it too
   const bareLit=e=>{
@@ -99,14 +105,30 @@ RQ.check=ast=>{
   const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):kids(n).map(firstBare).find(Boolean)||null;
   const countRefs=n=>n.t==='Ref'?1+countRefs(n.ty):kids(n).reduce((a,x)=>a+countRefs(x),0);
   const hasMutRef=n=>n.t==='Ref'?n.mut||hasMutRef(n.ty):kids(n).some(hasMutRef);
-  const optTy=t=>T.enum('Option',[t],DERIVES,true),resTy=(t,e)=>T.enum('Result',[t,e],DERIVES,true);
+  const optTy=t=>T.enum('Option',[t],STD_TRAITS,true),resTy=(t,e)=>T.enum('Result',[t,e],STD_TRAITS,true);
   const adtRec=n=>structs.get(n)||enums.get(n);
   const adtTy=n=>{const r=structs.get(n);return r?T.struct(n,r.der):T.enum(n,[],enums.get(n).der);};
+  // a collection's loans are not tracked, so no element may be, or hold, a reference or a &str
+  const holdsRef=t=>{
+    t=res(t);
+    return t.k==='ref'||t.k==='str'||t.k==='tuple'&&t.els.some(holdsRef)||(t.k==='array'||t.k==='slice')&&holdsRef(t.el)||(t.k==='enum'||t.k==='coll')&&t.args.some(holdsRef);
+  };
+  // a type that is still open, so a trait cannot be judged yet; fl also counts a float literal, which is not Eq or Hash once it settles
+  const isOpen=(t,fl)=>{
+    t=res(t);
+    const o=x=>isOpen(x,fl);
+    return t.k==='tvar'||fl&&t.k==='fvar'||t.k==='tuple'&&t.els.some(o)||(t.k==='array'||t.k==='slice')&&o(t.el)||t.k==='ref'&&o(t.to)||(t.k==='enum'||t.k==='coll')&&t.args.some(o);
+  };
   // `top` is set only for a fn's whole return type (and a const's type): that is the one place `&'static str` is checked against its leaves
   function tyOf(n,top){
     if(n.t==='Path'&&n.segs.length===1&&!n.global&&!n.segs[0].fn){
       const sg=n.segs[0],s=sg.name;
       if(sg.args){
+        if(COLL[s]&&!adtRec(s)){
+          if(s==='HashMap'&&!mapUse||sg.args.length!==COLL[s]||kids(n).length!==sg.args.length)return unsup(s,n.line);
+          const as=sg.args.map(a=>tyOf(a));
+          return as.some(holdsRef)?unsup('reference in collection',n.line):T.coll(s,as);
+        }
         const ok=(s==='Option'&&sg.args.length===1||s==='Result'&&sg.args.length===2)&&!structs.has(s)&&!enums.has(s);
         if(!ok||kids(n).length!==sg.args.length)return unsup(adtRec(s)?'generics':s,n.line);
         const as=sg.args.map(a=>tyOf(a));
@@ -139,7 +161,7 @@ RQ.check=ast=>{
     return unsup(n.t==='Path'?n.segs[n.segs.length-1].name:TYPE_NODE[n.t]||n.t,n.line);
   }
 
-  const DERIVES=['Debug','Clone','Copy','PartialEq','Eq'];
+  const DERIVES=[...STD_TRAITS,'Default'];
   // the derived traits, or null when an attribute is anything but a plain derive of a modeled trait
   function derivesOf(it){
     const out=[];
@@ -187,6 +209,8 @@ RQ.check=ast=>{
     const vn=new Set(it.variants.map(v=>v.name));
     if(it.generics.length||BUILTIN.has(it.name)||isInt(it.name)||!it.variants.length||vn.size!==it.variants.length||it.variants.some(v=>v.disc||!fieldsOk(v.kind,v.fields))){unsup('enum',it.line);return;}
     rec.variants=it.variants.map(v=>({name:v.name,kind:v.kind,fields:fieldList(v.kind,v.fields).map(f=>({name:f.name,ty:tyOf(f.ty)}))}));
+    const dv=it.variants.flatMap((v,i)=>v.attrs.includes('default')?[i]:[]);
+    rec.defaultVi=dv.length===1&&it.variants[dv[0]].kind==='unit'?dv[0]:-1;
   }
   const DROP_OK=new Set(['Block','ExprStmt','Macro','Lit','Path','Field','Paren']);
   const one=n=>n&&n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn;
@@ -250,6 +274,8 @@ RQ.check=ast=>{
     curSelf=null;
   }
 
+  const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
+  const mapUse=ast.items.filter(useMap).length===1;
   for(const it of ast.items){
     if(it.t==='Struct')structDecl(it);
     else if(it.t==='Enum')enumDecl(it);
@@ -263,7 +289,8 @@ RQ.check=ast=>{
     }else if(it.t==='Const'){
       const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
-    }else if(it.t!=='Impl'&&(ITEM[it.t]||!['Extern','MacroRules','Union'].includes(it.t)))unsup(ITEM[it.t]||it.t,it.line);
+    }else if(mapUse&&useMap(it)){}
+    else if(it.t!=='Impl'&&(ITEM[it.t]||!['Extern','MacroRules','Union'].includes(it.t)))unsup(ITEM[it.t]||it.t,it.line);
   }
   for(const it of ast.items)if(it.t==='Impl'&&!it.trait)implDecl(it);
   // a tuple or unit struct is also a value, so it cannot share a name with a fn or a const
@@ -283,16 +310,23 @@ RQ.check=ast=>{
     }
     return heldBy(t).some(x=>holds(x,seenS));
   };
+  // an enum derives Default from its one `#[default]` unit variant, so its fields are not asked for Default
+  const NEEDS={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['PartialOrd','Eq']};
+  const badDerive=(rec,all)=>{
+    const en=rec.node.t==='Enum';
+    return rec.der.some(tr=>(tr!=='Default'||!en)&&all.some(f=>!has(f.ty,tr))||(NEEDS[tr]||[]).some(r=>!rec.der.includes(r)))
+      ||en&&(rec.der.includes('Default')?rec.defaultVi<0:rec.node.variants.some(v=>v.attrs.includes('default')));
+  };
   for(const [name,rec] of [...structs,...enums]){
     const all=rec.fields.concat(...rec.variants.map(v=>v.fields));
     if(all.some(f=>holds(f.ty,new Set([name])))){rec.fields=[];rec.variants=[];unsup(rec.node.t==='Struct'?'struct':'enum',rec.node.line);}
     else if(weight(rec.node.t==='Struct'?T.struct(name,rec.der):T.enum(name,[],rec.der))>MAX_ARRAY)unsup('array length',rec.node.line);
     // a derive needs every field to have the trait, and Copy and Eq need Clone and PartialEq beside them
-    else if(rec.der.some(tr=>all.some(f=>!has(f.ty,tr)))||rec.der.includes('Copy')&&!rec.der.includes('Clone')||rec.der.includes('Eq')&&!rec.der.includes('PartialEq'))unsup('derive',rec.node.line);
+    else if(badDerive(rec,all))unsup('derive',rec.node.line);
   }
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
-  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[];
+  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[],keyChecks=[];
   // a fn declared `-> &'static str` may only give back string literals: any other leaf could borrow from a parameter, which rustc
   // rejects, and the quest does not model lifetimes. Block tails and if branches are looked through; return/break/continue have their own check.
   function staticLeaves(e){
@@ -317,7 +351,7 @@ RQ.check=ast=>{
   const ivar=()=>{const v=T.ivar();vars.push(v);return v;};
   const fvar=()=>{const v=T.fvar();vars.push(v);return v;};
   // a type with a struct or enum inside: printing it without Display or Debug is E0277, not something unmodeled
-  const mentionsAdt=t=>{t=res(t);return t.k==='struct'||t.k==='enum'||t.k==='ref'&&mentionsAdt(t.to)||t.k==='tuple'&&t.els.some(mentionsAdt)||(t.k==='array'||t.k==='slice')&&mentionsAdt(t.el);};
+  const mentionsAdt=t=>{t=res(t);return t.k==='struct'||t.k==='enum'||t.k==='coll'||t.k==='ref'&&mentionsAdt(t.to)||t.k==='tuple'&&t.els.some(mentionsAdt)||(t.k==='array'||t.k==='slice')&&mentionsAdt(t.el);};
   const printable=(t,dbg)=>{
     t=res(t);
     switch(t.k){
@@ -328,22 +362,32 @@ RQ.check=ast=>{
       case 'unit':return dbg;
       case 'tuple':return dbg&&t.els.every(x=>printable(x,dbg));
       case 'array':return dbg&&printable(t.el,dbg);
+      case 'coll':return dbg&&t.args.every(x=>printable(x,dbg));
       default:return false;
     }
   };
+  // rustc names the first element type that lacks Debug, not the Vec or HashMap around it
+  const lacksDebug=t=>{
+    t=res(t);
+    if(t.k==='ref')return lacksDebug(t.to);
+    const bad=t.k==='coll'&&t.args.find(a=>!printable(a,true));
+    return bad?lacksDebug(bad):t;
+  };
   function finish(){
+    for(const f of fmts)f.shown=show(f.fmt.debug?lacksDebug(f.t):f.t);
     for(const v of vars){const r=res(v);if(r.k==='ivar')r.ref=T.int('i32');else if(r.k==='fvar')r.ref=T.float;}
     for(const [v,line] of tvs)if(res(v).k==='tvar')unsup('inferred type',line);
     for(const [e,t] of lits){const r=res(t);I(e).rty=r.k==='int'?r.ty:r.k==='float'?'f64':'i32';}
     for(const f of fmts){
       const r=res(f.t);
       if(!printable(r,f.fmt.debug)){
-        if(mentionsAdt(r))errors.push(RQ.diag.make('E0277',f.line,f.col,{type:show(r),debug:f.fmt.debug}));
+        if(mentionsAdt(r))errors.push(RQ.diag.make('E0277',f.line,f.col,{type:f.shown,debug:f.fmt.debug}));
         else unsup('type checking',f.line);
       }
       else if(f.fmt.prec!==null&&r.k!=='float'&&r.k!=='any')unsup('format spec',f.line);
     }
-    vars=[];lits=[];fmts=[];tvs=[];
+    for(const [k,line] of keyChecks)if(!isOpen(k)&&(!has(k,'Eq')||!has(k,'Hash')))unsup('hash key',line);
+    vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];
   }
 
   function slice(e,x){
@@ -353,6 +397,7 @@ RQ.check=ast=>{
     if(!ts.every(t=>unify(t,T.int('usize'))))return unsup('type checking',e.line);
     if(b.k==='ref'&&b.mut)return unsup('reborrow',e.line);
     const base=b.k==='ref'?res(b.to):b;
+    if(base.k==='coll')return unsup('collection method',e.line);
     if(base.k==='String'||b.k==='str'){I(e).slice='str';return T.str;}
     if(base.k==='array'||base.k==='slice'){I(e).slice='arr';return mkRef(false,T.slice(base.el));}
     return unsup('type checking',e.line);
@@ -462,7 +507,6 @@ RQ.check=ast=>{
       :[{name:'Ok',kind:'tuple',fields:f(t.args[0])},{name:'Err',kind:'tuple',fields:f(t.args[1])}];
   };
   const noArgs=p=>p.t==='Path'&&!p.global&&p.segs.every(g=>!g.args&&!g.fn);
-  // what a path names when it builds a struct or an enum variant: {name (the type), ty, kind, fields, vi (the variant, null for a struct)}
   function ctorOf(p){
     if(!noArgs(p)||p.segs.length>2)return null;
     const sg=p.segs;
@@ -499,7 +543,6 @@ RQ.check=ast=>{
     const n=sg[0].name==='Self'?curSelf:sg[0].name;
     return n===t.name?vs.findIndex(v=>v.name===sg[1].name):-1;
   }
-  // the root name, the field names down to the place, and the first reference the place reaches through, for a place made only of fields
   function chainOf(e){
     const parts=[];
     let via=null;
@@ -514,10 +557,17 @@ RQ.check=ast=>{
     return {root:e,name:e.segs[0].name,parts,via,text:[e.segs[0].name,...parts].join('.')};
   }
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
-  // methods the compiler provides: derived Clone, and a few on Option and Result
   function builtinMethod(base,name){
-    const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
+    const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
+    if(base.k==='coll'){
+      const [k,v]=base.args,vec=base.name==='Vec';
+      if(name==='len'||name==='is_empty')return rec('&',[],name==='len'?T.int('usize'):T.bool,-1);
+      if(vec&&name==='push')return rec('&mut',[k],T.unit,-1);
+      // a key that is still open is judged when the fn ends (keyChecks)
+      if(!vec&&name==='insert'&&(isOpen(k,true)||has(k,'Eq')&&has(k,'Hash')))return rec('&mut',[k,v],optTy(v),-1);
+      return null;
+    }
     if(!base.builtin)return null;
     const opt=base.name==='Option',[a,b]=base.args;
     if(name==='is_some'||name==='is_none')return opt?rec('&',[],T.bool,-1):null;
@@ -530,11 +580,19 @@ RQ.check=ast=>{
     return null;
   }
   function adtMethod(e,r,base,args){
-    const isRef=r.k==='ref',name=e.name,own=base.builtin?null:methods.get(base.name);
+    const isRef=r.k==='ref',name=e.name,own=base.builtin||base.k==='coll'?null:methods.get(base.name);
     const m=(own&&own.get(name))||builtinMethod(base,name);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
       if(name==='clone'&&isRef&&!r.mut&&!args.length){I(e).um={key:'ref::clone',self:'&',adj:'val',kind:peel(e.recv).t==='Path'?'refvar':'temp',ref:true,text,from:0};return r;}
+      if(base.k==='coll'){
+        // the method exists but the elements lack a trait it needs; while an element type is open that is not judged
+        const map=base.name==='HashMap',bounded=name==='clone'&&!args.length||map&&name==='insert'&&args.length===2;
+        if(!bounded)return unsup('collection method',e.line);
+        if(isOpen(base,true))return unsup('inferred type',e.line);
+        errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'bounds',name,type:show(base)}));
+        return T.any;
+      }
       if(base.builtin||UNIVERSAL.includes(name)||(name==='eq'||name==='ne')&&has(base,'PartialEq'))return unsup('method call',e.line);
       errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base),kind:base.k}));
       return T.any;
@@ -543,6 +601,8 @@ RQ.check=ast=>{
     if(!sk){errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base),kind:base.k}));return T.any;}
     if(args.length!==m.params.length)return unsup('wrong argument count',e.line);
     args.forEach((t,i)=>coerce(t,m.params[i].ty,e.args[i]));
+    if(base.k==='coll'&&args.some(holdsRef))return unsup('reference in collection',e.line);
+    if(base.k==='coll'&&name==='insert'&&isOpen(base.args[0],true))keyChecks.push([base.args[0],e.line]);
     let adj;
     if(!isRef)adj=sk;
     else if(sk==='val')adj='copy';else if(!r.mut)adj='val';
@@ -647,6 +707,18 @@ RQ.check=ast=>{
     return rt||T.never;
   }
 
+  function vecMacro(e){
+    const ts=e.args.map(ex);
+    if(e.repeat){
+      const n=ex(e.repeat);
+      if(isOpen(ts[0]))return unsup('inferred type',e.line);
+      if(!has(ts[0],'Clone'))return unsup('type checking',e.line);
+      expect(n,T.int('usize'),e.repeat);
+    }
+    const el=ts.length?ts[0]:fresh(e.line);
+    for(const t of ts.slice(1))if(!unify(el,t))return unsup('type checking',e.line);
+    return ts.some(holdsRef)?unsup('reference in collection',e.line):T.coll('Vec',[el]);
+  }
   function ex(e){const t=expr(e);I(e).ty=t;return t;}
   const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   const placeChain=e=>{e=peel(e);return e.t==='Path'||((e.t==='Field'||e.t==='Index')&&placeChain(e.expr));};
@@ -704,11 +776,9 @@ RQ.check=ast=>{
         }
         if(!operands(a,b,e))return COMPARE.has(op)?T.bool:a;
         const u=res(a).k==='any'?b:a,c=cls(u);
-        if(c==='struct'||c==='enum'){
-          const eq=op==='=='||op==='!=';
-          if(eq&&has(u,'PartialEq'))return T.bool;
-          // Option and Result order their contents; a user type cannot derive PartialOrd here, so it has no ordering
-          if(!COMPARE.has(op)||res(u).builtin&&!eq)return unsup('type checking',e.line);
+        if(c==='struct'||c==='enum'||c==='coll'){
+          if(!COMPARE.has(op)||isOpen(u))return unsup(isOpen(u)?'inferred type':'type checking',e.line);
+          if(has(u,op==='=='||op==='!='?'PartialEq':'PartialOrd'))return T.bool;
           errors.push(RQ.diag.make('E0369',e.oline,e.ocol,{op,type:show(u)}));
           return T.bool;
         }
@@ -770,6 +840,15 @@ RQ.check=ast=>{
           I(e).sig={params:ts,ret:T.string};
           return T.string;
         }
+        if(sg.length===2&&COLL[sg[0].name]&&!adtRec(sg[0].name)&&sg[1].name==='new'&&noArgs(e.callee)){
+          const name=sg[0].name;
+          e.args.forEach(ex);
+          if(name==='HashMap'&&!mapUse)return unsup('HashMap',e.line);
+          if(e.args.length)return unsup('wrong argument count',e.line);
+          const ty=T.coll(name,Array.from({length:COLL[name]},()=>fresh(e.line)));
+          I(e).sig={params:[],ret:ty};
+          return ty;
+        }
         const ct=e.callee.t==='Path'?ctorOf(e.callee):null;
         if(ct){
           const ts=e.args.map(ex);
@@ -788,6 +867,12 @@ RQ.check=ast=>{
             ts.forEach((t,i)=>coerce(t,params[i],e.args[i]));
             I(e).sig={params,ret:m.ret,from:m.from,key:m.key};
             return m.ret;
+          }
+          if(adtRec(owner)&&sg[1].name==='default'&&has(adtTy(owner),'Default')){
+            if(ts.length)return unsup('wrong argument count',e.line);
+            const ty=adtTy(owner);
+            I(e).sig={params:[],ret:ty};I(e).dflt=ty;
+            return ty;
           }
           if(adtRec(owner)){errors.push(RQ.diag.make('E0599',sg[1].line,e.callee.col,{what:'item',name:sg[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));return T.any;}
           return unsup('path call',e.line);
@@ -824,7 +909,7 @@ RQ.check=ast=>{
         const rt=ex(e.recv),args=e.args.map(ex),r=res(rt);
         if(r.k==='any'||r.k==='never')return T.any;
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum')return adtMethod(e,r,adt,args);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll')return adtMethod(e,r,adt,args);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&!r.mut&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
@@ -846,6 +931,7 @@ RQ.check=ast=>{
         if(e.args===null)return T.any;
         if(e.name in PRINT)return format(e);
         if(e.name==='format'){format(e);return T.string;}
+        if(e.name==='vec'&&!e.named.length)return vecMacro(e);
         e.args.forEach(ex);
         return unsup(e.name+'!',e.line);
       }
@@ -873,6 +959,7 @@ RQ.check=ast=>{
         if(b.k==='any'||b.k==='never')return T.any;
         // through a `&[T]`; a `&[T; N]` keeps its length for the lint, so it is not indexed through the reference
         if(b.k==='ref'&&!b.mut&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
+        if((b.k==='ref'?res(b.to):b).k==='coll')return unsup('collection method',e.line);
         if(b.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
         I(e).alen=b.n;return b.el;
       }
@@ -938,7 +1025,10 @@ RQ.check=ast=>{
         if(it.t==='Range'&&it.from&&it.to){
           const a=ex(it.from),b=ex(it.to);
           if(!unify(a,b)||!['int','ivar','any'].includes(res(a).k))unsup('type checking',it.line);else el=a;
-        }else{ex(e.iter);unsup('for iterable',e.iter.line);}
+        }else{
+          const t=res(ex(e.iter));
+          unsup(has(t,'IntoIterator')&&(t.k==='ref'?res(t.to):t).k==='coll'?'collection method':'for iterable',e.iter.line);
+        }
         scopes.push(new Map());
         if(named)bindVar(pt.name,pt.mut,'let',el,pt);
         loops.push({ty:null,value:false});
@@ -995,6 +1085,6 @@ RQ.check=ast=>{
     expect(ex(c.node.init),c.ty,c.node.init);
     finish();
   }
-  return {errors,unsupported:un,shadows,shadowUses,varUses,info};
+  return {errors,unsupported:un,shadows,shadowUses,varUses,info,adts:{structs,enums}};
 };
 })();
