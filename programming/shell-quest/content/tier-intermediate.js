@@ -102,11 +102,11 @@ const CH=[
   anat:[['export','cmd'],['GREETING','var'],['=','op'],['hi','arg']],answer:'export GREETING=hi',
   explain:`A plain variable is private to your shell. <code>export</code> marks it for <b>sharing</b>, so programs and <code>scripts</code> you start can read it too.`,
   check:c=>c.ran('export')&&!!(SQ.S.exp&&SQ.S.exp.GREETING)},
- {title:'See the environment',goal:`Check that the Owl can see your greeting. After exporting GREETING in the last mission, list the shared variables: <code>env</code>`,note:`Jumped straight here? Run <code>export GREETING=hi</code> first.`,
+ {title:'See the environment',goal:`Check that the Owl can see your greeting. After exporting GREETING in the last mission, list the shared variables: <code>env</code>`,need:c=>!!(SQ.S.exp&&SQ.S.exp.GREETING),pre:['export GREETING=${GREETING:-hi}'],made:'exported GREETING',
   anat:[['env','cmd']],answer:'env',
   explain:`<code>env</code> prints the <b>environment</b>: every exported variable, one NAME=value per line, in alphabetical order. Find GREETING near the top of the list, among built-in ones like HOME and USER.`,
   check:c=>c.ran('env',e=>/^GREETING=\S/m.test(e.out))},
- {title:'Share with a script',goal:`Write a small script for the Owl and let it read the greeting. Write a script that uses it, then run it: <code>echo 'echo $GREETING' &gt; g.sh; chmod +x g.sh; ./g.sh</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
+ {title:'Share with a script',need:c=>!!(SQ.S.exp&&SQ.S.exp.GREETING),pre:['export GREETING=${GREETING:-hi}'],made:'exported GREETING',goal:`Write a small script for the Owl and let it read the greeting. Write a script that uses it, then run it: <code>echo 'echo $GREETING' &gt; g.sh; chmod +x g.sh; ./g.sh</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['echo','cmd'],[`'echo $GREETING'`,'arg'],['>','op'],['g.sh','arg'],[';','op'],['chmod +x g.sh','cmd'],[';','op'],['./g.sh','cmd']],answer:`echo 'echo $GREETING' > g.sh; chmod +x g.sh; ./g.sh`,
   explain:`Single quotes put the text <code>$GREETING</code> into the file untouched. When the script runs it reads the <b>exported</b> variable. Remove the export and the script would print an empty line.`,
   check:c=>{const v=SQ.S.vars.GREETING;if(!v||!(SQ.S.exp&&SQ.S.exp.GREETING))return false;
@@ -141,7 +141,7 @@ const CH=[
   explain:`<code>ln -s TARGET NAME</code> creates a <b>symbolic link</b>: a small file that just says where the real one is. The target comes first, the new name second. In <code>ls -l</code> a link shows as <code>today.log -&gt; village/logs/day1.log</code>.`,
   check:c=>{const d1=homeNode('~/village/logs/day1.log');if(!c.ran('ln')||!d1||d1.type!=='file')return false;
     return allLinks(SQ.S.fs,'',[]).some(p=>{const l=lstat(p);return l&&l.type==='link'&&getNode(p)===d1})}},
- {title:'Follow the shortcut',goal:`Look through the peephole. Read the log through the shortcut: <code>cat today.log</code>`,note:`Needs the link from the last mission. Not there? Run <code>ln -s village/logs/day1.log today.log</code> first, from your home folder.`,
+ {title:'Follow the shortcut',goal:`Look through the peephole. Read the log through the shortcut: <code>cat today.log</code>`,need:c=>{const l=lstat(norm('~/today.log'));return !!l&&l.type==='link'},pre:['ln -s village/logs/day1.log ~/today.log'],made:'linked today.log to village/logs/day1.log',
   anat:[['cat','cmd'],['today.log','arg']],answer:'cat today.log',
   explain:`Programs follow a link as if you had named the real file, so <code>cat</code> prints what is in <code>day1.log</code>. If you move or delete the target, the link is left pointing at nothing.`,
   check:c=>{const d1=homeNode('~/village/logs/day1.log');if(!d1||d1.type!=='file')return false;
