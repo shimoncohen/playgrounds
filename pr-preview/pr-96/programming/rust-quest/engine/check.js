@@ -51,7 +51,7 @@ RQ.check=ast=>{
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
   // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
   // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
-  const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','String'].includes(t.k)?t.k:null;};
+  const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','slice','String'].includes(t.k)?t.k:null;};
   const isRef=t=>{t=res(t);return t.k==='ref'||t.k==='str';};
   function clashes(g,w){
     g=res(g);w=res(w);
@@ -64,7 +64,9 @@ RQ.check=ast=>{
     if(unify(got,want))return true;
     const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
-    if(clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
+    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
+    // a shared reference never coerces to a &mut one; the other way round is a reborrow, which is not modeled
+    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&w.mut||clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
     return false;
   }
   const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
@@ -79,7 +81,9 @@ RQ.check=ast=>{
   };
 
   // a reference type with no lifetime written: in a return type that needs lifetime elision (E0106/E0515), which is not modeled
-  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'?bareRef(n.ty):false;
+  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):n.t==='Tuple'?n.tys.some(bareRef):n.t==='Array'||n.t==='Slice'?bareRef(n.ty):false;
+  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):n.t==='Tuple'?n.tys.map(firstBare).find(Boolean)||null:n.t==='Array'||n.t==='Slice'?firstBare(n.ty):null;
+  const countRefs=n=>n.t==='Ref'?1+countRefs(n.ty):n.t==='Tuple'?n.tys.reduce((a,x)=>a+countRefs(x),0):n.t==='Array'||n.t==='Slice'?countRefs(n.ty):0;
   // `top` is set only for a fn's whole return type (and a const's type): that is the one place `&'static str` is checked against its leaves
   function tyOf(n,top){
     if(n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn){
@@ -97,6 +101,7 @@ RQ.check=ast=>{
       if(to.t==='Ref')return unsup('reference to reference',n.line);
       if(n.lt&&!(top&&n.lt==='static'&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);
       if(isStr)return n.mut?unsup('reference',n.line):T.str;
+      if(to.t==='Slice'){const el=tyOf(to.ty);return n.mut?unsup('reference',n.line):mkRef(false,T.slice(el));}
       return mkRef(n.mut,tyOf(to));
     }
     if(n.t==='Tuple')return n.tys.length?T.tuple(n.tys.map(x=>tyOf(x))):T.unit;
@@ -159,10 +164,17 @@ RQ.check=ast=>{
         return {name:ok?p.pat.name:'_',mut:ok&&p.pat.mut,ty:tyOf(p.ty),pat:p.pat};
       });
       const ret=it.ret?tyOf(it.ret,true):T.unit;
-      if(it.ret&&bareRef(it.ret))unsup('lifetime elision',it.ret.line);
+      let from=-1;
+      if(it.ret&&bareRef(it.ret)){
+        // one lifetime position among the parameters is the one the result borrows; none or several is E0106
+        const refs=it.params.map(p=>countRefs(p.ty)),total=refs.reduce((a,x)=>a+x,0);
+        if(total!==1){const at=firstBare(it.ret);errors.push(RQ.diag.make('E0106',at.line,at.col,{}));}
+        else if(it.ret.t==='Ref'&&!it.ret.mut&&!it.params[refs.indexOf(1)].ty.mut&&it.params[refs.indexOf(1)].ty.t==='Ref'&&it.params[refs.indexOf(1)].ty.lt===null)from=refs.indexOf(1);
+        else unsup('lifetime elision',it.ret.line);
+      }
       if(it.name==='main'&&(params.length||it.ret))unsup('main signature',it.line);
       if(!it.body)syn(it.line,it.col,'free function without a body');
-      if(defined(it))fns.set(it.name,{node:it,params,ret});
+      if(defined(it))fns.set(it.name,{node:it,params,ret,from});
     }else if(it.t==='Const'){
       const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
@@ -204,6 +216,7 @@ RQ.check=ast=>{
     switch(t.k){
       case 'int':case 'float':case 'bool':case 'char':case 'str':case 'String':case 'any':case 'never':return true;
       case 'ref':return printable(t.to,dbg);
+      case 'slice':return dbg&&printable(t.el,dbg);
       case 'unit':return dbg;
       case 'tuple':return dbg&&t.els.every(x=>printable(x,dbg));
       case 'array':return dbg&&printable(t.el,dbg);
@@ -219,6 +232,18 @@ RQ.check=ast=>{
       else if(f.fmt.prec!==null&&r.k!=='float'&&r.k!=='any')unsup('format spec',f.line);
     }
     vars=[];lits=[];fmts=[];
+  }
+
+  function slice(e,x){
+    const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);
+    if(e.mut)return unsup('reference',e.line);
+    if(b.k==='any'||b.k==='never')return T.any;
+    if(!ts.every(t=>unify(t,T.int('usize'))))return unsup('type checking',e.line);
+    if(b.k==='ref'&&b.mut)return unsup('reborrow',e.line);
+    const base=b.k==='ref'?res(b.to):b;
+    if(base.k==='String'||b.k==='str'){I(e).slice='str';return T.str;}
+    if(base.k==='array'||base.k==='slice'){I(e).slice='arr';return mkRef(false,T.slice(base.el));}
+    return unsup('type checking',e.line);
   }
 
   function block(b){
@@ -418,10 +443,12 @@ RQ.check=ast=>{
         if(!f)return unknown(n,e.callee);
         if(ts.length!==f.params.length)return unsup('wrong argument count',e.line);
         ts.forEach((t,i)=>coerce(t,f.params[i].ty,e.args[i]));
-        I(e).sig={params:f.params.map(p=>p.ty),ret:f.ret};
+        I(e).sig={params:f.params.map(p=>p.ty),ret:f.ret,from:f.from};
         return f.ret;
       }
       case 'Ref':{
+        const sx=peel(e.expr);
+        if(sx.t==='Index'&&peel(sx.index).t==='Range')return slice(e,sx);
         const t=ex(e.expr),r=res(t);
         if(r.k==='ref'||r.k==='str')return unsup('reference to reference',e.line);
         return mkRef(e.mut,t);
@@ -436,6 +463,12 @@ RQ.check=ast=>{
         const rt=ex(e.recv),args=e.args.map(ex),r=res(rt);
         if(r.k==='any'||r.k==='never')return T.any;
         // o owned String, r &String, m &mut String, s &str
+        const seq=r.k==='array'?r:r.k==='ref'&&!r.mut&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
+        if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
+          if(args.length)return unsup('wrong argument count',e.line);
+          I(e).recv={method:'len',kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
+          return T.int('usize');
+        }
         const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):''):'';
         const sig=RQ.std.methods.get(e.name);
         if(!sig||!shape||!sig.recv.includes(shape))return unsup('method call',e.line);
@@ -475,6 +508,8 @@ RQ.check=ast=>{
       case 'Index':{
         const b=res(ex(e.expr)),i=ex(e.index);
         if(b.k==='any'||b.k==='never')return T.any;
+        // through a `&[T]`; a `&[T; N]` keeps its length for the lint, so it is not indexed through the reference
+        if(b.k==='ref'&&!b.mut&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
         if(b.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
         I(e).alen=b.n;return b.el;
       }

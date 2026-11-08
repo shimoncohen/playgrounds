@@ -51,6 +51,16 @@ const ERRORS={
     msg:o=>'`'+o.name+'` does not live long enough',
     tip:'A variable disappears at the end of the block that declares it, and a borrow of it cannot outlast that. Declare the variable in the outer block, or use the borrow before the block ends.'
   },
+  E0106:{
+    title:'a returned reference has no lifetime to borrow from',
+    msg:()=>'missing lifetime specifier',
+    tip:'A function that returns a reference has to say whose data it points at. With exactly one reference parameter Rust knows, but with none or with several it cannot guess. Return an owned value, like a `String`, instead.'
+  },
+  E0515:{
+    title:'a function returns a reference to its own local',
+    msg:o=>'cannot return '+(o.direct?'reference to ':'value referencing ')+(o.param?'function parameter':'local variable')+' `'+o.name+'`',
+    tip:'A local variable is freed when the function ends, so a reference to it would point at nothing. Return the value itself (for text, a `String`) so the caller becomes its owner.'
+  },
   E0428:{
     title:'a name is defined twice',
     msg:o=>'the name `'+o.name+'` is defined multiple times',
@@ -135,11 +145,12 @@ const HINTS={
   method:LATER,'nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,
   match:LATER,
   'method call':'Only `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on a `String` (and `len`, `to_string` and `to_owned` on a `&str`) are modeled for now.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled for now.',
-  'field of a temporary':'Reading a field of a value that is not in a variable, like `make().id`, is not modeled. Put the value in a variable first.',slice:LATER,
-  reference:'Only `&T` and `&mut T` on a `String` or a number are modeled, and `&str` for text. Use one of those, or pass the value itself.',
+  'field of a temporary':'Reading a field of a value that is not in a variable, like `make().id`, is not modeled. Put the value in a variable first.',slice:'A bare slice type `[T]` has no size, so it only appears behind a `&`, as `&[T]`.',
+  'slice of non-ASCII text':'Slicing text with accented letters, emoji or other non-English characters is not modeled, because one letter can take several bytes. Use plain English letters for now.',
+  reference:'Only `&T` and `&mut T` on a `String` or a number are modeled, `&str` for text, and `&[T]` for a slice. Use one of those, or pass the value itself.',
   dereference:'`*` works on a reference, like `*r` where `r` is a `&i32` or `&mut i32`. This value is not a reference.',
   'explicit lifetime':'Lifetime names like `\'a` are not modeled. Write `&T` and let Rust work the lifetime out, or return `&\'static str` from a `fn` for a string literal. `&\'static str` is modeled only as the return type of a `fn`.',
-  'lifetime elision':'A function that returns a reference is not modeled yet. Return an owned value, like a `String`, instead.',
+  'lifetime elision':'A function that returns a reference is modeled only as `-> &T` with exactly one `&` (not `&mut`) parameter. Otherwise return an owned value, like a `String`.',
   'reference coercion':'Rust Quest only converts a `&String` into a `&str` for you. Pass the same kind of reference the function asks for.',
   'reference to reference':'A reference to a reference, like `&&str` or `&t` where `t` is already a `&str`, is not modeled. Pass `t` itself instead.',
   reborrow:'Reborrowing a `&mut`, like `&*r`, or calling `as_str` on a `&mut String`, is not modeled. Use the `&mut` variable directly instead.',
@@ -163,7 +174,7 @@ const HINTS={
   'const initializer':'A `const` can only hold a literal, or simple maths on other constants, for now.',
   'integer overflow':'Dividing the smallest number of a type by `-1` overflows. Rust Quest does not model that case; use another divisor.',
   'const folding':'Rust Quest cannot tell whether the compiler would catch this overflow before the program runs. Pass the value in as a function parameter, or use numbers that cannot overflow.',
-  'range expression':'A range like `0..5` is modeled only right after `for ... in`.',
+  'range expression':'A range like `0..5` is modeled only right after `for ... in`, or inside `&text[0..5]` to take a slice.',
   'for iterable':'`for` loops over a range like `0..5` or `1..=5` for now.',
   'let condition':'`if let` and `while let` are not modeled yet. Use a plain `if` with a condition that is true or false.',
   'array length':'Write the array length as a plain number, like `[i32; 3]`, no bigger than 10000.',
