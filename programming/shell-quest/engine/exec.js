@@ -199,6 +199,12 @@ function ctxFor(line,opts){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.
   err:()=>SQ.rt.lastErr||'',status:()=>S.last}}
 /* A chapter's setup(), plus the `starter` text of its script/challenge missions: written only where the file is absent, so revisiting a chapter never clobbers saved work. */
 function setupChapter(ch){ch.setup();for(const m of ch.missions)if(m.file&&typeof m.starter==='string'&&(m.kind==='script'||m.kind==='challenge'))SQ.ensureFile(m.file,m.starter)}
+/* log, $? and cwd are put back so the setup never counts as the learner's own action */
+function ensureNeeds(m){if(!m||!m.need||!m.pre||m.need(ctxFor('')))return false;
+  const rt=SQ.rt,k={last:S.last,cwd:S.cwd,old:S.oldpwd,pl:rt.prevLast,out:rt.lastOut,err:rt.lastErr,took:rt.lineTook};
+  for(const l of m.pre)execLine(l);
+  Object.assign(rt,{log:[],prevLast:k.pl,lastOut:k.out,lastErr:k.err,lineTook:k.took});S.last=k.last;S.cwd=k.cwd;S.oldpwd=k.old;
+  return !!m.need(ctxFor(''))}
 /* missionVerdict(m, c, why): {good, failed} for any mission. A line with a command-not-found never passes a command mission. A custom m.check wins; script/challenge missions without one use scriptPasses.
    With why, a failed script/challenge mission also says why: the first failing case, judged inside the same world the check uses
    (m.world: fn => result, e.g. a sandbox with no leftover backup/), or m.checkFail when every case passes but the check still says no. */
@@ -228,5 +234,5 @@ function stepsApply(m,key,c){const d=stepsDone(key).slice(),newly=[];
 const oneLine=(t,n)=>{t=t.replace(/\n/g,'\\n');return t.length>n?t.slice(0,n-3)+'...':t};
 function scriptFailLine(m,f){if(f.index===-2)return oneLine(f.text,120);if(f.index<0)return `Save your script as ${m.file} first (nano ${m.file}).`;
   return oneLine(`Test ${f.index+1} (${f.label}) failed: expected "${f.expected}", got "${f.got}"`,120)}
-Object.assign(SQ,{runNamed,runPath,runCmd,execLine,ctxFor,setupChapter,scriptFailLine,missionVerdict,stepsDone,stepNext,stepsApply});
+Object.assign(SQ,{runNamed,runPath,runCmd,execLine,ctxFor,setupChapter,ensureNeeds,scriptFailLine,missionVerdict,stepsDone,stepNext,stepsApply});
 })(window.SQ = window.SQ || {});

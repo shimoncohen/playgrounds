@@ -27,7 +27,9 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
   else{const firstOpen=ch.missions.findIndex((x,j)=>!S.done[S.ch+'.'+j]);
     if(firstOpen>=0)S.mi=firstOpen;
     else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
-  SQ.ui.setPop()}
+  SQ.ui.setPop();landOn()}
+
+function landOn(){const m=CH[S.ch].missions[S.mi];if(m&&SQ.ensureNeeds(m))addLine(renderText(`(Set up for this mission: ${m.made}.)`),'sys')}
 
 /* One typed or generated line: echo it (unless echo:false), run it (optional stdin text), show the output, check the mission.
    opts.feedback is for script missions (a failed test case is explained); the typed prompt never sets it. */
@@ -59,7 +61,7 @@ function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').f
 
 /* a chapter switch, like Reset world, starts with no jobs, traps or shell options and the clock at 0 (SQ.resetProcs, procs.js); files and variables stay */
 function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;SQ.resetProcs();
-  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
+  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');landOn();renderAll();save();scrollDown()}
 
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
@@ -92,7 +94,7 @@ crumbsEl.addEventListener('click',e=>{const b=e.target.closest('[data-cd]');if(b
 mapEl.addEventListener('click',e=>{const b=e.target.closest('[data-path]');if(!b)return;const abs=b.dataset.path,n=getNode(abs);if(!n)return;fill((n.type==='dir'?'cd ':'cat ')+rel(abs))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(b)goChapter(+b.dataset.ch)});
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
+  if(b.dataset.mi!=null){S.mi=+b.dataset.mi;landOn();renderAll();save();scrollDown();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
   else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.steps?m.steps[SQ.stepNext(m,S.ch+'.'+S.mi)].answer:m.answer)}
@@ -162,7 +164,7 @@ SQ.rt.onSaveFail=e=>{const storage=!!e&&(e.name==='QuotaExceededError'||e.name==
 if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}
 SQ.rt.changed=new Set();
 welcome();if(S.hist.length)addLine(renderText(`Welcome back. You are on chapter ${S.ch+1}: ${CH[S.ch].name}.`),'tip');
-renderAll();renderGuide();fireIdle();save();
+landOn();renderAll();renderGuide();fireIdle();save();
 const h=(location.hash||'').slice(1);if(h==='guide'||h==='quickfire'||h==='fire')showTab(h==='guide'?'guide':'fire');
 else if(matchMedia('(pointer:fine)').matches)cmdIn.focus({preventScroll:true});
 })();
