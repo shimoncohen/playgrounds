@@ -666,7 +666,7 @@ describe('personal chapters', () => {
     assert.deepEqual([...AQ.CH.slice(15, 20).map((ch) => ch.missions.length)], [3, 3, 3, 3, 3]);
     assert.ok(AQ.CH.slice(15, 20).every((ch) => ch.tier === 'personal'));
     assert.ok(AQ.CH.slice(0, 15).every((ch) => ch.tier !== 'personal'));
-    assert.deepEqual([...AQ.CH.slice(15, 20).map((ch) => ch.badge)], ['Clockwork', 'Page Turner', 'Desk Clearer', 'Inbox Keeper', 'Pocket Toolsmith']);
+    assert.deepEqual([...AQ.CH.slice(15, 20).map((ch) => ch.badge)], ['Egg Timer', 'Stamped Envelope', 'Clear Desk', 'Calendar Entry', 'Pocket Toolbox']);
   });
   it('the three scenarios are present once, scheduled, unattended-free and tag-free, and none is shared with an earlier chapter', () => {
     const keys = AQ.CH[15].missions.map((m) => m.scenario);
