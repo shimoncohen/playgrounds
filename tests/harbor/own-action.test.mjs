@@ -46,7 +46,7 @@ const UNRELATED = ['echo hi', 'ls', 'docker ps', 'kubectl get pods'];
 const all = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => all.push({ ci, mi, m, key: ci + '.' + mi })));
 const answers = m => (m.steps || [m]).map(s => (typeof s.ans === 'function' ? s.ans() : s.ans));
-const jump = (h, ci, mi) => { h.goChapter(ci); h.S.mi = mi; h.S.inside = null; };
+const jump = (h, ci, mi) => { h.goChapter(ci); h.S.mi = mi; h.S.inside = null; h.land(); };
 
 test('a fresh game: unrelated commands never finish a mission', () => {
   const bad = [];
@@ -81,22 +81,46 @@ test('after a full playthrough: unrelated commands do not re-finish any mission'
   assert.deepEqual(bad, []);
 });
 
+// the answer to these accumulates ("two or three times"), so it is typed as many times as the goal says
+const REPEAT = { '6.3': 2, '9.5': 3 };
+
 test('from a fresh jump, each answer counts the first time it is typed', () => {
-  // known gap: a mission that needs an earlier mission's leftover is skipped here until the prerequisite follow-up lands
   const bad = [];
   for (const { ci, mi, m, key } of all) {
     const h = boot();
     jump(h, ci, mi);
     const n = (m.steps || [m]).length;
-    let lines = 0, stuck = false;
-    for (let i = 0; i < n + 1 && !h.S.done[key] && !stuck; i++) {
-      const before = h.S.steps?.[key]?.length ?? 0;
-      play(h, ci, mi); lines++;
-      stuck = !h.S.done[key] && (h.S.steps?.[key]?.length ?? 0) === before;
+
+    for (let i = 0; i < n && !h.S.done[key]; i++) {
+      h.skip(30000);
+      const a = stepAns(h, h.CH[ci].missions[mi], ci, mi);
+      const times = REPEAT[key] || 1;
+      for (let t = 0; t < times; t++) play(h, ci, mi);
+
+      if (/^edit /.test(a)) i--;
     }
-    if (!stuck && lines > n) bad.push(`${key} ${m.t}`);
+    if (!h.S.done[key]) bad.push(`${key} ${m.t}`);
   }
   assert.deepEqual(bad, []);
+});
+
+test('the setup for a jumped mission never completes it, earns XP or touches history', () => {
+  const bad = [];
+  for (const { ci, mi, key } of all) {
+    const h = boot();
+    jump(h, ci, mi);
+    if (h.S.done[key] || h.S.xp || h.S.hist.length) bad.push(key);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test('playing the whole course in order never prints a setup line', () => {
+  const h = boot();
+  CH.forEach((ch, c) => {
+    if (c > 0) h.goChapter(c);
+    for (let i = 0; i < ch.missions.length; i++) for (let k = 0; k < 4 && !h.S.done[c + '.' + i]; k++) play(h, c, i);
+  });
+  assert.equal(h.setups.length, 0, h.setups.join("\n"));
 });
 
 test('every chapter completes in order with the reference answers', () => {
