@@ -114,13 +114,67 @@ describe('the forms a learner may type still complete the mission', () => {
     });
   }
 
-  it('an editor Save of the mission file completes the script-writing and diary missions', () => {
+  const save = (title, rel, text, line = `(saved ${rel})`, typed = false) => {
+    const m = at(title), abs = SQ.norm(rel, SQ.HOME);
+    SQ.writeFile(abs, text, false, rel);
+    SQ.rt.log = [];
+    return SQ.missionVerdict(m, SQ.ctxFor(line, typed ? undefined : { saved: abs }), false).good;
+  };
+
+  it('an editor Save of the mission file completes the diary and script-writing missions', () => {
     fresh();
     run(SQ, 'mkdir camp');
-    SQ.writeFile(SQ.norm('~/camp/diary.txt', SQ.HOME), 'Day 1', false, 'camp/diary.txt');
-    SQ.rt.log = [];
-    assert.ok(SQ.missionVerdict(at('Start a diary'), SQ.ctxFor('(saved camp/diary.txt)'), false).good);
-    SQ.writeFile(SQ.norm('~/pack.sh', SQ.HOME), 'echo hi', false, 'pack.sh');
-    assert.ok(SQ.missionVerdict(at('Write a script'), SQ.ctxFor('(saved pack.sh)'), false).good);
+    assert.ok(save('Start a diary', 'camp/diary.txt', 'Day 1'));
+    assert.ok(save('Write a script', 'pack.sh', 'echo hi'));
+  });
+
+  it('a typed "(saved ...)" line is not an editor Save', () => {
+    fresh();
+    run(SQ, 'mkdir camp');
+    assert.ok(!save('Write a script', 'pack.sh', 'echo hi', '(saved pack.sh)', true));
+  });
+
+  const writes = [
+    ['Start a diary', 'mkdir camp', ['cd camp; echo hi > diary.txt; cd ..', '(cd camp; echo hi > diary.txt)', 'cd camp && echo hi > diary.txt && cd ~', '{ echo hi; } > camp/diary.txt', '(echo hi) > camp/diary.txt']],
+    ['Save a search', '', ['{ grep -i wolf journal.txt; } > wolves.txt', '(grep -i wolf journal.txt) > wolves.txt', 'cd village; grep -i wolf ../journal.txt > ../wolves.txt; cd ..']],
+    ['Add a second entry', 'mkdir camp; echo a > camp/diary.txt', ['cd camp; echo b >> diary.txt; cd ..', '{ echo b; } >> camp/diary.txt']],
+  ];
+  for (const [title, pre, lines] of writes) for (const l of lines) {
+    it(`${title}: "${l}" completes it`, () => {
+      fresh();
+      for (const x of pre.split('; ').filter(Boolean)) run(SQ, x);
+      run(SQ, l);
+      assert.ok(verdict(at(title), l));
+    });
+  }
+
+  it('the log janitor report counts when written after a cd and a ../', () => {
+    SQ.resetState(SQ.fresh());
+    enter(10);
+    const l = "cd village; grep ERROR logs/all.log | cut -d' ' -f1 | sort | uniq -c > ../report.txt; cd ..";
+    run(SQ, l);
+    assert.ok(verdict(at('Capstone: log janitor'), l));
+  });
+
+  describe('the two "second" missions need a real second entry', () => {
+    const cases = [
+      ['Add a second entry', 'mkdir camp; echo a > camp/diary.txt', 'camp/diary.txt', ['echo "" >> camp/diary.txt', 'echo -n >> camp/diary.txt']],
+      ['Add a second command', 'echo a > pack.sh', 'pack.sh', ['echo "" >> pack.sh', 'echo -n >> pack.sh']],
+    ];
+    for (const [title, pre, file, lines] of cases) {
+      for (const l of lines) it(`${title}: "${l}" does not complete it`, () => {
+        fresh();
+        for (const x of pre.split('; ')) run(SQ, x);
+        run(SQ, l);
+        assert.ok(!verdict(at(title), l));
+      });
+      it(`${title}: an unchanged Save does not complete it`, () => {
+        fresh();
+        for (const x of pre.split('; ')) run(SQ, x);
+        const abs = SQ.norm(file, SQ.HOME);
+        SQ.rt.log = [];
+        assert.ok(!SQ.missionVerdict(at(title), SQ.ctxFor(`(saved ${file})`, { saved: abs }), false).good);
+      });
+    }
   });
 });

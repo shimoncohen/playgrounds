@@ -85,7 +85,7 @@ The check context is built per line by `SQ.ctxFor(line)` in `programming/shell-q
 | `c.line`, `c.cwd` | the line just typed, the working directory. After an editor Save the line is the pseudo-line `(saved <path>)` and the log is empty |
 | `c.log` | command log for this line only: `{name, args, globbed, piped, redirect, errRedirect, code, out}` per command that ran (`errRedirect` is only set when `2>` was used, so treat it as optional). Compounds log too, after they finish: `if`, `while`, `until`, `case`, `[[`, `((` (no words, status as `code`), `for` (its items as `args`, logged before the body) and `(fn)` for a function definition. A function **call** is not logged, only the commands inside it |
 | `c.ran(name, pred?)` | some logged command has that name (and `pred(entry)` is true) |
-| `c.wrote(p, append?)` | this line (or this editor Save) wrote file `p`: a `>`/`>>` redirect, `tee`, or a Save. `append` demands `>>`, `tee -a` or a Save |
+| `c.wrote(p, append?)` | this line wrote file `p` (any redirect, also on a compound or after a `cd`, `tee`, and so on, judged by the resolved path), or the editor Save was of `p`. `append` demands an appending write (`>>`, `tee -a`) or a Save |
 | `c.flag(entry, ch)` | the entry has a short option containing `ch` (`-rf` has `r`) |
 | `c.has(p)` / `c.exists(p)`, `c.isDir(p)`, `c.isFile(p)` | path exists, is a folder, is a file (`~` and relative paths are taken from the home folder) |
 | `c.node(p)` | the raw file-system node, for modes or link targets (`SQ.modeOf(node)`) |

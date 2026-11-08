@@ -182,11 +182,10 @@ function scriptPasses(m){const nd=p=>getNode(norm(p,HOME)),fn=nd(m.file);
     if(tc.expectClock!==undefined&&res.clock!==tc.expectClock)return fail('clock '+tc.expectClock,'clock '+res.clock)}
   return {ok:true}}
 
-function ctxFor(line){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:SQ.rt.log,
+function ctxFor(line,opts){const nd=p=>getNode(norm(p,HOME));return {line,cwd:S.cwd,log:SQ.rt.log,
   ran:(n,p)=>SQ.rt.log.some(e=>e.name===n&&(!p||p(e))),has:p=>!!nd(p),
   /* a Save counts as an append too: it cannot be told apart */
-  wrote:(p,append)=>{const t=norm(p,HOME),is=x=>norm(x)===t,sv=/^\(saved (.+)\)$/.exec(line||'');
-    return !!sv&&is(sv[1])||SQ.rt.log.some(e=>e.redirect&&is(e.redirect.path)&&(!append||e.redirect.append)||e.name==='tee'&&e.args.some(is)&&(!append||e.args.includes('-a')))},node:nd,
+  wrote:(p,append)=>{const t=norm(p,HOME);return (opts&&opts.saved)===t||(SQ.rt.log.wrote||[]).some(w=>w.abs===t&&(!append||w.append))},node:nd,
   isDir:p=>{const n=nd(p);return !!n&&n.type==='dir'},isFile:p=>{const n=nd(p);return !!n&&n.type==='file'},
   read:p=>{const n=nd(p);return n&&n.type==='file'?n.content:''},
   flag:(e,ch)=>e.args.some(x=>/^-[A-Za-z]+$/.test(x)&&x.includes(ch)),

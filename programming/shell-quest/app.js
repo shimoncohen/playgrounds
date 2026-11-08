@@ -16,9 +16,9 @@ const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
   if(S.done[S.ch+'.'+S.mi])return; /* revisiting a finished mission (clicked in the list) never celebrates it again */
   const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
-  if(m.steps){try{const r=SQ.stepsApply(m,S.ch+'.'+S.mi,ctxFor(line));good=r.all;
+  if(m.steps){try{const r=SQ.stepsApply(m,S.ch+'.'+S.mi,ctxFor(line,{saved:opts.saved}));good=r.all;
       if(r.newly.length&&!good){const left=m.steps.length-SQ.stepsDone(S.ch+'.'+S.mi).length;addLine(renderText(`✓ Step done: ${m.title}. ${left} more to go.`),'win');SQ.ui.setPop()}}catch(e){}}
-  else try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
+  else try{const v=SQ.missionVerdict(m,ctxFor(line,{saved:opts.saved}),explain);good=v.good;failed=v.failed}catch(e){}
   if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
@@ -49,7 +49,7 @@ SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const 
   if(e){addLine(renderText(e),'err');scrollDown();return false}
   addLine(renderText('Saved '+shown),'sys');
   SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.lastErr='';SQ.rt.lineTook=0;SQ.rt.prevLast=S.last;
-  checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
+  checkMission('(saved '+shown+')',{saved:abs});renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
   runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true,ranAbs:abs})};
