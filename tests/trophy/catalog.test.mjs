@@ -75,3 +75,31 @@ test('catalog: every entry names a known subject and a done-key separator', () =
     assert.ok(q.missions.length > 0 && q.missions.every(n => Number.isInteger(n) && n > 0), q.key);
   }
 });
+
+// docs/story-guideline.md: each playground's story.js outline and a story line per chapter. A playground leaves this
+// list in the PR that writes its story; listing one that already has a story.js fails, so the list cannot go stale.
+const STORY_PENDING = new Set([]);
+const filled = s => typeof s === 'string' && s.trim().length > 0;
+
+for (const q of QUESTS) {
+  test(`story: ${q.name} has a story outline and a story line on every chapter`, () => {
+    const file = `${q.href}story.js`;
+    const exists = fs.existsSync(path.join(ROOT, file));
+    if (STORY_PENDING.has(q.key)) {
+      assert.ok(!exists, `${file} exists: remove ${q.key} from STORY_PENDING in this file`);
+      return;
+    }
+    assert.ok(exists, `${file} is missing (docs/story-guideline.md section 3)`);
+    const src = read(file);
+    assert.ok(!/<\/(script|style)/i.test(src), `${file} must stay bundle-safe`);
+    const sb = {};
+    vm.createContext(sb);
+    vm.runInContext(src, sb);
+    const s = sb.STORY;
+    assert.ok(s, `${file} must set STORY`);
+    assert.ok(filled(s.world) && filled(s.treasure), `${file}: world and treasure must be non-empty`);
+    assert.ok(Array.isArray(s.places) && s.places.length && s.places.every(filled), `${file}: places must list named places`);
+    assert.ok(Array.isArray(s.cast) && s.cast.length && s.cast.every(c => filled(c?.name) && filled(c?.role)), `${file}: cast needs a name and role each`);
+    CHAPTERS[q.key]().forEach((c, i) => assert.ok(filled(c.story), `${q.key} chapter ${i}: missing story line`));
+  });
+}

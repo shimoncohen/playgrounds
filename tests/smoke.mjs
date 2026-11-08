@@ -1232,7 +1232,7 @@ test('shell-quest: a save with chapters 1 to 15 badged shows three complete tier
   assert.equal((await page.textContent('#xpText')).trim(), '1890 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Automator');
   // chapter 15 is no longer the last chapter: its card shows the badge, and the next chapter is the first Expert one
-  assert.match(await page.textContent('#mission h2'), /Badge earned: Scripter/);
+  assert.match(await page.textContent('#mission h2'), /Badge earned: Backup Chest/);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -2042,7 +2042,7 @@ test('shell-quest capstone: with a leftover backup/, a script that never makes i
   assert.equal(await xp(), 0);
   await page.fill('#edText', m.answer);
   await page.click('#edRun');
-  await waitScreen(/Mission complete: Capstone: backup script/);
+  await waitScreen(/Mission complete: Capstone: the backup chest script/);
   await page.click('#edClose');
   await page.click('#mission button[data-mi="4"]');
   await type('nano scripts/mkconf.sh');
@@ -2251,7 +2251,7 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
     const last = await page.$$eval('#screen .line.win', els => els.map(e => e.textContent).filter(s => /Mission complete/.test(s)).pop() || '');
     assert.match(last, new RegExp(`Mission complete: ${esc(title)}\\s+\\+25 XP`));
   };
-  const BADGES = { 15: 'Text Wrangler', 16: 'Job Controller', 17: 'Pipeline Architect', 18: 'Toolsmith' };
+  const BADGES = { 15: 'Lamp Switch', 16: 'Bell Rope', 17: 'Visitor Ranking', 18: "Ada's Vault" };
   const x0 = await xp();
   for (const ci of [15, 16, 17, 18]) {
     await page.click(`.chap[data-ch="${ci}"]`);
@@ -3196,12 +3196,12 @@ test('agent-quest: the Tune chapters never scroll sideways at 390, 1000 and 1440
   }
 });
 
-test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
+test('agent-quest: finishing Schedules earns the Egg Timer badge, 55 XP and a star on the chapter chip', async () => {
   const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
   const { page } = o;
   assert.equal(await o.xp(), '20 XP');
   await o.solve();
-  assert.match(await page.textContent('#feedback'), /Badge earned: Clockwork/);
+  assert.match(await page.textContent('#feedback'), /Badge earned: Egg Timer/);
   assert.equal(await o.xp(), '55 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
   assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);

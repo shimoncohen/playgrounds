@@ -89,6 +89,7 @@ Config: `release-please-config.json` and `.release-please-manifest.json` (the cu
 ## Guides
 
 - [docs/tiers-guideline.md](docs/tiers-guideline.md): tiers, mission kinds, writing checks that hold up, keeping saves compatible, adopting tiers in another quest.
+- [docs/story-guideline.md](docs/story-guideline.md): the treasure-hunt story every playground follows, and how to keep missions on it.
 - [README](README.md): commands, repo map, CI, deployment.
 
 ## Conduct

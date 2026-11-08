@@ -21,6 +21,11 @@ body:
     attributes:
       label: Sketch (optional)
       description: A goal sentence, a reference answer, and the most likely wrong or lazy answer.
+  - type: textarea
+    id: story
+    attributes:
+      label: Which story beat does it serve?
+      description: Every playground is one treasure hunt (docs/story-guideline.md). Which chapter's leg does this advance, and which world places, characters or values would it use? "Not sure" is fine.
   - type: checkboxes
     id: pr
     attributes:
