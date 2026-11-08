@@ -2,6 +2,8 @@
    without a reference, a String or a deferred let is never lowered, so old programs keep their results. DOM-free.
    RQ.mir(ast, info) gives {fns, unsupported}. A fn is {name, ast (the Fn node id), line, locals, blocks}; blocks[0] is the entry.
      local  {id, name (null for a temp), src (the named local a temp was copied from), bind (the checker's binding), ty, mut, param, line}
+            A field of an owned local is a local of its own: {parent, sel (the field name, or 'Variant.field' below an enum), path:true, name 'p.f'}. The borrow pass
+            treats a path and its ancestors and descendants as overlapping and two siblings as disjoint.
      block  {id, instrs, succ (block ids), unreachable (no path from the entry; the analysis skips it)}
      instr  {op, ast (node id), line, col, ...}:
        decl   {l, uninit}     the local comes alive; uninit for `let x: T;`. Params have no decl, they are set on entry.
@@ -12,7 +14,8 @@
        branch {x}             the block has two succ: then, else (loop body, loop exit)
        return {x}             x is null for a unit fn
      rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args,from} | {k:'method',name,recv,args} | {k:'op',args}
-            | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l (`&l[a..b]` of an owned l too); from is the argument index a returned reference borrows from, or -1; a method call on an owned String
+            | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args} | {k:'peek',x} (a match reads its scrutinee without moving it).
+            A call to a method has the receiver as its first argument; `ref` of a path borrows just that field.  `ref` borrows the local l (`&l[a..b]` of an owned l too); from is the argument index a returned reference borrows from, or -1; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
      operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call or a method
             is an implicit reborrow, not a move (except std drop): {k:'copy',l,reb:true,sh} (sh: the callee takes `&`). Reading a Field or Index is a copy of the root local. */
@@ -46,7 +49,7 @@ function analysed(fn,info,ast){
   return hit;
 }
 
-function lowerFn(f,info,un,userDrop){
+function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   const {T,res,isCopy}=RQ.types;
   const L=[],B=[],lm=new Map(),scopes=[],loops=[];
   let cur,count=0,retL;
@@ -77,11 +80,39 @@ function lowerFn(f,info,un,userDrop){
   };
   const fin=(x,nd,dest)=>dest===undefined?x:put({k:'use',x},nd,dest);
   const out=(dest)=>dest===undefined?NIL:opnd(dest);
-  const declare=(pat,nd,uninit,ty,param)=>{
+  const paths=new Map(),uninit=new Set();
+  const pathLocal=(base,sel,ty)=>{
+    const k=base+'/'+sel;
+    if(paths.has(k))return paths.get(k);
+    const b=L[base];
+    const id=local(b.name===null?null:b.name+'.'+sel.replace(/^[^.]*\./,''),ty,{parent:base,sel,path:true,mut:b.mut,line:b.line});
+    paths.set(k,id);return id;
+  };
+  // a plain name ('local'), fields down from an owned local ('path'), fields down from a reference local ('via'), an index somewhere in the chain ('idx')
+  function classify(e){
+    let n=peel(e);
+    const fields=[];
+    for(;n.t==='Field'||n.t==='Index';n=peel(n.expr)){
+      if(n.t==='Index')return {k:'idx'};
+      fields.unshift(n);
+    }
+    const l=n.t==='Path'?lid(n):-1;
+    if(l<0)return {k:'other'};
+    if(!fields.length)return {k:'local',l};
+    if(fields.some(f=>tyOf(f.expr).k==='ref'))return {k:'via',l};
+    let cur=l;
+    for(const f of fields)cur=pathLocal(cur,f.name,tyOf(f));
+    return {k:'path',l:cur};
+  }
+  // moving a field out of a type that implements Drop is E0509
+  const dropped=l=>{for(let p=L[l].parent;p!==undefined;p=L[p].parent)if(L[p].ty.k==='struct'&&dropTys.has(L[p].ty.name))return true;return false;};
+  const declare=(pat,nd,uninit_,ty,param)=>{
     const b=info.get(pat).bind;
-    const id=local(pat.name,ty,{bind:b,mut:!!pat.mut,param:!!param,line:pat.line});
+    const self=pat.t==='SelfParam';
+    const id=local(self?'self':pat.name,ty,{bind:b,mut:self?pat.mut&&!pat.ref:!!pat.mut,param:!!param,line:pat.line});
     lm.set(b,id);scopes[scopes.length-1].push(id);
-    if(!param)emit('decl',nd,{l:id,uninit});
+    if(uninit_)uninit.add(id);
+    if(!param)emit('decl',nd,{l:id,uninit:uninit_});
     return id;
   };
   const kill=(ids,nd)=>{for(let j=ids.length-1;j>=0;j--)emit('dead',nd,{l:ids[j]});};
@@ -134,6 +165,10 @@ function lowerFn(f,info,un,userDrop){
       const q=peel(p.expr),l=q.t==='Path'?lid(q):-1;
       if(l>=0&&L[l].ty.k==='ref')return printLocal(l,nd);
     }
+    if(p.t==='Field'){
+      const c=classify(p);
+      if(c.k==='path')return put({k:'ref',l:c.l,mut:false,implicit:true},p,undefined,T.ref(false,L[c.l].ty,0));
+    }
     if(p.t==='Field'||p.t==='Index'){
       const r=rootOf(p);
       if(r.l>=0){
@@ -145,7 +180,17 @@ function lowerFn(f,info,un,userDrop){
   }
 
   function place(e,dest){
-    if(!isCopy(tyOf(e))){un('partial move',e);return fin(NIL,e,dest);}
+    const c=classify(e);
+    if(c.k==='path'){
+      if(!isCopy(tyOf(e))&&dropped(c.l)){un('partial move',e);return fin(NIL,e,dest);}
+      return fin(opnd(c.l),e,dest);
+    }
+    if(!isCopy(tyOf(e))){
+      if(c.k==='via')err('E0507',e,{name:chainText(e),mut:L[c.l].ty.mut});else un('partial move',e);
+      return fin(NIL,e,dest);
+    }
+    // a number read through a reference carries none of the reference's loans, but it still uses the reference
+    if(c.k==='via'&&!RQ.types.hasRef(tyOf(e))){emit('eval',e,{rv:{k:'peek',x:{k:'copy',l:c.l}}});return fin(NIL,e,dest);}
     const r=rootOf(e);
     let base;
     if(r.l>=0)base={k:'copy',l:r.l};
@@ -153,7 +198,53 @@ function lowerFn(f,info,un,userDrop){
     return r.idx.length?put({k:'op',args:[base,...r.idx.map(x=>ex(x))]},e,dest,tyOf(e)):fin(base,e,dest);
   }
 
+  const chainText=e=>{const parts=[];for(e=peel(e);e.t==='Field';e=peel(e.expr))parts.unshift(e.name);return [e.t==='Path'?e.segs[0].name:'value',...parts].join('.');};
+  function umethod(e,dest){
+    const u=info.get(e).um,p=peel(e.recv);
+    let ro,rest;
+    if(u.ref){
+      if(u.adj==='copy'){
+        const t=tyOf(e.recv);
+        ro=put({k:'deref',x:argOp(e.recv)},e,undefined,t.k==='ref'?res(t.to):t);
+      }else ro=argOp(e.recv,u.adj==='reb'||u.self==='&');
+      rest=seq(e.args,x=>argOp(x,true));
+    }else if(u.adj==='val'){
+      [ro,...rest]=seq([e.recv,...e.args],x=>x===e.recv?ex(x):argOp(x,true));
+    }else{
+      const mut=u.adj==='&mut',c=classify(e.recv);
+      let target=-1;
+      if(c.k==='local'||c.k==='path')target=c.l;
+      else if(c.k==='via'){
+        // behind a reference the field is reached through the reference itself, so the call reuses it as it is
+        const t=L[c.l].ty;
+        ro=opnd(c.l,t.k==='ref'&&t.mut,!mut);
+      }else if(c.k==='other'||u.kind==='temp'){
+        const x=ex(e.recv);
+        if(x.k!=='const')target=x.l;
+        else{
+          const t=put({k:'use',x},e.recv,undefined,tyOf(e.recv));
+          target=t.k==='const'?-1:t.l;
+        }
+      }else{un('borrow of a field',e);return fin(NIL,e,dest);}
+      if(ro===undefined){
+        if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
+        if(mut){
+          let q=p;
+          while(q.t==='Field')q=peel(q.expr);
+          const b=q.t==='Path'?info.get(q).bind:null;let again=false;
+          RQ.walk(e.args,a=>{if(a.t==='Path'&&b&&info.get(a)&&info.get(a).bind===b)again=true;});
+          if(again)un('two-phase borrow',e);
+        }
+        ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
+      }
+      rebTwice(e.args,e);
+      rest=seq(e.args,x=>argOp(x,true));
+    }
+    return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,method:true},e,dest,tyOf(e));
+  }
+
   function method(e,dest){
+    if(info.get(e).um)return umethod(e,dest);
     const r=info.get(e).recv;
     if(!r){un('method call',e);return fin(NIL,e,dest);}
     let ro,args;
@@ -164,31 +255,48 @@ function lowerFn(f,info,un,userDrop){
     }else{
       const mut=r.adj==='&mut',p=peel(e.recv);
       let target=-1;
+      let text=null;
       if(r.kind==='place'){
-        if(p.t==='Path')target=lid(p);
-        else{un(p.t==='Deref'?'reborrow':'borrow of a field',e);return fin(NIL,e,dest);}
-        if(mut){
-          const b=info.get(p).bind;let again=false;
+        const c=classify(e.recv);
+        if(c.k==='local'||c.k==='path')target=c.l;
+        else if(c.k==='via'){
+          // a field behind a reference is reached through the reference itself
+          const t=L[c.l].ty;
+          ro=opnd(c.l,t.k==='ref'&&t.mut,!mut);
+          text=chainText(e.recv);
+        }else{un(p.t==='Deref'?'reborrow':'borrow of a field',e);return fin(NIL,e,dest);}
+        if(mut&&target>=0){
+          let q=p;
+          while(q.t==='Field')q=peel(q.expr);
+          const b=info.get(q).bind;let again=false;
           RQ.walk(e.args,a=>{if(a.t==='Path'&&info.get(a)&&info.get(a).bind===b)again=true;});
           if(again)un('two-phase borrow',e);
         }
       }else if(e.name==='as_str'){un('temporary borrow',e);return fin(NIL,e,dest);}
       else{const x=ex(e.recv);if(x.k!=='const')target=x.l;}
-      if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
-      ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
+      if(ro===undefined){
+        if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
+        ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
+      }
       rebTwice(e.args,e);
       args=seq(e.args,x=>argOp(x,true));
+      return put({k:'method',name:e.name,recv:ro,args,text},e,dest,tyOf(e));
     }
     return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
   }
 
   // a base that is already a reference passes its loans on instead of making one
   function slice(e,x,dest){
-    const rg=peel(x.index),b=peel(x.expr),l=b.t==='Path'?lid(b):-1;
-    if(l<0){un(b.t==='Field'||b.t==='Index'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
+    const rg=peel(x.index),b=peel(x.expr),c=classify(b);
+    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
     const bounds=[rg.from,rg.to].filter(Boolean).map(y=>ex(y));
     if(bounds.length)emit('eval',e,{rv:{k:'op',args:bounds}});
-    const t=L[l].ty;
+    const l=c.l,t=L[l].ty;
+    // a field behind a reference lives as long as the reference does
+    if(c.k==='via'){
+      if(t.mut){un('reborrow',e);return fin(NIL,e,dest);}
+      return put({k:'use',x:opnd(l)},e,dest,tyOf(e));
+    }
     return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false,slice:true},e,dest,tyOf(e));
   }
 
@@ -204,9 +312,78 @@ function lowerFn(f,info,un,userDrop){
       emit('store',e,{ref:r,x:v});
       return;
     }
+    if(lhs.t==='Field'){
+      const c=classify(lhs);
+      if(c.k==='path'){
+        let root=c.l;
+        while(L[root].parent!==undefined)root=L[root].parent;
+        if(uninit.has(root)){un('deferred initialization',e);return;}
+        emit('assign',e,{l:c.l,rv:compound?{k:'op',args:[opnd(c.l),v]}:{k:'use',x:v}});
+      }else if(c.k==='via'){
+        const r=opnd(c.l,L[c.l].ty.k==='ref'&&L[c.l].ty.mut,false);
+        if(compound){
+          const t=tyOf(lhs);
+          v=put({k:'op',args:[put({k:'deref',x:r},e,undefined,t),v]},e,undefined,t);
+        }
+        emit('store',e,{ref:r,x:v});
+      }else un('assignment target',e);
+      return;
+    }
     const l=lid(e);
     if(l<0){un('assignment target',e);return;}
     emit('assign',e,{l,rv:compound?{k:'op',args:[opnd(l),v]}:{k:'use',x:v}});
+  }
+
+  // The scrutinee is read once (a peek), then each arm moves or copies what its names bind out of it. A name bound in a variant is a path below the
+  // scrutinee place, so a match arm that moves a String leaves the enum partially moved, as in Rust. Through a reference the names are copies of the reference.
+  function matchEx(e,dest){
+    const mi=info.get(e).match,t=tyOf(e);
+    if(dest===undefined&&!isUnit(t))dest=temp(t);
+    const sc=peel(e.scrut);
+    let root;
+    if(mi.mode==='ref'){
+      const x=argOp(sc,true);
+      if(x.k==='const'){un('temporary borrow',e);return NIL;}
+      root=x.l;
+    }else{
+      const c=classify(sc);
+      if(c.k==='local'||c.k==='path')root=c.l;
+      else if(c.k==='via')root=c.l;
+      else if(sc.t==='Deref'&&peel(sc.expr).t==='Path'&&lid(peel(sc.expr))>=0)root=lid(peel(sc.expr));
+      else if(c.k==='idx'){un('borrow of a field',e);return fin(NIL,e,dest);}
+      else{
+        const x=ex(sc);
+        root=x.k==='const'?temp(tyOf(sc)):x.l;
+        if(x.k==='const')emit('assign',sc,{l:root,rv:{k:'use',x}});
+      }
+    }
+    const viaRef=mi.mode==='move'&&(classify(sc).k==='via'||sc.t==='Deref');
+    if(mi.bindsMoved&&mi.mode==='move'&&dropped(root)){un('partial move',e);return fin(NIL,e,dest);}
+    emit('eval',sc,{rv:{k:'peek',x:{k:'copy',l:root}},grp:e.id});
+    const arms=e.arms.map(()=>blk()),j=blk();
+    B[cur].succ.push(...arms);
+    e.arms.forEach((a,i)=>{
+      cur=arms[i];
+      scopes.push([]);
+      const bindOne=(sp,o)=>{
+        const id=declare(sp,sp,false,info.get(sp).ty);
+        const sel=info.get(sp).sel;
+        let x;
+        if(mi.mode==='ref'||viaRef&&RQ.types.hasRef(info.get(sp).ty))x=opnd(root);
+        else if(viaRef)x=NIL;
+        else x=opnd(sel===''?root:pathLocal(root,sel,info.get(sp).ty));
+        emit('assign',sp,{l:id,rv:{k:'use',x},...o});
+      };
+      const p=a.pat;
+      if(p.t==='IdentPat'&&info.get(p)&&info.get(p).sel!==undefined)bindOne(p,{grp:e.id});
+      else if(p.t==='TupleStructPat'){for(const sp of p.pats)if(sp.t==='IdentPat')bindOne(sp,{grp:e.id});}
+      else if(p.t==='StructPat'){for(const f of p.fields)if(f.pat.t==='IdentPat')bindOne(f.pat,{grp:e.id});}
+      ex(a.body,dest);
+      kill(scopes.pop(),a.body);
+      edge(cur,j);
+    });
+    cur=j;
+    return out(dest);
   }
 
   function ifEx(e,dest){
@@ -318,6 +495,8 @@ function lowerFn(f,info,un,userDrop){
           cur=r;ex(e.rhs,d);edge(cur,j);cur=j;
           return opnd(d);
         }
+        // == and the others take their operands by reference, so comparing two Strings or structs moves neither
+        if(['==','!=','<','>','<=','>='].includes(e.op)&&!isCopy(tyOf(e.lhs)))return put({k:'op',args:seq([e.lhs,e.rhs],x=>printArg(x,e))},e,dest,tyOf(e));
         return put({k:'op',args:seq([e.lhs,e.rhs],ex)},e,dest,tyOf(e));
       }
       case 'Assign':assign(e);return fin(NIL,e,dest);
@@ -325,15 +504,23 @@ function lowerFn(f,info,un,userDrop){
         const c=e.callee;
         if(c.t!=='Path'){un('call',e);return fin(NIL,e,dest);}
         const fn=c.segs.map(s=>s.name).join('::');
+        if((info.get(e)||{}).ctor)return put({k:'agg',args:seq(e.args,ex)},e,dest,tyOf(e));
         rebTwice(e.args,e);
         const sig=(info.get(e)||{}).sig;
-        return put({k:'call',fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1},e,dest,tyOf(e));
+        return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1},e,dest,tyOf(e));
       }
       case 'MethodCall':return method(e,dest);
       case 'Ref':{
         const x=peel(e.expr);
         if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,dest);
         if(x.t==='Path'&&lid(x)>=0)return put({k:'ref',l:lid(x),mut:e.mut},e,dest,tyOf(e));
+        if(x.t==='Field'){
+          const c=classify(x);
+          if(c.k==='path')return put({k:'ref',l:c.l,mut:e.mut},e,dest,tyOf(e));
+          // a shared borrow of a field behind a shared reference lives as long as the reference does
+          if(c.k==='via'&&!e.mut&&L[c.l].ty.k==='ref'&&!L[c.l].ty.mut)return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
+          if(c.k==='via'){un('reborrow',e);return fin(NIL,e,dest);}
+        }
         un(x.t==='Field'||x.t==='Index'?'borrow of a field':x.t==='Deref'?'reborrow':'temporary borrow',e);
         return fin(NIL,e,dest);
       }
@@ -354,6 +541,7 @@ function lowerFn(f,info,un,userDrop){
         return put({k:'macro',name:e.name,args},e,dest,e.name==='format'?T.string:T.unit);
       }
       case 'Block':return blockEx(e,dest);
+      case 'Match':return matchEx(e,dest);
       case 'If':return ifEx(e,dest);
       case 'While':whileEx(e);return fin(NIL,e,dest);
       case 'Loop':return loopEx(e,dest);
@@ -379,6 +567,7 @@ function lowerFn(f,info,un,userDrop){
   try{
     cur=blk();
     scopes.push([]);
+    if(f.selfParam&&info.get(f.selfParam)&&info.get(f.selfParam).bind)declare(f.selfParam,f,false,info.get(f.selfParam).ty,true);
     for(const p of f.params)if(p.pat.t==='IdentPat'&&info.get(p.pat)&&info.get(p.pat).bind)declare(p.pat,f,false,info.get(p.pat).ty,true);
     const tl=f.body.tail,tt=tl&&tyOf(tl);
     blockEx(f.body,tl&&!isUnit(tt)?retDest(tt):undefined);
@@ -392,16 +581,22 @@ function lowerFn(f,info,un,userDrop){
   const seen=new Set([0]),st=[0];
   while(st.length)for(const s of B[st.pop()].succ)if(!seen.has(s)){seen.add(s);st.push(s);}
   for(const b of B)b.unreachable=!seen.has(b.id);
-  return {name:f.name,ast:f.id,line:f.line,locals:L,blocks:B};
+  return {name:fname||f.name,ast:f.id,line:f.line,locals:L,blocks:B};
 }
 
 RQ.mir=(ast,info)=>{
   const unsupported=[],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
-  const fns=[];
+  const fns=[],errors=[];
+  const err=(code,nd,o)=>{const k=code+'@'+nd.line+':'+nd.col;if(!seen.has(k)){seen.add(k);errors.push(RQ.diag.make(code,nd.line,nd.col,o));}};
   const userDrop=hasUserDrop(ast);
-  for(const it of ast.items)if(it.t==='Fn'&&it.body&&analysed(it,info,ast)){const m=lowerFn(it,info,un,userDrop);if(m)fns.push(m);}
-  return {fns,unsupported};
+  const dropTys=new Set(ast.items.filter(i=>i.t==='Impl'&&i.trait).map(i=>i.selfTy.segs&&i.selfTy.segs[0].name));
+  const add=(f,name)=>{if(f.t==='Fn'&&f.body&&analysed(f,info,ast)){const m=lowerFn(f,info,un,err,userDrop,dropTys,name);if(m)fns.push(m);}};
+  for(const it of ast.items){
+    if(it.t==='Fn')add(it,it.name);
+    else if(it.t==='Impl'&&!it.trait)for(const f of it.items)add(f,it.selfTy.segs[0].name+'::'+f.name);
+  }
+  return {fns,unsupported,errors};
 };
 RQ.mir.analysed=analysed;
 })();
