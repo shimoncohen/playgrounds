@@ -31,7 +31,7 @@ for (const [ci, ch] of D.CH.entries()) {
 test('lazy answers are caught', () => {
   const m = (c, i) => D.CH[c].missions[i];
   // printing the expected output without using the structure
-  assert.notEqual(check(m(0, 0), 'const crew = [1,2,3];\nprint(3);'), true);
+  assert.notEqual(check(m(0, 0), 'const staff = [1,2,3];\nprint(3);'), true);
   assert.notEqual(check(m(0, 1), 'print("red");print("gold");'), true);
   assert.notEqual(check(m(1, 1), 'const stack = [10, 20, 30];\nprint(stack.pop());\nprint(30);\nprint(3);'), true);
   assert.notEqual(check(m(1, 3), 'function balanced(t) { return true; }'), true);

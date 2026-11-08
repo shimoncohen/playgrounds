@@ -26,7 +26,7 @@ const ARRAY={id:'array',ch:0,title:'Array: a row of numbered boxes',name:'row',
 /* ---------- stacks ---------- */
 const slab=t=>`<span class="slab">${t}</span>`;
 const STACK={id:'stack',ch:1,title:'Stack: last in, first out',name:'stack',
- about:'A pile of plates. You only ever touch the <b>top</b>. The last thing you put on is the first thing you take off.',
+ about:'A pile of hat boxes. You only ever touch the <b>top</b>. The last thing you put on is the first thing you take off.',
  init:()=>[3,7],
  render:s=>`<div class="stackviz">${slab('top')}${s.v.map((x,i)=>`<div class="sbox" data-i="${i}">${x}</div>`).reverse().join('')||'<span class="empty">empty stack</span>'}<div class="sbase"></div></div>`,
  ops:[
@@ -37,7 +37,7 @@ const STACK={id:'stack',ch:1,title:'Stack: last in, first out',name:'stack',
 
 /* ---------- queues ---------- */
 const QUEUE={id:'queue',ch:2,title:'Queue: first in, first out',name:'queue',
- about:'A line at the shop. New people join at the <b>back</b>. The person at the <b>front</b> is served first, so things leave in the same order they arrived.',
+ about:'A line at the claim desk. New people join at the <b>back</b>. The person at the <b>front</b> is served first, so things leave in the same order they arrived.',
  init:()=>[5,2,9],
  render:s=>`<div class="queueviz">${slab('front →')}${s.v.map((x,i)=>`<div class="sbox" data-i="${i}">${x}</div>`).join('')||'<span class="empty">empty queue</span>'}${slab('← back')}</div>`,
  ops:[
@@ -68,15 +68,15 @@ const LIST={id:'list',ch:3,title:'Linked list: a chain of nodes',name:'head',
  ]};
 
 /* ---------- maps ---------- */
-const KEYS=['ada','bo','cy','di','ed'];
-const MAP={id:'map',ch:4,title:'Map: look things up by key',name:'ages',
+const KEYS=['umbrella','hat','scarf','boot','glove'];
+const MAP={id:'map',ch:4,title:'Map: look things up by key',name:'shelf',
  about:'A Map stores <b>key → value</b> pairs. Give it a key and it finds the value almost instantly, however many pairs it holds, without searching through them. (It does this by hashing, which turns the key into the spot to look.)',
- init:()=>new Map([['ada',36],['bo',29]]),
+ init:()=>new Map([['umbrella',3],['hat',7]]),
  ops:[
-  {label:'set',run:s=>{const k=pick(KEYS);if(!s.v.has(k)&&s.v.size>=5)return full(5,'pairs');const n=rnd(18,60);const had=s.v.has(k);s.v.set(k,n);return {code:`ages.set("${k}", ${n});`,say:had?`"${k}" was already a key, so <b>set</b> <b>replaced</b> its value with ${n}. A Map never holds the same key twice.`:`<b>set</b> stored a new pair: "${k}" → ${n}.`,hi:[{k}]}}},
-  {label:'get',run:s=>{if(!s.v.size)return empty('map');const k=pick([...s.v.keys()]);return {code:`ages.get("${k}")  // ${s.v.get(k)}`,say:`<b>get</b> went straight to "${k}" and found ${s.v.get(k)}, without looking at any other pair.`,hi:[{k}]}}},
-  {label:'get missing',run:s=>({code:'ages.get("zed")  // undefined',say:'A key that is not in the Map gives <code>undefined</code>, not an error. Use <code>has</code> when you need to tell "missing" from "stored undefined".',hi:[]})},
-  {label:'delete',run:s=>{if(!s.v.size)return empty('map');const k=pick([...s.v.keys()]);s.v.delete(k);return {code:`ages.delete("${k}");`,say:`<b>delete</b> removed the pair for "${k}". The others are untouched.`,hi:[]}}}
+  {label:'set',run:s=>{const k=pick(KEYS);if(!s.v.has(k)&&s.v.size>=5)return full(5,'pairs');const n=rnd(1,9);const had=s.v.has(k);s.v.set(k,n);return {code:`shelf.set("${k}", ${n});`,say:had?`"${k}" was already a key, so <b>set</b> <b>replaced</b> its value with ${n}. A Map never holds the same key twice.`:`<b>set</b> stored a new pair: "${k}" → ${n}.`,hi:[{k}]}}},
+  {label:'get',run:s=>{if(!s.v.size)return empty('map');const k=pick([...s.v.keys()]);return {code:`shelf.get("${k}")  // ${s.v.get(k)}`,say:`<b>get</b> went straight to "${k}" and found ${s.v.get(k)}, without looking at any other pair.`,hi:[{k}]}}},
+  {label:'get missing',run:s=>({code:'shelf.get("cape")  // undefined',say:'A key that is not in the Map gives <code>undefined</code>, not an error. Use <code>has</code> when you need to tell "missing" from "stored undefined".',hi:[]})},
+  {label:'delete',run:s=>{if(!s.v.size)return empty('map');const k=pick([...s.v.keys()]);s.v.delete(k);return {code:`shelf.delete("${k}");`,say:`<b>delete</b> removed the pair for "${k}". The others are untouched.`,hi:[]}}}
  ]};
 
 /* ---------- sets ---------- */
