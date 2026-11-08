@@ -115,12 +115,17 @@ function loanPass(F,errors,un,loans){
   const onS=L.map(()=>0n),onM=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(k));
   lo.forEach((x,k)=>{(x.mut?onM:onS)[x.l]|=lb[k];});
 
+  // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
   const hold=(s,i)=>{
-    if(i.op==='decl')s[i.l]=0n;
-    else if(i.op==='assign'){
+    if(i.op!=='decl'&&i.op!=='assign'&&i.op!=='dead')return;
+    let v=0n;
+    if(i.op==='assign'){
       const r=i.rv;
-      s[i.l]=r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:0n;
+      v=r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:0n;
     }
+    const kill=~(onS[i.l]|onM[i.l]);
+    for(let k=0;k<n;k++)s[k]&=kill;
+    if(i.op!=='dead')s[i.l]=v&kill;
   };
   const inn=B.map(()=>null),q=[0],queued=new Set(q);
   inn[0]=L.map(()=>0n);
