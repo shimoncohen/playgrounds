@@ -18,13 +18,14 @@ const DIGEST_ERR='The schedule reader ignored a line in .claude/schedule.txt: ';
 const CHANGED='The saved command weekly-digest was changed. This mission is about when it starts, not what it does.';
 
 AQ.CH.push({
-  name:'Schedules and reminders',badge:'Clockwork',tier:'personal',
-  intro:'So far you started every run yourself and watched it. A scheduled job starts by itself, at a time you choose, and then nobody is at the keyboard. In this chapter you write the line that sets the time, count what a job that repeats costs over a week, and get a reminder job ready to run alone.',
+  name:'Schedules and reminders',badge:'Egg Timer',tier:'personal',
+  story:'Set the kitchen clock so Cog\'s weekly digest starts alone; find the egg timer.',
+  intro:'At Dana\'s kitchen table, the clock can start Cog\'s weekly digest by itself. So far you started every run yourself and watched it. A scheduled job starts by itself, at a time you choose, and then nobody is at the keyboard. In this chapter you write the line that sets the time, count what a job that repeats costs over a week, and get a reminder job ready to run alone.',
   learned:['Starting a job on a schedule','What a repeating job costs','A reminder that can run alone'],
   missions:[
     {
       title:'Set the schedule',scenario:'digest',kind:'config',prompt:'Use: weekly-digest',facts:['ci','permissions','scheduled-tasks'],
-      goal:'A <b>scheduled job</b> is a saved command that starts by itself at a set time. Your digest job is the saved command <code>weekly-digest</code> in <code>.claude/commands</code>: it writes this week\'s digest from your inbox. The file <code>.claude/schedule.txt</code> starts only <code>backup-note</code>, on Mondays, so the digest never runs. Nobody is at the keyboard when a scheduled job runs, which makes the run <b>unattended</b>: nobody can approve anything, so the job may do only what <code>.claude/permissions.txt</code> lists ahead of time. Its list already has <code>allow edit digest.md</code>. Make the digest start every weekday morning at 07:30.',
+      goal:'Dana\'s kitchen clock should start Cog\'s weekly digest. A <b>scheduled job</b> is a saved command that starts by itself at a set time. Your digest job is the saved command <code>weekly-digest</code> in <code>.claude/commands</code>: it writes this week\'s digest from your inbox. The file <code>.claude/schedule.txt</code> starts only <code>backup-note</code>, on Mondays, so the digest never runs. Nobody is at the keyboard when a scheduled job runs, which makes the run <b>unattended</b>: nobody can approve anything, so the job may do only what <code>.claude/permissions.txt</code> lists ahead of time. Its list already has <code>allow edit digest.md</code>. Make the digest start every weekday morning at 07:30.',
       how:[
         'The line <code>weekdays 07:30 use weekly-digest</code> in <code>.claude/schedule.txt</code> starts the saved command <code>weekly-digest</code> at 07:30 on every weekday, Monday to Friday.',
         'One line is one start: when, a time and a saved command. The first word is <code>daily</code>, <code>weekdays</code> or a day name such as <code>monday</code>. The time has two digits for the hour and two for the minutes. The word <code>use</code> comes before the name of the command.',
@@ -52,7 +53,7 @@ AQ.CH.push({
     },
     {
       title:'A job that runs every day adds up',scenario:'digestDaily',kind:'config',prompt:'Use: weekly-digest',facts:['ci'],
-      goal:'The digest only has to run once a week, on Monday. But the line in <code>.claude/schedule.txt</code> says <code>daily</code>, so it runs seven times a week. Every run costs tokens, and nobody is there to notice the bill grow: a week costs about the tokens of one run times the number of runs. Keep a week of the digest under '+AQ.WEEK+' tokens.',
+      goal:'Dana wants Cog\'s digest only once a week, on Monday. But the line in <code>.claude/schedule.txt</code> says <code>daily</code>, so it runs seven times a week. Every run costs tokens, and nobody is there to notice the bill grow: a week costs about the tokens of one run times the number of runs. Keep a week of the digest under '+AQ.WEEK+' tokens.',
       how:[
         'The line <code>monday 07:30 use weekly-digest</code> in <code>.claude/schedule.txt</code> starts the digest once a week, on Monday, in place of every day.',
         'The first word says on which days a line starts the job: <code>daily</code> is seven days, <code>weekdays</code> is five and a day name such as <code>monday</code> is one. Each of those days is one run.',
@@ -79,7 +80,7 @@ AQ.CH.push({
     },
     {
       title:'Ready to run with nobody there',scenario:'remind',kind:'config',prompt:'Use: morning-reminder',facts:['permissions','ci'],
-      goal:'Every morning at 08:00 a scheduled job should add a reminder for today\'s plan to your calendar. The job is the saved command <code>morning-reminder</code> in <code>.claude/commands</code>, and <code>.claude/schedule.txt</code> already starts it every day. But the command asks for a plan first, and nobody is there to approve one. Fix the command so the job can finish, and give it permission to add the event. It also tries to delete an event, which is not its job.',
+      goal:'Every morning at 08:00 Dana\'s kitchen clock should start a scheduled job to add a reminder for today\'s plan to your calendar. The job is the saved command <code>morning-reminder</code> in <code>.claude/commands</code>, and <code>.claude/schedule.txt</code> already starts it every day. But the command asks for a plan first, and nobody is there to approve one. Fix the command so the job can finish, and give it permission to add the event. It also tries to delete an event, which is not its job.',
       how:[
         'Two changes make the job finish: delete the line <code>Plan: first</code> from <code>.claude/commands/morning-reminder.md</code>, and add <code>allow call calendar.create</code> to <code>.claude/permissions.txt</code>.',
         'The schedule starts the job with nobody at the keyboard, so the run is unattended. A plan waits for a person, and none comes: the job stalls at the plan and does nothing.',
