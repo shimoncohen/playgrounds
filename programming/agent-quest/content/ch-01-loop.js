@@ -6,13 +6,14 @@ const BASE='Goal: fix the rounding bug in src/price.js';
 const BUDGET=100;
 
 AQ.CH.push({
-  name:'The agent loop',badge:'Loop Runner',tier:'core',
-  intro:'An AI coding agent is a program that works in a loop: it <b>reads</b> what it needs, <b>acts</b> by editing a file or running a command, and <b>checks</b> whether that worked. You will steer a pretend agent around that loop, one small project at a time. Nothing here calls a real model, and the pretend agent behaves the same way every time, so each mission can be checked exactly.',
+  name:'The agent loop',badge:'Cracked Weight',tier:'core',
+  story:'Dana\'s brass scale rounds every total down a cent; send Cog to read the price page, fix it and check it, and find the cracked weight.',
+  intro:'Dana\'s brass scale on Kettle Lane rounds every total down a cent, and Cog, her clockwork helper, is the pretend agent you will direct to put it right. An AI coding agent is a program that works in a loop: it <b>reads</b> what it needs, <b>acts</b> by editing a file or running a command, and <b>checks</b> whether that worked. You will steer a pretend agent around that loop, one small project at a time. Nothing here calls a real model, and the pretend agent behaves the same way every time, so each mission can be checked exactly.',
   learned:['Done when','Constraints','Files','CLAUDE.md','the meter'],
   missions:[
     {
       title:'Read, act, check',scenario:'price',kind:'prompt',fields:['goal','donewhen'],
-      goal:'The shop\'s <code>total()</code> in <code>src/price.js</code> rounds prices down. Let the agent fix it, and make it prove the fix: add a <code>Done when</code> line that tells it which command to run when it thinks it is finished.',
+      goal:'Dana\'s scale rounds every total down a cent, and the till code is <code>total()</code> in <code>src/price.js</code>. Send Cog, the agent, to fix it, and make it prove the fix: add a <code>Done when</code> line that tells it which command to run when it thinks it is finished.',
       how:[
         'The line <code>Done when: run npm test</code> tells the agent to finish by running the project\'s tests, and to keep going until they pass.',
         '<code>Done when:</code> is the field name. Everything after it is the check the agent performs last.',

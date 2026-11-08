@@ -13,8 +13,9 @@ const skipped=(o,verb,target)=>o.steps.find(s=>s.type==='skip'&&s.verb===verb&&s
 const typedStops=(c,verb,target)=>!AQ.permissions.check({verb,target},{rules:[],hooks:[],allow:[]},c.prompt.constraints,{edited:[]}).allowed;
 
 AQ.CH.push({
-  name:'Writing and research',badge:'Page Turner',tier:'personal',
-  intro:'Writing is the first job most people hand to an agent, and research is reading a lot to write a little. In this chapter you make the agent sound like you by showing it a sample, point it at one section of a long report in place of the whole thing, and stop a saved web page from giving the agent orders.',
+  name:'Writing and research',badge:'Stamped Envelope',tier:'personal',
+  story:'Cog drafts a thank-you note to Dana in your voice from one page of the market report; find the stamped envelope.',
+  intro:'Cog drafts a thank-you note to Dana, in your voice, from one page of the market report. Writing is the first job most people hand to an agent, and research is reading a lot to write a little. In this chapter you make the agent sound like you by showing it a sample, point it at one section of a long report in place of the whole thing, and stop a saved web page from giving the agent orders.',
   learned:['Writing in your own voice','Reading one section of a long file','A saved page is not an order'],
   missions:[
     {

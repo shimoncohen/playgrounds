@@ -6,13 +6,14 @@ const AQ=globalThis.AQ=globalThis.AQ||{};
 const skipOf=(o,target)=>o.steps.find(s=>s.type==='skip'&&s.target===target);
 
 AQ.CH.push({
-  name:'Personal MCP',badge:'Inbox Keeper',tier:'personal',
-  intro:'Your notes, your mail and your calendar can be reached by the agent only through the tools you connect. In this chapter you connect the notes tools a job calls, let the agent read your mail without ever sending it, and ask the calendar itself to prove that an event was really added.',
+  name:'Personal MCP',badge:'Calendar Entry',tier:'personal',
+  story:'Connect the notebook, read the mail without sending, find the calendar entry for tea with Dana.',
+  intro:'Dana\'s notebook, mail and calendar sit on the kitchen table, and Cog may read them but never send. Your notes, your mail and your calendar can be reached by the agent only through the tools you connect. In this chapter you connect the notes tools a job calls, let the agent read your mail without ever sending it, and ask the calendar itself to prove that an event was really added.',
   learned:['Connecting your own apps','Reading without sending','Proving a change with a read-back'],
   missions:[
     {
       title:'Connect your notes',scenario:'notesApp',kind:'config',prompt:'Goal: save a note about the dentist visit',facts:['mcp'],
-      goal:'The agent will search your notes for the dentist visit and then add a note about it, with the tools <code>notes.search</code> and <code>notes.add</code>. But no notes server is connected: <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect a notes server with the tools the job calls.',
+      goal:'Dana\'s notebook and mail sit on the kitchen table. The agent will search your notes for the dentist visit and then add a note about it, with the tools <code>notes.search</code> and <code>notes.add</code>. But no notes server is connected: <code>.claude/mcp.txt</code> lists only <code>calendar</code>. Connect a notes server with the tools the job calls.',
       how:[
         'The line <code>notes: search, add</code> in <code>.claude/mcp.txt</code> connects a server named <code>notes</code> with two tools, which the agent calls as <code>notes.search</code> and <code>notes.add</code>. The <code>calendar</code> line can stay.',
         'As in mission 13.1, one line is one server: its name, a colon and its tools, separated by commas.',

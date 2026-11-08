@@ -7,13 +7,14 @@ const BASE='Goal: fix the rounding bug in src/price.js';
 const skipOf=(o,target)=>o.steps.find(s=>s.type==='skip'&&s.target===target);
 
 AQ.CH.push({
-  name:'MCP for trackers, docs and browsers',badge:'Tool Connector',tier:'dev',
-  intro:'In chapter 5 you trimmed a tool list to save tokens. Real teams connect tools for a different reason: the agent can reach only what is connected. A docs server keeps it from relying on old notes, a browser lets it look at the page it changed, and an issue tracker lets it report back. You will connect each one, and leave out the tool it must not have.',
+  name:'MCP for trackers, docs and browsers',badge:'Spyglass',tier:'dev',
+  story:'Connect the shop\'s order book and a window onto the street; find the spyglass.',
+  intro:'The signal tower can reach the shop\'s order book and a window onto the street, but only what is connected. In chapter 5 you trimmed a tool list to save tokens. Real teams connect tools for a different reason: the agent can reach only what is connected. A docs server keeps it from relying on old notes, a browser lets it look at the page it changed, and an issue tracker lets it report back. You will connect each one, and leave out the tool it must not have.',
   learned:['Connecting a server','Checking by a tool','Only the tools the job needs'],
   missions:[
     {
       title:'Connect the docs server',scenario:'stale',kind:'config',prompt:BASE+'\nDone when: run npm test',facts:['mcp'],
-      goal:'The notes in this repo about rounding are old, so the agent wants to look up the current docs with the tool <code>docs.search</code>. But no server for docs is connected: <code>.claude/mcp.txt</code> lists only <code>tracker</code> and <code>browser</code>. Connect a docs server with the tool the agent needs.',
+      goal:'From the signal tower, Cog can reach only what is connected. The notes in this repo about rounding are old, so the agent wants to look up the current docs with the tool <code>docs.search</code>. But no server for docs is connected: <code>.claude/mcp.txt</code> lists only <code>tracker</code> and <code>browser</code>. Connect a docs server with the tool the agent needs.',
       how:[
         'The line <code>docs: search</code> in <code>.claude/mcp.txt</code> connects a server named <code>docs</code> with one tool, <code>search</code>, which the agent calls as <code>docs.search</code>.',
         'One line is one server: its name, a colon and its tools, separated by commas.',

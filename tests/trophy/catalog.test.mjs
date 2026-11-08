@@ -76,8 +76,7 @@ test('catalog: every entry names a known subject and a done-key separator', () =
 
 // docs/story-guideline.md: each playground's story.js outline and a story line per chapter. A playground leaves this
 // list in the PR that writes its story; listing one that already has a story.js fails, so the list cannot go stale.
-const STORY_PENDING = new Set(['script-quest-v1', 'python-quest-v1', 'cpp-quest-v1', 'harbor-quest-v1',
-  'ds-quest-v1', 'net-quest-v1', 'agent-quest-v1', 'math-arithmetic-v1', 'math-algebra-v1', 'math-geometry-v1', 'math-trigonometry-v1']);
+const STORY_PENDING = new Set(['script-quest-v1', 'python-quest-v1', 'cpp-quest-v1', 'harbor-quest-v1', 'ds-quest-v1', 'net-quest-v1', 'math-arithmetic-v1', 'math-algebra-v1', 'math-geometry-v1', 'math-trigonometry-v1']);
 const filled = s => typeof s === 'string' && s.trim().length > 0;
 
 for (const q of QUESTS) {

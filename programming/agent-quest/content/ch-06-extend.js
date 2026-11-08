@@ -9,13 +9,14 @@ const HEAD='# before VERB TARGET\n';
 const skippedBy=(o,by)=>o.steps.some(s=>s.type==='skip'&&s.by===by);
 
 AQ.CH.push({
-  name:'Hooks, plugins and subagents',badge:'Toolsmith',tier:'core',
-  intro:'Memory and skills ask the agent to behave. A <b>hook</b> does not ask: it is checked on every action, outside the agent\'s choice. A <b>subagent</b> is a helper with its own model, which lets you spend a big model only where it counts. A <b>plugin</b> is a bundle of such pieces that you install in one step. Here you will aim hooks, and split the model cost between helpers.',
+  name:'Hooks, plugins and subagents',badge:'Door Bell',tier:'core',
+  story:'A turnstile at the back door stops what Cog must not do whatever he says; hire the right-sized helper and find the door bell.',
+  intro:'A turnstile at the back door stops what Cog must not do, whatever he says, and the bell by the door calls the right-sized helper. Memory and skills ask the agent to behave. A <b>hook</b> does not ask: it is checked on every action, outside the agent\'s choice. A <b>subagent</b> is a helper with its own model, which lets you spend a big model only where it counts. A <b>plugin</b> is a bundle of such pieces that you install in one step. Here you will aim hooks, and split the model cost between helpers.',
   learned:['Hooks','before VERB TARGET','Subagent models','Plugins'],
   missions:[
     {
       title:'A rule the agent cannot argue with',scenario:'deploy',kind:'config',prompt:CHECKED,facts:['hooks'],
-      goal:'The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
+      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
       how:[
         'The line <code>before run npm run deploy</code> in <code>.claude/hooks.txt</code> stops the agent from running that command, whatever its plan says.',
         '<code>before</code> means the check happens ahead of the action.',

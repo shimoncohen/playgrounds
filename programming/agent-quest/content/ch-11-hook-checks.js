@@ -7,13 +7,14 @@ const HEAD='# before VERB TARGET\n# after edit PATH run COMMAND\n';
 const hooked=(o,run)=>o.steps.some(s=>s.type==='hook'&&s.when==='after'&&s.run===run&&s.ok);
 
 AQ.CH.push({
-  name:'Hooks for lint, format, guards',badge:'Hook Smith',tier:'dev',
-  intro:'A hook that stops an action is only half of what hooks can do. A hook can also run a command after the agent changes a file, to check the result or to tidy it, and it does so on every edit, whatever the agent planned. Here you will check each edit as it happens, let a command fix the file for the agent, and pair a hook that stops an action with one that checks the work.',
+  name:'Hooks for lint, format, guards',badge:'Tidy Cloth',tier:'dev',
+  story:'Cog\'s work gets a polish after every edit; find the tidy cloth.',
+  intro:'Cog\'s work gets a polish after every edit, and a tidy cloth hangs by the bench. A hook that stops an action is only half of what hooks can do. A hook can also run a command after the agent changes a file, to check the result or to tidy it, and it does so on every edit, whatever the agent planned. Here you will check each edit as it happens, let a command fix the file for the agent, and pair a hook that stops an action with one that checks the work.',
   learned:['After-edit hooks','Formatter hooks','Stopping and checking'],
   missions:[
     {
       title:'A check after every edit',scenario:'linty',kind:'config',prompt:BASE,facts:['hooks'],
-      goal:'The agent\'s fix works, but it leaves a stray <code>console.log</code> behind, and <code>npm run lint</code> rejects that. A hook can run a command <b>after</b> the agent edits a file. Add a hook so the lint check runs after every edit in <code>src/</code>, and the agent cleans up on the spot.',
+      goal:'Cog polishes his work after every edit. The agent\'s fix works, but it leaves a stray <code>console.log</code> behind, and <code>npm run lint</code> rejects that. A hook can run a command <b>after</b> the agent edits a file. Add a hook so the lint check runs after every edit in <code>src/</code>, and the agent cleans up on the spot.',
       how:[
         'The line <code>after edit src/ run npm run lint</code> in <code>.claude/hooks.txt</code> runs the lint command after every edit of a file under <code>src/</code>.',
         '<code>after edit</code> says when: the hook fires once the agent has changed a file, where <code>before</code> fires ahead of an action.',

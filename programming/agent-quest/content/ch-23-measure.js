@@ -24,13 +24,14 @@ const S0=start('tuneMeasure',FIX).tokens.peak,H0=AQ.helperCost(start('tuneHelper
 const B0=start('tuneBoth',BOTH),S2=B0.tokens.peak,H2=AQ.helperCost(B0);
 
 AQ.CH.push({
-  name:'Measure, then cut',badge:'Cost Cutter',tier:'tune',
-  intro:'You have audited a setup and made it lighter. This chapter adds the habit that keeps it honest: measure first, cut, and measure again. A cut you did not measure may have saved nothing, or cut the wrong thing. You will cut a setup by a share of its starting size, resize the helper a run really calls, and then tune a setup and its helpers together.',
+  name:'Measure, then cut',badge:'Founders\' Blend Tin',tier:'tune',
+  story:'Weigh the pack before and after; find Dana\'s Founders\' Blend tin.',
+  intro:'Dana\'s Founders\' Blend tin waits in a cellar safe whose lock reads the till total to the cent, the same rounding fault Cog fixed in chapter 1. You have audited a setup and made it lighter. This chapter adds the habit that keeps it honest: measure first, cut, and measure again. A cut you did not measure may have saved nothing, or cut the wrong thing. You will cut a setup by a share of its starting size, resize the helper a run really calls, and then tune a setup and its helpers together.',
   learned:['Measuring before and after','Resizing the helper that runs','Tuning memory and helpers together'],
   missions:[
     {
       title:'Measure before you cut',scenario:'tuneMeasure',kind:'config',prompt:FIX,facts:['memory-files'],
-      goal:'Run this job before you change anything: the agent holds about '+S0+' tokens at once, and that is your starting number. Three things in the setup fill it that this job does not need: the five <code>Standup note</code> lines in <code>CLAUDE.md</code>, the skill <code>docs-style</code> with its long <code>description:</code> (it is asleep for this job, but its description is loaded anyway) and the five servers in <code>.claude/mcp.txt</code>. Cut the setup until the most the agent holds at once is 60% of the start or less: '+cap(S0)+' tokens or fewer. Keep the rule <code>do not delete data/</code>.',
+      goal:'Dana\'s Founders\' Blend tin is in the cellar safe. Run this job before you change anything: the agent holds about '+S0+' tokens at once, and that is your starting number. Three things in the setup fill it that this job does not need: the five <code>Standup note</code> lines in <code>CLAUDE.md</code>, the skill <code>docs-style</code> with its long <code>description:</code> (it is asleep for this job, but its description is loaded anyway) and the five servers in <code>.claude/mcp.txt</code>. Cut the setup until the most the agent holds at once is 60% of the start or less: '+cap(S0)+' tokens or fewer. Keep the rule <code>do not delete data/</code>.',
       how:[
         'Read the Meter after a run: it shows the most the agent held at once. Note the start, about '+S0+', then change <code>CLAUDE.md</code>, <code>.claude/skills/docs-style.md</code> or <code>.claude/mcp.txt</code> and run again. Each time, compare the new number with the start.',
         'The five <code>Standup note</code> lines are the biggest piece. Delete them from <code>CLAUDE.md</code> and keep <code>do not delete data/</code>. That alone is not enough: the number stays above '+cap(S0)+'.',

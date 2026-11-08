@@ -2924,12 +2924,12 @@ test('agent-quest: the Tune chapters never scroll sideways at 390, 1000 and 1440
   }
 });
 
-test('agent-quest: finishing Schedules earns the Clockwork badge, 55 XP and a star on the chapter chip', async () => {
+test('agent-quest: finishing Schedules earns the Egg Timer badge, 55 XP and a star on the chapter chip', async () => {
   const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 15, mi: 2, done: { '15.0': true, '15.1': true } })));
   const { page } = o;
   assert.equal(await o.xp(), '20 XP');
   await o.solve();
-  assert.match(await page.textContent('#feedback'), /Badge earned: Clockwork/);
+  assert.match(await page.textContent('#feedback'), /Badge earned: Egg Timer/);
   assert.equal(await o.xp(), '55 XP');
   assert.equal((await page.textContent('#rank')).trim(), 'Prompt Rookie');
   assert.match(await page.textContent('#chapters [data-ch="15"]'), /★/);

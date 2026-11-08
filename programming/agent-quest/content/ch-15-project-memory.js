@@ -16,13 +16,14 @@ const C15=(o,c)=>{
 };
 
 AQ.CH.push({
-  name:'Writing a project CLAUDE.md',badge:'Memory Keeper',tier:'dev',
-  intro:'Every run reads the memory file of the project first, so it is the cheapest place to teach a project its habits once. Here you write the lines that matter most: the check that proves a fix and the rule that protects a folder. You will also meet a line that looks right and does nothing at all.',
+  name:'Writing a project CLAUDE.md',badge:'First-Day Card',tier:'dev',
+  story:'Write Cog a first-day card for the cellar repo; find the card.',
+  intro:'Down in the tea cellar, Cog needs a first-day card that tells him how the place works. Every run reads the memory file of the project first, so it is the cheapest place to teach a project its habits once. Here you write the lines that matter most: the check that proves a fix and the rule that protects a folder. You will also meet a line that looks right and does nothing at all.',
   learned:['The default check','Only the root file counts','A memory file for a new repo'],
   missions:[
     {
       title:'Write the check into memory',scenario:'memgate',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'This project has its own gate, and its <code>README.md</code> names the command. Every run should end with that check, without anyone typing it. A <b>default check</b> is a <code>Done when</code> line written once in the root <code>CLAUDE.md</code>: any run whose prompt has no check of its own uses it. Read the README in the Files panel and write the project\'s check into the root memory file.',
+      goal:'The cellar repo needs a first-day card for Cog. This project has its own gate, and its <code>README.md</code> names the command. Every run should end with that check, without anyone typing it. A <b>default check</b> is a <code>Done when</code> line written once in the root <code>CLAUDE.md</code>: any run whose prompt has no check of its own uses it. Read the README in the Files panel and write the project\'s check into the root memory file.',
       how:[
         'The line <code>Done when: run npm run verify</code> in the root <code>CLAUDE.md</code> makes <code>npm run verify</code> the check of every run that has none of its own.',
         'It has the same shape as the <code>Done when</code> line you type in a prompt: a check the agent performs once the work is done.',

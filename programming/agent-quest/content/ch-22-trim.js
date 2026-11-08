@@ -14,8 +14,9 @@ const holders=(o,c)=>[['CLAUDE.md',c.setup.memory],...c.setup.memoryFolders.map(
 const bare=l=>l.replace(/^(?:extra|goal):\s*/i,'').trim();
 
 AQ.CH.push({
-  name:'Trim, dedupe, move rare rules',badge:'Lean Keeper',tier:'tune',
-  intro:'Once you know what is loaded, you can make it lighter. A rule written three times is paid for three times, and a checklist that one job in twenty needs is paid for by the other nineteen. In this chapter you keep a rule in one place, move a rare checklist into a skill, and move a chore into a saved command.',
+  name:'Trim, dedupe, move rare rules',badge:'Lean Pack',tier:'tune',
+  story:'Same rule three times, one rare chore: move it and find the lean pack.',
+  intro:'In the attic the same rule sits in three places and one rare chore rides along on every run. Once you know what is loaded, you can make it lighter. A rule written three times is paid for three times, and a checklist that one job in twenty needs is paid for by the other nineteen. In this chapter you keep a rule in one place, move a rare checklist into a skill, and move a chore into a saved command.',
   learned:['One place for each rule','Rare rules in a skill','A chore as a saved command'],
   missions:[
     {

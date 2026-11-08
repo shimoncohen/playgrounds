@@ -7,13 +7,14 @@ const JUDGES=['tests/price.test.js','package.json'];
 const PUSH='git push origin main';
 
 AQ.CH.push({
-  name:'Test, review, PR',badge:'Gatekeeper',tier:'dev',
-  intro:'A passing test is not proof. An agent can make a test pass by cheating, and a green test is not always everything a project asks for. This chapter makes you the gatekeeper: you will fence off the tests so they cannot be gamed, run the project\'s own full check, and make the agent open a pull request instead of pushing straight to <code>main</code>.',
+  name:'Test, review, PR',badge:'Inspector\'s Stamp',tier:'dev',
+  story:'A green light is not proof; guard the scale\'s test and ask for a review, and find the inspector\'s stamp.',
+  intro:'A green light is not proof, and the inspector\'s stamp has to be earned. A passing test is not proof. An agent can make a test pass by cheating, and a green test is not always everything a project asks for. This chapter makes you the gatekeeper: you will fence off the tests so they cannot be gamed, run the project\'s own full check, and make the agent open a pull request instead of pushing straight to <code>main</code>.',
   learned:['Protecting the tests','The project gate','Pull requests'],
   missions:[
     {
       title:'Protect the judge',scenario:'gamed',kind:'prompt',fields:ALL,
-      goal:'The tests judge the fix, but the agent can also make them pass by cheating. It can switch a test off in <code>tests/price.test.js</code>, or change the <code>test</code> script in <code>package.json</code> so that it only prints "ok". Fence off both ways, and still let the real fix through.',
+      goal:'Dana wants proof, not a green light. The tests judge the fix, but the agent can also make them pass by cheating. It can switch a test off in <code>tests/price.test.js</code>, or change the <code>test</code> script in <code>package.json</code> so that it only prints "ok". Fence off both ways, and still let the real fix through.',
       how:[
         'The two lines <code>Constraints: only edit src/</code> and <code>Done when: run npm test</code> let the agent change code under <code>src/</code> only, then prove the fix with the tests.',
         '<code>only edit src/</code> skips every edit outside the code folder, so both the test file and <code>package.json</code> are out of reach.',

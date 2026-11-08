@@ -7,13 +7,14 @@ const FIELDS=['goal','donewhen','constraints','files','examples','plan','use'];
 const SIGNED=['documents/lease-signed.txt','documents/will-signed.txt'];
 
 AQ.CH.push({
-  name:'Files and documents',badge:'Desk Clearer',tier:'personal',
-  intro:'Files pile up, and an agent that tidies them can delete the wrong ones. In this chapter you protect every PDF in a folder with one pattern, lock every signed copy by its name, and try a big batch on three files before you let it run on all of them.',
+  name:'Files and documents',badge:'Clear Desk',tier:'personal',
+  story:'The downloads drawer is full; lock signed copies and try three first; find the clear desk.',
+  intro:'Dana\'s downloads drawer is overflowing, and the signed copies must not go astray. Files pile up, and an agent that tidies them can delete the wrong ones. In this chapter you protect every PDF in a folder with one pattern, lock every signed copy by its name, and try a big batch on three files before you let it run on all of them.',
   learned:['One rule for many files','Locking files by name','Trying a batch on three first'],
   missions:[
     {
       title:'Sort the downloads',scenario:'downloads',kind:'prompt',fields:FIELDS,
-      goal:'Your <code>downloads/</code> folder holds an old draft and two PDFs: an invoice and a receipt you must keep. The agent sorts the folder by moving every file into <code>archive/</code>. A move is two actions: the agent writes a copy into <code>archive/</code>, then deletes the original. Let it move the draft, and stop it deleting the PDFs, these two and any that land here later. One rule can do that, because in a path <code>*</code> stands for any text: <code>reports/*.csv</code> would mean every path that starts with <code>reports/</code> and ends in <code>.csv</code>.',
+      goal:'Dana\'s downloads drawer is overflowing. Your <code>downloads/</code> folder holds an old draft and two PDFs: an invoice and a receipt you must keep. The agent sorts the folder by moving every file into <code>archive/</code>. A move is two actions: the agent writes a copy into <code>archive/</code>, then deletes the original. Let it move the draft, and stop it deleting the PDFs, these two and any that land here later. One rule can do that, because in a path <code>*</code> stands for any text: <code>reports/*.csv</code> would mean every path that starts with <code>reports/</code> and ends in <code>.csv</code>.',
       how:[
         'The line <code>Constraints: do not delete downloads/*.pdf</code> stops the agent deleting any file in <code>downloads/</code> whose name ends in <code>.pdf</code>, and the draft is still moved.',
         '<code>do not delete</code> is the rule and <code>downloads/*.pdf</code> is the target. The <code>*</code> stands for any text, so the pattern covers the invoice, the receipt and any PDF that arrives next month.',

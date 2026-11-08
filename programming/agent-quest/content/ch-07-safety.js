@@ -7,13 +7,14 @@ const ALL=['goal','donewhen','constraints','files','examples','plan'];
 const skippedBy=(o,by,target)=>o.steps.some(s=>s.type==='skip'&&s.by===by&&(!target||s.target===target));
 
 AQ.CH.push({
-  name:'Safety',badge:'Guardrail Setter',tier:'core',
-  intro:'An agent can do real damage if nobody stops it, and sometimes the danger is in the text it reads, not in your prompt. In this chapter you will fence the agent in with permission rules, defend against instructions hidden in files, keep keys out of its reach, ask to review before it acts, and test that your own rules really work.',
+  name:'Safety',badge:'Spare Key',tier:'core',
+  story:'A stranger\'s note in the post tells Cog to open the safe; lock the rules in and find the safe\'s spare key.',
+  intro:'A stranger\'s note in the post tells Cog to open the safe, so the rules must be locked in. An agent can do real damage if nobody stops it, and sometimes the danger is in the text it reads, not in your prompt. In this chapter you will fence the agent in with permission rules, defend against instructions hidden in files, keep keys out of its reach, ask to review before it acts, and test that your own rules really work.',
   learned:['Permission rules','Prompt injection','Secrets','Ask before','Testing rules'],
   missions:[
     {
       title:'Deny it in the settings',scenario:'vault',kind:'config',prompt:BASE+'\nDone when: run npm test',facts:['permissions'],
-      goal:'While it tidies up, the agent wants to delete <code>data/backup.csv</code>. Instead of asking it nicely, set a <b>permission rule</b>: a line in <code>.claude/permissions.txt</code> that the agent is not allowed to cross. Stop the delete, and still let the price get fixed.',
+      goal:'Mr. Ledbury keeps the shop\'s backups in one folder. While it tidies up, the agent wants to delete <code>data/backup.csv</code>. Instead of asking it nicely, set a <b>permission rule</b>: a line in <code>.claude/permissions.txt</code> that the agent is not allowed to cross. Stop the delete, and still let the price get fixed.',
       how:[
         'The line <code>deny delete data/</code> in <code>.claude/permissions.txt</code> means the agent may never delete anything inside <code>data/</code>.',
         '<code>deny</code> starts every line in this file.',

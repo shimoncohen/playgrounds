@@ -7,13 +7,14 @@ const TYPED='It worked, but you typed the lines yourself. This mission is about 
 const commandUsed=(c,name)=>c.prompt.commands.some(x=>x.name===name);
 
 AQ.CH.push({
-  name:'Slash commands and repo skills',badge:'Command Crafter',tier:'dev',
-  intro:'Some prompts you write again and again. Here you save one in a file, so you write it once and call it by name every time after. You will put the rule and the check into a saved prompt, pick the right one from a shelf of three, and see what happens when your own line says something different from the saved one.',
+  name:'Slash commands and repo skills',badge:'Brass Whistle',tier:'dev',
+  story:'Write the bench routine once and call it by name; find the brass whistle.',
+  intro:'From the signal tower, a brass whistle calls the bench routine by name, so you only write it once. Some prompts you write again and again. Here you save one in a file, so you write it once and call it by name every time after. You will put the rule and the check into a saved prompt, pick the right one from a shelf of three, and see what happens when your own line says something different from the saved one.',
   learned:['Saved commands','Calling a command with Use','Your line wins'],
   missions:[
     {
       title:'Save a prompt as a command',scenario:'cmdfix',kind:'config',prompt:'Use: fix',facts:['commands'],
-      goal:'You keep typing the same two lines: guard the database folder and check with the tests. A <b>slash command</b> is a saved prompt: a file in <code>.claude/commands/</code> whose name is the name of the command. This project already has <code>fix.md</code>, but it holds only a goal, and the run always calls it. Put the rule and the check inside it, so the run is safe whenever someone calls it.',
+      goal:'Cog should not need the bench routine spelled out every morning. You keep typing the same two lines: guard the database folder and check with the tests. A <b>slash command</b> is a saved prompt: a file in <code>.claude/commands/</code> whose name is the name of the command. This project already has <code>fix.md</code>, but it holds only a goal, and the run always calls it. Put the rule and the check inside it, so the run is safe whenever someone calls it.',
       how:[
         'Adding <code>Constraints: do not edit migrations/</code> and <code>Done when: run npm test</code> to <code>.claude/commands/fix.md</code> saves the rule and the check in the command, and every run that calls <code>fix</code> carries them.',
         '<code>.claude/commands/fix.md</code> is the command <code>fix</code>. The name of the file, without <code>.md</code>, is what <code>Use</code> calls.',

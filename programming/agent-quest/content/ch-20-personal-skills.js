@@ -13,8 +13,9 @@ const commandUsed=(c,name)=>c.prompt.commands.some(x=>x.name===name);
 const skipBy=(o,by)=>o.steps.some(s=>s.type==='skip'&&s.by===by);
 
 AQ.CH.push({
-  name:'Personal skills and commands',badge:'Pocket Toolsmith',tier:'personal',
-  intro:'Some chores come round every week, and some rules should follow a job wherever it goes. In this chapter you save a weekly chore as a command, give a scheduled job a skill that keeps it quiet, and tell a command from a skill by who starts it.',
+  name:'Personal skills and commands',badge:'Pocket Toolbox',tier:'personal',
+  story:'Save the Monday chore and a quiet-hours rule; find the pocket toolbox.',
+  intro:'Monday\'s chore comes round again, and a quiet-hours rule should follow Cog wherever he goes. Some chores come round every week, and some rules should follow a job wherever it goes. In this chapter you save a weekly chore as a command, give a scheduled job a skill that keeps it quiet, and tell a command from a skill by who starts it.',
   learned:['A weekly chore saved as a command','A skill for a scheduled job','Command or skill'],
   missions:[
     {

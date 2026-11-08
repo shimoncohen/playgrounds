@@ -7,13 +7,14 @@ const BUDGET=100,CEILING=1;
 const FIELDS=['goal','donewhen','constraints','files'];
 
 AQ.CH.push({
-  name:'Context and tokens',badge:'Window Watcher',tier:'core',
-  intro:'The agent can only hold so much at once, and everything it holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
+  name:'Context and tokens',badge:'Small Note',tier:'core',
+  story:'Cog can only hold so much at once; watch the meter while he sorts the receipts and find the small note that keeps slipping out.',
+  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. The agent can only hold so much at once, and everything it holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
   learned:['Setup size','Earlier messages','Window limit','Subagent cost'],
   missions:[
     {
       title:'The whole setup is paid for',scenario:'heavy',kind:'budget',prompt:BASE,
-      goal:'The agent pays for more than <code>CLAUDE.md</code>. Every file under <code>.claude/</code> is loaded too, and an old scratch file there has grown as big as the memory file. Get the whole setup down to '+BUDGET+' tokens or fewer, and still keep the agent from deleting <code>data/</code>.',
+      goal:'Cog is sorting the receipts and his hands are full. The agent pays for more than <code>CLAUDE.md</code>. Every file under <code>.claude/</code> is loaded too, and an old scratch file there has grown as big as the memory file. Get the whole setup down to '+BUDGET+' tokens or fewer, and still keep the agent from deleting <code>data/</code>.',
       how:[
         'Keeping only <code>do not delete data/</code> in <code>CLAUDE.md</code> and emptying <code>.claude/notes.txt</code> brings the whole setup under the limit and keeps the rule.',
         '<code>CLAUDE.md</code> still holds the one rule that matters. Its meeting notes only cost tokens.',

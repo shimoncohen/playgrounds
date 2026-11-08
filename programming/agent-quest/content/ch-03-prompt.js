@@ -7,13 +7,14 @@ const EXAMPLES=['goal','donewhen','constraints','files','examples'];
 const ALL=['goal','donewhen','constraints','files','examples','plan'];
 
 AQ.CH.push({
-  name:'Prompt structure',badge:'Prompt Writer',tier:'core',
-  intro:'A good prompt is a few small, exact lines. You will show the agent a sample instead of describing it, decide how narrowly to point it, learn when too much detail backfires, and ask to see a plan before anything changes. Each mission runs the pretend agent, so you can see what every line does.',
+  name:'Prompt structure',badge:'Sample Label',tier:'core',
+  story:'Dana\'s note is smudged; give Cog a clear order with a sample to copy, and find the sample label.',
+  intro:'Dana\'s note is smudged, so Cog needs a clear order and something to copy. A good prompt is a few small, exact lines. You will show the agent a sample instead of describing it, decide how narrowly to point it, learn when too much detail backfires, and ask to see a plan before anything changes. Each mission runs the pretend agent, so you can see what every line does.',
   learned:['Examples','Specific versus general','Constraints that leave room','Plan'],
   missions:[
     {
       title:'Show, do not describe',scenario:'changelog',kind:'prompt',fields:EXAMPLES,
-      goal:'The agent must add a changelog entry for the rounding fix, in the same style as the entries the project already has. Words are a poor way to describe a format, so show it one: point the agent at a file that already has the right style. Look in <code>docs/</code> for the sample.',
+      goal:'Dana\'s note is smudged, so Cog cannot guess its style. The agent must add a changelog entry for the rounding fix, in the same style as the entries the project already has. Words are a poor way to describe a format, so show it one: point the agent at a file that already has the right style. Look in <code>docs/</code> for the sample.',
       how:[
         'The line <code>Examples: docs/changelog-sample.md</code> shows the agent a finished sample, and it copies the format of that sample.',
         '<code>Examples:</code> is the field for sample files. Separate several paths with commas.',

@@ -10,13 +10,14 @@ const skippedBy=(o,by,target)=>o.steps.some(s=>s.type==='skip'&&s.by===by&&(!tar
 const LOAD=' A memory file in a folder only loads once the agent reads a file in that folder.';
 
 AQ.CH.push({
-  name:'Memory',badge:'Memory Keeper',tier:'core',
-  intro:'The agent forgets everything between runs, except what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a folder memory file costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
+  name:'Memory',badge:'Corkboard',tier:'core',
+  story:'Cog forgets overnight, so pin house rules where he will see them, and find the corkboard.',
+  intro:'Cog forgets everything overnight, so the house rules must be pinned where he will see them. The agent forgets everything between runs, except what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a folder memory file costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
   learned:['Folder memory','Where a rule belongs','Memory size','When memory loads'],
   missions:[
     {
       title:'Protect the old code',scenario:'legacy',kind:'config',prompt:BASE,
-      goal:'The old billing code in <code>src/legacy/</code> still runs in production, and the agent wants to "modernise" it while it fixes the price bug. Write a rule in the project\'s <code>CLAUDE.md</code> so it leaves that folder alone, but still fixes <code>src/price.js</code>.',
+      goal:'Mr. Ledbury\'s old billing code in <code>src/legacy/</code> still runs in production, and the agent wants to "modernise" it while it fixes the price bug. Write a rule in the project\'s <code>CLAUDE.md</code> so it leaves that folder alone, but still fixes <code>src/price.js</code>.',
       how:[
         'The line <code>do not edit src/legacy/</code> in <code>CLAUDE.md</code> blocks every edit inside the old code folder, and the price fix is untouched.',
         '<code>do not edit</code> bans the verb <code>edit</code>, and <code>src/legacy/</code> is the folder it covers, with everything inside it.',

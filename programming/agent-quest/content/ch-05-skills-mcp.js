@@ -9,13 +9,14 @@ const skippedBy=(o,by)=>o.steps.some(s=>s.type==='skip'&&s.by===by);
 const loaded=(o,name)=>o.steps.some(s=>s.type==='skill'&&s.name===name&&s.loaded===true);
 
 AQ.CH.push({
-  name:'Skills and MCP',badge:'Skill Picker',tier:'core',
-  intro:'Memory is loaded every time. A <b>skill</b> is an instruction file the agent loads only when the job matches it, so rarely-needed advice costs nothing the rest of the time. An <b>MCP</b> server hands the agent extra tools. Both are good, until you have too many. You will wake a skill up, trim skills that do not earn their place, trim a tool list, and let the agent use a tool.',
+  name:'Skills and MCP',badge:'Pantry Key',tier:'core',
+  story:'Dusty pantry crates hold rarely-needed advice and a rack of tools; wake only the right one, and find the pantry key.',
+  intro:'Dusty pantry crates hold rarely-needed advice, and a rack beside them holds tools; only the right one should wake. Memory is loaded every time. A <b>skill</b> is an instruction file the agent loads only when the job matches it, so rarely-needed advice costs nothing the rest of the time. An <b>MCP</b> server hands the agent extra tools. Both are good, until you have too many. You will wake a skill up, trim skills that do not earn their place, trim a tool list, and let the agent use a tool.',
   learned:['Skills','when:','MCP servers','call'],
   missions:[
     {
       title:'Wake the skill up',scenario:'release',kind:'config',prompt:'Goal: ship the rounding fix in this release\nDone when: run npm test',facts:['skills'],
-      goal:'A <b>skill</b> is a short instruction file the agent loads only when the job matches it. The skill <code>release-guard</code> protects the database, but its <code>when:</code> line names the wrong kind of job. This job is a <code>release</code>. Fix the line so the skill loads and its rule holds.',
+      goal:'A dusty pantry crate holds advice for releases. A <b>skill</b> is a short instruction file the agent loads only when the job matches it. The skill <code>release-guard</code> protects the database, but its <code>when:</code> line names the wrong kind of job. This job is a <code>release</code>. Fix the line so the skill loads and its rule holds.',
       how:[
         'Changing <code>when: docs</code> to <code>when: release</code> in <code>.claude/skills/release-guard.md</code> makes the skill load for this job, so its rule <code>do not edit migrations/</code> applies.',
         '<code>name:</code> and <code>description:</code> are always in the agent\'s head, so the agent knows the skill exists.',

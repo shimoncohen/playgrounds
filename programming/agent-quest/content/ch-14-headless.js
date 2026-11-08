@@ -8,13 +8,14 @@ const JOBFILE='.claude/commands/nightly-fix.md';
 const GOAL='Goal: fix the rounding bug in src/price.js\n';
 
 AQ.CH.push({
-  name:'CI and headless',badge:'Night Shift',tier:'dev',
-  intro:'So far someone was always at the keyboard to approve a plan or answer a question. Teams also start the agent by itself, at night, to fix a small bug before the morning. Nobody is there to say yes. In this chapter you set up a job that can finish on its own: it waits for nothing, does only what it was allowed to do, and knows where to look.',
+  name:'CI and headless',badge:'Night Lantern',tier:'dev',
+  story:'At night nobody is there to say yes; pre-approve exactly what Cog needs and find the night lantern.',
+  intro:'At night nobody is in the shop to say yes, so Cog works by the glow of the night lantern. So far someone was always at the keyboard to approve a plan or answer a question. Teams also start the agent by itself, at night, to fix a small bug before the morning. Nobody is there to say yes. In this chapter you set up a job that can finish on its own: it waits for nothing, does only what it was allowed to do, and knows where to look.',
   learned:['Jobs with nobody there','Pre-approved actions','Pointing the job at the failure'],
   missions:[
     {
       title:'Nobody there to approve',scenario:'nightly',kind:'config',prompt:JOB,facts:['headless','ci'],
-      goal:'A <b>headless</b> run starts from a command line, with no chat window. Teams often start one from a <b>CI</b> job, a task that a build server runs by itself, say every night. Nobody is there, so the run is <b>unattended</b>. Your nightly job calls the saved command <code>nightly-fix</code>, and that command asks the agent for a plan first. Change the command so the job can finish.',
+      goal:'At night nobody in the shop can say yes. A <b>headless</b> run starts from a command line, with no chat window. Teams often start one from a <b>CI</b> job, a task that a build server runs by itself, say every night. Nobody is there, so the run is <b>unattended</b>. Your nightly job calls the saved command <code>nightly-fix</code>, and that command asks the agent for a plan first. Change the command so the job can finish.',
       how:[
         'Deleting the line <code>Plan: first</code> from <code>.claude/commands/nightly-fix.md</code> lets the job go straight to the fix, with nobody needed to approve a plan.',
         '<code>Plan: first</code> makes the agent stop and wait for approval. In an unattended run nobody answers, so the Run panel shows the job stalled, and it ends blocked.',
