@@ -6,7 +6,7 @@
    Ownership is tracked as Rust does: a cell is moved when its non-Copy value is passed on, and what is still owned is dropped
    at the end of its scope in reverse declaration order (also while a panic unwinds), a temporary at the end of its statement.
    Dropping a struct runs its `Drop::drop` first, then drops its fields in declaration order.
-   events: {t:'alloc',kind,id,line} {t:'free',id,line} {t:'move',name,line} {t:'drop',name,ty,line,part?} (part: a field or element).
+   events: {t:'alloc',kind,id,line} {t:'free',id,line} {t:'move',name,line} {t:'drop',name,ty,line,part?} (part: a field or element) {t:'print',name,line}.
    With opts.snap it also records a snapshot before every statement and one at the end; opts.loans are the borrow pass's loans.
    Deterministic: no clock, no randomness. DOM-free. */
 (()=>{
@@ -55,10 +55,9 @@ RQ.interp=(ast,opts)=>{
   const unref=v=>RQ.std.unref(v);
   const read=(cell,line)=>{if(cell.val===null)throw new Unsup('deferred initialization',line);return cell.val;};
   const note=o=>{events.push(o);if(events.length>MAX_EVENTS)throw new Limit('steps');};
-  // a new String value is a new heap object, push_str keeps the object (same id) and changes what it holds
   const string=(s,id,line)=>{
     if(s.length>MAX_STRING)throw new Limit('string size');
-    if(id===undefined){id=nextId++;note({t:'alloc',kind:'String',id,line:line||0});heap.set(id,{id,kind:'String',v:s});}
+    if(id===undefined){id=nextId++;note({t:'alloc',kind:'String',id,empty:s==='',line:line||0});heap.set(id,{id,kind:'String',v:s});}
     else heap.get(id).v=s;
     return {k:'String',v:s,id};
   };
@@ -149,6 +148,8 @@ RQ.interp=(ast,opts)=>{
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
+    // an owned value that no variable holds is a temporary of the statement
+    [...e.args.slice(1),...e.named.map(x=>x.expr)].forEach((x,i)=>{const v=i<pos.length?pos[i]:named.get(e.named[i-pos.length].name);if(owns(v)&&!isPlace(x))temps.push({v,line:e.line});});
     let s='';
     try{
       for(const p of parts){
@@ -168,6 +169,7 @@ RQ.interp=(ast,opts)=>{
       throw x;
     }
     if(e.name==='format')return string(s,undefined,e.line);
+    note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
   }
   function constVal(n){
@@ -179,7 +181,6 @@ RQ.interp=(ast,opts)=>{
     return cval.get(n);
   }
   const owns=v=>v.k==='String'||v.k==='struct'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
-  // run `cleanup` after `work` however it ends, except when the run is being abandoned (a limit or an unmodeled construct)
   function guard(work,cleanup){
     let r;
     try{r=work();}
@@ -196,7 +197,7 @@ RQ.interp=(ast,opts)=>{
       case 'struct':{
         note({t:'drop',name,ty:v.name,line,part});
         const d=dropImpl.get(v.name);
-        if(d)runDrop(d,v,line);
+        if(d)runDrop(d,v,line,name);
         for(const f of v.fields)dropValue(f.val,name&&name+'.'+f.name,line,true);
         break;
       }
@@ -235,13 +236,14 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(x instanceof Panic)for(let i=vals.length-1;i>=0;i--)dropValue(vals[i],null,es[i].line);throw x;}
     return vals;
   }
-  function runDrop(f,v,line){
+  function runDrop(f,v,line,name){
     tick();
     if(depth+1>maxDepth)throw new Limit('depth');
     depth++;
     const fenv=[newScope()];
-    declare(fenv[0],'self',{val:{k:'ref',cell:{val:v},mut:true},name:'self',ty:'&mut '+v.name,line});
-    frames.push({fn:'drop',env:fenv,stmt:null});
+    const host={val:v,name:name||'a temporary',ty:v.name,line};
+    declare(fenv[0],'self',{val:{k:'ref',cell:host,mut:true},name:'self',ty:'&mut '+v.name,line});
+    frames.push({fn:'drop',env:fenv,stmt:null,host});
     try{block(f.body,fenv);}finally{depth--;frames.pop();}
   }
   function callFn(f,args,line){
@@ -270,7 +272,6 @@ RQ.interp=(ast,opts)=>{
         const cell={val:s.init?mv(s.init,env):null,name:pt.name,ty:tyName(pt),line:pt.line};
         declare(scope,pt.name,cell);
       }else if(s.init){
-        // `let _ = place;` neither moves nor drops; `let _ = value;` drops the value at once
         const v=ev(s.init,env);
         if(!isPlace(s.init))dropValue(v,null,s.line);
       }
@@ -318,7 +319,6 @@ RQ.interp=(ast,opts)=>{
     try{return v.k==='char'?"'"+v.v+"'":v.k==='str'?'"'+clip(v.v)+'"':v.k==='unit'?'()':RQ.std.display(v);}
     catch(x){return '?';}
   };
-  // the slots a value fills on the stack: one per scalar, String pointer or reference; heap ids only while the owner is live
   function leaves(v,path,out,live){
     switch(v.k){
       case 'String':out.push({path,heap:live?v.id:null});break;
@@ -338,11 +338,13 @@ RQ.interp=(ast,opts)=>{
   };
   function snapshot(line,end){
     if(!opts.snap)return;
-    if(snaps.length>=MAX_SNAPS)return;
+    if(snaps.length>=MAX_SNAPS-(end?0:1))return;
     const recs=new Map(),owners=new Map(),frs=[];
     for(const f of frames){
-      const vars=[];
-      for(const sc of f.env)for(const c of sc.own||[]){
+      const vars=[],cells=[];
+      if(f.host)cells.push(f.host);
+      for(const sc of f.env)cells.push(...sc.own||[]);
+      for(const c of cells){
         const live=c.val!==null&&!c.moved&&!c.dropped;
         const rec={uid:recs.size,name:c.name,ty:c.ty||'',state:c.val===null?'uninit':c.dropped?'dropped':c.moved?'moved':'owned',leaves:[]};
         if(c.val!==null)leaves(c.val,'',rec.leaves,live);
@@ -355,7 +357,7 @@ RQ.interp=(ast,opts)=>{
     for(const rec of recs.values())for(const l of rec.leaves){
       if(!l.ref)continue;
       const to=recs.get(l.cell),st=loanOf.get(l.loan);
-      // a borrow is live while a later use needs it; without the borrow pass's region it is shown as live
+      // without the borrow pass's region a loan is shown as live
       const live=!st||frames.some(f=>f.stmt&&st.live.some(id=>idsOf(f.stmt).has(id)));
       loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:rec.name+(l.path?'.'+l.path:''),place:to?to.name:null,live,line:st?st.line:0});
       if(to&&live&&!seen.has(to)){seen.add(to);to.n=0;}
@@ -369,7 +371,6 @@ RQ.interp=(ast,opts)=>{
     lastEv=events.length;
   }
 
-  // a temporary in a condition drops before the branch runs
   function cond(c,env){const mark=temps.length;return guard(()=>ev(c,env).v,()=>dropTemps(mark));}
   function ev(e,env){
     switch(e.t){
@@ -413,7 +414,6 @@ RQ.interp=(ast,opts)=>{
         if(!cell)return bug('assign');
         let r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
         if(e.op!=='=')r=binop(e.op.slice(0,-1),read(cell,e.line),r,e);
-        // the old value drops once the new one is computed, unless it was moved out or never set
         else if(cell.val!==null&&!cell.moved&&!cell.dropped)dropValue(cell.val,cell.name,e.line);
         cell.val=r;cell.moved=false;cell.dropped=false;return UNIT;
       }
@@ -453,7 +453,6 @@ RQ.interp=(ast,opts)=>{
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
         const rv=ev(e.recv,env),s=unref(rv).v;
-        // an owned String that no variable holds lives until the end of the statement
         if(rv.k==='String'&&!isPlace(e.recv))temps.push({v:rv,line:e.line});
         if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
         if(e.name==='as_str')return {k:'str',v:s};
