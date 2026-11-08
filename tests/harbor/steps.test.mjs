@@ -101,6 +101,14 @@ test('One image, many containers needs docker ps -a, not just docker ps', () => 
   assert.ok(h.S.done[ci + '.' + mi]);
 });
 
+test('One image, many containers: one run counts even with no earlier hello-world container', () => {
+  const { ci, mi } = find('One image, many containers');
+  const h = playTo(ci, mi);
+  h.run('docker container prune');
+  h.run('docker run hello-world');
+  assert.deepEqual([...h.S.steps[ci + '.' + mi]], [0]);
+});
+
 test('A second server: a curl before the server runs does not count', () => {
   const { ci, mi } = find('A second server');
   const h = playTo(ci, mi);
