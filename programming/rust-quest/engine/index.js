@@ -23,6 +23,38 @@ RQ.compile=src=>{
     counts:{shadow:ck.shadows,'shadow-use':ck.shadowUses,'var-use':ck.varUses}};
 };
 
+// The static "state at the error point" for a program that does not compile: the variables in scope on the error's line,
+// which of them moved or are borrowed there, and the loans (with the lines they span) that reach it.
+const lastLine=n=>{let hi=n.line;RQ.walk(n,m=>{if(m.line>hi)hi=m.line;});return hi;};
+function errorView(c){
+  const e=c.diags.find(d=>d.code||d.lint);
+  if(!e||!c.ast)return null;
+  const fn=c.ast.items.filter(i=>i.t==='Fn'&&i.body&&i.line<=e.line&&e.line<=lastLine(i)).pop();
+  if(!fn)return null;
+  const named=(/`([^`]+)`/.exec(e.msg)||[])[1]||null;
+  const vars=[],tyOf=n=>{const o=c.info&&c.info.get(n);return o&&o.ty?RQ.types.show(o.ty):'';};
+  for(const p of fn.params)if(p.pat.t==='IdentPat')vars.push({name:p.pat.name,ty:tyOf(p.pat),state:'owned'});
+  const inBlock=b=>{
+    for(const s of b.stmts){
+      if(s.line>e.line)break;
+      if(s.t==='Let'&&s.pat.t==='IdentPat'&&s.line<e.line)vars.push({name:s.pat.name,ty:tyOf(s.pat),state:s.init?'owned':'uninit'});
+      if(e.line<=lastLine(s)){
+        RQ.walk(s,m=>{if(m!==s&&m.t==='Block'&&m.line<=e.line&&e.line<=lastLine(m)){inBlock(m);return false;}});
+        return;
+      }
+    }
+  };
+  inBlock(fn.body);
+  const loans=(c.loans||[]).filter(l=>l.span&&!l.implicit&&l.span[0]<=e.line&&e.line<=l.span[1]);
+  // the same name can be declared twice (shadowing); the newest one is the one the error names
+  const byName=n=>{for(let i=vars.length-1;i>=0;i--)if(vars[i].name===n)return vars[i];return null;};
+  const target=named&&byName(named);
+  if(target&&e.code==='E0382')target.state='moved';
+  if(target&&e.code==='E0381')target.state='uninit';
+  for(const l of loans){const v=l.local&&byName(l.local);if(v&&v.state==='owned'){v.n=(v.n||0)+1;v.state=l.mut?'mutBorrowed':'shared';}}
+  return {error:{code:e.code||e.lint,line:e.line,msg:e.msg,name:named},fn:fn.name,vars,loans:loans.map(l=>({kind:l.mut?'mut':'shared',place:l.local,from:l.span[0],to:l.span[1]}))};
+}
+
 const PRINTS=['println','print','eprintln','eprint'];
 function holes(ast){
   let n=0;
@@ -73,13 +105,17 @@ RQ.features=src=>{
 function context(d,ast,counts){
   const errors=d.errors||[];
   const c={
-    status:d.status,errors,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
-    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:[],
+    status:d.status,errors,view:d.view||null,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
+    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],
     compiles:()=>c.status!=='error'&&c.status!=='unsupported'&&c.status!=='internal',
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
     onlyError:id=>errors.length===1&&(errors[0].code===id||errors[0].lint===id),
     out:()=>c.stdout,
+    moved:name=>c.events.some(e=>e.t==='move'&&e.name===name),
+    allocs:kind=>c.events.filter(e=>e.t==='alloc'&&(kind===undefined||e.kind===kind)).length,
+    dropOrder:()=>c.events.filter(e=>e.t==='drop'&&e.name&&!e.part).map(e=>e.name),
     usesMacro:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Macro'&&m.name===name)n++;});return n;},
+    usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},
     count:kind=>{
       if(!ast)return 0;
@@ -108,9 +144,9 @@ RQ.run=(src,opts)=>{
     const c=RQ.compile(src);ast=c.ast;
     if(!c.ast)return context({status:'error',errors:c.diags},null);
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
-    if(c.diags.length)return context({status:'error',errors:c.diags},ast,c.counts);
+    if(c.diags.length)return context({status:'error',errors:c.diags,view:opts.snap?errorView(c):null},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context(RQ.interp(c.ast,{...opts,info:c.info}),ast,c.counts);
+    return context({...RQ.interp(c.ast,{...opts,info:c.info,loans:c.loans}),loans:c.loans},ast,c.counts);
   }catch(e){
     return context({status:'internal',message:String(e&&e.message||e)},ast);
   }

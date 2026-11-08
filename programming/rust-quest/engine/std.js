@@ -126,6 +126,8 @@ const {T}=RQ.types;
 const methods=new Map([
   ['len',{recv:'orms',self:'&',args:[],ret:T.int('usize')}],
   ['clone',{recv:'orm',self:'&',args:[],ret:T.string}],
+  ['to_string',{recv:'orms',self:'&',args:[],ret:T.string}],
+  ['to_owned',{recv:'orms',self:'&',args:[],ret:T.string}],
   ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
   ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
 ]);

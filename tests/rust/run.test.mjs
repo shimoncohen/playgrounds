@@ -162,7 +162,7 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(feature('fn show(x: &dyn Show) {}\nfn main() {}'), 'dyn@1');
   });
   it('constructs of later chapters give unsupported with a hint in the catalog', () => {
-    assert.equal(feature('struct P { x: i32 }\nfn main() {}'), 'struct@1');
+    assert.equal(feature('struct P;\nfn main() {}'), 'struct@1');
     assert.equal(feature('fn main() {\n    match 1 { _ => {} }\n}'), 'match@2');
     assert.equal(feature('fn main() {\n    let v = vec![1];\n}'), 'vec!@2');
     assert.equal(feature('fn main() {\n    let x: f32 = 2.5;\n}'), 'f32@2');
