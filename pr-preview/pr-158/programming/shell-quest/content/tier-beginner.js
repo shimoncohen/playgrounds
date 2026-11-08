@@ -4,7 +4,7 @@ const {HOME,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,get
 /* the value after -type in a logged find, or '' */
 const typeOf=e=>{const i=e.args.indexOf('-type');return i<0?'':e.args[i+1]||''};
 const CH=[
-{tier:'beginner',name:'Where am I?',badge:'Pathfinder',intro:'Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
+{tier:'beginner',name:'Where am I?',badge:'Pathfinder',story:'A note in the clearing points to a cave; look around, read the map Ada hid from a plain look, and find the path to the cave.',intro:'A note pinned in the clearing says Ranger Ada hid her gold near a cave. Bash always has you standing inside one folder. First, learn to look around and walk between folders.',
  learned:['pwd','ls','ls -a','cat','cd','cd ..','cd ~'],
  setup(){ensureDir('~/forest/cave/deeper/chest');ensureFile('~/.secret_map',SECRET);ensureFile('~/readme.txt',README)},
  missions:[
@@ -36,7 +36,7 @@ const CH=[
   explain:`<code>~</code> (tilde) is a shortcut for your home folder, <code>/home/explorer</code>. Plain <code>cd</code> with nothing after it also goes home. A path that starts with <code>/</code> is an <b>absolute path</b>: it works no matter where you are.`,
   check:c=>c.cwd===HOME&&c.ran('cd')}
  ]},
-{tier:'beginner',name:'Make things',badge:'Builder',intro:'Folders and files don\'t have to exist already. You can create them and write text into them.',
+{tier:'beginner',name:'Make things',badge:'Builder',story:'The Owl says nights in the forest get cold, so build a camp, pitch a tent and start a diary to find a place to sleep.',intro:'The Owl warns that nights in the forest get cold, so the hunt needs a camp. Folders and files don\'t have to exist already. You can create them and write text into them.',
  learned:['mkdir','touch','echo','>','>>','mkdir -p'],setup(){},
  missions:[
  {title:'Build a camp',goal:`From home, create a folder: <code>mkdir camp</code>`,anat:[['mkdir','cmd'],['camp','arg']],
@@ -61,7 +61,7 @@ const CH=[
   how:[`<code>mkdir -p camp/supplies/food</code> creates <code>supplies</code> and <code>food</code> in one go, even though <code>supplies</code> does not exist yet.`,`<code>mkdir</code> is the command: create a folder.`,`<code>-p</code> is an option. It stands for <b>p</b>arents: make every missing folder along the path instead of complaining.`,`<code>camp/supplies/food</code> is the argument: a path three levels deep. <code>camp</code> exists already, so <code>supplies</code> and then <code>food</code> get made.`],answer:'mkdir -p camp/supplies/food',
   explain:`Without <code>-p</code>, <code>mkdir</code> refuses because <code>supplies</code> doesn't exist yet. <code>-p</code> (parents) creates every missing folder along the path. Try it without <code>-p</code> first to see the error.`,check:c=>c.isDir('~/camp/supplies/food')}
  ]},
-{tier:'beginner',name:'Copy, move, delete',badge:'Mover',intro:'Rearrange your world. These commands do most everyday file work.',
+{tier:'beginner',name:'Copy, move, delete',badge:'Mover',story:'The tent belongs in the village, so carry it there, keep a spare copy of the forest and clear away the clutter to find a tidy trail.',intro:'The tent belongs in the village, and the trail is full of clutter. Rearrange your world. These commands do most everyday file work.',
  learned:['cp','mv','rm','cp -r','rm -r','rmdir'],
  setup(){ensureDir('~/camp/supplies/food');ensureFile('~/camp/tent.txt','');ensureFile('~/readme.txt',README);ensureDir('~/village');ensureDir('~/forest/cave')},
  missions:[
@@ -87,7 +87,7 @@ const CH=[
   how:[`<code>rmdir camp/supplies/food</code> removes that folder, but only if nothing is in it.`,`<code>rmdir</code> is the command: <b>r</b>e<b>m</b>ove <b>dir</b>ectory.`,`<code>camp/supplies/food</code> is the argument: the folder to remove.`,`If the folder has anything inside, <code>rmdir</code> refuses. That is what makes it the safe way to tidy up.`],answer:'rmdir camp/supplies/food',
   explain:`<code>rmdir</code> only removes <b>empty</b> folders. If anything is inside, it refuses. That makes it the safe way to tidy up.`,check:c=>!c.has('~/camp/supplies/food')}
  ]},
-{tier:'beginner',name:'Read files',badge:'Reader',intro:'Real files can be thousands of lines long. These commands show just the part you need.',
+{tier:'beginner',name:'Read files',badge:'Reader',story:'Ada\'s journal is long and the Wolf keeps turning up in it; read its start and end and find every wolf line.',intro:'Ada\'s journal is long, and the Wolf keeps turning up in it. Real files can be thousands of lines long. These commands show just the part you need.',
  learned:['head','tail -n','wc -l','grep','grep -i','grep -n'],setup(){ensureFile('~/journal.txt',JOURNAL)},
  missions:[
  {title:'Open the journal',goal:`From home: <code>cat journal.txt</code>`,anat:[['cat','cmd'],['journal.txt','arg']],
@@ -112,7 +112,7 @@ const CH=[
   how:[`<code>grep -n map journal.txt</code> prints the lines that contain map, each with its line number in front.`,`<code>grep</code> is the command: search inside text.`,`<code>-n</code> is an option: show line <b>n</b>umbers.`,`<code>map</code> is what to look for and <code>journal.txt</code> is where to look.`],answer:'grep -n map journal.txt',
   explain:`<code>-n</code> puts the line number in front of each match. Options combine: <code>grep -in map journal.txt</code> does both at once.`,check:c=>c.ran('grep',e=>c.flag(e,'n'))}
  ]},
-{tier:'beginner',name:'Pipes',badge:'Plumber',intro:'The real power of bash: connect small commands so the output of one becomes the input of the next.',
+{tier:'beginner',name:'Pipes',badge:'Plumber',story:'Mira\'s villager list has repeats; chain small commands to sort it, count each name and find the wolf sightings.',intro:'Mira\'s villager list has repeats, and someone has to tidy it. The real power of bash: connect small commands so the output of one becomes the input of the next.',
  learned:['|','sort','uniq','uniq -c','> with any command'],setup(){ensureFile('~/journal.txt',JOURNAL);ensureFile('~/village/people.txt',PEOPLE)},
  missions:[
  {title:'Meet the villagers',goal:`<code>cat village/people.txt</code>`,anat:[['cat','cmd'],['village/people.txt','arg']],
@@ -137,7 +137,7 @@ const CH=[
   how:[`<code>grep -i wolf journal.txt &gt; wolves.txt</code> saves only the wolf lines into a new file.`,`<code>grep -i wolf journal.txt</code> is the same search as before.`,`<code>&gt;</code> sends its results into a file instead of the screen.`,`<code>wolves.txt</code> is the file that receives them. Check it with <code>cat wolves.txt</code>.`],answer:'grep -i wolf journal.txt > wolves.txt',
   explain:`Now you have a file of only the wolf sightings. Check it with <code>cat wolves.txt</code>.`,check:c=>/wolf/i.test(c.read('~/wolves.txt'))}
  ]},
-{tier:'beginner',name:'Wildcards & search',badge:'Tracker',intro:'Work with many files at once, and find anything, anywhere.',
+{tier:'beginner',name:'Wildcards & search',badge:'Tracker',story:'A rumour says gold is hidden somewhere in your world; match patterns, search every folder and find <code>gold.txt</code> in the chest.',intro:'A rumour in the village says gold is hidden somewhere in your world. Work with many files at once, and find anything, anywhere.',
  learned:['*','?','find -name','find -type','&&'],
  setup(){for(const k in LOGS)ensureFile('~/village/logs/'+k,LOGS[k]);ensureFile('~/forest/cave/deeper/chest/gold.txt',GOLD);ensureFile('~/readme.txt',README);ensureFile('~/journal.txt',JOURNAL)},
  missions:[
@@ -180,7 +180,7 @@ const CH=[
   explain:`<code>&amp;&amp;</code> runs the second command only if the first one worked. Here: create the folder, and only then copy every .txt file from home into it.`,
   check:c=>{const n=c.node('~/backup');return !!n&&n.type==='dir'&&Object.keys(n.children).filter(k=>k.endsWith('.txt')).length>=2}}
  ]},
-{tier:'beginner',name:'Your first script',badge:'Scripter',intro:'A script is a file full of commands that bash runs for you, top to bottom. This is where bash turns into programming.',
+{tier:'beginner',name:'Your first script',badge:'Scripter',story:'Pack for the next trip once and for all: store your name, write a packing script that lists the camp and find the shortcut for every future trip.',intro:'Ada\'s gold is only the first lock, so the next trip needs a packing list that does itself. A script is a file full of commands that bash runs for you, top to bottom. This is where bash turns into programming.',
  learned:['NAME=value','$NAME','chmod +x','./script.sh','for loops'],setup(){ensureDir('~/camp')},
  missions:[
  {title:'Store a value',goal:`<code>NAME="Ada"</code>`,anat:[['NAME','var'],['=','op'],['"Ada"','arg']],
