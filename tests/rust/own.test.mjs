@@ -36,16 +36,14 @@ describe('structs and Drop: drop order', () => {
 
 describe('structs and Drop: what stays unsupported', () => {
   it('reports the construct instead of guessing', () => {
-    assert.equal(feature('struct P;\nfn main() {}'), 'struct');
-    assert.equal(feature('struct P(i32);\nfn main() {}'), 'struct');
-    assert.equal(feature('#[derive(Debug)]\nstruct P {\n    x: i32,\n}\nfn main() {}'), 'struct');
+    assert.equal(feature('#[derive(Hash)]\nstruct P {\n    x: i32,\n}\nfn main() {}'), 'derive');
     assert.equal(feature('struct P {\n    x: &str,\n}\nfn main() {}'), 'struct');
     assert.equal(feature('struct P {\n    p: P,\n}\nfn main() {}'), 'struct');
-    assert.equal(feature('struct P {\n    x: i32,\n}\nimpl P {\n    fn f(&self) {}\n}\nfn main() {}'), 'impl');
+    assert.equal(feature('struct P {\n    x: i32,\n}\nimpl P {\n    const A: i32 = 1;\n}\nfn main() {}'), 'impl');
     assert.equal(feature(P(...N.slice(0, 3), 'impl Drop for N {', '    fn drop(&mut self) {', '        let x = 1;', '    }', '}', 'fn main() {}')), 'impl');
     assert.equal(feature(P(...N, 'fn main() {', '    let n = N { id: 1 };', '    println!("{}", make(2).id);', '}')), 'field of a temporary');
     assert.equal(feature(P(...N, 'fn main() {', '    let n = N {};', '}')), 'struct literal');
-    assert.equal(feature(P(...N, 'fn main() {', '    let n = N { id: 1 };', '    println!("{}", n);', '}')), 'type checking');
+    assert.equal(RQ.run(P(...N, 'fn main() {', '    let n = N { id: 1 };', '    println!("{}", n);', '}')).onlyError('E0277'), true);
   });
 });
 
@@ -134,7 +132,7 @@ describe('snapshots', () => {
 describe('the state at the error point', () => {
   it('names the variables in scope, the moved one, and the loans that reach the line', () => {
     const c = RQ.run(P('fn main() {', '    let a = String::from("hi");', '    let b = a;', '    println!("{}", a);', '}'), { snap: true });
-    assert.deepEqual(c.view.error, { code: 'E0382', line: 4, msg: 'use of moved value: `a`', name: 'a' });
+    assert.deepEqual(c.view.error, { code: 'E0382', line: 4, msg: 'borrow of moved value: `a`', name: 'a' });
     assert.deepEqual(c.view.vars.map((v) => [v.name, v.state]), [['a', 'moved'], ['b', 'owned']]);
     const d = RQ.run(P('fn main() {', '    let mut a = String::from("hi");', '    let r = &a;', '    a.push_str("!");', '    println!("{}", r);', '}'), { snap: true });
     assert.equal(d.view.error.code, 'E0502');

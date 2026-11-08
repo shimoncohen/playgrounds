@@ -530,6 +530,23 @@ test('rust-quest: a slice is drawn as a dashed arrow into the heap of the String
   await ctx.close();
 });
 
+test('rust-quest: the memory view shows an enum variant with its payload, a field that moved out, and a borrow of one field', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'enum E {\n    A(String),\n    B,\n}\nstruct P {\n    a: String,\n    n: i32,\n}\nfn main() {\n    let e = E::A(String::from("x"));\n    let p = P { a: String::from("y"), n: 1 };\n    let r = &p.n;\n    let t = p.a;\n    println!("{} {}", r, t);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, steps - 2);
+  const text = n => page.textContent(`#memory .mv-var:has(.mv-name:text-is("${n}"))`);
+  assert.match(await text('e'), /A\s*A\.0\s*pointer to #\d/);
+  assert.match(await text('p'), /a\s*moved\s*n\s*1/);
+  assert.match(await text('r'), /& to p\.n/);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

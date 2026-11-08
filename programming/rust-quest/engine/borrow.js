@@ -5,6 +5,9 @@
    Per local a forward may-dataflow tracks MOVED, UNINIT and EVER (assigned on some path). A use is any operand or borrow of the local;
    the destination of an assign and `dead` are not uses. A move reaching a use is E0382, else a missing initialisation is E0381. Blocks
    with no path from the entry are skipped, because the edges out of them stay in succ.
+   A field is a local of its own (a path, see mir.js). A path is moved when it, or an ancestor, was moved; using a path whose descendant
+   was moved is a use of a partially moved value; assigning to a path puts it and its descendants back. Two paths overlap when one is an
+   ancestor of the other, and a loan on a path conflicts with an access to any path that overlaps it, never with a sibling.
    Loans: every `ref` assign is a loan. A second forward may-dataflow gives holds[local], the loans a local carries: a copy or move of a
    local passes them on, `as_str` passes its receiver's, a call, op or macro result carries none. A backward liveness pass gives the
    locals live at each instr (its own uses count). A loan is live at an instr iff a live local holds it, and an access to the loan's
@@ -12,7 +15,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
-RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate');
+RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate','repeated error');
 const MOVED=1,UNINIT=2,EVER=4;
 const VISITS=50;
 
@@ -23,7 +26,7 @@ function uses(i,use){
   const a=x=>{if(x&&x.reb)use(x.l,false,x.sh?'rebs':'reb');else o(x);};
   const rv=r=>{
     if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref');
-    else if(r.k==='use'||r.k==='deref')o(r.x);
+    else if(r.k==='use'||r.k==='deref'||r.k==='peek')o(r.x);
     else if(r.k==='method'){a(r.recv);r.args.forEach(a);}
     else if(r.args)r.args.forEach(a);
   };
@@ -32,19 +35,51 @@ function uses(i,use){
   else if(i.op==='branch'||i.op==='return')o(i.x);
 }
 
-function analyse(F,errors){
-  const B=F.blocks,L=F.locals,n=L.length;
-  const deferred=new Set(),found=[];
-  for(const b of B)for(const i of b.instrs)if(i.op==='decl'&&i.uninit)deferred.add(i.l);
+function relations(L){
+  const kids=L.map(()=>[]);
+  for(const l of L)if(l.parent!==undefined)kids[l.parent].push(l.id);
+  const A=L.map(l=>{const a=[];for(let p=l.parent;p!==undefined;p=L[p].parent)a.push(p);return a;});
+  const D=L.map(l=>{const d=[],st=[...kids[l.id]];while(st.length){const x=st.pop();d.push(x);st.push(...kids[x]);}return d;});
+  const R=L.map((l,k)=>A[k].length?A[k][A[k].length-1]:k);
+  return {A,D,R};
+}
+const BORROWS=new Set(['ref','mut','reb','rebs']);
+
+function analyse(F,errors,un){
+  const B=F.blocks,L=F.locals,n=L.length,{A,D,R}=relations(L);
+  const deferred=new Set(),found=[],binds=new Map();
+  for(const b of B)for(const i of b.instrs){
+    if(i.op==='decl'&&i.uninit)deferred.add(i.l);
+    // the paths a match moves into its names
+    if(i.grp!==undefined&&i.op==='assign'&&i.rv.k==='use'&&i.rv.x.k==='move'&&L[i.rv.x.l].path){
+      if(!binds.has(i.grp))binds.set(i.grp,new Set());
+      binds.get(i.grp).add(i.rv.x.l);
+    }
+  }
+  // what is wrong with l at this point: moved (it or an ancestor), partially moved (a descendant), or not yet initialised
+  const bad=(s,l)=>{
+    if(s[l]&MOVED)return {code:'E0382',at:l};
+    for(const a of A[l])if(s[a]&MOVED)return {code:'E0382',at:a};
+    for(const d of D[l])if(s[d]&MOVED)return {code:'E0382',at:l,partial:true,part:d};
+    return s[R[l]]&UNINIT?{code:'E0381',at:R[l]}:null;
+  };
   const step=(s,i,rep)=>{
-    uses(i,(l,mv)=>{
-      if(rep&&L[l].name!==null)rep(s[l]&MOVED?'E0382':s[l]&UNINIT?'E0381':'',l,i);
+    uses(i,(l,mv,kind)=>{
+      if(rep&&L[l].name!==null){
+        const b=bad(s,l);
+        if(b){
+          if(b.partial&&kind==='copy'&&i.grp!==undefined&&binds.has(i.grp)&&D[l].some(d=>s[d]&MOVED&&binds.get(i.grp).has(d)))rep('AMBIG',l,i);
+          else rep(b.code,l,i,{at:b.at,partial:b.partial,borrow:BORROWS.has(kind)});
+        }
+      }
       if(mv)s[l]|=MOVED;
     });
-    if(i.op==='decl')s[i.l]=i.uninit?UNINIT:0;
+    if(i.op==='decl'){s[i.l]=i.uninit?UNINIT:0;for(const d of D[i.l])s[d]=0;}
     else if(i.op==='assign'){
       if(rep&&deferred.has(i.l)&&!L[i.l].mut&&s[i.l]&EVER)rep('E0384',i.l,i);
-      s[i.l]=EVER;
+      if(rep&&L[i.l].path&&A[i.l].some(a=>s[a]&MOVED))rep('E0382',i.l,i,{at:A[i.l].find(a=>s[a]&MOVED),assign:true});
+      s[i.l]=L[i.l].path?0:EVER;
+      for(const d of D[i.l])s[d]=0;
     }
   };
   const inn=B.map(()=>null),q=[0],queued=new Set(q);
@@ -67,38 +102,48 @@ function analyse(F,errors){
   for(const b of B){
     if(!inn[b.id])continue;
     const s=inn[b.id].slice();
-    for(const i of b.instrs)step(s,i,(code,l,at)=>{if(code)found.push({code,l,line:at.line,col:at.col});});
+    for(const i of b.instrs)step(s,i,(code,l,at,o)=>{if(code)found.push({code,l,line:at.line,col:at.col,grp:at.grp,...o});});
   }
   found.sort((a,b)=>a.line-b.line||a.col-b.col);
-  const once=new Set(),seen=new Set();
+  const once=new Set(),seen=new Set(),grpDone=new Set();
   for(const f of found){
+    if(f.code==='AMBIG'){un('partial move',f);continue;}
     const k=f.code+'@'+f.line+':'+f.col;
     if(seen.has(k)||f.code!=='E0384'&&once.has(f.l))continue;
+    // one error per match: its scrutinee and the names it binds are the same mistake
+    if(f.code==='E0382'&&f.grp!==undefined){if(grpDone.has(f.grp))continue;grpDone.add(f.grp);}
     seen.add(k);
     if(f.code!=='E0384')once.add(f.l);
-    errors.push(RQ.diag.make(f.code,f.line,f.col,{name:L[f.l].name,kind:'let'}));
+    errors.push(RQ.diag.make(f.code,f.line,f.col,{name:L[f.partial||f.at===undefined?f.l:f.at].name,kind:'let',borrow:f.borrow,partial:f.partial,assign:f.assign}));
   }
   return true;
 }
 
 // E0596: a `&mut` borrow of a named local that is not `mut` (a ref temp for an autoref has no name), or push_str through a `&` receiver
-function mutability(F,errors){
-  const L=F.locals,seen=new Set();
-  const err=(i,name,ref)=>{
+function mutability(F,errors,un){
+  const L=F.locals,seen=new Set(),{R}=relations(L);
+  const err=(i,name,ref,root)=>{
     const k=i.line+':'+i.col;
     if(seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make('E0596',i.line,i.col,{name,ref}));
+    errors.push(RQ.diag.make('E0596',i.line,i.col,{name,ref,root}));
   };
+  const roots=new Map();
   for(const b of F.blocks){
     if(b.unreachable)continue;
     for(const i of b.instrs){
       const r=i.rv;
       if(!r)continue;
-      if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut)err(i,L[r.l].name,false);
+      if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut){
+        // rustc folds several of these on one variable into a single error, reported elsewhere than at each borrow
+        const root=R[r.l];
+        if(roots.has(root)&&roots.get(root)!==i.line+':'+i.col)un('repeated error',i);
+        roots.set(root,i.line+':'+i.col);
+        err(i,L[r.l].name,false,L[r.l].path?L[R[r.l]].name:null);
+      }
       else if(r.k==='method'&&r.recv.k!=='const'&&RQ.std.methods.get(r.name).self==='&mut'){
         const t=L[r.recv.l].ty;
-        if(t.k==='ref'&&!t.mut)err(i,'*'+(L[r.recv.l].name||L[r.recv.l].src||'value'),true);
+        if(t.k==='ref'&&!t.mut)err(i,r.text||'*'+(L[r.recv.l].name||L[r.recv.l].src||'value'),true,null);
       }
     }
   }
@@ -108,23 +153,28 @@ const bit=k=>1n<<BigInt(k);
 const refy=t=>t.k==='ref'||t.k==='str';
 
 function loanPass(F,errors,un,loans,stats){
-  const B=F.blocks,L=F.locals,n=L.length;
+  const B=F.blocks,L=F.locals,n=L.length,{A,D,R}=relations(L);
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
   for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,live:new Set(),span:[i.line,i.line]});}
-  const onS=L.map(()=>0n),onM=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(k));
-  lo.forEach((x,k)=>{(x.mut?onM:onS)[x.l]|=lb[k];});
+  const onS=L.map(()=>0n),onM=L.map(()=>0n),sub=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(R[k]));
+  // onS/onM: the loans an access to l conflicts with (on l, an ancestor or a descendant); sub: the loans on l and below, which a write to l ends
+  lo.forEach((x,k)=>{
+    for(const r of [x.l,...A[x.l],...D[x.l]])(x.mut?onM:onS)[r]|=lb[k];
+    for(const r of [x.l,...A[x.l]])sub[r]|=lb[k];
+  });
 
   // the loans the value assigned by i carries; a call gives back its `from` argument's, a slice of a reference its base's
+  // a field carries what its root carries
   const val=(s,i)=>{
     const r=i.rv,from=r.k==='call'&&r.from>=0?r.args[r.from]:null;
-    return r.k==='ref'?lb[at.get(i)]|s[r.l]:r.k==='use'&&r.x.k!=='const'?s[r.x.l]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[r.recv.l]:from&&from.k!=='const'?s[from.l]:0n;
+    return r.k==='ref'?lb[at.get(i)]|s[R[r.l]]:r.k==='use'&&r.x.k!=='const'?s[R[r.x.l]]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[R[r.recv.l]]:from&&from.k!=='const'?s[R[from.l]]:0n;
   };
   // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
   const hold=(s,i)=>{
     if(i.op!=='decl'&&i.op!=='assign'&&i.op!=='dead')return;
     const v=i.op==='assign'?val(s,i):0n;
-    const kill=~(onS[i.l]|onM[i.l]);
+    const kill=~sub[i.l];
     for(let k=0;k<n;k++)s[k]&=kill;
     if(i.op!=='dead')s[i.l]=v&kill;
   };
@@ -146,7 +196,7 @@ function loanPass(F,errors,un,loans,stats){
   }
 
   const back=(m,i)=>{
-    if(i.op==='assign'||i.op==='decl')m&=~nb[i.l];
+    if((i.op==='assign'||i.op==='decl')&&!L[i.l].path)m&=~nb[i.l];
     uses(i,l=>{m|=nb[l];});
     return m;
   };
@@ -211,7 +261,7 @@ function loanPass(F,errors,un,loans,stats){
         const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty));
         if(k>=0){
           const key='E0515@'+i.line+':'+i.col;
-          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param}));}
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param,path:!!L[lo[k].l].path}));}
         }
       }
       uses(i,(l,_mv,kind)=>access(l,kind,i));
@@ -236,12 +286,12 @@ function loanPass(F,errors,un,loans,stats){
 }
 
 RQ.borrow=(ast,info)=>{
-  const m=RQ.mir(ast,info),errors=[],loans=[],moves=[],maxLive={shared:0,mut:0},unsupported=[...m.unsupported],seen=new Set();
+  const m=RQ.mir(ast,info),errors=[...(m.errors||[])],loans=[],moves=[],maxLive={shared:0,mut:0},unsupported=[...m.unsupported],seen=new Set();
   const un=(feature,nd)=>{const k=feature+'@'+nd.line;if(!seen.has(k)){seen.add(k);unsupported.push({feature,line:nd.line});}};
   if(!unsupported.length)for(const F of m.fns){
-    const ok=analyse(F,errors);
+    const ok=analyse(F,errors,un);
     for(const b of F.blocks)if(!b.unreachable)for(const i of b.instrs)uses(i,(l,mv)=>{if(mv&&F.locals[l].name!==null)moves.push({name:F.locals[l].name,line:i.line});});
-    if(ok)mutability(F,errors);
+    if(ok)mutability(F,errors,un);
     if(!ok||!loanPass(F,errors,un,loans,maxLive)){unsupported.push({feature:'program too large',line:F.line});break;}
   }
   return {errors,unsupported,loans,moves,maxLive,analysed:m.fns.map(f=>f.name)};

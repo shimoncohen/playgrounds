@@ -392,7 +392,7 @@ describe('run: String and reference programs', () => {
     }
   });
   it('a borrow of a field is unsupported at run time too (no copy standing in for the place)', () => {
-    assert.equal(feat('    let mut t = (1, 2);\n    let r = &mut t.0;\n    *r = 5;'), 'borrow of a field@4');
+    assert.equal(feat('    let mut t = [1, 2];\n    let r = &mut t[0];\n    *r = 5;'), 'borrow of a field@4');
   });
   it('a string that grows past 100,000 characters stops with limit "string size"', () => {
     for (const body of [

@@ -424,10 +424,10 @@ describe('the unsupported list, end to end through RQ.run', () => {
   it('mir triggers', () => sweepAll([
     [SIMPLE('let mut x = 1;', 'let r = &mut x;', 'let r2 = r;'), 'reborrow', 4],
     [SIMPLE('let x = 1;', 'let r = &x;', 'let r2 = &*r;'), 'reborrow', 4],
-    [SIMPLE('let t = (1, 2);', 'let r = &t.0;'), 'borrow of a field', 3],
+    [SIMPLE('let a = [1, 2];', 'let r = &a[0];'), 'borrow of a field', 3],
     [SIMPLE('let r = &String::new();'), 'temporary borrow', 2],
     [SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'), 'temporary borrow', 2],
-    [SIMPLE('let t = (String::from("a"), 1);', 'let s = t.0;'), 'partial move', 3],
+    [SIMPLE('let a = [String::new()];', 'let s = a[0];'), 'partial move', 3],
     [SIMPLE('let s = String::new();', 'let r = &s;', 'let t = *r;'), 'move out of reference', 4],
     [SIMPLE('let mut s = String::from("a");', 's.push_str(&s);'), 'two-phase borrow', 3],
     [SIMPLE('let s = String::new();', 'if true {', '}'), 'constant condition', 3],

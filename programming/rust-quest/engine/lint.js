@@ -170,6 +170,13 @@ RQ.lint=(ast,info)=>{
         barrier();return null;
       }
       case 'Assign':{
+        // a write to a field leaves the folded value of its root unknown
+        if(e.lhs.t==='Field'||e.lhs.t==='Index'){
+          ev(e.rhs);
+          const rb=rootBind(e.lhs);
+          if(rb)forget([rb]);
+          barrier();return null;
+        }
         // *r = v: lints in v still fire, but nothing is stored and nothing folded (the Deref's .bind is the reference, not the target)
         if(e.lhs.t==='Deref'){ev(e.rhs);barrier();return null;}
         const b=bindOf(e),before=barriers;
@@ -219,6 +226,22 @@ RQ.lint=(ast,info)=>{
         if(known&&div&&doubtful(e.cond,c)){unsup('const folding',e.cond.line);div=false;}
         return null;
       }
+      case 'Match':{
+        ev(e.scrut);barrier();
+        const base=snap();
+        let all=e.arms.length>0;
+        // rustc may fold the scrutinee and drop the arms it rules out, which the lint pass cannot tell, so no arm is judged
+        for(const a of e.arms){
+          st=new Map([...base].map(([k,v])=>[k,{...v}]));
+          const was=div;
+          dead++;
+          if(a.body.t==='Block')block(a.body);else ev(a.body);
+          dead--;
+          all=all&&div;div=was;
+        }
+        st=base;forget(assignedIn(e));barrier();
+        div=all;return null;
+      }
       case 'Loop':
         loopBody(e,null);
         div=!hasBreak(e.body);return null;
@@ -249,7 +272,8 @@ RQ.lint=(ast,info)=>{
   }
 
   for(const n of consts.keys())constKnown(n);
-  for(const it of ast.items){
+  const fns=ast.items.flatMap(it=>it.t==='Fn'?[it]:it.t==='Impl'&&!it.trait?it.items:[]);
+  for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
     st=new Map();dead=0;barriers=0;div=false;borrowed=new Set();
     RQ.walk(it.body,n=>{

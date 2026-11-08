@@ -95,7 +95,7 @@ describe('format specs in println!', () => {
     assert.equal(c.unsupported.feature, 'type checking');
   });
   it('any other spec, and a precision on a non-float, stay unsupported', () => {
-    for (const spec of ['{:#?}', '{:x}', '{:e}', '{:5}', '{:<5}', '{:05}', '{:+}', '{:.2?}', '{:>5.2}']) {
+    for (const spec of ['{:x}', '{:e}', '{:5}', '{:<5}', '{:05}', '{:+}', '{:.2?}', '{:>5.2}']) {
       const c = RQ.run(main(`    println!("${spec}", 1.5);`));
       assert.equal(c.status, 'unsupported', spec);
       assert.equal(c.unsupported.feature, 'format spec', spec);
@@ -112,6 +112,7 @@ describe('format specs in println!', () => {
     assert.equal(p.spec, false);
     assert.equal(JSON.stringify(p.parts.filter((x) => x.lit === undefined).map((x) => [x.idx ?? x.name, x.fmt.debug, x.fmt.prec, x.fmt.width])),
       JSON.stringify([[0, true, null, null], [0, false, 3, null], ['n', false, null, 4], [1, false, null, null]]));
-    assert.equal(RQ.std.parseFormat('{:#?}').spec, true);
+    assert.equal(RQ.std.parseFormat('{:#?}').spec, false);
+    assert.equal(RQ.std.parseFormat('{:#x}').spec, true);
   });
 });

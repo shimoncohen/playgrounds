@@ -18,8 +18,51 @@ const ERRORS={
   },
   E0382:{
     title:'a value is used after it moved',
-    msg:o=>'use of moved value: `'+o.name+'`',
-    tip:'A `String` has one owner. Passing it on, or writing `let t = s;`, moves it, and the old name stops working. Make a copy with `.clone()`, or lend it with `&`.'
+    msg:o=>o.assign?'assign to part of moved value: `'+o.name+'`':(o.borrow?'borrow':'use')+' of '+(o.partial?'partially moved':'moved')+' value: `'+o.name+'`',
+    tip:'A `String` has one owner. Passing it on, or writing `let t = s;`, moves it, and the old name stops working. A field moves on its own too: after `let n = p.name;` the rest of `p` still works, but `p` as a whole does not. Make a copy with `.clone()`, or lend it with `&`.'
+  },
+  E0004:{
+    title:'a match leaves some cases out',
+    msg:o=>{
+      const m=o.missing.map(x=>'`'+x+'`'),n=m.length;
+      return 'non-exhaustive patterns: '+(n===1?m[0]:n<=3?m.slice(0,-1).join(', ')+' and '+m[n-1]:m.slice(0,3).join(', ')+' and '+(n-3)+' more')+' not covered';
+    },
+    tip:'A `match` has to handle every variant of the `enum`. Add an arm for each missing one, or a last arm with `_` to catch the rest.'
+  },
+  E0170:{
+    title:'a pattern name is also a variant',
+    msg:o=>'pattern binding `'+o.name+'` is named the same as one of the variants of the type `'+o.enum+'`',
+    tip:'A bare name in a pattern is a new variable that matches anything, not the variant. Write the variant by its full path, like `Shape::Circle`, or rename the variable.'
+  },
+  E0277:{
+    title:'a value cannot be printed this way',
+    msg:o=>'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    tip:'`{}` needs the type to know how to show itself, and your own types do not. Print it with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one.'
+  },
+  E0369:{
+    title:'two values of this type cannot be compared',
+    msg:o=>'binary operation `'+o.op+'` cannot be applied to type `'+o.type+'`',
+    tip:'`==` needs the type to say what equal means. Add `#[derive(PartialEq)]` above the type, or compare the fields one by one.'
+  },
+  E0594:{
+    title:'a field is assigned, but it cannot change',
+    msg:o=>o.ref?'cannot assign to `'+o.name+'`, which is behind a `&` reference':'cannot assign to `'+o.name+'`, as `'+o.root+'` is not declared as mutable',
+    tip:'Changing a field changes the value that holds it, so that value has to be `mut`. Write `let mut` for the variable, or take a `&mut` parameter instead of a `&` one.'
+  },
+  E0507:{
+    title:'a value moves out from behind a reference',
+    msg:o=>'cannot move out of `'+o.name+'`'+(o.variant?' as enum variant `'+o.variant+'`':'')+' which is behind a '+(o.mut?'mutable':'shared')+' reference',
+    tip:'A reference only lends the value, so you cannot take it away from the owner. Copy it with `.clone()`, borrow it with `&`, or take the whole value by value in the signature.'
+  },
+  E0609:{
+    title:'a value has no such field',
+    msg:o=>'no field `'+o.name+'` on type `'+o.type+'`',
+    tip:'Check the spelling against the fields in the type\'s definition. A tuple\'s fields are numbered from 0.'
+  },
+  E0599:{
+    title:'no such method or item',
+    msg:o=>o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant or associated item':'function or associated item')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
+    tip:'Rust cannot find that name on this type. Check the spelling, that it is defined in an `impl` block for the type, and that a method has `self` as its first parameter. `.clone()` also needs `#[derive(Clone)]` on the type.'
   },
   E0499:{
     title:'a value is borrowed as mutable twice',
@@ -43,7 +86,7 @@ const ERRORS={
   },
   E0596:{
     title:'a value is borrowed as mutable, but it cannot change',
-    msg:o=>o.ref?'cannot borrow `'+o.name+'` as mutable, as it is behind a `&` reference':'cannot borrow `'+o.name+'` as mutable, as it is not declared as mutable',
+    msg:o=>o.ref?'cannot borrow `'+o.name+'` as mutable, as it is behind a `&` reference':'cannot borrow `'+o.name+'` as mutable, as '+(o.root?'`'+o.root+'`':'it')+' is not declared as mutable',
     tip:'Changing a value through a borrow needs the right to change it. Write `let mut` for the variable, or take a `&mut` parameter instead of a `&` one.'
   },
   E0597:{
@@ -58,7 +101,7 @@ const ERRORS={
   },
   E0515:{
     title:'a function returns a reference to its own local',
-    msg:o=>'cannot return '+(o.direct?'reference to ':'value referencing ')+(o.param?'function parameter':'local variable')+' `'+o.name+'`',
+    msg:o=>'cannot return '+(o.direct?'reference to ':'value referencing ')+(o.path?'local data':o.param?'function parameter':'local variable')+' `'+o.name+'`',
     tip:'A local variable is freed when the function ends, so a reference to it would point at nothing. Return the value itself (for text, a `String`) so the caller becomes its owner.'
   },
   E0428:{
@@ -139,12 +182,15 @@ const HINTS={
   'higher-ranked bound':'Higher-ranked bounds (`for<...>`) are not modeled. Plain lifetime names cover every mission.',
   'lifetime bound':'Bounds between lifetimes (like `\'a: \'b`) are not modeled. Plain lifetime names cover every mission.',
   'never type':'The `!` type is not modeled. Give the function a normal return type instead.',
-  struct:'Only a plain `struct Name { field: Type }` is modeled: named fields that own their value (no `&`), no generics and no `#[derive]`.',enum:LATER,
-  impl:'Only `impl Drop for Name { fn drop(&mut self) { ... } }` is modeled, and its body only prints with `println!`.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
+  struct:'A `struct` is modeled with named, tuple or unit fields that own their value (no `&`) and no generics. A tuple or unit `struct` cannot share its name with a `fn` or a `const`.',
+  enum:'An `enum` is modeled with variants written as `Name`, `Name(T)` or `Name { field: T }`, no generics, and no `= value` numbers on the variants.',
+  derive:'Only `#[derive(...)]` of `Debug`, `Clone`, `Copy`, `PartialEq` and `Eq` is modeled. Every field must have the trait too, `Copy` needs `Clone` beside it, and `Eq` needs `PartialEq`.',
+  'match guard':'A `match` arm with an `if` guard is not modeled. Put the condition inside the arm instead.',
+  impl:'Only `impl Name { ... }` with plain methods and associated functions (no generics, attributes or constants), and `impl Drop for Name` whose `drop` only prints with `println!`, are modeled.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
   'type alias':LATER,use:'`use` is not needed yet: the missions only use what Rust gives every program.',mod:LATER,generics:LATER,
-  method:LATER,'nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,
-  match:LATER,
-  'method call':'Only `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on a `String` (and `len`, `to_string` and `to_owned` on a `&str`) are modeled for now.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled for now.',
+  method:'A method takes `self`, `&self` or `&mut self` as its first parameter. A receiver with a type written out, like `self: Box<Self>`, is not modeled.','nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,
+  match:'A `match` is modeled on an `enum`, or a `&` to one, only. Use `if` for other values.',
+  'method call':'Modeled for now: `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on a `String` (and `len`, `to_string` and `to_owned` on a `&str`); the methods you write in an `impl`; `clone` on a type that derives `Clone`; `is_some`, `is_none`, `is_ok`, `is_err`, `unwrap`, `expect` and `unwrap_or` on `Option` and `Result`.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled for now. An `enum` has no fields: use a `match`.',
   'field of a temporary':'Reading a field of a value that is not in a variable, like `make().id`, is not modeled. Put the value in a variable first.',slice:'A bare slice type `[T]` has no size, so it only appears behind a `&`, as `&[T]`.',
   'slice of non-ASCII text':'Slicing text with accented letters, emoji or other non-English characters is not modeled, because one letter can take several bytes. Use plain English letters for now.',
   reference:'Only `&T` and `&mut T` on a `String` or a number are modeled, `&str` for text, and `&[T]` for a slice. Use one of those, or pass the value itself.',
@@ -153,22 +199,23 @@ const HINTS={
   'lifetime elision':'A function that returns a reference is modeled only as `-> &T` with exactly one `&` (not `&mut`) parameter. Otherwise return an owned value, like a `String`.',
   'reference coercion':'Rust Quest only converts a `&String` into a `&str` for you. Pass the same kind of reference the function asks for.',
   'reference to reference':'A reference to a reference, like `&&str` or `&t` where `t` is already a `&str`, is not modeled. Pass `t` itself instead.',
-  reborrow:'Reborrowing a `&mut`, like `&*r`, or calling `as_str` on a `&mut String`, is not modeled. Use the `&mut` variable directly instead.',
-  'borrow of a field':'Borrowing a field or an element, like `&t.0` or `&a[0]`, is not modeled. Borrow the whole variable instead.',
+  reborrow:'Reborrowing a `&mut`, like `&*r`, borrowing a field behind a `&mut`, like `&mut self.items`, or calling `as_str` on a `&mut String`, is not modeled. Use the `&mut` variable directly instead.',
+  'borrow of a field':'Borrowing an array element, like `&a[0]`, is not modeled. Borrow the whole variable instead.',
   'temporary borrow':'Borrowing a temporary value, like `&5`, `&String::new()` or `String::from("a").as_str()`, is not modeled. Put the value in a variable first, then borrow the variable.',
-  'partial move':'Moving a field or an element out of a tuple or array, like `let s = t.0;`, is not modeled. Use a field that is a number, or `.clone()` it.',
+  'partial move':'Moving an element out of an array, a field out of a type with `impl Drop`, or a name out of a `match` on such a value is not modeled. Use `.clone()`, or a field that is a number. A match that moves a name the compiler may already see as moved is not modeled either.',
   'move out of reference':'Moving a value out from behind a reference, like `let t = *r;` on a `&String`, is not modeled. Use `r.clone()` to copy it instead.',
   'two-phase borrow':'A `&mut` method call whose argument uses the same variable, like `s.push_str(&s)`, is not modeled. Copy the argument into a variable first.',
   'constant condition':'An `if` or `while` whose condition is the literal `true` or `false` is not modeled. Put the condition in a variable, or use `loop`.',
   'use while borrowed':'Reading or updating a number while a `&mut` borrow of it is still in use is not modeled. Finish with the `&mut` first, or read the value through the reference.',
   'reference in aggregate':'A tuple or array that holds a reference, like `(&x, 1)`, is not modeled. Keep the reference in its own variable.',
+  'repeated error':'Several `&mut` borrows of a variable that is not `mut` are one error in Rust, and Rust Quest does not model how it is reported. Write `let mut` for the variable first.',
   'program too large':'This function is too big for the borrow checker in Rust Quest. Split it into smaller functions.',
   cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':LATER,'struct literal':'Write every field of the `struct` exactly once, as `Name { field: value, ... }`, with no `..` base.','qualified path':LATER,
-  'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out. Rust Quest does not infer a type behind `_` yet.',
-  pattern:'Rust Quest only models a plain name (or `_`) on the left of a `let`, `mut name` included.',
+  'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out, like `let x: Option<i32> = None;`. Rust Quest does not infer a type behind `_`, or for a `None` that nothing else gives a type.',
+  pattern:'A `let` takes a plain name (or `_`), `mut name` included. A `match` arm takes a variant like `Shape::Circle(r)` whose parts are plain names or `_`, a `_`, or a name that catches the rest.',
   'let else':LATER,
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
-  'format spec':'Only `{}`, `{:?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
+  'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
   'assignment target':'Only a plain variable name can be assigned to for now.',
   'type checking':'Rust Quest cannot tell yet whether these types fit together. Keep each value to one type for now.',
   'const initializer':'A `const` can only hold a literal, or simple maths on other constants, for now.',
@@ -180,14 +227,14 @@ const HINTS={
   'array length':'Write the array length as a plain number, like `[i32; 3]`, no bigger than 10000.',
   'break outside loop':'`break` and `continue` only work inside a loop.',
   'main signature':'`main` takes no parameters and returns nothing in this quest. Write `fn main() { ... }`.',
-  'path call':'Calling functions that live inside a type or module (`Name::function`) is not modeled yet.',
+  'path call':'Only `Name::function` for a function in your own `impl Name { ... }`, an `enum` variant, `String::new` and `String::from` are modeled.',
   'function value':'Using a function as a value is not modeled yet. Call it with `name(...)` instead.',
   'bit shift':'Shifts are not modeled yet. Multiply or divide instead.',
   'block label':LATER,
   call:'Only a call to one of your own functions, like `name(1, 2)`, is modeled for now.',
   'wrong argument count':'Rust Quest does not check argument counts yet. Pass exactly what the function declares.',
   String:'Only a plain `String` is modeled, with no type arguments or path in front. Build one with `String::from("hi")` or `String::new()`.',
-  Vec:LATER,HashMap:LATER,Option:LATER,Result:LATER,Box:LATER,
+  Vec:LATER,HashMap:LATER,Option:'Write `Option<T>` with its type argument, like `Option<i32>`, and build it with `Some(x)` or `None`.',Result:'Write `Result<T, E>` with both type arguments, like `Result<i32, String>`, and build it with `Ok(x)` or `Err(e)`.',Box:LATER,
   str:'Use the `&str` type for text for now.',
   'panic!':'`panic!` is not modeled yet. Print a message with `println!` instead.',
   'assert!':'`assert!` is not modeled yet. Print the value with `println!` and look at it.',

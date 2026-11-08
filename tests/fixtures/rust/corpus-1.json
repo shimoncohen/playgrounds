@@ -1852,5 +1852,815 @@
     "src": "fn main() {\n    let mut s = String::from(\"hello\");\n    let a = &s[..2];\n    println!(\"{}\", a);\n    let m = &mut s;\n    m.push_str(\"!\");\n}\n",
     "expect": "ok", "out": "he\n", "err": "", "exit": 0,
     "why": "the slice is used up before the &mut starts", "pr": "P7"
+  },
+  {
+    "id": "field-two-mut-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let x = &mut p.a;\n    let y = &mut p.b;\n    x.push_str(\"1\");\n    y.push_str(\"2\");\n    println!(\"{} {}\", p.a, p.b);\n}\n",
+    "expect": "ok", "out": "a1 b2\n", "err": "", "exit": 0,
+    "why": "two fields of one struct borrow mutably at once", "pr": "P8"
+  },
+  {
+    "id": "field-two-mut",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let x = &mut p.a;\n    let y = &mut p.a;\n    x.push_str(\"1\");\n    y.push_str(\"2\");\n    println!(\"{} {}\", p.a, p.b);\n}\n",
+    "expect": {"code": "E0499", "line": 10}, "pair": "field-two-mut-ok",
+    "why": "the same field cannot borrow mutably twice", "pr": "P8"
+  },
+  {
+    "id": "field-mut-sibling-read-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let m = &mut p.a;\n    let r = &p.b;\n    m.push_str(\"1\");\n    println!(\"{} {}\", r, p.n);\n}\n",
+    "expect": "ok", "out": "b 1\n", "err": "", "exit": 0,
+    "why": "a field is read while a sibling is borrowed mutably", "pr": "P8"
+  },
+  {
+    "id": "field-mut-whole-read",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let m = &mut p.a;\n    let r = &p;\n    m.push_str(\"1\");\n    println!(\"{} {}\", r.b, p.n);\n}\n",
+    "expect": {"code": "E0502", "line": 10}, "pair": "field-mut-sibling-read-ok",
+    "why": "the whole struct cannot be read while a field is borrowed mutably", "pr": "P8"
+  },
+  {
+    "id": "field-whole-mut-field-read-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let m = &mut p.n;\n    let r = &p.b;\n    *m += 1;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "a field is borrowed mutably while a sibling is read", "pr": "P8"
+  },
+  {
+    "id": "field-whole-mut-then-field",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let m = &mut p;\n    let r = &p.b;\n    m.n += 1;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 10}, "pair": "field-whole-mut-field-read-ok",
+    "why": "a field cannot be borrowed while the whole struct is borrowed mutably", "pr": "P8"
+  },
+  {
+    "id": "field-ref-sibling-write-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.n;\n    p.a = String::from(\"z\");\n    println!(\"{} {}\", r, p.a);\n}\n",
+    "expect": "ok", "out": "1 z\n", "err": "", "exit": 0,
+    "why": "a field is written while a sibling is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-write",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.n;\n    p.n = 5;\n    println!(\"{} {}\", r, p.a);\n}\n",
+    "expect": {"code": "E0506", "line": 10}, "pair": "field-ref-write-ok",
+    "why": "a field cannot be written while it is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-write-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.a;\n    p.n = 5;\n    println!(\"{} {}\", r, p.a);\n}\n",
+    "expect": "ok", "out": "a a\n", "err": "", "exit": 0,
+    "why": "the accepted twin of field-ref-write: another field is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-sibling-move-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.a;\n    let t = p.b;\n    println!(\"{} {}\", r, t);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "a field moves while a sibling is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-move",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.a;\n    let t = p.a;\n    println!(\"{} {}\", r, t);\n}\n",
+    "expect": {"code": "E0505", "line": 10}, "pair": "field-ref-sibling-move-ok",
+    "why": "a field cannot move while it is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-move-whole",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &p.a;\n    let q = p;\n    println!(\"{} {}\", r, q.n);\n}\n",
+    "expect": {"code": "E0505", "line": 10}, "pair": "field-ref-sibling-move-ok",
+    "why": "the whole struct cannot move while a field is borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-slice-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let s = &p.a[0..1];\n    p.b.push_str(\"x\");\n    println!(\"{} {}\", s, p.b);\n}\n",
+    "expect": "ok", "out": "a bx\n", "err": "", "exit": 0,
+    "why": "a slice of a field keeps just that field borrowed", "pr": "P8"
+  },
+  {
+    "id": "field-ref-slice",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let s = &p.a[0..1];\n    p.a.push_str(\"x\");\n    println!(\"{} {}\", s, p.b);\n}\n",
+    "expect": {"code": "E0502", "line": 10}, "pair": "field-ref-slice-ok",
+    "why": "a slice of a field cannot outlive a write to that field", "pr": "P8"
+  },
+  {
+    "id": "field-mut-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &mut p.a;\n    r.push_str(\"!\");\n    println!(\"{}\", p.a);\n}\n",
+    "expect": "ok", "out": "a!\n", "err": "", "exit": 0,
+    "why": "a field of a mutable variable borrows mutably", "pr": "P8"
+  },
+  {
+    "id": "field-mut-immutable",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let r = &mut p.a;\n    r.push_str(\"!\");\n    println!(\"{}\", p.a);\n}\n",
+    "expect": {"code": "E0596", "line": 9}, "pair": "field-mut-ok",
+    "why": "a field of an immutable variable cannot borrow mutably", "pr": "P8"
+  },
+  {
+    "id": "field-assign-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    p.n = 2;\n    p.a.push_str(\"!\");\n    println!(\"{} {}\", p.n, p.a);\n}\n",
+    "expect": "ok", "out": "2 a!\n", "err": "", "exit": 0,
+    "why": "a field of a mutable variable can be assigned", "pr": "P8"
+  },
+  {
+    "id": "field-assign-immutable",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    p.n = 2;\n    println!(\"{}\", p.n);\n}\n",
+    "expect": {"code": "E0594", "line": 9}, "pair": "field-assign-ok-twin",
+    "why": "a field of an immutable variable cannot be assigned", "pr": "P8"
+  },
+  {
+    "id": "field-assign-ok-twin",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    p.n = 2;\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the accepted twin of field-assign-immutable", "pr": "P8"
+  },
+  {
+    "id": "field-assign-ref",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn set(p: &P) {\n    p.n = 2;\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    set(&p);\n    println!(\"{}\", p.n);\n}\n",
+    "expect": {"code": "E0594", "line": 8}, "pair": "field-assign-ref-ok",
+    "why": "a field cannot be assigned through a shared reference", "pr": "P8"
+  },
+  {
+    "id": "field-assign-ref-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn set(p: &mut P) {\n    p.n = 2;\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    set(&mut p);\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a field can be assigned through a mutable reference", "pr": "P8"
+  },
+  {
+    "id": "partial-move-rest-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    println!(\"{} {} {}\", t, p.b, p.n);\n}\n",
+    "expect": "ok", "out": "a b 1\n", "err": "", "exit": 0,
+    "why": "a moved field leaves the other fields usable", "pr": "P8"
+  },
+  {
+    "id": "partial-move-reuse",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    println!(\"{} {}\", t, p.a);\n}\n",
+    "expect": {"code": "E0382", "line": 10}, "pair": "partial-move-reuse-ok",
+    "why": "a moved field cannot be used again", "pr": "P8"
+  },
+  {
+    "id": "partial-move-reuse-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    println!(\"{} {}\", t, p.b);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "the accepted twin of partial-move-reuse: the other field", "pr": "P8"
+  },
+  {
+    "id": "partial-move-whole",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    let q = p;\n    println!(\"{} {}\", t, q.b);\n}\n",
+    "expect": {"code": "E0382", "line": 10}, "pair": "partial-move-whole-ok",
+    "why": "a partly moved struct cannot move as a whole", "pr": "P8"
+  },
+  {
+    "id": "partial-move-whole-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    let q = p.b;\n    println!(\"{} {}\", t, q);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "the other field still moves on its own", "pr": "P8"
+  },
+  {
+    "id": "partial-move-borrow",
+    "src": "#[derive(Debug)]\nstruct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    println!(\"{:?} {}\", p, t);\n}\n",
+    "expect": {"code": "E0382", "line": 11}, "pair": "partial-move-borrow-ok",
+    "why": "a partly moved struct cannot be borrowed as a whole", "pr": "P8"
+  },
+  {
+    "id": "partial-move-borrow-ok",
+    "src": "#[derive(Debug)]\nstruct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    println!(\"{:?} {}\", p.b, t);\n}\n",
+    "expect": "ok", "out": "\"b\" a\n", "err": "", "exit": 0,
+    "why": "a field of a partly moved struct can be borrowed", "pr": "P8"
+  },
+  {
+    "id": "partial-move-copy-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let k = p.n;\n    println!(\"{} {} {}\", k, p.n, p.a);\n}\n",
+    "expect": "ok", "out": "1 1 a\n", "err": "", "exit": 0,
+    "why": "a Copy field copies and does not move", "pr": "P8"
+  },
+  {
+    "id": "partial-move-loop",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    for i in 0..2 {\n        let t = p.a;\n        println!(\"{} {}\", i, t);\n    }\n}\n",
+    "expect": {"code": "E0382", "line": 10}, "pair": "partial-move-loop-ok",
+    "why": "a field moves out in every pass of a loop", "pr": "P8"
+  },
+  {
+    "id": "partial-move-loop-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    for i in 0..2 {\n        let t = p.n;\n        println!(\"{} {}\", i, t);\n    }\n}\n",
+    "expect": "ok", "out": "0 1\n1 1\n", "err": "", "exit": 0,
+    "why": "a Copy field can be read in every pass of a loop", "pr": "P8"
+  },
+  {
+    "id": "partial-move-reinit-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let t = p.a;\n    p.a = String::from(\"again\");\n    let q = p;\n    println!(\"{} {} {}\", t, q.a, q.b);\n}\n",
+    "expect": "ok", "out": "a again b\n", "err": "", "exit": 0,
+    "why": "writing a moved field puts the struct back together", "pr": "P8"
+  },
+  {
+    "id": "partial-move-assign-whole",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let q = p;\n    p.n = 3;\n    println!(\"{}\", q.n);\n}\n",
+    "expect": {"code": "E0382", "line": 10}, "pair": "partial-move-assign-whole-ok",
+    "why": "assigning a field of a moved struct is an error", "pr": "P8"
+  },
+  {
+    "id": "partial-move-assign-whole-ok",
+    "src": "struct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let q = p.n;\n    p.n = 3;\n    println!(\"{}\", q);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the accepted twin of partial-move-assign-whole", "pr": "P8"
+  },
+  {
+    "id": "partial-move-fn-ok",
+    "src": "fn len(s: String) -> usize {\n    s.len()\n}\n\nstruct P {\n    a: String,\n    b: String,\n    n: i32,\n}\n\nfn main() {\n    let mut p = P { a: String::from(\"a\"), b: String::from(\"b\"), n: 1 };\n    let k = len(p.a);\n    println!(\"{} {}\", k, p.b);\n}\n",
+    "expect": "ok", "out": "1 b\n", "err": "", "exit": 0,
+    "why": "a field moves into a function and the rest stays", "pr": "P8"
+  },
+  {
+    "id": "partial-move-nested-ok",
+    "src": "struct I {\n    s: String,\n    t: String,\n}\n\nstruct O {\n    i: I,\n    n: i32,\n}\n\nfn main() {\n    let o = O { i: I { s: String::from(\"s\"), t: String::from(\"t\") }, n: 1 };\n    let a = o.i.s;\n    println!(\"{} {} {}\", a, o.i.t, o.n);\n}\n",
+    "expect": "ok", "out": "s t 1\n", "err": "", "exit": 0,
+    "why": "a field of a field moves, the rest of the outer struct stays", "pr": "P8"
+  },
+  {
+    "id": "partial-move-nested",
+    "src": "struct I {\n    s: String,\n    t: String,\n}\n\nstruct O {\n    i: I,\n    n: i32,\n}\n\nfn main() {\n    let o = O { i: I { s: String::from(\"s\"), t: String::from(\"t\") }, n: 1 };\n    let a = o.i.s;\n    let b = o.i;\n    println!(\"{} {}\", a, o.n);\n}\n",
+    "expect": {"code": "E0382", "line": 14}, "pair": "partial-move-nested-twin",
+    "why": "the parent of a moved field cannot move whole", "pr": "P8"
+  },
+  {
+    "id": "partial-move-nested-twin",
+    "src": "struct I {\n    s: String,\n    t: String,\n}\n\nstruct O {\n    i: I,\n    n: i32,\n}\n\nfn main() {\n    let o = O { i: I { s: String::from(\"s\"), t: String::from(\"t\") }, n: 1 };\n    let a = o.i.s;\n    let b = o.i.t;\n    println!(\"{} {} {}\", a, b, o.n);\n}\n",
+    "expect": "ok", "out": "s t 1\n", "err": "", "exit": 0,
+    "why": "the sibling of the moved field moves on its own", "pr": "P8"
+  },
+  {
+    "id": "partial-move-tuple-ok",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let x = t.0;\n    println!(\"{} {}\", x, t.1);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "a tuple moves its parts one at a time", "pr": "P8"
+  },
+  {
+    "id": "partial-move-tuple",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let x = t.0;\n    let u = t;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "partial-move-tuple-twin",
+    "why": "a partly moved tuple cannot move as a whole", "pr": "P8"
+  },
+  {
+    "id": "partial-move-tuple-twin",
+    "src": "fn main() {\n    let t = (String::from(\"a\"), String::from(\"b\"));\n    let x = t.0;\n    let u = t.1;\n    println!(\"{} {}\", x, u);\n}\n",
+    "expect": "ok", "out": "a b\n", "err": "", "exit": 0,
+    "why": "the other part of the tuple moves on its own", "pr": "P8"
+  },
+  {
+    "id": "partial-move-deref",
+    "src": "struct P {\n    name: String,\n}\n\nfn take(p: &P) -> String {\n    p.name\n}\n\nfn main() {\n    let p = P { name: String::from(\"n\") };\n    println!(\"{}\", take(&p));\n}\n",
+    "expect": {"code": "E0507", "line": 6}, "pair": "partial-move-deref-ok",
+    "why": "a field cannot move out from behind a reference", "pr": "P8"
+  },
+  {
+    "id": "partial-move-deref-ok",
+    "src": "struct P {\n    name: String,\n}\n\nfn take(p: &P) -> String {\n    p.name.clone()\n}\n\nfn main() {\n    let p = P { name: String::from(\"n\") };\n    println!(\"{}\", take(&p));\n}\n",
+    "expect": "ok", "out": "n\n", "err": "", "exit": 0,
+    "why": "a clone of the field leaves the original behind the reference", "pr": "P8"
+  },
+  {
+    "id": "partial-move-deref-mut",
+    "src": "struct P {\n    name: String,\n}\n\nfn take(p: &mut P) -> String {\n    p.name\n}\n\nfn main() {\n    let mut p = P { name: String::from(\"n\") };\n    println!(\"{}\", take(&mut p));\n}\n",
+    "expect": {"code": "E0507", "line": 6}, "pair": "partial-move-deref-mut-ok",
+    "why": "a field cannot move out from behind a mutable reference either", "pr": "P8"
+  },
+  {
+    "id": "partial-move-deref-mut-ok",
+    "src": "struct P {\n    name: String,\n}\n\nfn take(p: &mut P) -> String {\n    p.name.clone()\n}\n\nfn main() {\n    let mut p = P { name: String::from(\"n\") };\n    println!(\"{}\", take(&mut p));\n}\n",
+    "expect": "ok", "out": "n\n", "err": "", "exit": 0,
+    "why": "a clone of the field leaves the original behind the mutable reference", "pr": "P8"
+  },
+  {
+    "id": "match-variants",
+    "src": "enum Shape {\n    Dot,\n    Circle(i32),\n    Rect { w: i32, h: i32 },\n    Label(String),\n}\n\nfn size(s: Shape) -> i32 {\n    match s {\n        Shape::Dot => 0,\n        Shape::Circle(r) => 3 * r * r,\n        Shape::Rect { w, h } => w * h,\n        Shape::Label(t) => t.len() as i32,\n    }\n}\n\nfn main() {\n    println!(\"{}\", size(Shape::Dot));\n    println!(\"{}\", size(Shape::Circle(2)));\n    println!(\"{}\", size(Shape::Rect { w: 3, h: 4 }));\n    println!(\"{}\", size(Shape::Label(String::from(\"hey\"))));\n}\n",
+    "expect": "ok", "out": "0\n12\n12\n3\n", "err": "", "exit": 0,
+    "why": "each variant kind binds its payload in its arm", "pr": "P8"
+  },
+  {
+    "id": "match-ref-bindings",
+    "src": "enum Shape {\n    Dot,\n    Circle(i32),\n    Rect { w: i32, h: i32 },\n    Label(String),\n}\n\nfn size(s: &Shape) -> i32 {\n    match s {\n        Shape::Circle(r) => *r,\n        Shape::Rect { w, .. } => *w,\n        Shape::Label(t) => t.len() as i32,\n        _ => -1,\n    }\n}\n\nfn main() {\n    let a = Shape::Label(String::from(\"abc\"));\n    println!(\"{} {}\", size(&a), size(&a));\n    let b = Shape::Rect { w: 5, h: 1 };\n    println!(\"{}\", size(&b));\n    let c = a;\n    if size(&c) > 0 {\n        println!(\"moved after\");\n    }\n}\n",
+    "expect": "ok", "out": "3 3\n5\nmoved after\n", "err": "", "exit": 0,
+    "why": "a match on a reference binds references and keeps the owner", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let d = E::A;\n    let n = match d { E::A => 1 };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0004", "line": 8}, "pair": "match-nonexhaustive-ok",
+    "why": "a match must cover every variant", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive-ok",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let d = E::A;\n    let n = match d { E::A => 1, _ => 2 };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a catch-all arm covers the rest", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive-payload",
+    "src": "enum E {\n    A(i32),\n    B,\n}\n\nfn main() {\n    let d = E::B;\n    match d {\n        E::B => println!(\"b\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 8}, "pair": "match-nonexhaustive-payload-ok",
+    "why": "a tuple variant left out is reported with its shape", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive-payload-ok",
+    "src": "enum E {\n    A(i32),\n    B,\n}\n\nfn main() {\n    let d = E::B;\n    match d {\n        _ => println!(\"b\"),\n    }\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "a wildcard arm covers the tuple variant", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive-option",
+    "src": "fn main() {\n    let o: Option<i32> = None;\n    let n = match o { Some(n) => n };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "match-nonexhaustive-option-ok",
+    "why": "Option needs its None arm", "pr": "P8"
+  },
+  {
+    "id": "match-nonexhaustive-option-ok",
+    "src": "fn main() {\n    let o: Option<i32> = None;\n    let n = match o { Some(n) => n, _ => 0 };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "a wildcard covers None", "pr": "P8"
+  },
+  {
+    "id": "match-arm-types",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let d = E::A;\n    let n = match d {\n        E::A => 1,\n        E::B => \"b\",\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0308", "line": 10}, "pair": "match-arm-types-ok",
+    "why": "every arm of a match has the same type", "pr": "P8"
+  },
+  {
+    "id": "match-arm-types-ok",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let d = E::A;\n    let n = match d {\n        E::A => 1,\n        E::B => 2,\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "arms of one type", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-ok",
+    "src": "enum Msg {\n    Text(String),\n    Pair(String, String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    let b = Msg::Pair(String::from(\"x\"), String::from(\"y\"));\n    let c = Msg::Quit;\n    match a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Pair(x, y) => println!(\"{} {}\", x, y),\n        Msg::Quit => println!(\"quit\"),\n    }\n    match b {\n        Msg::Pair(x, _) => println!(\"first {}\", x),\n        _ => println!(\"other\"),\n    }\n    match c {\n        Msg::Quit => println!(\"bye\"),\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "text hi\nfirst x\nbye\n", "err": "", "exit": 0,
+    "why": "a name in an arm moves the payload out; the other variant is untouched", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-reuse",
+    "src": "enum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Quit => println!(\"quit\"),\n    }\n    match a {\n        Msg::Text(_) => println!(\"again\"),\n        Msg::Quit => println!(\"quit\"),\n    }\n}\n",
+    "expect": {"code": "E0382", "line": 12}, "pair": "match-move-binding-reuse-ok",
+    "why": "a match that moved a payload leaves the enum partly moved", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-reuse-ok",
+    "src": "enum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match &a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Quit => println!(\"quit\"),\n    }\n    match a {\n        Msg::Text(_) => println!(\"again\"),\n        Msg::Quit => println!(\"quit\"),\n    }\n}\n",
+    "expect": "ok", "out": "text hi\nagain\n", "err": "", "exit": 0,
+    "why": "matching on a reference first does not move the payload", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-whole",
+    "src": "enum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Quit => println!(\"quit\"),\n    }\n    let b = a;\n}\n",
+    "expect": {"code": "E0382", "line": 12}, "pair": "match-move-binding-whole-ok",
+    "why": "the enum cannot be used whole after a payload moved out", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-whole-ok",
+    "src": "enum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match a {\n        Msg::Text(_) => println!(\"text\"),\n        Msg::Quit => println!(\"quit\"),\n    }\n    let b = a;\n}\n",
+    "expect": "ok", "out": "text\n", "err": "", "exit": 0,
+    "why": "a wildcard arm does not move the payload", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-print",
+    "src": "#[derive(Debug)]\nenum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Quit => println!(\"quit\"),\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0382", "line": 13}, "pair": "match-move-binding-print-ok",
+    "why": "a partly moved enum cannot be printed", "pr": "P8"
+  },
+  {
+    "id": "match-move-binding-print-ok",
+    "src": "#[derive(Debug)]\nenum Msg {\n    Text(String),\n    Quit,\n}\n\nfn main() {\n    let a = Msg::Text(String::from(\"hi\"));\n    match &a {\n        Msg::Text(t) => println!(\"text {}\", t),\n        Msg::Quit => println!(\"quit\"),\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "text hi\nText(\"hi\")\n", "err": "", "exit": 0,
+    "why": "matching on a reference leaves the enum whole to print", "pr": "P8"
+  },
+  {
+    "id": "match-move-behind-ref",
+    "src": "enum E {\n    A(String),\n    B,\n}\n\nstruct W {\n    e: E,\n}\n\nfn show(w: &W) {\n    match w.e {\n        E::A(s) => println!(\"{}\", s),\n        E::B => {}\n    }\n}\n\nfn main() {\n    let w = W { e: E::A(String::from(\"x\")) };\n    show(&w);\n}\n",
+    "expect": {"code": "E0507", "line": 11}, "pair": "match-move-behind-ref-ok",
+    "why": "a name cannot move a payload out from behind a reference", "pr": "P8"
+  },
+  {
+    "id": "match-move-behind-ref-ok",
+    "src": "enum E {\n    A(String),\n    B,\n}\n\nstruct W {\n    e: E,\n}\n\nfn show(w: &W) {\n    match &w.e {\n        E::A(s) => println!(\"{}\", s),\n        E::B => {}\n    }\n}\n\nfn main() {\n    let w = W { e: E::A(String::from(\"x\")) };\n    show(&w);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "matching on a reference to the field borrows the payload", "pr": "P8"
+  },
+  {
+    "id": "match-catch-all-name",
+    "src": "enum E {\n    A,\n    B,\n    C,\n}\n\nfn main() {\n    let x = E::C;\n    let n = match x {\n        E::A => 1,\n        other => match other {\n            E::B => 2,\n            _ => 3,\n        },\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "a plain name catches what the earlier arms left", "pr": "P8"
+  },
+  {
+    "id": "match-temp-scrutinee-drop",
+    "src": "struct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nfn mk() -> Option<D> {\n    Some(D { n: 5 })\n}\n\nfn main() {\n    match mk() {\n        Some(d) => println!(\"got {}\", d.n),\n        None => println!(\"none\"),\n    }\n    println!(\"between\");\n    match mk() {\n        Some(_) => println!(\"peek\"),\n        None => {}\n    }\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "got 5\ndrop 5\nbetween\npeek\ndrop 5\nend\n", "err": "", "exit": 0,
+    "why": "a temporary scrutinee drops at the end of the match, and an arm name at the arm end", "pr": "P8"
+  },
+  {
+    "id": "match-binding-drop-order",
+    "src": "struct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nenum Slot {\n    Full(D),\n    Empty,\n}\n\nfn main() {\n    let a = D { n: 1 };\n    let s = Slot::Full(D { n: 2 });\n    let e = Slot::Empty;\n    match s {\n        Slot::Full(d) => println!(\"full {}\", d.n),\n        Slot::Empty => println!(\"empty\"),\n    }\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "full 2\ndrop 2\nend\ndrop 1\n", "err": "", "exit": 0,
+    "why": "a payload moved into a name drops with that name", "pr": "P8"
+  },
+  {
+    "id": "option-result-flow",
+    "src": "fn half(n: i32) -> Option<i32> {\n    if n % 2 == 0 { Some(n / 2) } else { None }\n}\n\nfn parse(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\n\nfn main() {\n    println!(\"{:?} {:?}\", half(4), half(3));\n    println!(\"{:?} {:?}\", parse(2), parse(-2));\n    match half(8) {\n        Some(n) => println!(\"half {}\", n),\n        None => println!(\"odd\"),\n    }\n    match parse(-1) {\n        Ok(n) => println!(\"ok {}\", n),\n        Err(e) => println!(\"err {}\", e),\n    }\n    let s: Option<String> = Some(String::from(\"hey\"));\n    let n: Option<String> = None;\n    println!(\"{:?} {:?}\", s, n);\n}\n",
+    "expect": "ok", "out": "Some(2) None\nOk(2) Err(\"negative\")\nhalf 4\nerr negative\nSome(\"hey\") None\n", "err": "", "exit": 0,
+    "why": "Option and Result are built, matched and printed", "pr": "P8"
+  },
+  {
+    "id": "option-methods",
+    "src": "fn main() {\n    let a = Some(2);\n    let n: Option<i32> = None;\n    let r: Result<i32, String> = Err(String::from(\"e\"));\n    let k: Result<i32, String> = Ok(9);\n    println!(\"{} {} {} {}\", a.is_some(), n.is_none(), r.is_err(), k.is_ok());\n    println!(\"{} {} {}\", n.unwrap_or(7), a.unwrap(), k.unwrap());\n    let s = Some(String::from(\"x\"));\n    let t: Option<String> = None;\n    println!(\"{} {}\", s.unwrap_or(String::from(\"d\")), t.unwrap_or(String::from(\"d\")));\n}\n",
+    "expect": "ok", "out": "true true true true\n7 2 9\nx d\n", "err": "", "exit": 0,
+    "why": "is_some, is_none, is_ok, is_err, unwrap and unwrap_or", "pr": "P8"
+  },
+  {
+    "id": "option-unwrap-none-panic",
+    "src": "fn main() {\n    let n: Option<i32> = None;\n    println!(\"start\");\n    let x = n.unwrap();\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "start\n", "err": "\nthread 'main' panicked at src/main.rs:4:15:\ncalled `Option::unwrap()` on a `None` value\n", "exit": 101,
+    "why": "unwrap on None panics at the method name", "pr": "P8"
+  },
+  {
+    "id": "option-expect-panic",
+    "src": "fn main() {\n    let n: Option<i32> = None;\n    let x = n.expect(\"need a value\");\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:15:\nneed a value\n", "exit": 101,
+    "why": "expect on None panics with the message", "pr": "P8"
+  },
+  {
+    "id": "result-unwrap-err-panic",
+    "src": "fn main() {\n    let r: Result<i32, String> = Err(String::from(\"bad\"));\n    let x = r.unwrap();\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:15:\ncalled `Result::unwrap()` on an `Err` value: \"bad\"\n", "exit": 101,
+    "why": "unwrap on an Err shows the error with Debug", "pr": "P8"
+  },
+  {
+    "id": "result-expect-err-panic",
+    "src": "fn main() {\n    let r: Result<i32, String> = Err(String::from(\"bad\"));\n    let x = r.expect(\"it failed\");\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:15:\nit failed: \"bad\"\n", "exit": 101,
+    "why": "expect on an Err shows the message and the error", "pr": "P8"
+  },
+  {
+    "id": "option-unwrap-drops-error",
+    "src": "#[derive(Debug)]\nstruct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nfn main() {\n    let r: Result<i32, D> = Err(D { n: 4 });\n    let x = r.unwrap();\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "drop 4\n", "err": "\nthread 'main' panicked at src/main.rs:14:15:\ncalled `Result::unwrap()` on an `Err` value: D { n: 4 }\n", "exit": 101,
+    "why": "a failing unwrap drops the error while unwinding", "pr": "P8"
+  },
+  {
+    "id": "option-move",
+    "src": "fn main() {\n    let a: Option<String> = Some(String::from(\"s\"));\n    let b = a;\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "option-move-ok",
+    "why": "an Option of a String moves with the String", "pr": "P8"
+  },
+  {
+    "id": "option-move-ok",
+    "src": "fn main() {\n    let a: Option<String> = Some(String::from(\"s\"));\n    let b = &a;\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "Some(\"s\") Some(\"s\")\n", "err": "", "exit": 0,
+    "why": "a reference to the Option does not move it", "pr": "P8"
+  },
+  {
+    "id": "option-copy-ok",
+    "src": "fn main() {\n    let a: Option<i32> = Some(5);\n    let b = a;\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "Some(5) Some(5)\n", "err": "", "exit": 0,
+    "why": "an Option of a number copies", "pr": "P8"
+  },
+  {
+    "id": "derive-debug-struct",
+    "src": "#[derive(Debug)]\nstruct Named {\n    id: u8,\n    name: String,\n    ratio: f64,\n}\n\n#[derive(Debug)]\nstruct Pair(i32, String);\n\n#[derive(Debug)]\nstruct Unit;\n\nfn main() {\n    let n = Named { id: 1, name: String::from(\"a\\\"b\"), ratio: 2.0 };\n    println!(\"{:?}\", n);\n    println!(\"{:?} {:?}\", Pair(3, String::from(\"p\")), Unit);\n    println!(\"{:#?}\", n);\n    println!(\"{:#?}\", Pair(3, String::from(\"p\")));\n    println!(\"{:#?}\", Unit);\n}\n",
+    "expect": "ok", "out": "Named { id: 1, name: \"a\\\"b\", ratio: 2.0 }\nPair(3, \"p\") Unit\nNamed {\n    id: 1,\n    name: \"a\\\"b\",\n    ratio: 2.0,\n}\nPair(\n    3,\n    \"p\",\n)\nUnit\n", "err": "", "exit": 0,
+    "why": "derived Debug of named, tuple and unit structs", "pr": "P8"
+  },
+  {
+    "id": "derive-debug-enum",
+    "src": "#[derive(Debug)]\nenum E {\n    A,\n    B(i32, String),\n    C { x: i32, tag: Option<String> },\n}\n\nfn main() {\n    println!(\"{:?} {:?} {:?}\", E::A, E::B(1, String::from(\"b\")), E::C { x: 2, tag: Some(String::from(\"t\")) });\n    println!(\"{:#?}\", E::B(1, String::from(\"b\")));\n    println!(\"{:#?}\", E::C { x: 2, tag: None });\n    let all = [E::A, E::B(0, String::new())];\n    println!(\"{:?}\", all);\n    println!(\"{:#?}\", all);\n}\n",
+    "expect": "ok", "out": "A B(1, \"b\") C { x: 2, tag: Some(\"t\") }\nB(\n    1,\n    \"b\",\n)\nC {\n    x: 2,\n    tag: None,\n}\n[A, B(0, \"\")]\n[\n    A,\n    B(\n        0,\n        \"\",\n    ),\n]\n", "err": "", "exit": 0,
+    "why": "derived Debug of every variant kind", "pr": "P8"
+  },
+  {
+    "id": "derive-debug-nested",
+    "src": "#[derive(Debug)]\nstruct Inner {\n    v: i32,\n}\n\n#[derive(Debug)]\nstruct Outer {\n    i: Inner,\n    t: (i32, String),\n    a: [u8; 2],\n    o: Option<Inner>,\n    r: Result<i32, String>,\n}\n\nfn main() {\n    let o = Outer { i: Inner { v: 1 }, t: (2, String::from(\"x\")), a: [3, 4], o: Some(Inner { v: 5 }), r: Err(String::from(\"e\")) };\n    println!(\"{:?}\", o);\n    println!(\"{:#?}\", o);\n    println!(\"{:?} {:#?}\", (1,), (1,));\n}\n",
+    "expect": "ok", "out": "Outer { i: Inner { v: 1 }, t: (2, \"x\"), a: [3, 4], o: Some(Inner { v: 5 }), r: Err(\"e\") }\nOuter {\n    i: Inner {\n        v: 1,\n    },\n    t: (\n        2,\n        \"x\",\n    ),\n    a: [\n        3,\n        4,\n    ],\n    o: Some(\n        Inner {\n            v: 5,\n        },\n    ),\n    r: Err(\n        \"e\",\n    ),\n}\n(1,) (\n    1,\n)\n", "err": "", "exit": 0,
+    "why": "derived Debug nests structs, tuples, arrays, Option and Result", "pr": "P8"
+  },
+  {
+    "id": "derive-clone-eq",
+    "src": "#[derive(Debug, Clone, PartialEq)]\nstruct P {\n    s: String,\n    n: i32,\n}\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\nenum Color {\n    Red,\n    Green,\n}\n\nfn main() {\n    let a = P { s: String::from(\"x\"), n: 1 };\n    let mut b = a.clone();\n    println!(\"{} {}\", a == b, a != b);\n    b.n = 2;\n    b.s.push_str(\"y\");\n    println!(\"{} {:?} {:?}\", a == b, a, b);\n    let c = Color::Red;\n    let d = c;\n    println!(\"{:?} {:?} {} {}\", c, d, c == d, c == Color::Green);\n    let r = &a;\n    let e = r.clone();\n    println!(\"{:?}\", e);\n}\n",
+    "expect": "ok", "out": "true false\nfalse P { s: \"x\", n: 1 } P { s: \"xy\", n: 2 }\nRed Red true false\nP { s: \"x\", n: 1 }\n", "err": "", "exit": 0,
+    "why": "derived Clone makes a deep copy and PartialEq compares every field", "pr": "P8"
+  },
+  {
+    "id": "derive-copy",
+    "src": "#[derive(Debug, Clone, Copy, PartialEq)]\nstruct Pt {\n    x: i32,\n    y: i32,\n}\n\nfn show(p: Pt) -> i32 {\n    p.x + p.y\n}\n\nfn main() {\n    let a = Pt { x: 1, y: 2 };\n    let mut b = a;\n    b.x = 10;\n    println!(\"{} {} {} {:?} {:?}\", show(a), show(a), show(b), a, b);\n}\n",
+    "expect": "ok", "out": "3 3 12 Pt { x: 1, y: 2 } Pt { x: 10, y: 2 }\n", "err": "", "exit": 0,
+    "why": "a derived Copy struct copies on assignment, call and field write", "pr": "P8"
+  },
+  {
+    "id": "derive-move",
+    "src": "#[derive(Debug, Clone)]\nstruct Pt {\n    x: i32,\n}\n\nfn show(p: Pt) -> i32 {\n    p.x\n}\n\nfn main() {\n    let a = Pt { x: 1 };\n    println!(\"{}\", show(a));\n    println!(\"{}\", show(a));\n}\n",
+    "expect": {"code": "E0382", "line": 13}, "pair": "derive-move-ok",
+    "why": "without Copy a struct moves into a call", "pr": "P8"
+  },
+  {
+    "id": "derive-move-ok",
+    "src": "#[derive(Debug, Clone, Copy)]\nstruct Pt {\n    x: i32,\n}\n\nfn show(p: Pt) -> i32 {\n    p.x\n}\n\nfn main() {\n    let a = Pt { x: 1 };\n    println!(\"{}\", show(a));\n    println!(\"{}\", show(a));\n}\n",
+    "expect": "ok", "out": "1\n1\n", "err": "", "exit": 0,
+    "why": "the accepted twin of derive-move", "pr": "P8"
+  },
+  {
+    "id": "print-display-struct",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{}\", p);\n}\n",
+    "expect": {"code": "E0277", "line": 7}, "pair": "print-display-field-ok",
+    "why": "a struct has no Display", "pr": "P8"
+  },
+  {
+    "id": "print-display-field-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field has Display", "pr": "P8"
+  },
+  {
+    "id": "print-display-inline",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{p}\");\n}\n",
+    "expect": {"code": "E0277", "line": 7}, "pair": "print-display-inline-ok",
+    "why": "a struct captured inline has no Display either", "pr": "P8"
+  },
+  {
+    "id": "print-display-inline-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field is printed by position", "pr": "P8"
+  },
+  {
+    "id": "print-debug-missing",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{:?}\", p);\n}\n",
+    "expect": {"code": "E0277", "line": 7}, "pair": "print-debug-field-ok",
+    "why": "a struct without derive(Debug) cannot print with {:?}", "pr": "P8"
+  },
+  {
+    "id": "print-debug-field-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{:?}\", p.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field prints with {:?}", "pr": "P8"
+  },
+  {
+    "id": "print-display-option",
+    "src": "fn main() {\n    let o = Some(5);\n    println!(\"{}\", o);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "print-debug-option-ok",
+    "why": "an Option has no Display", "pr": "P8"
+  },
+  {
+    "id": "print-debug-option-ok",
+    "src": "fn main() {\n    let o = Some(5);\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "Some(5)\n", "err": "", "exit": 0,
+    "why": "an Option prints with {:?}", "pr": "P8"
+  },
+  {
+    "id": "compare-no-partialeq",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = P { n: 1 };\n    if a == b {\n        println!(\"eq\");\n    }\n}\n",
+    "expect": {"code": "E0369", "line": 8}, "pair": "compare-field-ok",
+    "why": "a struct without PartialEq cannot be compared", "pr": "P8"
+  },
+  {
+    "id": "compare-field-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = P { n: 1 };\n    if a.n == b.n {\n        println!(\"eq\");\n    }\n}\n",
+    "expect": "ok", "out": "eq\n", "err": "", "exit": 0,
+    "why": "fields compare", "pr": "P8"
+  },
+  {
+    "id": "clone-no-derive",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = a.clone();\n    println!(\"{}\", b.n);\n}\n",
+    "expect": {"code": "E0599", "line": 7}, "pair": "clone-no-derive-ok",
+    "why": "clone needs derive(Clone) or an impl", "pr": "P8"
+  },
+  {
+    "id": "clone-no-derive-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = a;\n    println!(\"{}\", b.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "without clone the struct moves", "pr": "P8"
+  },
+  {
+    "id": "clone-derive-ok",
+    "src": "#[derive(Clone)]\nstruct P {\n    n: i32,\n}\n\nfn main() {\n    let a = P { n: 1 };\n    let b = a.clone();\n    println!(\"{}\", b.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "derive(Clone) gives clone", "pr": "P8"
+  },
+  {
+    "id": "impl-methods",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let mut c = C::new(1);\n    c.bump();\n    c.bump();\n    println!(\"{} {}\", c.get(), c.tag());\n    let t = c.into_tag();\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "3 c\nc\n", "err": "", "exit": 0,
+    "why": "associated fn, &self, &mut self and self methods", "pr": "P8"
+  },
+  {
+    "id": "impl-autoref-reborrow",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn twice(c: &mut C) {\n    c.bump();\n    c.bump();\n}\n\nfn read(c: &C) -> i32 {\n    c.get()\n}\n\nfn main() {\n    let mut c = C::new(0);\n    twice(&mut c);\n    let r = &mut c;\n    r.bump();\n    twice(r);\n    println!(\"{} {}\", read(&c), C::get(&c));\n}\n",
+    "expect": "ok", "out": "5 5\n", "err": "", "exit": 0,
+    "why": "the receiver is borrowed, reborrowed or used as it is", "pr": "P8"
+  },
+  {
+    "id": "impl-copy-self-behind-ref",
+    "src": "#[derive(Clone, Copy)]\nstruct Q {\n    n: i32,\n}\n\nimpl Q {\n    fn take(self) -> i32 {\n        self.n\n    }\n}\n\nfn main() {\n    let q = Q { n: 4 };\n    let r = &q;\n    println!(\"{} {}\", r.take(), q.take());\n}\n",
+    "expect": "ok", "out": "4 4\n", "err": "", "exit": 0,
+    "why": "a Copy value is copied out from behind a reference to call a self method", "pr": "P8"
+  },
+  {
+    "id": "impl-enum-methods",
+    "src": "#[derive(Debug, Clone, Copy, PartialEq)]\nenum Dir {\n    N,\n    E,\n    S,\n    W,\n}\n\nimpl Dir {\n    fn turn(self) -> Self {\n        match self {\n            Self::N => Self::E,\n            Self::E => Self::S,\n            Self::S => Self::W,\n            Self::W => Self::N,\n        }\n    }\n\n    fn vertical(&self) -> bool {\n        match *self {\n            Dir::N => true,\n            Dir::S => true,\n            Dir::E => false,\n            Dir::W => false,\n        }\n    }\n}\n\nfn main() {\n    let d = Dir::N;\n    let mut e = d;\n    for _ in 0..3 {\n        e = e.turn();\n    }\n    println!(\"{:?} {:?} {} {}\", d, e, d.vertical(), e.vertical());\n}\n",
+    "expect": "ok", "out": "N W true false\n", "err": "", "exit": 0,
+    "why": "methods on an enum match on self", "pr": "P8"
+  },
+  {
+    "id": "impl-tuple-unit-struct",
+    "src": "struct Temp(f64);\nstruct Unit;\n\nimpl Temp {\n    fn new(v: f64) -> Self {\n        Self(v)\n    }\n\n    fn warmer(&self, d: f64) -> Temp {\n        Temp(self.0 + d)\n    }\n}\n\nimpl Unit {\n    fn hello() -> u32 {\n        7\n    }\n\n    fn id(&self) -> u32 {\n        Self::hello()\n    }\n}\n\nfn main() {\n    let t = Temp::new(20.5);\n    let w = t.warmer(1.5);\n    println!(\"{} {} {} {}\", t.0, w.0, Unit::hello(), Unit.id());\n}\n",
+    "expect": "ok", "out": "20.5 22 7 7\n", "err": "", "exit": 0,
+    "why": "tuple and unit structs have associated functions and fields", "pr": "P8"
+  },
+  {
+    "id": "impl-field-mutation",
+    "src": "struct S {\n    items: String,\n    count: usize,\n}\n\nimpl S {\n    fn push(&mut self, c: &str) {\n        self.items.push_str(c);\n        self.count += 1;\n    }\n\n    fn summary(&self) -> String {\n        format!(\"{} items: {}\", self.count, self.items)\n    }\n}\n\nfn main() {\n    let mut s = S { items: String::new(), count: 0 };\n    s.push(\"a\");\n    s.push(\"b\");\n    println!(\"{}\", s.summary());\n    let sum = s.summary();\n    s.push(\"c\");\n    println!(\"{} {}\", sum, s.summary());\n}\n",
+    "expect": "ok", "out": "2 items: ab\n2 items: ab 3 items: abc\n", "err": "", "exit": 0,
+    "why": "methods write numbers and grow Strings behind &mut self", "pr": "P8"
+  },
+  {
+    "id": "impl-no-method",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n    c.nothing();\n}\n",
+    "expect": {"code": "E0599", "line": 30}, "pair": "impl-no-method-ok",
+    "why": "a type has only the methods its impl gives it", "pr": "P8"
+  },
+  {
+    "id": "impl-no-method-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n    c.get();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the method exists", "pr": "P8"
+  },
+  {
+    "id": "impl-no-assoc",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::make(1);\n}\n",
+    "expect": {"code": "E0599", "line": 29}, "pair": "impl-no-assoc-ok",
+    "why": "an associated function that is not in the impl", "pr": "P8"
+  },
+  {
+    "id": "impl-no-assoc-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the associated function exists", "pr": "P8"
+  },
+  {
+    "id": "impl-bump-immutable",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n    c.bump();\n}\n",
+    "expect": {"code": "E0596", "line": 30}, "pair": "impl-bump-immutable-ok",
+    "why": "a &mut self method needs a mutable variable", "pr": "P8"
+  },
+  {
+    "id": "impl-bump-immutable-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let mut c = C::new(1);\n    c.bump();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the variable is mut", "pr": "P8"
+  },
+  {
+    "id": "impl-bump-behind-ref",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn poke(c: &C) {\n    c.bump();\n}\n\nfn main() {\n    let c = C::new(1);\n    poke(&c);\n}\n",
+    "expect": {"code": "E0596", "line": 29}, "pair": "impl-bump-behind-ref-ok",
+    "why": "a &mut self method cannot be called through a shared reference", "pr": "P8"
+  },
+  {
+    "id": "impl-bump-behind-ref-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn poke(c: &C) {\n    c.get();\n}\n\nfn main() {\n    let c = C::new(1);\n    poke(&c);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a &self method through a shared reference", "pr": "P8"
+  },
+  {
+    "id": "impl-self-moves",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n    let t = c.into_tag();\n    println!(\"{} {}\", t, c.get());\n}\n",
+    "expect": {"code": "E0382", "line": 31}, "pair": "impl-self-moves-ok",
+    "why": "a self method moves the value", "pr": "P8"
+  },
+  {
+    "id": "impl-self-moves-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let c = C::new(1);\n    let t = c.tag();\n    println!(\"{} {}\", t, c.get());\n}\n",
+    "expect": "ok", "out": "c 1\n", "err": "", "exit": 0,
+    "why": "a &self method does not", "pr": "P8"
+  },
+  {
+    "id": "impl-self-behind-ref",
+    "src": "#[derive(Clone)]\nstruct Q {\n    n: i32,\n}\n\nimpl Q {\n    fn take(self) -> i32 {\n        self.n\n    }\n}\n\nfn eat(q: &Q) -> i32 {\n    q.take()\n}\n\nfn main() {\n    let q = Q { n: 1 };\n    println!(\"{}\", eat(&q));\n}\n",
+    "expect": {"code": "E0507", "line": 13}, "pair": "impl-self-behind-ref-ok",
+    "why": "a self method cannot take a value from behind a reference", "pr": "P8"
+  },
+  {
+    "id": "impl-self-behind-ref-ok",
+    "src": "#[derive(Clone, Copy)]\nstruct Q {\n    n: i32,\n}\n\nimpl Q {\n    fn take(self) -> i32 {\n        self.n\n    }\n}\n\nfn eat(q: &Q) -> i32 {\n    q.take()\n}\n\nfn main() {\n    let q = Q { n: 1 };\n    println!(\"{}\", eat(&q));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a Copy value is copied out from behind the reference", "pr": "P8"
+  },
+  {
+    "id": "impl-result-borrows-self",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let mut c = C::new(1);\n    let t = c.tag();\n    c.bump();\n    println!(\"{}\", t);\n}\n",
+    "expect": {"code": "E0502", "line": 31}, "pair": "impl-result-borrows-self-ok",
+    "why": "a result borrowed from self keeps the owner borrowed", "pr": "P8"
+  },
+  {
+    "id": "impl-result-borrows-self-ok",
+    "src": "struct C {\n    n: i32,\n    tag: String,\n}\n\nimpl C {\n    fn new(n: i32) -> Self {\n        Self { n, tag: String::from(\"c\") }\n    }\n\n    fn get(&self) -> i32 {\n        self.n\n    }\n\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n\n    fn tag(&self) -> &String {\n        &self.tag\n    }\n\n    fn into_tag(self) -> String {\n        self.tag\n    }\n}\n\nfn main() {\n    let mut c = C::new(1);\n    let t = c.tag();\n    c.get();\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "c\n", "err": "", "exit": 0,
+    "why": "a read-only call while the result lives is fine", "pr": "P8"
+  },
+  {
+    "id": "impl-elision-option",
+    "src": "fn pick(a: &str, b: &str) -> Option<&str> {\n    None\n}\n\nfn main() {\n    println!(\"{:?}\", pick(\"a\", \"b\"));\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "impl-elision-option-ok",
+    "why": "a returned Option<&str> with two reference parameters has no lifetime to borrow", "pr": "P8"
+  },
+  {
+    "id": "impl-elision-option-ok",
+    "src": "fn pick(a: &str, b: &str) -> Option<String> {\n    None\n}\n\nfn main() {\n    println!(\"{:?}\", pick(\"a\", \"b\"));\n}\n",
+    "expect": "ok", "out": "None\n", "err": "", "exit": 0,
+    "why": "an owned Option<String> needs no lifetime", "pr": "P8"
+  },
+  {
+    "id": "impl-option-borrow-push",
+    "src": "fn pick(s: &str) -> Option<&str> {\n    None\n}\n\nfn main() {\n    let mut s = String::from(\"a\");\n    let r = pick(&s);\n    s.push_str(\"b\");\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 8}, "pair": "impl-option-borrow-push-ok",
+    "why": "an Option<&str> result keeps its argument borrowed", "pr": "P8"
+  },
+  {
+    "id": "impl-option-borrow-push-ok",
+    "src": "fn pick(s: &str) -> Option<&str> {\n    None\n}\n\nfn main() {\n    let mut s = String::from(\"a\");\n    let r = pick(&s);\n    s.push_str(\"b\");\n    println!(\"{:?}\", s);\n}\n",
+    "expect": "ok", "out": "\"ab\"\n", "err": "", "exit": 0,
+    "why": "the result is not used after the push", "pr": "P8"
+  },
+  {
+    "id": "impl-drop-field-assign",
+    "src": "struct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nstruct H {\n    a: D,\n}\n\nfn main() {\n    let mut h = H { a: D { n: 1 } };\n    h.a = D { n: 2 };\n    println!(\"assigned\");\n    let t = h.a;\n    h.a = D { n: 3 };\n}\n",
+    "expect": "ok", "out": "drop 1\nassigned\ndrop 2\ndrop 3\n", "err": "", "exit": 0,
+    "why": "writing a field drops the old value first", "pr": "P8"
+  },
+  {
+    "id": "impl-drop-partial-move",
+    "src": "struct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nstruct H {\n    a: D,\n    b: D,\n}\n\nfn main() {\n    let h = H { a: D { n: 1 }, b: D { n: 2 } };\n    let x = h.b;\n    println!(\"moved\");\n    let y = D { n: 9 };\n}\n",
+    "expect": "ok", "out": "moved\ndrop 9\ndrop 2\ndrop 1\n", "err": "", "exit": 0,
+    "why": "a partly moved struct drops its remaining fields after later locals", "pr": "P8"
+  },
+  {
+    "id": "impl-drop-method-self",
+    "src": "struct D {\n    n: i32,\n}\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.n);\n    }\n}\n\nstruct H {\n    d: D,\n    k: i32,\n}\n\nimpl H {\n    fn into_d(self) -> D {\n        self.d\n    }\n\n    fn replace(&mut self, n: i32) {\n        self.d = D { n };\n    }\n}\n\nfn main() {\n    let mut h = H { d: D { n: 1 }, k: 5 };\n    h.replace(2);\n    println!(\"replaced\");\n    let d = h.into_d();\n    println!(\"got {}\", d.n);\n}\n",
+    "expect": "ok", "out": "drop 1\nreplaced\ngot 2\ndrop 2\n", "err": "", "exit": 0,
+    "why": "a self method drops what it does not return", "pr": "P8"
+  },
+  {
+    "id": "field-missing",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{}\", p.m);\n}\n",
+    "expect": {"code": "E0609", "line": 7}, "pair": "field-missing-ok",
+    "why": "a struct has only the fields it declares", "pr": "P8"
+  },
+  {
+    "id": "field-missing-ok",
+    "src": "struct P {\n    n: i32,\n}\n\nfn main() {\n    let p = P { n: 1 };\n    println!(\"{}\", p.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the field exists", "pr": "P8"
+  },
+  {
+    "id": "tuple-field-missing",
+    "src": "fn main() {\n    let t = (1, 2);\n    println!(\"{}\", t.2);\n}\n",
+    "expect": {"code": "E0609", "line": 3}, "pair": "tuple-field-ok",
+    "why": "a tuple has only the fields it declares", "pr": "P8"
+  },
+  {
+    "id": "tuple-field-ok",
+    "src": "fn main() {\n    let t = (1, 2);\n    println!(\"{}\", t.1);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the tuple field exists", "pr": "P8"
+  },
+  {
+    "id": "arith-through-refs",
+    "src": "enum Shape {\n    Circle(f64),\n    Rect { w: f64, h: f64 },\n}\n\nimpl Shape {\n    fn area(&self) -> f64 {\n        match self {\n            Shape::Circle(r) => 3.0 * r * r,\n            Shape::Rect { w, h } => w * h,\n        }\n    }\n}\n\nfn main() {\n    println!(\"{} {}\", Shape::Circle(2.0).area(), Shape::Rect { w: 2.0, h: 3.5 }.area());\n}\n",
+    "expect": "ok", "out": "12 7\n", "err": "", "exit": 0,
+    "why": "arithmetic on a reference to a number works like the number", "pr": "P8"
+  },
+  {
+    "id": "lint-in-method",
+    "src": "struct M {\n    v: u8,\n}\n\nimpl M {\n    fn go(&self) -> u8 {\n        let a: u8 = 255;\n        a + 1\n    }\n}\n\nfn main() {\n    let m = M { v: 1 };\n    println!(\"{}\", m.go());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 8}, "pair": "lint-in-method-ok",
+    "why": "the overflow lint also checks the body of a method", "pr": "P8"
+  },
+  {
+    "id": "lint-in-method-ok",
+    "src": "struct M {\n    v: u8,\n}\n\nimpl M {\n    fn go(&self) -> u8 {\n        let a: u8 = 254;\n        a + 1\n    }\n}\n\nfn main() {\n    let m = M { v: 1 };\n    println!(\"{}\", m.go());\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "a sum that fits", "pr": "P8"
+  },
+  {
+    "id": "variant-name-binding",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let e = E::B;\n    let n = match e {\n        A => 1,\n        _ => 2,\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0170", "line": 9}, "pair": "variant-name-binding-ok",
+    "why": "a bare variant name in a pattern is a new binding, which rustc denies as E0170", "pr": "P8"
+  },
+  {
+    "id": "variant-name-binding-ok",
+    "src": "enum E {\n    A,\n    B,\n}\n\nfn main() {\n    let e = E::B;\n    let n = match e {\n        E::A => 1,\n        _ => 2,\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the variant written with its enum is a pattern", "pr": "P8"
+  },
+  {
+    "id": "option-move-out-deref",
+    "src": "fn first(r: &Option<String>) {\n    match *r {\n        Some(s) => println!(\"{}\", s),\n        None => {}\n    }\n}\n\nfn main() {\n    let o = Some(String::from(\"a\"));\n    first(&o);\n}\n",
+    "expect": {"code": "E0507", "line": 2}, "pair": "option-move-out-deref-ok",
+    "why": "a name in a Some pattern moves the String out from behind the reference", "pr": "P8"
+  },
+  {
+    "id": "option-move-out-deref-ok",
+    "src": "fn first(r: &Option<String>) {\n    match r {\n        Some(s) => println!(\"{}\", s),\n        None => {}\n    }\n}\n\nfn main() {\n    let o = Some(String::from(\"a\"));\n    first(&o);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "matching the reference binds a reference to the String", "pr": "P8"
   }
 ]

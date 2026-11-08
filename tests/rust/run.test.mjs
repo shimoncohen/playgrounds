@@ -162,21 +162,21 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(feature('fn show(x: &dyn Show) {}\nfn main() {}'), 'dyn@1');
   });
   it('constructs of later chapters give unsupported with a hint in the catalog', () => {
-    assert.equal(feature('struct P;\nfn main() {}'), 'struct@1');
+    assert.equal(feature('trait T {}\nfn main() {}'), 'trait@1');
     assert.equal(feature('fn main() {\n    match 1 { _ => {} }\n}'), 'match@2');
     assert.equal(feature('fn main() {\n    let v = vec![1];\n}'), 'vec!@2');
     assert.equal(feature('fn main() {\n    let x: f32 = 2.5;\n}'), 'f32@2');
-    assert.equal(feature('fn main() {\n    println!("{:#?}", 1);\n}'), 'format spec@2');
+    assert.equal(feature('fn main() {\n    println!("{:x}", 1);\n}'), 'format spec@2');
     assert.equal(RQ.run('fn main() {\n    if true { }\n    let x = 2.5;\n    println!("{:?} {}", 1, x);\n}').out(), '1 2.5\n');
   });
-  it('an unannotated Some, Ok or Err call is unsupported, not E0425', () => {
-    assert.equal(feature('fn main() {\n    let x = Some(1);\n}'), 'Option@2');
-    assert.equal(feature('fn main() {\n    let x = Ok(1);\n}'), 'Result@2');
-    assert.equal(feature('fn main() {\n    let e = 1;\n    let x = Err(e);\n}'), 'Result@3');
+  it('Some builds an Option; an Ok or Err whose other type nothing decides is unsupported, not E0425', () => {
+    assert.equal(RQ.run('fn main() {\n    let x = Some(1);\n    println!("{:?}", x);\n}').out(), 'Some(1)\n');
+    assert.equal(feature('fn main() {\n    let x = Ok(1);\n}'), 'inferred type@2');
+    assert.equal(feature('fn main() {\n    let e = 1;\n    let x = Err(e);\n}'), 'inferred type@3');
     assert.equal(RQ.run('fn main() {\n    let x = Nope(1);\n}').onlyError('E0425'), true);
   });
   it('unsupported wins over an error found in the same program, and over a syntax-valid E0384', () => {
-    assert.equal(RQ.run('struct S;\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
+    assert.equal(RQ.run('trait T {}\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
   });
   it('the checker rejects what rustc rejects with a code or lint, and does not guess the rest', () => {
     const id = (src) => { const c = RQ.run(src); assert.equal(c.status, 'error', src); return `${c.errors[0].code || c.errors[0].lint}@${c.errors[0].line}`; };
