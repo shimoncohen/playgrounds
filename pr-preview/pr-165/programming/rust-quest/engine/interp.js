@@ -264,6 +264,11 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(!(x instanceof Limit||x instanceof Unsup))cleanup();throw x;}
     cleanup();return r;
   }
+  // a map's entries in key-text order: the view must not claim the insertion order, which a real HashMap does not keep
+  function entries(m){
+    if(m.k!=='map')return m.v;
+    return m.v.map(en=>({en,t:RQ.std.debug(en.key)})).sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:0).map(x=>x.en);
+  }
   function dropValue(v,name,line,part){
     if(!owns(v))return;
     switch(v.k){
@@ -290,7 +295,7 @@ RQ.interp=(ast,opts)=>{
         // a map drops its entries in an order rustc does not fix, which a Drop impl that prints would show
         if(v.k==='map'&&v.v.length>1&&v.v.some(en=>hasDrop(en.key)||hasDrop(en.val)))throw new Unsup('hash map order',line);
         note({t:'drop',name,ty:v.ty,line,part});
-        v.v.forEach((x,i)=>{
+        entries(v).forEach((x,i)=>{
           if(v.k==='vec')dropValue(x,name&&name+'['+i+']',line,true);
           else{dropValue(x.key,name&&name+'[key '+i+']',line,true);dropValue(x.val,name&&name+'[value '+i+']',line,true);}
         });
@@ -552,12 +557,12 @@ RQ.interp=(ast,opts)=>{
       case 'vec':case 'map':
         out.push({path,heap:live?v.id:null});
         // the elements are one type, so if the first owns no heap memory none does and the walk is skipped
-        if(v.v.length&&(v.k==='vec'?owns(v.v[0]):owns(v.v[0].key)||owns(v.v[0].val)))v.v.forEach((x,i)=>{
+        if(v.v.length&&(v.k==='vec'?owns(v.v[0]):owns(v.v[0].key)||owns(v.v[0].val)))entries(v).forEach((x,i)=>{
           const inner=[];
           if(v.k==='vec')leaves(x,path+'['+i+']',inner,live);
           else{
-            const k=x.key,at=path+(['int','bool','char','String'].includes(k.k)?'['+(k.k==='String'?'"'+clip(k.v)+'"':scalar(k))+']':'[entry '+i+']');
-            leaves(k,at+' key',inner,live);leaves(x.val,at,inner,live);
+            const k=x.key,at=['int','bool','char','String'].includes(k.k)?'key '+(k.k==='String'?'"'+clip(k.v)+'"':scalar(k)):'entry '+i;
+            leaves(k,path+'['+at+']',inner,live);leaves(x.val,path+'[value of '+at+']',inner,live);
           }
           for(const l of inner)out.push({...l,hidden:true});
         });
@@ -585,7 +590,7 @@ RQ.interp=(ast,opts)=>{
   }
   function collText(c){
     if(!c.v.length)return '';
-    const items=c.v.slice(0,8).map(x=>c.k==='vec'?inline(x):inline(x.key)+': '+inline(x.val));
+    const items=entries(c).slice(0,8).map(x=>c.k==='vec'?inline(x):inline(x.key)+': '+inline(x.val));
     const shown=items.join(', ')+(c.v.length>8?', … '+(c.v.length-8)+' more':'');
     return c.k==='vec'?'['+shown+']':'{'+shown+'}';
   }
@@ -914,6 +919,8 @@ RQ.interp=(ast,opts)=>{
     snapshot(snaps.length?snaps[snaps.length-1].line:1,true);
     return {status:'ok',stdout:out,stderr:err,exit:0,...extra()};
   }catch(x){
+    // a value nested thousands deep overflows the JS stack in drop, clone, == or Debug
+    if(x instanceof RangeError)x=new Limit('nesting');
     if(x instanceof Limit)return {status:'limit',limit:x.why,stdout:out.slice(0,MAX_OUTPUT),stderr:err.slice(0,MAX_OUTPUT),exit:null,...extra()};
     if(x instanceof Unsup)return {status:'unsupported',unsupported:{feature:x.feature,line:x.line},stdout:out,stderr:err,exit:null,...extra()};
     if(x instanceof Panic){
