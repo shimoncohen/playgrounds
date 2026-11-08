@@ -167,8 +167,8 @@ test('Reset world does not fire the current mission setup', () => {
   assert.equal(h.setups.length, n);
 });
 
-test('Spot the newcomer passes on its answer right after landing', () => {
-  const { ci, mi, key } = all.find(x => x.m.t === 'Spot the newcomer');
+test('Spot the new crew passes on its answer right after landing', () => {
+  const { ci, mi, key } = all.find(x => x.m.t === 'Spot the new crew');
   const h = boot();
   jump(h, ci, mi);
   h.run(stepAns(h, h.CH[ci].missions[mi], ci, mi));
@@ -219,28 +219,28 @@ function playBefore(title) {
 }
 const webId = h => h.S.d.containers.find(x => x.name === 'web').id;
 const VARIANTS = [
-  ['Save to the volume', 'echo "I survive" > /data/note.txt && cat /data/note.txt'],
-  ['Change the message', 'echo "fresh" > message.txt && cat message.txt'],
-  ['Change the message', 'echo "fresh" > "message.txt"'],
-  ['A room of its own', 'kubectl create ns shop && kubectl get ns'],
-  ['A room of its own', 'k create namespace shop -o yaml'],
-  ['Delete it', 'kubectl delete pod -n default hello'],
-  ['Your first pod', 'kubectl run --image=nginx hello'],
+  ['Write in the logbook', 'echo "I survive" > /data/note.txt && cat /data/note.txt'],
+  ['Repaint the shop sign', 'echo "fresh" > message.txt && cat message.txt'],
+  ['Repaint the shop sign', 'echo "fresh" > "message.txt"'],
+  ['A room for the shop', 'kubectl create ns shop && kubectl get ns'],
+  ['A room for the shop', 'k create namespace shop -o yaml'],
+  ['Scuttle the test crew', 'kubectl delete pod -n default hello'],
+  ['Send out your own crew', 'kubectl run --image=nginx hello'],
   ['Ask for three', 'kubectl create deployment --image=nginx:1.26 web'],
-  ['Fix it with -e', 'docker rm db && docker run -d --name db -e "POSTGRES_PASSWORD=secret" postgres'],
-  ['Run a server in the background', 'docker run -d --name "web" nginx'],
-  ['Run a server in the background', 'docker run -d --name=web nginx'],
-  ['Run a server in the background', 'sudo docker run -d --name web nginx'],
-  ['Build it', 'docker build -t "shop:1.0" .'],
-  ['Open a door', 'docker run -d --name web -p 127.0.0.1:8080:80 nginx'],
-  ['Cause a clash', 'docker run -d --name web3 -p 127.0.0.1:8080:80 nginx'],
-  ['Download without running', 'docker pull -q nginx'],
-  ['Download without running', 'docker pull nginx --quiet'],
-  ['Remove it', 'docker container rm -f web'],
-  ['Remove it', 'sudo docker rm -f web'],
-  ['Remove it', 'false || docker rm -f web'],
-  ['Stop it', h => 'docker stop ' + webId(h)],
-  ['Stop it', 'docker container stop web'],
+  ['Hand it the missing setting', 'docker rm db && docker run -d --name db -e "POSTGRES_PASSWORD=secret" postgres'],
+  ['Open the crew\'s web stall', 'docker run -d --name "web" nginx'],
+  ['Open the crew\'s web stall', 'docker run -d --name=web nginx'],
+  ['Open the crew\'s web stall', 'sudo docker run -d --name web nginx'],
+  ['Build the shop\'s crate, version 1', 'docker build -t "shop:1.0" .'],
+  ['Open a numbered door', 'docker run -d --name web -p 127.0.0.1:8080:80 nginx'],
+  ['Two stalls, one door', 'docker run -d --name web3 -p 127.0.0.1:8080:80 nginx'],
+  ['Order stock from the quay', 'docker pull -q nginx'],
+  ['Order stock from the quay', 'docker pull nginx --quiet'],
+  ['Take the stall down', 'docker container rm -f web'],
+  ['Take the stall down', 'sudo docker rm -f web'],
+  ['Take the stall down', 'false || docker rm -f web'],
+  ['Close the stall for the night', h => 'docker stop ' + webId(h)],
+  ['Close the stall for the night', 'docker container stop web'],
 ];
 
 test('accepted variants of a command complete their mission', () => {
@@ -255,7 +255,7 @@ test('accepted variants of a command complete their mission', () => {
 });
 
 test('a chain word inside quotes is not a command', () => {
-  const { h, key } = playBefore('Remove it');
+  const { h, key } = playBefore('Take the stall down');
   h.run('docker rm -f web');
   assert.ok(h.S.done[key]);
   delete h.S.done[key];
