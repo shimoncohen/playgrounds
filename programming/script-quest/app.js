@@ -378,8 +378,8 @@ const CH=[
   anat:[['"5"','val'],['+','op'],['5','val']],
   explain:'You get <code>"55"</code>, not 10. When one side of <code>+</code> is a string, JavaScript turns the other side into a string too and glues them. This trips up everyone once. Now you know.',
   check:c=>c.ok&&c.value==='55'},
- {title:'Print several things at once',goal:'Label the booth sign: give `console.log` more than one value, separated by commas.',code:'console.log("Tickets sold:", 12, true)',
-  anat:[['console.log','fn'],['"Tickets sold:"','val'],[',','op'],['12','val'],[',','op'],['true','val']],
+ {title:'Print several things at once',goal:'Label the booth sign: give `console.log` more than one value, separated by commas.',code:'console.log("Tickets sold:", 12)',
+  anat:[['console.log','fn'],['"Tickets sold:"','val'],[',','op'],['12','val']],
   explain:'Commas separate the values. <code>console.log</code> prints them in a row with spaces between. Very handy for labelling what you print: <code>console.log("coins:", 10)</code>.',
   check:c=>c.ok&&/console\.log\s*\([^)]*,/.test(c.src)&&c.logs.length>0},
  {title:'Leave a note for humans',goal:'Leave a note on the booth door: write a line of code with a comment after it.',code:'console.log("Back at 8") // note for the next stagehand',
@@ -849,7 +849,7 @@ const qfOpen=done=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch
 
 // ================= UI =================
 const KEY='script-quest-v1';
-const RUNS={'greet.js':'node greet.js Ada','package.json':'npm start','math.js':null};
+const RUNS={'greet.js':'node greet.js Pepper','package.json':'npm start','math.js':null};
 CH.forEach(ch=>ch.missions.forEach(m=>{if(m.editFile&&!('run' in m))m.run=m.editFile in RUNS?RUNS[m.editFile]:'node '+m.editFile}));
 const INITIAL_FILES={'hello.js':'console.log("Welcome backstage!")\n','notes.txt':'Sweep the ring\nFeed Mumbles\nHang the posters\n'};
 let S={xp:0,done:{},chap:0,cur:{},best:0,files:null,pkgs:[]};
