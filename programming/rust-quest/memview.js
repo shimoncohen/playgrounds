@@ -62,7 +62,7 @@ function heapBox(o){
   const b=h('div','mv-box');
   b.dataset.heap=o.id;
   b.append(h('span','mv-id','#'+o.id),h('span','mv-kind',o.kind));
-  if(o.content==='')b.append(h('em','mv-empty','empty, no heap memory yet'));else b.append(h('q',null,o.content));
+  if(o.content==='')b.append(h('em','mv-empty','empty, no heap memory yet'));else{const coll=o.kind==='Vec'||o.kind==='HashMap';b.append(h(coll?'span':'q',coll?'mv-coll':null,o.content));}
   b.append(h('small',null,o.owner?'owner: '+o.owner:'no owner'));
   return b;
 }

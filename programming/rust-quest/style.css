@@ -220,7 +220,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .mv-var[data-state="shared"]{border-color:var(--blue)}
 .mv-var[data-state="mutBorrowed"]{border-color:var(--err)}
 .mv-box{border:1.5px solid var(--ink);border-radius:8px;padding:5px 8px;background:var(--surface);display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
-.mv-box q{font-family:var(--font-mono);font-size:13px;overflow-wrap:anywhere}
+.mv-box q,.mv-box .mv-coll{font-family:var(--font-mono);font-size:13px;overflow-wrap:anywhere}
 .mv-box small{flex:1 0 100%;color:var(--muted)}
 .mv-id{font-family:var(--font-mono);font-weight:700}
 .mv-kind{font-size:12px;color:var(--muted)}

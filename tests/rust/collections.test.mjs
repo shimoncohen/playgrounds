@@ -120,6 +120,41 @@ describe('Vec memory view', () => {
   });
 });
 
+describe('HashMap memory view', () => {
+  const map2 = (...ins) => RQ.run(P(USE, 'fn main() {', '    let mut m = HashMap::new();', ...ins.map((l) => '    ' + l), '    let n = m.len();', '}'), { snap: true });
+  it('shows entries in key order, so inserting b then a looks the same as a then b', () => {
+    const ab = map2('m.insert(1, 10);', 'm.insert(2, 20);'), ba = map2('m.insert(2, 20);', 'm.insert(1, 10);');
+    assert.equal(ab.snaps.at(-2).heap[0].content, '{1: 10, 2: 20}');
+    assert.equal(ba.snaps.at(-2).heap[0].content, '{1: 10, 2: 20}');
+  });
+  it('the String values of a map are freed in key order whichever was inserted first', () => {
+    const freed = (...ins) => {
+      const c = map2(...ins);
+      const first = c.snaps.find((x) => x.heap.some((h) => h.kind === 'String' && h.content === 'x'));
+      const xid = first.heap.find((h) => h.content === 'x').id;
+      return c.events.filter((e) => e.t === 'free').map((e) => (e.id === xid ? 'x' : 'other')).join(',');
+    };
+    const ab = freed('m.insert(1, String::from("x"));', 'm.insert(2, String::from("y"));'), ba = freed('m.insert(2, String::from("y"));', 'm.insert(1, String::from("x"));');
+    assert.equal(ab, 'x,other,other');
+    assert.equal(ba, ab);
+  });
+  it('an owner reads as the value of a key, not as a Vec index', () => {
+    const c = map2('m.insert(1, String::from("x"));');
+    assert.equal(c.snaps.at(-2).heap.find((h) => h.kind === 'String').owner, 'm[value of key 1]');
+  });
+});
+
+describe('deep nesting', () => {
+  const deep = (tail) => P('#[derive(Clone, Debug, PartialEq, PartialOrd)]', 'struct N {', '    k: Vec<N>,', '}', 'fn main() {', '    let mut n = N { k: Vec::new() };', '    let mut i = 0;', '    while i < 2000 {', '        n = N { k: vec![n] };', '        i += 1;', '    }', tail, '}');
+  for (const tail of ['', '    let c = n.clone();', '    let e = n == n;', '    let o = n < n;', '    println!("{:?}", n);']) {
+    it(`stops with a limit instead of an internal error: ${tail.trim() || 'drop at the end'}`, () => {
+      const c = RQ.run(deep(tail));
+      assert.equal(c.status, 'limit');
+      assert.equal(c.limit, 'nesting');
+    });
+  }
+});
+
 describe('Clone, Debug and PartialEq lookup on collections', () => {
   it('clone is deep: a new heap record, independent contents', () => {
     const c = RQ.run(main('let mut v = vec![String::from("a")];', 'let w = v.clone();', 'v.push(String::from("b"));', 'println!("{:?} {:?} {}", v, w, v == w);'));

@@ -571,6 +571,23 @@ test('rust-quest: the memory view shows a Vec on the heap with its elements and 
   await ctx.close();
 });
 
+test('rust-quest: a HashMap heap box shows no quotes, an owner that reads as a key, and entries in key order', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'use std::collections::HashMap;\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(2, String::from("b"));\n    m.insert(1, String::from("a"));\n    println!("{}", m.len());\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, steps - 2);
+  const boxes = await page.$$eval('#memory .mv-box', els => els.map(e => e.textContent));
+  assert.ok(boxes.some(t => /^#\d+HashMap\{1: pointer to #\d+, 2: pointer to #\d+\}owner: m$/.test(t)), boxes.join('|'));
+  assert.ok(boxes.some(t => /Stringaowner: m\[value of key 1\]/.test(t)), boxes.join('|'));
+  assert.equal(await page.$('#memory .mv-box:has(.mv-kind:text-is("HashMap")) q'), null);
+  assert.equal(await page.$eval('#memory', e => e.scrollWidth <= e.clientWidth + 1), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
