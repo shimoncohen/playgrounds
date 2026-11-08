@@ -17,13 +17,13 @@ const C15=(o,c)=>{
 
 AQ.CH.push({
   name:'Writing a project CLAUDE.md',badge:'First-Day Card',tier:'dev',
-  story:'Write Cog a first-day card for the cellar repo; find the card.',
+  story:'Write Cog a first-day card for the cellar project; find the card.',
   intro:'Down in the tea cellar, Cog needs a first-day card that tells him how the place works. Every run reads the memory file of the project first, so it is the cheapest place to teach a project its habits once. Here you write the lines that matter most: the check that proves a fix and the rule that protects a folder. You will also meet a line that looks right and does nothing at all.',
-  learned:['The default check','Only the root file counts','A memory file for a new repo'],
+  learned:['The default check','Only the root file counts','A memory file for a new project'],
   missions:[
     {
       title:'Write the check into memory',scenario:'memgate',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'The cellar repo needs a first-day card for Cog. This project has its own gate, and its <code>README.md</code> names the command. Every run should end with that check, without anyone typing it. A <b>default check</b> is a <code>Done when</code> line written once in the root <code>CLAUDE.md</code>: any run whose prompt has no check of its own uses it. Read the README in the Files panel and write the project\'s check into the root memory file.',
+      goal:'The cellar project needs a first-day card for Cog. This project has its own gate, and its <code>README.md</code> names the command. Every run should end with that check, without anyone typing it. A <b>default check</b> is a <code>Done when</code> line written once in the root <code>CLAUDE.md</code>: any run whose prompt has no check of its own uses it. Read the README in the Files panel and write the project\'s check into the root memory file.',
       how:[
         'The line <code>Done when: run npm run verify</code> in the root <code>CLAUDE.md</code> makes <code>npm run verify</code> the check of every run that has none of its own.',
         'It has the same shape as the <code>Done when</code> line you type in a prompt: a check the agent performs once the work is done.',
@@ -54,8 +54,8 @@ AQ.CH.push({
       check:C15
     },
     {
-      title:'Write it for a new repo',scenario:'newrepo',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'Dana opens a new repo in the cellar, and it needs a card of its own. Its <code>README.md</code> says how the project is checked and what must never be touched by hand. Read it in the Files panel, then write the root <code>CLAUDE.md</code> so that every run follows both: the rule and the default check.',
+      title:'Write it for a new project',scenario:'newrepo',kind:'config',prompt:BASE,facts:['memory-files'],
+      goal:'Dana opens a new project in the cellar, and it needs a card of its own. Its <code>README.md</code> says how the project is checked and what must never be touched by hand. Read it in the Files panel, then write the root <code>CLAUDE.md</code> so that every run follows both: the rule and the default check.',
       how:[
         'The two lines <code>do not edit generated/</code> and <code>Done when: run npm run verify</code> in the root <code>CLAUDE.md</code> give every run the rule and the check the README asks for.',
         'A line like <code>do not edit generated/</code> in the memory file is a standing rule. The agent sees it on every run, so you do not retype it in each prompt.',

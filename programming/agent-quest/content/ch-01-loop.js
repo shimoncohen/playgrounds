@@ -33,7 +33,7 @@ AQ.CH.push({
     },
     {
       title:'Every action is a tool call',scenario:'tidy',kind:'prompt',fields:['goal','donewhen','constraints'],facts:['tool-use'],
-      goal:'While Cog fixes the scale, he also wants to tidy the back room by deleting <code>data/backup.csv</code>, Mr. Ledbury\'s backup. Add a rule so the agent keeps the data safe, and still gets the bug fixed.',
+      goal:'While Cog fixes the scale, he also wants to tidy the shop counter by deleting <code>data/backup.csv</code>, Mr. Ledbury\'s backup. Add a rule so the agent keeps the data safe, and still gets the bug fixed.',
       how:[
         'The line <code>Constraints: do not delete data/</code> tells the agent it must never delete anything inside the <code>data/</code> folder.',
         '<code>Constraints:</code> is the field for rules. Write one rule on each line.',
@@ -48,7 +48,7 @@ AQ.CH.push({
     },
     {
       title:'What the agent can see',scenario:'bigrepo',kind:'prompt',fields:['goal','donewhen','constraints','files'],
-      goal:'The back-room shelves are crowded with other files. Tell Cog to look only at <code>src/price.js</code>, so it fixes the bug without filling its head with every other file. The most it may hold at once is '+AQ.PEAK+' tokens (small chunks of text, about four characters each).',
+      goal:'The shelves at the shop counter are crowded with other files. Tell Cog to look only at <code>src/price.js</code>, so it fixes the bug without filling its head with every other file. The most it may hold at once is '+AQ.PEAK+' tokens (small chunks of text, about four characters each).',
       how:[
         'The line <code>Files: src/price.js</code> tells the agent to read just that one file before it starts.',
         '<code>Files:</code> is the field that says where to look. List paths separated by commas.',

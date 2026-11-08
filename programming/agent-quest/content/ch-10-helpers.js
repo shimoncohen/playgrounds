@@ -10,13 +10,13 @@ const tooDear=o=>{const n=AQ.helperCost(o);return n>MOST?'The helpers you used c
 
 AQ.CH.push({
   name:'Subagents, parallel work, worktrees',badge:'Tidy Summaries',tier:'dev',
-  story:'The ledger needs many readers; send helpers into the shelves and find the stack of tidy summaries.',
-  intro:'The ledger needs many readers, so Cog sends helpers into the shelves. Some jobs are too big for one agent to hold in mind. Here the agent hands the reading to helpers. A helper works in its own context, so what it reads never crowds the main agent. You will delegate a search, pay only for the helpers a run really uses (a setup lists the price of every helper, but a run pays only for the ones it hands work to), and split a search that is too big for one helper.',
+  story:'The shop code needs many readers; send helpers into the shelves and find the stack of tidy summaries.',
+  intro:'The shop code needs many readers, so Cog sends helpers into the shelves. Some jobs are too big for one agent to hold in mind. Here the agent hands the reading to helpers. A helper works in its own context, so what it reads never crowds the main agent. You will delegate a search, pay only for the helpers a run really uses (a setup lists the price of every helper, but a run pays only for the ones it hands work to), and split a search that is too big for one helper.',
   learned:['Delegating a search','Paying per helper','Splitting a search'],
   missions:[
     {
       title:'Send the search away',scenario:'haystack',kind:'prompt',fields:DEV,facts:['subagents'],
-      goal:'Mr. Ledbury\'s ledger needs many readers. The rounding bug is hiding somewhere in ten files, and one of them is an old copy of the price code. Reading them all would fill the main agent\'s context. Instead, <b>delegate</b> the search: hand the job to a helper, which reads in its own context and sends back only what matters. The main agent may hold at most '+AQ.PEAK+' tokens at once.',
+      goal:'Dana\'s shop code needs many readers. The rounding bug is hiding somewhere in ten files, and one of them is an old copy of the price code. Reading them all would fill the main agent\'s context. Instead, <b>delegate</b> the search: hand the job to a helper, which reads in its own context and sends back only what matters. The main agent may hold at most '+AQ.PEAK+' tokens at once.',
       how:[
         'The two lines <code>Use: scout</code> and <code>Done when: run npm test</code> hand the file search to the helper <code>scout</code>, then prove the fix with the tests.',
         '<code>Use</code> names a helper from <code>.claude/agents/</code>. The helper reads the project in its own context, so none of its reading counts toward what the main agent holds.',
@@ -48,7 +48,7 @@ AQ.CH.push({
     },
     {
       title:'Split a huge search',scenario:'huge',kind:'prompt',fields:DEV,facts:['subagents','worktrees'],
-      goal:'Mr. Ledbury\'s ledger is so big that one helper cannot hold everything it reads. A helper has a window of '+AQ.context.WINDOW+' tokens too, and past it the helper loses track of files. Split the search over two small helpers, <code>scout</code> and <code>scout2</code>, and keep what the run pays for helpers at '+MOST+' units or fewer.',
+      goal:'Dana\'s shop code is so big that one helper cannot hold everything it reads. A helper has a window of '+AQ.context.WINDOW+' tokens too, and past it the helper loses track of files. Split the search over two small helpers, <code>scout</code> and <code>scout2</code>, and keep what the run pays for helpers at '+MOST+' units or fewer.',
       how:[
         'The line <code>Use: scout, scout2</code> hands the search to two helpers. The Run panel shows each helper and how many tokens it held.',
         'The files are shared out in order, so <code>scout</code> takes the first three of the five and <code>scout2</code> the last two. Each share fits a window.',

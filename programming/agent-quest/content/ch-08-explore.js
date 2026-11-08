@@ -7,13 +7,13 @@ const skippedNotSeen=(o,target)=>o.steps.some(s=>s.type==='skip'&&s.by==='not se
 
 AQ.CH.push({
   name:'Explore, plan, implement',badge:'Bookmark',tier:'dev',
-  story:'Mr. Ledbury\'s ledger is huge; have Cog look first, limit the change and leave notes, and find the bookmark.',
-  intro:'Mr. Ledbury\'s ledger is huge, so Cog should look before he touches anything. Good work on a code project goes in three steps: explore, plan, then change. This chapter drills the habits around them. You will send an agent to look around without letting it touch the code, cap how many files a change may reach, and hand the notes of one run to the next so it does not start from nothing.',
+  story:'Dana\'s shop code is huge; have Cog look first, limit the change and leave notes, and find the bookmark.',
+  intro:'Dana\'s shop code is huge, so Cog should look before he touches anything. Good work on a code project goes in three steps: explore, plan, then change. This chapter drills the habits around them. You will send an agent to look around without letting it touch the code, cap how many files a change may reach, and hand the notes of one run to the next so it does not start from nothing.',
   learned:['Read-only exploration','Capping a change','Hand-off notes'],
   missions:[
     {
       title:'Look without touching',scenario:'survey',kind:'prompt',fields:ALL,
-      goal:'Mr. Ledbury\'s ledger is huge. Send the agent to <b>explore</b>: to read around the cart code, find out why the cart total is off, and write what it finds into <code>NOTES.md</code>. It also wants to "fix it right away" in the code it finds. Limit it so the notes file is the only file it may change.',
+      goal:'Dana\'s shop code is huge. Send the agent to <b>explore</b>: to read around the cart code, find out why the cart total is off, and write what it finds into <code>NOTES.md</code>. It also wants to "fix it right away" in the code it finds. Limit it so the notes file is the only file it may change.',
       how:[
         'The line <code>Constraints: only edit NOTES.md</code> lets the agent change one file, the notes, and skips every other edit.',
         '<code>only</code> is the opposite of <code>do not</code>: instead of listing what is banned, it names the one thing that is allowed.',
