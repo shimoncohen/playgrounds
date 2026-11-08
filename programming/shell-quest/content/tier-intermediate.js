@@ -101,7 +101,7 @@ const CH=[
  {title:'Export it',goal:`Mark a variable for sharing: <code>export GREETING=hi</code>`,
   anat:[['export','cmd'],['GREETING','var'],['=','op'],['hi','arg']],answer:'export GREETING=hi',
   explain:`A plain variable is private to your shell. <code>export</code> marks it for <b>sharing</b>, so programs and <code>scripts</code> you start can read it too.`,
-  check:c=>!!(SQ.S.exp&&SQ.S.exp.GREETING)},
+  check:c=>c.ran('export')&&!!(SQ.S.exp&&SQ.S.exp.GREETING)},
  {title:'See the environment',goal:`After exporting GREETING in the last mission, list the shared variables: <code>env</code>`,note:`Jumped straight here? Run <code>export GREETING=hi</code> first.`,
   anat:[['env','cmd']],answer:'env',
   explain:`<code>env</code> prints the <b>environment</b>: every exported variable, one NAME=value per line, in alphabetical order. Find GREETING near the top of the list, among built-in ones like HOME and USER.`,
@@ -127,19 +127,19 @@ const CH=[
  {title:'Lock it down',goal:`Make <code>secrets.txt</code> private, so only you can read and write it: <code>chmod 600 secrets.txt</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['chmod','cmd'],['600','arg'],['secrets.txt','arg']],answer:'chmod 600 secrets.txt',
   explain:`A number mode has one digit for the owner, the group and everyone else. Read is 4, write is 2, run is 1, and you add them up. So <code>6</code> is read plus write and <code>0</code> is nothing. Check it with <code>ls -l secrets.txt</code>: you will see <code>-rw-------</code>.`,
-  check:c=>{const n=homeNode('~/secrets.txt');return !!n&&n.type==='file'&&modeOf(n)===0o600}},
+  check:c=>{if(!c.ran('chmod'))return false;const n=homeNode('~/secrets.txt');return !!n&&n.type==='file'&&modeOf(n)===0o600}},
  {title:'Add a permission',goal:`Let yourself run <code>notes.txt</code>, without touching any other permission: <code>chmod u+x notes.txt</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['chmod','cmd'],['u+x','opt'],['notes.txt','arg']],answer:'chmod u+x notes.txt',
   explain:`The letter form says <b>who</b> (<code>u</code> owner, <code>g</code> group, <code>o</code> others, <code>a</code> all), then <code>+</code> to add or <code>-</code> to remove, then what (<code>r</code>, <code>w</code>, <code>x</code>). Everything you do not mention stays as it was.`,
-  check:c=>{const n=homeNode('~/notes.txt');return !!n&&n.type==='file'&&(modeOf(n)&0o100)!==0}},
+  check:c=>{if(!c.ran('chmod'))return false;const n=homeNode('~/notes.txt');return !!n&&n.type==='file'&&(modeOf(n)&0o100)!==0}},
  {title:'Read-only for all',goal:`Make <code>notes.txt</code> read-only for everyone: <code>chmod a=r notes.txt</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['chmod','cmd'],['a=r','opt'],['notes.txt','arg']],answer:'chmod a=r notes.txt',
   explain:`With <code>=</code> you <b>set</b> exactly what is allowed, instead of adding or removing. <code>a=r</code> gives everybody read and nothing else, so the run permission you added a moment ago is gone. The number for it is <code>444</code>.`,
-  check:c=>{const n=homeNode('~/notes.txt');return !!n&&n.type==='file'&&modeOf(n)===0o444}},
+  check:c=>{if(!c.ran('chmod'))return false;const n=homeNode('~/notes.txt');return !!n&&n.type==='file'&&modeOf(n)===0o444}},
  {title:'Make a shortcut',goal:`Create <code>today.log</code> point at the first day's log: <code>ln -s village/logs/day1.log today.log</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['ln','cmd'],['-s','opt'],['village/logs/day1.log','arg'],['today.log','arg']],answer:'ln -s village/logs/day1.log today.log',
   explain:`<code>ln -s TARGET NAME</code> creates a <b>symbolic link</b>: a small file that just says where the real one is. The target comes first, the new name second. In <code>ls -l</code> a link shows as <code>today.log -&gt; village/logs/day1.log</code>.`,
-  check:c=>{const d1=homeNode('~/village/logs/day1.log');if(!d1||d1.type!=='file')return false;
+  check:c=>{const d1=homeNode('~/village/logs/day1.log');if(!c.ran('ln')||!d1||d1.type!=='file')return false;
     return allLinks(SQ.S.fs,'',[]).some(p=>{const l=lstat(p);return l&&l.type==='link'&&getNode(p)===d1})}},
  {title:'Follow the shortcut',goal:`Read the log through the shortcut: <code>cat today.log</code>`,note:`Needs the link from the last mission. Not there? Run <code>ln -s village/logs/day1.log today.log</code> first, from your home folder.`,
   anat:[['cat','cmd'],['today.log','arg']],answer:'cat today.log',
@@ -186,7 +186,7 @@ const CH=[
   answer:`grep ERROR village/logs/all.log 2>/dev/null | cut -d' ' -f1 | sort | uniq -c > report.txt`,
   explain:`Each stage does one small job: <code>grep</code> keeps the ERROR lines, <code>cut</code> keeps the address, <code>sort</code> puts equal addresses side by side, <code>uniq -c</code> counts each group, and <code>&gt;</code> saves the report. Read it with <code>cat report.txt</code>.`,
   check:c=>{const log=homeNode('~/village/logs/all.log');if(!log||log.type!=='file')return false;const want=wantCounts(log.content),keys=Object.keys(want);if(!keys.length)return false;
-    return [norm('~/report.txt'),norm('report.txt')].some(p=>{const r=getNode(p);if(!r||r.type!=='file')return false;const got=reportCounts(r.content);
+    return [norm('~/report.txt'),norm('report.txt')].some(p=>{const r=getNode(p);if(!c.wrote(p)||!r||r.type!=='file')return false;const got=reportCounts(r.content);
       return !!got&&got.n===keys.length&&keys.every(k=>got.m[k]===want[k])})}}
  ]}
 ];
