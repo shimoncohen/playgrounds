@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for humans. Read this first; [CONTRIBUTING.md](CONTRIBUTING.md) has the PR workflow, [docs/tiers-guideline.md](docs/tiers-guideline.md) has the mission-authoring detail.
+Rules of the repo for coding agents (Claude Code, Codex, Copilot, ...) and for humans. Read this first; [CONTRIBUTING.md](CONTRIBUTING.md) has the PR workflow, [docs/tiers-guideline.md](docs/tiers-guideline.md) has the mission-authoring detail, [docs/story-guideline.md](docs/story-guideline.md) the story every playground follows.
 
 ## What this is
 
@@ -33,10 +33,11 @@ CI runs the tests for the parts a PR changes (`tools/ci-plan.mjs`) and all of th
 10. **Code in prose.** Commands, options, file names, variables and functions in learner text are `<code>` (backticks where the page escapes the field), never plain words. `tests/shell/codestyle.test.mjs` enforces the checkable part; see `docs/tiers-guideline.md` section 6a.
 11. **Tone.** Learner-facing text is friendly, concrete and a little playful. It is never condescending, and it never assumes prior knowledge the quest has not taught yet.
 12. **Teach before use.** Every term a mission, question, hint, guide or quick-fire entry relies on was taught by an earlier mission on the default path, or is defined in place before first use. Order the course as a dependency chain (`docs/tiers-guideline.md` section 6).
+13. **Every playground follows its story.** Each playground is one treasure hunt, outlined in its `story.js` (world, places, cast, final treasure); every chapter has a `story` line (its leg of the hunt) and its missions use the world's names and values. The story never replaces the explanation and never uses a term before it is taught. `tests/trophy/catalog.test.mjs` enforces the outline and the chapter lines; see `docs/story-guideline.md`.
 
 ## Skills
 
-In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a PR), `review-mission` (adversarial content review), `playtest` (play it in a browser), `mission-voice` (learner-facing tone), `triage-issue`. Use them when the task matches.
+In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a PR), `review-mission` (adversarial content review), `playtest` (play it in a browser), `mission-voice` (learner-facing tone), `quest-story` (a playground's treasure-hunt story), `triage-issue`. Use them when the task matches.
 
 ## Where things go
 
@@ -55,6 +56,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Add a Math track | `math/<track>/` (`index.html`, `app.js`, `content.js`, copied from `geometry/` with its own `PROGRESS` key `math-<track>-v1`), the track and its chapters in `math/graph.js`, the landing card text in `index.html`, its entry in `shared/catalog.js` and its loader in `tests/trophy/catalog.test.mjs` (`tests/math/graph.test.mjs` checks the landing Math card's `data-subject` and the catalog's math keys against the graph tracks), `TRACKS` in `tests/math/content.test.mjs`, `PAGES` and the hub tests in `tests/smoke.mjs`, the README repo map |
 | Upgrade a Math vendored library | pins in `tools/vendor-math.sh`, rerun it, commit `math/vendor/` (never edit those files by hand) |
 | Add a whole playground | new `programming/<name>-quest/`, its card in `programming/index.html`, its entry in `shared/catalog.js` (key, name, subject, href, done-key separator, missions per chapter) and its loader in `tests/trophy/catalog.test.mjs` (the landing Programming card reads the catalog), `NAMES` in `tests/smoke.mjs`; use the `new-playground` skill |
+| Write or change a playground's story | `<playground folder>/story.js` (DOM-free outline), the `story` line, `intro` and `badge` of each chapter, `STORY_PENDING` in `tests/trophy/catalog.test.mjs`; use the `quest-story` skill and `docs/story-guideline.md` |
 | Change the Trophy Room | `shared/trophies.js` (DOM-free; level, achievements), `trophy-room/` (page), `shared/catalog.js` (playgrounds and their counts) + `tests/trophy/` and the trophy room tests in `tests/smoke.mjs` |
 | Change progress saving | `shared/progress.js` (affects every quest; add a smoke test) |
 | Change CI / deploy | `.github/workflows/`, `tools/` (separate PR, flag it) |
