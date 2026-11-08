@@ -89,6 +89,10 @@ describe('lifetime elision on a fn signature', () => {
       assert.equal(c.errors[0].col, src.indexOf('-> ') + 4, src);
     }
   });
+  it('a reference inside a slice type counts as a lifetime position', () => {
+    assert.equal(ids(RQ.run(P('fn f(xs: &[&str]) -> &str {', '    xs[0]', '}', 'fn main() {}'))), 'E0106@1');
+    assert.equal(ids(RQ.run(P('fn f(xs: i32) -> &[&str] {', '    &[]', '}', 'fn main() {}'))), 'E0106@1');
+  });
   it("&'static str needs none, and what is not modeled is reported", () => {
     assert.equal(RQ.run(P("fn f(a: &str, b: &str) -> &'static str {", '    "x"', '}', 'fn main() {', '    println!("{}", f("a", "b"));', '}')).stdout, 'x\n');
     assert.equal(feature(P('fn f(x: &mut i32) -> &mut i32 {', '    x', '}', 'fn main() {}')), 'lifetime elision@1');
@@ -102,6 +106,14 @@ describe('lifetime elision on a fn signature', () => {
 });
 
 describe('E0515: returning a reference to a local', () => {
+  it('words the error as rustc does: reference or value, local or parameter', () => {
+    const msg = (...b) => RQ.run(P('fn make(s: &str, t: String) -> &str {', ...b.map((l) => '    ' + l), '}', 'fn main() {', '    make("a", String::new());', '}')).errors[0].msg;
+    assert.equal(msg('let u = s.to_owned();', '&u'), 'cannot return reference to local variable `u`');
+    assert.equal(msg('let u = s.to_owned();', '&u[0..1]'), 'cannot return value referencing local variable `u`');
+    assert.equal(msg('let u = s.to_owned();', 'u.as_str()'), 'cannot return value referencing local variable `u`');
+    assert.equal(msg('&t'), 'cannot return reference to function parameter `t`');
+    assert.equal(msg('&t[..1]'), 'cannot return value referencing function parameter `t`');
+  });
   const body = (...b) => P('fn make(s: &str, t: String) -> &str {', ...b.map((l) => '    ' + l), '}', 'fn main() {', '    make("a", String::new());', '}');
   it('finds a reference, a slice, as_str, a parameter and a reference kept in a variable', () => {
     for (const [b, line] of [[['let u = s.to_owned();', '&u'], 3], [['let u = s.to_owned();', '&u[0..1]'], 3], [['let u = s.to_owned();', 'u.as_str()'], 3], [['&t'], 2],
@@ -160,6 +172,7 @@ describe('maxLive and the check helpers', () => {
     assert.deepEqual([0, 1, 2].map((i) => c.paramIsRef('f', i)), [true, true, false]);
     assert.deepEqual([0, 1].map((i) => c.paramIsRef('f', i, 'mut')), [false, true]);
     assert.equal(c.paramIsRef('missing', 0), false);
+    assert.deepEqual([c.usesParam('f', 1), c.usesParam('f', 0), c.usesParam('f', 2)], [true, false, false]);
     assert.deepEqual([c.methodIn('f', 'push_str'), c.methodIn('main', 'push_str')], [1, 0]);
   });
 });
@@ -170,7 +183,7 @@ describe('snapshots of a slice', () => {
     const last = c.snaps[c.snaps.length - 2];
     const v = (n) => last.frames[0].vars.find((x) => x.name === n);
     const w = v('w').leaves[0], b = v('b').leaves[0];
-    assert.deepEqual([w.ref, w.toName, w.text], [true, 's', '"world"']);
+    assert.deepEqual([w.ref, w.toName, w.text, w.range, w.into], [true, 's', '"world"', [6, 11], 1]);
     assert.deepEqual([b.ref, b.toName, b.text], [true, 'a', '[1..3]']);
   });
 });

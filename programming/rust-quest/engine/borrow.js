@@ -211,7 +211,7 @@ function loanPass(F,errors,un,loans,stats){
         const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty));
         if(k>=0){
           const key='E0515@'+i.line+':'+i.col;
-          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value'}));}
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param}));}
         }
       }
       uses(i,(l,_mv,kind)=>access(l,kind,i));

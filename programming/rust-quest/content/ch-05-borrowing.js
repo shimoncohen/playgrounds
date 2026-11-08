@@ -18,7 +18,7 @@ const ONE='    let s = String::from("hello");\n';
 RQ.CH.push({
   name:'Borrowing',
   badge:'Loan Keeper',
-  intro:'Moving a value around is safe, but handing it over every time is clumsy. Rust lets you lend a value instead: you give out a <em>reference</em>, the borrower looks at the value (or, with a stricter kind of loan, changes it), and the owner keeps ownership. The compiler checks every loan, and its error messages in this chapter tell you what it saw. The memory view draws each loan as a dashed arrow back to the borrowed value.',
+  intro:'Moving a value around is safe, but handing it over every time is clumsy. Rust lets you lend a value instead: you give out a <em>reference</em>, the borrower looks at the value (or, with a stricter kind of loan, changes it), and the owner keeps ownership. The compiler checks every loan, and its error messages in this chapter tell you what it saw. The memory view draws a reference as a dashed arrow and marks the borrowed variable as borrowed.',
   toolbox:'In this chapter: <code>&</code> and <code>&mut</code> parameters, <code>&s[0..5]</code> slices, a function that returns a <code>&str</code>, and the errors <code>E0502</code>, <code>E0596</code>, <code>E0106</code> and <code>E0515</code>.',
   learned:['&','&mut','borrow','slice','E0502'],
   missions:[
@@ -31,7 +31,7 @@ RQ.CH.push({
         'A parameter written <code>s: &String</code> is the matching type: a reference to a <code>String</code>. Reading through it works like reading the <code>String</code> itself, so <code>println!("{}!", s)</code> needs no change.',
         'When <code>shout</code> ends, the loan ends and nothing is freed, because the owner is still <code>main</code>. That is what <code>println!</code> was doing all along in chapter 4: it borrowed its arguments for a moment and gave them back.'
       ],
-      explain:'A reference lets a function look at a value without taking it over. Compare with chapter 4: there the function had to return the <code>String</code> so the caller could use it again. Here <code>main</code> never lets go of <code>a</code>, so there are no copies and no hand-backs. Press Run and look for the dashed arrow: it points from the parameter back to the variable it borrows.',
+      explain:'A reference lets a function look at a value without taking it over. Compare with chapter 4: there the function had to return the <code>String</code> so the caller could use it again. Here <code>main</code> never lets go of <code>a</code>, so there are no copies and no hand-backs. Press Run and look for the dashed arrow from the parameter to <code>a</code>, and the <em>borrowed</em> mark on <code>a</code>.',
       hint:'Change the parameter type from <code>String</code> to <code>&String</code>. The body stays the same.',
       starter:SHOUT('s: String','    println!("{}!", s);\n'),
       starterErr:'E0308',
@@ -39,7 +39,8 @@ RQ.CH.push({
       alts:[SHOUT('s: &str','    println!("{}!", s);\n'),SHOUT('text: &String','    println!("{}!", text);\n')],
       wrong:[
         {src:SHOUT('s: &String','    println!("{}", s);\n'),wrongWhy:'check'},
-        {src:SHOUT('s: &mut String','    println!("{}!", s);\n'),wrongWhy:'E0308'}
+        {src:SHOUT('s: &mut String','    println!("{}!", s);\n'),wrongWhy:'E0308'},
+        {src:SHOUT('s: &String','    println!("{}!", "hey");\n'),wrongWhy:'check'}
       ],
       lazy:[
         {src:SHOUT('s: &String','    let t = s.clone();\n    println!("{}!", t);\n'),wrongWhy:'check'},
@@ -52,7 +53,7 @@ RQ.CH.push({
         {src:SHOUT('s: &String','    println!("hey!");\n'),wrongWhy:'check'}
       ],
       defines:['ref-type'],previews:[],
-      check:c=>c.out()!=='hey!\nhey is still here\n'?'`shout` has to print the word with a `!`, and then `main` prints `hey is still here`.':!c.paramIsRef('shout',0)?'Make the parameter a reference, so `shout` borrows its `String` instead of taking it.':c.calls('shout')<1?'Keep the call to `shout` in `main`.':c.allocs('String')!==1?'The only `String` should be the one `main` builds. Borrow it; do not copy it.':c.count('hole')<2?'Print the `String` that `shout` was lent through a `{}` hole.':true
+      check:c=>c.out()!=='hey!\nhey is still here\n'?'`shout` has to print the word with a `!`, and then `main` prints `hey is still here`.':!c.paramIsRef('shout',0)?'Make the parameter a reference, so `shout` borrows its `String` instead of taking it.':c.calls('shout')<1?'Keep the call to `shout` in `main`.':c.allocs('String')!==1?'The only `String` should be the one `main` builds. Borrow it; do not copy it.':!c.usesParam('shout',0)||c.count('hole')<2?'Print the `String` that `shout` was lent, through a `{}` hole.':true
     },
     {
       title:'Borrow it to change it',kind:'fix',
@@ -144,7 +145,7 @@ RQ.CH.push({
         'The whole program points at two parts of one <code>String</code> and prints each part. A <em>slice</em> is a reference to a stretch of a value: it borrows part of <code>s</code> and copies nothing.',
         '<code>&s[0..5]</code> is the slice of <code>s</code> from byte <code>0</code> up to, but not including, byte <code>5</code>. Its type is <code>&str</code>, the same type as text written in quotes, like <code>"hello"</code>.',
         '<code>&s[6..11]</code> takes the second word. A slice counts bytes, which is the same as counting letters for plain English text. Leave out one end and the range runs to that end: <code>&s[..5]</code> starts at the front, <code>&s[6..]</code> runs to the back.',
-        'A slice is a loan like any other, so <code>s</code> stays borrowed while a slice of it is in use. The memory view shows the slice as a dashed arrow back to <code>s</code>.'
+        'A slice is a loan like any other, so <code>s</code> stays borrowed while a slice of it is in use. The memory view shows the slice as a dashed arrow into the heap box of <code>s</code>, labelled with the bytes it covers, like <code>[0..5]</code>, and marks <code>s</code> as borrowed.'
       ],
       explain:'That is why text written in quotes is a <code>&str</code>: it is a slice of text stored inside the program. Slicing a <code>String</code> gives the same type, so one function that takes <code>&str</code> accepts both. If the range reaches past the end, the program panics at run time with a message that names the byte index.',
       hint:'Write <code>let hello = &s[0..5];</code> and <code>let world = &s[6..11];</code>, then print each one.',

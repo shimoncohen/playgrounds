@@ -182,14 +182,14 @@ function lowerFn(f,info,un,userDrop){
     return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
   }
 
-  // `&base[a..b]`: a shared loan on an owned base; a base that is already a reference is passed on, so the slice carries its loans
+  // a base that is already a reference passes its loans on instead of making one
   function slice(e,x,dest){
     const rg=peel(x.index),b=peel(x.expr),l=b.t==='Path'?lid(b):-1;
     if(l<0){un(b.t==='Field'||b.t==='Index'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
     const bounds=[rg.from,rg.to].filter(Boolean).map(y=>ex(y));
     if(bounds.length)emit('eval',e,{rv:{k:'op',args:bounds}});
     const t=L[l].ty;
-    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false},e,dest,tyOf(e));
+    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false,slice:true},e,dest,tyOf(e));
   }
 
   function assign(e){

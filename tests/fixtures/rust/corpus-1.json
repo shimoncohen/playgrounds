@@ -1608,6 +1608,18 @@
     "why": "two reference parameters: Rust cannot tell which one the result borrows", "pr": "P7"
   },
   {
+    "id": "elide-slice-of-refs",
+    "src": "fn pick(xs: &[&str]) -> &str {\n    xs[0]\n}\n\nfn main() {\n}\n",
+    "expect": {"code": "E0106", "line": 1}, "pair": "elide-slice-of-refs-ok",
+    "why": "a &[&str] holds two lifetimes, so the result has no single one to borrow from", "pr": "P7"
+  },
+  {
+    "id": "elide-slice-of-refs-ok",
+    "src": "fn pick(xs: &[i32]) -> i32 {\n    xs[0]\n}\n\nfn main() {\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the accepted twin of elide-slice-of-refs", "pr": "P7"
+  },
+  {
     "id": "elide-owned-param",
     "src": "fn pick(s: String) -> &str {\n    \"x\"\n}\n\nfn main() {\n    println!(\"{}\", pick(String::new()));\n}\n",
     "expect": {"code": "E0106", "line": 1}, "pair": "elide-owned-param-ok",
