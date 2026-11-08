@@ -183,7 +183,7 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(feature('fn main() {\n    let x = 1 + 1.0;\n}'), 'type checking@2');
   });
   it('every feature the engine can report has a hint in the diag catalog', () => {
-    for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
+    for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES, ...RQ.BORROW_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
     assert.ok(RQ.diag.hint('anything else').length > 0);
   });
 });

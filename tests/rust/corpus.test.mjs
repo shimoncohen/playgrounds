@@ -48,6 +48,15 @@ describe('corpus v0: shape', () => {
     const ids = corpus.map((e) => e.id).join(' ');
     for (const w of ['hole', 'immutable-assign', '-mut', 'shadow']) assert.match(ids, new RegExp(w));
   });
+
+  it('P5: each borrow-check code has 3 or more rejects, each with a paired accept', () => {
+    assert.ok(corpus.some((e) => e.pr === 'P5'));
+    for (const code of ['E0381', 'E0382', 'E0499', 'E0502', 'E0505', 'E0506', 'E0596', 'E0597']) {
+      const rs = corpus.filter((e) => e.expect !== 'ok' && e.expect.code === code);
+      assert.ok(rs.length >= 3, `${code} has ${rs.length} rejects`);
+      for (const e of rs) assert.equal(byId.get(e.pair)?.expect, 'ok', `${e.id} has no paired accept`);
+    }
+  });
 });
 
 describe('corpus v0: RQ.run agrees with every authored entry', () => {

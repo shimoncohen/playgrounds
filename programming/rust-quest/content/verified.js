@@ -1,2 +1,2 @@
 /* Written only by tests/rust/verify-rustc.mjs. Do not edit. */
-globalThis.RQ=globalThis.RQ||{};RQ.verified={"rustc":"1.99.1","edition":"2024","date":"2026-11-02","inputsHash":"0bdcd0a6f28879a4cb03d5e22a6b663bc67acf5b4b674c92825b60cf806c635a","resultsHash":"b4ca08f076fa216dc2bfe5b40e5d3441ecf1751b7b58fa2f4dc0878f227618d4","counts":{"corpus":126,"missions":197}};
+globalThis.RQ=globalThis.RQ||{};RQ.verified={"rustc":"1.99.1","edition":"2024","date":"2026-11-04","inputsHash":"d685593529751deb32891fb41678fcfedab0486edddb1998f8809f4d11bcae42","resultsHash":"8dd1b8ac583358b24bc9f66758da904e3df06aaac1a9ed2324240c8182726c12","counts":{"corpus":198,"missions":197}};
