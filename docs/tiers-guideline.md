@@ -76,6 +76,7 @@ Rules: step 1 is one plain sentence about the whole line (what goes in, what com
 - Progress is `S.steps['<ch>.<mi>']` (indexes done), created lazily and dropped on completion, so old saves load unchanged and a finished course exports as before. Never reuse it for anything else.
 - Rules: two to four steps; every step is its own goal the learner can name; do not use steps to chop a one-line idea into pieces. The mission-level `answer` must equal the first step's (the solvability test asserts it). Add steps to a **shipped** mission only as a reviewed behaviour change: the golden fixture records its transcript, so say so in the PR (Beginner 6.4 "Find by type" is the example, and its golden record was re-recorded in a commit of its own).
 - Shell Quest and Harbor Quest support `steps`. Harbor's steps use its own field names (`{g,a,h,ans,ok}`), and the mission keeps only its overall `g`. Network Quest replays the whole session, so its checks require the commands in order with `c.inOrder(re1, re2, ...)` instead.
+- **Own action only.** A mission check passes only on the learner's own action in this mission: the command just typed (or the file just saved). It may read the sandbox only to confirm that action worked, and never counts things built up across missions. If a mission needs something an earlier one made, it says so, and the game creates what is missing when the learner jumps there out of order. Each quest has a test that enforces it: `tests/<quest>/own-action.test.mjs`, or for Script Quest the own-input case in `tests/smoke.mjs`.
 - Script missions are checked by their hidden tests when saved, so their cards suggest runs ("try it with ...") rather than ask for them.
 
 The check context is built per line by `SQ.ctxFor(line)` in `programming/shell-quest/engine/exec.js`. The real helpers:
@@ -85,6 +86,7 @@ The check context is built per line by `SQ.ctxFor(line)` in `programming/shell-q
 | `c.line`, `c.cwd` | the line just typed, the working directory. After an editor Save the line is the pseudo-line `(saved <path>)` and the log is empty |
 | `c.log` | command log for this line only: `{name, args, globbed, piped, redirect, errRedirect, code, out}` per command that ran (`errRedirect` is only set when `2>` was used, so treat it as optional). Compounds log too, after they finish: `if`, `while`, `until`, `case`, `[[`, `((` (no words, status as `code`), `for` (its items as `args`, logged before the body) and `(fn)` for a function definition. A function **call** is not logged, only the commands inside it |
 | `c.ran(name, pred?)` | some logged command has that name (and `pred(entry)` is true) |
+| `c.wrote(p, append?)` | this line wrote file `p` (any redirect, also on a compound or after a `cd`, `tee`, and so on, judged by the resolved path), or the editor Save was of `p`. `append` demands an appending write (`>>`, `tee -a`) or a Save |
 | `c.flag(entry, ch)` | the entry has a short option containing `ch` (`-rf` has `r`) |
 | `c.has(p)` / `c.exists(p)`, `c.isDir(p)`, `c.isFile(p)` | path exists, is a folder, is a file (`~` and relative paths are taken from the home folder) |
 | `c.node(p)` | the raw file-system node, for modes or link targets (`SQ.modeOf(node)`) |
@@ -108,8 +110,8 @@ Examples:
 // command style: the right command ran with the right option
 check: c => c.ran('grep', e => c.flag(e, 'i'))
 
-// outcome style: the folder exists, however it was made
-check: c => c.isDir('~/camp/tools')
+// outcome style: the learner's own command ran and the folder exists (state alone would also pass from an earlier mission)
+check: c => c.ran('mkdir') && c.isDir('~/camp/tools')
 
 // outcome style against data: output must equal what the real file says
 check: c => {
