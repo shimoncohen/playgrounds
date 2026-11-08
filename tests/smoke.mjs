@@ -1632,6 +1632,26 @@ test('shell-quest editor: the discard prompt resets after a timeout and when typ
   await ctx.close();
 });
 
+test('shell-quest editor: an unchanged Save does not count as writing the file', async () => {
+  const { ctx, page, errors, type, waitScreen, screen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await page.click('#chapters [data-ch="1"]');
+  await type('mkdir camp && echo "Day 1" > camp/diary.txt && echo "Day 2" > camp/notes.txt');
+  await waitScreen(/Mission complete: Build a camp/);
+  await type('cat camp/notes.txt >> camp/diary.txt');
+  await page.click('#mission .dot[data-mi="4"]');
+  assert.match(await page.textContent('#mission h2'), /Add a second entry/);
+  await type('nano camp/diary.txt');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.click('#edSave');
+  await waitScreen(/Saved camp\/diary\.txt/);
+  assert.doesNotMatch(await screen(), /Mission complete: Add a second entry/);
+  await page.fill('#edText', 'Day 1\nDay 2\nDay 3\n');
+  await page.click('#edSave');
+  await waitScreen(/Mission complete: Add a second entry/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest editor: a failed save shows the error and leaves the editor open and unsaved', async () => {
   const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
   await type('mkdir sub');
