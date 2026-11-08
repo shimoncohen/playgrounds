@@ -12,7 +12,7 @@ CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => missions.push({ ci, mi, m,
 const answerOf = m => m.ans ?? m.start;
 const inputsOf = m => (m.test ? [...m.test] : null);
 
-const GUESS = 'Game: Guess the Number', RPS = 'Mini game: Rock, Paper, Scissors';
+const GUESS = 'Game: Guess the Number', RPS = "Tock's challenge: Rock, Paper, Scissors";
 const byTitle = t => { const x = missions.filter(e => e.m.title === t); assert.equal(x.length, 1, `mission renamed or duplicated: ${t}`); return x[0]; };
 const usesStepDepth = m => m.check.toString().includes('stepDepth');
 
