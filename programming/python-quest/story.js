@@ -7,6 +7,6 @@
       { name: 'Inky', role: 'the ink-stained cat who knocks things over' },
       { name: 'Mr. Grumble', role: 'the grumpy lender who hid the page and loves riddles' },
     ],
-    treasure: 'The Last Page of the town\'s first story, which fits the torn half-note pinned to the front door in chapter 1.',
+    treasure: 'The Last Page of the town\'s first story, which fits the torn half-note pinned to the front door in chapter 0.',
   };
 })(typeof window !== 'undefined' ? window : globalThis);

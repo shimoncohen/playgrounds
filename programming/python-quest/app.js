@@ -615,7 +615,7 @@ const CH=[
 {name:'Math & text',badge:'Ledger Page',story:'The ledger desk is a mess of late fees and book titles; add, divide and slice them, and find the stamped ledger page.',intro:'The ledger desk is a mess of late fees and book titles. Python is a great calculator and handles text well too. This chapter covers the operators, then how to slice and change text.',
  learned:['+ - * /','// and %','**','len()','.upper()','s[0], s[-1]','s[1:4]','input()','int()'],
  missions:[
- {title:'Damage calculator',goal:'Three late books cost 7 coins each. Store <code>fees = 7 * 3</code> and print it.',
+ {title:'Late-fee calculator',goal:'Three late books cost 7 coins each. Store <code>fees = 7 * 3</code> and print it.',
   anat:[['fees','var'],['=','op'],['7','num'],['*','op','times'],['3','num']],
   explain:'Math operators: <code>+</code> add, <code>-</code> subtract, <code>*</code> multiply, <code>/</code> divide. Python follows the usual order: <code>*</code> and <code>/</code> before <code>+</code> and <code>-</code>. Brackets go first. The shortcuts work for these too: <code>x *= 2</code> means <code>x = x * 2</code>, and <code>/=</code> divides the same way.',
   starter:'',answer:'fees = 7 * 3\nprint(fees)',
@@ -626,7 +626,7 @@ const CH=[
   note:'% is great for "every Nth time" checks: <code>n % 2</code> is 0 for every even number, because even numbers divide by 2 with nothing left over.',
   starter:'',answer:'print(17 / 5)\nprint(17 // 5)\nprint(17 % 5)',
   check:c=>c.lines.join('|')==='3.4|3|2'||'The console should show 3.4, then 3, then 2.'},
- {title:'Power up',goal:'A rumour about Inky doubles its listeners every night for 10 nights. Print <code>2 ** 10</code>.',
+ {title:'Power up',goal:'A rumour about Inky spreads: the number of listeners doubles every night for 10 nights. Print <code>2 ** 10</code>.',
   anat:[['2','num'],['**','op','to the power'],['10','num']],
   explain:'<code>**</code> means "to the power of". <code>2 ** 10</code> is 2×2×2×2×2×2×2×2×2×2. Python integers can get as big as you like.',
   starter:'',answer:'print(2 ** 10)',check:c=>c.printed('1024')&&/\*\*/.test(c.code)||'Use ** to print 1024.'},
@@ -646,7 +646,7 @@ const CH=[
   explain:'<code>word[0:3]</code> means "from position 0 up to, but not including, 3". Leave a side out to go to the edge: <code>word[:3]</code> or <code>word[3:]</code>.',
   starter:'word = "bookmark"\n',answer:'word = "bookmark"\nprint(word[0:3])',
   check:c=>c.printed('boo')&&/\[[^\]]*:/.test(c.code)||'Use a slice like word[0:3] to print boo.'},
- {title:'Ask the player',goal:'A reader walks in: use <code>input()</code> to ask for a name, then print <code>Welcome, NAME!</code>. Your answers go in the <b>Answers tray</b> under the editor.',
+ {title:'Ask the reader',goal:'A reader walks in: use <code>input()</code> to ask for a name, then print <code>Welcome, NAME!</code>. Your answers go in the <b>Answers tray</b> under the editor.',
   anat:[['name','var'],['=','op'],['input','fn'],['("Your name? ")','str','question']],
   explain:'<code>input()</code> pauses, shows the question, and waits for the player to type. Whatever they type is stored as text. In this playground, you type the answers ahead of time in the tray.',
   inputs:['Nell'],starter:'',answer:'name = input("What is your name? ")\nprint(f"Welcome, {name}!")',
@@ -681,7 +681,7 @@ const CH=[
   note:'Try changing books_read to 95 and 40 and run it again.',
   starter:'books_read = 85\n',answer:'books_read = 85\nif books_read >= 90:\n    print("Gold")\nelif books_read >= 70:\n    print("Silver")\nelse:\n    print("Bronze")',
   check:c=>!/^\s*elif\b/m.test(c.code)?'Use elif for the middle case.':c.val('books_read')===85&&c.lines.join('|')!=='Silver'?'With books_read 85 only Silver should print.':true},
- {title:'Two things at once',goal:'Print <code>The reading-room door opens</code> only if <code>has_card</code> is True <b>and</b> <code>hour</code> is below 18.',
+ {title:'Two things at once',goal:'Print <code>The reading-room door opens</code> only if <code>has_card</code> is True <b>and</b> <code>hour</code> is below 18 (on a 24-hour clock).',
   anat:[['has_card','var'],['and','kw','both'],['hour < 18','var']],
   explain:'<code>and</code> needs both sides True. <code>or</code> needs at least one. <code>not</code> flips True and False.',
   starter:'has_card = True\nhour = 14\n',answer:'has_card = True\nhour = 14\nif has_card and hour < 18:\n    print("The reading-room door opens")',
@@ -717,7 +717,7 @@ const CH=[
   check:c=>(c.val('satchel')||[]).includes('tea')?'tea is still in the list.':!/\.remove\(|\.pop\(/.test(c.code)?'Use .remove("tea").':c.out.includes("['lantern', 'bookmark', 'map']")||'Print the satchel.'},
  {title:'Check the bag',goal:'If <code>"lantern"</code> is <b>in</b> the satchel, print <code>Ready to read!</code>.',
   anat:[['"lantern"','str'],['in','kw','is inside?'],['satchel','var']],
-  explain:'<code>in</code> asks "is this item somewhere in the list?" and gives back True or False. It works on text too: <code>"dra" in "dragon"</code> is True.',
+  explain:'<code>in</code> asks "is this item somewhere in the list?" and gives back True or False. It works on text too: <code>"Moon" in "Moon Atlas"</code> is True.',
   starter:'satchel = ["lantern", "bookmark", "map"]\n',answer:'satchel = ["lantern", "bookmark", "map"]\nif "lantern" in satchel:\n    print("Ready to read!")',
   check:c=>!/\bin\b/.test(c.code.replace(/print\(.*\)/g,''))?'Use the word in.':c.printed('Ready to read!')||'Print Ready to read!'},
  {title:'Upgrade an item',goal:'Swap the bookmark for a better one: set <code>satchel[1]</code> to <code>"golden bookmark"</code> and print the list.',
@@ -804,7 +804,7 @@ const CH=[
  learned:['{"key": value}','d["key"]','d["new"] = x','.get(key, default)','.items()','in (keys)'],
  missions:[
  {title:'A reader\'s card',goal:'Create <code>reader = {"name": "Nell", "books": 12, "coins": 25}</code> for the reader\'s card and print <code>reader["name"]</code>.',
-  anat:[['{','br','dict'],['"name"','str','key'],[':','op'],['"Ada"','str','value'],['}','br']],
+  anat:[['{','br','dict'],['"name"','str','key'],[':','op'],['"Nell"','str','value'],['}','br']],
   explain:'Curly brackets make a dict. Each entry is <code>key: value</code>. To read a value, put its key in square brackets. In the memory map, each key points to its value. <code>len()</code> counts a dict\'s keys.',
   starter:'',answer:'reader = {"name": "Nell", "books": 12, "coins": 25}\nprint(reader["name"])',
   check:c=>c.type('reader')!=='dict'?'Make reader a dict with curly brackets.':(()=>{const h=c.val('reader');return h.name&&h.books===12&&h.coins===25?(c.printed(h.name)||'Print reader["name"].'):'reader needs keys "name", "books" (12) and "coins" (25).'})()},
@@ -823,12 +823,12 @@ const CH=[
   explain:'<code>.items()</code> gives each pair. Writing <code>key, value</code> unpacks the pair into two boxes at once. Looping over a dict on its own gives just the keys.',
   starter:'reader = {"name": "Nell", "books": 12, "coins": 75}\n',answer:'reader = {"name": "Nell", "books": 12, "coins": 75}\nfor key, value in reader.items():\n    print(f"{key}: {value}")',
   check:c=>!/\.items\(\)/.test(c.code)?'Loop over reader.items().':c.printed('name: Nell')&&c.printed('books: 12')||'Print each line as key: value.'},
- {title:'Find a book',goal:'Mr. Grumble files books by shelf. Ask which book to find with <code>input()</code>. If it is in <code>shelves</code>, print <code>It is on shelf N</code>, otherwise print <code>We don\'t have that book</code>.',
+ {title:'Find a book',goal:'Mr. Grumble files books by shelf. Ask which book to find with <code>input()</code> and store it in <code>book</code>. If it is in <code>shelves</code>, print <code>It is on shelf N</code>, otherwise print <code>We don\'t have that book</code>.',
   anat:[['if','kw'],['book','var'],['in','kw'],['shelves','var'],[':','op']],
   explain:'This mixes everything so far: input, a dict lookup, and an if/else. <code>book in shelves</code> checks the keys, and <code>{shelves[book]}</code> inside the f-string looks the shelf up.',
   note:'Change the answer in the tray to "Sky Atlas" and run again to test the else path.',
   inputs:['Dragon Tales'],starter:'shelves = {"Moon Atlas": 3, "Tea Recipes": 8, "Dragon Tales": 15}\n',answer:'shelves = {"Moon Atlas": 3, "Tea Recipes": 8, "Dragon Tales": 15}\nbook = input("Which book? ")\nif book in shelves:\n    print(f"It is on shelf {shelves[book]}")\nelse:\n    print("We don\'t have that book")',
-  check:c=>{if(!/input\(/.test(c.code))return 'Ask with input().';if(!/^\s*else\s*:/m.test(c.code))return 'Add an else for items the shop does not sell.';const it=c.val('book'),p=c.val('shelves')||{};
+  check:c=>{if(!/input\(/.test(c.code))return 'Ask with input().';if(!/^\s*else\s*:/m.test(c.code))return 'Add an else for books the library does not hold.';const it=c.val('book'),p=c.val('shelves')||{};
     return it in p?(c.out.includes(`It is on shelf ${p[it]}`)||`Print It is on shelf ${p[it]}`):(c.out.includes("We don't have that book")||"Print We don't have that book")}}
  ]},
 {name:'Build a game',badge:'Last Page',story:'Mr. Grumble guards the last page with a guessing riddle; use everything you have learned to beat it, and find the Last Page.',intro:'Mr. Grumble hid the last page behind a guessing riddle. Time to combine it all. You will use the random module, catch bad input, and build a guessing game and a battle loop.',
@@ -867,7 +867,7 @@ const CH=[
     if(h.wits>0&&d.wits>0)return 'The loop should run until one of them reaches 0.';return /solved|defeated|win|won|wins|lost|lose/i.test(c.lines.slice(-1)[0]||'')||'After the loop, print who won.'}},
  {title:'Make it yours',goal:'Add your own page to the library: write a small game or program, at least 8 lines, that uses a <b>function</b> and a <b>loop</b> and runs without errors.',
   anat:[['def','kw'],['for / while','kw'],['if','kw'],['print','fn']],
-  explain:'Ideas: a dice duel against the computer, a shop where you spend gold until it runs out, a quiz that keeps score, a times-table trainer. Use the Field guide when you forget something.',
+  explain:'Ideas: a dice duel against the computer, a book fair where you spend coins until they run out, a quiz that keeps score, a times-table trainer. Use the Field guide when you forget something.',
   starter:'# Your game goes here\n',answer:'import random\n\ndef roll():\n    return random.randint(1, 6)\n\nscore = 0\nfor turn in range(1, 4):\n    mine = roll()\n    theirs = roll()\n    print(f"Turn {turn}: you {mine}, computer {theirs}")\n    if mine > theirs:\n        score += 1\nprint(f"You won {score} of 3 turns")',
   check:c=>{const n=c.code.split('\n').filter(l=>l.trim()).length;return n<8?`Write at least 8 lines of code (you have ${n}).`:!/^\s*def\b/m.test(c.code)?'Include a function (def).':!/^\s*(for|while)\b/m.test(c.code)?'Include a loop (for or while).':!c.out.trim()?'Make it print something.':true}}
  ]}
