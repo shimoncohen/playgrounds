@@ -16,6 +16,9 @@ RQ.lint=(ast,info)=>{
   const flag=(id,n,o)=>once(id+'@'+n.line+':'+n.col,()=>errors.push(RQ.diag.make(id,n.line,n.col,o)));
   const rtyOf=e=>(info.get(e)||{}).rty;
   const bindOf=e=>(info.get(e)||{}).bind;
+  // the local a place hangs off: x for x, x.0 and x[i]
+  const rootBind=n=>{n=peel(n);while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'?bindOf(n):null;};
+  let borrowed=new Set(); // per fn: the locals that are the root of a & or &mut operand, or of an autoref method receiver
 
   // overflowing_literals is a type-based lint, so it covers every literal, reachable or not
   const negated=new Set();
@@ -81,6 +84,7 @@ RQ.lint=(ast,info)=>{
     for(const s of b.stmts){
       if(div)return null;
       if(s.t==='Let'){
+        if(!s.init)continue; // a deferred let has no value to fold
         const before=barriers,v=ev(s.init);
         if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:barriers===before});}
       }else if(s.t==='ExprStmt')ev(s.expr);
@@ -117,7 +121,8 @@ RQ.lint=(ast,info)=>{
         if(b){
           const s=st.get(b);
           if(!s||!s.val)return null;
-          return {...s.val,amb:s.val.amb||(b.mut&&(b.assigns===0||!s.fresh))};
+          // a local whose address is taken anywhere in the fn: rustc's folding of it is not verified
+          return {...s.val,amb:s.val.amb||borrowed.has(b)||(b.mut&&(b.assigns===0||!s.fresh))};
         }
         const n=e.segs[0].name;
         if(!consts.has(n))return null;
@@ -152,7 +157,21 @@ RQ.lint=(ast,info)=>{
         const a=ev(e.expr),t=e.ty.t==='Path'?e.ty.segs[0].name:'';
         return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.amb):null;
       }
+      case 'Ref':{
+        ev(e.expr);
+        // a &mut hands out a way to change the value that rustc's folding may or may not see
+        if(e.mut){const b=rootBind(e.expr);if(b)forget([b]);barrier();}
+        return null;
+      }
+      case 'Deref':ev(e.expr);return null;
+      case 'MethodCall':{
+        ev(e.recv);
+        for(const a of e.args)ev(a);
+        barrier();return null;
+      }
       case 'Assign':{
+        // *r = v: lints in v still fire, but nothing is stored and nothing folded (the Deref's .bind is the reference, not the target)
+        if(e.lhs.t==='Deref'){ev(e.rhs);barrier();return null;}
         const b=bindOf(e),before=barriers;
         let r=ev(e.rhs);
         if(e.op!=='='){
@@ -231,7 +250,13 @@ RQ.lint=(ast,info)=>{
   for(const n of consts.keys())constKnown(n);
   for(const it of ast.items){
     if(it.t!=='Fn'||!it.body)continue;
-    st=new Map();dead=0;barriers=0;div=false;
+    st=new Map();dead=0;barriers=0;div=false;borrowed=new Set();
+    RQ.walk(it.body,n=>{
+      let root=null;
+      if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr
+      else if(n.t==='MethodCall'){const r=(info.get(n)||{}).recv;if(r&&r.adj!=='val')root=rootBind(n.recv);}
+      if(root)borrowed.add(root);
+    });
     block(it.body);
   }
   const by=(a,b)=>a.line-b.line||(a.col||0)-(b.col||0);

@@ -3,6 +3,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const MAX_PAD=1000;
 class Unmodeled extends Error{}
+class Over extends Error{}
 const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],
   [/^\.(\d{1,3})$/,m=>({debug:false,prec:+m[1],width:null})],[/^>(\d{1,3})$/,m=>({debug:false,prec:null,width:+m[1]})]];
 const fmtOf=s=>{for(const [re,mk] of SPECS){const m=re.exec(s);if(m)return mk(m);}return null;};
@@ -74,33 +75,39 @@ function f64(x,spec){
 
 const ESC={'\n':'\\n','\r':'\\r','\t':'\\t','\\':'\\\\'};
 // the escapes Rust prints are modeled for plain ASCII text only; anything else is left to the real compiler
-function quoted(s,q){
+function quoted(s,q,room){
   let o=q;
   for(const c of s){
     if(c===q)o+='\\'+q;
     else if(ESC[c])o+=ESC[c];
     else if(c>=' '&&c<='~')o+=c;
     else throw new Unmodeled('debug text');
+    if(o.length>room)throw new Over();
   }
   return o+q;
 }
+const unref=v=>{while(v.k==='ref')v=v.cell.val;return v;};
 function display(v){
+  v=unref(v);
   switch(v.k){
     case 'int':return v.v.toString();
     case 'float':return f64(v.v,'');
     case 'bool':return v.v?'true':'false';
-    case 'char':case 'str':return v.v;
+    case 'char':case 'str':case 'String':return v.v;
     default:throw new Error('display of '+v.k);
   }
 }
 // tick is called once per value printed, so a big array counts against the step budget
-function debug(v,tick){
+// room is how many chars the text may still have; past it Over is thrown, so a nested value never builds far beyond the output cap
+function debug(v,tick,room=Infinity){
   if(tick)tick();
-  const sub=x=>debug(x,tick);
+  let used=0;
+  const sub=x=>{const s=debug(x,tick,room-used);used+=s.length+2;if(used>room)throw new Over();return s;};
+  v=unref(v);
   switch(v.k){
     case 'float':return f64(v.v,'?');
-    case 'char':return quoted(v.v,"'");
-    case 'str':return quoted(v.v,'"');
+    case 'char':return quoted(v.v,"'",room);
+    case 'str':case 'String':return quoted(v.v,'"',room);
     case 'unit':return '()';
     case 'tuple':return '('+v.v.map(sub).join(', ')+(v.v.length===1?',':'')+')';
     case 'array':return '['+v.v.map(sub).join(', ')+']';
@@ -108,10 +115,19 @@ function debug(v,tick){
   }
 }
 // width counts characters, as Rust does
-function render(v,fmt,tick){
-  const s=fmt.debug?debug(v,tick):fmt.prec!==null?f64(v.v,'.'+fmt.prec):display(v);
+function render(v,fmt,tick,room){
+  const s=fmt.debug?debug(v,tick,room):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
   if(fmt.width===null)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled};
+// The methods the checker knows. The name is user text, so this is a Map (a plain object would answer `constructor`).
+// recv: which receivers take it, as letters: o owned String, r &String, m &mut String, s &str. self: how an owned receiver is borrowed.
+const {T}=RQ.types;
+const methods=new Map([
+  ['len',{recv:'orms',self:'&',args:[],ret:T.int('usize')}],
+  ['clone',{recv:'orm',self:'&',args:[],ret:T.string}],
+  ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
+  ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
+]);
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,Over,methods,unref};
 })();
