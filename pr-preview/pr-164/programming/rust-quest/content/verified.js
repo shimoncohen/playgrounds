@@ -1,0 +1,2 @@
+/* Written only by tests/rust/verify-rustc.mjs. Do not edit. */
+globalThis.RQ=globalThis.RQ||{};RQ.verified={"rustc":"1.99.1","edition":"2024","date":"2026-11-08","inputsHash":"e71c213e5a8bc934802760d3b52973e03179a7b3973cec89fe6e09c7feada9ae","resultsHash":"abc2e709730766ac823d288478dc403e57bca38b99ce43db26938473b8c26410","counts":{"corpus":444,"missions":345}};
