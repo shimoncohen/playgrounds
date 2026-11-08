@@ -12,13 +12,14 @@ const RULEISH=/^(do not|only|ask before)\s+\S+\s+\S/i;
 const notConnected=(o,target)=>o.steps.some(s=>s.type==='skip'&&s.target===target&&s.by==='not connected');
 
 AQ.CH.push({
-  name:'Audit what is loaded',badge:'Load Auditor',tier:'tune',
-  intro:'A setup grows a little with every job, and the agent pays for all of it on every run. Before you cut anything, look at what is loaded: the words that pick a skill, the rule lines that stop nothing, and the tools a job never calls. In this chapter you shorten a description, delete rules that point at things that are gone, and keep only the tools the job calls.',
+  name:'Audit what is loaded',badge:'Old Inventory',tier:'tune',
+  story:'The attic is cluttered; list what Cog carries every run, and find the old inventory.',
+  intro:'The stockroom attic is cluttered, so first list what Cog carries on every run. A setup grows a little with every job, and the agent pays for all of it on every run. Before you cut anything, look at what is loaded: the words that pick a skill, the rule lines that stop nothing, and the tools a job never calls. In this chapter you shorten a description, delete rules that point at things that are gone, and keep only the tools the job calls.',
   learned:['What a skill description is for','Rule lines that stop nothing','Trimming the tools inside a server'],
   missions:[
     {
       title:'What the agent reads to pick a skill',scenario:'tuneDesc',kind:'config',prompt:'Goal: ship the rounding fix in this release\nDone when: run npm test',facts:['skills'],
-      goal:'The skill <code>release-guard</code> has a <code>description:</code> of about forty words, and the agent carries it on every run. In real Claude Code the agent reads the name and description of a skill to decide whether to load it. In this practice the <code>when:</code> line does the loading, but the description still has to do its job: say when the skill applies and what it guards. Rewrite it in 10 words or fewer, keep the guard working, and get the most the agent holds at once down to '+AQ.TUNE.desc+' tokens or fewer. The Meter shows it after a run.',
+      goal:'The stockroom attic is cluttered. The skill <code>release-guard</code> has a <code>description:</code> of about forty words, and the agent carries it on every run. In real Claude Code the agent reads the name and description of a skill to decide whether to load it. In this practice the <code>when:</code> line does the loading, but the description still has to do its job: say when the skill applies and what it guards. Rewrite it in 10 words or fewer, keep the guard working, and get the most the agent holds at once down to '+AQ.TUNE.desc+' tokens or fewer. The Meter shows it after a run.',
       how:[
         'A line such as <code>description: Use during a release: blocks edits to migrations</code> says in eight words when the skill applies (a release) and what it guards (the migrations). It does the same job as the long one, and the agent holds far less.',
         'The description is always loaded, used or not, so every word of it is paid for on every run. The body of the skill loads only when <code>when:</code> matches the job.',
@@ -44,7 +45,7 @@ AQ.CH.push({
     },
     {
       title:'Lines the agent ignores',scenario:'tuneDead',kind:'budget',prompt:'Goal: fix the rounding bug in src/price.js',facts:['memory-files'],
-      goal:'A line in <code>CLAUDE.md</code> only acts as a rule when the folder or command it names is in the project. Three lines in this shop\'s file name things that are gone: <code>old-api/</code>, <code>billing/</code> and the command <code>npm run legacy-build</code>. The agent cannot place them, so they stop nothing, and they are still loaded on every run. Delete the lines that do nothing, keep the rule that guards <code>data/</code>, and get the whole setup down to '+AQ.TUNE.dead+' tokens or fewer.',
+      goal:'Mr. Ledbury never cleared the old lines out of the attic. A line in <code>CLAUDE.md</code> only acts as a rule when the folder or command it names is in the project. Three lines in this shop\'s file name things that are gone: <code>old-api/</code>, <code>billing/</code> and the command <code>npm run legacy-build</code>. The agent cannot place them, so they stop nothing, and they are still loaded on every run. Delete the lines that do nothing, keep the rule that guards <code>data/</code>, and get the whole setup down to '+AQ.TUNE.dead+' tokens or fewer.',
       how:[
         'Deleting the three lines <code>do not edit old-api/</code>, <code>only edit billing/</code> and <code>ask before run npm run legacy-build</code> leaves the notes and the live rule <code>do not delete data/</code>. The file falls under the limit.',
         'A rule line counts only when its target exists. These targets are gone, so the lines are read and then ignored. Under the file, the editor says how many other lines only cost tokens: the notes are in that number too, so look at which lines look like rules.',
@@ -67,7 +68,7 @@ AQ.CH.push({
     },
     {
       title:'Only the tools the job calls',scenario:'tuneMcp',kind:'config',prompt:'Goal: read today\'s calendar and the newest mail',facts:['mcp'],
-      goal:'This job reads today\'s calendar and the newest mail: one tool from each of two servers, <code>calendar.list</code> and <code>mail.read</code>. The list in <code>.claude/mcp.txt</code> connects five servers with all their tools, and every tool name is loaded on every run, as in mission 5.4. There one server was enough. Here the job needs two, so trim the tools inside each line as well. Keep both tools connected, and get the most the agent holds at once down to '+AQ.TUNE.mcp+' tokens or fewer.',
+      goal:'Dana\'s morning job for Cog reads today\'s calendar and the newest mail: one tool from each of two servers, <code>calendar.list</code> and <code>mail.read</code>. The list in <code>.claude/mcp.txt</code> connects five servers with all their tools, and every tool name is loaded on every run, as in mission 5.4. There one server was enough. Here the job needs two, so trim the tools inside each line as well. Keep both tools connected, and get the most the agent holds at once down to '+AQ.TUNE.mcp+' tokens or fewer.',
       how:[
         'The two lines <code>calendar: list</code> and <code>mail: read</code> keep exactly the two tools the job calls. The other three servers go, and so do the tools of these two that the job never touches.',
         'A line is a server name, a colon and its tools. Deleting a line removes the whole server. Shortening the list keeps the server and loads fewer names.',
