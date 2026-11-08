@@ -35,7 +35,7 @@
   </aside>
   <div class="codeCol" id="codePanel">
     <div class="edhead"><span class="file">src/main.rs</span><span class="sp"></span><button type="button" class="linkbtn" id="bCopy">Copy code</button><a class="linkbtn" href="https://play.rust-lang.org/" target="_blank" rel="noopener noreferrer">Open the Rust Playground</a><button type="button" class="linkbtn" id="bReset">Reset to starter</button></div>
-    <div class="editor"><textarea id="code" rows="12" aria-label="Rust code editor" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off"></textarea></div>
+    <div class="editor"><div class="gutter" id="gutter" aria-hidden="true" hidden></div><textarea id="code" rows="12" aria-label="Rust code editor" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off"></textarea></div>
     <div class="keys" id="keys" aria-label="Extra keys"></div>
     <div class="actions"><button type="button" class="btn" id="bRun">Run <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button></div>
     <div class="feedback" id="feedback" aria-live="polite"></div>
@@ -45,6 +45,12 @@
       <section class="outPanel" aria-labelledby="outTitle">
         <h3 id="outTitle">Result</h3>
         <div id="result" class="result" aria-live="polite"><p class="note">Press <b>Run</b> to see what your program prints, or what the compiler says.</p></div>
+      </section>
+    </div>
+    <div class="panel" id="memPanel" hidden>
+      <section class="memSection" aria-labelledby="memTitle">
+        <h3 id="memTitle">Memory view</h3>
+        <div id="memory" class="memory" hidden></div>
       </section>
     </div>
   </aside>
@@ -87,9 +93,11 @@
 <script src="content/ch-01-hello.js"></script>
 <script src="content/ch-02-types.js"></script>
 <script src="content/ch-03-functions.js"></script>
+<script src="content/ch-04-ownership.js"></script>
 <script src="content/extras.js"></script>
 <script src="content/verified.js"></script>
 <script src="ui.js"></script>
+<script src="memview.js"></script>
 <script src="editor.js"></script>
 <script src="app.js"></script>
 </body>

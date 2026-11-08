@@ -11,7 +11,7 @@
        dead   {l}             StorageDead of a named local, in reverse declaration order. Temps get none.
        branch {x}             the block has two succ: then, else (loop body, loop exit)
        return {x}             x is null for a unit fn
-     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut} | {k:'call',fn,args} | {k:'method',name,recv,args} | {k:'op',args}
+     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args} | {k:'method',name,recv,args} | {k:'op',args}
             | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args}.  `ref` borrows the local l; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
      operand {k:'copy'|'move',l} by isCopy of the value's type, or {k:'const'}. A `&mut` local passed to a call or a method
@@ -125,7 +125,7 @@ function lowerFn(f,info,un,userDrop){
     return {base:p,l,idx};
   };
   // format_args! takes `&arg` of every argument first, so a reference local is borrowed too and a later arg cannot reassign it
-  const printLocal=(l,nd)=>put({k:'ref',l,mut:false},nd,undefined,T.ref(false,L[l].ty,0));
+  const printLocal=(l,nd)=>put({k:'ref',l,mut:false,implicit:true},nd,undefined,T.ref(false,L[l].ty,0));
   function printArg(x,nd){
     const p=peel(x);
     if(p.t==='Path'){const l=lid(p);if(l>=0)return printLocal(l,nd);}
@@ -138,7 +138,7 @@ function lowerFn(f,info,un,userDrop){
       const r=rootOf(p);
       if(r.l>=0){
         if(r.idx.length)emit('eval',p,{rv:{k:'op',args:r.idx.map(x=>ex(x))}});
-        return put({k:'ref',l:r.l,mut:false},p,undefined,T.ref(false,L[r.l].ty,0));
+        return put({k:'ref',l:r.l,mut:false,implicit:true},p,undefined,T.ref(false,L[r.l].ty,0));
       }
     }
     return ex(x);
@@ -175,7 +175,7 @@ function lowerFn(f,info,un,userDrop){
       }else if(e.name==='as_str'){un('temporary borrow',e);return fin(NIL,e,dest);}
       else{const x=ex(e.recv);if(x.k!=='const')target=x.l;}
       if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
-      ro=put({k:'ref',l:target,mut},e,undefined,T.ref(mut,L[target].ty,0));
+      ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
       rebTwice(e.args,e);
       args=seq(e.args,x=>argOp(x,true));
     }
@@ -332,13 +332,14 @@ function lowerFn(f,info,un,userDrop){
       }
       case 'Field':case 'Index':return place(e,dest);
       case 'Tuple':case 'Array':return put({k:'agg',args:seq(e.elems,ex)},e,dest,tyOf(e));
+      case 'StructLit':return put({k:'agg',args:seq(e.fields.map(f=>f.expr),ex)},e,dest,tyOf(e));
       case 'ArrayRepeat':return put({k:'agg',args:[ex(e.elem)]},e,dest,tyOf(e));
       case 'Macro':{
-        if(!PRINT.has(e.name)||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
+        if(!(PRINT.has(e.name)||e.name==='format')||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
         const args=seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
         const caps=e.args[0]&&info.get(e.args[0])&&info.get(e.args[0]).caps||[];
         for(const c of caps)if(c.bind&&lm.has(c.bind))args.push(printLocal(lm.get(c.bind),e));
-        return put({k:'macro',name:e.name,args},e,dest,T.unit);
+        return put({k:'macro',name:e.name,args},e,dest,e.name==='format'?T.string:T.unit);
       }
       case 'Block':return blockEx(e,dest);
       case 'If':return ifEx(e,dest);

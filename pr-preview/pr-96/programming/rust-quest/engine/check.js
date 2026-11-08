@@ -9,7 +9,8 @@
      recv  a MethodCall: {method, kind:'place'|'refvar'|'temp', adj:'&'|'&mut'|'val'}. kind is a place expression, a local that
            holds a reference, or anything else; adj is how the receiver is passed (an owned place is borrowed, a reference is used)
      sig   a Call: {params:[type], ret:type}
-     rty, alen  the resolved literal type and array length, as before */
+     rty, alen  the resolved literal type and array length, as before
+   Structs are plain `struct Name { field: Type }` with owned fields; the only impl is `impl Drop for Name { fn drop(&mut self) { prints } }`. */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
@@ -18,9 +19,9 @@ RQ.CHECK_FEATURES=['struct','enum','impl','trait','static','type alias','use','m
   'method call','field access','slice','reference','dereference','cast','try operator','struct literal','qualified path',
   'fn pointer','impl Trait','inferred type','pattern','let else','deferred initialization','format spec','assignment target','type checking',
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
-  'range expression','for iterable','let condition','array length','break outside loop',
+  'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'String','Vec','HashMap','Option','Result','Box','str',...MACRO_NAMES.map(n=>n+'!')];
+  'String','Vec','HashMap','Option','Result','Box','str',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
@@ -38,7 +39,7 @@ RQ.check=ast=>{
   const I=n=>{let o=info.get(n);if(!o){o={};info.set(n,o);}return o;};
   const unsup=(f,line)=>{const k=f+'@'+line;if(!seen.has(k)){seen.add(k);un.push({feature:f,line});}return T.any;};
   const syn=(line,col,msg)=>errors.push({line,col,msg});
-  const fns=new Map(),consts=new Map(),itemNames=new Set();
+  const fns=new Map(),consts=new Map(),itemNames=new Set(),structs=new Map(),drops=new Map();
   // lets that rebind a visible name, those whose value reads the old one, and every read of a local variable
   let shadows=0,shadowUses=0,varUses=0;
   const defined=it=>{
@@ -88,6 +89,7 @@ RQ.check=ast=>{
       if(s==='char')return T.char;
       if(s==='f64')return T.float;
       if(s==='String')return T.string;
+      if(structs.has(s))return T.struct(s);
       return unsup(s,n.line);
     }
     if(n.t==='Ref'){
@@ -107,8 +109,45 @@ RQ.check=ast=>{
     return unsup(n.t==='Path'?n.segs[n.segs.length-1].name:TYPE_NODE[n.t]||n.t,n.line);
   }
 
+  // a struct lives in the type namespace, so it may share a name with a fn or a const
+  for(const it of ast.items)if(it.t==='Struct'){
+    if(structs.has(it.name))errors.push(RQ.diag.make('E0428',it.line,it.col,{name:it.name}));
+    else structs.set(it.name,{node:it,fields:[]});
+  }
+  const refNode=n=>n.t==='Ref'||(n.t==='Tuple'&&n.tys.some(refNode))||(n.t==='Array'&&refNode(n.ty));
+  const BUILTIN=new Set(['String','bool','char','f64','str','Vec','Option','Result','Box','HashMap']);
+  function structDecl(it){
+    const rec=structs.get(it.name);
+    if(rec.node!==it)return;
+    const names=new Set();
+    let ok=!it.generics.length&&it.kind==='named'&&!it.attrs.length&&!BUILTIN.has(it.name)&&!isInt(it.name);
+    // a borrowed field needs a lifetime, which is not modeled
+    for(const f of ok?it.fields:[]){
+      if(names.has(f.name)||refNode(f.ty))ok=false;
+      names.add(f.name);
+    }
+    if(!ok){unsup('struct',it.line);return;}
+    rec.fields=it.fields.map(f=>({name:f.name,ty:tyOf(f.ty)}));
+  }
+  const DROP_OK=new Set(['Block','ExprStmt','Macro','Lit','Path','Field','Paren']);
+  function dropImpl(it){
+    const f=it.items[0],tr=it.trait,st=it.selfTy,one=n=>n&&n.t==='Path'&&n.segs.length===1&&!n.segs[0].args&&!n.segs[0].fn;
+    const name=one(st)?st.segs[0].name:'';
+    let ok=one(tr)&&tr.segs[0].name==='Drop'&&!it.generics.length&&!it.attrs.length&&structs.has(name)&&!drops.has(name)
+      &&it.items.length===1&&f.t==='Fn'&&f.name==='drop'&&!f.generics.length&&!f.attrs.length&&!f.params.length&&!f.ret&&!!f.body
+      &&!!f.selfParam&&f.selfParam.ref&&f.selfParam.mut&&!f.selfParam.lt&&!f.selfParam.ty;
+    // the body only prints: anything else (a call, a move, a borrow) would need the full analysis of a method
+    if(ok){
+      if(f.body.tail||f.body.stmts.some(x=>x.t!=='ExprStmt'||x.expr.t!=='Macro'||!(x.expr.name in PRINT)))ok=false;
+      RQ.walk(f.body,n=>{if(!DROP_OK.has(n.t))ok=false;});
+    }
+    if(ok)drops.set(name,it);else unsup('impl',it.line);
+  }
+
   for(const it of ast.items){
-    if(it.t==='Fn'){
+    if(it.t==='Struct')structDecl(it);
+    else if(it.t==='Impl')dropImpl(it);
+    else if(it.t==='Fn'){
       if(it.generics.length)unsup('generics',it.line);
       if(it.selfParam)unsup('method',it.line);
       const names=new Set();
@@ -130,6 +169,16 @@ RQ.check=ast=>{
     }else if(ITEM[it.t])unsup(ITEM[it.t],it.line);
     else if(!['Extern','MacroRules','Union'].includes(it.t))unsup(it.t,it.line);
   }
+  // a struct that holds itself, directly or through a tuple or array, has infinite size (E0072), which is not modeled
+  const holds=(t,seenS)=>{
+    t=res(t);
+    if(t.k==='struct'){
+      if(seenS.has(t.name))return true;
+      return structs.get(t.name).fields.some(f=>holds(f.ty,new Set([...seenS,t.name])));
+    }
+    return t.k==='tuple'?t.els.some(x=>holds(x,seenS)):t.k==='array'?holds(t.el,seenS):false;
+  };
+  for(const [name,rec] of structs)if(rec.fields.some(f=>holds(f.ty,new Set([name])))){rec.fields=[];unsup('struct',rec.node.line);}
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
   let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[];
@@ -269,6 +318,7 @@ RQ.check=ast=>{
 
   function ex(e){const t=expr(e);I(e).ty=t;return t;}
   const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
+  const placeChain=e=>{e=peel(e);return e.t==='Path'||((e.t==='Field'||e.t==='Index')&&placeChain(e.expr));};
   function expr(e){
     switch(e.t){
       case 'Lit':{
@@ -346,6 +396,15 @@ RQ.check=ast=>{
           I(e).sig={params:from?[T.str]:[],ret:T.string};
           return T.string;
         }
+        if(sg.length===2&&sg[0].name==='Clone'&&sg[1].name==='clone'&&!sg[0].args&&!sg[1].args&&!e.callee.global){
+          const ts=e.args.map(ex);
+          if(ts.length!==1)return unsup('wrong argument count',e.line);
+          // only a `&String` argument is modeled, so the copy is always a String
+          const a=res(ts[0]);
+          if(!(a.k==='any'||a.k==='ref'&&!a.mut&&res(a.to).k==='String'))return unsup('type checking',e.line);
+          I(e).sig={params:ts,ret:T.string};
+          return T.string;
+        }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
         const n=e.callee.segs[0].name,f=fns.get(n);
         const ts=e.args.map(ex);
@@ -390,6 +449,7 @@ RQ.check=ast=>{
       case 'Macro':{
         if(e.args===null)return T.any;
         if(e.name in PRINT)return format(e);
+        if(e.name==='format'){format(e);return T.string;}
         e.args.forEach(ex);
         return unsup(e.name+'!',e.line);
       }
@@ -419,12 +479,28 @@ RQ.check=ast=>{
         I(e).alen=b.n;return b.el;
       }
       case 'Field':{
-        const b=res(ex(e.expr));
+        let b=res(ex(e.expr));
         if(b.k==='any'||b.k==='never')return T.any;
+        // a field of a reference to a struct reads through it; only the `self` of a Drop impl is one
+        if(b.k==='ref'&&res(b.to).k==='struct')b=res(b.to);
+        if(b.k==='struct'){
+          const f=structs.get(b.name).fields.find(x=>x.name===e.name);
+          if(!f)return unsup('field access',e.line);
+          return placeChain(e.expr)?f.ty:unsup('field of a temporary',e.line);
+        }
         const i=/^\d+$/.test(e.name)?Number(e.name):-1;
         return b.k==='tuple'&&i>=0&&i<b.els.length?b.els[i]:unsup('field access',e.line);
       }
       case 'Cast':return cast(e);
+      case 'StructLit':{
+        const p=e.path,name=p.t==='Path'&&p.segs.length===1&&!p.segs[0].args&&!p.global?p.segs[0].name:'';
+        const rec=structs.get(name);
+        const ts=e.fields.map(f=>ex(f.expr));
+        // a missing, repeated or unknown field (E0063, E0062, E0560) and `..base` are not modeled
+        if(!rec||e.base||e.fields.length!==rec.fields.length||e.fields.some(f=>!rec.fields.some(x=>x.name===f.name))||new Set(e.fields.map(f=>f.name)).size!==e.fields.length)return unsup('struct literal',e.line);
+        e.fields.forEach((f,i)=>coerce(ts[i],rec.fields.find(x=>x.name===f.name).ty,f.expr));
+        return T.struct(name);
+      }
       case 'If':{
         expect(ex(e.cond),T.bool,e.cond);
         const a=block(e.then);
@@ -496,6 +572,13 @@ RQ.check=ast=>{
   // rustc runs only const fn in a const, so a call to a plain fn there is E0015; the quest allows literals and maths on other consts
   const constOk=e=>e.t==='Lit'||e.t==='Path'||((e.t==='Paren'||e.t==='Unary')&&constOk(e.expr))||(e.t==='Binary'&&constOk(e.lhs)&&constOk(e.rhs));
   for(const f of fns.values())fnBody(f);
+  for(const [name,it] of drops){
+    const f=it.items[0];
+    scopes=[new Map()];curRet=T.unit;loops=[];curStatic=false;
+    bindVar('self',false,'param',mkRef(true,T.struct(name)),f.selfParam);
+    block(f.body);
+    finish();
+  }
   for(const c of consts.values()){
     scopes=[new Map()];loops=[];
     if(!c.node.init){unsup('deferred initialization',c.node.line);continue;}

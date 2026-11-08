@@ -13,10 +13,10 @@ RQ.CH=RQ.CH||[];
 const program=(m,input)=>m.harness?input+'\n'+m.harness:input;
 
 // result is true or one friendly sentence; c is null for an empty editor. unsupported and internal never complete a mission.
-RQ.evalMission=(m,input)=>{
+RQ.evalMission=(m,input,opts)=>{
   const src=String(input??'');
   if(!src.trim())return {c:null,result:'Write some code first, then press Run.'};
-  const c=RQ.run(program(m,src));
+  const full=program(m,src),c=RQ.run(full,opts);
   let result;
   if(c.status==='error'){
     const e=c.errors[0];
@@ -26,7 +26,7 @@ RQ.evalMission=(m,input)=>{
   else if(c.status==='limit')result=c.limit==='string size'?'The program made a string too long for the practice runner and was stopped. Is a loop making it longer every time round?':c.limit==='output size'?'The program printed too much for the practice runner and was stopped. Is a loop printing every time round?':'The program ran for too long and was stopped. Is something calling itself forever?';
   else if(c.status==='panic'&&m.expect!=='panic')result='The program stopped with a panic: '+c.panic.msg+' (line '+c.panic.line+').';
   else result=m.check(c);
-  return {c,result};
+  return {c,result,src:full};
 };
 RQ.runMission=(m,input)=>RQ.evalMission(m,input).result;
 
