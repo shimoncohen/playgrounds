@@ -13,7 +13,7 @@ const code = [cut('const CH=[', '\nCH.forEach'), cut('const QF=[', 'const VALUED
 const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = new Function(code + '\nreturn {CH,QF,PZ_DF,PZ_Y,GUIDE,qfOpen};')();
 
 const plain = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-const cardText = m => plain([m.t, m.i, m.g, m.h, (m.a || []).map(x => x[0]).join(' '), m.after].filter(Boolean).join('\n'));
+const cardText = m => plain([m.t, m.i, m.g, m.h, (m.a || []).map(x => x[0]).join(' '), ...(m.steps || []).map(s => [s.g, s.h, (s.a || []).map(x => x[0]).join(' ')].join('\n')), m.after].filter(Boolean).join('\n'));
 const flat = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));

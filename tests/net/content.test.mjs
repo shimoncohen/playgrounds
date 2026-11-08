@@ -213,8 +213,7 @@ describe('chapter 2: lazy answers are caught', () => {
     const net = NQ.createNet('pair', m(3).setup);
     assert.equal(net.exec('ping -c 1 10.0.0.3').code, 1);
     assert.equal(run(3, [DEL, P1]), true);
-    assert.equal(run(3, [DEL]), true);
-    assert.equal(run(3, [ADD('02:00:00:00:00:02')]), true);
+    assert.equal(run(3, [ADD('02:00:00:00:00:02'), P1]), true);
     assert.equal(run(3, ['arping 10.0.0.3', DEL, 'ping 10.0.0.3']), true);
   });
   it('4: doing nothing, looking, a broadcast entry or a downed card do not pass', () => {
@@ -247,7 +246,7 @@ describe('chapter 3: lazy answers are caught', () => {
     const net = NQ.createNet('pair', m(0).setup);
     assert.equal(net.devices.phone.ifaces.eth0.ip, null);
     assert.equal(net.exec('ping -c 1 10.0.0.2', 'phone').code, 2);
-    for (const ip of ['10.0.0.3/24', '10.0.0.77/24', '10.0.0.3/16']) assert.equal(run(0, [ADD(ip)]), true, ip);
+    for (const ip of ['10.0.0.3/24', '10.0.0.77/24', '10.0.0.3/16']) assert.equal(run(0, [ADD(ip), 'ping -c 1 10.0.0.2']), true, ip);
   });
   it('1: nothing, a bad or taken address, another subnet or a look at ip addr do not pass', () => {
     for (const lines of [[], ['ip addr'], ['ping -c 1 10.0.0.2'], [ADD('10.0.0.2/24')], [ADD('10.0.1.3/24')], [ADD('10.0.0.3/32')], [ADD('10.0.0.3/30'), 'ip link set eth0 down']])
@@ -264,8 +263,8 @@ describe('chapter 3: lazy answers are caught', () => {
     assert.equal(net.exec('ping -c 1 10.0.0.2', 'phone').code, 2);
     assert.equal(net.exec('ping -c 1 10.0.0.200', 'laptop').code, 1);
     assert.equal(run(1, m(1).answer), true);
-    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.3/24')]), true);
-    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.200/23')]), true);
+    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.3/24'), 'ping -c 1 10.0.0.2']), true);
+    assert.equal(run(1, [DEL('10.0.0.200/25'), ADD('10.0.0.200/23'), 'ping -c 1 10.0.0.2']), true);
   });
   it('2: nothing, the old prefix again, a narrower prefix, a delete without a new address, a clash or a downed card do not pass', () => {
     for (const lines of [[], ['ip addr'], [DEL('10.0.0.200/25'), ADD('10.0.0.200/25')], [DEL('10.0.0.200/25'), ADD('10.0.0.200/26')], [DEL('10.0.0.200/25'), ADD('10.0.0.200/32')],
@@ -308,11 +307,10 @@ describe('chapter 3: lazy answers are caught', () => {
     assert.equal(net.devices.laptop.ifaces.eth0.ip, '192.168.1.10/24');
     assert.match(net.exec('arping -c 1 192.168.1.10', 'printer').out.join('\n'), /Unicast reply from 192\.168\.1\.10 \[02:00:00:00:00:01\]/);
     assert.equal(run(4, m(4).answer), true);
-    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.99/24')]), true);
-    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.20/24'), 'arping -c 1 192.168.1.20'].slice(0, 2)), true);
+    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.99/24'), 'ping -c 1 192.168.1.1']), true);
   });
   it('5: the same change on the laptop clears the clash too (either device may move)', () => {
-    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.30/24')], undefined, { ...m(4), dev: 'laptop' }), true);
+    assert.equal(run(4, [DEL('192.168.1.10/24'), ADD('192.168.1.30/24'), 'ping -c 1 192.168.1.1'], undefined, { ...m(4), dev: 'laptop' }), true);
   });
   it('5: nothing, arping, deleting only, the router\'s or laptop\'s address, another subnet or a short prefix do not pass', () => {
     for (const lines of [[], ['arping -c 1 192.168.1.10', 'ip link'], [DEL('192.168.1.10/24')], [DEL('192.168.1.10/24'), ADD('192.168.1.1/24')], [DEL('192.168.1.10/24'), ADD('192.168.1.10/24')],
@@ -324,11 +322,12 @@ describe('chapter 3: lazy answers are caught', () => {
   it('5: the clash check does not throw on a net with several interfaces without addresses', () => {
     assert.doesNotThrow(() => run(4, [DEL('192.168.1.10/24'), 'ip route']));
   });
-  it('6: /31 and /32 both run, then the sum of what ipcalc printed; one of them, other prefixes or a wrong total do not pass', () => {
+  it('6: /31 then /32 run in order, then the sum of what ipcalc printed; one of them, other prefixes or a wrong total do not pass', () => {
     const l = ['ipcalc 10.0.0.0/31', 'ipcalc 10.0.0.1/32'];
     assert.equal(solve(m(5)).expect, '3');
     assert.equal(run(5, l, '3'), true);
-    assert.equal(run(5, [l[1], l[0]], '3.'), true);
+    assert.notEqual(run(5, [l[1], l[0]], '3'), true, 'the /32 before the /31 does not count');
+    assert.equal(run(5, [l[1], ...l], '3.'), true);
     assert.equal(run(5, ['ipcalc 192.168.0.4/31', 'ipcalc 192.168.0.9/32', 'ipcalc 10.0.0.0/30'], '3'), true);
     assert.equal(run(5, l, ''), NQ.ASK);
     for (const [lines, a] of [[[], '3'], [[l[0]], '3'], [[l[1]], '3'], [['ipcalc 10.0.0.0/30', 'ipcalc 10.0.0.0/24'], '3'], [l, '2'], [l, '1'], [l, '4'], [l, '0'], [l, '2 + 1'], [['ipcalc 10.0.0.0/31', 'ipcalc 10.0.0.1'], '3']])
@@ -372,7 +371,7 @@ describe('chapter 4: lazy answers are caught', () => {
     assert.equal(net.exec('ping -c 1 172.16.0.10', 'printer').code, 2);
     assert.match(net.exec('ping -c 1 172.16.0.10', 'printer').err.join(' '), /Network is unreachable/);
     assert.equal(run(1, m(1).answer), true);
-    assert.equal(run(1, [DEF('192.168.1.1')]), true);
+    assert.equal(run(1, [DEF('192.168.1.1'), 'ping -c 1 172.16.0.10']), true);
   });
   it('2: nothing, a ping, the laptop as gateway, a route to the server only, or the fix on another device do not pass', () => {
     for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route'], [DEF('192.168.1.10')], [DEF('192.168.1.99')], ['ip route add 172.16.0.0/24 via 192.168.1.1'], ['ip route add 10.0.1.0/30 via 192.168.1.1'],
@@ -390,7 +389,7 @@ describe('chapter 4: lazy answers are caught', () => {
     const arp = r.entries.find((e) => e.dev === 'laptop' && e.dir === 'tx' && e.packet.layers.some((l) => l.name === 'ARP'));
     assert.equal(arp.packet.layers.find((l) => l.name === 'ARP').fields.tpa, '192.168.1.2');
     assert.equal(run(2, m(2).answer), true);
-    assert.equal(run(2, ['ip route del default', DEF('192.168.1.1')]), true);
+    assert.equal(run(2, ['ip route del default', DEF('192.168.1.1'), 'ping -c 1 172.16.0.10']), true);
   });
   it('3: nothing, a ping, deleting only, another bad or taken gateway, a route for the server only, or the fix on another device do not pass', () => {
     for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route del default'], ['ip route del default', DEF('192.168.1.2')], ['ip route del default', DEF('192.168.1.20')], ['ip route del default', DEF('192.168.1.10')],
@@ -422,8 +421,8 @@ describe('chapter 4: lazy answers are caught', () => {
     assert.equal(net.exec('ping -c 1 172.16.0.10', 'r1').code, 2);
     assert.match(net.exec('ping -c 1 172.16.0.10', 'laptop').out.join('\n'), /From 192\.168\.1\.1 icmp_seq=1 Destination Net Unreachable/);
     assert.equal(run(4, m(4).answer), true);
-    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2']), true);
-    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2 dev eth1']), true);
+    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2', 'ping -c 1 172.16.0.10']), true);
+    assert.equal(run(4, ['ip route add 172.16.0.0/24 via 10.0.1.2 dev eth1', 'ping -c 1 172.16.0.10']), true);
   });
   it('5: nothing, a ping, a default route, a route to another subnet or gateway, or the fix on another device do not pass', () => {
     for (const lines of [[], ['ping -c 1 172.16.0.10'], ['ip route'], [DEF('10.0.1.2')], ['ip route add 172.16.1.0/24 via 10.0.1.2'], ['ip route add 172.16.0.0/24 via 192.168.1.20'], ['ip route add 172.16.0.0/24 via 192.168.1.10'],
@@ -516,8 +515,8 @@ describe('chapter 5: lazy answers are caught', () => {
     assert.match(net.exec(PING, 'laptop').out.join('\n'), /From 192\.168\.1\.1 icmp_seq=1 Destination Net Unreachable/);
     assert.equal(net.exec(PING, 'home').code, 2);
     assert.equal(run(4, m(4).answer), true);
-    assert.equal(run(4, [DEF]), true);
-    assert.equal(run(4, [DEF + ' dev eth1']), true);
+    assert.equal(run(4, [DEF, PING]), true);
+    assert.equal(run(4, [DEF + ' dev eth1', PING]), true);
   });
   it('5: nothing, a ping, a wrong gateway, a route for the server only, no default, NAT off, a downed card or the fix on another device do not pass', () => {
     for (const lines of [[], [PING], ['ip route'], ['ip route add default via 192.168.1.10'], ['ip route add default via 192.168.1.11'], ['ip route add default dev eth1'], ['ip route add default dev eth0'],
@@ -550,8 +549,8 @@ describe('chapter 5: lazy answers are caught', () => {
     assert.match(net.exec('nat', 'home').out[0], /^NAT is off/);
     assert.equal(net.exec(PING, 'laptop').code, 1);
     assert.equal(run(6, m(6).answer), true);
-    assert.equal(run(6, ['nat on']), true);
-    for (const lines of [[], ['nat'], ['nat table'], ['nat off'], ['nat on', 'nat off'], ['nat on', 'ip route del default'], ['nat on', 'ip link set eth1 down'], ['nat on', 'ip link set eth0 down'],
+    assert.equal(run(6, ['nat', 'nat on']), true);
+    for (const lines of [[], ['nat'], ['nat on'], ['nat table'], ['nat off'], ['nat on', 'nat off'], ['nat on', 'ip route del default'], ['nat on', 'ip link set eth1 down'], ['nat on', 'ip link set eth0 down'],
       ['ip route del default', 'nat on'], ['nat maybe'], ['nat on now']])
       assert.notEqual(run(6, lines), true, lines.join(' ; '));
     assert.notEqual(run(6, ['nat on'], undefined, { ...m(6), dev: 'laptop' }), true, 'a host cannot run NAT');
@@ -771,7 +770,7 @@ describe('review fixes for chapters 2 to 5', () => {
       const r = run(2, 4, ['ip addr del 192.168.1.10/24 dev eth0', 'ip addr add ' + bad + ' dev eth0']);
       assert.match(r, /broadcast address/, bad);
     }
-    assert.equal(run(2, 4, ['ip addr del 192.168.1.10/24 dev eth0', 'ip addr add 192.168.1.254/24 dev eth0']), true);
+    assert.equal(run(2, 4, ['ip addr del 192.168.1.10/24 dev eth0', 'ip addr add 192.168.1.254/24 dev eth0', 'ping -c 1 192.168.1.1']), true);
   });
   it('5.3: the NAT table question still works after nat off, but nat table printed with NAT off does not count', () => {
     const sw = mm(4, 2);

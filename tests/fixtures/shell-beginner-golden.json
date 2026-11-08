@@ -328,11 +328,11 @@
     "mission": 4,
     "title": "Treasure hunt",
     "typed": "find . -name gold.txt",
-    "output": "explorer@basecamp:~$ find . -name gold.txt\n./forest/cave/deeper/chest/gold.txt",
+    "output": "explorer@basecamp:~$ find . -name gold.txt\n./forest/cave/deeper/chest/gold.txt\n✓ Step done: Treasure hunt. 1 more to go.",
     "xpText": "535 XP",
     "then": {
-      "typed": "cat ./forest/cave/deeper/chest/gold.txt",
-      "output": "explorer@basecamp:~$ cat ./forest/cave/deeper/chest/gold.txt\nYou found the gold!\nSecret word: PENGUIN\n(Tux the penguin is the mascot of Linux.)\n✓ Mission complete: Treasure hunt   +10 XP"
+      "typed": "cat forest/cave/deeper/chest/gold.txt",
+      "output": "explorer@basecamp:~$ cat forest/cave/deeper/chest/gold.txt\nYou found the gold!\nSecret word: PENGUIN\n(Tux the penguin is the mascot of Linux.)\n✓ Mission complete: Treasure hunt   +10 XP"
     }
   },
   {
