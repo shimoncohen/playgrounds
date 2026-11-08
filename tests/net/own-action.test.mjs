@@ -6,8 +6,8 @@ import { loadNet } from './harness.mjs';
 
 const NQ = loadNet();
 const UNRELATED = ['help', 'echo hi', 'ip addr', 'ip route', 'ip neigh', 'nat'];
-// `ip addr` also lists each card's MAC, so this mission takes it as well as its answer `ip link`
-const ALSO_OWN = { 'Your own card': ['ip addr'] };
+// `ip addr` also lists each card's MAC, so a mission answered by `ip link` takes it too
+const ALSO_OWN = { 'ip link': ['ip addr'] };
 const expectOf = (m) => {
   if (!m.question) return null;
   const net = NQ.createNet(m.scenario, m.setup);
@@ -19,7 +19,7 @@ describe('an unrelated command never completes a mission', () => {
   NQ.CH.forEach((ch, c) => ch.missions.forEach((m, i) => {
     it(`${c}.${i} ${m.title}`, () => {
       const expect = expectOf(m);
-      for (const line of UNRELATED.filter((l) => !m.answer.includes(l) && !(ALSO_OWN[m.title] || []).includes(l))) {
+      for (const line of UNRELATED.filter((l) => !m.answer.includes(l) && !m.answer.some((a) => (ALSO_OWN[a] || []).includes(l)))) {
         assert.notEqual(NQ.runMission(m, [line], expect), true, line);
       }
     });
