@@ -387,11 +387,16 @@ RQ.check=ast=>{
       else if(f.fmt.prec!==null&&r.k!=='float'&&r.k!=='any')unsup('format spec',f.line);
     }
     for(const [k,line] of keyChecks)if(!isOpen(k)&&(!has(k,'Eq')||!has(k,'Hash')))unsup('hash key',line);
-    for(const [l,line] of patLits){const r=res(l.ty);if(r.k!=='int'||!fits(l.v,r.ty))unsup('pattern',line);}
+    for(const [l,line] of patLits){const r=res(l.ty);if(r.k!=='int'||!fits(l.v,r.ty)||l.noBelow&&l.v===RQ.types.INT[r.ty][0])unsup('pattern',line);}
     for(const x of exChecks){
-      const miss=RQ.exhaust.missing(exDesc(x.st),x.rows);
+      const d=exDesc(x.st),first=x.e.arms[0];
+      if(!x.rows.length&&d.k!=='enum'){errors.push(RQ.diag.make('E0004',x.e.scrut.line,x.e.scrut.col,{empty:show(x.st)}));continue;}
+      const miss=RQ.exhaust.missing(d,x.rows);
       if(miss===null)unsup('pattern',x.e.line);
-      else if(miss.length)errors.push(RQ.diag.make(x.e.kind==='let'?'E0005':'E0004',x.e.scrut.line,x.e.scrut.col,{missing:miss}));
+      else if(miss.length){
+        const at=x.e.kind==='let'?first.pat:x.e.scrut;
+        errors.push(RQ.diag.make(x.e.kind==='let'?'E0005':'E0004',at.line,at.col,{missing:miss}));
+      }
     }
     vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
@@ -722,6 +727,7 @@ RQ.check=ast=>{
           if(!lo&&!hi||p.lo&&!lo||p.hi&&!hi||[lo,hi].some(x=>x&&x.kind!=='int'&&x.kind!=='char'))return bad();
           const hv=hi?(p.inclusive?hi.v:hi.v-1n):null;
           if(lo&&hi&&lo.v>hv)return bad();
+          if(!lo&&!p.inclusive)hi.noBelow=true;
           ends=[lo,hi].filter(Boolean);
           ir={c:'range',lo:lo?lo.v:null,hi:hv};
         }
@@ -802,6 +808,7 @@ RQ.check=ast=>{
       default:return {k:'opaque'};
     }
   }
+  const scrutRoot=n=>{while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'&&n.segs.length===1?n.segs[0].name:null;};
   function matchExpr(e){
     let st=ex(e.scrut);
     if(e.annot){const a=tyOf(e.annot);coerce(st,a,e.scrut);st=a;}
@@ -816,7 +823,11 @@ RQ.check=ast=>{
       scopes.push(new Map());
       const ps={cov,viaRef,scrut:e.scrut,names:new Set(),binds:0};
       const ir=walkPat(a.pat,st,'move',[],ps);
-      if(a.guard)expect(ex(a.guard),T.bool,a.guard);
+      if(a.guard){
+        expect(ex(a.guard),T.bool,a.guard);
+        const root=scrutRoot(sc);
+        if(root)RQ.walk(a.guard,g=>{if(g.t==='Assign'&&scrutRoot(peel(g.lhs))===root)unsup('match guard',g.line);});
+      }
       rows.push({p:ir,g:!!a.guard});
       const bt=ex(a.body);
       scopes.pop();

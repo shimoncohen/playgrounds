@@ -34,6 +34,7 @@ const ERRORS={
   E0004:{
     title:'a match leaves some cases out',
     msg:o=>{
+      if(o.empty)return 'non-exhaustive patterns: type `'+o.empty+'` is non-empty';
       const m=o.missing.map(x=>'`'+x+'`'),n=m.length;
       return 'non-exhaustive patterns: '+(n===1?m[0]:n<=3?m.slice(0,-1).join(', ')+' and '+m[n-1]:m.slice(0,3).join(', ')+' and '+(n-3)+' more')+' not covered';
     },
@@ -200,7 +201,7 @@ const HINTS={
   struct:'A `struct` is modeled with named, tuple or unit fields that own their value (no `&`) and no generics. A tuple or unit `struct` cannot share its name with a `fn` or a `const`.',
   enum:'An `enum` is modeled with variants written as `Name`, `Name(T)` or `Name { field: T }`, no generics, and no `= value` numbers on the variants.',
   derive:'Only `#[derive(...)]` of `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Default` and `Hash` is modeled. Every field must have the trait too. `Copy` needs `Clone`, `Eq` and `PartialOrd` need `PartialEq`, and `Ord` needs `PartialOrd` and `Eq`. An `enum` derives `Default` from the one unit variant marked `#[default]`.',
-  'match guard':'A `match` guard that moves a name its arm binds, like `Some(s) if eat(s)`, is not modeled (rustc reports `E0507`). Make the guard only read the name.',
+  'match guard':'A `match` guard that moves a name its arm binds, like `Some(s) if eat(s)` (rustc reports `E0507`), or assigns to the value being matched (`E0506`), is not modeled. Make the guard only read.',
   impl:'Only `impl Name { ... }` with plain methods and associated functions (no generics, attributes or constants), and `impl Drop for Name` whose `drop` only prints with `println!`, are modeled.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
   'type alias':LATER,use:'The only `use` modeled is `use std::collections::HashMap;` once at the top of the file. The missions otherwise use what Rust gives every program.',mod:LATER,generics:LATER,
   method:'A method takes `self`, `&self` or `&mut self` as its first parameter. A receiver with a type written out, like `self: Box<Self>`, is not modeled.','nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,

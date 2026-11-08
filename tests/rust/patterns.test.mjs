@@ -196,3 +196,80 @@ describe('a pattern names things as rustc does', () => {
     assert.equal(msg(main('let n = 5;', 'match n {', '    "five" => {}', '    _ => {}', '}')), 'E0308: mismatched types: expected integer, found `&str`');
   });
 });
+
+describe('E0004 and E0005 as rustc 1.99.1 words them', () => {
+  it('lists true before false', () => {
+    assert.equal(miss('(bool, bool)', '(true, true)', '(false, false)'), E4('`(true, false)` and `(false, true)`'));
+    assert.equal(miss('bool', 'true'), E4('`false`'));
+  });
+  it('a single missing value at the edge of its type is named MIN or MAX', () => {
+    assert.equal(miss('u8', '0..=254'), E4('`u8::MAX`'));
+    assert.equal(miss('i8', '-128..=126'), E4('`i8::MAX`'));
+    assert.equal(miss('i8', '-127..=127'), E4('`i8::MIN`'));
+    assert.equal(miss('u8', '1..=255'), E4('`0_u8`'));
+  });
+  it('an arm with only a guard leaves the whole type out', () => {
+    assert.equal(miss('i32', 'x if g'), E4('`i32::MIN..=i32::MAX`'));
+    assert.equal(miss('u16', 'x if g'), E4('`0_u16..=u16::MAX`'));
+    assert.equal(miss('char', 'x if g'), E4("`'\\0'..='\\u{d7ff}'` and `'\\u{e000}'..='\\u{10ffff}'`"));
+    assert.equal(miss('usize', 'x if g'), E4('`0_usize..`'));
+    assert.equal(miss('isize', 'x if g'), E4('`_`'));
+  });
+  it('usize and isize have values past MAX (and below isize MIN) that only a half-open range covers', () => {
+    assert.equal(miss('usize', '0', '1..=usize::MAX'), E4('`usize::MAX..`'));
+    assert.equal(miss('usize', '0..=5', '7..=usize::MAX'), E4('`6_usize` and `usize::MAX..`'));
+    assert.equal(miss('isize', 'isize::MIN..=0', '1..=isize::MAX'), E4('`..isize::MIN` and `isize::MAX..`'));
+    assert.equal(miss('isize', 'isize::MIN..=0', '1..'), E4('`..isize::MIN`'));
+    assert.equal(miss('isize', '..=0', '1..=isize::MAX'), E4('`isize::MAX..`'));
+    assert.equal(miss('isize', '1..=5'), E4('`..=0_isize` and `6_isize..`'));
+    assert.equal(out(main('let u: usize = 3;', 'match u {', '    0 => println!("z"),', '    1.. => println!("p"),', '}', 'let i: isize = -3;', 'match i {', '    ..=-1 => println!("n"),', '    0.. => println!("p"),', '}')), 'p\nn\n');
+  });
+  it('a one-tuple is printed with its comma', () => {
+    assert.equal(miss('(bool,)', '(true,)'), E4('`(false,)`'));
+  });
+  it('a match with no arms on anything but an enum says the type is non-empty', () => {
+    assert.equal(miss('bool'), 'E0004: non-exhaustive patterns: type `bool` is non-empty');
+    assert.equal(miss('u8'), 'E0004: non-exhaustive patterns: type `u8` is non-empty');
+    assert.equal(miss('&str'), 'E0004: non-exhaustive patterns: type `&str` is non-empty');
+    assert.equal(miss('&Option<u8>'), 'E0004: non-exhaustive patterns: type `&Option<u8>` is non-empty');
+    assert.equal(miss('(bool,)'), 'E0004: non-exhaustive patterns: type `(bool,)` is non-empty');
+    assert.equal(miss('Option<u8>'), E4('`None` and `Some(_)`'));
+  });
+  it('E0005 points at the pattern, not at the value', () => {
+    const at = (src) => { const c = RQ.run(src); assert.equal(c.errors[0].code, 'E0005'); return `${c.errors[0].line}:${c.errors[0].col}`; };
+    assert.equal(at(main('let o = Some(1);', 'let Some(q) = o;')), '3:9');
+    assert.equal(at(main('let o = Some(1);', 'let (a, Some(b)) = (1, o);')), '3:9');
+  });
+});
+
+describe('half-open patterns that stop short of a bound', () => {
+  it('..hi is an exclusive range from the bottom of the type', () => {
+    assert.equal(out(main('for n in 0..3u32 {', '    match n * 10 + 3 {', '        ..10 => println!("low"),', '        10..20 => println!("mid"),', '        20.. => println!("high"),', '    }', '}')), 'low\nmid\nhigh\n');
+    assert.equal(out(main('match -3i32 {', '    ..-1 => println!("neg"),', '    _ => println!("other"),', '}')), 'neg\n');
+    assert.equal(miss('u32', '..10', '11..'), E4('`10_u32`'));
+  });
+  it('a slice rest after a comma is still a rest, and ..0 (E0579 in rustc) is unsupported', () => {
+    assert.equal(feature(main('let n = 5u32;', 'match n {', '    ..0 => {}', '    _ => {}', '}')), 'pattern@4');
+    assert.equal(feature(main('let n = 5i8;', 'match n {', '    ..i8::MIN => {}', '    _ => {}', '}')), 'pattern@4');
+  });
+});
+
+describe('a destructuring let is straight-line code for the lints', () => {
+  it('a sum of the parts of a tuple that overflows stops the build, as rustc does', () => {
+    assert.equal(ids(RQ.run(main('let (a, b) = (255u8, 1u8);', 'println!("{}", a + b);'))), 'arithmetic_overflow@3');
+    assert.equal(ids(RQ.run(main('let (a, (b, _)) = (255u8, (1u8, 2));', 'println!("{}", a + b);'))), 'arithmetic_overflow@3');
+    assert.equal(ids(RQ.run(main('let (a, b) = (5u8, 0u8);', 'println!("{}", a / b);'))), 'unconditional_panic@3');
+    assert.equal(out(main('let (a, b) = (250u8, 1u8);', 'println!("{}", a + b);')), '251\n');
+  });
+  it('a part that is assigned afterwards is no longer known', () => {
+    assert.equal(out(main('let (mut a, b) = (255u8, 1u8);', 'a = 0;', 'println!("{}", a + b);')), '1\n');
+  });
+});
+
+describe('a guard that assigns to the scrutinee', () => {
+  it('is unsupported (rustc gives E0506); a guard that assigns elsewhere is fine', () => {
+    assert.equal(feature(main('let mut x = 1;', 'match x {', '    n if { x += 1; true } => println!("{}", n),', '    _ => {}', '}')), 'match guard@4');
+    assert.equal(feature(main('let mut t = (1, 2);', 'match t.0 {', '    n if { t.1 = 4; true } => println!("{}", n),', '    _ => {}', '}')), 'match guard@4');
+    assert.equal(out(main('let mut x = 1;', 'let y = 2;', 'match y {', '    n if { x += 1; true } => println!("{} {}", n, x),', '    _ => {}', '}')), '2 2\n');
+  });
+});

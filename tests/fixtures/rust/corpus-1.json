@@ -3394,5 +3394,83 @@
     "src": "struct D(String);\n\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn nth(i: u32) -> Option<D> {\n    if i < 2 { Some(D(String::from(\"x\"))) } else { None }\n}\n\nfn main() {\n    let mut i = 0;\n    while let Some(d) = nth(i) {\n        println!(\"body {}\", d.0);\n        i += 1;\n    }\n    println!(\"done\");\n}\n",
     "expect": "ok", "out": "body x\ndrop x\nbody x\ndrop x\ndone\n", "err": "", "exit": 0,
     "why": "each round drops its value at the end of the round", "pr": "P9"
+  },
+  {
+    "id": "exh-usize-max",
+    "src": "fn main() {\n    let n: usize = 5;\n    match n {\n        0 => println!(\"zero\"),\n        1..=usize::MAX => println!(\"more\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-usize-max-ok",
+    "why": "usize::MAX is not covered by a closed range, so 1..=usize::MAX leaves usize::MAX.. out", "pr": "P9"
+  },
+  {
+    "id": "exh-usize-max-ok",
+    "src": "fn main() {\n    let n: usize = 5;\n    match n {\n        0 => println!(\"zero\"),\n        1..=usize::MAX => println!(\"more\"), _=>(),\n    }\n}\n",
+    "expect": "ok", "out": "more\n", "err": "", "exit": 0,
+    "why": "a last arm covers what the closed range cannot", "pr": "P9"
+  },
+  {
+    "id": "exh-isize-edges",
+    "src": "fn main() {\n    let n: isize = 5;\n    match n {\n        isize::MIN..=0 => println!(\"low\"),\n        1..=isize::MAX => println!(\"high\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-isize-edges-ok",
+    "why": "a closed range over isize leaves both ends open: ..isize::MIN and isize::MAX..", "pr": "P9"
+  },
+  {
+    "id": "exh-isize-edges-ok",
+    "src": "fn main() {\n    let n: isize = 5;\n    match n {\n        isize::MIN..=0 => println!(\"low\"),\n        1..=isize::MAX => println!(\"high\"), _=>(),\n    }\n}\n",
+    "expect": "ok", "out": "high\n", "err": "", "exit": 0,
+    "why": "a last arm covers both open ends", "pr": "P9"
+  },
+  {
+    "id": "exh-isize-top",
+    "src": "fn main() {\n    let n: isize = 5;\n    match n {\n        ..=0 => println!(\"low\"),\n        1..=isize::MAX => println!(\"high\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-isize-top-ok",
+    "why": "the lower half-open range reaches below isize::MIN, but the closed top still leaves isize::MAX..", "pr": "P9"
+  },
+  {
+    "id": "exh-isize-top-ok",
+    "src": "fn main() {\n    let n: isize = 5;\n    match n {\n        ..=0 => println!(\"low\"),\n        1..=isize::MAX => println!(\"high\"), _=>(),\n    }\n}\n",
+    "expect": "ok", "out": "high\n", "err": "", "exit": 0,
+    "why": "a last arm covers the open top", "pr": "P9"
+  },
+  {
+    "id": "exh-isize-halfopen-ok",
+    "src": "fn main() {\n    let n: isize = -5;\n    match n {\n        ..=-1 => println!(\"neg\"),\n        0.. => println!(\"pos\"),\n    }\n}\n",
+    "expect": "ok", "out": "neg\n", "err": "", "exit": 0,
+    "why": "two half-open ranges cover isize with nothing left", "pr": "P9"
+  },
+  {
+    "id": "exh-range-to",
+    "src": "fn main() {\n    let n: u32 = 5;\n    match n {\n        ..10 => println!(\"low\"),\n        11.. => println!(\"high\"),\n    }\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-range-to-ok",
+    "why": "..10 stops at 9 and 11.. starts at 11, so 10 has no arm", "pr": "P9"
+  },
+  {
+    "id": "exh-range-to-ok",
+    "src": "fn main() {\n    let n: u32 = 5;\n    match n {\n        ..10 => println!(\"low\"),\n        10.. => println!(\"high\"),\n    }\n}\n",
+    "expect": "ok", "out": "low\n", "err": "", "exit": 0,
+    "why": "..10 and 10.. meet with nothing between", "pr": "P9"
+  },
+  {
+    "id": "exh-empty-bool",
+    "src": "fn main() {\n    let b = true;\n    match b {}\n}\n",
+    "expect": {"code": "E0004", "line": 3}, "pair": "exh-empty-bool-ok",
+    "why": "a match with no arms only fits a type with no values", "pr": "P9"
+  },
+  {
+    "id": "exh-empty-bool-ok",
+    "src": "fn main() {\n    let b = true;\n    match b {_=>()}\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "one wildcard arm covers bool", "pr": "P9"
+  },
+  {
+    "id": "lint-arith-destructure",
+    "src": "fn main() {\n    let (a, b) = (255u8, 1u8);\n    println!(\"{}\", a + b);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3}, "pair": "lint-arith-destructure-ok",
+    "why": "a tuple taken apart by let still has known values, so the sum overflows at compile time", "pr": "P9"
+  },
+  {
+    "id": "lint-arith-destructure-ok",
+    "src": "fn main() {\n    let (a, b) = (250u8, 1u8);\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "251\n", "err": "", "exit": 0,
+    "why": "the same sum fits in u8", "pr": "P9"
   }
 ]

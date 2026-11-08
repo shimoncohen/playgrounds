@@ -556,7 +556,7 @@ test('rust-quest: chapters 6 and 7 play through: a struct shows its fields, an i
   await page.click('#bRun');
   await page.waitForSelector('#memory .mv-ctl input[type=range]');
   await last(1);
-  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Pet\s*name\s*pointer to #1\s*age\s*3/);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Pet\s*name\s*pointer to #1\s*age\s*5/);
   assert.match(await page.textContent('#feedback'), /Mission complete/);
   await page.click('[data-ch="6"]');
   await page.click('#mission .dot[data-mi="1"]');

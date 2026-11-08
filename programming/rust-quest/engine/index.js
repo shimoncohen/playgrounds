@@ -140,6 +140,19 @@ function context(d,ast,counts){
     methodIn:(fn,name)=>{let n=0;const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);if(f)RQ.walk(f,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     selfOf:name=>{let r=null;if(ast)RQ.walk(ast,m=>{if(m.t==='Impl'&&!m.trait)for(const f of m.items)if(r===null&&f.name===name&&f.selfParam)r=f.selfParam.ref?(f.selfParam.mut?'&mut':'&'):'val';});return r;},
     fieldsPrinted:()=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Macro'&&PRINTS.includes(m.name)&&m.args)for(const a of m.args.slice(1))RQ.walk(a,x=>{if(x.t==='Field')n++;});});return n;},
+    fieldRead:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Field'&&m.name===name)n++;});return n;},
+    matchOn:(kind,fn,from,prints)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(f)RQ.walk(f.body,m=>{
+        if(m.t!=='Match'||m.kind!==kind)return;
+        let reads=false,shown=!prints;
+        RQ.walk(m.scrut,x=>{if(x.t==='Path'&&x.segs.length===1&&x.segs[0].name===from)reads=true;});
+        if(prints)RQ.walk(m.arms[0].body,x=>{if(x.t==='Macro'&&PRINTS.includes(x.name))shown=true;});
+        if(reads&&shown)n++;
+      });
+      return n;
+    },
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},
     count:kind=>{
