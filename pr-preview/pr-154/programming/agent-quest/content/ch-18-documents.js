@@ -7,13 +7,14 @@ const FIELDS=['goal','donewhen','constraints','files','examples','plan','use'];
 const SIGNED=['documents/lease-signed.txt','documents/will-signed.txt'];
 
 AQ.CH.push({
-  name:'Files and documents',badge:'Desk Clearer',tier:'personal',
-  intro:'Files pile up, and an agent that tidies them can delete the wrong ones. In this chapter you protect every PDF in a folder with one pattern, lock every signed copy by its name, and try a big batch on three files before you let it run on all of them.',
+  name:'Files and documents',badge:'Clear Desk',tier:'personal',
+  story:'The downloads drawer is full; lock signed copies and try three first; find the clear desk.',
+  intro:'Dana\'s downloads drawer is overflowing, and the signed copies must not go astray. Files pile up, and an agent that tidies them can delete the wrong ones. In this chapter you protect every PDF in a folder with one pattern, lock every signed copy by its name, and try a big batch on three files before you let it run on all of them.',
   learned:['One rule for many files','Locking files by name','Trying a batch on three first'],
   missions:[
     {
       title:'Sort the downloads',scenario:'downloads',kind:'prompt',fields:FIELDS,
-      goal:'Your <code>downloads/</code> folder holds an old draft and two PDFs: an invoice and a receipt you must keep. The agent sorts the folder by moving every file into <code>archive/</code>. A move is two actions: the agent writes a copy into <code>archive/</code>, then deletes the original. Let it move the draft, and stop it deleting the PDFs, these two and any that land here later. One rule can do that, because in a path <code>*</code> stands for any text: <code>reports/*.csv</code> would mean every path that starts with <code>reports/</code> and ends in <code>.csv</code>.',
+      goal:'Dana\'s downloads drawer is overflowing. Your <code>downloads/</code> folder holds an old draft and two PDFs: an invoice and a receipt you must keep. The agent sorts the folder by moving every file into <code>archive/</code>. A move is two actions: the agent writes a copy into <code>archive/</code>, then deletes the original. Let it move the draft, and stop it deleting the PDFs, these two and any that land here later. One rule can do that, because in a path <code>*</code> stands for any text: <code>reports/*.csv</code> would mean every path that starts with <code>reports/</code> and ends in <code>.csv</code>.',
       how:[
         'The line <code>Constraints: do not delete downloads/*.pdf</code> stops the agent deleting any file in <code>downloads/</code> whose name ends in <code>.pdf</code>, and the draft is still moved.',
         '<code>do not delete</code> is the rule and <code>downloads/*.pdf</code> is the target. The <code>*</code> stands for any text, so the pattern covers the invoice, the receipt and any PDF that arrives next month.',
@@ -21,7 +22,7 @@ AQ.CH.push({
         'A pattern that is too wide stops the draft as well: <code>downloads/*</code> covers the draft, so it is never moved. Writing each PDF out by name also keeps these two, but it is not the one rule this mission is about, and the next PDF would be deleted.'
       ],
       explain:'A star saves you from listing files one by one, and it keeps working when new files arrive. It also reaches across folders, so the pattern decides how much it covers: too narrow and a PDF slips through, too wide and the draft cannot be moved either. The practice refuses a pattern that matches no file in the project, so a typo shows up before the agent runs.',
-      hint:'Write a rule against deleting, and end the target with the part every PDF shares, <code>.pdf</code>.',
+      hint:'To keep Dana\'s PDFs, write a rule against deleting, and end the target with the part every PDF shares, <code>.pdf</code>.',
       answer:'Constraints: do not delete downloads/*.pdf',
       wrong:'Constraints: do not delete downloads/*.txt',
       lazy:'',
@@ -35,7 +36,7 @@ AQ.CH.push({
     },
     {
       title:'Lock every signed copy',scenario:'contracts',kind:'config',prompt:'Goal: tidy up documents/',
-      goal:'The folder <code>documents/</code> holds a lease and a will. Each has a draft you may still change and a signed copy you must never touch. The agent is tidying the folder, and it wants to rewrite and then delete every file in it, signed copies included. Stop it changing or deleting any signed copy, and let it tidy the drafts. New contracts will arrive, so write the rules once, by the part of the name that every signed copy shares.',
+      goal:'Dana\'s kitchen drawer, the folder <code>documents/</code>, holds a lease and a will. Each has a draft you may still change and a signed copy you must never touch. The agent is tidying the folder, and it wants to rewrite and then delete every file in it, signed copies included. Stop it changing or deleting any signed copy, and let it tidy the drafts. New contracts will arrive, so write the rules once, by the part of the name that every signed copy shares.',
       how:[
         'The two lines <code>deny edit *-signed.txt</code> and <code>deny delete *-signed.txt</code> in <code>.claude/permissions.txt</code> stop the agent changing or deleting any file whose name ends in <code>-signed.txt</code>, and leave the drafts alone.',
         '<code>deny</code> starts each line, <code>edit</code> and <code>delete</code> are the two verbs, and <code>*-signed.txt</code> is the target: any text, then <code>-signed.txt</code>.',
@@ -55,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'Try the batch on three first',scenario:'stamp',kind:'prompt',fields:FIELDS,
-      goal:'The folder <code>notes/</code> holds eight weekly notes, and the agent will stamp each one as reviewed. A stamp is a small change, but if it were wrong, eight notes would carry it. Try the batch on three first: say how many files the agent may change at most, and check the first few before you let it do the rest.',
+      goal:'The folder <code>notes/</code> on Dana\'s desk holds eight weekly notes, and Cog will stamp each one as reviewed. A stamp is a small change, but if it were wrong, eight notes would carry it. Try the batch on three first: say how many files the agent may change at most, and check the first few before you let it do the rest.',
       how:[
         'The line <code>Constraints: max 3 files</code> lets the agent change three different files at most, and then it stops.',
         '<code>max 3 files</code> is a rule about size. It counts different files, not edits: changing one file twice counts once.',
