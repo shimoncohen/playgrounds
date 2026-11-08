@@ -350,7 +350,7 @@ function makeNodeEnv(R,vfs,file,args,io){
 
 // ================= CURRICULUM =================
 // mission: {title, goal, code (shown in goal), anat, answer, explain, hint, check(c), need:[names], pre:'code', expectError:true}
-const decl=(src,n)=>new RegExp('\\b(?:let|const|var|function|class)\\s+'+n+'\\b').test(src||'');
+const decl=(src,n)=>new RegExp('\\b(?:let|const|var)\\b[^;\\n]*\\b'+n+'\\b|\\b(?:function|class)\\s+'+n+'\\b').test(src||'');
 const isArr=Array.isArray;
 const logsHave=(c,re)=>c.logs.some(l=>re.test(l));
 const CH=[
@@ -598,7 +598,7 @@ const CH=[
  {title:'Add something new',goal:'Give the hero a weapon property that did not exist before.',code:'hero["weapon"] = "bow"',need:['hero'],pre:'const hero = { name: "Ada", hp: 100, level: 2 }',
   anat:[['hero','name'],['["weapon"]','op'],['=','op'],['"bow"','val']],
   explain:'Square brackets with a string work like a dot. They are useful when the key is stored in a variable: <code>hero[key]</code>. Assigning to a new key adds it.',
-  check:c=>{const h=c.val('hero');return c.ok&&/\bweapon\b[^=\n]*=(?!=)|Object\.assign\([^)]*\bweapon\b/.test(c.src)&&h&&Object.keys(h).length>=4}},
+  check:c=>{const h=c.val('hero');return c.ok&&/\bweapon\b[^=\n]*=(?!=)|(?:Object\.assign|Object\.defineProperty)\([^)]*\bweapon\b/.test(c.src)&&h&&Object.keys(h).length>=4}},
  {title:'Two labels, one object',goal:'Create a second variable pointing at the hero.',code:'const twin = hero',need:['hero'],pre:'const hero = { name: "Ada", hp: 100, level: 2, weapon: "bow" }',
   anat:[['const','kw'],['twin','name'],['=','op'],['hero','name']],
   explain:'Look at Memory. Both boxes show the same <b>#ID</b>, highlighted. This did <b>not</b> copy the hero. Objects live in one place, and variables hold an <b>arrow pointing to it</b>, called a reference.',
@@ -760,12 +760,12 @@ const CH=[
  {title:'Write a file',goal:'Use writeFileSync to create a new file called `todo.txt`.',code:'node -e "require(\'fs\').writeFileSync(\'todo.txt\', \'learn npm\')"',
   anat:[['writeFileSync','fn'],['"todo.txt"','arg'],['"learn npm"','val']],
   explain:'Watch the Project panel: <code>todo.txt</code> appears. You can do this from a file or a one-liner. Then type <code>cat todo.txt</code> (<code>cat</code> is a terminal command that prints a file\'s contents) to read it.',
-  check:c=>c.cmd==='node'&&c.ok&&'todo.txt' in c.files},
+  check:c=>c.cmd==='node'&&c.ok&&'todo.txt' in c.files&&/writeFileSync/.test((c.src||'')+(c.files[c.args[0]]||''))},
  {title:'Share code between files',goal:'Create `math.js` that exports an add function.',code:'function add(a, b) {\n  return a + b\n}\nmodule.exports = { add }',
   anat:[['module.exports','name'],['=','op'],['{ add }','val']],
   explain:'Each file is a module (a bundle of code, like <code>fs</code>) with its own private boxes. <code>module.exports</code> is the list of things a file chooses to share. Save it; there is nothing to run yet.',
   editFile:'math.js',
-  check:c=>(c.cmd==='(save)'&&c.args[0]==='math.js'||c.cmd==='node'&&/math\.js/.test(c.src||''))&&/module\.exports|exports\./.test(c.files['math.js']||'')},
+  check:c=>(c.cmd==='(save)'&&c.args[0]==='math.js'||c.cmd==='node'&&c.args[0]==='math.js')&&/module\.exports|exports\./.test(c.files['math.js']||'')},
  {title:'Use another file',goal:'Create `app.js` that requires ./math and prints `add(2, 3)`. Run it.',code:'const math = require("./math")\nconsole.log(math.add(2, 3))',
   anat:[['require','fn'],['"./math"','arg'],['math.add','name']],
   explain:'<code>./</code> means "a file in this folder". Without it, Node looks for a built-in module or an installed package (code other people wrote and shared) instead. Real projects are dozens or hundreds of small modules wired together like this.',
