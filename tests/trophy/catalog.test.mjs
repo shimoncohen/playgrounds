@@ -78,7 +78,7 @@ test('catalog: every entry names a known subject and a done-key separator', () =
 
 // docs/story-guideline.md: each playground's story.js outline and a story line per chapter. A playground leaves this
 // list in the PR that writes its story; listing one that already has a story.js fails, so the list cannot go stale.
-const STORY_PENDING = new Set(['rust-quest-v1']);
+const STORY_PENDING = new Set([]);
 const filled = s => typeof s === 'string' && s.trim().length > 0;
 
 for (const q of QUESTS) {

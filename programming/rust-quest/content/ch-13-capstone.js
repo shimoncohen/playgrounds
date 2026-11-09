@@ -76,9 +76,10 @@ const GOOD='let good = vec!['+ENT('shell',4)+', '+ENT('pearl',2)+'];',EMPTY='let
 const DAY_OUT='Ok(24)\nErr(Unknown("gem"))\nOk(0)\n';
 
 RQ.CH.push({
-  name:'The harbor ledger',
-  badge:'Reef Master',
-  intro:`The tide goes out for the last time this season, and Pip has a whole day of finds to write down: shells, pearls and tangles of weed. Nothing in the ledger is new. Each mission is a small job that uses several things you already know, side by side, the way real programs do: a <code>struct</code> and an <code>enum</code>, a <code>Vec</code> and a <code>HashMap</code>, references and lifetimes, a trait with a generic function, a closure, and <code>Result</code> with <code>?</code>. When the last job works, the ledger adds up the day.`,
+  name:'The tide ledger',
+  badge:'Moon Pearl',
+  story:'The last low tide of the season has come, as Moss\'s first note said; write the whole day of finds into the ledger, add it up, and find the Moon Pearl in the deepest pool.',
+  intro:`The last low tide of the season has come, just as Moss's first note said, and the Moon Pearl waits in the deepest pool. First Pip has a whole day of finds to write down: shells, pearls and tangles of weed. Nothing in the ledger is new. Each mission is a small job that uses several things you already know, side by side, the way real programs do: a <code>struct</code> and an <code>enum</code>, a <code>Vec</code> and a <code>HashMap</code>, references and lifetimes, a trait with a generic function, a closure, and <code>Result</code> with <code>?</code>. When the last job works, the ledger adds up the day.`,
   toolbox:`In this chapter: nothing new. It puts <code>struct</code>, <code>enum</code> and <code>match</code>, ownership and <code>&amp;</code> borrows, <code>Vec</code> and <code>HashMap</code>, <code>Result</code> and <code>?</code>, lifetime names, <code>trait</code> bounds, closures and iterator chains to work together, with the errors <code>E0382</code>, <code>E0308</code>, <code>E0106</code>, <code>E0599</code> and <code>E0004</code> you have met on the way.`,
   learned:['a struct and an enum together','borrowing a Vec','a HashMap tally','Result and ? in a chain','lifetimes on a search','a trait bound on a generic','a closure rule','the whole ledger'],
   missions:[

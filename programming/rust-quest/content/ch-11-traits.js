@@ -39,8 +39,9 @@ const CRATE_MAIN=J('',MAIN('let a = Crate { item: 3 };','let b = Crate { item: S
 
 RQ.CH.push({
   name:'Traits and generics',
-  badge:'Rule Weaver',
-  intro:`Crabs click, gulls squawk, and the tide pool needs one way to ask any of them to make a sound. A <em>trait</em> is a written promise that a type has certain methods, and a <em>generic</em> is code that works for any type that keeps a promise. This chapter writes both, then uses traits to print your own types with <code>{}</code>, run code when a value goes away, and turn one error into another for <code>?</code>. It ends with a <code>struct</code> that holds any type, built the way <code>Option</code> is.`,
+  badge:'Calling Conch',
+  story:'The tide map leads to the calling rocks, where crabs click and gulls squawk; make one promise every creature keeps, and find the calling conch.',
+  intro:`The tide map leads to the calling rocks. Crabs click, gulls squawk, and the tide pool needs one way to ask any of them to make a sound. A <em>trait</em> is a written promise that a type has certain methods, and a <em>generic</em> is code that works for any type that keeps a promise. This chapter writes both, then uses traits to print your own types with <code>{}</code>, run code when a value goes away, and turn one error into another for <code>?</code>. It ends with a <code>struct</code> that holds any type, built the way <code>Option</code> is.`,
   toolbox:`In this chapter: <code>trait</code>, <code>impl Trait for Type</code>, default methods, <code>&lt;T: Trait&gt;</code> and <code>impl Trait</code> parameters, <code>where</code>, <code>fmt::Display</code>, <code>Drop</code>, <code>From</code> with <code>?</code>, a generic <code>struct</code>, and the errors <code>E0599</code>, <code>E0308</code>, <code>E0369</code>, <code>E0277</code> and <code>E0407</code>.`,
   learned:['trait','default method','trait bound','E0369 on a type parameter','impl Trait','Display','Drop','From and ?','generic struct'],
   missions:[

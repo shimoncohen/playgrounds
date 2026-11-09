@@ -11,8 +11,9 @@ const FIRST_MAIN='fn main() {\n    println!("{}", first_square_over(50));\n    p
 
 RQ.CH.push({
   name:'Functions and flow',
-  badge:'Flow Controller',
-  intro:'So far everything happened in <code>main</code>, top to bottom. Now you write functions of your own and steer the program: choose with <code>if</code>, and repeat with <code>loop</code>, <code>while</code> and <code>for</code>.',
+  badge:'Tide Clock',
+  story:'The brass weight opens the tide steps, which only count down at low tide; write your own steps, choose and repeat, and find the tide clock.',
+  intro:'The brass weight opens the tide steps, which only count down at low tide. So far everything happened in <code>main</code>, top to bottom. Now you write functions of your own and steer the program: choose with <code>if</code>, and repeat with <code>loop</code>, <code>while</code> and <code>for</code>.',
   toolbox:'In this chapter: <code>fn</code> with parameters and a return type, <code>if</code> and <code>else</code>, <code>loop</code> and <code>break</code>, <code>while</code>, and <code>for</code> over <code>0..5</code> and <code>1..=5</code>.',
   learned:['functions','parameters','return values','if','loop','while','for','ranges'],
   missions:[
@@ -118,22 +119,22 @@ RQ.CH.push({
     },
     {
       title:'Count down with while',kind:'write',
-      goal:'Print <code>3</code>, <code>2</code> and <code>1</code> on their own lines, then <code>Liftoff!</code>, using a <code>while</code> loop.',
+      goal:'Print <code>3</code>, <code>2</code> and <code>1</code> on their own lines, then <code>Low tide!</code>, using a <code>while</code> loop.',
       how:[
         'The whole program counts down with <code>while</code> a number is still above zero, then announces the launch.',
         '<code>while n > 0 { ... }</code> checks the condition before every round and runs the block only while it is true. When it turns false, the loop ends.',
         'Inside the block, <code>println!("{}", n);</code> prints the number and <code>n = n - 1;</code> makes it smaller. Without that line the condition would stay true forever.',
-        'After the loop, one last <code>println!</code> prints <code>Liftoff!</code>.'
+        'After the loop, one last <code>println!</code> prints <code>Low tide!</code>.'
       ],
       explain:'Use <code>while</code> when you do not know ahead of time how many rounds you need, only when to stop. If the condition is false from the start, the block never runs at all.',
       hint:'Start with <code>let mut n = 3;</code>, then <code>while n > 0 { ... }</code>.',
-      starter:STUB('count down from 3, then print Liftoff!'),
-      answer:prog('    let mut n = 3;\n    while n > 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Liftoff!");\n'),
-      alts:[prog('    let mut n = 3;\n    while n >= 1 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Liftoff!");\n')],
-      wrong:[{src:prog('    let mut n = 3;\n    while n >= 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Liftoff!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 4;\n    while n > 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Liftoff!");\n'),wrongWhy:'check'}],
-      lazy:[{src:prog('    println!("3");\n    println!("2");\n    println!("1");\n    println!("Liftoff!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 3;\n    while n > 0 {\n        n = n - 1;\n    }\n    println!("3");\n    println!("2");\n    println!("1");\n    println!("Liftoff!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 3;\n    loop {\n        println!("{}", n);\n        n = n - 1;\n        if n == 0 {\n            break;\n        }\n    }\n    println!("Liftoff!");\n'),wrongWhy:'check'}],
+      starter:STUB('count down from 3, then print Low tide!'),
+      answer:prog('    let mut n = 3;\n    while n > 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Low tide!");\n'),
+      alts:[prog('    let mut n = 3;\n    while n >= 1 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Low tide!");\n')],
+      wrong:[{src:prog('    let mut n = 3;\n    while n >= 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Low tide!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 4;\n    while n > 0 {\n        println!("{}", n);\n        n = n - 1;\n    }\n    println!("Low tide!");\n'),wrongWhy:'check'}],
+      lazy:[{src:prog('    println!("3");\n    println!("2");\n    println!("1");\n    println!("Low tide!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 3;\n    while n > 0 {\n        n = n - 1;\n    }\n    println!("3");\n    println!("2");\n    println!("1");\n    println!("Low tide!");\n'),wrongWhy:'check'},{src:prog('    let mut n = 3;\n    loop {\n        println!("{}", n);\n        n = n - 1;\n        if n == 0 {\n            break;\n        }\n    }\n    println!("Low tide!");\n'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='3\n2\n1\nLiftoff!\n'?'The program has to print `3`, `2`, `1` and `Liftoff!`, each on its own line.':c.count('while')<1?'This mission is about `while`: repeat the printing with a `while` loop.':c.count('assign')<1?'Make `n` smaller each round, or the loop never ends.':c.count('var-use')<3?'Let the loop do the counting: test `n`, print `n` and change `n` inside the loop, instead of typing the numbers.':true
+      check:c=>c.out()!=='3\n2\n1\nLow tide!\n'?'The program has to print `3`, `2`, `1` and `Low tide!`, each on its own line.':c.count('while')<1?'This mission is about `while`: repeat the printing with a `while` loop.':c.count('assign')<1?'Make `n` smaller each round, or the loop never ends.':c.count('var-use')<3?'Let the loop do the counting: test `n`, print `n` and change `n` inside the loop, instead of typing the numbers.':true
     },
     {
       title:'Walk through a range with for',kind:'write',
@@ -158,19 +159,19 @@ RQ.CH.push({
       title:'A typo in a name',kind:'fix',
       goal:'This program stops with an error because it uses a name Rust cannot find. Fix it so it prints <code>42</code>.',
       how:[
-        'The whole program stores <code>40</code> in <code>score</code>, adds <code>2</code> and prints the sum. Rust refuses to build it, because one name is spelled differently from the variable.',
-        '<code>let score = 40;</code> creates the variable <code>score</code>.',
-        'The print asks for <code>scor</code>, with a letter missing. Rust has no variable by that name, and reports <code>E0425</code>: it cannot find the name.',
+        'The whole program stores <code>40</code> in <code>shells</code>, adds <code>2</code> and prints the sum. Rust refuses to build it, because one name is spelled differently from the variable.',
+        '<code>let shells = 40;</code> creates the variable <code>shells</code>.',
+        'The print asks for <code>shell</code>, with a letter missing. Rust has no variable by that name, and reports <code>E0425</code>: it cannot find the name.',
         'Spell the name the same way in both places and the error goes away.'
       ],
-      explain:'<code>E0425</code> means the compiler met a name it does not know. Usually it is a typo, or the variable lives in a block that has already ended. Rust is strict about spelling and capital letters: <code>score</code> and <code>Score</code> are different names.',
-      hint:'Change <code>scor</code> to <code>score</code>.',
-      starter:prog('    let score = 40;\n    println!("{}", scor + 2);\n'),
+      explain:'<code>E0425</code> means the compiler met a name it does not know. Usually it is a typo, or the variable lives in a block that has already ended. Rust is strict about spelling and capital letters: <code>shells</code> and <code>Shells</code> are different names.',
+      hint:'Change <code>shell</code> to <code>shells</code>.',
+      starter:prog('    let shells = 40;\n    println!("{}", shell + 2);\n'),
       starterErr:'E0425',
-      answer:prog('    let score = 40;\n    println!("{}", score + 2);\n'),
-      alts:[prog('    let scor = 40;\n    println!("{}", scor + 2);\n')],
-      wrong:[{src:prog('    let score = 40;\n    println!("{}", score + 3);\n'),wrongWhy:'check'},{src:prog('    let score = 40;\n    println!("{}", scores + 2);\n'),wrongWhy:'E0425'}],
-      lazy:[{src:prog('    println!("42");\n'),wrongWhy:'check'},{src:prog('    let score = 40;\n    println!("{}", 40 + 2);\n'),wrongWhy:'check'}],
+      answer:prog('    let shells = 40;\n    println!("{}", shells + 2);\n'),
+      alts:[prog('    let shell = 40;\n    println!("{}", shell + 2);\n')],
+      wrong:[{src:prog('    let shells = 40;\n    println!("{}", shells + 3);\n'),wrongWhy:'check'},{src:prog('    let shells = 40;\n    println!("{}", shellss + 2);\n'),wrongWhy:'E0425'}],
+      lazy:[{src:prog('    println!("42");\n'),wrongWhy:'check'},{src:prog('    let shells = 40;\n    println!("{}", 40 + 2);\n'),wrongWhy:'check'}],
       defines:[],previews:[],
       check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.count('var-use')<1?'Use the variable in the print: add `2` to it instead of typing the number.':true
     }

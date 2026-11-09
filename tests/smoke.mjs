@@ -483,7 +483,7 @@ test('rust-quest: the memory view steps through mission 4.1 and shows the error 
   const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
   assert.equal(steps, 4);
   await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 2);
-  assert.match(await page.textContent('#memory .mv-heap'), /#1String\s*hello, Rustowner: s/);
+  assert.match(await page.textContent('#memory .mv-heap'), /#1String\s*ahoy, Rustowner: s/);
   await page.waitForSelector('#memory .mv-arrows path.mv-a-own', { state: 'attached' });
   assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-own', p => p.length), 1);
   const [stack, heap] = await page.$$eval('#memory .mv-stack, #memory .mv-heap', els => els.map(e => e.getBoundingClientRect().top));
@@ -515,7 +515,7 @@ test('rust-quest: a slice is drawn as a dashed arrow into the heap of the String
   await page.waitForSelector('#memory .mv-ctl input[type=range]');
   await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 3);
   const slots = await page.$$eval('#memory .mv-ref', els => els.map(e => e.textContent));
-  assert.deepEqual(slots, ['[0..5] "hello"', '[6..11] "world"']);
+  assert.deepEqual(slots, ['[0..5] "hello"', '[6..10] "cove"']);
   assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("s"))'), /borrowed x2/);
   await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
   assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-shared', p => p.length), 2);
@@ -556,7 +556,7 @@ test('rust-quest: chapters 6 and 7 play through: a struct shows its fields, an i
   await page.click('#bRun');
   await page.waitForSelector('#memory .mv-ctl input[type=range]');
   await last(1);
-  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Pet\s*name\s*pointer to #1\s*age\s*5/);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Critter\s*name\s*pointer to #1\s*age\s*5/);
   assert.match(await page.textContent('#feedback'), /Mission complete/);
   await page.click('[data-ch="6"]');
   await page.click('#mission .dot[data-mi="1"]');
@@ -843,7 +843,7 @@ test('rust-quest: missions 1.1 to 1.6 give XP once each, wrong tries give a hint
     await page.waitForSelector('#feedback .msg.win');
     assert.equal(await xp(), `${(i + 1) * 10} XP`);
     assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
-    const badge = /Badge earned: First Steps/.test(await page.textContent('#feedback'));
+    const badge = /Badge earned: Moss's Note/.test(await page.textContent('#feedback'));
     assert.equal(badge, i === ms.length - 1);
     await page.click('#bRun');
     await page.waitForTimeout(100);

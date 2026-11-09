@@ -10,34 +10,35 @@ const TWO='    let first = String::from("one");\n    let second = String::from("
 
 RQ.CH.push({
   name:'Ownership',
-  badge:'Heap Keeper',
-  intro:'Text that can grow lives in a piece of memory called the heap, and in Rust every such value has exactly one owner: the variable that holds it. This chapter shows what that means when you hand a value to another variable or to a function, and when Rust frees it. Press Run on any mission and a memory view appears, so you can watch the stack and the heap change one line at a time.',
+  badge:'Driftwood Key',
+  story:'The tide clock points at a heap of driftwood where each piece has one owner; hand pieces on carefully, and find the driftwood key.',
+  intro:'The tide clock points at a heap of driftwood where each piece has one owner, and Gus the gull snatches anything left lying about. Text that can grow lives in a piece of memory called the heap, and in Rust every such value has exactly one owner: the variable that holds it. This chapter shows what that means when you hand a value to another variable or to a function, and when Rust frees it. Press Run on any mission and a memory view appears, so you can watch the stack and the heap change one line at a time.',
   toolbox:'In this chapter: <code>String::from</code>, <code>push_str</code>, <code>.clone()</code>, <code>drop</code>, functions that take and return a <code>String</code>, and the memory view.',
   learned:['String','heap','move','Copy','clone','drop'],
   missions:[
     {
       title:'Put text on the heap',kind:'write',
-      goal:'Make a <code>String</code> that holds <code>hello</code>, add <code>, Rust</code> to the end of it, and print it, so the line says <code>hello, Rust</code>.',
+      goal:'Make a <code>String</code> that holds <code>ahoy</code>, add <code>, Rust</code> to the end of it, and print it, so the line says <code>ahoy, Rust</code>.',
       how:[
         'The whole program builds a piece of text that can grow, adds to it, and prints it. Text that can grow is a <code>String</code>, and its letters live on the heap, not in the variable itself.',
-        '<code>String::from("hello")</code> makes a <code>String</code> from a piece of text. <code>::</code> names a function that belongs to a type. Chapter 6 shows how to write your own.',
+        '<code>String::from("ahoy")</code> makes a <code>String</code> from a piece of text. <code>::</code> names a function that belongs to a type. Chapter 6 shows how to write your own.',
         '<code>s.push_str(", Rust")</code> adds text to the end of <code>s</code>. <code>.</code> calls a function that belongs to the value. Chapter 6 shows how to write your own. Changing <code>s</code> means it has to be declared with <code>let mut</code>.',
         'Both <code>println!("{}", s)</code> and <code>push_str</code> leave <code>s</code> usable afterwards. They borrow <code>s</code> for a moment and give it back. Chapter 5 explains borrowing.'
       ],
       explain:'A variable such as <code>s</code> sits on the stack and holds only a small note: where the text is, and how long it is. The letters themselves sit on the heap. When the text grows, the heap part grows, and <code>s</code> still owns it. Run the program and drag the step slider to see both.',
-      hint:'Write <code>let mut s = String::from("hello");</code>, then <code>s.push_str(", Rust");</code>, then print <code>s</code>.',
+      hint:'Write <code>let mut s = String::from("ahoy");</code>, then <code>s.push_str(", Rust");</code>, then print <code>s</code>.',
       starter:STUB('make the String, add to it, print it'),
-      answer:prog('    let mut s = String::from("hello");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),
-      alts:[prog('    let mut s = String::new();\n    s.push_str("hello");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),prog('    let mut greeting = String::from("hello");\n    greeting.push_str(", Rust");\n    println!("{}", greeting);\n')],
-      wrong:[{src:prog('    let mut s = String::from("hello");\n    s.push_str(" Rust");\n    println!("{}", s);\n'),wrongWhy:'check'},{src:prog('    let s = String::from("hello");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),wrongWhy:'E0596'}],
-      lazy:[{src:prog('    println!("hello, Rust");\n'),wrongWhy:'check'},{src:prog('    let s = String::from("hello, Rust");\n    println!("{}", s);\n'),wrongWhy:'check'}],
+      answer:prog('    let mut s = String::from("ahoy");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),
+      alts:[prog('    let mut s = String::new();\n    s.push_str("ahoy");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),prog('    let mut greeting = String::from("ahoy");\n    greeting.push_str(", Rust");\n    println!("{}", greeting);\n')],
+      wrong:[{src:prog('    let mut s = String::from("ahoy");\n    s.push_str(" Rust");\n    println!("{}", s);\n'),wrongWhy:'check'},{src:prog('    let s = String::from("ahoy");\n    s.push_str(", Rust");\n    println!("{}", s);\n'),wrongWhy:'E0596'}],
+      lazy:[{src:prog('    println!("ahoy, Rust");\n'),wrongWhy:'check'},{src:prog('    let s = String::from("ahoy, Rust");\n    println!("{}", s);\n'),wrongWhy:'check'}],
       defines:[],
       previews:[
         {tag:'path-call',wording:'<code>::</code> names a function that belongs to a type. Chapter 6 shows how to write your own.',home:6},
         {tag:'method-call',wording:'<code>.</code> calls a function that belongs to the value. Chapter 6 shows how to write your own.',home:6},
         {tag:'borrow-note',wording:'They borrow <code>s</code> for a moment and give it back. Chapter 5 explains borrowing.',home:5}
       ],
-      check:c=>c.out()!=='hello, Rust\n'?'The program has to print `hello, Rust` on one line, with the comma after `hello`.':c.allocs('String')!==1?'Build one `String` with `String::from` (or `String::new`) and grow that same `String`.':c.usesMethod('push_str')<1?'Add the second part with `push_str`, so the same `String` grows.':true
+      check:c=>c.out()!=='ahoy, Rust\n'?'The program has to print `ahoy, Rust` on one line, with the comma after `ahoy`.':c.allocs('String')!==1?'Build one `String` with `String::from` (or `String::new`) and grow that same `String`.':c.usesMethod('push_str')<1?'Add the second part with `push_str`, so the same `String` grows.':true
     },
     {
       title:'One owner at a time',kind:'fix',
