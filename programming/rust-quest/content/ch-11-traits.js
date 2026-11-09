@@ -16,7 +16,7 @@ const CLICKS=IMPL('Crab','format!("{} clicks", self.name)'),SQUAWKS=IMPL('Gull',
 const PAIR_MAIN=(call)=>J('',MAIN('let c = Crab { name: String::from("Pip") };','let g = Gull { name: String::from("Gus") };',call+'(&c);',call+'(&g);'));
 const ANNOUNCE=head=>FN(head,'println!("{}", x.sound());');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
+const OTHER=RQ.other('text');
 const BOUND=(g,name)=>!!g&&g.tparams.some(t=>t.bounds.includes(name));
 const MEET=J('',L('fn meet<T: Cry>(x: &T) {','    println!("{}", x.intro());','}'),MAIN('let c = Crab { name: String::from("Pip") };','let g = Gull { name: String::from("Gus") };','meet(&c);','meet(&g);'));
 const INTRO=L('    fn intro(&self) -> String {','        format!("{} says {}", self.name(), self.sound())','    }');

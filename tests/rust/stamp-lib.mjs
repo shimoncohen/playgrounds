@@ -11,6 +11,7 @@ export function programs(RQ, corpus) {
   const all = [
     ...corpus.map((e) => ({ id: 'corpus:' + e.id, src: e.src, entry: e })),
     ...RQ.missionPrograms().map((p) => ({ id: 'mission:' + p.id, src: p.src, role: p.role })),
+    ...RQ.GUIDE.flatMap((g, gi) => g.ex.map(([src], k) => ({ id: `guide:${gi}.${k}`, src, role: 'guide' }))),
   ];
   return all.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
@@ -22,7 +23,7 @@ export function digest(c) {
 
 export const inputsHash = (corpus, progs) => sha256(canonical({
   corpus: [...corpus].sort((a, b) => (a.id < b.id ? -1 : 1)),
-  missions: progs.filter((p) => p.id.startsWith('mission:')).map((p) => ({ id: p.id, src: p.src })),
+  missions: progs.filter((p) => !p.id.startsWith('corpus:')).map((p) => ({ id: p.id, src: p.src })),
 }));
 export const resultsHash = (run, progs) => sha256(canonical(progs.map((p) => ({ id: p.id, r: digest(run(p.src)) }))));
 
@@ -31,7 +32,7 @@ export function record(RQ, corpus) {
   return {
     inputsHash: inputsHash(corpus, progs),
     resultsHash: resultsHash(RQ.run, progs),
-    counts: { corpus: progs.filter((p) => p.id.startsWith('corpus:')).length, missions: progs.filter((p) => p.id.startsWith('mission:')).length },
+    counts: { corpus: progs.filter((p) => p.id.startsWith('corpus:')).length, missions: progs.filter((p) => p.id.startsWith('mission:')).length, guide: progs.filter((p) => p.id.startsWith('guide:')).length },
   };
 }
 

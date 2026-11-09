@@ -71,7 +71,7 @@ function errorView(c){
 }
 
 const PRINTS=['println','print','eprintln','eprint'];
-const peelP=e=>e.t==='Paren'?peelP(e.expr):e;
+const peel=RQ.peel;
 function holes(ast){
   let n=0;
   RQ.walk(ast,m=>{
@@ -140,7 +140,7 @@ function liveIn(ast,fn,pick){
   const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
   if(!f)return 0;
   const read=readNames(f.body),dead=new Set(),inits=new Map();
-  const mark=n=>{n=peelP(n);dead.add(n);if(n.t==='Try')mark(n.expr);else if(n.t==='MethodCall')mark(n.recv);};
+  const mark=n=>{n=peel(n);dead.add(n);if(n.t==='Try')mark(n.expr);else if(n.t==='MethodCall')mark(n.recv);};
   RQ.walk(f.body,m=>{
     if(m.t==='ExprStmt'&&m.semi)mark(m.expr);
     else if(m.t==='Let'&&m.init){
@@ -210,7 +210,7 @@ function context(d,ast,counts,src){
     // struct literals of `name` that give a field a borrow of something
     borrowInit:name=>{
       let n=0;
-      if(ast)RQ.walk(ast,m=>{if(m.t==='StructLit'&&m.path.segs[m.path.segs.length-1].name===name)n+=m.fields.filter(f=>f.expr&&peelP(f.expr).t==='Ref').length;});
+      if(ast)RQ.walk(ast,m=>{if(m.t==='StructLit'&&m.path.segs[m.path.segs.length-1].name===name)n+=m.fields.filter(f=>f.expr&&peel(f.expr).t==='Ref').length;});
       return n;
     },
     usesParam:(fn,i)=>{
@@ -251,7 +251,7 @@ function context(d,ast,counts,src){
     },
     litArgs:what=>{
       let n=0;
-      const lit=a=>{a=peelP(a);return a.t==='Lit'||a.t==='Unary'&&a.op==='-'&&peelP(a.expr).t==='Lit';};
+      const lit=a=>{a=peel(a);return a.t==='Lit'||a.t==='Unary'&&a.op==='-'&&peel(a.expr).t==='Lit';};
       if(ast)RQ.walk(ast,m=>{
         if(what==='print'&&m.t==='Macro'&&PRINTS.includes(m.name)&&m.args)n+=m.args.slice(1).filter(lit).length;
         else if(m.t==='MethodCall'&&m.name===what)n+=m.args.filter(lit).length;
@@ -283,12 +283,12 @@ function context(d,ast,counts,src){
     onRecv:(fn,method,name)=>{
       let n=0;
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
-      if(f)RQ.walk(f.body,m=>{if(m.t==='MethodCall'&&m.name===method){const r=peelP(m.recv);if(r.t==='Path'&&r.segs.length===1&&r.segs[0].name===name)n++;}});
+      if(f)RQ.walk(f.body,m=>{if(m.t==='MethodCall'&&m.name===method){const r=peel(m.recv);if(r.t==='Path'&&r.segs.length===1&&r.segs[0].name===name)n++;}});
       return n;
     },
     callArg:(callee,name)=>{
       let n=0;
-      if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===callee&&m.args.some(a=>{a=peelP(a);return a.t==='Path'&&a.segs.length===1&&a.segs[0].name===name;}))n++;});
+      if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===callee&&m.args.some(a=>{a=peel(a);return a.t==='Path'&&a.segs.length===1&&a.segs[0].name===name;}))n++;});
       return n;
     },
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},

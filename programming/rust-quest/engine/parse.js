@@ -12,6 +12,7 @@ const ASSIGN=new Set(['=','+=','-=','*=','/=','%=','^=','&=','|=','<<=','>>=']);
 const CLOSE={'(':')','[':']','{':'}'};
 const BLOCKLIKE=new Set(['if','match','while','loop','for','unsafe']);
 
+RQ.peel=e=>e.t==='Paren'?RQ.peel(e.expr):e;
 RQ.walk=(n,f,parent)=>{
   if(Array.isArray(n)){for(const x of n)RQ.walk(x,f,parent);return;}
   if(!n||typeof n!=='object')return;
@@ -153,7 +154,7 @@ RQ.parse=tokens=>{
       expP(']');return mk('Slice',x,{ty:el});
     }
     if(isP('!')){p++;feat('never type',x.line);return mk('Never',x);}
-    if(isK('impl')){p++;return mk('ImplTrait',x,{bounds:bounds()});}
+    if(isK('impl')){p++;const bs=bounds();if(!bs.length)fail('at least one trait must be specified',x);return mk('ImplTrait',x,{bounds:bs});}
     if(isK('dyn')){p++;feat('dyn',x.line);return mk('DynTrait',x,{bounds:bounds()});}
     if(isK('for')){p++;expP('<');while(!isCloseAngle())p++;closeAngle();feat('higher-ranked bound',x.line);return ty();}
     if(isK('fn')||isK('unsafe')||isK('extern')){

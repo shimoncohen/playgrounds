@@ -6611,5 +6611,1853 @@
     "src": "fn pick<'a>(x: &'a str, y: &'a str) -> &'a str {\n    y\n}\nfn main() {\n    println!(\"{}\", pick(\"a\", \"b\"));\n}\n",
     "expect": "ok", "out": "b\n", "err": "", "exit": 0,
     "why": "the edit removes the error", "pr": "P15"
+  },
+  {
+    "id": "lifetimes-001",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let a = String::from(\"abcd\");\n    let b = String::from(\"xy\");\n    println!(\"{}\", longest(a.as_str(), b.as_str()));\n    println!(\"{}\", longest(\"ab\", \"cde\"));\n}\n",
+    "expect": "ok", "out": "abcd\ncde\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-002",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let a = String::from(\"abcd\");\n    let r: &str;\n    {\n        let b = String::from(\"xy\");\n        r = longest(&a, &b);\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0597", "line": 9},
+    "why": "lifetimes unit test: rustc reports E0597", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-003",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let a = String::from(\"abcd\");\n    {\n        let b = String::from(\"xy\");\n        println!(\"{}\", longest(&a, &b));\n    }\n}\n",
+    "expect": "ok", "out": "abcd\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-004",
+    "src": "fn first<'a>(x: &'a str, y: &'a str) -> &'a str {\n    x\n}\nfn main() {\n    let a = String::from(\"abcd\");\n    let r: &str;\n    {\n        let b = String::from(\"xy\");\n        r = first(&a, &b);\n    }\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0597", "line": 9},
+    "why": "lifetimes unit test: rustc reports E0597", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-005",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let mut a = String::from(\"abcd\");\n    let b = String::from(\"xy\");\n    let r = longest(&a, &b);\n    a.push_str(\"!\");\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "why": "lifetimes unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-006",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let a = String::from(\"abcd\");\n    let b = String::from(\"xy\");\n    let r = longest(&a, &b);\n    let c = b;\n    println!(\"{} {}\", r, c);\n}\n",
+    "expect": {"code": "E0505", "line": 8},
+    "why": "lifetimes unit test: rustc reports E0505", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-007",
+    "src": "fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {\n    let mut a = String::from(\"abcd\");\n    let b = String::from(\"xy\");\n    let r = longest(&a, &b);\n    a = String::from(\"z\");\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0506", "line": 8},
+    "why": "lifetimes unit test: rustc reports E0506", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-008",
+    "src": "fn longest<'a>(x: &'a str, y: &str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {}\n",
+    "expect": {"code": "E0621", "line": 2},
+    "why": "lifetimes unit test: rustc reports E0621", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-009",
+    "src": "fn f<'a>(x: &'a str, y: &str, c: bool) -> &'a str {\n    let mut best = y;\n    best = x;\n    if c { best = x; }\n    best\n}\nfn main() {}\n",
+    "expect": {"code": "E0621", "line": 5},
+    "why": "lifetimes unit test: rustc reports E0621", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-010",
+    "src": "fn f<'a>(x: &'a str, y: &str) -> &'a str {\n    longest(x, y)\n}\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\nfn main() {}\n",
+    "expect": {"code": "E0621", "line": 2},
+    "why": "lifetimes unit test: rustc reports E0621", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-011",
+    "src": "fn g<'a>(x: &'a str, y: &str) -> &'a str {\n    if x.len() > 1 { return y; }\n    x\n}\nfn main() {}\n",
+    "expect": {"code": "E0621", "line": 2},
+    "why": "lifetimes unit test: rustc reports E0621", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-012",
+    "src": "fn f<'a>(x: &'a str, y: &str) -> &'a str {\n    println!(\"{}\", y.len());\n    x\n}\nfn main() { println!(\"{}\", f(\"a\", \"b\")); }\n",
+    "expect": "ok", "out": "1\na\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-013",
+    "src": "fn f(x: &str) -> &'a str {\n    x\n}\nfn main() {}\n",
+    "expect": {"code": "E0261", "line": 1},
+    "why": "lifetimes unit test: rustc reports E0261", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-014",
+    "src": "fn f<'a>(x: &'a str) -> &'a str {\n    let s = String::from(\"a\");\n    &s\n}\nfn main() {}\n",
+    "expect": {"code": "E0515", "line": 3},
+    "why": "lifetimes unit test: rustc reports E0515", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-015",
+    "src": "fn f<'a>(n: i32) -> &'a str {\n    if n > 0 { \"p\" } else { \"q\" }\n}\nfn main() { println!(\"{}\", f(1)); }\n",
+    "expect": "ok", "out": "p\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-016",
+    "src": "fn f<'a>(x: &'a str) -> String { x.to_string() }\nfn g<'a>(x: &str) -> i32 { 3 }\nfn main() { println!(\"{} {}\", f(\"a\"), g(\"b\")); }\n",
+    "expect": "ok", "out": "a 3\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-017",
+    "src": "fn max_ref<'a>(a: &'a i32, b: &'a i32) -> &'a i32 {\n    if *a > *b { a } else { b }\n}\nfn tail<'a>(v: &'a [i32], n: usize) -> &'a [i32] { &v[n..] }\nfn main() { let p = 3; let q = 9; let v = [1, 2, 3]; println!(\"{} {:?}\", max_ref(&p, &q), tail(&v, 1)); }\n",
+    "expect": "ok", "out": "9 [2, 3]\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-018",
+    "src": "struct Person {\n    name: String,\n}\nfn name<'a>(p: &'a Person) -> &'a str { &p.name }\nfn main() { let p = Person { name: String::from(\"Ann\") }; println!(\"{}\", name(&p)); }\n",
+    "expect": "ok", "out": "Ann\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-019",
+    "src": "fn f<'a>(x: &'a str) -> &'a str { x }\nfn main() {\n    let s = String::from(\"a\");\n    let r = f(&s);\n    let r2 = f(r);\n    let t = s;\n    println!(\"{}\", r2);\n}\n",
+    "expect": {"code": "E0505", "line": 6},
+    "why": "lifetimes unit test: rustc reports E0505", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-020",
+    "src": "fn f<'a>(x: &'a str, y: &str) -> &str { x }\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 1},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-021",
+    "src": "fn f<'a>(x: &'a str, y: &'a str) -> &str { x }\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 1},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-022",
+    "src": "fn f<'a>(x: &str, y: &str) -> &str { x }\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 1},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-023",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let novel = String::from(\"Call me Ishmael.\");\n    let e = Excerpt { part: &novel[..4] };\n    println!(\"{}\", e.part);\n}\n",
+    "expect": "ok", "out": "Call\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-024",
+    "src": "struct Excerpt {\n    part: &str,\n}\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 2},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-025",
+    "src": "struct Excerpt {\n    part: &'a str,\n}\nfn main() {}\n",
+    "expect": {"code": "E0261", "line": 2},
+    "why": "lifetimes unit test: rustc reports E0261", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-026",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let e: Excerpt;\n    {\n        let novel = String::from(\"Call me\");\n        e = Excerpt { part: &novel };\n    }\n    println!(\"{}\", e.part);\n}\n",
+    "expect": {"code": "E0597", "line": 8},
+    "why": "lifetimes unit test: rustc reports E0597", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-027",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let novel = String::from(\"Call me\");\n    let e = Excerpt { part: &novel };\n    drop(novel);\n    println!(\"{}\", e.part);\n}\n",
+    "expect": {"code": "E0505", "line": 7},
+    "why": "lifetimes unit test: rustc reports E0505", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-028",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut novel = String::from(\"Call me\");\n    let e = Excerpt { part: &novel };\n    novel.push_str(\"!\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": {"code": "E0502", "line": 7},
+    "why": "lifetimes unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-029",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut novel = String::from(\"Call me\");\n    let e = Excerpt { part: &novel };\n    novel = String::from(\"z\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": {"code": "E0506", "line": 7},
+    "why": "lifetimes unit test: rustc reports E0506", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-030",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut novel = String::from(\"Call me\");\n    let e = Excerpt { part: &novel };\n    println!(\"{}\", e.part);\n    novel.push_str(\"!\");\n    println!(\"{}\", novel);\n}\n",
+    "expect": "ok", "out": "Call me\nCall me!\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-031",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let t = String::from(\"hi there\");\n    let e = Excerpt { part: &t };\n    let f = e;\n    let u = t;\n    println!(\"{}\", f.part);\n}\n",
+    "expect": {"code": "E0505", "line": 8},
+    "why": "lifetimes unit test: rustc reports E0505", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-032",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn make<'a>() -> Excerpt<'a> {\n    let s = String::from(\"a\");\n    Excerpt { part: &s }\n}\nfn main() {}\n",
+    "expect": {"code": "E0515", "line": 6},
+    "why": "lifetimes unit test: rustc reports E0515", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-033",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn make(t: &str) -> Excerpt {\n    Excerpt { part: t }\n}\nfn main() { let e = make(\"a\"); println!(\"{}\", e.part); }\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-034",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn make() -> Excerpt {\n    Excerpt { part: \"x\" }\n}\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 4},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-035",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn first(e: &Excerpt) -> &str {\n    e.part\n}\nfn main() {}\n",
+    "expect": {"code": "E0106", "line": 4},
+    "why": "lifetimes unit test: rustc reports E0106", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-036",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl Excerpt {\n    fn level(&self) -> i32 { 3 }\n}\nfn main() {}\n",
+    "expect": {"code": "E0726", "line": 4},
+    "why": "lifetimes unit test: rustc reports E0726", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-037",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl Excerpt<'a> {\n    fn level(&self) -> i32 { 3 }\n}\nfn main() {}\n",
+    "expect": {"code": "E0261", "line": 4},
+    "why": "lifetimes unit test: rustc reports E0261", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-038",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n    id: u32,\n}\nimpl<'a> Excerpt<'a> {\n    fn part(&self) -> &str { self.part }\n    fn id(&self) -> u32 { self.id }\n}\nimpl Excerpt<'_> {\n    fn len(&self) -> usize { self.part.len() }\n}\nfn main() {\n    let t = String::from(\"hi there\");\n    let e = Excerpt { part: &t, id: 7 };\n    println!(\"{} {} {}\", e.part(), e.id(), e.len());\n}\n",
+    "expect": "ok", "out": "hi there 7 8\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-039",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn part(&self) -> &str { self.part }\n}\nfn main() {\n    let mut t = String::from(\"hi\");\n    let e = Excerpt { part: &t };\n    let p = e.part();\n    t.push_str(\"x\");\n    println!(\"{}\", p);\n}\n",
+    "expect": {"code": "E0502", "line": 11},
+    "why": "lifetimes unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-040",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(part: &'a str) -> Excerpt<'a> { Excerpt { part } }\n}\nfn main() { let t = String::from(\"hi\"); let e = Excerpt::new(&t); println!(\"{}\", e.part); }\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-041",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn pick<'b>(&self, other: &'b str) -> &'b str { other }\n}\nfn main() { let t = String::from(\"hi\"); let e = Excerpt { part: &t }; println!(\"{}\", e.pick(\"zz\")); }\n",
+    "expect": "ok", "out": "zz\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-042",
+    "src": "#[derive(Debug, Clone, Copy)]\nstruct Excerpt<'a> {\n    part: &'a str,\n    n: i32,\n}\nfn main() {\n    let t = String::from(\"hello\");\n    let e = Excerpt { part: &t, n: 1 };\n    let f = e;\n    println!(\"{:?} {:?}\", e, f);\n}\n",
+    "expect": "ok", "out": "Excerpt { part: \"hello\", n: 1 } Excerpt { part: \"hello\", n: 1 }\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-043",
+    "src": "struct W<'a>(&'a str, i32);\nfn main() { let t = String::from(\"a\"); let w = W(&t, 2); println!(\"{} {}\", w.0, w.1); }\n",
+    "expect": "ok", "out": "a 2\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-044",
+    "src": "struct Person {\n    name: String,\n}\nstruct Badge<'a> {\n    owner: &'a Person,\n}\nfn main() { let p = Person { name: String::from(\"Ann\") }; let b = Badge { owner: &p }; println!(\"{}\", b.owner.name); }\n",
+    "expect": "ok", "out": "Ann\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-045",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn longer<'a>(a: Excerpt<'a>, b: Excerpt<'a>) -> &'a str {\n    if a.part.len() > b.part.len() { a.part } else { b.part }\n}\nfn main() { let x = String::from(\"aaa\"); let y = String::from(\"b\"); println!(\"{}\", longer(Excerpt { part: &x }, Excerpt { part: &y })); }\n",
+    "expect": "ok", "out": "aaa\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-046",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let s = String::from(\"a\");\n    let e = Excerpt { part: &s };\n    let r = &e;\n    let p = r.part;\n    println!(\"{}\", p);\n    drop(s);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-047",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn f<'a>(e: &'a Excerpt<'a>) -> &'a str { let p = e.part; p }\nfn main() { let s = String::from(\"q\"); let e = Excerpt { part: &s }; println!(\"{}\", f(&e)); }\n",
+    "expect": "ok", "out": "q\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-048",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new3(p: &str) -> Self { Excerpt { part: p } }\n}\nfn main() {}\n",
+    "expect": {"code": "E0621", "line": 5},
+    "why": "lifetimes unit test: rustc reports E0621", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-049",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(p: &'a str) -> Self { Excerpt { part: p } }\n    fn part(&self) -> &str { self.part }\n}\nfn main() {\n    let s = String::from(\"Call me Ishmael.\");\n    let e = Excerpt::new(&s[..4]);\n    println!(\"{}\", e.part());\n    drop(s);\n}\n",
+    "expect": "ok", "out": "Call\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-050",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let b = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    e.part = &b[..];\n    println!(\"{}\", e.part);\n    e.part = b.as_str();\n    println!(\"{}\", e.part);\n}\n",
+    "expect": "ok", "out": "a\na\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-051",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let t = String::from(\"hi\");\n    let e = Excerpt { part: &t };\n    println!(\"{}\", e.part);\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "hi\nhi\n", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-052",
+    "src": "fn f<'a>(x: Option<&'a str>) -> Option<&'a str> { x }\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-053",
+    "src": "struct S<'a> { r: &'a str }\nfn f<'a>(s: &'a S<'a>) -> &'a str { s.r }\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "lifetimes-054",
+    "src": "struct S<'a> { r: &'a str }\nstruct T<'a> { s: S<'a> }\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "lifetimes unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-001",
+    "src": "fn main() {\n    let v = vec![3, 1, 2];\n    let c = v.iter().filter(|&&x| x > 1).count();\n    let s: i32 = v.iter().map(|&x| x * 2).sum();\n    println!(\"{} {}\", c, s);\n}\n",
+    "expect": "ok", "out": "2 12\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-002",
+    "src": "fn main() {\n    let v = vec![5, 6];\n    for (i, x) in v.iter().enumerate() {\n        println!(\"{} {}\", i, x);\n    }\n}\n",
+    "expect": "ok", "out": "0 5\n1 6\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-003",
+    "src": "fn main() {\n    let mut n = 1;\n    let f = move || n * 2;\n    n += 1;\n    println!(\"{} {}\", f(), n);\n}\n",
+    "expect": "ok", "out": "2 2\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-004",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut a = || n += 1;\n    let mut b = || n += 2;\n    a();\n    b();\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "why": "closures unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "closures-005",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut inc = || count += 1;\n    inc();\n    println!(\"{}\", count);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-006",
+    "src": "fn main() {\n    let v = vec![1];\n    let mut f = || v.push(2);\n    f();\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "why": "closures unit test: rustc reports E0596", "pr": "unit"
+  },
+  {
+    "id": "closures-007",
+    "src": "struct Cart {\n    items: Vec<i32>,\n    bonus: i32,\n}\nimpl Cart {\n    fn total(&self) -> i32 {\n        self.items.iter().map(|x| x + self.bonus).sum()\n    }\n}\n\nfn main() {\n    let c = Cart { items: vec![1, 2], bonus: 10 };\n    println!(\"{}\", c.total());\n}\n\n",
+    "expect": "ok", "out": "23\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-008",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    let inc = || n += 1;\n    apply(inc);\n}\n",
+    "expect": {"code": "E0525", "line": 6},
+    "why": "closures unit test: rustc reports E0525", "pr": "unit"
+  },
+  {
+    "id": "closures-009",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    apply(|| n += 1);\n}\n",
+    "expect": {"code": "E0594", "line": 6},
+    "why": "closures unit test: rustc reports E0594", "pr": "unit"
+  },
+  {
+    "id": "closures-010",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let mut v = vec![1];\n    apply(|| v.push(2));\n}\n",
+    "expect": {"code": "E0596", "line": 6},
+    "why": "closures unit test: rustc reports E0596", "pr": "unit"
+  },
+  {
+    "id": "closures-011",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a, b| a + b));\n}\n\n",
+    "expect": {"code": "E0593", "line": 5},
+    "why": "closures unit test: rustc reports E0593", "pr": "unit"
+  },
+  {
+    "id": "closures-012",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a: String| 1));\n}\n\n",
+    "expect": {"code": "E0631", "line": 5},
+    "why": "closures unit test: rustc reports E0631", "pr": "unit"
+  },
+  {
+    "id": "closures-013",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(5));\n}\n\n",
+    "expect": {"code": "E0277", "line": 5},
+    "why": "closures unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "closures-014",
+    "src": "fn main() {\n    let f = |x: i32| x / 0;\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 2},
+    "why": "closures unit test: rustc reports unconditional_panic", "pr": "unit"
+  },
+  {
+    "id": "closures-015",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4, 5, 6];\n    let a: Vec<i32> = v.iter().map(|x| x * 2).collect();\n    let b: Vec<i32> = v.iter().filter(|x| **x % 2 == 0).copied().collect();\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "[2, 4, 6, 8, 10, 12] [2, 4, 6]\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-016",
+    "src": "fn main() {\n    let v = vec![3, 1, 4, 1, 5];\n    let s: i32 = v.iter().sum();\n    let p: i32 = v.iter().product();\n    println!(\"{} {} {} {:?} {:?} {:?}\", s, p, v.iter().count(), v.iter().min(), v.iter().max(), v.iter().last());\n    println!(\"{} {}\", v.iter().fold(0, |a, x| a * 10 + x), v.iter().any(|x| *x == 5));\n    println!(\"{} {:?} {:?}\", v.iter().all(|x| *x < 5), v.iter().find(|x| **x > 3), v.iter().position(|x| *x == 4));\n}\n",
+    "expect": "ok", "out": "14 60 5 Some(1) Some(5) Some(5)\n31415 true\nfalse Some(4) Some(2)\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-017",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4, 5, 6];\n    let w = vec![10, 20, 30];\n    let z: Vec<(i32, i32)> = v.iter().copied().zip(w.iter().copied()).collect();\n    let r: Vec<i32> = v.iter().rev().copied().collect();\n    let t: Vec<i32> = v.iter().skip(1).take(3).copied().collect();\n    let tw: Vec<i32> = v.iter().take_while(|x| **x < 4).copied().collect();\n    let sw: Vec<i32> = v.iter().skip_while(|x| **x < 4).copied().collect();\n    println!(\"{:?} {:?} {:?} {:?} {:?}\", z, r, t, tw, sw);\n}\n",
+    "expect": "ok", "out": "[(1, 10), (2, 20), (3, 30)] [6, 5, 4, 3, 2, 1] [2, 3, 4] [1, 2, 3] [4, 5, 6]\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-018",
+    "src": "fn main() {\n    let sq: Vec<i32> = (1..4).map(|x| x * x).collect();\n    let t: i32 = (1..=4).product();\n    let r: Vec<i32> = (0..5).rev().collect();\n    println!(\"{:?} {} {:?}\", sq, t, r);\n}\n",
+    "expect": "ok", "out": "[1, 4, 9] 24 [4, 3, 2, 1, 0]\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-019",
+    "src": "fn total(v: &[i32]) -> i32 {\n    v.iter().sum()\n}\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{} {}\", total(&a), total(&a[1..]));\n}\n\n",
+    "expect": "ok", "out": "6 5\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-020",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let r: String = s.chars().rev().collect();\n    println!(\"{} {}\", r, s.chars().count());\n}\n",
+    "expect": "ok", "out": "olleh 5\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-021",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let m: HashMap<i32, i32> = (1..4).map(|x| (x, x * x)).collect();\n    let mut ks: Vec<i32> = m.keys().copied().collect();\n    ks.sort();\n    let t: i32 = m.values().sum();\n    println!(\"{:?} {} {:?}\", ks, t, m.get(&3));\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] 14 Some(9)\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-022",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let mut it = v.iter();\n    println!(\"{:?} {:?} {:?}\", it.next(), it.next(), it.next());\n}\n",
+    "expect": "ok", "out": "Some(1) Some(2) None\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-023",
+    "src": "fn main() {\n    let names = vec![String::from(\"ab\"), String::from(\"c\")];\n    for n in names.iter().map(|s| s.len()) {\n        println!(\"{}\", n);\n    }\n}\n",
+    "expect": "ok", "out": "2\n1\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-024",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\"), String::from(\"bb\")];\n    let w: Vec<usize> = v.into_iter().map(|s| s.len()).collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-025",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let first = v.iter().next().copied();\n    v.push(3);\n    println!(\"{:?}\", first);\n}\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-026",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    v.iter().for_each(|x| v.push(*x));\n}\n",
+    "expect": {"code": "E0502", "line": 3},
+    "why": "closures unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "closures-027",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| x > 1).count();\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "why": "closures unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "closures-028",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| x == 2).count();\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "closures unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "closures-029",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let t = v.iter().fold(0, |a| a);\n}\n",
+    "expect": {"code": "E0593", "line": 3},
+    "why": "closures unit test: rustc reports E0593", "pr": "unit"
+  },
+  {
+    "id": "closures-030",
+    "src": "fn main() {\n    let o: Option<i32> = Some(4);\n    let n: Option<i32> = None;\n    println!(\"{:?} {:?} {}\", o.map(|x| x + 1), o.and_then(|x| if x > 3 { Some(x * 2) } else { None }), n.unwrap_or_else(|| 99));\n    println!(\"{:?} {:?} {:?}\", o.filter(|x| *x > 9), o.ok_or_else(|| 0), o.map_or(0, |x| x * 3));\n}\n",
+    "expect": "ok", "out": "Some(5) Some(8) 99\nNone Ok(4) 12\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-031",
+    "src": "fn parse(s: &str) -> Result<i32, String> {\n    if s == \"1\" { Ok(1) } else { Err(String::from(\"bad\")) }\n}\nfn main() {\n    println!(\"{:?} {:?} {}\", parse(\"1\").map(|x| x + 1), parse(\"x\").map_err(|m| m.len()), parse(\"x\").unwrap_or_else(|m| m.len() as i32));\n}\n\n",
+    "expect": "ok", "out": "Ok(2) Err(3) 3\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-032",
+    "src": "fn main() {\n    let mut v = vec![1.5, 0.5];\n    v.sort_by_key(|x| *x);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "closures unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "closures-033",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<String, i32> = HashMap::new();\n    *m.entry(String::from(\"a\")).or_insert_with(|| { println!(\"made\"); 5 }) += 1;\n    *m.entry(String::from(\"a\")).or_insert_with(|| { println!(\"again\"); 100 }) += 1;\n    println!(\"{:?}\", m.get(\"a\"));\n}\n",
+    "expect": "ok", "out": "made\nSome(7)\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-034",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let mut t = 0;\n    for x in v.iter() {\n        t += x;\n    }\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-035",
+    "src": "fn main() {\n    let f = || { let a: u8 = 255; a + 1 };\n    println!(\"{}\", f());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 2},
+    "why": "closures unit test: rustc reports arithmetic_overflow", "pr": "unit"
+  },
+  {
+    "id": "closures-036",
+    "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![1, 2];\n    let n = b.iter().map(|x| { println!(\"b{}\", x); *x }).zip(a.iter()).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "b1\nb2\n2\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-037",
+    "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![1, 2];\n    let n = b.iter().map(|x| { println!(\"b{}\", x); *x }).zip(a.iter().map(|x| { println!(\"a{}\", x); *x })).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "b1\na1\nb2\na2\n2\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-038",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let mut f = || v.push(2);\n    v.push(1);\n    f();\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "why": "closures unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "closures-039",
+    "src": "fn make() -> impl Fn() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n\n",
+    "expect": {"code": "E0594", "line": 3},
+    "why": "closures unit test: rustc reports E0594", "pr": "unit"
+  },
+  {
+    "id": "closures-040",
+    "src": "fn make() -> impl FnMut() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-041",
+    "src": "fn make() -> impl Fn() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n\n",
+    "expect": {"code": "E0507", "line": 3},
+    "why": "closures unit test: rustc reports E0507", "pr": "unit"
+  },
+  {
+    "id": "closures-042",
+    "src": "fn make() -> impl FnMut() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n\n",
+    "expect": {"code": "E0507", "line": 3},
+    "why": "closures unit test: rustc reports E0507", "pr": "unit"
+  },
+  {
+    "id": "closures-043",
+    "src": "fn make() -> impl FnOnce() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n\n",
+    "expect": "ok", "out": "\"x\"\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-044",
+    "src": "fn make() -> impl Fn() -> i32 {\n    let mut c = 0;\n    return move || { c += 1; c };\n}\nfn main() {\n    println!(\"{}\", make()());\n}\n\n",
+    "expect": {"code": "E0594", "line": 3},
+    "why": "closures unit test: rustc reports E0594", "pr": "unit"
+  },
+  {
+    "id": "closures-045",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    println!(\"{}\", apply(|| 5));\n}\n\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-046",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    let n = 3;\n    println!(\"{}\", apply(|| n));\n}\n\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-047",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    let n = 3;\n    println!(\"{}\", apply(move || n));\n}\n\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-048",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(|| n.len() as i32));\n}\n\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-049",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(move || n.len() as i32));\n}\n\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "closures unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "closures-050",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 { f() + f() }\nfn main() {\n    let mut n = 3;\n    println!(\"{}\", apply(|| { n += 1; n }));\n}\n\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "closures unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "closures-051",
+    "src": "fn bump<F: FnMut() -> i32>(mut f: F) -> i32 { f() + f() }\nfn main() {\n    let mut n = 0;\n    let f = move || { n += 1; n };\n    println!(\"{} {}\", bump(f), bump(f));\n}\n\n",
+    "expect": "ok", "out": "3 3\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-052",
+    "src": "fn main() {\n    let y = 1;\n    let f = |x| x + y;\n    println!(\"{}\", f(1));\n    println!(\"{}\", f(1.5));\n}\n",
+    "expect": {"code": "E0308", "line": 5},
+    "why": "closures unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "closures-053",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 { f(1) }\nfn main() {\n    println!(\"{}\", apply(|x: i64| x));\n}\n\n",
+    "expect": {"code": "E0631", "line": 3},
+    "why": "closures unit test: rustc reports E0631", "pr": "unit"
+  },
+  {
+    "id": "closures-054",
+    "src": "fn main() {\n    let mut v = vec![3, 1];\n    let f = |x: i32| { println!(\"f{}\", x); x };\n    v.retain(|n| f(*n) > 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "f3\nf1\n[3]\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-055",
+    "src": "fn main() {\n    let tally = |word: &str| word.len();\n    println!(\"{}\", tally(\"anemone\"));\n    println!(\"{}\", tally(\"tun\"));\n}\n",
+    "expect": "ok", "out": "7\n3\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-056",
+    "src": "fn main() {\n    let mut log = String::from(\"moon\");\n    let show = || println!(\"{}\", log);\n    show();\n    log.push_str(\" rising\");\n    println!(\"{}\", log);\n}\n",
+    "expect": "ok", "out": "moon\nmoon rising\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-057",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut tick = || count += 1;\n    for _ in 0..5 {\n        tick();\n    }\n    println!(\"{}\", count);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-058",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {\n    f(x)\n}\n\n\nfn main() {\n    let bonus = 5;\n    println!(\"{}\", apply(|n: i32| n + bonus, 4));\n    println!(\"{}\", apply(|n: i32| n * 2, 10));\n}\n",
+    "expect": "ok", "out": "9\n20\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-059",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {\n    if x == 4 {\n        7\n    } else {\n        20\n    }\n}\n\n\nfn main() {\n    let bonus = 5;\n    println!(\"{}\", apply(|n: i32| n + bonus, 4));\n    println!(\"{}\", apply(|n: i32| n * 2, 10));\n}\n",
+    "expect": "ok", "out": "7\n20\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-060",
+    "src": "fn run_twice<F: FnMut()>(mut f: F) {\n    f();\n    f();\n}\n\nfn main() {\n    let mut count = 10;\n    let bump = || count += 1;\n    run_twice(bump);\n    println!(\"{}\", count);\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-061",
+    "src": "fn adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n\n}\n\n\nfn main() {\n    let add3 = adder(5);\n    println!(\"{}\", add3(4));\n    println!(\"{}\", adder(10)(1));\n}\n",
+    "expect": "ok", "out": "9\n11\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-062",
+    "src": "fn adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| if n == 3 { x + 3 } else { x + 10 }\n}\n\n\nfn main() {\n    let add3 = adder(5);\n    println!(\"{}\", add3(4));\n    println!(\"{}\", adder(10)(1));\n}\n",
+    "expect": "ok", "out": "14\n11\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-063",
+    "src": "fn main() {\n    let shells = vec![1, 3];\n    let doubled = shells.iter().map(|n| {\n        println!(\"doubling {}\", n);\n        n * 2\n    });\n    println!(\"before\");\n    let list: Vec<i32> = doubled.collect();\n    println!(\"{}\", list.len());\n}\n",
+    "expect": "ok", "out": "before\ndoubling 1\ndoubling 3\n2\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-064",
+    "src": "fn main() {\n    let shells = vec![10, 2, 7];\n    let big: Vec<i32> = shells.iter().filter(|n| **n > 6).copied().collect();\n    println!(\"{:?}\", big);\n    let total: i32 = big.iter().sum();\n    println!(\"{}\", total);\n}\n",
+    "expect": "ok", "out": "[10, 7]\n17\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "closures-065",
+    "src": "fn tidy(sizes: &mut Vec<i32>) {\n    sizes.retain(|s| *s > 4);\n    sizes.sort_by_key(|s| -*s);\n}\n\nfn top_double(sizes: &Vec<i32>) -> i32 {\n    sizes.first().map(|s| s * 2).unwrap_or_else(|| 0)\n}\n\n\nfn main() {\n    let mut sizes = vec![1, 7, 4, 6];\n    tidy(&mut sizes);\n    println!(\"{:?}\", sizes);\n    println!(\"{}\", top_double(&sizes));\n    let none: Vec<i32> = vec![];\n    println!(\"{}\", top_double(&none));\n}\n",
+    "expect": "ok", "out": "[7, 6]\n14\n0\n", "err": "", "exit": 0,
+    "why": "closures unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-001",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    println!(\"{:?} {:#?}\", m, m);\n}\n\n",
+    "expect": "ok", "out": "{} {}\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-002",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 2);\n    println!(\"{:?} {:#?}\", m, m);\n}\n\n",
+    "expect": "ok", "out": "{1: 2} {\n    1: 2,\n}\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-003",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 10);\n    m.insert(2, 20);\n    m.insert(3, 30);\n    let mut ks = Vec::new();\n    for k in m.keys() {\n        ks.push(*k);\n    }\n    ks.sort();\n    println!(\"{:?}\", ks);\n}\n\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-004",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 10);\n    m.insert(2, 20);\n    m.insert(3, 30);\n    let mut t = 0;\n    for (_, v) in &m {\n        t += *v;\n    }\n    println!(\"{}\", t);\n}\n\n",
+    "expect": "ok", "out": "60\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-005",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for (_, _) in &m {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-006",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for (_, _) in &mut m {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-007",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for (_, _) in m {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-008",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.keys() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-009",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.values() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-010",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.values_mut() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-011",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.iter() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-012",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.iter_mut() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-013",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    for _ in m.into_iter() {}\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-014",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    let mut n: HashMap<i32, i32> = HashMap::new();\n    n.extend(m);\n}\n\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-015",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    println!(\"{}\", m.len());\n}\n\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-016",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    println!(\"{:?}\", m.get(&1));\n}\n\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-017",
+    "src": "use std::collections::HashMap;\nstruct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    m.insert(2, 2);\n    let n = m.clone();\n    println!(\"{}\", n == m);\n}\n\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-018",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 2);\n    println!(\"{:?}\", m);\n}\n\n",
+    "expect": "ok", "out": "{1: 2}\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-019",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    for x in &v {\n        print!(\"{} \", x);\n    }\n    for x in v.iter() {\n        print!(\"{} \", *x + 1);\n    }\n    for x in v.into_iter() {\n        print!(\"{} \", x * 2);\n    }\n    println!(\"\");\n}\n",
+    "expect": "ok", "out": "1 2 3 2 3 4 2 4 6 \n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-020",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    for x in &mut v {\n        *x += 10;\n    }\n    for x in v.iter_mut() {\n        *x *= 2;\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[22, 24, 26]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-021",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\"), String::from(\"b\"), String::from(\"c\")];\n    let mut s = String::new();\n    let mut n = 0;\n    for t in v {\n        n += 1;\n        if n == 2 {\n            continue;\n        }\n        s.push_str(&t);\n    }\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ac\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-022",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\")), (2, String::from(\"b\"))];\n    for (n, s) in &v {\n        println!(\"{} {}\", n, s);\n    }\n    for (n, s) in v {\n        if n == 2 {\n            break;\n        }\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "1 a\n2 b\na\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-023",
+    "src": "struct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let v = vec![D(1), D(2), D(3)];\n    for d in v {\n        println!(\"got {}\", d.0);\n        if d.0 == 2 {\n            break;\n        }\n    }\n    println!(\"end\");\n}\n\n",
+    "expect": "ok", "out": "got 1\ndrop 1\ngot 2\ndrop 2\ndrop 3\nend\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-024",
+    "src": "struct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let v = vec![D(1), D(2)];\n    for _ in v {\n        println!(\"turn\");\n    }\n}\n\n",
+    "expect": "ok", "out": "turn\ndrop 1\nturn\ndrop 2\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-025",
+    "src": "struct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let v = vec![D(1), D(2), D(3)];\n    let z = vec![0];\n    for d in v {\n        println!(\"got {}\", d.0);\n        println!(\"{}\", z[d.0 as usize]);\n    }\n}\n\n",
+    "expect": "ok", "out": "got 1\ndrop 1\ndrop 2\ndrop 3\n", "err": "\nthread 'main' panicked at src/main.rs:12:25:\nindex out of bounds: the len is 1 but the index is 1\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-026",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 10);\n    m.insert(2, 20);\n    m.insert(3, 30);\n    let mut t = 0;\n    for (k, v) in &m {\n        t += *k * *v;\n    }\n    for (_, v) in &mut m {\n        *v += 1;\n    }\n    for v in m.values_mut() {\n        *v += 1;\n    }\n    for k in m.keys() {\n        t += *k;\n    }\n    for v in m.values() {\n        t += *v;\n    }\n    println!(\"{} {:?}\", t, m.get(&2));\n}\n\n",
+    "expect": "ok", "out": "212 Some(22)\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-027",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<String, Vec<i32>> = HashMap::new();\n    m.insert(String::from(\"a\"), vec![1, 2]);\n    let mut n = 0;\n    for (k, v) in m {\n        n += k.len() + v.len();\n    }\n    println!(\"{}\", n);\n}\n\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-028",
+    "src": "fn main() {\n    let mut t = 0;\n    for i in 0..4 {\n        t += i;\n    }\n    for i in 1..=3 {\n        t += i;\n    }\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-029",
+    "src": "struct S {\n    items: Vec<i32>,\n    count: i32,\n}\nimpl S {\n    fn go(&mut self) {\n        for x in &self.items {\n            self.count += *x;\n        }\n        for x in self.items.iter_mut() {\n            *x += 1;\n        }\n    }\n}\nfn show(v: &Vec<i32>) {\n    for x in v {\n        print!(\"{} \", x);\n    }\n}\nfn bump(v: &mut Vec<i32>) {\n    for x in v {\n        *x += 1;\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], count: 0 };\n    s.go();\n    bump(&mut s.items);\n    show(&s.items);\n    println!(\"{}\", s.count);\n}\n\n",
+    "expect": "ok", "out": "3 4 3\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-030",
+    "src": "fn main() {\n    let mut v = vec![1];\n    for x in &v {\n        v.push(*x);\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-031",
+    "src": "fn main() {\n    let mut v = vec![1];\n    for x in v.iter() {\n        v.clear();\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-032",
+    "src": "fn main() {\n    let mut v = vec![1];\n    for x in &mut v {\n        v.push(*x);\n    }\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-033",
+    "src": "fn main() {\n    let mut v = vec![1];\n    for x in &v {\n        for y in &mut v {\n            *y += *x;\n        }\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-034",
+    "src": "fn main() {\n    let mut v = vec![1];\n    for x in &v {\n        println!(\"{}\", x);\n    }\n    v.push(2);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "1\n[1, 2]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-035",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 1);\n    for (k, v) in &m {\n        m.insert(*k + 1, *v);\n    }\n}\n\n",
+    "expect": {"code": "E0502", "line": 6},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-036",
+    "src": "fn f(v: &mut Vec<i32>) {\n    for x in v.iter() {\n        v.push(*x);\n    }\n}\nfn main() {}\n",
+    "expect": {"code": "E0502", "line": 3},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-037",
+    "src": "fn f(v: &mut Vec<i32>) {\n    for x in v.iter_mut() {\n        v.push(*x);\n    }\n}\nfn main() {}\n",
+    "expect": {"code": "E0499", "line": 3},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-038",
+    "src": "fn f(v: &mut Vec<i32>) {\n    for x in v {\n        println!(\"{}\", x);\n    }\n    v.push(1);\n}\nfn main() {}\n",
+    "expect": {"code": "E0382", "line": 5},
+    "why": "iter unit test: rustc reports E0382", "pr": "unit"
+  },
+  {
+    "id": "iter-039",
+    "src": "fn f(v: &mut Vec<i32>) {\n    for x in v.iter_mut() {\n        *x += 1;\n    }\n    v.push(0);\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-040",
+    "src": "fn main() {\n    let v = vec![1];\n    for x in v {}\n    println!(\"{}\", v.len());\n}\n",
+    "expect": {"code": "E0382", "line": 4},
+    "why": "iter unit test: rustc reports E0382", "pr": "unit"
+  },
+  {
+    "id": "iter-041",
+    "src": "fn main() {\n    let v = vec![1];\n    for x in &mut v {\n        *x += 1;\n    }\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "why": "iter unit test: rustc reports E0596", "pr": "unit"
+  },
+  {
+    "id": "iter-042",
+    "src": "fn main() {\n    let v = vec![(1, 2)];\n    for (a, b) in &v {\n        println!(\"{} {}\", a, b);\n    }\n}\n",
+    "expect": "ok", "out": "1 2\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-043",
+    "src": "fn main() {\n    let v = vec![Some(1), None];\n    for Some(x) in v {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0005", "line": 3},
+    "why": "iter unit test: rustc reports E0005", "pr": "unit"
+  },
+  {
+    "id": "iter-044",
+    "src": "fn main() {\n    let mut g = vec![vec![1, 2], vec![3, 4]];\n    g[1][0] += 10;\n    g[0][1] = 7;\n    let r = &g[1];\n    println!(\"{:?} {} {}\", r, g[0][1], g.len());\n}\n",
+    "expect": "ok", "out": "[13, 4] 7 2\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-045",
+    "src": "fn main() {\n    let mut v = vec![1, 1, 0, 0];\n    for i in 2..v.len() {\n        v[i] = v[i - 1] + v[i - 2];\n    }\n    v[0] += v[1];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[2, 1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-046",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let r = &v[0];\n    v.push(2);\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-047",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let a = &mut v[0];\n    let b = &mut v[1];\n    *a += 1;\n    *b += 1;\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-048",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let r = &v[0];\n    v[1] = 5;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-049",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let r = &v[0];\n    println!(\"{}\", r);\n    v[1] = 5;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "1\n[1, 5]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-050",
+    "src": "fn main() {\n    let v = vec![1];\n    v[0] = 5;\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "why": "iter unit test: rustc reports E0596", "pr": "unit"
+  },
+  {
+    "id": "iter-051",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\")];\n    let s = v[0];\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "why": "iter unit test: rustc reports E0507", "pr": "unit"
+  },
+  {
+    "id": "iter-052",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let x = v[7];\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:14:\nindex out of bounds: the len is 3 but the index is 7\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-053",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    v[7] += 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:6:\nindex out of bounds: the len is 3 but the index is 7\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-054",
+    "src": "fn main() {\n    let g = vec![vec![1, 2], vec![3]];\n    let n = g[1][1];\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:17:\nindex out of bounds: the len is 1 but the index is 1\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-055",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let r = &v;\n    let x = r[7];\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:14:\nindex out of bounds: the len is 3 but the index is 7\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-056",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let r = &v[1..9];\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:15:\nrange end index 9 out of range for slice of length 3\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-057",
+    "src": "struct D(i32);\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let mut v = vec![D(1)];\n    v[3] = D(2);\n}\n\n",
+    "expect": "ok", "out": "drop 2\ndrop 1\n", "err": "\nthread 'main' panicked at src/main.rs:9:6:\nindex out of bounds: the len is 1 but the index is 3\n", "exit": 101,
+    "why": "iter unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "iter-058",
+    "src": "fn sum(xs: &[i32]) -> i32 {\n    let mut t = 0;\n    for i in 0..xs.len() {\n        t += xs[i];\n    }\n    t\n}\nfn main() {\n    let v = vec![1, 2, 3];\n    println!(\"{} {}\", sum(&v), sum(&v[1..]));\n}\n\n",
+    "expect": "ok", "out": "6 5\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-059",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let s = &v[1..];\n    v.push(4);\n    println!(\"{}\", s.len());\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-060",
+    "src": "fn main() {\n    let mut v: Vec<i32> = Vec::new();\n    println!(\"{:?} {:?} {:?}\", v.pop(), v.get(3), v.first());\n    let mut w = vec![3, 1, 2];\n    w.sort();\n    println!(\"{:?} {}\", w, w.contains(&2));\n    w.reverse();\n    w.truncate(2);\n    w.swap(0, 1);\n    w.insert(1, 9);\n    let r = w.remove(0);\n    println!(\"{:?} {} {:?} {:?}\", w, r, w.last(), w.get(0));\n    w.extend(vec![7]);\n    w.extend([8, 9]);\n    w.clear();\n    println!(\"{} {}\", w.is_empty(), v.len());\n}\n",
+    "expect": "ok", "out": "None None None\n[1, 2, 3] true\n[9, 3] 2 Some(3) Some(9)\ntrue 0\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-061",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    if let Some(x) = v.get_mut(1) {\n        *x += 40;\n    }\n    let a = v.get(1).copied();\n    let b = v.first().copied().unwrap_or(0);\n    let s = vec![String::from(\"x\")];\n    let c = s.first().cloned();\n    let p = v.pop();\n    println!(\"{:?} {:?} {} {:?} {:?}\", v, a, b, c, p);\n}\n",
+    "expect": "ok", "out": "[1] Some(42) 1 Some(\"x\") Some(42)\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-062",
+    "src": "fn main() {\n    let mut v: Vec<f64> = vec![1.5, 0.5];\n    v.sort();\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "iter unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "iter-063",
+    "src": "struct S;\nfn main() {\n    let v = vec![S];\n    println!(\"{}\", v.contains(&S));\n}\n\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "iter unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "iter-064",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let w = vec![2];\n    v.extend(w);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0382", "line": 5},
+    "why": "iter unit test: rustc reports E0382", "pr": "unit"
+  },
+  {
+    "id": "iter-065",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let w = vec![2];\n    v.extend(w);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-066",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<String, i32> = HashMap::new();\n    m.insert(String::from(\"a\"), 1);\n    let k = String::from(\"b\");\n    println!(\"{:?} {:?} {}\", m.get(\"a\"), m.get(&k), m.contains_key(\"a\"));\n    *m.entry(String::from(\"a\")).or_insert(0) += 5;\n    *m.entry(String::from(\"c\")).or_insert(7) += 1;\n    if let Some(x) = m.get_mut(\"a\") {\n        *x += 1;\n    }\n    println!(\"{:?} {:?} {}\", m.get(\"a\"), m.get(\"c\"), m.len());\n    println!(\"{:?} {:?}\", m.remove(\"a\"), m.remove(\"zz\"));\n    let mut n: HashMap<String, i32> = HashMap::new();\n    n.extend(m);\n    n.extend(vec![(String::from(\"q\"), 1)]);\n    println!(\"{}\", n.len());\n    n.clear();\n    println!(\"{}\", n.is_empty());\n}\n\n",
+    "expect": "ok", "out": "Some(1) None true\nSome(7) Some(8) 2\nSome(7) None\n2\ntrue\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-067",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, Vec<i32>> = HashMap::new();\n    m.entry(1).or_default().push(10);\n    m.entry(1).or_default().push(20);\n    println!(\"{:?}\", m.get(&1));\n}\n\n",
+    "expect": "ok", "out": "Some([10, 20])\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-068",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    let c = m.entry(1).or_insert(0);\n    m.insert(2, 2);\n    *c += 1;\n}\n\n",
+    "expect": {"code": "E0499", "line": 5},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-069",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let mut m: HashMap<f64, i32> = HashMap::new();\n    let x = m.get(&1.0);\n}\n\n",
+    "expect": {"code": "E0599", "line": 4},
+    "why": "iter unit test: rustc reports E0599", "pr": "unit"
+  },
+  {
+    "id": "iter-070",
+    "src": "use std::collections::HashMap;\nfn main() {\n    let v = vec![1, 2];\n    let mut m: HashMap<i32, i32> = HashMap::new();\n    m.insert(1, 2);\n    println!(\"{} {} {:?}\", v.contains(&2), v.contains(&9), m.get(&1));\n}\n\n",
+    "expect": "ok", "out": "true false Some(2)\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-071",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    v.push(v.len());\n    v.push(v[0] + v[1]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 2, 3]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-072",
+    "src": "struct C {\n    n: i32,\n}\nimpl C {\n    fn get(&self) -> i32 {\n        self.n\n    }\n    fn set(&mut self, n: i32) {\n        self.n = n;\n    }\n}\nfn main() {\n    let mut c = C { n: 4 };\n    c.set(c.get() + 1);\n    println!(\"{}\", c.get());\n}\n\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-073",
+    "src": "struct S {\n    items: Vec<i32>,\n    total: i32,\n}\nimpl S {\n    fn g(&mut self) {\n        let n = self.items.len() - 1;\n        self.items[n] = 5;\n        self.items[0] = self.items[n];\n        self.total = 1;\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], total: 0 };\n    s.g();\n    println!(\"{:?} {}\", s.items, s.total);\n}\n",
+    "expect": "ok", "out": "[5, 5] 1\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-074",
+    "src": "struct S {\n    items: Vec<i32>,\n    total: i32,\n}\nimpl S {\n    fn peek(&self) -> i32 {\n        self.total\n    }\n    fn g(&mut self) {\n        for x in &self.items {\n            self.items.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], total: 0 };\n    s.g();\n    println!(\"{} {:?}\", s.total, s.items);\n}\n",
+    "expect": {"code": "E0502", "line": 11},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-075",
+    "src": "struct S {\n    items: Vec<i32>,\n    total: i32,\n}\nimpl S {\n    fn peek(&self) -> i32 {\n        self.total\n    }\n    fn g(&mut self) {\n        for x in &mut self.items {\n            self.items.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], total: 0 };\n    s.g();\n    println!(\"{} {:?}\", s.total, s.items);\n}\n",
+    "expect": {"code": "E0499", "line": 11},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-076",
+    "src": "struct S {\n    items: Vec<i32>,\n    total: i32,\n}\nimpl S {\n    fn peek(&self) -> i32 {\n        self.total\n    }\n    fn g(&mut self) {\n        for x in &self.items {\n            self.total += *x;\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], total: 0 };\n    s.g();\n    println!(\"{} {:?}\", s.total, s.items);\n}\n",
+    "expect": "ok", "out": "3 [1, 2]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-077",
+    "src": "struct S {\n    items: Vec<i32>,\n    total: i32,\n}\nimpl S {\n    fn peek(&self) -> i32 {\n        self.total\n    }\n    fn g(&mut self) {\n        for x in &mut self.items {\n            *x += self.total;\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], total: 0 };\n    s.g();\n    println!(\"{} {:?}\", s.total, s.items);\n}\n",
+    "expect": "ok", "out": "0 [1, 2]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-078",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    v.swap(0, v.len() - 1);\n}\n",
+    "expect": {"code": "E0502", "line": 3},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-079",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    if let Some(x) = v.get_mut(v.len() - 1) {\n        *x = 0;\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 3},
+    "why": "iter unit test: rustc reports E0502", "pr": "unit"
+  },
+  {
+    "id": "iter-080",
+    "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    v.push(v.len());\n    v.insert(v.len(), 0);\n    v.truncate(v.len() - 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 2]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-081",
+    "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    let r = &v;\n    v.push(r.len());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 2]\n", "err": "", "exit": 0,
+    "why": "iter unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "iter-082",
+    "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    let r = &mut v;\n    v.push(r.len());\n    r.push(1);\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "why": "iter unit test: rustc reports E0499", "pr": "unit"
+  },
+  {
+    "id": "iter-083",
+    "src": "fn main() {\n    let v = vec![7u32];\n    let c = true;\n    let n: u32 = if c { &v[0] } else { 0 };\n}\n",
+    "expect": {"code": "E0308", "line": 4},
+    "why": "iter unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "iter-084",
+    "src": "fn main() {\n    let c = true;\n    let x = if c { 1 } else { \"x\" };\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "why": "iter unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "traits-001",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct Dog;\nimpl Speak for Dog {\n    fn name(&self) -> String { String::from(\"dog\") }\n    fn speak(&self) -> String { String::from(\"woof\") }\n}\nstruct Cat;\nimpl Speak for Cat {\n    fn name(&self) -> String { String::from(\"cat\") }\n    fn speak(&self) -> String { String::from(\"meow\") }\n    fn intro(&self) -> String { String::from(\"the cat ignores you\") }\n}\nfn main() {\n    println!(\"{}\", Dog.intro());\n    println!(\"{}\", Cat.intro());\n}\n",
+    "expect": "ok", "out": "dog says woof\nthe cat ignores you\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-002",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct Dog;\nimpl Speak for Dog {\n    fn name(&self) -> String { String::from(\"dog\") }\n    fn speak(&self) -> String { String::from(\"woof\") }\n}\nfn talk<T: Speak>(x: &T) -> String { x.speak() }\nfn twice(x: &impl Speak) -> String { format!(\"{}{}\", x.speak(), x.speak()) }\nfn calm<T>(x: &T) -> String where T: Speak { x.name() }\nfn main() {\n    let d = Dog;\n    println!(\"{} {} {}\", talk(&d), twice(&d), calm(&d));\n    println!(\"{}\", Speak::speak(&d));\n}\n",
+    "expect": "ok", "out": "woof woofwoof dog\nwoof\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-003",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct D;\nimpl Speak for D {\n    fn name(&self) -> String { String::new() }\n}\nfn main() {}\n",
+    "expect": {"code": "E0046", "line": 9},
+    "why": "traits unit test: rustc reports E0046", "pr": "unit"
+  },
+  {
+    "id": "traits-004",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct D;\nimpl Speak for D {\n    fn name(&self) -> String { String::new() }\n    fn speak(&self) -> String { String::new() }\n    fn roll(&self) {}\n}\nfn main() {}\n",
+    "expect": {"code": "E0407", "line": 12},
+    "why": "traits unit test: rustc reports E0407", "pr": "unit"
+  },
+  {
+    "id": "traits-005",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct Dog;\nimpl Speak for Dog {\n    fn name(&self) -> String { String::from(\"dog\") }\n    fn speak(&self) -> String { String::from(\"woof\") }\n}\nimpl Speak for Dog {\n    fn name(&self) -> String { String::new() }\n    fn speak(&self) -> String { String::new() }\n}\nfn main() {}\n",
+    "expect": {"code": "E0119", "line": 13},
+    "why": "traits unit test: rustc reports E0119", "pr": "unit"
+  },
+  {
+    "id": "traits-006",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct S;\nimpl T for S {\n    fn f(&self) -> bool { true }\n}\nfn main() {}\n",
+    "expect": {"code": "E0053", "line": 6},
+    "why": "traits unit test: rustc reports E0053", "pr": "unit"
+  },
+  {
+    "id": "traits-007",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct S;\nimpl T for S {\n    fn f(&self, n: i32) -> i32 { n }\n}\nfn main() {}\n",
+    "expect": {"code": "E0050", "line": 6},
+    "why": "traits unit test: rustc reports E0050", "pr": "unit"
+  },
+  {
+    "id": "traits-008",
+    "src": "struct S;\nimpl Nope for S {}\nfn main() {}\n",
+    "expect": {"code": "E0405", "line": 2},
+    "why": "traits unit test: rustc reports E0405", "pr": "unit"
+  },
+  {
+    "id": "traits-009",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct Dog;\nimpl Speak for Dog {\n    fn name(&self) -> String { String::from(\"dog\") }\n    fn speak(&self) -> String { String::from(\"woof\") }\n}\nstruct Cat;\nfn main() {\n    let c = Cat;\n    println!(\"{}\", c.speak());\n}\n",
+    "expect": {"code": "E0599", "line": 16},
+    "why": "traits unit test: rustc reports E0599", "pr": "unit"
+  },
+  {
+    "id": "traits-010",
+    "src": "trait Speak {\n    fn name(&self) -> String;\n    fn speak(&self) -> String;\n    fn intro(&self) -> String {\n        format!(\"{} says {}\", self.name(), self.speak())\n    }\n}\nstruct Dog;\nimpl Speak for Dog {\n    fn name(&self) -> String { String::from(\"dog\") }\n    fn speak(&self) -> String { String::from(\"woof\") }\n}\nstruct Cat;\nfn talk<T: Speak>(x: &T) -> String { x.speak() }\nfn main() {\n    let c = Cat;\n    println!(\"{}\", talk(&c));\n}\n",
+    "expect": {"code": "E0277", "line": 17},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-011",
+    "src": "fn largest<T: PartialOrd + Copy>(list: &[T]) -> T {\n    let mut big = list[0];\n    for i in 0..list.len() {\n        if list[i] > big { big = list[i]; }\n    }\n    big\n}\nfn main() {\n    let a = [3, 9, 2];\n    let b = [1.5, 0.5];\n    println!(\"{}\", largest(&a));\n    println!(\"{}\", largest(&b));\n}\n",
+    "expect": "ok", "out": "9\n1.5\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-012",
+    "src": "fn big<T>(a: T, b: T) -> bool { a > b }\nfn main() {}\n",
+    "expect": {"code": "E0369", "line": 1},
+    "why": "traits unit test: rustc reports E0369", "pr": "unit"
+  },
+  {
+    "id": "traits-013",
+    "src": "fn add<T>(a: T, b: T) -> T { a + b }\nfn main() {}\n",
+    "expect": {"code": "E0369", "line": 1},
+    "why": "traits unit test: rustc reports E0369", "pr": "unit"
+  },
+  {
+    "id": "traits-014",
+    "src": "fn show<T>(a: T) { println!(\"{}\", a); }\nfn main() {}\n",
+    "expect": {"code": "E0277", "line": 1},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-015",
+    "src": "fn dup<T>(a: T) -> T { a.clone() }\nfn main() {}\n",
+    "expect": {"code": "E0599", "line": 1},
+    "why": "traits unit test: rustc reports E0599", "pr": "unit"
+  },
+  {
+    "id": "traits-016",
+    "src": "fn dup<T>(a: T) -> (T, T) { (a, a) }\nfn main() {}\n",
+    "expect": {"code": "E0382", "line": 1},
+    "why": "traits unit test: rustc reports E0382", "pr": "unit"
+  },
+  {
+    "id": "traits-017",
+    "src": "fn dup<T: Copy>(a: T) -> (T, T) { (a, a) }\nfn main() {\n    println!(\"{:?}\", dup(2));\n}\n",
+    "expect": "ok", "out": "(2, 2)\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-018",
+    "src": "fn eq<T: PartialEq>(a: T, b: T) -> bool { a == b }\nstruct Q;\nfn main() {\n    println!(\"{}\", eq(Q, Q));\n}\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-019",
+    "src": "fn dup<T: Copy>(a: T) -> (T, T) { (a, a) }\nfn main() {\n    let q = dup(String::from(\"x\"));\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-020",
+    "src": "fn f<T: Nope>(x: T) {}\nfn main() {}\n",
+    "expect": {"code": "E0405", "line": 1},
+    "why": "traits unit test: rustc reports E0405", "pr": "unit"
+  },
+  {
+    "id": "traits-021",
+    "src": "fn show<T: Display>(x: T) { println!(\"{}\", x); }\nfn main() {}\n",
+    "expect": {"code": "E0405", "line": 1},
+    "why": "traits unit test: rustc reports E0405", "pr": "unit"
+  },
+  {
+    "id": "traits-022",
+    "src": "use std::fmt;\nstruct Point { x: i32, y: i32 }\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn show<T: fmt::Display>(x: T) -> String { format!(\"[{}]\", x) }\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{}\", p);\n    println!(\"{:>10}|\", p);\n    let s = p.to_string();\n    println!(\"{} {}\", s, s.len());\n    println!(\"{}\", show(p));\n}\n",
+    "expect": "ok", "out": "(1, -2)\n(1, -2)|\n(1, -2) 7\n[(1, -2)]\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-023",
+    "src": "struct P;\nfn main() {\n    println!(\"{}\", P);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-024",
+    "src": "use std::fmt;\nstruct Point { x: i32, y: i32 }\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn main() {\n    println!(\"{:?}\", Point { x: 1, y: 2 });\n}\n",
+    "expect": {"code": "E0277", "line": 9},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-025",
+    "src": "use std::fmt;\nstruct P;\nimpl fmt::Display for P {\n    fn fmt(&self, f: &mut fmt::Formatter) -> String { String::new() }\n}\nfn main() {}\n",
+    "expect": {"code": "E0053", "line": 4},
+    "why": "traits unit test: rustc reports E0053", "pr": "unit"
+  },
+  {
+    "id": "traits-026",
+    "src": "struct G(i32);\nimpl Drop for G {\n    fn drop(&mut self) {\n        let doubled = self.0 * 2;\n        if doubled > 2 { println!(\"big {}\", doubled); return; }\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let _a = G(1);\n    let _b = G(5);\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "end\nbig 10\ndrop 1\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-027",
+    "src": "struct G;\nimpl Drop for G { fn drop(&mut self) {} }\nfn main() {\n    let g = G;\n    g.drop();\n}\n",
+    "expect": {"code": "E0040", "line": 5},
+    "why": "traits unit test: rustc reports E0040", "pr": "unit"
+  },
+  {
+    "id": "traits-028",
+    "src": "struct G;\nimpl Drop for G { fn drop(&mut self) {} }\nimpl Drop for G { fn drop(&mut self) {} }\nfn main() {}\n",
+    "expect": {"code": "E0119", "line": 3},
+    "why": "traits unit test: rustc reports E0119", "pr": "unit"
+  },
+  {
+    "id": "traits-029",
+    "src": "#[derive(Debug)]\nenum AppError { Parse(String), Neg(i32) }\n#[derive(Debug)]\nstruct ParseFail(String);\nimpl From<ParseFail> for AppError {\n    fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) }\n}\nimpl From<i32> for AppError {\n    fn from(n: i32) -> Self { AppError::Neg(n) }\n}\nfn parse(s: &str) -> Result<i32, ParseFail> {\n    if s == \"x\" { Err(ParseFail(String::from(\"bad\"))) } else { Ok(1) }\n}\nfn neg(n: i32) -> Result<i32, i32> { if n < 0 { Err(n) } else { Ok(n) } }\nfn run(s: &str, n: i32) -> Result<i32, AppError> {\n    let a = parse(s)?;\n    let b = neg(n)?;\n    Ok(a + b)\n}\nfn main() {\n    println!(\"{:?}\", run(\"ok\", 2));\n    println!(\"{:?}\", run(\"x\", 2));\n    println!(\"{:?}\", run(\"ok\", -3));\n    println!(\"{:?}\", AppError::from(7));\n    let f: AppError = ParseFail(String::from(\"q\")).into();\n    println!(\"{:?}\", f);\n}\n",
+    "expect": "ok", "out": "Ok(3)\nErr(Parse(\"bad\"))\nErr(Neg(-3))\nNeg(7)\nParse(\"q\")\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-030",
+    "src": "#[derive(Debug)]\nenum AppError { Parse(String) }\nstruct ParseFail(String);\nfn parse(s: &str) -> Result<i32, ParseFail> { Err(ParseFail(String::from(s))) }\nfn run(s: &str) -> Result<i32, AppError> {\n    let a = parse(s)?;\n    Ok(a)\n}\nfn main() { println!(\"{:?}\", run(\"x\")); }\n",
+    "expect": {"code": "E0277", "line": 6},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-031",
+    "src": "#[derive(Debug)]\nstruct Meters(f64);\nimpl From<f64> for Meters { fn from(v: f64) -> Meters { Meters(v) } }\nfn main() {\n    let x: i32 = 5;\n    let o: Meters = x.into();\n}\n",
+    "expect": {"code": "E0277", "line": 6},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-032",
+    "src": "#[derive(Debug)]\nstruct Meters(f64);\nimpl From<f64> for Meters { fn from(v: f64) -> Meters { Meters(v) } }\nfn main() {\n    let m = Meters::from(String::from(\"a\"));\n}\n",
+    "expect": {"code": "E0277", "line": 5},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-033",
+    "src": "#[derive(Debug)]\nenum AppError { Parse(String) }\nstruct ParseFail(String);\nimpl From<ParseFail> for AppError { fn from(e: i32) -> AppError { AppError::Parse(String::new()) } }\nfn main() {}\n",
+    "expect": {"code": "E0053", "line": 4},
+    "why": "traits unit test: rustc reports E0053", "pr": "unit"
+  },
+  {
+    "id": "traits-034",
+    "src": "#[derive(Debug)]\nenum AppError { Parse(String) }\nstruct ParseFail(String);\nimpl From<ParseFail> for AppError { fn from(e: ParseFail) -> i32 { 1 } }\nfn main() {}\n",
+    "expect": {"code": "E0053", "line": 4},
+    "why": "traits unit test: rustc reports E0053", "pr": "unit"
+  },
+  {
+    "id": "traits-035",
+    "src": "#[derive(Debug)]\nenum AppError { Parse(String) }\nstruct ParseFail(String);\nimpl From<ParseFail> for AppError { fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) } }\nimpl From<ParseFail> for AppError { fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) } }\nfn main() {}\n",
+    "expect": {"code": "E0119", "line": 5},
+    "why": "traits unit test: rustc reports E0119", "pr": "unit"
+  },
+  {
+    "id": "traits-036",
+    "src": "use std::fmt::Display;\n#[derive(Debug, Clone, PartialEq)]\nstruct Pair<T> { a: T, b: T }\nimpl<T> Pair<T> {\n    fn new(a: T, b: T) -> Pair<T> { Pair { a, b } }\n    fn first(&self) -> &T { &self.a }\n    fn swap(self) -> Pair<T> { Pair { a: self.b, b: self.a } }\n}\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show_largest(&self) {\n        if self.a > self.b { println!(\"largest {}\", self.a); } else { println!(\"largest {}\", self.b); }\n    }\n}\nimpl Pair<f64> {\n    fn sum(&self) -> f64 { self.a + self.b }\n}\nfn main() {\n    let p = Pair::new(3, 9);\n    p.show_largest();\n    println!(\"{} {:?}\", p.first(), p.clone().swap());\n    let q = Pair { a: 1.5, b: 2.0 };\n    println!(\"{}\", q.sum());\n    let s = Pair::new(String::from(\"x\"), String::from(\"y\"));\n    println!(\"{:?} {}\", s, s == s.clone());\n}\n",
+    "expect": "ok", "out": "largest 9\n3 Pair { a: 9, b: 3 }\n3.5\nPair { a: \"x\", b: \"y\" } true\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-037",
+    "src": "#[derive(Debug)]\nenum Maybe<T> { Nothing, Just(T) }\nimpl<T> Maybe<T> {\n    fn is_just(&self) -> bool { match self { Maybe::Just(_) => true, Maybe::Nothing => false } }\n    fn or(self, d: T) -> T { match self { Maybe::Just(v) => v, Maybe::Nothing => d } }\n}\nfn main() {\n    let m: Maybe<i32> = Maybe::Just(4);\n    let n: Maybe<i32> = Maybe::Nothing;\n    println!(\"{} {} {}\", m.is_just(), n.is_just(), n.or(7));\n    println!(\"{:?}\", Maybe::Just(\"hi\"));\n}\n",
+    "expect": "ok", "out": "true false 7\nJust(\"hi\")\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-038",
+    "src": "struct Pair<T> { a: T, b: T }\nfn main() { let p = Pair { a: 1, b: 2.5 }; }\n",
+    "expect": {"code": "E0308", "line": 2},
+    "why": "traits unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "traits-039",
+    "src": "struct Pair<T> { a: i32 }\nfn main() {}\n",
+    "expect": {"code": "E0392", "line": 1},
+    "why": "traits unit test: rustc reports E0392", "pr": "unit"
+  },
+  {
+    "id": "traits-040",
+    "src": "struct Pair<T> { a: T }\nfn show(p: Pair) {}\nfn main() {}\n",
+    "expect": {"code": "E0107", "line": 2},
+    "why": "traits unit test: rustc reports E0107", "pr": "unit"
+  },
+  {
+    "id": "traits-041",
+    "src": "struct Pair<T> { a: T }\nfn show(p: Pair<i32, i32>) {}\nfn main() {}\n",
+    "expect": {"code": "E0107", "line": 2},
+    "why": "traits unit test: rustc reports E0107", "pr": "unit"
+  },
+  {
+    "id": "traits-042",
+    "src": "struct W<T> { v: T }\nimpl<T> W<T> { fn get(&self) -> T { self.v } }\nfn main() {}\n",
+    "expect": {"code": "E0507", "line": 2},
+    "why": "traits unit test: rustc reports E0507", "pr": "unit"
+  },
+  {
+    "id": "traits-043",
+    "src": "struct Pair<T> { a: T, b: T }\nimpl Pair<f64> { fn sum(&self) -> f64 { self.a + self.b } }\nfn main() { let p = Pair { a: 1, b: 2 }; println!(\"{}\", p.sum()); }\n",
+    "expect": {"code": "E0599", "line": 3},
+    "why": "traits unit test: rustc reports E0599", "pr": "unit"
+  },
+  {
+    "id": "traits-044",
+    "src": "struct Pair<T> { a: T, b: T }\nimpl<T: std::fmt::Display> Pair<T> { fn show(&self) { println!(\"{} {}\", self.a, self.b); } }\nstruct Q;\nfn main() { let p = Pair { a: Q, b: Q }; p.show(); }\n",
+    "expect": {"code": "E0599", "line": 4},
+    "why": "traits unit test: rustc reports E0599", "pr": "unit"
+  },
+  {
+    "id": "traits-045",
+    "src": "#[derive(Debug)]\nstruct W<T> { v: T }\nfn main() { let w = W { v: String::from(\"a\") }; let c = w; println!(\"{:?}\", w); }\n",
+    "expect": {"code": "E0382", "line": 3},
+    "why": "traits unit test: rustc reports E0382", "pr": "unit"
+  },
+  {
+    "id": "traits-046",
+    "src": "#[derive(Debug, Clone, Copy)]\nstruct W<T> { v: T }\nfn main() { let w = W { v: 1 }; let c = w; println!(\"{:?} {:?}\", w, c); }\n",
+    "expect": "ok", "out": "W { v: 1 } W { v: 1 }\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-047",
+    "src": "trait T { fn f(); }\nstruct S;\nimpl T for S {}\nfn main() {}",
+    "expect": {"code": "E0046", "line": 3},
+    "why": "traits unit test: rustc reports E0046", "pr": "unit"
+  },
+  {
+    "id": "traits-048",
+    "src": "fn f<T: >(x: T) {}\nfn main() {}",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-049",
+    "src": "struct S<T>(T);\nimpl S { }\nfn main() {}",
+    "expect": {"code": "E0107", "line": 2},
+    "why": "traits unit test: rustc reports E0107", "pr": "unit"
+  },
+  {
+    "id": "traits-050",
+    "src": "trait T { fn f(&self) -> Self; }\nfn g<U: T>(u: &U) -> U { u.f() }\nfn main() {}",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-051",
+    "src": "struct S;\nimpl From<i32> for S { fn from(x: i32) -> S { S } }\nfn main() { let s: S = 1.into(); let t: S = 2.0.into(); }",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "traits unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "traits-052",
+    "src": "trait A { fn f(&self); }\ntrait A {}\nfn main() {}",
+    "expect": {"code": "E0428", "line": 2},
+    "why": "traits unit test: rustc reports E0428", "pr": "unit"
+  },
+  {
+    "id": "traits-053",
+    "src": "use std::fmt::Display;\nfn show<T: Display>(x: T) { println!(\"{}\", x); }\nfn main() {\n    let mut s = String::from(\"a\");\n    show(&s);\n    s.push_str(\"b\");\n    show(&s);\n}\n",
+    "expect": "ok", "out": "a\nab\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-054",
+    "src": "#[derive(Clone, Copy)]\nstruct D;\nimpl Drop for D { fn drop(&mut self) {} }\nfn main() {}\n",
+    "expect": {"code": "E0184", "line": 2},
+    "why": "traits unit test: rustc reports E0184", "pr": "unit"
+  },
+  {
+    "id": "traits-055",
+    "src": "#[derive(Clone)]\nstruct D;\nimpl Drop for D { fn drop(&mut self) {} }\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-056",
+    "src": "#[derive(Default, Debug)]\nstruct W { v: i32 }\nfn main() {\n    println!(\"{:?}\", W::default());\n}\n",
+    "expect": "ok", "out": "W { v: 0 }\n", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-057",
+    "src": "struct A;\nstruct B;\nimpl A for B {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 3},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-058",
+    "src": "enum A { X }\nfn f<T: A>(_x: T) {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 2},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-059",
+    "src": "struct A;\nfn f<T>(_x: T)\nwhere\n    T: A,\n{}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 4},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-060",
+    "src": "struct B;\nimpl String for B {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 2},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-061",
+    "src": "fn f<T, U: T>(_x: U) {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 1},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-062",
+    "src": "fn f<U: i32>(_x: U) {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 1},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-063",
+    "src": "struct B;\nfn ff() {}\nimpl ff for B {}\nfn main() {}\n",
+    "expect": {"code": "E0404", "line": 3},
+    "why": "traits unit test: rustc reports E0404", "pr": "unit"
+  },
+  {
+    "id": "traits-064",
+    "src": "struct B;\nimpl Nope for B {}\nfn main() {}\n",
+    "expect": {"code": "E0405", "line": 2},
+    "why": "traits unit test: rustc reports E0405", "pr": "unit"
+  },
+  {
+    "id": "traits-065",
+    "src": "struct A;\nimpl From<A> for A { fn from(a: A) -> A { a } }\nfn main() {}\n",
+    "expect": {"code": "E0119", "line": 2},
+    "why": "traits unit test: rustc reports E0119", "pr": "unit"
+  },
+  {
+    "id": "traits-066",
+    "src": "enum A { X }\nimpl From<A> for A { fn from(a: A) -> A { a } }\nfn main() {}\n",
+    "expect": {"code": "E0119", "line": 2},
+    "why": "traits unit test: rustc reports E0119", "pr": "unit"
+  },
+  {
+    "id": "traits-067",
+    "src": "struct A;\nstruct B;\nimpl From<A> for B { fn from(_a: A) -> B { B } }\nfn main() { let _b = B::from(A); }\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "traits-068",
+    "src": "trait T { fn f(&self); }\nstruct A;\nimpl T for A {\n    pub fn f(&self) {}\n}\nfn main() {}\n",
+    "expect": {"code": "E0449", "line": 4},
+    "why": "traits unit test: rustc reports E0449", "pr": "unit"
+  },
+  {
+    "id": "traits-069",
+    "src": "trait T {\n    pub fn f(&self);\n}\nfn main() {}\n",
+    "expect": {"code": "E0449", "line": 2},
+    "why": "traits unit test: rustc reports E0449", "pr": "unit"
+  },
+  {
+    "id": "traits-070",
+    "src": "struct A;\nimpl From<i32> for A {\n    pub fn from(_n: i32) -> A { A }\n}\nfn main() {}\n",
+    "expect": {"code": "E0449", "line": 3},
+    "why": "traits unit test: rustc reports E0449", "pr": "unit"
+  },
+  {
+    "id": "traits-071",
+    "src": "struct B;\npub impl B {}\nfn main() {}\n",
+    "expect": {"code": "E0449", "line": 2},
+    "why": "traits unit test: rustc reports E0449", "pr": "unit"
+  },
+  {
+    "id": "traits-072",
+    "src": "enum E {\n    pub X,\n}\nfn main() {}\n",
+    "expect": {"code": "E0449", "line": 2},
+    "why": "traits unit test: rustc reports E0449", "pr": "unit"
+  },
+  {
+    "id": "traits-073",
+    "src": "struct B;\nimpl B { pub fn f(&self) {} }\nfn main() { B.f(); }\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "traits unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-001",
+    "src": "struct G(i32);\nimpl Drop for G { fn drop(&mut self) { println!(\"drop {}\", self.0); } }\nfn f(n: i32) -> Result<i32, String> {\n    let _a = G(1);\n    if n < 0 { return Err(String::from(\"x\")); }\n    Ok(n)\n}\nfn g(n: i32) -> Result<i32, String> {\n    let _g = G(2);\n    let v = f(n)?;\n    let _h = G(3);\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g(-1));\n}\n",
+    "expect": "ok", "out": "drop 1\ndrop 2\nErr(\"x\")\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-002",
+    "src": "fn check(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\nstruct A { n: i32 }\nimpl A {\n    fn add(&mut self, k: i32) -> Result<i32, String> {\n        self.n += check(k)?;\n        Ok(self.n)\n    }\n}\nfn sum() -> Result<i32, String> {\n    let mut a = A { n: 0 };\n    for k in vec![1, 2, -3, 4] {\n        a.add(k)?;\n    }\n    Ok(check(1)? + check(2)?)\n}\nfn main() { println!(\"{:?}\", sum()); }\n",
+    "expect": "ok", "out": "Err(\"negative\")\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-003",
+    "src": "fn check(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\nfn g() -> Result<u8, String> {\n    let a = check(1)?;\n    let x: u8 = 255 + 1;\n    Ok(x)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 6},
+    "why": "result unit test: rustc reports arithmetic_overflow", "pr": "unit"
+  },
+  {
+    "id": "result-004",
+    "src": "fn g(o: Option<i32>) -> Option<i32> {\n    let a = o?;\n    let b = Some(a + 1)?;\n    Some(b)\n}\nfn main() { println!(\"{:?} {:?}\", g(Some(1)), g(None)); }\n",
+    "expect": "ok", "out": "Some(2) None\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-005",
+    "src": "fn check(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\nfn main() {\n    let v = check(1)?;\n    println!(\"{}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 5},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-006",
+    "src": "fn f() -> Option<i32> { Some(1) }\nfn g() -> i32 {\n    let v = f()?;\n    v\n}\nfn main() { g(); }\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-007",
+    "src": "fn f() -> Option<i32> { Some(1) }\nfn g() -> Result<i32, String> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() { g().unwrap(); }\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-008",
+    "src": "fn f() -> Result<i32, String> { Ok(1) }\nfn g() -> Option<i32> {\n    let v = f()?;\n    Some(v)\n}\nfn main() { g(); }\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-009",
+    "src": "#[derive(Debug)]\nenum A { X }\n#[derive(Debug)]\nenum B { Y }\nfn f() -> Result<i32, A> { Err(A::X) }\nfn g() -> Result<i32, B> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": {"code": "E0277", "line": 7},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-010",
+    "src": "fn f() -> Result<i32, i32> { Err(1) }\nfn g() -> Result<i32, String> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() { g(); }\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-011",
+    "src": "fn f() -> Result<i32, String> { Ok(1) }\nfn g() -> Result<u8, String> {\n    let n: u8 = f()?;\n    Ok(n)\n}\nfn main() { g(); }\n",
+    "expect": {"code": "E0308", "line": 3},
+    "why": "result unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "result-012",
+    "src": "fn f() -> Result<(), String> { Ok(()) }\nfn g() -> Result<(), String> {\n    f()?;\n    f()?\n}\nfn main() { g(); }\n",
+    "expect": {"code": "E0308", "line": 4},
+    "why": "result unit test: rustc reports E0308", "pr": "unit"
+  },
+  {
+    "id": "result-013",
+    "src": "#[derive(Debug)]\nenum E { Neg(i32) }\nstruct G(i32);\nimpl Drop for G { fn drop(&mut self) { println!(\"drop {}\", self.0); } }\nfn f(n: i32) -> Result<i32, E> { if n < 0 { Err(E::Neg(n)) } else { Ok(n) } }\nfn main() -> Result<(), E> {\n    let _g = G(1);\n    f(2)?;\n    f(-7)?;\n    println!(\"unreached\");\n    Ok(())\n}\n",
+    "expect": "ok", "out": "drop 1\n", "err": "Error: Neg(-7)\n", "exit": 1,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-014",
+    "src": "fn main() {\n    let r: Result<i32, String> = Err(String::from(\"boom\"));\n    println!(\"{:?} {:?}\", r.clone().ok(), r.clone().err());\n    let o: Option<i32> = None;\n    println!(\"{:?}\", o.ok_or(String::from(\"none\")));\n    println!(\"{:?}\", Some(2).ok_or(\"e\"));\n    println!(\"{}\", r.clone().unwrap_or_default());\n    let z: Option<String> = None;\n    println!(\"{:?}\", z.unwrap_or_default());\n    println!(\"{}\", r.unwrap_err());\n}\n",
+    "expect": "ok", "out": "None Some(\"boom\")\nErr(\"none\")\nOk(2)\n0\n\"\"\nboom\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-015",
+    "src": "fn main() {\n    let r: Result<Vec<i32>, i32> = Err(1);\n    println!(\"{:?}\", r.unwrap_or_default());\n}\n",
+    "expect": "ok", "out": "[]\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-016",
+    "src": "fn main() {\n    let r: Result<i32, i32> = Ok(1);\n    let n = r.map(|x| x + 1);\n    println!(\"{:?}\", n);\n}\n",
+    "expect": "ok", "out": "Ok(2)\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-017",
+    "src": "fn pick(n: i32) -> i32 {\n    if n > 0 { n } else { panic!(\"not positive: {}\", n) }\n}\nfn main() { println!(\"{}\", pick(3)); }\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-018",
+    "src": "struct G;\nimpl Drop for G { fn drop(&mut self) { println!(\"drop\"); } }\nfn main() {\n    let _g = G;\n    let x: i32 = panic!(\"boom\");\n}\n",
+    "expect": "ok", "out": "drop\n", "err": "\nthread 'main' panicked at src/main.rs:5:18:\nboom\n", "exit": 101,
+    "why": "result unit test: panics with exit 101", "pr": "unit"
+  },
+  {
+    "id": "result-019",
+    "src": "fn f() -> Result<i32, i32> { Ok(1) }\nfn main() {\n    let v = f()?;\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-020",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nlet x = split(a)?;\nOk(x)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-021",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nOk(split(a)?)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-022",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nlet r = split(a);\nlet x = r?;\nOk(x)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-023",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nlet _z = split(a)?;\nOk(1)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-024",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nsplit(a)?;\nOk(1)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-025",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nlet x = split(0)?;\nOk(x)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-026",
+    "src": "fn split(n: u32) -> Result<u32, String> { Ok(n) }\nfn g(a: u32) -> Result<u32, String> {\nmatch split(a) { Ok(h) => Ok(h), Err(e) => return Err(e) }\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-027",
+    "src": "fn h(v: &Vec<u32>, i: usize) -> Result<u32, String> {\nlet x = v.get(i).copied().ok_or(String::from(\"n\"))?;\nOk(x)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-028",
+    "src": "fn h(v: &Vec<u32>, i: usize) -> Result<u32, String> {\nlet _d = v.get(i).ok_or(String::from(\"n\"));\nOk(0)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-029",
+    "src": "fn h(v: &Vec<u32>, i: usize) -> Result<u32, String> {\nv.get(i).ok_or(String::from(\"n\"));\nOk(0)\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-030",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let f = |i: usize| {\n        let x = v.get(i)?;\n        Some(*x * 10)\n    };\n    println!(\"{:?} {:?}\", f(1), f(9));\n}\n",
+    "expect": "ok", "out": "Some(20) None\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "result-031",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let f = |i: usize| {\n        let x = v.get(i)?;\n        *x * 10\n    };\n    println!(\"{:?} {:?}\", f(1), f(9));\n}\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "result unit test: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "result-032",
+    "src": "fn main() {\n    let f = |r: Option<i32>| -> Option<i32> { let n = r?; Some(n + 1) };\n    println!(\"{:?} {:?}\", f(Some(1)), f(None));\n}\n",
+    "expect": "ok", "out": "Some(2) None\n", "err": "", "exit": 0,
+    "why": "result unit test: compiles and runs", "pr": "unit"
   }
 ]

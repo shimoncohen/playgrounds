@@ -220,3 +220,19 @@ describe('check helpers for ? and ok_or', () => {
     assert.equal(c(['v.get(i).ok_or(String::from("n"));', 'Ok(0)']), 0);
   });
 });
+
+describe('? in a closure with no declared return type', () => {
+  const C = (body, tail) => P('fn main() {', '    let v = vec![1, 2, 3];', '    let f = |i: usize| {', `        ${body}`, `        ${tail}`, '    };', '    println!("{:?} {:?}", f(1), f(9));', '}');
+  it('an Option ? is judged by the tail, which makes the closure return an Option', () => {
+    assert.equal(run(C('let x = v.get(i)?;', 'Some(*x * 10)')).stdout, 'Some(20) None\n');
+  });
+  it('a plain tail is E0277 at the ?', () => {
+    assert.equal(rejects(C('let x = v.get(i)?;', '*x * 10')), 'E0277@4');
+  });
+  it('a Result ? whose error type the tail leaves open is unsupported, not accepted', () => {
+    assert.equal(feature(P('fn main() {', '    let f = |r: Result<i32, String>| {', '        let n = r?;', '        Ok(n + 1)', '    };', '    println!("{:?}", f(Ok(1)));', '}')), 'inferred type@3');
+  });
+  it('a closure with a declared return type is unchanged', () => {
+    assert.equal(run(P('fn main() {', '    let f = |r: Option<i32>| -> Option<i32> { let n = r?; Some(n + 1) };', '    println!("{:?} {:?}", f(Some(1)), f(None));', '}')).stdout, 'Some(2) None\n');
+  });
+});

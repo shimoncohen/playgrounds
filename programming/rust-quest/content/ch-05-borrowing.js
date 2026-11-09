@@ -2,6 +2,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+const OTHER=RQ.other('text');
 const prog=body=>'fn main() {\n'+body+'}\n';
 const SHOUT=(sig,body)=>'fn shout('+sig+') {\n'+body+'}\n\nfn main() {\n    let a = String::from("hey");\n    shout(&a);\n    println!("{} is still here", a);\n}\n';
 const HEAD='fn head(s: &str, n: usize) -> &str {\n    &s[..n]\n}\n';
@@ -188,10 +189,11 @@ RQ.CH.push({
       lazy:[
         {src:HEADFN('s: &str, n: usize) -> &str','    if n == 5 {\n        "hello"\n    } else if n == 3 {\n        "hel"\n    } else {\n        "herm"\n    }\n'),wrongWhy:'check'},
         {src:HEADFN('s: &str, n: usize) -> &str','    s\n'),wrongWhy:'check'},
-        {src:HEADFN('s: &str, n: usize) -> String','    String::from(&s[..n])\n'),wrongWhy:'check'}
+        {src:HEADFN('s: &str, n: usize) -> String','    String::from(&s[..n])\n'),wrongWhy:'check'},
+        {src:'fn head(s: &str, n: usize) -> &str {\n    if n == 5 {\n        &s[..5]\n    } else if n == 3 {\n        &s[..3]\n    } else {\n        &s[..4]\n    }\n}\n',wrongWhy:'check'}
       ],
       defines:[],previews:[],
-      check:c=>c.out()!=='hello\nhel\nherm\n'?'`head(&s, n)` has to give back the first `n` letters: `hello`, `hel` and `herm`.':!c.paramIsRef('head',0)?'Take the text by reference, so `head` borrows it.':c.allocs('String')!==2?'The only `String`s should be the two that `main` builds. Hand back a slice; do not build a new `String`.':c.count('index')<1?'Take the front of `s` with a slice, like `&s[..n]`.':true
+      check:c=>c.out()!=='hello\nhel\nherm\n'?'`head(&s, n)` has to give back the first `n` letters: `hello`, `hel` and `herm`.':!c.paramIsRef('head',0)?'Take the text by reference, so `head` borrows it.':c.allocs('String')!==2?'The only `String`s should be the two that `main` builds. Hand back a slice; do not build a new `String`.':c.count('index')<1?'Take the front of `s` with a slice, like `&s[..n]`.':OTHER(c,'he\nh\nhermit\n','`head` has to give back the first `n` letters of any text, not only the ones `main` asks about.',['head(&s, 5)','head(&s, 2)'],['head(&s, 3)','head(&s, 1)'],['head(&t, 4)','head(&t, 6)'])
     },
     {
       title:'A slice keeps its String borrowed',kind:'fix',
@@ -244,10 +246,11 @@ RQ.CH.push({
       lazy:[
         {src:LONGEST('&\'static str','    "bigger"\n'),wrongWhy:'check'},
         {src:LONGEST('String','    String::from("bigger")\n'),wrongWhy:'check'},
-        {src:LONGEST('&\'static str','    if a.len() > b.len() {\n        "bigger"\n    } else {\n        "longer"\n    }\n'),wrongWhy:'check'}
+        {src:LONGEST('&\'static str','    if a.len() > b.len() {\n        "bigger"\n    } else {\n        "longer"\n    }\n'),wrongWhy:'check'},
+        {src:'fn longest(a: &str, b: &str) -> String {\n    if a == "tiny" {\n        b.to_string()\n    } else {\n        a.to_string()\n    }\n}\n',wrongWhy:'check'}
       ],
       defines:[],previews:[],
-      check:c=>c.out()!=='bigger\nlonger\n'?'`longest` has to give back the longer text: `bigger` and then `longer`.':c.allocs('String')!==2?'Return an owned `String` built from the longer input, one per call.':true
+      check:c=>c.out()!=='bigger\nlonger\n'?'`longest` has to give back the longer text: `bigger` and then `longer`.':c.allocs('String')!==2?'Return an owned `String` built from the longer input, one per call.':OTHER(c,'sea\nshark\n','`longest` has to give back the longer of any two texts, not only the ones `main` asks about.',['longest("tiny", "bigger")','longest("sea", "ox")'],['longest("longer", "hi")','longest("eel", "shark")'])
     },
     {
       title:'A reference to something that is gone',kind:'fix',

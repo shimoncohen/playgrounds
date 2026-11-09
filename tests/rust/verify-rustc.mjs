@@ -1,4 +1,4 @@
-// Checks the corpus and every mission program against a real rustc, three ways for programs that compile (the authored
+// Checks the corpus, every mission program and every field-guide example against a real rustc, three ways for programs that compile (the authored
 // fields, rustc, RQ.run) and two ways for the rest. On 0 mismatches it writes tests/fixtures/rust/verified.json and
 // programming/rust-quest/content/verified.js; on any mismatch it exits nonzero and writes nothing. It never edits the corpus.
 //
@@ -6,7 +6,7 @@
 //   RUSTC_RUNNER="sh tests/rust/docker-run.sh" RUST_IMAGE=rust:slim@sha256:... node tests/rust/verify-rustc.mjs
 //
 // RUSTC_RUNNER is split on whitespace and run without a shell; its arguments are those of build-run.sh.
-// RQ_TMP is where the temporary program directories go (default: the OS temp dir).
+// RQ_TMP is where the temporary program directories go (default: the OS temp dir). RQ_JOBS is how many programs run at once (default 1).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,6 +20,7 @@ const RUN_TIMEOUT_S = 10;
 const HOST_TIMEOUT_MS = 15 * 60 * 1000; // a backstop only: the runner enforces its own, shorter limits
 const RUNNER = (process.env.RUSTC_RUNNER || 'sh tests/rust/build-run.sh').split(/\s+/).filter(Boolean);
 const TMP = process.env.RQ_TMP || os.tmpdir();
+const JOBS = Math.max(1, Number(process.env.RQ_JOBS) || 1);
 
 const run = (args) => new Promise((resolve, reject) => {
   execFile(RUNNER[0], [...RUNNER.slice(1), ...args], { cwd: ROOT, timeout: HOST_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -97,7 +98,7 @@ if (+ver[1] < 1 || (+ver[1] === 1 && +ver[2] < 85)) {
 }
 
 const mismatches = [];
-for (const p of progs) {
+const check = async (p) => {
   const dir = fs.mkdtempSync(path.join(TMP, 'rq-verify-'));
   try {
     fs.mkdirSync(path.join(dir, 'src'));
@@ -111,7 +112,10 @@ for (const p of progs) {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
-}
+};
+const queue = [...progs];
+await Promise.all(Array.from({ length: JOBS }, async () => { for (let p; (p = queue.shift());) await check(p); }));
+mismatches.sort();
 
 if (mismatches.length) {
   console.error(mismatches.join('\n'));
@@ -122,4 +126,4 @@ if (mismatches.length) {
 const rec = { rustc: version, edition: EDITION, ...(process.env.RUST_IMAGE ? { image: process.env.RUST_IMAGE } : {}), date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
 fs.writeFileSync(path.join(ROOT, 'tests/fixtures/rust/verified.json'), JSON.stringify(rec, null, 2) + '\n');
 fs.writeFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), verifiedJs(rec));
-console.log(`rustc ${version} edition ${EDITION}: ${rec.counts.corpus} corpus + ${rec.counts.missions} mission programs, 0 mismatches`);
+console.log(`rustc ${version} edition ${EDITION}: ${rec.counts.corpus} corpus + ${rec.counts.missions} mission programs + ${rec.counts.guide} guide examples, 0 mismatches`);

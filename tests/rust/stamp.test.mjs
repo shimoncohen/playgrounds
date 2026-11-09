@@ -18,12 +18,14 @@ describe('the verify record matches the tree', () => {
     assert.match(v().rustc, /^\d+\.\d+\.\d+/);
     assert.equal(v().edition, '2024');
     assert.match(v().date, /^\d{4}-\d{2}-\d{2}/);
+    assert.match(v().image, /^rust@sha256:[0-9a-f]{64}$/);
   });
   it('inputsHash covers the corpus and every mission program', () => assert.equal(inputsHash(corpus, progs), v().inputsHash));
   it('resultsHash covers what RQ.run returns for each of them', () => assert.equal(resultsHash(RQ.run, progs), v().resultsHash));
   it('the program counts equal what the tree holds', () => {
     assert.deepEqual(v().counts, record(RQ, corpus).counts);
     assert.equal(v().counts.missions, RQ.missionPrograms().length);
+    assert.equal(v().counts.guide, RQ.GUIDE.reduce((n, g) => n + g.ex.length, 0));
   });
   it('verified.js carries exactly verified.json', () => {
     const sandbox = {};
@@ -31,8 +33,7 @@ describe('the verify record matches the tree', () => {
     vm.createContext(sandbox);
     const js = fs.readFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), 'utf8');
     vm.runInContext(js, sandbox);
-    const { rustc, edition, date, inputsHash: ih, resultsHash: rh, counts } = v();
-    assert.deepEqual(JSON.parse(JSON.stringify(sandbox.RQ.verified)), { rustc, edition, date, inputsHash: ih, resultsHash: rh, counts });
+    assert.deepEqual(JSON.parse(JSON.stringify(sandbox.RQ.verified)), v());
     assert.equal(js, verifiedJs(sandbox.RQ.verified));
   });
 });
@@ -54,6 +55,11 @@ describe('the hashes catch drift', () => {
     const n = RQ2.missionPrograms().length;
     RQ2.CH[0].missions[0].wrong.push({ src: 'fn main() {}\n', wrongWhy: 'check' });
     assert.equal(RQ2.missionPrograms().length, n + 1);
+    assert.notEqual(inputsHash(corpus, programs(RQ2, corpus)), base.i);
+  });
+  it('a changed guide example changes inputsHash', () => {
+    const RQ2 = loadRust();
+    RQ2.GUIDE[0].ex[0][0] += '// x\n';
     assert.notEqual(inputsHash(corpus, programs(RQ2, corpus)), base.i);
   });
   it('a changed engine result changes resultsHash', () => {

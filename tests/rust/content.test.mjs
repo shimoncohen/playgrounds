@@ -124,11 +124,16 @@ describe('extras', () => {
     RQ.CH.forEach((_, ci) => assert.ok(RQ.GUIDE.filter((g) => g.ch === ci).length >= 1, `chapter ${ci}`));
     for (const g of RQ.GUIDE) { assert.ok(RQ.CH[g.ch] && g.c && g.what); for (const [code] of g.ex) assert.ok(code.includes('fn main')); }
   });
-  it('every guide example runs: ok, or the error it is there to show', () => {
-    for (const g of RQ.GUIDE) for (const [code, , declared] of g.ex) assert.ok(['ok', 'error', ...(declared === 'panic' ? ['panic'] : [])].includes(RQ.run(code).status), code);
-  });
-  it('a guide example that panics says so, and one that says so does panic', () => {
-    for (const g of RQ.GUIDE) for (const [code, , declared] of g.ex) assert.equal(RQ.run(code).status === 'panic', declared === 'panic', code);
+  it('every guide example has the status it declares: ok, panic, or the error id it is there to show', () => {
+    for (const g of RQ.GUIDE) for (const [code, , declared] of g.ex) {
+      const c = RQ.run(code);
+      if (!declared) assert.equal(c.status, 'ok', code);
+      else if (declared === 'panic') assert.equal(c.status, 'panic', code);
+      else {
+        assert.equal(c.status, 'error', code);
+        assert.equal(c.errors.filter((e) => e.code || e.lint).map((e) => e.code || e.lint).join(), declared, code);
+      }
+    }
   });
   it('every quest chapter has at least 6 quick-fire questions', () => {
     RQ.CH.forEach((_, ci) => assert.ok(RQ.QF.filter((q) => q.ch === ci).length >= 6, `chapter ${ci}`));

@@ -31,7 +31,7 @@ const M7_MAIN=L('')+MAIN('let bucket = vec![4, 8, 15];','println!("{:?}", shell_
 const M7_OUT='Ok(8)\nOk(15)\nErr("no shell at 7")\n';
 const ODD=L('#[derive(Debug)]','enum ShareError {','    Odd(u32),','}','','fn split(shells: u32) -> Result<u32, ShareError> {','    if shells % 2 == 1 {','        Err(ShareError::Odd(shells))','    } else {','        Ok(shells / 2)','    }','}','');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other numbers.':r.out()!==want?why:true;};
+const OTHER=RQ.other('numbers');
 
 RQ.CH.push({
   name:'Errors with Result',

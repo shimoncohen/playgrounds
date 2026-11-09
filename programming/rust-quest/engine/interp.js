@@ -32,7 +32,7 @@ const cmpCodePoints=(x,y)=>{
   for(let i=0;i<Math.min(p.length,q.length);i++){const d=p[i].codePointAt(0)-q[i].codePointAt(0);if(d)return d;}
   return p.length-q.length;
 };
-const peel=e=>e.t==='Paren'?peel(e.expr):e;
+const peel=RQ.peel;
 const MAX_STRING=100000; // JS chars; a doubling loop would otherwise take all the memory
 const MAX_OUTPUT=1000000; // JS chars of stdout and stderr together; a loop printing a near-limit String would otherwise fill memory before maxSteps
 // Rust's len counts UTF-8 bytes; TextEncoder is not in the vm sandbox
@@ -1057,6 +1057,8 @@ RQ.interp=(ast,opts)=>{
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
     if(key==='Into::id')return rv;
+    if(key==='Into::String')return string(unref(rv).v,undefined,e.line);
+    if(key==='Into::int')return int(unref(rv).v,info.get(e).um.to);
     if(key.startsWith('Src::'))return srcIter(key,e,rv);
     if(key.startsWith('Iter::'))return iterOp(key,e,rv,args);
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
@@ -1387,6 +1389,10 @@ RQ.interp=(ast,opts)=>{
       case 'Binary':{
         if(e.op==='&&'){const a=ev(e.lhs,env);return a.v?ev(e.rhs,env):a;}
         if(e.op==='||'){const a=ev(e.lhs,env);return a.v?a:ev(e.rhs,env);}
+        if(e.op==='+'&&res(typeOf(e.lhs)).k==='String'){
+          const a=mv(e.lhs,env),b=unref(ev(e.rhs,env));
+          return string(a.v+b.v,a.id,e.line);
+        }
         const a=ev(e.lhs,env),b=ev(e.rhs,env);
         return binop(e.op,a,b,e);
       }
