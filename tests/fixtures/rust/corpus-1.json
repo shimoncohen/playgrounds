@@ -4681,5 +4681,63 @@
     "src": "fn main() {\n    let mut v = vec![4, 8];\n    let r = v.get(0).ok_or(\"none\");\n    v.len();\n    println!(\"{:?}\", r);\n}\n",
     "expect": "ok", "out": "Ok(4)\n", "err": "", "exit": 0,
     "why": "copied ends the loan", "pr": "P11"
+  },
+  {
+    "id": "mutref-get-push",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.get(0);\n    v.push(1);\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": {"code":"E0502","line":3},
+    "pair": "mutref-get-len",
+    "why": "get through a &mut Vec parameter keeps a shared loan on *v", "pr": "P11"
+  },
+  {
+    "id": "mutref-get-len",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.get(0);\n    v.len();\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": "ok", "out": "Some(4)\n", "err": "", "exit": 0,
+    "why": "the call after it does not write the Vec", "pr": "P11"
+  },
+  {
+    "id": "mutref-first-push",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.first();\n    v.push(1);\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": {"code":"E0502","line":3},
+    "pair": "mutref-first-len",
+    "why": "first through a &mut Vec parameter keeps a shared loan on *v", "pr": "P11"
+  },
+  {
+    "id": "mutref-first-len",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.first();\n    v.len();\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": "ok", "out": "Some(4)\n", "err": "", "exit": 0,
+    "why": "the call after it does not write the Vec", "pr": "P11"
+  },
+  {
+    "id": "mutref-last-push",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.last();\n    v.push(1);\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": {"code":"E0502","line":3},
+    "pair": "mutref-last-len",
+    "why": "last through a &mut Vec parameter keeps a shared loan on *v", "pr": "P11"
+  },
+  {
+    "id": "mutref-last-len",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.last();\n    v.len();\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": "ok", "out": "Some(8)\n", "err": "", "exit": 0,
+    "why": "the call after it does not write the Vec", "pr": "P11"
+  },
+  {
+    "id": "mutref-get-mut-push",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.get_mut(0);\n    v.push(1);\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": {"code":"E0499","line":3},
+    "pair": "mutref-get-mut-skip",
+    "why": "get_mut through a &mut Vec parameter keeps a mutable loan on *v", "pr": "P11"
+  },
+  {
+    "id": "mutref-get-mut-skip",
+    "src": "fn f(v: &mut Vec<i32>) {\n    let x = v.get_mut(0);\n    1;\n    println!(\"{:?}\", x);\n}\nfn main() {\n    let mut v = vec![4, 8];\n    f(&mut v);\n}\n",
+    "expect": "ok", "out": "Some(4)\n", "err": "", "exit": 0,
+    "why": "the line after it leaves the Vec alone", "pr": "P11"
+  },
+  {
+    "id": "mutref-index-after-use-push",
+    "src": "fn f(v: &mut Vec<i32>, n: i32) {\n    let x = &v[0];\n    println!(\"{}\", x);\n    v.push(n);\n}\nfn main() {\n    let mut v = vec![4];\n    f(&mut v, 2);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "4\n[4, 2]\n", "err": "", "exit": 0,
+    "why": "the borrow of v[0] ends before the push, and v is only reborrowed", "pr": "P11"
   }
 ]

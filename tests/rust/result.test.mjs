@@ -198,3 +198,25 @@ describe('? diagnostics carry their own tip', () => {
     assert.match(c.errors[0].tip, /return type/);
   });
 });
+
+describe('check helpers for ? and ok_or', () => {
+  const F = 'fn split(n: u32) -> Result<u32, String> { Ok(n) }';
+  const t = (body, param) => RQ.run(P(F, 'fn g(a: u32) -> Result<u32, String> {', ...body, '}', 'fn main() {}')).tryOn('g', 'split', param);
+  it('tryOn counts a ? on the call, or on a local that holds it, when its value is used', () => {
+    assert.equal(t(['let x = split(a)?;', 'Ok(x)'], 'a'), 1);
+    assert.equal(t(['Ok(split(a)?)'], 'a'), 1);
+    assert.equal(t(['let r = split(a);', 'let x = r?;', 'Ok(x)'], 'a'), 1);
+  });
+  it('tryOn ignores a thrown-away ?, one on other input, and a hand-written match', () => {
+    assert.equal(t(['let _z = split(a)?;', 'Ok(1)'], 'a'), 0);
+    assert.equal(t(['split(a)?;', 'Ok(1)'], 'a'), 0);
+    assert.equal(t(['let x = split(0)?;', 'Ok(x)'], 'a'), 0);
+    assert.equal(t(['match split(a) { Ok(h) => Ok(h), Err(e) => return Err(e) }'], 'a'), 0);
+  });
+  it('chainOn wants the method on a chain from the base call, with its result used', () => {
+    const c = (body) => RQ.run(P('fn h(v: &Vec<u32>, i: usize) -> Result<u32, String> {', ...body, '}', 'fn main() {}')).chainOn('h', 'ok_or', 'get');
+    assert.equal(c(['let x = v.get(i).copied().ok_or(String::from("n"))?;', 'Ok(x)']), 1);
+    assert.equal(c(['let _d = v.get(i).ok_or(String::from("n"));', 'Ok(0)']), 0);
+    assert.equal(c(['v.get(i).ok_or(String::from("n"));', 'Ok(0)']), 0);
+  });
+});
