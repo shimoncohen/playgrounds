@@ -135,7 +135,7 @@ function mutability(F,errors,un){
     for(const i of b.instrs){
       const r=i.rv;
       if(!r)continue;
-      if(r.k==='ref'&&r.mut&&!r.deref&&L[r.l].name!==null&&!L[r.l].mut){
+      if(r.k==='ref'&&r.mut&&!r.deref&&!r.cap&&L[r.l].name!==null&&!L[r.l].mut){
         // rustc folds several of these on one variable into a single error, reported elsewhere than at each borrow
         const root=R[r.l];
         if(roots.has(root)&&roots.get(root)!==i.line+':'+i.col)un('repeated error',i);
@@ -157,7 +157,7 @@ function loanPass(F,errors,un,loans,stats){
   const B=F.blocks,L=F.locals,n=L.length,{A,D,R}=relations(L);
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
-  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,deref:!!i.rv.deref,live:new Set(),span:[i.line,i.line]});}
+  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,deref:!!i.rv.deref,cap:!!i.rv.cap,live:new Set(),span:[i.line,i.line]});}
   const onS=L.map(()=>0n),onM=L.map(()=>0n),sub=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(R[k]));
   // onS/onM: the loans an access to l conflicts with (on l, an ancestor or a descendant); sub: the loans on l and below, which a write to l ends
   lo.forEach((x,k)=>{
@@ -171,7 +171,7 @@ function loanPass(F,errors,un,loans,stats){
   const flow=(o,i)=>{
     const r=i.rv,g=x=>x&&x.k!=='const'?o[R[x.l]]:0n;
     return r.k==='use'?g(r.x):r.k==='method'&&r.name==='as_str'?g(r.recv):r.k==='agg'?r.args.reduce((m,x)=>m|g(x),0n)
-      :r.k==='call'&&r.from>=0?[r.from,...r.more||[]].reduce((m,k)=>m|g(r.args[k]),0n):0n;
+      :r.k==='call'&&r.src!==undefined?o[R[r.src]]:r.k==='call'&&r.from>=0?[r.from,...r.more||[]].reduce((m,k)=>m|g(r.args[k]),0n):0n;
   };
   const val=(s,i)=>i.rv.k==='ref'?lb[at.get(i)]|s[R[i.rv.l]]:flow(s,i);
   // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
@@ -279,8 +279,11 @@ function loanPass(F,errors,un,loans,stats){
       }
       if(i.op==='assign'&&L[i.l].ret){
         const held=val(s,i);
-        const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty));
-        if(k>=0){
+        const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty)&&!L[x.l].cap);
+        if(k>=0&&lo[k].cap){
+          const key='E0373@'+lo[k].i.line+':'+lo[k].i.col;
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0373',lo[k].i.line,lo[k].i.col,{name:L[lo[k].l].name}));}
+        }else if(k>=0){
           const key='E0515@'+i.line+':'+i.col;
           if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param,path:!!L[lo[k].l].path}));}
         }

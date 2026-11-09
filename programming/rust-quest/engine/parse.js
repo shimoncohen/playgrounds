@@ -302,7 +302,7 @@ RQ.parse=tokens=>{
           p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});
           // `m.entry(k).or_insert(v)` is one call to the checker; a bare `entry` has no type of its own, so it stays unsupported
           const r=e.recv;
-          if((e.name==='or_insert'&&e.args.length===1||e.name==='or_default'&&!e.args.length)&&r.t==='MethodCall'&&r.name==='entry'&&r.args.length===1&&!r.targs){
+          if((e.name==='or_insert'&&e.args.length===1||e.name==='or_insert_with'&&e.args.length===1||e.name==='or_default'&&!e.args.length)&&r.t==='MethodCall'&&r.name==='entry'&&r.args.length===1&&!r.targs){
             e.recv=r.recv;e.args=[...r.args,...e.args];e.name='entry.'+e.name;
           }
         }
@@ -412,10 +412,28 @@ RQ.parse=tokens=>{
     expP('}');return mk('Match',x,{scrut,arms});
   }
   function closure(){
-    const x=T();const mv=!!eatK('move');const params=[];
-    if(!eatP('||')){expP('|');while(!isP('|')){const pt=patNoOr();let t=null;if(eatP(':'))t=ty();params.push({pat:pt,ty:t});if(!eatP(','))break;}expP('|');}
+    const x=T();const mv=!!eatK('move');const params=[],lets=[],derefs=[];
+    if(!eatP('||')){expP('|');while(!isP('|')){const pt=patNoOr();let t=null;if(eatP(':'))t=ty();
+      // a pattern other than a name is a let on a hidden name, like a `for` pattern
+      let core=pt,depth=0;
+      while(core.t==='RefPat'&&!core.mut){core=core.pat;depth++;}
+      if(pt.t==='IdentPat'&&!pt.sub&&!pt.byRef)params.push({pat:pt,ty:t});
+      else if(depth&&(core.t==='Wild'||core.t==='IdentPat'&&!core.sub&&!core.byRef)){
+        // `|&x|` copies the value out of the reference: a let on a hidden name
+        const nm='#cl'+params.length;
+        params.push({pat:mk('IdentPat',pt,{name:nm,mut:false,byRef:false,sub:null}),ty:t});
+        if(core.t==='IdentPat'){
+          let init=mk('Path',pt,{segs:[{name:nm,args:null,fn:null,line:pt.line}],global:false});
+          for(let i=0;i<depth;i++)init=mk('Deref',pt,{expr:init});
+          derefs.push(mk('Let',pt,{pat:core,ty:null,init,els:null}));
+        }
+      }
+      else{const nm='#cl'+params.length;params.push({pat:mk('IdentPat',pt,{name:nm,mut:false,byRef:false,sub:null}),ty:t});if(pt.t!=='Wild')lets.push([pt,mk('Path',pt,{segs:[{name:nm,args:null,fn:null,line:pt.line}],global:false})]);}
+      if(!eatP(','))break;}expP('|');}
     let ret=null,body;
     if(eatP('->')){ret=ty();body=block();}else body=expr(false);
+    if(derefs.length){if(body.t==='Block'&&!body.label)body.stmts=[...derefs,...body.stmts];else body=mk('Block',body,{stmts:derefs,tail:body,unsafe:false,label:null});}
+    for(const [pt,sc] of lets.reverse())body=mk('Match',pt,{scrut:sc,arms:[mk('Arm',pt,{pat:pt,guard:null,body})],kind:'let',annot:null});
     return mk('Closure',x,{move:mv,params,ret,body});
   }
   function structLit(pa,x){

@@ -5645,5 +5645,911 @@
     "src": "trait T {\n    pub fn f(&self) -> i32;\n}\nfn main() {}\n",
     "expect": { "code": "E0449", "line": 2 }, "pair": "trait-item-private-ok",
     "why": "pub on a trait method is E0449", "pr": "P13"
+  },
+  {
+    "id": "cl-add-two",
+    "src": "fn main() {\n    let add = |a: i32, b: i32| a + b;\n    println!(\"{}\", add(2, 3));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a closure is called like a function", "pr": "P14"
+  },
+  {
+    "id": "cl-inferred-param",
+    "src": "fn main() {\n    let add = |a, b| a + b;\n    println!(\"{}\", add(2, 3));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a call fixes the parameter types", "pr": "P14"
+  },
+  {
+    "id": "cl-body-block",
+    "src": "fn main() {\n    let f = |x: i32| -> i32 {\n        let y = x * 2;\n        y + 1\n    };\n    println!(\"{}\", f(4));\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "a closure can have a block body and a return type", "pr": "P14"
+  },
+  {
+    "id": "cl-captures-by-ref",
+    "src": "fn main() {\n    let k = 10;\n    let f = |x: i32| x + k;\n    println!(\"{} {}\", f(1), k);\n}\n",
+    "expect": "ok", "out": "11 10\n", "err": "", "exit": 0,
+    "why": "a reading closure leaves the variable usable", "pr": "P14"
+  },
+  {
+    "id": "cl-fnmut-counter",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut tick = || count += 1;\n    tick();\n    tick();\n    println!(\"{}\", count);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a mut closure changes its capture, and the variable shows it after the last call", "pr": "P14"
+  },
+  {
+    "id": "cl-move-copy",
+    "src": "fn main() {\n    let mut n = 1;\n    let mut f = move || { n += 1; n };\n    println!(\"{} {}\", f(), f());\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2 3\n1\n", "err": "", "exit": 0,
+    "why": "a move closure changes its own copy of a number", "pr": "P14"
+  },
+  {
+    "id": "cl-move-string",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let f = move || s.len();\n    println!(\"{} {}\", f(), f());\n}\n",
+    "expect": "ok", "out": "2 2\n", "err": "", "exit": 0,
+    "why": "a move closure owns its String and can run again", "pr": "P14"
+  },
+  {
+    "id": "cl-fnonce-run",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let f = move || s;\n    let t = f();\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "a closure that returns its capture runs once", "pr": "P14"
+  },
+  {
+    "id": "cl-two-readers",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let f = || s.len();\n    let g = || s.len() + 1;\n    println!(\"{} {}\", f(), g());\n}\n",
+    "expect": "ok", "out": "2 3\n", "err": "", "exit": 0,
+    "why": "two closures can read the same variable", "pr": "P14"
+  },
+  {
+    "id": "cl-borrow-ends",
+    "src": "fn main() {\n    let mut s = String::from(\"a\");\n    let show = || println!(\"{}\", s);\n    show();\n    s.push_str(\"b\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "a\nab\n", "err": "", "exit": 0,
+    "why": "the closure borrow ends after its last call", "pr": "P14"
+  },
+  {
+    "id": "cl-mut-borrow-ends",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut inc = || n += 1;\n    inc();\n    inc();\n    println!(\"{}\", n);\n    n += 1;\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n3\n", "err": "", "exit": 0,
+    "why": "the mutable borrow ends after the last call", "pr": "P14"
+  },
+  {
+    "id": "cl-apply-fn",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {\n    f(x)\n}\nfn main() {\n    let k = 3;\n    println!(\"{} {}\", apply(|x| x + 1, 5), apply(|x| x * k, 5));\n}\n",
+    "expect": "ok", "out": "6 15\n", "err": "", "exit": 0,
+    "why": "a generic parameter with an Fn bound takes any matching closure", "pr": "P14"
+  },
+  {
+    "id": "cl-apply-impl",
+    "src": "fn apply(f: impl Fn(i32) -> i32, x: i32) -> i32 {\n    f(x) + f(x)\n}\nfn main() {\n    println!(\"{}\", apply(|x| x * 2, 5));\n}\n",
+    "expect": "ok", "out": "20\n", "err": "", "exit": 0,
+    "why": "impl Fn works in an argument", "pr": "P14"
+  },
+  {
+    "id": "cl-where-bound",
+    "src": "fn apply<F>(f: F) -> i32\nwhere\n    F: Fn() -> i32,\n{\n    f()\n}\nfn main() {\n    println!(\"{}\", apply(|| 7));\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "a where clause names the closure bound", "pr": "P14"
+  },
+  {
+    "id": "cl-fnmut-param",
+    "src": "fn twice<F: FnMut()>(mut f: F) {\n    f();\n    f();\n}\nfn main() {\n    let mut n = 0;\n    twice(|| n += 5);\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "an FnMut parameter is called through a mut binding", "pr": "P14"
+  },
+  {
+    "id": "cl-fnonce-param",
+    "src": "fn run<F: FnOnce() -> String>(f: F) -> String {\n    f()\n}\nfn main() {\n    let s = String::from(\"moved\");\n    println!(\"{}\", run(move || s));\n}\n",
+    "expect": "ok", "out": "moved\n", "err": "", "exit": 0,
+    "why": "an FnOnce parameter can take a closure that moves its capture", "pr": "P14"
+  },
+  {
+    "id": "cl-return-move",
+    "src": "fn adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n\n}\nfn main() {\n    let a = adder(5);\n    println!(\"{} {}\", a(1), a(2));\n}\n",
+    "expect": "ok", "out": "6 7\n", "err": "", "exit": 0,
+    "why": "a returned closure owns what it uses", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fnmut",
+    "src": "fn counter() -> impl FnMut() -> i32 {\n    let mut c = 0;\n    move || {\n        c += 1;\n        c\n    }\n}\nfn main() {\n    let mut next = counter();\n    println!(\"{} {} {}\", next(), next(), next());\n}\n",
+    "expect": "ok", "out": "1 2 3\n", "err": "", "exit": 0,
+    "why": "a returned FnMut keeps its own state", "pr": "P14"
+  },
+  {
+    "id": "cl-compose",
+    "src": "fn compose(f: impl Fn(i32) -> i32, g: impl Fn(i32) -> i32) -> impl Fn(i32) -> i32 {\n    move |x| g(f(x))\n}\nfn main() {\n    let h = compose(|x| x + 1, |x| x * 10);\n    println!(\"{}\", h(2));\n}\n",
+    "expect": "ok", "out": "30\n", "err": "", "exit": 0,
+    "why": "closures passed in and returned", "pr": "P14"
+  },
+  {
+    "id": "cl-nested",
+    "src": "fn main() {\n    let outer = 5;\n    let f = |x: i32| {\n        let g = |y: i32| y + outer;\n        g(x) * 2\n    };\n    println!(\"{}\", f(1));\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "a closure inside a closure", "pr": "P14"
+  },
+  {
+    "id": "cl-in-loop",
+    "src": "fn main() {\n    let mut out = Vec::new();\n    for i in 0..3 {\n        let f = |x: i32| x + i;\n        out.push(f(10));\n    }\n    println!(\"{:?}\", out);\n}\n",
+    "expect": "ok", "out": "[10, 11, 12]\n", "err": "", "exit": 0,
+    "why": "a closure made in a loop captures that turn", "pr": "P14"
+  },
+  {
+    "id": "cl-struct-self",
+    "src": "struct Cart {\n    items: Vec<i32>,\n    bonus: i32,\n}\nimpl Cart {\n    fn total(&self) -> i32 {\n        self.items.iter().map(|x| x + self.bonus).sum()\n    }\n}\nfn main() {\n    let c = Cart { items: vec![1, 2, 3], bonus: 10 };\n    println!(\"{}\", c.total());\n}\n",
+    "expect": "ok", "out": "36\n", "err": "", "exit": 0,
+    "why": "a closure in a method reads self", "pr": "P14"
+  },
+  {
+    "id": "it-map-collect",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let w: Vec<i32> = v.iter().map(|x| x * 2).collect();\n    println!(\"{:?} {:?}\", v, w);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [2, 4, 6]\n", "err": "", "exit": 0,
+    "why": "map builds new values and leaves v alone", "pr": "P14"
+  },
+  {
+    "id": "it-filter-copied",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4, 5, 6];\n    let e: Vec<i32> = v.iter().filter(|x| **x % 2 == 0).copied().collect();\n    println!(\"{:?}\", e);\n}\n",
+    "expect": "ok", "out": "[2, 4, 6]\n", "err": "", "exit": 0,
+    "why": "filter keeps what the test accepts", "pr": "P14"
+  },
+  {
+    "id": "it-consumers",
+    "src": "fn main() {\n    let v = vec![3, 1, 4, 1, 5];\n    let s: i32 = v.iter().sum();\n    let p: i32 = v.iter().product();\n    let c = v.iter().count();\n    println!(\"{} {} {} {:?} {:?} {:?}\", s, p, c, v.iter().min(), v.iter().max(), v.iter().last());\n}\n",
+    "expect": "ok", "out": "14 60 5 Some(1) Some(5) Some(5)\n", "err": "", "exit": 0,
+    "why": "the consumers that end a chain", "pr": "P14"
+  },
+  {
+    "id": "it-find-position",
+    "src": "fn main() {\n    let v = vec![3, 1, 4, 1, 5];\n    println!(\"{:?} {:?} {} {}\", v.iter().find(|x| **x > 3), v.iter().position(|x| *x == 4), v.iter().any(|x| *x == 5), v.iter().all(|x| *x < 5));\n}\n",
+    "expect": "ok", "out": "Some(4) Some(2) true false\n", "err": "", "exit": 0,
+    "why": "find, position, any and all stop early", "pr": "P14"
+  },
+  {
+    "id": "it-fold",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let t = v.iter().fold(0, |acc, x| acc * 10 + x);\n    let s = v.iter().fold(String::new(), |mut acc, x| {\n        acc.push_str(\"x\");\n        acc\n    });\n    println!(\"{} {}\", t, s);\n}\n",
+    "expect": "ok", "out": "123 xxx\n", "err": "", "exit": 0,
+    "why": "fold carries a total through the items", "pr": "P14"
+  },
+  {
+    "id": "it-enumerate-zip",
+    "src": "fn main() {\n    let v = vec![5, 6, 7];\n    let w = vec![10, 20, 30];\n    for (i, x) in v.iter().enumerate() {\n        println!(\"{} {}\", i, x);\n    }\n    let z: Vec<(i32, i32)> = v.iter().copied().zip(w.iter().copied()).collect();\n    println!(\"{:?}\", z);\n}\n",
+    "expect": "ok", "out": "0 5\n1 6\n2 7\n[(5, 10), (6, 20), (7, 30)]\n", "err": "", "exit": 0,
+    "why": "enumerate numbers and zip pairs", "pr": "P14"
+  },
+  {
+    "id": "it-rev-take-skip",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4, 5, 6];\n    let a: Vec<i32> = v.iter().rev().copied().collect();\n    let b: Vec<i32> = v.iter().skip(1).take(3).copied().collect();\n    let c: Vec<i32> = v.iter().take_while(|x| **x < 4).copied().collect();\n    let d: Vec<i32> = v.iter().skip_while(|x| **x < 4).copied().collect();\n    println!(\"{:?} {:?} {:?} {:?}\", a, b, c, d);\n}\n",
+    "expect": "ok", "out": "[6, 5, 4, 3, 2, 1] [2, 3, 4] [1, 2, 3] [4, 5, 6]\n", "err": "", "exit": 0,
+    "why": "rev, skip, take, take_while and skip_while", "pr": "P14"
+  },
+  {
+    "id": "it-rev-map",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let w: Vec<i32> = v.iter().map(|x| { println!(\"m{}\", x); x * 2 }).rev().collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "m3\nm2\nm1\n[6, 4, 2]\n", "err": "", "exit": 0,
+    "why": "rev runs the closure from the back", "pr": "P14"
+  },
+  {
+    "id": "it-range",
+    "src": "fn main() {\n    let sq: Vec<i32> = (1..4).map(|x| x * x).collect();\n    let t: i32 = (1..=4).product();\n    let r: Vec<i32> = (0..5).rev().collect();\n    let n = (0..10).filter(|x| x % 3 == 0).count();\n    println!(\"{:?} {} {:?} {}\", sq, t, r, n);\n}\n",
+    "expect": "ok", "out": "[1, 4, 9] 24 [4, 3, 2, 1, 0] 4\n", "err": "", "exit": 0,
+    "why": "ranges are iterators", "pr": "P14"
+  },
+  {
+    "id": "it-chars",
+    "src": "fn main() {\n    let s = String::from(\"hello\");\n    let r: String = s.chars().rev().collect();\n    let n = s.chars().count();\n    println!(\"{} {}\", r, n);\n}\n",
+    "expect": "ok", "out": "olleh 5\n", "err": "", "exit": 0,
+    "why": "chars walks the text", "pr": "P14"
+  },
+  {
+    "id": "it-lazy-order",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let r = v.iter().map(|x| {\n        println!(\"map {}\", x);\n        x + 1\n    });\n    println!(\"before\");\n    let w: Vec<i32> = r.collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "before\nmap 1\nmap 2\nmap 3\n[2, 3, 4]\n", "err": "", "exit": 0,
+    "why": "nothing runs until a consumer asks", "pr": "P14"
+  },
+  {
+    "id": "it-lazy-interleave",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4];\n    let r: Vec<i32> = v.iter().map(|x| { println!(\"m{}\", x); x * 2 }).filter(|x| { println!(\"f{}\", x); *x > 2 }).collect();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": "ok", "out": "m1\nf2\nm2\nf4\nm3\nf6\nm4\nf8\n[4, 6, 8]\n", "err": "", "exit": 0,
+    "why": "each item goes through the whole chain before the next", "pr": "P14"
+  },
+  {
+    "id": "it-lazy-short-circuit",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let any = v.iter().map(|x| { println!(\"m{}\", x); *x }).any(|x| x == 2);\n    println!(\"{}\", any);\n}\n",
+    "expect": "ok", "out": "m1\nm2\ntrue\n", "err": "", "exit": 0,
+    "why": "any stops pulling when it finds one", "pr": "P14"
+  },
+  {
+    "id": "it-next-while",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let mut it = v.iter();\n    while let Some(x) = it.next() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "next gives one item at a time", "pr": "P14"
+  },
+  {
+    "id": "it-for-adapter",
+    "src": "fn main() {\n    let names = vec![String::from(\"a\"), String::from(\"b\")];\n    for n in names.iter().map(|s| s.len()) {\n        println!(\"{}\", n);\n    }\n}\n",
+    "expect": "ok", "out": "1\n1\n", "err": "", "exit": 0,
+    "why": "a for loop can walk an adapter", "pr": "P14"
+  },
+  {
+    "id": "it-into-iter",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\"), String::from(\"b\")];\n    let w: Vec<usize> = v.into_iter().map(|s| s.len()).collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 1]\n", "err": "", "exit": 0,
+    "why": "into_iter hands the items over", "pr": "P14"
+  },
+  {
+    "id": "it-iter-mut",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    for x in v.iter_mut() {\n        *x *= 2;\n    }\n    v.iter_mut().for_each(|x| *x += 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 5, 7]\n", "err": "", "exit": 0,
+    "why": "iter_mut changes the items in place", "pr": "P14"
+  },
+  {
+    "id": "it-captured-sum",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let mut total = 0;\n    v.iter().for_each(|x| total += x);\n    println!(\"{}\", total);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "a closure in an adapter can change a capture", "pr": "P14"
+  },
+  {
+    "id": "it-array-slice",
+    "src": "fn total(v: &[i32]) -> i32 {\n    v.iter().sum()\n}\nfn main() {\n    let a = [1, 2, 3];\n    let d: Vec<i32> = a.iter().map(|x| x * 2).collect();\n    println!(\"{} {:?}\", total(&a), d);\n}\n",
+    "expect": "ok", "out": "6 [2, 4, 6]\n", "err": "", "exit": 0,
+    "why": "arrays and slices have iter too", "pr": "P14"
+  },
+  {
+    "id": "it-hashmap-sorted",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(1, 10);\n    m.insert(2, 20);\n    let mut ks: Vec<i32> = m.keys().copied().collect();\n    ks.sort();\n    let t: i32 = m.values().sum();\n    println!(\"{:?} {}\", ks, t);\n}\n",
+    "expect": "ok", "out": "[1, 2] 30\n", "err": "", "exit": 0,
+    "why": "sorting makes map output stable", "pr": "P14"
+  },
+  {
+    "id": "it-collect-hashmap",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let m: HashMap<i32, i32> = (1..4).map(|x| (x, x * x)).collect();\n    println!(\"{} {:?}\", m.len(), m.get(&3));\n}\n",
+    "expect": "ok", "out": "3 Some(9)\n", "err": "", "exit": 0,
+    "why": "collect can build a HashMap from pairs", "pr": "P14"
+  },
+  {
+    "id": "cl-option-methods",
+    "src": "fn main() {\n    let o: Option<i32> = Some(4);\n    let n: Option<i32> = None;\n    println!(\"{:?} {:?} {}\", o.map(|x| x + 1), o.and_then(|x| if x > 3 { Some(x * 2) } else { None }), n.unwrap_or_else(|| 99));\n}\n",
+    "expect": "ok", "out": "Some(5) Some(8) 99\n", "err": "", "exit": 0,
+    "why": "closure-taking Option methods", "pr": "P14"
+  },
+  {
+    "id": "cl-result-methods",
+    "src": "fn parse(s: &str) -> Result<i32, String> {\n    if s == \"1\" { Ok(1) } else { Err(String::from(\"bad\")) }\n}\nfn main() {\n    println!(\"{:?} {:?} {}\", parse(\"1\").map(|x| x + 1), parse(\"x\").map_err(|m| m.len()), parse(\"x\").unwrap_or_else(|m| m.len() as i32));\n}\n",
+    "expect": "ok", "out": "Ok(2) Err(3) 3\n", "err": "", "exit": 0,
+    "why": "closure-taking Result methods", "pr": "P14"
+  },
+  {
+    "id": "cl-sort-retain",
+    "src": "fn main() {\n    let mut v = vec![String::from(\"ccc\"), String::from(\"a\"), String::from(\"bb\")];\n    v.sort_by_key(|s| s.len());\n    println!(\"{:?}\", v);\n    v.retain(|s| s.len() > 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[\"a\", \"bb\", \"ccc\"]\n[\"bb\", \"ccc\"]\n", "err": "", "exit": 0,
+    "why": "sort_by_key and retain take closures", "pr": "P14"
+  },
+  {
+    "id": "cl-entry-or-insert-with",
+    "src": "use std::collections::HashMap;\n\nfn main() {\n    let mut m: HashMap<String, i32> = HashMap::new();\n    *m.entry(String::from(\"a\")).or_insert_with(|| 5) += 1;\n    *m.entry(String::from(\"a\")).or_insert_with(|| 100) += 1;\n    println!(\"{:?}\", m.get(\"a\"));\n}\n",
+    "expect": "ok", "out": "Some(7)\n", "err": "", "exit": 0,
+    "why": "or_insert_with runs the closure only when the key is missing", "pr": "P14"
+  },
+  {
+    "id": "cl-closure-in-vec-loop",
+    "src": "fn main() {\n    let words = vec![String::from(\"ab\"), String::from(\"c\")];\n    let lens: Vec<usize> = words.iter().map(|w| w.len()).collect();\n    let longest = lens.iter().max();\n    println!(\"{:?} {:?}\", lens, longest);\n}\n",
+    "expect": "ok", "out": "[2, 1] Some(2)\n", "err": "", "exit": 0,
+    "why": "a closure reads each item", "pr": "P14"
+  },
+  {
+    "id": "cl-const-lint",
+    "src": "fn main() {\n    let f = |x: i32| {\n        let a = 255u8;\n        a\n    };\n    println!(\"{}\", f(1));\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "a closure body is checked like any other code", "pr": "P14"
+  },
+  {
+    "id": "cl-fnmut-not-mut",
+    "src": "fn main() {\n    let mut count = 0;\n    let tick = || count += 1;\n    tick();\n    println!(\"{}\", count);\n}\n",
+    "expect": {"code": "E0596", "line": 4}, "pair": "cl-fnmut-not-mut-ok",
+    "why": "calling a closure that changes a capture needs the closure itself to be mut", "pr": "P14"
+  },
+  {
+    "id": "cl-fnmut-not-mut-ok",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut tick = || count += 1;\n    tick();\n    println!(\"{}\", count);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-borrow-then-write",
+    "src": "fn main() {\n    let mut n = 1;\n    let f = || n * 2;\n    n += 1;\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0506", "line": 4}, "pair": "cl-borrow-then-write-ok",
+    "why": "a closure that reads n borrows it, so n cannot be assigned until the last call; move copies n", "pr": "P14"
+  },
+  {
+    "id": "cl-borrow-then-write-ok",
+    "src": "fn main() {\n    let mut n = 1;\n    let f = move || n * 2;\n    n += 1;\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-two-mut-borrows",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut m = 0;\n    let mut a = || n += 1;\n    let mut b = || n += 2;\n    a();\n    b();\n    println!(\"{} {}\", n, m);\n}\n",
+    "expect": {"code": "E0499", "line": 5}, "pair": "cl-two-mut-borrows-ok",
+    "why": "two closures that change n cannot both borrow it; closures on different variables are fine", "pr": "P14"
+  },
+  {
+    "id": "cl-two-mut-borrows-ok",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut m = 0;\n    let mut a = || n += 1;\n    let mut b = || m += 2;\n    a();\n    b();\n    println!(\"{} {}\", n, m);\n}\n",
+    "expect": "ok", "out": "1 2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-mut-borrow-then-read",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut inc = || count += 1;\n    println!(\"{}\", count);\n    inc();\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "cl-mut-borrow-then-read-ok",
+    "why": "reading count while the closure still holds a mutable borrow of it", "pr": "P14"
+  },
+  {
+    "id": "cl-mut-borrow-then-read-ok",
+    "src": "fn main() {\n    let mut count = 0;\n    let mut inc = move || count += 1;\n    println!(\"{}\", count);\n    inc();\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-move-then-use",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let f = move || s.len();\n    println!(\"{}\", s);\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "cl-move-then-use-ok",
+    "why": "move puts s inside the closure, so s is gone afterwards; a borrowing closure leaves it", "pr": "P14"
+  },
+  {
+    "id": "cl-move-then-use-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let f = || s.len();\n    println!(\"{}\", s);\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "a\n1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-move-while-borrowed",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    let f = move || s.len();\n    println!(\"{} {}\", r, f());\n}\n",
+    "expect": {"code": "E0505", "line": 4}, "pair": "cl-move-while-borrowed-ok",
+    "why": "a move closure takes s while r still points at it", "pr": "P14"
+  },
+  {
+    "id": "cl-move-while-borrowed-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let r = &s;\n    let f = || s.len();\n    println!(\"{} {}\", r, f());\n}\n",
+    "expect": "ok", "out": "a 1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-fnonce-twice",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let f = || s;\n    let a = f();\n    let b = f();\n    println!(\"{} {}\", a, b);\n}\n",
+    "expect": {"code": "E0382", "line": 5}, "pair": "cl-fnonce-twice-ok",
+    "why": "a closure that returns its capture can run once; cloning lets it run again", "pr": "P14"
+  },
+  {
+    "id": "cl-fnonce-twice-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let f = || s.clone();\n    let a = f();\n    let b = f();\n    println!(\"{} {}\", a, b);\n}\n",
+    "expect": "ok", "out": "a a\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-assign-not-mut",
+    "src": "fn main() {\n    let n = 0;\n    let mut f = || n += 1;\n    f();\n}\n",
+    "expect": {"code": "E0594", "line": 3}, "pair": "cl-assign-not-mut-ok",
+    "why": "a closure cannot assign to a capture that is not mut", "pr": "P14"
+  },
+  {
+    "id": "cl-assign-not-mut-ok",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut f = || n += 1;\n    f();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-push-not-mut",
+    "src": "fn main() {\n    let v = vec![1];\n    let mut f = || v.push(2);\n    f();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 3}, "pair": "cl-push-not-mut-ok",
+    "why": "a closure cannot borrow a capture as mutable unless the variable is mut", "pr": "P14"
+  },
+  {
+    "id": "cl-push-not-mut-ok",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let mut f = || v.push(2);\n    f();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-fnmut-closure",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    let inc = || n += 1;\n    apply(inc);\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0525", "line": 6}, "pair": "cl-fn-bound-fnmut-closure-ok",
+    "why": "a closure that changes a capture is FnMut, so Fn is too strong", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-fnmut-closure-ok",
+    "src": "fn apply<F: FnMut()>(mut f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    let inc = || n += 1;\n    apply(inc);\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-inline-assign",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    apply(|| n += 1);\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0594", "line": 6}, "pair": "cl-fn-bound-inline-assign-ok",
+    "why": "a closure written in the call is judged against Fn, and assigning breaks it", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-inline-assign-ok",
+    "src": "fn apply<F: FnMut()>(mut f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    apply(|| n += 1);\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-inline-move",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let s = String::from(\"a\");\n    apply(move || drop(s));\n}\n",
+    "expect": {"code": "E0507", "line": 6}, "pair": "cl-fn-bound-inline-move-ok",
+    "why": "an Fn closure cannot move its capture out; a clone can be dropped", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-inline-move-ok",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let s = String::from(\"a\");\n    apply(move || drop(s.clone()));\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-fnonce-closure",
+    "src": "fn apply<F: Fn()>(f: F) {\n    f();\n}\nfn main() {\n    let s = String::from(\"a\");\n    let eat = move || drop(s);\n    apply(eat);\n}\n",
+    "expect": {"code": "E0525", "line": 6}, "pair": "cl-fn-bound-fnonce-closure-ok",
+    "why": "a closure that drops its capture is FnOnce", "pr": "P14"
+  },
+  {
+    "id": "cl-fn-bound-fnonce-closure-ok",
+    "src": "fn apply<F: FnOnce()>(f: F) {\n    f();\n}\nfn main() {\n    let s = String::from(\"a\");\n    let eat = move || drop(s);\n    apply(eat);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-generic-fnmut-not-mut",
+    "src": "fn call<F: FnMut()>(f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    call(|| n += 1);\n}\n",
+    "expect": {"code": "E0596", "line": 2}, "pair": "cl-generic-fnmut-not-mut-ok",
+    "why": "calling an FnMut parameter needs the parameter to be mut", "pr": "P14"
+  },
+  {
+    "id": "cl-generic-fnmut-not-mut-ok",
+    "src": "fn call<F: FnMut()>(mut f: F) {\n    f();\n}\nfn main() {\n    let mut n = 0;\n    call(|| n += 1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-generic-fnonce-twice",
+    "src": "fn call<F: FnOnce() -> String>(f: F) -> String {\n    let a = f();\n    f()\n}\nfn main() {\n    println!(\"{}\", call(|| String::from(\"x\")));\n}\n",
+    "expect": {"code": "E0382", "line": 3}, "pair": "cl-generic-fnonce-twice-ok",
+    "why": "FnOnce can run once, Fn can run again", "pr": "P14"
+  },
+  {
+    "id": "cl-generic-fnonce-twice-ok",
+    "src": "fn call<F: Fn() -> String>(f: F) -> String {\n    let a = f();\n    f()\n}\nfn main() {\n    println!(\"{}\", call(|| String::from(\"x\")));\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-return-borrowing",
+    "src": "fn adder(n: i32) -> impl Fn(i32) -> i32 {\n    |x| x + n\n}\nfn main() {\n    println!(\"{}\", adder(2)(3));\n}\n",
+    "expect": {"code": "E0373", "line": 2}, "pair": "cl-return-borrowing-ok",
+    "why": "a returned closure must own what it uses", "pr": "P14"
+  },
+  {
+    "id": "cl-return-borrowing-ok",
+    "src": "fn adder(n: i32) -> impl Fn(i32) -> i32 {\n    move |x| x + n\n}\nfn main() {\n    println!(\"{}\", adder(2)(3));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-wrong-arity",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a, b| a + b));\n}\n",
+    "expect": {"code": "E0593", "line": 5}, "pair": "cl-wrong-arity-ok",
+    "why": "the closure takes the number of arguments the bound lists", "pr": "P14"
+  },
+  {
+    "id": "cl-wrong-arity-ok",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a| a + 1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-wrong-param-type",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a: String| 1));\n}\n",
+    "expect": {"code": "E0631", "line": 5}, "pair": "cl-wrong-param-type-ok",
+    "why": "an annotated parameter must match what the function passes", "pr": "P14"
+  },
+  {
+    "id": "cl-wrong-param-type-ok",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a: i32| 1));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-call-arg-count",
+    "src": "fn main() {\n    let f = |x: i32| x + 1;\n    println!(\"{}\", f(1, 2));\n}\n",
+    "expect": {"code": "E0057", "line": 3}, "pair": "cl-call-arg-count-ok",
+    "why": "a closure is called with one value per parameter", "pr": "P14"
+  },
+  {
+    "id": "cl-call-arg-count-ok",
+    "src": "fn main() {\n    let f = |x: i32| x + 1;\n    println!(\"{}\", f(1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-call-arg-type",
+    "src": "fn main() {\n    let f = |x: i32| x + 1;\n    println!(\"{}\", f(\"a\"));\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "cl-call-arg-type-ok",
+    "why": "the argument has the parameter type", "pr": "P14"
+  },
+  {
+    "id": "cl-call-arg-type-ok",
+    "src": "fn main() {\n    let f = |x: i32| x + 1;\n    println!(\"{}\", f(1));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-param-needs-type",
+    "src": "fn main() {\n    let f = |s| s.len();\n    println!(\"{}\", f(\"abc\"));\n}\n",
+    "expect": {"code": "E0282", "line": 2}, "pair": "cl-param-needs-type-ok",
+    "why": "a method on a closure parameter needs its type written", "pr": "P14"
+  },
+  {
+    "id": "cl-param-needs-type-ok",
+    "src": "fn main() {\n    let f = |s: &str| s.len();\n    println!(\"{}\", f(\"abc\"));\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-call-non-fn",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x(1));\n}\n",
+    "expect": {"code": "E0618", "line": 3}, "pair": "cl-call-non-fn-ok",
+    "why": "only a function or closure can be called", "pr": "P14"
+  },
+  {
+    "id": "cl-call-non-fn-ok",
+    "src": "fn main() {\n    let x = 5;\n    println!(\"{}\", x + 1);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-not-callable-arg",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(5));\n}\n",
+    "expect": {"code": "E0277", "line": 5}, "pair": "cl-not-callable-arg-ok",
+    "why": "a bound that names Fn needs something callable", "pr": "P14"
+  },
+  {
+    "id": "cl-not-callable-arg-ok",
+    "src": "fn apply<F: Fn(i32) -> i32>(f: F) -> i32 {\n    f(1)\n}\nfn main() {\n    println!(\"{}\", apply(|a| 5));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-collect-untyped",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let w = v.iter().map(|x| x * 2).collect();\n    println!(\"{}\", 1);\n}\n",
+    "expect": {"code": "E0283", "line": 3}, "pair": "it-collect-untyped-ok",
+    "why": "collect needs the type it builds", "pr": "P14"
+  },
+  {
+    "id": "it-collect-untyped-ok",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let w: Vec<_> = v.iter().map(|x| x * 2).collect();\n    println!(\"{}\", 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-collect-method-first",
+    "src": "fn main() {\n    let v = (1..4).collect();\n    println!(\"{}\", v.len());\n}\n",
+    "expect": {"code": "E0282", "line": 2}, "pair": "it-collect-method-first-ok",
+    "why": "a method on an untyped collect result needs the type first", "pr": "P14"
+  },
+  {
+    "id": "it-collect-method-first-ok",
+    "src": "fn main() {\n    let v: Vec<_> = (1..4).collect();\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-sum-untyped",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let s = v.iter().sum();\n    println!(\"{}\", 1);\n}\n",
+    "expect": {"code": "E0283", "line": 3}, "pair": "it-sum-untyped-ok",
+    "why": "sum needs the type it adds up to", "pr": "P14"
+  },
+  {
+    "id": "it-sum-untyped-ok",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let s: i32 = v.iter().sum();\n    println!(\"{}\", 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-collect-refs-into-values",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let w: Vec<i32> = v.iter().collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "it-collect-refs-into-values-ok",
+    "why": "iter gives references, into_iter gives values", "pr": "P14"
+  },
+  {
+    "id": "it-collect-refs-into-values-ok",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let w: Vec<i32> = v.into_iter().collect();\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-collect-wrong-item",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let w: Vec<String> = v.iter().map(|x| x + 1).collect();\n    println!(\"{}\", w.len());\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "it-collect-wrong-item-ok",
+    "why": "the Vec holds what the map produces", "pr": "P14"
+  },
+  {
+    "id": "it-collect-wrong-item-ok",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let w: Vec<i32> = v.iter().map(|x| x + 1).collect();\n    println!(\"{}\", w.len());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-sum-wrong-type",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let t: i64 = v.iter().sum();\n    println!(\"{}\", t);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "it-sum-wrong-type-ok",
+    "why": "sum gives the item type", "pr": "P14"
+  },
+  {
+    "id": "it-sum-wrong-type-ok",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![1, 2, 3];\n    let t: i32 = v.iter().sum();\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-max-float",
+    "src": "fn main() {\n    let v = vec![1.5, 2.5];\n    let m = v.iter().max();\n    println!(\"{:?}\", m);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "it-max-float-ok",
+    "why": "floats have no total order, so max needs integers", "pr": "P14"
+  },
+  {
+    "id": "it-max-float-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let m = v.iter().max();\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(2)\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-filter-compare-ref",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| x > 1).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0308", "line": 3}, "pair": "it-filter-compare-ref-ok",
+    "why": "filter gives a reference to a reference", "pr": "P14"
+  },
+  {
+    "id": "it-filter-compare-ref-ok",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| **x > 1).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-filter-eq-ref",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| x == 2).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "it-filter-eq-ref-ok",
+    "why": "comparing a reference with a number needs the star", "pr": "P14"
+  },
+  {
+    "id": "it-filter-eq-ref-ok",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let n = v.iter().filter(|x| **x == 2).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-next-not-mut",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let it = v.iter();\n    println!(\"{:?}\", it.next());\n}\n",
+    "expect": {"code": "E0596", "line": 4}, "pair": "it-next-not-mut-ok",
+    "why": "next changes the iterator", "pr": "P14"
+  },
+  {
+    "id": "it-next-not-mut-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let mut it = v.iter();\n    println!(\"{:?}\", it.next());\n}\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-held-borrow",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let first = v.iter().next();\n    v.push(3);\n    println!(\"{:?}\", first);\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "it-held-borrow-ok",
+    "why": "the iterator keeps v borrowed while first is used", "pr": "P14"
+  },
+  {
+    "id": "it-held-borrow-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let first = v.iter().next();\n    v.len();\n    println!(\"{:?}\", first);\n}\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-for-each-push",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w: Vec<i32> = vec![];\n    v.iter().for_each(|x| v.push(*x));\n    println!(\"{:?} {:?}\", v, w);\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "it-for-each-push-ok",
+    "why": "pushing into the vec being walked is blocked", "pr": "P14"
+  },
+  {
+    "id": "it-for-each-push-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w: Vec<i32> = vec![];\n    v.iter().for_each(|x| w.push(*x));\n    println!(\"{:?} {:?}\", v, w);\n}\n",
+    "expect": "ok", "out": "[1, 2] [1, 2]\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-into-iter-moves",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let n = v.into_iter().count();\n    println!(\"{} {}\", n, v.len());\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "it-into-iter-moves-ok",
+    "why": "into_iter takes the Vec", "pr": "P14"
+  },
+  {
+    "id": "it-into-iter-moves-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let n = v.iter().count();\n    println!(\"{} {}\", n, v.len());\n}\n",
+    "expect": "ok", "out": "2 2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-lazy-borrow-dropped",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let r = v.iter().map(|x| x * 2);\n    drop(v);\n    println!(\"{}\", r.count());\n}\n",
+    "expect": {"code": "E0505", "line": 4}, "pair": "it-lazy-borrow-dropped-ok",
+    "why": "a lazy iterator still borrows the Vec", "pr": "P14"
+  },
+  {
+    "id": "it-lazy-borrow-dropped-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let r = v.iter().map(|x| x * 2);\n    drop(r);\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-for-over-map-push",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    for x in v.iter().map(|x| x + 1) {\n        v.push(x);\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "it-for-over-map-push-ok",
+    "why": "looping over an adapter keeps the Vec borrowed", "pr": "P14"
+  },
+  {
+    "id": "it-for-over-map-push-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    for x in v.clone().iter().map(|x| x + 1) {\n        v.push(x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-closure-count",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let n: Vec<i32> = v.iter().map(|a, b| 1).collect();\n    println!(\"{:?}\", n);\n}\n",
+    "expect": {"code": "E0593", "line": 3}, "pair": "it-closure-count-ok",
+    "why": "map passes one item", "pr": "P14"
+  },
+  {
+    "id": "it-closure-count-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let n: Vec<i32> = v.iter().map(|a| 1).collect();\n    println!(\"{:?}\", n);\n}\n",
+    "expect": "ok", "out": "[1, 1]\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "it-fold-closure-count",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let t = v.iter().fold(0, |a| a);\n    println!(\"{}\", t);\n}\n",
+    "expect": {"code": "E0593", "line": 3}, "pair": "it-fold-closure-count-ok",
+    "why": "fold passes the total and the item", "pr": "P14"
+  },
+  {
+    "id": "it-fold-closure-count-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let t = v.iter().fold(0, |a, b| a);\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-option-map-moves",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    let n = o.map(|s| s.len());\n    println!(\"{:?} {:?}\", n, o);\n}\n",
+    "expect": {"code": "E0382", "line": 4}, "pair": "cl-option-map-moves-ok",
+    "why": "map takes the Option", "pr": "P14"
+  },
+  {
+    "id": "cl-option-map-moves-ok",
+    "src": "fn main() {\n    let o = Some(String::from(\"a\"));\n    let n = o.clone().map(|s| s.len());\n    println!(\"{:?} {:?}\", n, o);\n}\n",
+    "expect": "ok", "out": "Some(1) Some(\"a\")\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-sort-key-needs-ord",
+    "src": "fn main() {\n    let mut v = vec![1.5, 0.5];\n    v.sort_by_key(|x| *x);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 3}, "pair": "cl-sort-key-needs-ord-ok",
+    "why": "floats have no total order", "pr": "P14"
+  },
+  {
+    "id": "cl-sort-key-needs-ord-ok",
+    "src": "fn main() {\n    let mut v = vec![15, 5];\n    v.sort_by_key(|x| *x);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[5, 15]\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-move-copy-still-lints",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let f = move || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4}, "pair": "cl-move-copy-still-lints-ok",
+    "why": "a move closure copies x, so x stays a known constant", "pr": "P14"
+  },
+  {
+    "id": "cl-move-copy-still-lints-ok",
+    "src": "fn main() {\n    let x: u8 = 254;\n    let f = move || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": "ok", "out": "255 254\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-push-reads-vec-late",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let f = || v.len();\n    v.push(f());\n    println!(\"{:?} {}\", v, f());\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "cl-push-reads-vec-ok",
+    "why": "the closure is called again after the push, so its borrow is still live", "pr": "P14"
+  },
+  {
+    "id": "cl-push-reads-vec-ok",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let f = || v.len();\n    v.push(f());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 1]\n", "err": "", "exit": 0,
+    "why": "the last call of the closure comes inside the push, a two-phase borrow", "pr": "P14"
+  },
+  {
+    "id": "cl-named-arith-closure-map-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let f = |x| x * 2;\n    let r: Vec<i32> = v.into_iter().map(f).collect();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": "ok", "out": "[2, 4]\n", "err": "", "exit": 0,
+    "why": "a closure named first and passed to map", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fn-mutates",
+    "src": "fn make() -> impl Fn() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": {"code": "E0594", "line": 3}, "pair": "cl-return-fnmut-mutates-ok",
+    "why": "a returned impl Fn cannot change what it captured", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fnmut-mutates-ok",
+    "src": "fn make() -> impl FnMut() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fn-moves-out",
+    "src": "fn make() -> impl Fn() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": {"code": "E0507", "line": 3}, "pair": "cl-return-fnonce-moves-out-ok",
+    "why": "a returned impl Fn cannot move a capture out", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fnonce-moves-out-ok",
+    "src": "fn make() -> impl FnOnce() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": "ok", "out": "\"x\"\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-move-string",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(move || n.len() as i32));\n}\n",
+    "expect": {"code": "E0277", "line": 6}, "pair": "cl-copy-bound-borrow-string-ok",
+    "why": "a closure that moves a String in is not Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-borrow-string-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(|| n.len() as i32));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a closure that only borrows is Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-no-capture-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    println!(\"{}\", apply(|| 5));\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "a closure that captures nothing is Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-move-copy-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = 3;\n    println!(\"{}\", apply(move || n));\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "a move of a Copy number stays Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-closure-own-state-ok",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut f = move || { n += 1; n };\n    let mut g = f;\n    println!(\"{} {} {}\", f(), g(), f());\n}\n",
+    "expect": "ok", "out": "1 1 2\n", "err": "", "exit": 0,
+    "why": "each copy of a Copy closure counts on its own", "pr": "P14"
+  },
+  {
+    "id": "cl-annotated-param-float-arg",
+    "src": "fn main() {\n    let y = 1;\n    let f = |x: i32| x + y;\n    println!(\"{}\", f(1.5));\n}\n",
+    "expect": {"code": "E0308", "line": 4}, "pair": "cl-annotated-param-int-arg-ok",
+    "why": "the argument is a float, the parameter an integer", "pr": "P14"
+  },
+  {
+    "id": "cl-annotated-param-int-arg-ok",
+    "src": "fn main() {\n    let y = 1;\n    let f = |x: i32| x + y;\n    println!(\"{}\", f(2));\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-zip-shorter-left-ok",
+    "src": "fn main() {\n    let a = vec![1, 2];\n    let b = vec![1, 2, 3];\n    let n = a.iter().map(|x| { println!(\"a{}\", x); *x }).zip(b.iter().map(|x| { println!(\"b{}\", x); *x })).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "a1\nb1\na2\nb2\n2\n", "err": "", "exit": 0,
+    "why": "the shorter side is on the left, so no side effect runs for the leftover item", "pr": "P14"
+  },
+  {
+    "id": "cl-zip-longer-left-plain-ok",
+    "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![1, 2];\n    let n = a.iter().zip(b.iter()).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a longer left side without a closure has no side effect to count", "pr": "P14"
   }
 ]

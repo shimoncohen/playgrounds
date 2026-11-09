@@ -46,7 +46,7 @@ describe('Vec as a type', () => {
     assert.equal(feature(main('let v: Vec<i32, i32> = Vec::new();')), 'Vec@2');
     assert.equal(feature(main('let v = Vec::<i32>::new();')), 'path call@2');
     assert.equal(feature(main('let v: Vec<i32> = Vec::with_capacity(2);')), 'path call@2');
-    assert.equal(feature(main('let v = vec![1, 2];', 'let it = v.iter();')), 'iterator@3');
+    assert.equal(feature(main('let v = vec![1, 2];', 'let it = v.iter().peekable();')), 'iterator@3');
     assert.equal(feature(main('let mut v = vec![1, 2];', 'v.dedup();')), 'collection method@3');
     assert.equal(feature(main('let v = vec![1, 2];', 'let x = v.get(0..1);')), 'range expression@3');
   });
@@ -261,7 +261,7 @@ describe('HashMap', () => {
     assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32> = HashMap::new();', '}')), 'HashMap@3');
     assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, &str> = HashMap::new();', '}')), 'reference in collection@3');
     assert.equal(feature(P(USE, 'fn main() {', '    let mut m: HashMap<i32, i32> = HashMap::new();', '    m.shrink_to_fit();', '}')), 'collection method@4');
-    assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, i32> = HashMap::new();', '    let n = m.keys();', '}')), 'iterator@4');
+    assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, i32> = HashMap::new();', '    let n = m.keys().peekable();', '}')), 'iterator@4');
   });
 });
 

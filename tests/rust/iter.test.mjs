@@ -146,9 +146,8 @@ describe('for over collections', () => {
   });
   it('what stays unsupported has a hint: arrays and slices, iterators held in a variable, adapters and closures', () => {
     assert.equal(feature(main('let a = [1, 2];', 'for x in a {}')), 'for iterable@3');
-    assert.equal(feature(main('let v = vec![1];', 'let it = v.iter();')), 'iterator@3');
-    assert.equal(feature(main('let v = vec![1];', 'for x in v.iter().rev() {}')), 'iterator@3');
-    assert.equal(feature(main('let mut v = vec![1];', 'v.retain(|x| *x > 0);')), 'closure@3');
+    assert.equal(feature(main('let v = vec![1];', 'let it = v.iter().peekable();')), 'iterator@3');
+    assert.equal(feature(main('let v = vec![1];', 'for x in v.iter().zip_all() {}')), 'iterator@3');
     assert.equal(feature(main('let v = vec![1];', 'for x in &v[..1] {}')), 'for iterable@3');
     for (const f of ['iterator', 'for iterable']) assert.ok(RQ.diag.hint(f).length > 30, f);
   });

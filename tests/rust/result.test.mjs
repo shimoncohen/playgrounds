@@ -158,8 +158,8 @@ describe('Result and Option methods without a closure', () => {
     assert.equal(feature(P('struct S { n: i32 }', ...body('let r: Result<S, i32> = Err(1);', 'let n = r.unwrap_or_default();').split('\n').filter(Boolean))).split('@')[0], 'method call');
     assert.equal(run(body('let r: Result<Vec<i32>, i32> = Err(1);', 'println!("{:?}", r.unwrap_or_default());')).stdout, '[]\n');
   });
-  it('a closure method is still unsupported', () => {
-    assert.equal(feature(body('let r: Result<i32, i32> = Ok(1);', 'let n = r.map(|x| x + 1);')).split('@')[0], 'closure');
+  it('a closure method is modeled', () => {
+    assert.equal(run(body('let r: Result<i32, i32> = Ok(1);', 'let n = r.map(|x| x + 1);', 'println!("{:?}", n);')).stdout, 'Ok(2)\n');
   });
 });
 

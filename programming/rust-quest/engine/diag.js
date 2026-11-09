@@ -104,8 +104,8 @@ const ERRORS={
   },
   E0277:{
     title:'a type is missing a trait this code needs',
-    msg:o=>o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.what==='bound'?BOUND(o):o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
-    tipFor:o=>o.what==='bound'?'A bound such as `T: '+o.trait+'` is a promise the caller keeps: the type you pass in has to have an `impl '+o.trait+' for '+o.type+'`'+(o.trait==='Display'||o.trait==='Debug'||o.trait==='Clone'||o.trait==='PartialEq'||o.trait==='PartialOrd'?' (or a derive, where the trait can be derived)':'')+'. Add the impl, or pass a type that has it.':o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
+    msg:o=>o.what==='fn'?'expected a `'+o.text+'` closure, found `'+o.type+'`':o.what==='cmp'?'can\'t compare `'+o.left+'` with `'+o.right+'`':o.what==='collect'?'a value of type `'+o.type+'` cannot be built from an iterator over elements of type `'+o.item+'`':o.what==='sum'?'a value of type `'+o.type+'` cannot be made by '+(o.op==='product'?'multiplying':'summing')+' an iterator over elements of type `'+o.item+'`':o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.what==='bound'?BOUND(o):o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    tipFor:o=>o.what==='fn'?'The function asks for something it can call. Pass a closure like `|x| x + 1`, or a value of a type that has the bound.':o.what==='cmp'?'`==` and the other comparisons need the same number of `&` on both sides. A closure for `filter` receives a reference to each item, which is a reference to a reference for `iter()`: write `**x`, or `*x == &2`, to compare with a plain number.':o.what==='collect'?'`collect` builds the type you ask for out of the items the iterator gives. A `Vec<i32>` needs `i32` items, and `iter()` gives `&i32`, so add `.copied()` or `.cloned()` before `collect`, or `map(|x| *x)`.':o.what==='sum'?'`sum` gives back the same number type as the items. Convert the items first, or ask for the type the items have.':o.what==='bound'?'A bound such as `T: '+o.trait+'` is a promise the caller keeps: the type you pass in has to have an `impl '+o.trait+' for '+o.type+'`'+(o.trait==='Display'||o.trait==='Debug'||o.trait==='Clone'||o.trait==='PartialEq'||o.trait==='PartialOrd'?' (or a derive, where the trait can be derived)':'')+'. Add the impl, or pass a type that has it.':o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
     tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field.'
   },
   E0369:{
@@ -116,12 +116,12 @@ const ERRORS={
   },
   E0594:{
     title:'a field is assigned, but it cannot change',
-    msg:o=>o.ref?'cannot assign to `'+o.name+'`, which is behind a `&` reference':'cannot assign to `'+o.name+'`, as `'+o.root+'` is not declared as mutable',
+    msg:o=>o.closure?'cannot assign to `'+o.name+'`, as it is a captured variable in a `'+o.closure+'` closure':o.plain?'cannot assign to `'+o.name+'`, as it is not declared as mutable':o.ref?'cannot assign to `'+o.name+'`, which is behind a `&` reference':'cannot assign to `'+o.name+'`, as `'+o.root+'` is not declared as mutable',
     tip:'Changing a field changes the value that holds it, so that value has to be `mut`. Write `let mut` for the variable, or take a `&mut` parameter instead of a `&` one.'
   },
   E0507:{
     title:'a value moves out of a place that keeps it',
-    msg:o=>o.index?'cannot move out of index of `'+o.type+'`':'cannot move out of `'+o.name+'`'+(o.variant?' as enum variant `'+o.variant+'`':'')+' which is behind a '+(o.mut?'mutable':'shared')+' reference',
+    msg:o=>o.closure?'cannot move out of `'+o.name+'`, a captured variable in an `'+o.closure+'` closure':o.index?'cannot move out of index of `'+o.type+'`':'cannot move out of `'+o.name+'`'+(o.variant?' as enum variant `'+o.variant+'`':'')+' which is behind a '+(o.mut?'mutable':'shared')+' reference',
     tip:'A reference only lends the value, and a `Vec` keeps its elements, so neither lets you take one away. Copy it with `.clone()`, borrow it with `&`, or take the whole value by value in the signature.'
   },
   E0609:{
@@ -157,8 +157,48 @@ const ERRORS={
   },
   E0596:{
     title:'a value is borrowed as mutable, but it cannot change',
-    msg:o=>o.ref?'cannot borrow `'+o.name+'` as mutable, as it is behind a `&` reference':'cannot borrow `'+o.name+'` as mutable, as '+(o.root?'`'+o.root+'`':'it')+' is not declared as mutable',
+    msg:o=>o.closure?'cannot borrow `'+o.name+'` as mutable, as it is a captured variable in a `'+o.closure+'` closure':o.ref?'cannot borrow `'+o.name+'` as mutable, as it is behind a `&` reference':'cannot borrow `'+o.name+'` as mutable, as '+(o.root?'`'+o.root+'`':'it')+' is not declared as mutable',
     tip:'Changing a value through a borrow needs the right to change it. Write `let mut` for the variable, or take a `&mut` parameter instead of a `&` one.'
+  },
+  E0282:{
+    title:'a type is needed here',
+    msg:()=>'type annotations needed',
+    tip:'Rust works out a type from how a value is used, but a closure parameter that is used before anything fixes its type, like `|s| s.len()`, has none yet. Write it: `|s: &str| s.len()`.'
+  },
+  E0283:{
+    title:'a type is needed here',
+    msg:()=>'type annotations needed',
+    tip:'`collect`, `sum` and `product` can build several types, so Rust cannot guess which one you want. Name it on the variable, like `let v: Vec<i32> = ...`, or on the call, like `.collect::<Vec<i32>>()`.'
+  },
+  E0525:{
+    title:'a closure is not the kind the function asks for',
+    msg:o=>'expected a closure that implements the `'+o.want+'` trait, but this closure only implements `'+o.has+'`',
+    tip:'A closure that changes a captured variable is `FnMut`, and one that moves a captured value out is `FnOnce`. A function that asks for `Fn` or `FnMut` may call the closure many times, so it needs a closure that can be called again: change the bound to the kind the closure is, or stop the closure from changing or moving what it captured.'
+  },
+  E0593:{
+    title:'a closure takes the wrong number of arguments',
+    msg:o=>'closure is expected to take '+o.want+' argument'+(o.want===1?'':'s')+', but it takes '+o.got+' argument'+(o.got===1?'':'s'),
+    tip:'The function that receives the closure decides what it is called with. Write one parameter for each value it passes, like `|a, b|` for two.'
+  },
+  E0631:{
+    title:'a closure parameter has the wrong type',
+    msg:()=>'type mismatch in closure arguments',
+    tip:'The closure is called with values of one type, and the type you wrote for a parameter is a different one. Remove the annotation, or write the type the function passes.'
+  },
+  E0057:{
+    title:'a closure is called with the wrong number of arguments',
+    msg:o=>'this function takes '+o.want+' argument'+(o.want===1?'':'s')+' but '+o.got+' argument'+(o.got===1?' was':'s were')+' supplied',
+    tip:'Call the closure with one value for each parameter between its `|` bars.'
+  },
+  E0618:{
+    title:'a value that is not a function is called',
+    msg:o=>'expected function, found `'+o.type+'`',
+    tip:'Only a function or a closure can be followed by `( ... )`. Check the name: it may be a variable that holds a plain value.'
+  },
+  E0373:{
+    title:'a closure outlives what it borrows',
+    msg:o=>'closure may outlive the current function, but it borrows `'+o.name+'`, which is owned by the current function',
+    tip:'A closure that only borrows a local variable cannot leave the function that owns the variable. Write `move` before the bars, like `move || x + 1`, so the closure takes its own copy or owns the value.'
   },
   E0597:{
     title:'a borrowed value goes out of scope too soon',
@@ -284,7 +324,7 @@ const HINTS={
   enum:'An `enum` is modeled with variants written as `Name`, `Name(T)` or `Name { field: T }`, no generics, and no `= value` numbers on the variants.',
   derive:'Only `#[derive(...)]` of `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Default` and `Hash` is modeled. Every field must have the trait too. `Copy` needs `Clone`, `Eq` and `PartialOrd` need `PartialEq`, and `Ord` needs `PartialOrd` and `Eq`. An `enum` derives `Default` from the one unit variant marked `#[default]`.',
   'match guard':'A `match` guard that moves a name its arm binds, like `Some(s) if eat(s)` (rustc reports `E0507`), or assigns to or borrows mutably part of the value being matched (`E0506`, `E0502`), is not modeled. Make the guard only read.',
-  impl:'Only `impl Name { ... }` with plain methods and associated functions (no generics, attributes or constants), and `impl Drop for Name` whose `drop` only prints with `println!`, are modeled.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
+  impl:'Modeled: `impl Name { ... }`, `impl Trait for Name` for your own traits, and the std traits `Display`, `Drop` and `From`. Writing `impl Iterator for Name`, `impl Debug` or `impl Clone` by hand is not modeled: derive what can be derived, or give the type a method that returns a `Vec`.',trait:LATER,static:'`static` items are not modeled. Use a `const`, which the quest does model.',
   'type alias':LATER,use:'The only `use` modeled is `use std::collections::HashMap;` once at the top of the file. The missions otherwise use what Rust gives every program.',mod:LATER,generics:LATER,
   method:'A method takes `self`, `&self` or `&mut self` as its first parameter. A receiver with a type written out, like `self: Box<Self>`, is not modeled.','nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:LATER,
   match:'A `match` on a `&mut` reference is not modeled. Match on the value itself, or on a `&` reference.',
@@ -310,7 +350,7 @@ const HINTS={
   'repeated error':'Several `&mut` borrows of a variable that is not `mut` are one error in Rust, and Rust Quest does not model how it is reported. Write `let mut` for the variable first.',
   'program too large':'This function is too big for the borrow checker in Rust Quest. Split it into smaller functions.',
   cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':'`?` is modeled on a `Result` or an `Option` that holds no reference, in a function that returns the same kind. Match on the value or use `unwrap` for anything else.','error conversion':'`?` here would have to turn one error type into another with `From`, which Rust Quest teaches in a later chapter. Make both error types the same, for now.','struct literal':'Write every field of the `struct` exactly once, as `Name { field: value, ... }`, with no `..` base.','qualified path':LATER,
-  'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out, like `let x: Option<i32> = None;`. Rust Quest does not infer a type behind `_`, or for a `None` that nothing else gives a type.',
+  'fn pointer':LATER,'impl Trait':'`impl Trait` is modeled for an argument, like `x: &impl Speak` or `f: impl Fn(i32) -> i32`, and for a returned closure, like `-> impl Fn(i32) -> i32`. A returned `impl Iterator` or any other `impl Trait` is not modeled: return a `Vec` instead.','inferred type':'Write the type out, like `let x: Option<i32> = None;`. Rust Quest does not infer a type behind `_`, or for a `None` that nothing else gives a type.',
   pattern:'Modeled patterns: a name or `_`, literals, ranges like `1..=5`, `|` between patterns that bind nothing, tuples, `struct` and `enum` variants (`Shape::Rect { w, h }`, `Some(n)`), and `n @ 1..=5`. Not modeled yet: `ref`, `&` patterns, slices, constants, floats, a `&` met inside a tuple or `struct`, a wrong field list, and a name that repeats.',
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
   'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
@@ -320,8 +360,18 @@ const HINTS={
   'const initializer':'A `const` can only hold a literal, or simple maths on other constants, for now.',
   'integer overflow':'Dividing the smallest number of a type by `-1` overflows. Rust Quest does not model that case; use another divisor.',
   'const folding':'Rust Quest cannot tell whether the compiler would catch this overflow before the program runs. Pass the value in as a function parameter, or use numbers that cannot overflow.',
-  'range expression':'A range like `0..5` is modeled only right after `for ... in`, or inside `&text[0..5]` to take a slice.',
-  'for iterable':'`for` loops over a range like `0..5`, over a `Vec` or `HashMap`, and over `&v`, `&mut v`, `v.iter()`, `v.iter_mut()`, `m.keys()` and `m.values()`. Arrays, slices and other iterators are not modeled yet: loop over a `Vec`, or count with a range and index.',
+  'range expression':'A range like `0..5` is modeled right after `for ... in`, inside `&text[0..5]` to take a slice, and as the start of an iterator chain like `(0..5).map(...)`. Put the range in parentheses to call a method on it.',
+  'closure kind':'A parameter that is itself an `Fn`, `FnMut` or `FnOnce` value can only be passed on to a bound of the same kind or a weaker one. Pass a closure instead.',
+  'closure bound':'A closure passed where `Clone` is required is not modeled. Pass a closure that captures nothing as a `fn` item, or drop the `Clone` bound.',
+  'zip with a side effect on its longer side':'Rust decides whether `zip` pulls one more item from its longer side by how the iterators are built, and Rust Quest does not model that when a closure would run. Keep the closures out of the longer side, or make both sides the same length.',
+  'closure returning a reference':'A closure that gives back a reference, or a bound like `Fn(&str) -> &str`, is not modeled, because the lifetime of the result would have to be worked out. Return an owned value, like a number or a `String`.',
+  'closure capture of a field':'A closure that moves or changes a field of a `struct` it captures is not modeled. Capture the whole variable, or copy the field into a variable first.',
+  'closure capture of a mutable reference':'A closure that uses a `&mut` variable is not modeled. Change the value through a plain variable, or call the function that takes the `&mut` directly.',
+  'closure that owns a value with Drop':'A closure that moves a value that implements `Drop` into itself is not modeled.',
+  'iterator over values with Drop':'Iterating over owned values that implement `Drop` is not modeled. Loop over references with `.iter()` instead.',
+  'sort_by_key with side effects':'`sort_by_key` is modeled for a key closure that only reads its argument, because the sort calls it a number of times that Rust decides. Print and count outside the closure.',
+  'iterator sum overflow':'An overflow inside `sum` or `product` panics inside the standard library, with a message Rust Quest does not model. Use numbers that cannot overflow.',
+  'for iterable':'`for` loops over a range like `0..5`, over a `Vec` or `HashMap`, over `&v`, `&mut v`, `v.iter()`, `m.keys()` and the like, and over any iterator built from them, like `v.iter().enumerate()`. An array or a slice with `&` in front is not modeled: loop over a `Vec`, or call `.iter()`.',
   'let condition':'A `let` inside an `if` or `while` condition next to other tests, like `if x > 0 && let Some(n) = o`, is not modeled. Use `if let` or `while let` on its own, and put the other test inside the block.',
   nesting:'Code nested this deeply, in a pattern, an expression or a type, is not modeled. Split it into smaller pieces.',
   'array length':'Write the array length as a plain number, like `[i32; 3]`, no bigger than 10000.',
@@ -338,7 +388,7 @@ const HINTS={
   HashMap:'Add `use std::collections::HashMap;` at the top, then write `HashMap<K, V>` with both types, like `HashMap<String, i32>`, and build one with `HashMap::new()`.',
   'map index':'Indexing a `HashMap` with `m[&key]` is not modeled yet: a missing key panics inside the standard library. Use `m.get(&key)`, which gives an `Option`, and match on it.',
   'collection method':'Modeled on a `Vec`: `push`, `pop`, `len`, `is_empty`, `insert`, `remove`, `clear`, `truncate`, `swap`, `reverse`, `sort`, `contains`, `get`, `get_mut`, `first`, `last`, `extend` and `clone`. On a `HashMap`: `insert`, `get`, `get_mut`, `contains_key`, `remove`, `extend`, `len`, `is_empty`, `clear`, `clone` and `entry(k).or_insert(v)`. Closures and iterator adapters wait for a later chapter.',
-  iterator:'`iter()`, `iter_mut()`, `keys()`, `values()` and `values_mut()` are modeled right after `for ... in`, like `for x in v.iter()`. An iterator in a variable, or with `map`, `filter` and the like, is not modeled yet. Loop over the collection instead.',
+  iterator:'Modeled iterators come from a `Vec`, an array, a slice, a `HashMap`, a range or `chars()`. Adapters: `map`, `filter`, `enumerate`, `zip`, `rev`, `take`, `skip`, `take_while`, `skip_while`, `copied` and `cloned`. Consumers: `sum`, `product`, `count`, `collect`, `fold`, `any`, `all`, `find`, `position`, `min`, `max`, `last`, `for_each` and `next`. `rev` works on a plain source, `map`, `filter`, `copied`, `cloned` and `enumerate`. Write the loop by hand for anything else, or use one of those.',
   'hash key':'A `HashMap` key must be `Eq` and `Hash`, and Rust Quest could not tell whether this key is. Write the map\'s type out, like `let mut m: HashMap<String, i32> = HashMap::new();`.',
   'reference in collection':'A `Vec` or `HashMap` that holds a reference, like `Vec<&str>` or `v.push(&x)`, is not modeled. Keep owned values in it, like `String`.',
   Option:'Write `Option<T>` with its type argument, like `Option<i32>`, and build it with `Some(x)` or `None`.',Result:'Write `Result<T, E>` with both type arguments, like `Result<i32, String>`, and build it with `Ok(x)` or `Err(e)`.',Box:LATER,

@@ -736,6 +736,32 @@ test('rust-quest: chapter 11 plays through: a missing trait method is E0599, a t
   await ctx.close();
 });
 
+test('rust-quest: chapter 12 plays through: a closure that outlives its function is E0373, a collect with no type is E0282, and a lazy pipeline prints in the order Rust runs it', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="11"]');
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0502[\s\S]*cannot borrow .?log.? as mutable/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0373[\s\S]*closure may outlive the current function/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0282[\s\S]*type annotations needed/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /before[\s\S]*doubling 2[\s\S]*doubling 5[\s\S]*doubling 9/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

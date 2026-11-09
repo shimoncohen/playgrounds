@@ -147,8 +147,8 @@ describe('Option and Result', () => {
     assert.equal(d.panic.msg, 'it failed: "bad"');
     assert.equal(d.panic.col, 15);
   });
-  it('a closure argument stays unsupported until closures are modeled', () => {
-    assert.equal(feature(main('let a = Some(2);', 'let b = a.map(|x| x + 1);')), 'closure@3');
+  it('a closure argument is modeled', () => {
+    assert.equal(RQ.run(main('let a = Some(2);', 'let b = a.map(|x| x + 1);', 'println!("{:?}", b);')).stdout, 'Some(3)\n');
   });
   it('Option<T> is Copy only when T is', () => {
     assert.equal(RQ.run(main('let a = Some(1);', 'let b = a;', 'println!("{:?} {:?}", a, b);')).stdout, 'Some(1) Some(1)\n');
