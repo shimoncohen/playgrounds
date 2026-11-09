@@ -161,3 +161,37 @@ describe('generic structs and enums', () => {
     assert.equal(run(P('#[derive(Debug, Clone, Copy)]', 'struct W<T> { v: T }', 'fn main() { let w = W { v: 1 }; let c = w; println!("{:?} {:?}", w, c); }')).stdout, 'W { v: 1 } W { v: 1 }\n');
   });
 });
+
+describe('what stays unsupported, and odd shapes never throw', () => {
+  it('reports the construct with its hint', () => {
+    assert.equal(feature(P('trait Make { fn make() -> Self; }', 'struct A;', 'impl Make for A { fn make() -> A { A } }', 'fn build<T: Make>() -> T { T::make() }', 'fn main() { let a: A = build(); }')), 'path call@4');
+    assert.equal(feature(P('use std::fmt::Display;', 'fn f<T: Display>(x: T) -> impl Display { x }', 'fn main() {}')), 'impl Trait@2');
+    assert.equal(feature(P('fn f<T: std::ops::Add>(a: T, b: T) {}', 'fn main() {}')), 'bounds@1');
+    assert.equal(feature(P('fn f<const N: usize>() {}', 'fn main() {}')), 'generics@1');
+    assert.equal(feature(P('fn f<T: Clone>(x: T) -> T { x }', 'fn main() {', '    let g = |a: i32| a;', '}')), 'closure@3');
+    assert.equal(feature(P('use std::fmt;', 'struct W<T>(T);', 'impl<T: fmt::Display> fmt::Display for W<T> {', '    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }', '}', 'fn main() {}')), 'impl@3');
+    assert.equal(feature(P('struct S;', 'impl std::fmt::Debug for S {', '    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "S") }', '}', 'fn main() {}')), 'impl@2');
+    assert.equal(feature(P('fn id<T>(x: T) -> T { x }', 'fn main() {', '    let a = id::<i32>(1);', '}')), 'path call@3');
+  });
+  it('an open type that nothing decides is unsupported, not an error', () => {
+    assert.equal(feature(P('struct S<T> { items: Vec<T> }', 'impl<T> S<T> { fn new() -> S<T> { S { items: Vec::new() } } }', 'fn main() {', '    let s = S::new();', '}')), 'inferred type@4');
+  });
+  it('odd sources are answered, never thrown', () => {
+    const odd = ['impl impl Drop for N {}', 'trait T { fn f(); }\nstruct S;\nimpl T for S {}\nfn main() {}', 'fn f<T: >(x: T) {}\nfn main() {}', 'impl<T> T {}\nfn main() {}', 'struct S<T, T>(T);\nfn main() {}',
+      'trait T { fn f(&self); }\nimpl T for &str { fn f(&self) {} }\nfn main() {}', 'trait T { fn f(&self); }\nimpl T for i32 { fn f(&self) {} }\nfn main() { 1.f(); }', 'fn f(x: impl) {}\nfn main() {}',
+      'struct S<T>(T);\nimpl S { }\nfn main() {}', 'struct S<T>(T);\nimpl<T> S<T, T> { }\nfn main() {}', 'trait T { fn f(&self) -> Self; }\nfn g<U: T>(u: &U) -> U { u.f() }\nfn main() {}',
+      'use std::fmt;\nstruct S;\nimpl fmt::Display for S { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f) } }\nfn main() { println!("{}", S); }',
+      'use std::fmt;\nstruct S;\nimpl fmt::Display for S { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(S, "x") } }\nfn main() {}',
+      'struct S;\nimpl From<i32> for S { fn from(x: i32) -> S { S } }\nfn main() { let s: S = 1.into(); let t: S = 2.0.into(); }',
+      'struct S;\nimpl From for S {}\nfn main() {}', 'trait A { fn f(&self); }\ntrait A {}\nfn main() {}'];
+    for (const src of odd) assert.notEqual(RQ.run(src).status, 'internal', src);
+  });
+});
+
+describe('a reference that could end up stored is not followed through a generic', () => {
+  it('a result that takes the type parameter is unsupported when it is a reference, and a plain argument is fine', () => {
+    assert.equal(feature(P('struct W<T> { v: T }', 'impl<T> W<T> { fn new(v: T) -> W<T> { W { v } } fn get(&self) -> &T { &self.v } }',
+      'fn main() {', '    let mut s = String::from("a");', '    let w = W::new(&s);', '    s.push_str("b");', '    println!("{}", w.get());', '}')), 'generic reference@5');
+    assert.equal(run(P('use std::fmt::Display;', 'fn show<T: Display>(x: T) { println!("{}", x); }', 'fn main() {', '    let mut s = String::from("a");', '    show(&s);', '    s.push_str("b");', '    show(&s);', '}')).stdout, 'a\nab\n');
+  });
+});

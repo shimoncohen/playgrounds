@@ -378,7 +378,7 @@ RQ.check=ast=>{
       f.tps.forEach(p=>{
         const k=f.params.findIndex(q=>mentionsParam(q.ty,p)),at=k>=0&&argNodes[k]||callee;
         for(const tr of p.declared)obligs.push({ty:inst.get(p),tr,line:at.line,col:at.col});
-        if(mentionsParam(f.ret,p))obligs.push({ty:inst.get(p),ret:true,line});
+        if(mentionsParam(f.ret,p)||f.params.some(q=>res(q.ty).k==='ref'&&res(q.ty).mut&&mentionsParam(q.ty,p)))obligs.push({ty:inst.get(p),ret:true,line});
       });
     };
     return {inst,params,ret,meet};
@@ -998,6 +998,7 @@ RQ.check=ast=>{
     if(base&&!unify(subst(m.pattern,im),base))return null;
     const shown=()=>show(subst(m.pattern,im));
     for(const p of m.itps)for(const tr of p.declared)obligs.push({ty:im.get(p),tr,line,col,method:m.node.name,shown,kind:m.pattern.k});
+    for(const p of m.itps)if(mentionsParam(m.ret,p))obligs.push({ty:im.get(p),ret:true,line});
     return {...m,params:m.params.map(q=>({...q,ty:subst(q.ty,im)})),ret:subst(m.ret,im),selfTy:m.selfTy&&subst(m.selfTy,im)};
   }
   const missingTrait=(base,name)=>{

@@ -175,7 +175,7 @@ RQ.CH.push({
       how:[
         `The whole function prints what a creature says, for any creature with the <code>Cry</code> trait. It already does that with <code>&lt;T: Cry&gt;(x: &T)</code>: a type name, a bound, and the name used once in the parameter.`,
         `When the type name is used only once, in a parameter, Rust lets you skip the list: <code>x: &impl Cry</code> means "a reference to some type that has <code>Cry</code>". It is the same bound, written where the type goes.`,
-        `Use the longer form when the same type must appear twice, as in <code>fn larger&lt;T: PartialOrd&gt;(a: T, b: T)</code>, where both values have to be the same type. <code>a: impl PartialOrd, b: impl PartialOrd</code> would allow two different types.`,
+        `Use the longer form when the same type must appear twice, as in <code>fn larger&lt;T: PartialOrd&gt;(a: T, b: T)</code>, where both values have to be the same type. <code>a: impl PartialOrd, b: impl PartialOrd</code> would let a caller pass two different types.`,
         `Keep the <code>&</code>: a bare <code>impl Cry</code> wants the creature itself, and the call passes a reference to it.`
       ],
       explain:`<code>impl Trait</code> in a parameter is shorthand for a generic with one bound. The caller sees no difference, and the body can do exactly what the trait allows, no more. Shorthand and long form can be mixed in one signature.`,
@@ -235,7 +235,7 @@ RQ.CH.push({
       goal:`A <code>Guard</code> should say <code>closing</code> and its name at the moment it is dropped. Write the <code>impl Drop for Guard</code> that does it. The hidden <code>main</code> should print <code>in the block</code>, <code>closing inner</code>, <code>after the block</code> and <code>closing outer</code>, in that order.`,
       how:[
         `The whole program makes a guard called <code>outer</code>, then a block with a guard called <code>inner</code>, and prints a line from inside and one after the block. Chapter 4 showed that a value is freed where its block ends, the newest first. <code>Drop</code> is the trait that lets a type run code at that moment.`,
-        `The <code>impl</code> has one method: <code>fn drop(&mut self)</code>. It takes <code>&mut self</code> because the value is still there while the method runs, and it returns nothing. Rust calls it for you at the closing <code>}</code>, once per value, in the same order as before.`,
+        `The <code>impl</code> has one method: <code>fn drop(&mut self)</code>. It takes <code>&mut self</code>, because the value is still whole while the method runs, and it returns nothing. Rust calls it for you at the closing <code>}</code>, once per value, in the same order as before.`,
         `Print the guard's name inside it, with <code>println!("closing {}", self.name);</code>. The body may do anything a method may: print, call other functions, make local variables.`,
         `You never call <code>drop</code> yourself on the value with <code>guard.drop()</code>: that is <code>E0040</code>, because Rust would run it a second time at the end. The function <code>drop(guard)</code> from chapter 4 is how you end a value early.`
       ],

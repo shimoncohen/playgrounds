@@ -21,7 +21,7 @@ RQ.compile=src=>{
   // E0384, E0594 and a shared-reference E0596 are borrowck errors in rustc, so the pass still runs when the checker found only those, or typeck errors confined to other fns
   if(!unsupported.length&&!global){
     const live=n=>!(n.t==='Fn'&&n.body&&inBad(n));
-    const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
+    const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'||it.t==='Trait'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
     diags=[...diags,...b.errors.filter(e=>!inBad(e))].sort((a,b)=>a.line-b.line||a.col-b.col);
     unsupported.push(...b.unsupported.filter(u=>!inBad(u)));loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
