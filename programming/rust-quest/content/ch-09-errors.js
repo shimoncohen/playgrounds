@@ -35,14 +35,15 @@ const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'K
 
 RQ.CH.push({
   name:'Errors with Result',
-  badge:'Tide Reader',
-  intro:'Some steps can fail: a shell count that will not split between two kids, a bucket with no shell at that place. Rust has no hidden exceptions. It writes it in the type: a function that can fail gives back a <code>Result</code>, which is either <code>Ok</code> with the value or <code>Err</code> with the reason. The compiler then makes you deal with both. This chapter reads a <code>Result</code> with <code>match</code>, stops on one with <code>expect</code>, passes an error up to the caller with <code>?</code>, and gives errors names of your own.',
+  badge:'Sharing Stone',
+  story:'Gus wants half of the tally, and some counts will not split; say when a step fails and pass the reason on, and find the sharing stone.',
+  intro:'Gus wants half of the tally, and some counts will not split. Some steps can fail: a shell count that will not split between Pip and Gus, a bucket with no shell at that place. Rust has no hidden exceptions. It writes it in the type: a function that can fail gives back a <code>Result</code>, which is either <code>Ok</code> with the value or <code>Err</code> with the reason. The compiler then makes you deal with both. This chapter reads a <code>Result</code> with <code>match</code>, stops on one with <code>expect</code>, passes an error up to the caller with <code>?</code>, and gives errors names of your own.',
   toolbox:'In this chapter: <code>Result&lt;T, E&gt;</code> with <code>Ok</code> and <code>Err</code>, <code>match</code> on a <code>Result</code>, <code>expect</code> and the panic it causes, the <code>?</code> operator, <code>ok_or</code>, an <code>enum</code> as the error type printed with <code>{:?}</code>, <code>main</code> that returns a <code>Result</code>, and the errors <code>E0382</code> and <code>E0277</code> around <code>?</code>. The error types here are all the same inside one function, and there are no closures.',
   learned:['Result','Ok and Err','match on Result','expect','?','? moves','E0277 for ?','error enum','ok_or','main -> Result'],
   missions:[
     {
       title:'A step that can fail',kind:'write',
-      goal:'Write a function <code>split</code> that takes <code>shells: u32</code> and gives back a <code>Result&lt;u32, String&gt;</code>. Two kids share the shells, so an even count gives <code>Ok</code> with half of it, and an odd count gives <code>Err</code> with a message of your own.',
+      goal:'Write a function <code>split</code> that takes <code>shells: u32</code> and gives back a <code>Result&lt;u32, String&gt;</code>. Pip and Gus share the shells, so an even count gives <code>Ok</code> with half of it, and an odd count gives <code>Err</code> with a message of your own.',
       how:[
         'The whole function either hands back a good answer or says why it cannot. <code>Result&lt;u32, String&gt;</code> is the type for that: a value that is <code>Ok(number)</code> when the step worked, or <code>Err(message)</code> when it did not. It is an <code>enum</code> with two variants, like the <code>Option</code> you met with <code>Some</code> and <code>None</code>, but the second variant carries a reason.',
         'The first type in the angle brackets, <code>u32</code>, is what <code>Ok</code> holds, and the second, <code>String</code>, is what <code>Err</code> holds. The last expression of the function is the value it returns, so each branch of an <code>if</code> and <code>else</code> can end in one of them.',

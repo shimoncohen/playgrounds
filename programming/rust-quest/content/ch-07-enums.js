@@ -31,8 +31,9 @@ const SWAP=(...body)=>L('fn swap(p: (i32, i32)) -> (i32, i32) {',...body.map(l=>
 
 RQ.CH.push({
   name:'Enums and match',
-  badge:'Pattern Matcher',
-  intro:'A <code>struct</code> says "all of these parts at once". An <code>enum</code> says "exactly one of these choices". You list the choices, and <code>match</code> makes you handle every one of them, so a case you forgot is an error you see before the program runs. This chapter also meets <code>Option</code>, Rust\'s way to say "a value, or nothing", and the shorter forms <code>if let</code>, <code>while let</code> and <code>let ... else</code> for when only one case matters.',
+  badge:'Signal Lens',
+  story:'The logbook tells you to read the cove\'s signal lamp, which shows exactly one light at a time; handle every light it can show, and find the lamp\'s lens.',
+  intro:'Moss\'s logbook says to read the cove\'s signal lamp, which shows exactly one light at a time. A <code>struct</code> says "all of these parts at once". An <code>enum</code> says "exactly one of these choices". You list the choices, and <code>match</code> makes you handle every one of them, so a case you forgot is an error you see before the program runs. This chapter also meets <code>Option</code>, Rust\'s way to say "a value, or nothing", and the shorter forms <code>if let</code>, <code>while let</code> and <code>let ... else</code> for when only one case matters.',
   toolbox:'In this chapter: <code>enum</code> with plain, tuple and named variants, <code>match</code> with literals, ranges, <code>|</code>, <code>_</code>, names, guards and pairs, <code>Option</code> with <code>Some</code> and <code>None</code>, <code>if let</code>, <code>while let</code>, <code>let ... else</code>, taking a tuple apart with <code>let</code>, and the errors <code>E0004</code> and <code>E0005</code>.',
   learned:['enum','match','E0004','_','ranges in match','guards','Option','if let','while let','let else','destructuring'],
   missions:[

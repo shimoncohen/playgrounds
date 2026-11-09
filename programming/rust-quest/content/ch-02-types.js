@@ -9,8 +9,9 @@ const ADD='fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\n';
 
 RQ.CH.push({
   name:'Types and numbers',
-  badge:'Number Cruncher',
-  intro:'Every value in Rust has a type: a label that says what kind of thing it is and how much room it gets. In this chapter you meet the number types, mix them with <code>as</code>, group values into tuples and arrays, and watch what happens when a number does not fit.',
+  badge:'Brass Weight',
+  story:'Moss\'s note says to weigh every find; learn the shell scale\'s numbers, line up its weights, and find the scale\'s brass weight.',
+  intro:'Moss\'s first note says to weigh every find, so Pip heads for the shell scale, which gives up its brass weight only to someone who knows its numbers. Every value in Rust has a type: a label that says what kind of thing it is and how much room it gets. In this chapter you meet the number types, mix them with <code>as</code>, group values into tuples and arrays, and watch what happens when a number does not fit.',
   toolbox:'In this chapter: <code>i32</code>, <code>u8</code> and <code>f64</code>, type annotations, <code>as</code>, tuples and <code>.0</code>, arrays and <code>a[1]</code>, <code>{:?}</code>, and <code>const</code>.',
   learned:['type annotations','f64','as','tuples','arrays','const','overflow'],
   missions:[
@@ -92,20 +93,20 @@ RQ.CH.push({
     },
     {
       title:'Line values up in an array',kind:'write',
-      goal:'A shelf holds <code>[10, 20, 30]</code>. Print the middle number, <code>20</code>, and then the whole shelf with <code>{:?}</code>.',
+      goal:'The shell scale shows three weights, <code>[10, 20, 30]</code>. Print the middle one, <code>20</code>, and then all of them with <code>{:?}</code>.',
       how:[
         'The whole program stores three numbers in one array with <code>[ ]</code>, prints one of them by its place, then prints all three.',
-        'An array holds several values of the <em>same</em> type in square brackets: <code>let shelf = [10, 20, 30];</code>.',
-        '<code>shelf[1]</code> is the value at place <code>1</code>. Places count from <code>0</code>, so <code>shelf[0]</code> is <code>10</code> and <code>shelf[1]</code> is <code>20</code>.',
+        'An array holds several values of the <em>same</em> type in square brackets: <code>let weights = [10, 20, 30];</code>.',
+        '<code>weights[1]</code> is the value at place <code>1</code>. Places count from <code>0</code>, so <code>weights[0]</code> is <code>10</code> and <code>weights[1]</code> is <code>20</code>.',
         '<code>{:?}</code> is a hole that prints a whole tuple or array in a debugging layout: <code>[10, 20, 30]</code>. Plain <code>{}</code> cannot print one.'
       ],
-      explain:'Asking for a place past the end, like <code>shelf[3]</code>, is a mistake Rust refuses to build when it can see it. Arrays also show their size in their type: <code>[i32; 3]</code> is three <code>i32</code> values.',
-      hint:'Write <code>println!("{}", shelf[1]);</code> and then <code>println!("{:?}", shelf);</code>.',
-      starter:STUB('make the shelf, print its middle, then print all of it'),
-      answer:prog('    let shelf = [10, 20, 30];\n    println!("{}", shelf[1]);\n    println!("{:?}", shelf);\n'),
-      alts:[prog('    let shelf: [i32; 3] = [10, 20, 30];\n    println!("{}", shelf[1]);\n    println!("{:?}", shelf);\n'),prog('    let shelf = [10, 20, 30];\n    let mid = shelf[1];\n    println!("{}", mid);\n    println!("{:?}", shelf);\n')],
-      wrong:[{src:prog('    let shelf = [10, 20, 30];\n    println!("{}", shelf[0]);\n    println!("{:?}", shelf);\n'),wrongWhy:'check'},{src:prog('    let shelf = [10, 20, 30];\n    println!("{}", shelf[3]);\n    println!("{:?}", shelf);\n'),wrongWhy:'unconditional_panic'}],
-      lazy:[{src:prog('    println!("20");\n    println!("[10, 20, 30]");\n'),wrongWhy:'check'},{src:prog('    println!("{}", [10, 20, 30][1]);\n    println!("{:?}", [10, 20, 30]);\n'),wrongWhy:'check'},{src:prog('    let shelf = [10, 20, 30];\n    println!("{}", 20);\n    println!("{:?}", shelf);\n'),wrongWhy:'check'}],
+      explain:'Asking for a place past the end, like <code>weights[3]</code>, is a mistake Rust refuses to build when it can see it. Arrays also show their size in their type: <code>[i32; 3]</code> is three <code>i32</code> values.',
+      hint:'Write <code>println!("{}", weights[1]);</code> and then <code>println!("{:?}", weights);</code>.',
+      starter:STUB('make weights, print the middle one, then print all of them'),
+      answer:prog('    let weights = [10, 20, 30];\n    println!("{}", weights[1]);\n    println!("{:?}", weights);\n'),
+      alts:[prog('    let weights: [i32; 3] = [10, 20, 30];\n    println!("{}", weights[1]);\n    println!("{:?}", weights);\n'),prog('    let weights = [10, 20, 30];\n    let mid = weights[1];\n    println!("{}", mid);\n    println!("{:?}", weights);\n')],
+      wrong:[{src:prog('    let weights = [10, 20, 30];\n    println!("{}", weights[0]);\n    println!("{:?}", weights);\n'),wrongWhy:'check'},{src:prog('    let weights = [10, 20, 30];\n    println!("{}", weights[3]);\n    println!("{:?}", weights);\n'),wrongWhy:'unconditional_panic'}],
+      lazy:[{src:prog('    println!("20");\n    println!("[10, 20, 30]");\n'),wrongWhy:'check'},{src:prog('    println!("{}", [10, 20, 30][1]);\n    println!("{:?}", [10, 20, 30]);\n'),wrongWhy:'check'},{src:prog('    let weights = [10, 20, 30];\n    println!("{}", 20);\n    println!("{:?}", weights);\n'),wrongWhy:'check'}],
       defines:['array','index'],previews:[],
       check:c=>c.out()!=='20\n[10, 20, 30]\n'?'The program has to print `20` and then `[10, 20, 30]`, each on its own line.':c.count('let')<1?'Give the array a name with `let` first.':c.count('array')<1||c.count('index')<1?'Make an array with square brackets and read its middle with `[1]`.':c.count('var-use')<2?'Use the name of the array in both prints.':true
     },
@@ -130,23 +131,23 @@ RQ.CH.push({
     },
     {
       title:'A number too big for its type',kind:'fix',
-      goal:'This program stops with an error before it runs: <code>seats</code> is a <code>u8</code>, and <code>255 + 1</code> is too big for one. Fix it so it prints <code>256</code>.',
+      goal:'This program stops with an error before it runs: <code>pools</code> is a <code>u8</code>, and <code>255 + 1</code> is too big for one. Fix it so it prints <code>256</code>.',
       how:[
-        'The whole program adds two numbers into <code>seats</code> and prints it. Rust refuses to build it, because the answer cannot be stored.',
-        'A <code>u8</code> holds <code>0</code> to <code>255</code>. In <code>let seats: u8 = 255 + 1;</code> the compiler works out the sum, sees <code>256</code>, and stops.',
+        'The whole program adds two numbers into <code>pools</code> and prints it. Rust refuses to build it, because the answer cannot be stored.',
+        'A <code>u8</code> holds <code>0</code> to <code>255</code>. In <code>let pools: u8 = 255 + 1;</code> the compiler works out the sum, sees <code>256</code>, and stops.',
         'The stop is a lint called <code>arithmetic_overflow</code>. A lint is an extra check the compiler runs, and this one is on by default.',
-        'Give <code>seats</code> a bigger type, such as <code>u16</code>, which holds up to <code>65535</code>, and the sum fits.'
+        'Give <code>pools</code> a bigger type, such as <code>u16</code>, which holds up to <code>65535</code>, and the sum fits.'
       ],
-      explain:'The lint is called <code>arithmetic_overflow</code>. Writing <code>let seats: u8 = 256;</code> trips a sister lint, <code>overflowing_literals</code>, because the number itself is too big. Either way the fix is the same: pick a type with more room.',
+      explain:'The lint is called <code>arithmetic_overflow</code>. Writing <code>let pools: u8 = 256;</code> trips a sister lint, <code>overflowing_literals</code>, because the number itself is too big. Either way the fix is the same: pick a type with more room.',
       hint:'Change <code>u8</code> to <code>u16</code>.',
-      starter:prog('    let seats: u8 = 255 + 1;\n    println!("{}", seats);\n'),
+      starter:prog('    let pools: u8 = 255 + 1;\n    println!("{}", pools);\n'),
       starterErr:'arithmetic_overflow',
-      answer:prog('    let seats: u16 = 255 + 1;\n    println!("{}", seats);\n'),
-      alts:[prog('    let seats: i32 = 255 + 1;\n    println!("{}", seats);\n'),prog('    let seats: u32 = 256;\n    println!("{}", seats);\n')],
-      wrong:[{src:prog('    let seats: u8 = 255;\n    println!("{}", seats);\n'),wrongWhy:'check'},{src:prog('    let seats: u8 = 200 + 56;\n    println!("{}", seats);\n'),wrongWhy:'arithmetic_overflow'},{src:prog('    let seats: u8 = 256;\n    println!("{}", seats);\n'),wrongWhy:'overflowing_literals'}],
-      lazy:[{src:prog('    println!("256");\n'),wrongWhy:'check'},{src:prog('    println!("{}", 256);\n'),wrongWhy:'check'},{src:prog('    let seats: u16 = 255;\n    println!("256");\n'),wrongWhy:'check'}],
+      answer:prog('    let pools: u16 = 255 + 1;\n    println!("{}", pools);\n'),
+      alts:[prog('    let pools: i32 = 255 + 1;\n    println!("{}", pools);\n'),prog('    let pools: u32 = 256;\n    println!("{}", pools);\n')],
+      wrong:[{src:prog('    let pools: u8 = 255;\n    println!("{}", pools);\n'),wrongWhy:'check'},{src:prog('    let pools: u8 = 200 + 56;\n    println!("{}", pools);\n'),wrongWhy:'arithmetic_overflow'},{src:prog('    let pools: u8 = 256;\n    println!("{}", pools);\n'),wrongWhy:'overflowing_literals'}],
+      lazy:[{src:prog('    println!("256");\n'),wrongWhy:'check'},{src:prog('    println!("{}", 256);\n'),wrongWhy:'check'},{src:prog('    let pools: u16 = 255;\n    println!("256");\n'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='256\n'?'The program has to print `256` on one line.':c.count('let')<1||c.count('annot')<1?'Keep the variable and its type: change the type, do not remove it.':c.count('var-use')<1?'Print the variable `seats` instead of typing the number.':true
+      check:c=>c.out()!=='256\n'?'The program has to print `256` on one line.':c.count('let')<1||c.count('annot')<1?'Keep the variable and its type: change the type, do not remove it.':c.count('var-use')<1?'Print the variable `pools` instead of typing the number.':true
     },
     {
       title:'When a program panics',kind:'write',expect:'panic',

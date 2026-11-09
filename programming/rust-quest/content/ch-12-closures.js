@@ -32,8 +32,9 @@ const STD_TOP=TOP('sizes.first().map(|s| s * 2).unwrap_or_else(|| 0)');
 
 RQ.CH.push({
   name:'Closures and iterators',
-  badge:'Tide Weaver',
-  intro:`Crabs do not follow a fixed script: Pip counts shells one way on Monday and another way on Tuesday. A <em>closure</em> is a small function you write in the middle of your code, without a name of its own, that can use the variables around it. This chapter writes closures, finds out how they borrow and move what they use, passes them to functions and hands them back, and then chains them into <em>iterators</em>: lazy pipelines that walk a collection one item at a time.`,
+  badge:'Counting Net',
+  story:'The conch calls Pip to the counting nets, which sort the catch a different way each day; write small rules on the spot, and find the counting net.',
+  intro:`The calling conch sends Pip to the counting nets, which sort the catch a different way each day. Crabs do not follow a fixed script: Pip counts shells one way on Monday and another way on Tuesday. A <em>closure</em> is a small function you write in the middle of your code, without a name of its own, that can use the variables around it. This chapter writes closures, finds out how they borrow and move what they use, passes them to functions and hands them back, and then chains them into <em>iterators</em>: lazy pipelines that walk a collection one item at a time.`,
   toolbox:`In this chapter: <code>|x| ...</code> closures with and without types, what a closure borrows, <code>move</code>, <code>Fn</code>, <code>FnMut</code> and <code>FnOnce</code>, <code>impl Fn</code> as a parameter and as a result, <code>map</code>, <code>filter</code>, <code>collect</code>, <code>sum</code> and the other iterator methods, <code>sort_by_key</code>, <code>retain</code>, <code>unwrap_or_else</code>, and the errors <code>E0282</code>, <code>E0283</code>, <code>E0502</code>, <code>E0596</code>, <code>E0525</code>, <code>E0373</code> and <code>E0277</code>.`,
   learned:['closure','closure borrows','mutable closure','closure parameter','Fn, FnMut and FnOnce','move','lazy iterator','iterator adapters','closures in std methods'],
   missions:[
