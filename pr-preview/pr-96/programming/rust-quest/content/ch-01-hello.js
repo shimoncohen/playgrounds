@@ -7,14 +7,15 @@ const STUB=(note)=>prog('    // '+note+'\n');
 
 RQ.CH.push({
   name:'Hello, Rust',
-  badge:'First Steps',
-  intro:'Every Rust program starts in a function called <code>main</code>. In this chapter you print your first line, give values names with <code>let</code>, and meet the compiler\'s favourite rule: values do not change unless you say so.',
+  badge:'Moss\'s Note',
+  story:'A message rock on Saltwhistle Cove answers only to someone who greets it; say hello, name what you carry, and find Moss\'s first note.',
+  intro:'Old Moss the sea turtle hid the Moon Pearl somewhere on Saltwhistle Cove and left clues for Pip to follow, starting at a message rock that answers only to someone who greets it. Her first note says the pearl rises in the deepest pool only at the last low tide of the season. Every Rust program starts in a function called <code>main</code>. In this chapter you print your first line, give values names with <code>let</code>, and meet the compiler\'s favourite rule: values do not change unless you say so.',
   toolbox:'In this chapter: <code>fn main</code>, <code>println!</code>, <code>print!</code>, <code>let</code>, <code>let mut</code>, whole numbers with <code>+ - * / %</code>, and <code>true</code> and <code>false</code>.',
   learned:['fn main','println!','{}','let','let mut','shadowing'],
   missions:[
     {
       title:'Say hello',kind:'write',
-      goal:'Make the program print <code>Hello, Rust!</code> on its own line.',
+      goal:'The message rock answers only to a greeting. Make the program print <code>Hello, Rust!</code> on its own line.',
       how:[
         'The whole program is one function, <code>main</code>, where every Rust program starts. Inside it, <code>println!</code> prints one line of text.',
         '<code>fn main() { ... }</code> declares the function <code>main</code>. The curly braces hold what it does.',
@@ -52,42 +53,42 @@ RQ.CH.push({
     },
     {
       title:'Name a value with let',kind:'write',
-      goal:'Store <code>40</code> in a variable called <code>score</code> and <code>2</code> in one called <code>bonus</code>, then print their sum, <code>42</code>.',
+      goal:'Store <code>40</code> in a variable called <code>shells</code> and <code>2</code> in one called <code>bonus_shells</code>, then print their sum, <code>42</code>.',
       how:[
         'The whole program gives two numbers names, adds them and prints <code>42</code>.',
-        '<code>let score = 40;</code> creates a variable named <code>score</code> that holds <code>40</code>. The <code>=</code> puts the value in.',
-        'The same works for <code>bonus</code>. After that the name stands for its value, so <code>score + bonus</code> means <code>40 + 2</code>.',
-        '<code>println!("{}", score + bonus);</code> fills the hole with the sum.'
+        '<code>let shells = 40;</code> creates a variable named <code>shells</code> that holds <code>40</code>. The <code>=</code> puts the value in.',
+        'The same works for <code>bonus_shells</code>. After that the name stands for its value, so <code>shells + bonus_shells</code> means <code>40 + 2</code>.',
+        '<code>println!("{}", shells + bonus_shells);</code> fills the hole with the sum.'
       ],
-      explain:'A variable is a name for a value. Names make a program readable: <code>score + bonus</code> says more than <code>40 + 2</code>.',
-      hint:'Write two <code>let</code> lines, then <code>println!("{}", score + bonus);</code>.',
-      starter:STUB('make score and bonus here, then print their sum'),
-      answer:prog('    let score = 40;\n    let bonus = 2;\n    println!("{}", score + bonus);\n'),
-      alts:[prog('    let a = 40;\n    let b = 2;\n    println!("{}", a + b);\n'),prog('    let score = 40;\n    let bonus = 2;\n    let total = score + bonus;\n    println!("{}", total);\n')],
-      wrong:[{src:prog('    let score = 40;\n    let bonus = 2;\n    println!("{}", score);\n'),wrongWhy:'check'},{src:prog('    let score = 40;\n    let bonus = 2;\n    println!("{}", score - bonus);\n'),wrongWhy:'check'}],
-      lazy:[{src:prog('    println!("{}", 42);\n'),wrongWhy:'check'},{src:prog('    println!("{}", 40 + 2);\n'),wrongWhy:'check'},{src:prog('    let score = 40;\n    let bonus = 2;\n    println!("{}", 42);\n'),wrongWhy:'check'}],
+      explain:'A variable is a name for a value. Names make a program readable: <code>shells + bonus_shells</code> says more than <code>40 + 2</code>.',
+      hint:'Write two <code>let</code> lines, then <code>println!("{}", shells + bonus_shells);</code>.',
+      starter:STUB('make shells and bonus_shells here, then print their sum'),
+      answer:prog('    let shells = 40;\n    let bonus_shells = 2;\n    println!("{}", shells + bonus_shells);\n'),
+      alts:[prog('    let a = 40;\n    let b = 2;\n    println!("{}", a + b);\n'),prog('    let shells = 40;\n    let bonus_shells = 2;\n    let total = shells + bonus_shells;\n    println!("{}", total);\n')],
+      wrong:[{src:prog('    let shells = 40;\n    let bonus_shells = 2;\n    println!("{}", shells);\n'),wrongWhy:'check'},{src:prog('    let shells = 40;\n    let bonus_shells = 2;\n    println!("{}", shells - bonus_shells);\n'),wrongWhy:'check'}],
+      lazy:[{src:prog('    println!("{}", 42);\n'),wrongWhy:'check'},{src:prog('    println!("{}", 40 + 2);\n'),wrongWhy:'check'},{src:prog('    let shells = 40;\n    let bonus_shells = 2;\n    println!("{}", 42);\n'),wrongWhy:'check'}],
       defines:['let'],previews:[],
       check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.count('let')<2?'Give both numbers a name with `let` first, then add the names.':c.count('var-use')<2?'Use the names: add the two variables in `println!` instead of typing the number.':true
     },
     {
       title:'Why can\'t I change it?',kind:'fix',
-      goal:'This program stops with an error, because it changes <code>score</code> after creating it. Fix it so it prints <code>1</code> and then <code>2</code>.',
+      goal:'This program stops with an error, because it changes <code>shells</code> after creating it. Fix it so it prints <code>1</code> and then <code>2</code>.',
       how:[
         'The whole program shows a value with <code>println!</code>, changes it and shows it again. Rust refuses the change until you say the variable may change.',
-        '<code>let score = 1;</code> makes an immutable variable: once it holds <code>1</code>, it cannot be given another value.',
-        '<code>score = 2;</code> tries to give <code>score</code> a new value. That is what the error <code>E0384</code> complains about.',
-        'Writing <code>let mut score = 1;</code> adds <code>mut</code> (short for mutable), which allows the change.'
+        '<code>let shells = 1;</code> makes an immutable variable: once it holds <code>1</code>, it cannot be given another value.',
+        '<code>shells = 2;</code> tries to give <code>shells</code> a new value. That is what the error <code>E0384</code> complains about.',
+        'Writing <code>let mut shells = 1;</code> adds <code>mut</code> (short for mutable), which allows the change.'
       ],
       explain:'The error code is <code>E0384</code>. Rust makes values unchangeable by default, so nothing can change behind your back. Ask for change with <code>mut</code> only where you need it.',
-      hint:'Put <code>mut</code> between <code>let</code> and <code>score</code>.',
-      starter:prog('    let score = 1;\n    println!("{}", score);\n    score = 2;\n    println!("{}", score);\n'),
+      hint:'Put <code>mut</code> between <code>let</code> and <code>shells</code>.',
+      starter:prog('    let shells = 1;\n    println!("{}", shells);\n    shells = 2;\n    println!("{}", shells);\n'),
       starterErr:'E0384',
-      answer:prog('    let mut score = 1;\n    println!("{}", score);\n    score = 2;\n    println!("{}", score);\n'),
-      alts:[prog('    let mut score = 1;\n    println!("{}", score);\n    score = 1 + 1;\n    println!("{}", score);\n')],
-      wrong:[{src:prog('    let mut score = 1;\n    println!("{}", score);\n    println!("{}", score);\n'),wrongWhy:'check'},{src:prog('    let mut score = 1;\n    println!("{}", score);\n    score = 2;\n'),wrongWhy:'check'}],
-      lazy:[{src:prog('    println!("1");\n    println!("2");\n'),wrongWhy:'check'},{src:prog('    println!("{}", 1);\n    println!("{}", 2);\n'),wrongWhy:'check'},{src:prog('    let mut score = 1;\n    println!("{}", 1);\n    println!("{}", 2);\n'),wrongWhy:'check'}],
+      answer:prog('    let mut shells = 1;\n    println!("{}", shells);\n    shells = 2;\n    println!("{}", shells);\n'),
+      alts:[prog('    let mut shells = 1;\n    println!("{}", shells);\n    shells = 1 + 1;\n    println!("{}", shells);\n')],
+      wrong:[{src:prog('    let mut shells = 1;\n    println!("{}", shells);\n    println!("{}", shells);\n'),wrongWhy:'check'},{src:prog('    let mut shells = 1;\n    println!("{}", shells);\n    shells = 2;\n'),wrongWhy:'check'}],
+      lazy:[{src:prog('    println!("1");\n    println!("2");\n'),wrongWhy:'check'},{src:prog('    println!("{}", 1);\n    println!("{}", 2);\n'),wrongWhy:'check'},{src:prog('    let mut shells = 1;\n    println!("{}", 1);\n    println!("{}", 2);\n'),wrongWhy:'check'}],
       defines:['mut','assign'],previews:[],
-      check:c=>c.out()!=='1\n2\n'?'The program has to print `1` and then `2`, each on its own line.':c.count('let')<1||c.count('hole')<2||c.count('var-use')<2?'Keep the variable: print `score` twice with `{}`, before and after the change.':c.count('assign')<1?'Change `score` itself: give it the new value with `=` between the two prints.':true
+      check:c=>c.out()!=='1\n2\n'?'The program has to print `1` and then `2`, each on its own line.':c.count('let')<1||c.count('hole')<2||c.count('var-use')<2?'Keep the variable: print `shells` twice with `{}`, before and after the change.':c.count('assign')<1?'Change `shells` itself: give it the new value with `=` between the two prints.':true
     },
     {
       title:'Lose a life',kind:'write',
@@ -110,22 +111,22 @@ RQ.CH.push({
     },
     {
       title:'Same name, new variable',kind:'write',
-      goal:'A price starts at <code>10</code> coins. Raise it by <code>5</code> with a second <code>let price</code> instead of <code>mut</code>, then print it: <code>15</code>.',
+      goal:'A pearl costs <code>10</code> coins. Raise it by <code>5</code> with a second <code>let pearl_price</code> instead of <code>mut</code>, then print it: <code>15</code>.',
       how:[
-        'The whole program replaces <code>price</code> with a new variable of the same name and prints it.',
-        '<code>let price = 10;</code> makes the first <code>price</code>.',
-        '<code>let price = price + 5;</code> makes a second variable, also named <code>price</code>. The right side still sees the old one, <code>10</code>, so the new one holds <code>15</code>. This is called shadowing.',
-        'From that line on, <code>price</code> means the new variable, so <code>println!</code> prints <code>15</code>. Neither variable needed <code>mut</code>.'
+        'The whole program replaces <code>pearl_price</code> with a new variable of the same name and prints it.',
+        '<code>let pearl_price = 10;</code> makes the first <code>pearl_price</code>.',
+        '<code>let pearl_price = pearl_price + 5;</code> makes a second variable, also named <code>pearl_price</code>. The right side still sees the old one, <code>10</code>, so the new one holds <code>15</code>. This is called shadowing.',
+        'From that line on, <code>pearl_price</code> means the new variable, so <code>println!</code> prints <code>15</code>. Neither variable needed <code>mut</code>.'
       ],
       explain:'Shadowing builds a new variable, so the old value stays untouched while you are not looking at it. <code>mut</code> changes one variable in place; shadowing makes a fresh one.',
-      hint:'Repeat the <code>let</code>, this time with <code>price + 5</code> on the right.',
-      starter:prog('    let price = 10;\n    // raise it by 5 here, then print it\n'),
-      answer:prog('    let price = 10;\n    let price = price + 5;\n    println!("{}", price);\n'),
-      alts:[prog('    let price = 10;\n    let price = 5 + price;\n    println!("{}", price);\n'),prog('    let price = 10;\n    let price = price + 2 + 3;\n    println!("{}", price);\n')],
-      wrong:[{src:prog('    let price = 10;\n    let price = price + 50;\n    println!("{}", price);\n'),wrongWhy:'check'},{src:prog('    let price = 10;\n    println!("{}", price);\n'),wrongWhy:'check'}],
-      lazy:[{src:prog('    println!("{}", 15);\n'),wrongWhy:'check'},{src:prog('    let mut price = 10;\n    price = price + 5;\n    println!("{}", price);\n'),wrongWhy:'check'},{src:prog('    let price = 10;\n    let price = 15;\n    println!("{}", price);\n'),wrongWhy:'check'},{src:prog('    let price = 10;\n    let price = price + 5;\n    println!("15");\n'),wrongWhy:'check'},{src:prog('    let price = 10;\n    let price = price;\n    println!("{}", 15);\n'),wrongWhy:'check'}],
+      hint:'Repeat the <code>let</code>, this time with <code>pearl_price + 5</code> on the right.',
+      starter:prog('    let pearl_price = 10;\n    // raise it by 5 here, then print it\n'),
+      answer:prog('    let pearl_price = 10;\n    let pearl_price = pearl_price + 5;\n    println!("{}", pearl_price);\n'),
+      alts:[prog('    let pearl_price = 10;\n    let pearl_price = 5 + pearl_price;\n    println!("{}", pearl_price);\n'),prog('    let pearl_price = 10;\n    let pearl_price = pearl_price + 2 + 3;\n    println!("{}", pearl_price);\n')],
+      wrong:[{src:prog('    let pearl_price = 10;\n    let pearl_price = pearl_price + 50;\n    println!("{}", pearl_price);\n'),wrongWhy:'check'},{src:prog('    let pearl_price = 10;\n    println!("{}", pearl_price);\n'),wrongWhy:'check'}],
+      lazy:[{src:prog('    println!("{}", 15);\n'),wrongWhy:'check'},{src:prog('    let mut pearl_price = 10;\n    pearl_price = pearl_price + 5;\n    println!("{}", pearl_price);\n'),wrongWhy:'check'},{src:prog('    let pearl_price = 10;\n    let pearl_price = 15;\n    println!("{}", pearl_price);\n'),wrongWhy:'check'},{src:prog('    let pearl_price = 10;\n    let pearl_price = pearl_price + 5;\n    println!("15");\n'),wrongWhy:'check'},{src:prog('    let pearl_price = 10;\n    let pearl_price = pearl_price;\n    println!("{}", 15);\n'),wrongWhy:'check'}],
       defines:['shadow'],previews:[],
-      check:c=>c.out()!=='15\n'?'The program has to print `15` on one line.':c.count('mut')>0?'This mission is about shadowing: leave out `mut` and write a second `let price`.':c.count('shadow')<1?'Make a second variable with the same name: `let price = ...;` again.':c.count('shadow-use')<1?'The second `let price` should start from the first one: use `price` on its right side, like `price + 5`.':c.count('hole')<1||c.count('var-use')<2?'Print `price` itself with `{}` instead of typing the number.':true
+      check:c=>c.out()!=='15\n'?'The program has to print `15` on one line.':c.count('mut')>0?'This mission is about shadowing: leave out `mut` and write a second `let pearl_price`.':c.count('shadow')<1?'Make a second variable with the same name: `let pearl_price = ...;` again.':c.count('shadow-use')<1?'The second `let pearl_price` should start from the first one: use `pearl_price` on its right side, like `pearl_price + 5`.':c.count('hole')<1||c.count('var-use')<2?'Print `pearl_price` itself with `{}` instead of typing the number.':true
     }
   ]
 });

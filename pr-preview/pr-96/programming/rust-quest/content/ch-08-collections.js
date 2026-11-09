@@ -25,8 +25,9 @@ const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'K
 
 RQ.CH.push({
   name:'Vec and HashMap',
-  badge:'Bucket Keeper',
-  intro:'So far every variable held one thing. A <code>Vec</code> is a list that grows, and a <code>HashMap</code> is a table that finds a value by its key. Both own what is inside them, so the borrowing rules from the last chapters apply to every element: a reference to one shell is a loan of the whole bucket, and the compiler treats it that way. The memory view draws a <code>Vec</code> and a <code>HashMap</code> as a box on the heap, with a pointer to each element that owns memory of its own.',
+  badge:'Tally Bucket',
+  story:'Through the lens you see the bucket line where Pip collects shells; fill the buckets, count each kind, and find Pip\'s tally bucket.',
+  intro:'Through the signal lens Pip spots the bucket line where the shells are collected. So far every variable held one thing. A <code>Vec</code> is a list that grows, and a <code>HashMap</code> is a table that finds a value by its key. Both own what is inside them, so the borrowing rules from the last chapters apply to every element: a reference to one shell is a loan of the whole bucket, and the compiler treats it that way. The memory view draws a <code>Vec</code> and a <code>HashMap</code> as a box on the heap, with a pointer to each element that owns memory of its own.',
   toolbox:'In this chapter: <code>Vec</code> with <code>vec!</code>, <code>push</code>, <code>pop</code>, <code>len</code>, <code>get</code>, <code>sort</code>, <code>extend</code> and indexing with <code>v[i]</code>; <code>for</code> over <code>&amp;v</code>, <code>&amp;mut v</code> and <code>v</code>; <code>HashMap</code> with <code>insert</code>, <code>get</code>, <code>entry</code> and <code>or_insert</code>; and the errors <code>E0502</code> and <code>E0382</code> on a collection. No closures and no iterator adapters yet.',
   learned:['Vec','push','get','for over a Vec','&mut loop','HashMap','entry','map order'],
   missions:[

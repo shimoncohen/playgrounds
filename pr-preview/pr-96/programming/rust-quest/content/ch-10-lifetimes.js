@@ -30,8 +30,9 @@ const SAME_LT=s=>!!s&&s.params.length>=2&&!!s.params[0]&&s.params.every(p=>p===s
 
 RQ.CH.push({
   name:'Lifetimes',
-  badge:'Tide Mapper',
-  intro:`A reference is only good while the thing it points at is still there. Rust checks that for every reference, and most of the time it works the answer out by itself. When a function takes two references and gives one back, it cannot tell which input the answer comes from, so you tell it with a <em>lifetime name</em>. This chapter writes those names on functions and on a <code>struct</code> that holds a reference, and reads the errors that appear when a reference would outlast what it points at.`,
+  badge:'Tide Map',
+  story:'Under the sharing stone, tide notes are pinned to the wall and wash away with the tide; keep each note only while its words last, and find the tide map.',
+  intro:`Under the sharing stone, tide notes are pinned to the tide-note wall, and they wash away with the tide. A reference is only good while the thing it points at is still there. Rust checks that for every reference, and most of the time it works the answer out by itself. When a function takes two references and gives one back, it cannot tell which input the answer comes from, so you tell it with a <em>lifetime name</em>. This chapter writes those names on functions and on a <code>struct</code> that holds a reference, and reads the errors that appear when a reference would outlast what it points at.`,
   toolbox:`In this chapter: <code>&'a str</code> with <code>&lt;'a&gt;</code>, one name shared by two inputs and the result, a parameter left out of the name, <code>&'static str</code>, a <code>struct</code> that holds a reference, <code>impl&lt;'a&gt;</code>, and the errors <code>E0597</code>, <code>E0621</code>, <code>E0106</code> and <code>E0726</code>.`,
   learned:['lifetime name','shared lifetime','E0597 through a call','E0621','static','struct with a reference','impl with a lifetime','method result borrow'],
   missions:[
