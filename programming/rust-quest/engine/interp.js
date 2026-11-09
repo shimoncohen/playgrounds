@@ -778,7 +778,7 @@ RQ.interp=(ast,opts)=>{
   // Closures and iterators. A closure is {k:'closure',node,scope,owned,kind}: scope holds the cells it captured (shared for a borrow, its own
   // for a move or copy) and owned lists the latter. An iterator is {k:'iter',next,back,len,drop,heap}: next gives the next item or undefined, so
   // every adapter pulls from the one before it and side effects happen in the order Rust runs them.
-  const optVal=(x,ty)=>ctorVal({adt:'Option',variant:x===undefined?0:1},x===undefined?[]:[x]);
+  const optVal=x=>ctorVal({adt:'Option',variant:x===undefined?0:1},x===undefined?[]:[x]);
   function dropClosure(c,line){
     for(let i=c.owned.length-1;i>=0;i--){
       const x=c.owned[i];

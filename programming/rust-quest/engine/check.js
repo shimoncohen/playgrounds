@@ -14,6 +14,8 @@
      ctor  a Call or Path that builds a struct or enum variant: {adt, variant}; variant is null for a struct
      match a Match: {mode:'move'|'ref', place, bindsMoved}; arms: IdentPat nodes carry sel (the path below the scrutinee) and bty
      rty, alen  the resolved literal type and array length, as before
+     cc    a Call of a closure value; iterFor a For over an iterator value; um.inner a `&mut self` iterator method whose result borrows what the iterator borrows
+     cl    a Closure (written by mir.js): {caps:[{name,bind,mode ('ref'|'mut'|'move'|'copy')}],kind ('Fn'|'FnMut'|'FnOnce'),move}
    Structs are `struct Name { f: T }`, `struct Name(T)` and `struct Name;`; enums have unit, tuple and struct variants. Type parameters are
    allowed, without bounds; a field is a reference only in a struct with a lifetime. #[derive] takes Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default and Hash. Option and Result are builtin generic enums; Vec<T> and
    HashMap<K, V> are builtin collections (kind coll) whose elements are never references. `use std::collections::HashMap;` is the one `use` that is modeled. The impls are inherent `impl Name { ... }` and `impl<T> Name<T> { ... }`,
@@ -767,6 +769,7 @@ RQ.check=ast=>{
     for(const [e,t] of lits){const r=res(t);I(e).rty=r.k==='int'?r.ty:r.k==='float'?'f64':'i32';}
     for(const f of fmts){
       const r=res(f.t);
+      if(r.k==='tvar'&&r.pendDone)continue;
       if(!printable(r,f.fmt.debug)){
         if(mentionsAdt(r))errors.push(RQ.diag.make('E0277',f.line,f.col,{type:f.shown,debug:f.fmt.debug}));
         else unsup('type checking',f.line);
@@ -1134,7 +1137,7 @@ RQ.check=ast=>{
     const p=peel(e.recv);
     if(sk==='&mut'&&guardRoot&&scrutRoot(p)===guardRoot){if(isRef)unsup('match guard',e.line);else guardBorrow(p,e.line,e.col);}
     if(gi)gi.meet();
-    I(e).um={key:m.key,self:sk,adj,kind:isRef?(p.t==='Path'?'refvar':'temp'):placeChain(e.recv)?'place':'temp',ref:isRef,text,from:m.from,more:m.more};
+    I(e).um={key:m.key,self:sk,adj,kind:isRef?(p.t==='Path'?'refvar':'temp'):placeChain(e.recv)?'place':'temp',ref:isRef,text,from:m.from,more:m.more,inner:m.inner};
     // a &mut self method needs a mutable place: behind a shared reference, or through one to a field, it is E0596
     if(sk==='&mut'&&(isRef&&!r.mut||!isRef&&ch&&ch.via&&!ch.via.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:text,ref:true}));
     // a by-value self takes the value away from behind the reference, which only a Copy type allows
@@ -1437,6 +1440,7 @@ RQ.check=ast=>{
     t=res(t);
     if(t.k==='any'||t.k==='never')return;
     if(t.k==='tvar')return unsup('inferred type',node.line);
+    if(t.k==='ref'&&['closure','opq','param','tvar'].includes(res(t.to).k))return unsup('closure kind',node.line);
     if(!callable(t)){errors.push(RQ.diag.make('E0277',node.line,node.col,{what:'fn',text:sigText(w),type:show(t)}));return;}
     const s=sigOf(t);
     if(s.params.length!==w.params.length){errors.push(RQ.diag.make('E0593',node.line,node.col,{want:w.params.length,got:s.params.length}));return;}
@@ -1458,7 +1462,7 @@ RQ.check=ast=>{
       return d;
     });
     const tvp=e.params.map((p,i)=>!p.ty&&(!exp||wrongCount)?res(ps[i]):null);
-    tvp.forEach((v,i)=>{if(v&&v.k==='tvar')v.cparam=e.params[i].pat;});
+    tvp.forEach((v,i)=>{if(v&&v.k==='tvar'){v.cparam=e.params[i].pat;if(wrongCount)v.pendDone=true;}});
     const ret=e.ret?tyOf(e.ret):exp?exp.ret:fresh(e.line);
     const ct=T.closure(e.id,ps,ret);
     if(exp)ct.exp=exp.kind;
@@ -1469,6 +1473,7 @@ RQ.check=ast=>{
     e.params.forEach((p,i)=>bindVar(p.pat.name,p.pat.mut,'param',ps[i],p.pat));
     const bt=exW(e.body,ret);
     coerce(bt,ret,endNode(e.body));
+    if(res(bt).k==='any'&&res(ret).k==='tvar')res(ret).pendDone=true;
     scopes.pop();
     curRet=keep.r;loops=keep.l;curCl=keep.c;want=keep.w;
     if(e.move&&holdsRef(ret))return unsup('closure returning a reference',e.line);
@@ -1567,7 +1572,7 @@ RQ.check=ast=>{
       }
       case 'count':return {build:()=>rec('Iter::count','val',[],usz,-1)};
       case 'last':return {build:()=>rec('Iter::last','val',[],optTy(item),hasRef(item)?0:-1)};
-      case 'next':return {build:()=>rec('Iter::next','&mut',[],optTy(item),hasRef(item)?0:-1)};
+      case 'next':return {build:()=>({...rec('Iter::next','&mut',[],optTy(item),-1),inner:hasRef(item)})};
       case 'min':case 'max':return {build:()=>{
         const i=res(item);
         if(!isOpen(i,false)&&!has(i,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(i.k==='ref'?i.to:i)}));return rec('Iter::'+name,'val',[],optTy(item),-1);}
@@ -1575,7 +1580,7 @@ RQ.check=ast=>{
       }};
       case 'any':case 'all':return {cl:()=>fn('FnMut',[item],T.bool),build:()=>rec('Iter::'+name,'&mut',[T.any],T.bool,-1)};
       case 'position':return {cl:()=>fn('FnMut',[item],T.bool),build:()=>rec('Iter::position','&mut',[T.any],optTy(usz),-1)};
-      case 'find':return {cl:()=>fn('FnMut',[mkRef(false,item)],T.bool),build:()=>rec('Iter::find','&mut',[T.any],optTy(item),hasRef(item)?0:-1)};
+      case 'find':return {cl:()=>fn('FnMut',[mkRef(false,item)],T.bool),build:()=>({...rec('Iter::find','&mut',[T.any],optTy(item),-1),inner:hasRef(item)})};
       case 'for_each':return {cl:()=>fn('FnMut',[item],T.unit),build:()=>rec('Iter::for_each','val',[T.any],T.unit,-1)};
       case 'fold':return {cl:(i,ts)=>i===1?fn('FnMut',[ts[0],item],ts[0]):null,build:args=>hasRef(args[0])?null:rec('Iter::fold','val',[args[0],T.any],args[0],-1)};
       case 'sum':case 'product':case 'collect':return {build:()=>{
@@ -1589,7 +1594,7 @@ RQ.check=ast=>{
     return {unsup:'iterator'};
   }
   function srcSpec(e,r,base,name){
-    const isRef=r.k==='ref',mut=isRef&&r.mut,line=e.line;
+    const isRef=r.k==='ref',mut=isRef&&r.mut;
     if(e.args.length)return null;
     const lend=(sk,item,flags)=>({build:()=>rec('Src::'+name,sk,[],iterOf(item,{lent:true,...flags}),isRef||sk!=='val'?0:-1)});
     if(base.k==='String'||base.k==='str'){
@@ -1629,7 +1634,8 @@ RQ.check=ast=>{
       if(base.name==='Vec'&&name==='sort_by_key'){
         const K=fresh(at);
         return {cl:()=>fn('FnMut',[mkRef(false,k)],K),build:()=>{
-          if(hasRef(K)||!isOpen(K,false)&&!has(K,'Ord'))return null;
+          if(hasRef(K))return null;
+          if(!isOpen(K,false)&&!has(K,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(K)}));}
           return rec('Vec::sort_by_key','&mut',[T.any],T.unit,-1);
         }};
       }

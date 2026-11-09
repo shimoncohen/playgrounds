@@ -353,7 +353,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   const SLICE_MUT=new Set(['Vec::swap','Vec::get_mut']);
   function umethod(e,dest){
     const u=info.get(e).um,p=peel(e.recv);
-    let ro,rest;
+    let ro,rest,inner;
     if(u.ref){
       if(u.adj==='copy'){
         const t=tyOf(e.recv);
@@ -412,11 +412,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           }
         }
         ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
+        inner=target;
       }
       if(early)rest=early;
       else{rebTwice(e.args,e);rest=seq(e.args,stdArgs(u));}
     }
-    return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,more:u.more||[],method:true},e,dest,tyOf(e));
+    // `next` on `&mut it` hands back items from what the iterator borrows, not from the borrow of the iterator itself
+    return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,more:u.more||[],method:true,...u.inner&&inner!==undefined&&{src:inner}},e,dest,tyOf(e));
   }
 
   function method(e,dest){

@@ -171,7 +171,7 @@ function loanPass(F,errors,un,loans,stats){
   const flow=(o,i)=>{
     const r=i.rv,g=x=>x&&x.k!=='const'?o[R[x.l]]:0n;
     return r.k==='use'?g(r.x):r.k==='method'&&r.name==='as_str'?g(r.recv):r.k==='agg'?r.args.reduce((m,x)=>m|g(x),0n)
-      :r.k==='call'&&r.from>=0?[r.from,...r.more||[]].reduce((m,k)=>m|g(r.args[k]),0n):0n;
+      :r.k==='call'&&r.src!==undefined?o[R[r.src]]:r.k==='call'&&r.from>=0?[r.from,...r.more||[]].reduce((m,k)=>m|g(r.args[k]),0n):0n;
   };
   const val=(s,i)=>i.rv.k==='ref'?lb[at.get(i)]|s[R[i.rv.l]]:flow(s,i);
   // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
