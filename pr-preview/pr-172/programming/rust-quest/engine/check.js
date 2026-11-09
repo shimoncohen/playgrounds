@@ -31,7 +31,7 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'error conversion','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
+  'error conversion','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
@@ -760,6 +760,11 @@ RQ.check=ast=>{
     for(const o of obligs){
       const r=res(o.ty);
       if(r.k==='tvar'||isOpen(r,false))continue;
+      // whether a closure is Copy depends on its captures, which only mir.js works out
+      if(r.k==='closure'&&!o.ret&&!o.method&&(o.tr==='Copy'||o.tr==='Clone')){
+        if(o.tr==='Clone')unsup('closure bound',o.line);else r.needCopy={line:o.line,col:o.col};
+        continue;
+      }
       if(o.method&&methodSeen.has(o.line+':'+o.col))continue;
       if(o.method&&!meets(r,o.tr))methodSeen.add(o.line+':'+o.col);
       if(o.ret){if(r.k==='str'||hasRef(r))unsup('generic reference',o.line);}
@@ -1419,16 +1424,16 @@ RQ.check=ast=>{
   const takeWant=()=>{const w=want;want=null;return w&&!['any','never'].includes(res(w).k)?w:null;};
   function exW(e,w){
     const t=peel(e).t;
+    if(t==='Closure'&&w&&res(w).k==='opq'){if(++opqCl>1)return unsup('closure kind',peel(e).line);expSig=sigOf(w);}
     if(w&&(t==='Match'||t==='If'||t==='Block'||t==='MethodCall'&&['collect','sum','product'].includes(peel(e).name)))want=w;
     return ex(e);
   }
   const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   const placeChain=e=>{e=peel(e);return e.t==='Path'||((e.t==='Field'||e.t==='Index')&&placeChain(e.expr));};
-  // Closures and iterators. A closure is its own type; mir.js works out how it captures and which Fn trait it implements (info.get(closure).cl).
-  // An iterator type says whether it holds a borrow (lent) and whether `rev` is allowed (de, double-ended) and `len` is known (es).
+  // mir.js decides how a closure captures and which Fn trait it implements (info.get(closure).cl)
   const RANK={Fn:0,FnMut:1,FnOnce:2};
   const usz=T.int('usize');
-  let expSig=null,curCl=null,letInit=null,letPat=null,reuse=null,rangeOk=false,pend=[];
+  let expSig=null,opqCl=0,curCl=null,letInit=null,letPat=null,reuse=null,rangeOk=false,pend=[];
   const callable=t=>{t=res(t);return t.k==='closure'||t.k==='opq'||t.k==='param'&&!!t.fnb&&!!t.fnb.params;};
   const sigOf=t=>{
     t=res(t);
@@ -1444,7 +1449,9 @@ RQ.check=ast=>{
     if(!callable(t)){errors.push(RQ.diag.make('E0277',node.line,node.col,{what:'fn',text:sigText(w),type:show(t)}));return;}
     const s=sigOf(t);
     if(s.params.length!==w.params.length){errors.push(RQ.diag.make('E0593',node.line,node.col,{want:w.params.length,got:s.params.length}));return;}
-    if(!s.params.every((p,i)=>unify(p,w.params[i]))){errors.push(RQ.diag.make('E0631',node.line,node.col,{}));return;}
+    const bad=s.params.findIndex((p,i)=>!unify(p,w.params[i]));
+    // rustc defers an operator on an untyped parameter (&i32 * 2 is fine), where the engine settled it on the literal's type
+    if(bad>=0){if(s.params[bad].arith)unsup('inferred type',node.line);else errors.push(RQ.diag.make('E0631',node.line,node.col,{}));return;}
     if(!unify(s.ret,w.ret)){unsup('type checking',node.line);return;}
     if(t.k==='closure'){if(t.need==null||RANK[w.kind]<RANK[t.need])t.need=w.kind;}
     else if(RANK[s.kind]>RANK[w.kind])unsup('closure kind',node.line);
@@ -1453,12 +1460,17 @@ RQ.check=ast=>{
     if(e.params.some(p=>p.pat.byRef||p.pat.sub))return unsup('pattern',e.line);
     const n=e.params.length;
     const wrongCount=!!exp&&exp.params.length!==n;
+    let badParam=false;
     if(wrongCount)errors.push(RQ.diag.make('E0593',e.line,e.col,{want:exp.params.length,got:n}));
     const ps=e.params.map((p,i)=>{
       const v=exp&&!wrongCount?exp.params[i]:null;
       if(!p.ty)return v||fresh(p.pat.line);
       const d=tyOf(p.ty);
-      if(v&&!unify(d,v))errors.push(RQ.diag.make('E0631',e.line,e.col,{}));
+      if(v&&!unify(d,v)){
+        badParam=true;
+        // on a std adapter rustc adds a second error (E0599, E0277) for whatever uses the result
+        if(exp.std)unsup('type checking',e.line);else errors.push(RQ.diag.make('E0631',e.line,e.col,{}));
+      }
       return d;
     });
     const tvp=e.params.map((p,i)=>!p.ty&&(!exp||wrongCount)?res(ps[i]):null);
@@ -1472,7 +1484,7 @@ RQ.check=ast=>{
     curCl=cl;curRet=ret;loops=[];want=null;
     e.params.forEach((p,i)=>bindVar(p.pat.name,p.pat.mut,'param',ps[i],p.pat));
     const bt=exW(e.body,ret);
-    coerce(bt,ret,endNode(e.body));
+    if(!badParam)coerce(bt,ret,endNode(e.body));
     if(res(bt).k==='any'&&res(ret).k==='tvar')res(ret).pendDone=true;
     scopes.pop();
     curRet=keep.r;loops=keep.l;curCl=keep.c;want=keep.w;
@@ -1484,7 +1496,7 @@ RQ.check=ast=>{
     const ts=[];
     e.args.forEach((a,i)=>{
       const w=sig&&sig(i,ts);
-      if(w&&peel(a).t==='Closure'){expSig=w;ts.push(ex(a));return;}
+      if(w&&peel(a).t==='Closure'){expSig={...w,std:true};ts.push(ex(a));return;}
       if(e.name==='zip'&&peel(a).t==='Range')rangeOk=true;
       const t=ex(a);
       if(w)fnMeet(t,w,a);
@@ -1695,7 +1707,13 @@ RQ.check=ast=>{
     }else return null;
     const s=sigOf(ty),ts=e.args.map(ex);
     if(ts.length!==s.params.length){errors.push(RQ.diag.make('E0057',e.line,e.col,{want:s.params.length,got:ts.length}));return T.any;}
-    ts.forEach((t,i)=>coerce(t,s.params[i],e.args[i]));
+    ts.forEach((t,i)=>{
+      const n=errors.length;
+      coerce(t,s.params[i],e.args[i]);
+      // the first call fixes an untyped parameter that an operator used, and rustc then reports a mismatch inside the body, not at the call
+      if(s.params[i].arith&&!s.params[i].called&&errors.length>n){errors.length=n;unsup('inferred type',e.line);}
+      s.params[i].called=true;
+    });
     if(holdsRef(s.ret))return unsup('closure returning a reference',e.line);
     I(e).cc={kind:s.kind};
     return s.ret;
@@ -1765,6 +1783,7 @@ RQ.check=ast=>{
           if(!(COMPARE.has(op)?na&&nb:true)||!unify(na||a,nb||b))return unsup('type checking',e.line);
           a=na||a;b=nb||b;
         }
+        for(const x of [a,b])if(x.k==='tvar'&&x.cparam)x.arith=true;
         if(!operands(a,b,e))return COMPARE.has(op)?T.bool:a;
         const u=res(a).k==='any'?b:a;
         let core=res(u);
@@ -2165,7 +2184,7 @@ RQ.check=ast=>{
 
   function fnBody(f){
     if(!f.node.body)return;
-    scopes=[new Map()];curRet=f.ret;loops=[];tparams=f.tmap||null;
+    scopes=[new Map()];curRet=f.ret;loops=[];tparams=f.tmap||null;opqCl=0;
     if(f.reg)I(f.node).reg=f.reg;
     if(f.node.name==='main'&&f.node.ret){
       const m=res(f.ret);

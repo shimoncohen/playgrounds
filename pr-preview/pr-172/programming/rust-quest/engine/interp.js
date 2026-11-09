@@ -494,6 +494,7 @@ RQ.interp=(ast,opts)=>{
       if(c){
         const v=read(c,x.line);
         if(t&&!isCopy(t)&&res(t).k!=='ref'){c.moved=true;note({t:'move',name:c.name,line:x.line});}
+        else if(v.k==='closure'&&v.owned.length)return copyClosure(v,x.line);
         return v;
       }
     }
@@ -775,7 +776,7 @@ RQ.interp=(ast,opts)=>{
     lastEv=events.length;
   }
 
-  // Closures and iterators. A closure is {k:'closure',node,scope,owned,kind}: scope holds the cells it captured (shared for a borrow, its own
+  // A closure is {k:'closure',node,scope,owned,kind}: scope holds the cells it captured (shared for a borrow, its own
   // for a move or copy) and owned lists the latter. An iterator is {k:'iter',next,back,len,drop,heap}: next gives the next item or undefined, so
   // every adapter pulls from the one before it and side effects happen in the order Rust runs them.
   const optVal=x=>ctorVal({adt:'Option',variant:x===undefined?0:1},x===undefined?[]:[x]);
@@ -784,6 +785,12 @@ RQ.interp=(ast,opts)=>{
       const x=c.owned[i];
       if(x.val!==null&&!x.moved&&!x.dropped){x.dropped=true;dropValue(x.val,x.name,line,true);}
     }
+  }
+  // a Copy closure that owns captures hands each copy its own state
+  function copyClosure(c,line){
+    const scope=new Map(c.scope),owned=c.owned.map(x=>({...x,val:cloneVal(x.val,line)}));
+    c.owned.forEach((x,i)=>{for(const [k,cell] of scope)if(cell===x)scope.set(k,owned[i]);});
+    return {...c,scope,owned};
   }
   function makeClosure(e,env){
     const cl=info.get(e).cl,scope=new Map(),owned=[];
@@ -799,7 +806,9 @@ RQ.interp=(ast,opts)=>{
     }
     return {k:'closure',node:e,scope,owned,kind:cl.kind};
   }
+  let closureCalls=0;
   function callClosure(f,args,line){
+    closureCalls++;
     tick();
     if(depth+1>maxDepth)throw new Limit('depth');
     depth++;
@@ -963,10 +972,11 @@ RQ.interp=(ast,opts)=>{
       case 'zip':{
         const o=f.k==='iter'?f:srcIter('Src::into_iter',e,f);
         return mkIter({next:()=>{
-          const a=src.next();
+          const before=closureCalls,a=src.next(),ranA=closureCalls!==before;
           if(a===undefined)return undefined;
           const b=o.next();
-          if(b===undefined){dropValue(a,null,line);return undefined;}
+          // rustc skips this extra left pull for exact-size random-access sides but not for filter, chars() and the like, so a closure run here is not modelled
+          if(b===undefined){if(ranA)throw new Unsup('zip with a side effect on its longer side',line);dropValue(a,null,line);return undefined;}
           return {k:'tuple',v:[a,b]};
         },len:()=>Math.min(src.len(),o.len()),drop:l=>{src.drop(l);o.drop(l);}},src.heap||o.heap);
       }

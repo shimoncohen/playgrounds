@@ -22,7 +22,10 @@ RQ.compile=src=>{
   if(!unsupported.length&&!global){
     const live=n=>!(n.t==='Fn'&&n.body&&inBad(n));
     const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'||it.t==='Trait'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
-    diags=[...diags,...b.errors.filter(e=>!inBad(e))].sort((a,b)=>a.line-b.line||a.col-b.col);
+    let be=b.errors.filter(e=>!inBad(e));
+    // the one type error only mir.js can see (a closure's Copy bound) ends the compile before borrowck, as any type error does
+    if(be.some(e=>e.code==='E0277')){be=be.filter(e=>e.code==='E0277');diags=diags.filter(e=>!BORROWCK.includes(e.code));}
+    diags=[...diags,...be].sort((a,b)=>a.line-b.line||a.col-b.col);
     unsupported.push(...b.unsupported.filter(u=>!inBad(u)));loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
@@ -261,6 +264,33 @@ function context(d,ast,counts,src){
       if(f)RQ.walk(f.body,m=>{if(m.t===T)n++;});
       return n;
     },
+    // caps are empty unless borrow checking ran
+    closures:()=>{const r=[];if(ast)RQ.walk(ast,m=>{if(m.t==='Closure'){const o=d.info&&d.info.get(m);r.push({move:!!m.move,caps:o&&o.cl?o.cl.caps:[]});}});return r;},
+    printsIn:inside=>{
+      let n=0;
+      const go=(x,inCl)=>RQ.walk(x,m=>{
+        if(m.t==='Closure'&&!inCl&&m!==x){go(m,true);return false;}
+        if(m.t==='Macro'&&PRINTS.includes(m.name)&&inCl===inside)n++;
+      });
+      if(ast)go(ast,false);
+      return n;
+    },
+    printedCalls:name=>{
+      let n=0;
+      if(ast)RQ.walk(ast,m=>{if(m.t==='Macro'&&PRINTS.includes(m.name)&&m.args&&callsTo(m.args,name))n++;});
+      return n;
+    },
+    onRecv:(fn,method,name)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(f)RQ.walk(f.body,m=>{if(m.t==='MethodCall'&&m.name===method){const r=peelP(m.recv);if(r.t==='Path'&&r.segs.length===1&&r.segs[0].name===name)n++;}});
+      return n;
+    },
+    callArg:(callee,name)=>{
+      let n=0;
+      if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===callee&&m.args.some(a=>{a=peelP(a);return a.t==='Path'&&a.segs.length===1&&a.segs[0].name===name;}))n++;});
+      return n;
+    },
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
     calls:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===name)n++;});return n;},
     count:kind=>{
@@ -307,7 +337,7 @@ RQ.run=(src,opts)=>{
       const r=RQ.interp(c.ast,{...o,seed:1,snap:false});
       orderDependent=r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;
     }
-    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive},ast,c.counts,src);
+    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive,info:c.info},ast,c.counts,src);
   }catch(e){
     // source nested thousands deep overflows a recursive pass; that is the learner's code, not a bug
     if(e instanceof RangeError&&!ast)return context({status:'unsupported',unsupported:{feature:'nesting',line:1},unsupportedAll:[{feature:'nesting',line:1}]},null);

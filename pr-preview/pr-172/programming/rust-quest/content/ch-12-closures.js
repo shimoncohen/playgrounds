@@ -9,7 +9,8 @@ const FN=(head,...body)=>L(head+' {',...body.map(l=>'    '+l),'}');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
 const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
 // a closure has no node of its own in the check context, so a closure that is called by name and no `fn` besides main stand for it
-const CLOSURE_ONLY=(c,name)=>c.calls(name)<1||c.count('fn')>1?'Make `'+name+'` a closure with `let '+name+' = |...| ...;` and call it, with no `fn` besides `main`.':null;
+const CLOSURE_ONLY=(c,name)=>c.calls(name)<1||c.count('fn')>1?'Make `'+name+'` a closure with `let '+name+' = |...| ...;` and call it, with no `fn` besides `main`.'
+  :c.printedCalls(name)<2?'Print what `'+name+'` gives back, in each of the two `println!` lines, so the numbers come from the closure.':null;
 const FN_BOUND=g=>!!g&&(g.tparams.some(t=>t.bounds.includes('Fn'))||g.impl.some(b=>!!b&&b.includes('Fn')));
 const KIND_BOUND=(g,kind)=>!!g&&(g.tparams.some(t=>t.bounds.includes(kind))||g.impl.some(b=>!!b&&b.includes(kind)));
 
@@ -57,7 +58,8 @@ RQ.CH.push({
       ],
       lazy:[
         {src:MAIN('let tally = |word: &str| word.len();','println!("5");','println!("4");'),wrongWhy:'check'},
-        {src:J(FN('fn tally(word: &str) -> usize','word.len()'),MAIN('println!("{}", tally("shell"));','println!("{}", tally("crab"));')),wrongWhy:'check'}
+        {src:J(FN('fn tally(word: &str) -> usize','word.len()'),MAIN('println!("{}", tally("shell"));','println!("{}", tally("crab"));')),wrongWhy:'check'},
+        {src:MAIN('let tally = |word: &str| word.len();','let _ = tally("x");','println!("{}", "shell".len());','println!("{}", "crab".len());'),wrongWhy:'check'}
       ],
       defines:['closure'],previews:[],
       check:c=>{
@@ -87,12 +89,13 @@ RQ.CH.push({
         {src:LOG('show();','log.push_str(" rising");','show();'),wrongWhy:'E0502'}
       ],
       lazy:[
-        {src:MAIN('let mut log = String::from("tide");','println!("{}", log);','log.push_str(" rising");','println!("{}", log);'),wrongWhy:'check'}
+        {src:MAIN('let mut log = String::from("tide");','println!("{}", log);','log.push_str(" rising");','println!("{}", log);'),wrongWhy:'check'},
+        {src:MAIN('let mut log = String::from("tide");','let show = || println!("tide");','show();','log.push_str(" rising");','println!("{}", log);'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!=='tide\ntide rising\n')return 'The program has to print `tide` and then `tide rising`.';
-        if(c.calls('show')<1)return 'Keep the closure `show` and call it, so the borrow is the one this mission is about.';
+        if(c.calls('show')<1||!c.closures().some(x=>x.caps.length>0))return 'Keep the closure `show`, let it print a variable from around it, and call it, so the borrow is the one this mission is about.';
         return OTHER(c,'moon\nmoon rising\n','The text comes from `log`, so another start has to show up.',['"tide"','"moon"']);
       }
     },
@@ -116,12 +119,13 @@ RQ.CH.push({
         {src:TICK('let mut tick = || count += 1;').replace('println!("{}", count);','tick();\n    println!("{}", count);'),wrongWhy:'check'}
       ],
       lazy:[
-        {src:MAIN('let mut count = 0;','let mut tick = || count += 1;','count += 3;','println!("{}", count);'),wrongWhy:'check'}
+        {src:MAIN('let mut count = 0;','let mut tick = || count += 1;','count += 3;','println!("{}", count);'),wrongWhy:'check'},
+        {src:MAIN('let mut count = 0;','let mut tick = || {};','for _ in 0..3 {','    tick();','    count += 1;','}','println!("{}", count);'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!=='3\n')return 'The program has to print `3`.';
-        if(c.calls('tick')<1||c.count('fn')>1)return 'Keep `tick` as a closure and call it, with no `fn` besides `main`.';
+        if(c.calls('tick')<1||c.count('fn')>1||!c.closures().some(x=>x.caps.some(k=>k.name==='count'&&k.mode==='mut')))return 'Keep `tick` as a closure that changes `count`, and call it, with no `fn` besides `main`.';
         return OTHER(c,'5\n','The loop calls `tick` once per round, so another count has to show up.',['0..3','0..5']);
       }
     },
@@ -173,11 +177,13 @@ RQ.CH.push({
         {src:TWICE('fn run_twice<F: FnOnce()>(f: F)'),wrongWhy:'E0382'}
       ],
       lazy:[
-        {src:J(L('fn run_twice<F: Fn()>(f: F) {','    f();','    f();','}'),MAIN('let mut count = 0;','let bump = || println!("bump");','run_twice(bump);','println!("{}", count);')),wrongWhy:'check'}
+        {src:J(L('fn run_twice<F: Fn()>(f: F) {','    f();','    f();','}'),MAIN('let mut count = 0;','let bump = || println!("bump");','run_twice(bump);','println!("{}", count);')),wrongWhy:'check'},
+        {src:J(L('fn run_twice<F: FnMut()>(mut f: F) {','}'),MAIN('let mut count = 0;','let bump = || count += 1;','run_twice(bump);','count += 2;','println!("{}", count);')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!=='2\n')return 'The program has to print `2`.';
+        if(!c.callsIn('run_twice','f')||c.callArg('run_twice','bump')<1)return 'Keep `run_twice(bump)` in `main`, and let `run_twice` call its closure `f`.';
         if(!KIND_BOUND(c.genericOf('run_twice'),'FnMut'))return 'Ask for the kind of closure `bump` is: the bound `FnMut()`.';
         return OTHER(c,'12\n','`run_twice` has to call the closure twice, so the count must go up by two.',['count = 0','count = 10']);
       }
@@ -230,12 +236,14 @@ RQ.CH.push({
         {src:LAZY('let list: Vec<String> = doubled.collect();'),wrongWhy:'E0277'}
       ],
       lazy:[
-        {src:MAIN('let list: Vec<i32> = vec![4, 10, 18];','println!("before");','println!("doubling 2");','println!("doubling 5");','println!("doubling 9");','println!("{}", list.len());'),wrongWhy:'check'}
+        {src:MAIN('let list: Vec<i32> = vec![4, 10, 18];','println!("before");','println!("doubling 2");','println!("doubling 5");','println!("doubling 9");','println!("{}", list.len());'),wrongWhy:'check'},
+        {src:MAIN('let shells = vec![2, 5, 9];','let _l: Vec<i32> = shells.iter().map(|n| n * 2).collect();','println!("before");','let mut i = 0;','while i < shells.len() {','    println!("doubling {}", shells[i]);','    i += 1;','}','println!("{}", shells.len());'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!==LAZY_OUT)return 'The program has to print `before`, then a `doubling` line for each shell, then `3`.';
-        if(c.usesMethod('map')<1||c.usesMethod('collect')<1||c.count('for')>0)return 'Keep the pipeline: `iter()`, `map` and `collect`, with no loop.';
+        if(c.usesMethod('map')<1||c.usesMethod('collect')<1||c.count('for')+c.count('while')+c.count('loop')>0)return 'Keep the pipeline: `iter()`, `map` and `collect`, with no loop.';
+        if(c.printsIn(true)<1||c.printsIn(false)>2)return 'The `doubling` lines have to be printed by the closure inside `map`.';
         return OTHER(c,'before\ndoubling 1\ndoubling 3\n2\n','The pipeline has to run on the shells in the vector, so another vector has to show up.',['vec![2, 5, 9]','vec![1, 3]']);
       }
     },
@@ -259,12 +267,14 @@ RQ.CH.push({
       ],
       lazy:[
         {src:MAIN('let big: Vec<i32> = vec![8, 12, 20];','println!("{:?}", big);','let total: i32 = big.iter().sum();','println!("{}", total);'),wrongWhy:'check'},
-        {src:MAIN('let shells = vec![3, 8, 12, 5, 20];','let mut big: Vec<i32> = Vec::new();','for n in shells.iter() {','    if *n > 6 {','        big.push(*n);','    }','}','println!("{:?}", big);','let total: i32 = big.iter().sum();','println!("{}", total);'),wrongWhy:'check'}
+        {src:MAIN('let shells = vec![3, 8, 12, 5, 20];','let mut big: Vec<i32> = Vec::new();','for n in shells.iter() {','    if *n > 6 {','        big.push(*n);','    }','}','println!("{:?}", big);','let total: i32 = big.iter().sum();','println!("{}", total);'),wrongWhy:'check'},
+        {src:MAIN('let shells = vec![3, 8, 12, 5, 20];','let _d: Vec<i32> = shells.iter().filter(|n| **n > 6).copied().collect();','let mut big: Vec<i32> = Vec::new();','let mut i = 0;','while i < shells.len() {','    if shells[i] > 6 {','        big.push(shells[i]);','    }','    i += 1;','}','println!("{:?}", big);','let total: i32 = big.iter().sum();','println!("{}", total);'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!=='[8, 12, 20]\n40\n')return 'The program has to print `[8, 12, 20]` and then `40`.';
-        if(c.usesMethod('filter')<1||c.usesMethod('collect')<1||c.count('for')>0)return 'Keep the pipeline: `filter` and `collect`, with no loop.';
+        if(c.usesMethod('filter')<1||c.usesMethod('collect')<1||c.count('for')+c.count('while')+c.count('loop')>0)return 'Keep the pipeline: `filter` and `collect`, with no loop.';
+        if(c.chainOn('main','collect','filter')<1)return '`big` has to be the result of the `filter` and `collect` pipeline.';
         return OTHER(c,'[10, 7]\n17\n','The pipeline has to keep the shells above 6 from the vector, so another vector has to show up.',['vec![3, 8, 12, 5, 20]','vec![10, 2, 7]']);
       }
     },
@@ -288,13 +298,16 @@ RQ.CH.push({
         {src:J(STD_TIDY,TOP('sizes.first().map(|s| s * 3).unwrap_or_else(|| 0)')),wrongWhy:'check'}
       ],
       lazy:[
-        {src:J(TIDY('sizes.clear();','sizes.push(30);','sizes.push(18);','sizes.push(9);','sizes.push(5);'),STD_TOP),wrongWhy:'check'}
+        {src:J(TIDY('sizes.clear();','sizes.push(30);','sizes.push(18);','sizes.push(9);','sizes.push(5);'),STD_TOP),wrongWhy:'check'},
+        {src:J(TIDY('let mut other = vec![3, 1];','other.retain(|s| *s > 2);','other.sort_by_key(|s| -*s);','let mut kept: Vec<i32> = Vec::new();','for s in sizes.iter() {','    if *s > 4 {','        kept.push(*s);','    }','}','kept.sort_by_key(|s| -*s);','*sizes = kept;'),TOP('let _z = sizes.first().map(|s| s * 2).unwrap_or_else(|| 0);','let mut best = 0;','for s in sizes.iter() {','    if *s * 2 > best {','        best = *s * 2;','    }','}','best')),wrongWhy:'check'},
+        {src:J(STD_TIDY,TOP('let _q = Some(1).map(|s| s * 2).unwrap_or_else(|| 0);','let mut best = 0;','for s in sizes.iter() {','    if *s * 2 > best {','        best = *s * 2;','    }','}','best')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!=='[30, 18, 9, 5]\n60\n0\n')return 'The program has to print `[30, 18, 9, 5]`, `60` and `0`.';
-        const missing=['retain','sort_by_key','unwrap_or_else'].filter(m=>c.usesMethod(m)<1);
-        if(missing.length)return 'Use the closure methods: still missing '+missing.map(m=>'`'+m+'`').join(', ')+'.';
+        const missing=[['retain','tidy'],['sort_by_key','tidy'],['unwrap_or_else','top_double']].filter(([m,fn])=>m==='unwrap_or_else'?c.chainOn(fn,m,'first')<1:c.onRecv(fn,m,'sizes')<1);
+        if(missing.length)return 'Use the closure methods on `sizes`, and finish `top_double` with `unwrap_or_else`: still missing '+missing.map(([m])=>'`'+m+'`').join(', ')+'.';
+        if(['tidy','top_double'].some(fn=>c.countIn('for',fn)+c.countIn('while',fn)+c.countIn('loop',fn)>0))return 'Let the closure methods do the work, with no loop in `tidy` or `top_double`.';
         if(c.usesMethod('map')<1&&c.usesMethod('and_then')<1)return 'Change the first size inside the `Option` with `map` (or `and_then`).';
         return OTHER(c,'[7, 6]\n14\n0\n','The functions have to work on the vector `main` builds, so another vector has to show up.',['vec![30, 5, 18, 2, 9]','vec![1, 7, 4, 6]']);
       }
