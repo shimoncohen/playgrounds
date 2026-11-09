@@ -231,7 +231,7 @@ RQ.interp=(ast,opts)=>{
     if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
   function macro(e,env){
-    if(!e.args.length){emit(e.name,'');return UNIT;}
+    if(!e.args.length){if(e.name==='panic')throw panic('explicit panic',e);emit(e.name,'');return UNIT;}
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
@@ -256,6 +256,7 @@ RQ.interp=(ast,opts)=>{
       throw x;
     }
     if(e.name==='format')return string(s,undefined,e.line);
+    if(e.name==='panic')throw panic(s,e);
     note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
   }
@@ -849,6 +850,28 @@ RQ.interp=(ast,opts)=>{
         const x=unref(v.fields[0].val);
         return ctorVal({adt:'Option',variant:1},[key.endsWith('cloned')?cloneVal(x,e.line):x]);
       }
+      case 'ok':case 'err':{
+        const keep=key.endsWith('::ok')===ok,x=v.fields[0].val;
+        if(keep)return ctorVal({adt:'Option',variant:1},[x]);
+        dropValue(x,null,e.line);
+        return ctorVal({adt:'Option',variant:0},[]);
+      }
+      case 'ok_or':{
+        if(ok){dropValue(args[0],null,e.line);return ctorVal({adt:'Result',variant:0},[v.fields[0].val]);}
+        return ctorVal({adt:'Result',variant:1},[args[0]]);
+      }
+      case 'unwrap_err':case 'expect_err':{
+        const x=v.fields[0].val;
+        if(!ok)return x;
+        const why=(key.endsWith('expect_err')?unref(args[0]).v:'called `Result::unwrap_err()` on an `Ok` value')+': '+RQ.std.debug(x,tick,MAX_OUTPUT);
+        dropValue(x,null,e.line);
+        throw panic(why,at0);
+      }
+      case 'unwrap_or_default':{
+        if(ok)return v.fields[0].val;
+        if(!opt)dropValue(v.fields[0].val,null,e.line);
+        return defaultVal(res(typeOf(e)),e.line);
+      }
       case 'unwrap_or':{
         if(ok){dropValue(args[0],null,e.line);return v.fields[0].val;}
         if(!opt)dropValue(v.fields[0].val,null,e.line);
@@ -1093,6 +1116,11 @@ RQ.interp=(ast,opts)=>{
       case 'Macro':return e.name==='vec'?vecMacro(e,env):macro(e,env);
       case 'Block':return block(e,env);
       case 'Return':throw new Ret(e.expr?mv(e.expr,env):UNIT);
+      case 'Try':{
+        const v=mv(e.expr,env);
+        if(v.variant==='Ok'||v.variant==='Some')return v.fields[0].val;
+        throw new Ret(v);
+      }
       case 'Tuple':return e.elems.length?{k:'tuple',v:mvAll(e.elems,env)}:UNIT;
       case 'Array':return {k:'array',v:mvAll(e.elems,env)};
       case 'StructLit':{
@@ -1145,8 +1173,13 @@ RQ.interp=(ast,opts)=>{
   try{
     // rustc range-checks every const; the lint pass reports an overflow, so a const only fails here on a shape it cannot model
     for(const n of consts.keys())constVal(n);
-    callFn(fns.get('main'),[],1);
+    const ret=callFn(fns.get('main'),[],1);
     snapshot(snaps.length?snaps[snaps.length-1].line:1,true);
+    if(ret&&ret.variant==='Err'){
+      err+='Error: '+RQ.std.debug(ret.fields[0].val,tick,MAX_OUTPUT)+'\n';
+      dropValue(ret,null,1);
+      return {status:'ok',stdout:out,stderr:err,exit:1,...extra()};
+    }
     return {status:'ok',stdout:out,stderr:err,exit:0,...extra()};
   }catch(x){
     // a value nested thousands deep overflows the JS stack in drop, clone, == or Debug

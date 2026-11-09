@@ -656,6 +656,30 @@ test('rust-quest: chapter 8 plays through: a loop shows its borrow of the Vec, a
   await ctx.close();
 });
 
+test('rust-quest: chapter 9 plays through: a used-up Result is E0382, ? in a plain fn is E0277, and main returning an Err shows the error output and exit code 1', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="8"]');
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0382[\s\S]*borrow of moved value: r/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0277[\s\S]*operator can only be used in a function that returns Result or Option/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .stderr');
+  assert.match(await page.textContent('#result'), /Your program ended with an error[\s\S]*each kid gets 4[\s\S]*Error: Odd\(7\)[\s\S]*Exit code 1/);
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

@@ -47,7 +47,8 @@ const ERRORS={
   },
   E0277:{
     title:'a type is missing a trait this code needs',
-    msg:o=>o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    msg:o=>o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    tipFor:o=>o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
     tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field.'
   },
   E0369:{
@@ -130,7 +131,7 @@ const ERRORS={
     // rustc names a number literal's open type in words, without backticks
     msg:o=>{
       const q=t=>t==='integer'||t==='floating-point number'?t:'`'+t+'`';
-      const head={match:'`match` arms have incompatible types',else:'`if` and `else` have incompatible types',letelse:'`else` clause of `let...else` does not diverge'}[o.what]||'mismatched types';
+      const head={match:'`match` arms have incompatible types',else:'`if` and `else` have incompatible types',letelse:'`else` clause of `let...else` does not diverge',try:'`?` operator has incompatible types'}[o.what]||'mismatched types';
       return head+': expected '+q(o.expected)+', found '+q(o.found);
     },
     tip:'Every value has one type, and the two sides here have to agree. Change the value to the type the other side expects, or change the type you wrote.'
@@ -226,7 +227,7 @@ const HINTS={
   'reference in aggregate':'A tuple or array that holds a reference, like `(&x, 1)`, is not modeled. Keep the reference in its own variable.',
   'repeated error':'Several `&mut` borrows of a variable that is not `mut` are one error in Rust, and Rust Quest does not model how it is reported. Write `let mut` for the variable first.',
   'program too large':'This function is too big for the borrow checker in Rust Quest. Split it into smaller functions.',
-  cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':LATER,'struct literal':'Write every field of the `struct` exactly once, as `Name { field: value, ... }`, with no `..` base.','qualified path':LATER,
+  cast:'This kind of `as` conversion is not modeled. Convert between numbers, or turn a `bool` or a `char` into a number.','try operator':'`?` is modeled on a `Result` or an `Option` that holds no reference, in a function that returns the same kind. Match on the value or use `unwrap` for anything else.','error conversion':'`?` here would have to turn one error type into another with `From`, which Rust Quest teaches in a later chapter. Make both error types the same, for now.','struct literal':'Write every field of the `struct` exactly once, as `Name { field: value, ... }`, with no `..` base.','qualified path':LATER,
   'fn pointer':LATER,'impl Trait':LATER,'inferred type':'Write the type out, like `let x: Option<i32> = None;`. Rust Quest does not infer a type behind `_`, or for a `None` that nothing else gives a type.',
   pattern:'Modeled patterns: a name or `_`, literals, ranges like `1..=5`, `|` between patterns that bind nothing, tuples, `struct` and `enum` variants (`Shape::Rect { w, h }`, `Some(n)`), and `n @ 1..=5`. Not modeled yet: `ref`, `&` patterns, slices, constants, floats, a `&` met inside a tuple or `struct`, a wrong field list, and a name that repeats.',
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
@@ -242,7 +243,7 @@ const HINTS={
   nesting:'Code nested this deeply, in a pattern, an expression or a type, is not modeled. Split it into smaller pieces.',
   'array length':'Write the array length as a plain number, like `[i32; 3]`, no bigger than 10000.',
   'break outside loop':'`break` and `continue` only work inside a loop.',
-  'main signature':'`main` takes no parameters and returns nothing in this quest. Write `fn main() { ... }`.',
+  'main signature':'`main` takes no parameters and returns nothing, or `Result<(), E>` where `E` can be printed with `{:?}`. Write `fn main() { ... }` or `fn main() -> Result<(), String> { ... }`.',
   'path call':'Only `Name::function` for a function in your own `impl Name { ... }`, an `enum` variant, `Name::default()` for a type that derives `Default`, `String::new`, `String::from`, `Vec::new` and `HashMap::new` are modeled.',
   'function value':'Using a function as a value is not modeled yet. Call it with `name(...)` instead.',
   'bit shift':'Shifts are not modeled yet. Multiply or divide instead.',
@@ -279,7 +280,7 @@ RQ.diag={
   UNSUPPORTED:HINTS,
   hint:feature=>Object.hasOwn(HINTS,feature)?HINTS[feature]:DEFAULT_HINT,
   panicText,
-  make:(id,line,col,o)=>{const d=ERRORS[id],msg=d?d.msg(o||{}):id;return d&&d.lint?{lint:id,line,col,msg}:{code:id,line,col,msg};},
+  make:(id,line,col,o)=>{const d=ERRORS[id],msg=d?d.msg(o||{}):id,tip=d&&d.tipFor&&d.tipFor(o||{});return d&&d.lint?{lint:id,line,col,msg}:{code:id,line,col,msg,...tip&&{tip}};},
   tip:id=>(ERRORS[id]&&ERRORS[id].tip)||'',
   title:id=>(ERRORS[id]&&ERRORS[id].title)||''
 };

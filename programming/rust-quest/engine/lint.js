@@ -175,6 +175,7 @@ RQ.lint=(ast,info)=>{
         for(const a of e.args)ev(a);
         barrier();return null;
       }
+      case 'Try':ev(e.expr);barrier();return null;
       case 'Assign':{
         // a write to a field leaves the folded value of its root unknown
         if(e.lhs.t==='Field'||e.lhs.t==='Index'){
@@ -197,7 +198,9 @@ RQ.lint=(ast,info)=>{
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
         for(const a of args)ev(a);
-        barrier();return null;
+        barrier();
+        if(e.name==='panic')div=true;
+        return null;
       }
       case 'Index':{
         const a=ev(e.expr),i=ev(e.index),n=(info.get(e)||{}).alen;
