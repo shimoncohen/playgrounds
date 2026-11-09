@@ -202,7 +202,7 @@ describe('inherent impls and method resolution', () => {
     assert.equal(feature(P('struct S;', 'impl S {', '    const A: i32 = 1;', '}', 'fn main() {}')), 'impl@2');
     assert.equal(feature(P('struct S;', 'trait T {}', 'impl T for S {}', 'fn main() {}')), 'trait@2');
     assert.equal(feature(P('struct S {', '    n: i32,', '}', 'impl S {', '    fn f(&mut self) -> &mut i32 {', '        &mut self.n', '    }', '}', 'fn main() {}')), 'lifetime elision@5');
-    assert.equal(feature(P('struct S {', '    n: i32,', '}', 'impl S {', '    fn set(&mut self, n: i32) {}', '    fn get(&self) -> i32 { 0 }', '}', 'fn main() {', '    let mut s = S { n: 1 };', '    s.set(s.get());', '}')), 'two-phase borrow@10');
+    assert.equal(out(P('struct S {', '    n: i32,', '}', 'impl S {', '    fn set(&mut self, n: i32) {}', '    fn get(&self) -> i32 { 0 }', '}', 'fn main() {', '    let mut s = S { n: 1 };', '    s.set(s.get());', '}')), '');
   });
 });
 

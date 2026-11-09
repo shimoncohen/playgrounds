@@ -118,7 +118,7 @@ function context(d,ast,counts){
   const errors=d.errors||[];
   const c={
     status:d.status,errors,view:d.view||null,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
-    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],maxLive:kind=>(d.maxLive||{})[kind]||0,
+    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,hashIterated:!!d.hashIterated,orderDependent:!!d.orderDependent,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],maxLive:kind=>(d.maxLive||{})[kind]||0,
     compiles:()=>c.status!=='error'&&c.status!=='unsupported'&&c.status!=='internal',
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
     onlyError:id=>errors.length===1&&(errors[0].code===id||errors[0].lint===id),
@@ -193,7 +193,13 @@ RQ.run=(src,opts)=>{
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
     if(c.diags.length)return context({status:'error',errors:c.diags,view:opts.snap?errorView(c):null},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context({...RQ.interp(c.ast,{...opts,info:c.info,adts:c.adts,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
+    const o={...opts,info:c.info,adts:c.adts,loans:c.loans},d=RQ.interp(c.ast,{...o,seed:0});
+    let orderDependent=false;
+    if(d.hashIterated&&(d.status==='ok'||d.status==='panic')){
+      const r=RQ.interp(c.ast,{...o,seed:1,snap:false});
+      orderDependent=r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;
+    }
+    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive},ast,c.counts);
   }catch(e){
     // source nested thousands deep overflows a recursive pass; that is the learner's code, not a bug
     if(e instanceof RangeError&&!ast)return context({status:'unsupported',unsupported:{feature:'nesting',line:1},unsupportedAll:[{feature:'nesting',line:1}]},null);

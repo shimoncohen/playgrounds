@@ -46,9 +46,9 @@ describe('Vec as a type', () => {
     assert.equal(feature(main('let v: Vec<i32, i32> = Vec::new();')), 'Vec@2');
     assert.equal(feature(main('let v = Vec::<i32>::new();')), 'path call@2');
     assert.equal(feature(main('let v: Vec<i32> = Vec::with_capacity(2);')), 'path call@2');
-    assert.equal(feature(main('let v = vec![1, 2];', 'let x = v[0];')), 'collection method@3');
-    assert.equal(feature(main('let v = vec![1, 2];', 'for x in v {}')), 'collection method@3');
-    assert.equal(feature(main('let v = vec![1, 2];', 'let x = v.pop();')), 'collection method@3');
+    assert.equal(feature(main('let v = vec![1, 2];', 'let it = v.iter();')), 'iterator@3');
+    assert.equal(feature(main('let mut v = vec![1, 2];', 'v.dedup();')), 'collection method@3');
+    assert.equal(feature(main('let v = vec![1, 2];', 'let x = v.get(0..1);')), 'range expression@3');
   });
   it('a recursive type through a Vec has a size, and a Vec of big arrays counts as one value', () => {
     assert.equal(out(P('struct Node {', '    kids: Vec<Node>,', '}', 'fn main() {', '    let n = Node { kids: vec![Node { kids: vec![] }] };', '    println!("{}", n.kids.len());', '}')), '1\n');
@@ -67,8 +67,9 @@ describe('Vec owns its elements', () => {
     assert.equal(ids(RQ.run(main('let v = Vec::new();', 'v.push(1);'))), 'E0596@3');
     assert.equal(ids(RQ.run(P('fn add(v: &Vec<i32>) {', '    v.push(1);', '}', 'fn main() {}'))), 'E0596@2');
   });
-  it('a push whose argument reads the same Vec is the two-phase borrow, left unsupported', () => {
-    assert.equal(feature(main('let mut v = vec![1];', 'v.push(v.len());')), 'two-phase borrow@3');
+  it('a push whose argument reads the same Vec is a two-phase borrow, but one that borrows it is not modeled', () => {
+    assert.equal(out(main('let mut v = vec![1];', 'v.push(v.len());', 'println!("{:?}", v);')), '[1, 1]\n');
+    assert.equal(feature(main('let mut v = vec![1];', 'v.push(v.pop().unwrap());')), 'two-phase borrow@3');
   });
   it('dropping a Vec drops its elements in order, then frees it', () => {
     const c = RQ.run(P(...NOISY, 'fn main() {', '    let mut v = Vec::new();', '    v.push(N { id: 1 });', '    v.push(N { id: 2 });', '    println!("made");', '}'));
@@ -214,19 +215,19 @@ describe('HashMap', () => {
   it('the key and the value move into the map', () => {
     assert.equal(ids(RQ.run(P(USE, 'fn main() {', '    let mut m = HashMap::new();', '    let k = String::from("a");', '    m.insert(k, 1);', '    println!("{}", k);', '}'))), 'E0382@6');
   });
-  it('a map with no entries or one prints, and with two or more is unsupported: rustc\'s order changes from run to run', () => {
+  it('a map with no entries or one prints; two or more print in an order the two seeds disagree on', () => {
     assert.equal(out(P(USE, 'fn main() {', '    let mut m: HashMap<i32, i32> = HashMap::new();', '    println!("{:?}", m);', '    m.insert(1, 2);', '    println!("{:?} {:#?}", m, m);', '}')), '{}\n{1: 2} {\n    1: 2,\n}\n');
     const c = RQ.run(P(USE, 'fn main() {', '    let mut m = HashMap::new();', '    m.insert(1, 2);', '    m.insert(3, 4);', '    println!("{:?}", m);', '}'));
-    assert.equal(c.status, 'unsupported');
-    assert.equal(c.unsupported.feature, 'hash map order');
-    assert.equal(c.unsupported.line, 6);
-    assert.ok(RQ.diag.hint('hash map order').length > 20);
+    assert.equal(c.status, 'ok');
+    assert.equal(c.hashIterated, true);
+    assert.equal(c.orderDependent, true);
   });
-  it('dropping a map of two or more values with a Drop impl is unsupported, one value is not', () => {
+  it('dropping a map of two or more values with a Drop impl is order dependent, one value is not', () => {
     const two = (n) => RQ.run(P(USE, ...NOISY, 'fn main() {', '    let mut m = HashMap::new();', ...Array.from({ length: n }, (_, i) => `    m.insert(${i}, N { id: ${i} });`), '}'));
     assert.equal(two(1).stdout, 'drop 0\n');
-    assert.equal(two(2).status, 'unsupported');
-    assert.equal(two(2).unsupported.feature, 'hash map order');
+    assert.equal(two(1).orderDependent, false);
+    assert.equal(two(2).status, 'ok');
+    assert.equal(two(2).orderDependent, true);
   });
   it('a map of Strings drops without a Drop impl in two or more entries', () => {
     assert.equal(RQ.run(P(USE, 'fn main() {', '    let mut m = HashMap::new();', '    m.insert(String::from("a"), String::from("x"));', '    m.insert(String::from("b"), String::from("y"));', '    println!("{}", m.len());', '}')).status, 'ok');
@@ -259,8 +260,8 @@ describe('HashMap', () => {
   it('shapes that are not modeled say so', () => {
     assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32> = HashMap::new();', '}')), 'HashMap@3');
     assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, &str> = HashMap::new();', '}')), 'reference in collection@3');
-    assert.equal(feature(P(USE, 'fn main() {', '    let mut m: HashMap<i32, i32> = HashMap::new();', '    m.get(&1);', '}')), 'collection method@4');
-    assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, i32> = HashMap::new();', '    for x in m {}', '}')), 'collection method@4');
+    assert.equal(feature(P(USE, 'fn main() {', '    let mut m: HashMap<i32, i32> = HashMap::new();', '    m.shrink_to_fit();', '}')), 'collection method@4');
+    assert.equal(feature(P(USE, 'fn main() {', '    let m: HashMap<i32, i32> = HashMap::new();', '    let n = m.keys();', '}')), 'iterator@4');
   });
 });
 

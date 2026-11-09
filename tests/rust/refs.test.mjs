@@ -135,7 +135,7 @@ describe('coercion', () => {
     assert.equal(un('    let mut s = String::new();\n    let r: &str = &mut s;'), 'reference coercion@4');
     assert.equal(un('    let mut x = 1;\n    let r: &i32 = &mut x;'), 'reference coercion@4');
     assert.equal(code('    let x = 1;\n    let r: &mut i32 = &x;'), 'E0308@4');
-    assert.equal(un('    let s = "a";\n    let r: &String = s;'), 'reference coercion@4');
+    assert.equal(code('    let s = "a";\n    let r: &String = s;'), 'E0308@4');
   });
   it('a reference to a &str is reference to reference, not E0308', () => {
     assert.equal(un('    let t: &str = "a";\n    show(&t);', 'fn show(s: &str) {}'), 'reference to reference@4');
