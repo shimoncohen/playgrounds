@@ -183,7 +183,7 @@ function context(d,ast,counts,src){
       const t=ast&&ast.items.find(x=>x.t==='Trait'&&x.name===name);
       return t?{methods:t.items.filter(f=>f.t==='Fn').map(f=>({name:f.name,body:!!f.body}))}:null;
     },
-    // a fn's type parameters with the trait names bounding each (from the list and from `where`), and the bounds of each `impl Trait` parameter
+    // `where` bounds are merged only for a single-segment type parameter
     genericOf:fn=>{
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
       if(!f)return null;

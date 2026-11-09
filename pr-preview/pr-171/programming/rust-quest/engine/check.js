@@ -14,10 +14,10 @@
      ctor  a Call or Path that builds a struct or enum variant: {adt, variant}; variant is null for a struct
      match a Match: {mode:'move'|'ref', place, bindsMoved}; arms: IdentPat nodes carry sel (the path below the scrutinee) and bty
      rty, alen  the resolved literal type and array length, as before
-   Structs are `struct Name { f: T }`, `struct Name(T)` and `struct Name;`; enums have unit, tuple and struct variants. Neither is generic and no field is a
-   reference. #[derive] takes Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default and Hash. Option and Result are builtin generic enums; Vec<T> and
-   HashMap<K, V> are builtin collections (kind coll) whose elements are never references. `use std::collections::HashMap;` is the one `use` that is modeled. The impls are inherent `impl Name { ... }`
-   (methods and associated fns, no generics) and `impl Drop for Name { fn drop(&mut self) { prints } }`. A match takes an enum or a shared reference to one,
+   Structs are `struct Name { f: T }`, `struct Name(T)` and `struct Name;`; enums have unit, tuple and struct variants. Type parameters are
+   allowed, without bounds; a field is a reference only in a struct with a lifetime. #[derive] takes Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default and Hash. Option and Result are builtin generic enums; Vec<T> and
+   HashMap<K, V> are builtin collections (kind coll) whose elements are never references. `use std::collections::HashMap;` is the one `use` that is modeled. The impls are inherent `impl Name { ... }` and `impl<T> Name<T> { ... }`,
+   `impl Trait for Name` (a user trait, Display, From<X>) and `impl Drop for Name { fn drop(&mut self) { prints } }`. A match takes an enum or a shared reference to one,
    with unit, tuple and struct variant patterns whose parts are names or `_`. */
 (()=>{
 'use strict';
@@ -314,6 +314,7 @@ RQ.check=ast=>{
     const rec=enums.get(it.name);
     if(rec.node!==it)return;
     if(derivesOf(it)===null){unsup('derive',it.line);return;}
+    for(const v of it.variants)noVis(v);
     const vn=new Set(it.variants.map(v=>v.name));
     const tys=it.generics.length>0&&it.generics.every(g=>g.kind==='ty'&&!g.bounds.length&&!g.default);
     if(it.generics.length&&!tys||BUILTIN.has(it.name)||isInt(it.name)||!it.variants.length||vn.size!==it.variants.length||it.variants.some(v=>v.disc||!fieldsOk(v.kind,v.fields))){unsup('enum',it.line);return;}
@@ -329,21 +330,40 @@ RQ.check=ast=>{
   const PRELUDE_TRAITS=new Set(['Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Default']);
   const OTHER_PRELUDE=new Set(['Send','Sync','Sized','Drop','Fn','FnMut','FnOnce','AsRef','AsMut','Into','From','Iterator','Extend','IntoIterator','DoubleEndedIterator','ExactSizeIterator','ToOwned','ToString','TryFrom','TryInto','FromIterator']);
   const IMPLIED={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['Eq','PartialOrd','PartialEq']};
-  function boundName(b){
+  // '' is a fn, const or static, which rustc also reports as E0404; undefined is a name that does not exist (E0405)
+  function nonTrait(name,ps){
+    if(ps&&ps.has(name))return 'type parameter';
+    if(traits.has(name))return;
+    if(structs.has(name))return 'struct';
+    if(enums.has(name))return 'enum';
+    if(['String','Vec','Box'].includes(name)||name==='HashMap'&&mapUse)return 'struct';
+    if(name==='Option'||name==='Result')return 'enum';
+    if(isInt(name)||['bool','char','f64','str'].includes(name))return 'builtin type';
+    const it=ast.items.find(x=>x.name===name&&['TypeAlias','Mod','Fn','Const','Static'].includes(x.t));
+    return it?{TypeAlias:'type alias',Mod:'module'}[it.t]||'':undefined;
+  }
+  function notTrait(name,line,col,ps){
+    if(name==='Self'){unsup('bounds',line);return true;}
+    const kind=nonTrait(name,ps);
+    if(kind===undefined)return false;
+    errors.push(RQ.diag.make('E0404',line,col,{name,kind}));return true;
+  }
+  function boundName(b,ps){
     if(b.t==='Lifetime'){unsup('lifetime bound',b.line);return null;}
     if(b.segs.some(g=>g.args||g.fn)){unsup('bounds',b.line);return null;}
     const names=b.segs.map(g=>g.name),last=names[names.length-1],pre=names.slice(0,-1).join('::');
     if(names.length===1){
       if(traits.has(last)&&!traits.get(last).builtin||PRELUDE_TRAITS.has(last)||(last==='Debug'||last==='Display')&&uses.has(last))return last;
       if(OTHER_PRELUDE.has(last)||last==='Hash'&&uses.has('Hash')){unsup('bounds',b.line);return null;}
+      if(notTrait(last,b.line,b.col,ps))return null;
       errors.push(RQ.diag.make('E0405',b.line,b.col,{name:last}));return null;
     }
     if((pre==='std::fmt'||pre==='fmt'&&uses.has('fmt'))&&(last==='Display'||last==='Debug')||pre==='std::cmp'&&['PartialEq','Eq','PartialOrd','Ord'].includes(last)||pre==='std::clone'&&last==='Clone'||pre==='std::marker'&&last==='Copy'||pre==='std::default'&&last==='Default')return last;
     unsup('bounds',b.line);return null;
   }
   // a bound that could not be resolved is already reported, so the parameter then accepts anything and adds no second error
-  function boundOf(p,b){
-    const n=boundName(b);
+  function boundOf(p,b,ps){
+    const n=boundName(b,ps);
     if(n)addBound(p,n);
     else{p.lenient=true;p.bounds={has:()=>true,add(){}};}
   }
@@ -359,11 +379,12 @@ RQ.check=ast=>{
       if(g.kind!=='ty'||g.default||map.has(g.name)||BUILTIN.has(g.name)||adtRec(g.name)||traits.has(g.name)){unsup('generics',g.line||line);continue;}
       const p=T.param(g.name,new Set());p.declared=[];p.line=g.line;p.col=g.col;map.set(g.name,p);
     }
-    for(const g of gs)if(g.kind==='ty'&&map.has(g.name))for(const b of g.bounds)boundOf(map.get(g.name),b);
+    const scope=new Set([...(tparams?tparams.keys():[]),...map.keys()]);
+    for(const g of gs)if(g.kind==='ty'&&map.has(g.name))for(const b of g.bounds)boundOf(map.get(g.name),b,scope);
     for(const w of wh||[]){
       const t=w.ty;
       if(w.lt||!t||t.t!=='Path'||t.segs.length!==1||t.segs[0].args||!map.has(t.segs[0].name)){unsup('where',line);continue;}
-      for(const b of w.bounds)boundOf(map.get(t.segs[0].name),b);
+      for(const b of w.bounds)boundOf(map.get(t.segs[0].name),b,scope);
     }
     return map;
   }
@@ -477,6 +498,7 @@ RQ.check=ast=>{
     const self=selfPar=T.param('Self',new Set([it.name]));
     self.declared=[it.name];
     for(const f of it.items){
+      noVis(f);
       if(rec.methods.has(f.name)||f.attrs.length){unsup('trait',f.line);rec.bad=true;continue;}
       rec.methods.set(f.name,{node:f,name:f.name,owner:null,key:'dyn:'+it.name+'::'+f.name,trait:it.name,hasBody:!!f.body,selfPar:self,...fnSig(f,null,null,self)});
     }
@@ -490,6 +512,7 @@ RQ.check=ast=>{
     if(names.length===1&&last==='Drop')return STD_IMPL.Drop;
     if(last==='Display'&&(pre==='std::fmt'||pre==='fmt'&&uses.has('fmt')||pre===''&&uses.has('Display')))return STD_IMPL.Display;
     if(names.length===1&&PRELUDE_TRAITS.has(last)||OTHER_PRELUDE.has(last)||last==='Debug'&&(pre!==''||uses.has('Debug'))||last==='Hash'&&pre===''&&uses.has('Hash')||pre!==''){unsup('impl',tp.line);return null;}
+    if(notTrait(last,tp.line,tp.col))return null;
     errors.push(RQ.diag.make('E0405',tp.line,tp.col,{name:last}));return null;
   }
   const STD_IMPL={Drop:{name:'Drop',builtin:true,methods:new Map([['drop',{name:'drop',hasBody:false}]])},Display:{name:'Display',builtin:true,methods:new Map([['fmt',{name:'fmt',hasBody:false}]])}};
@@ -503,10 +526,11 @@ RQ.check=ast=>{
     curSelf=owner;
     const from=tyOf(argNode),list=froms.get(owner)||[],name='From<'+show(from)+'>';
     froms.set(owner,list);
-    if(list.some(x=>show(x.from)===show(from))){errors.push(RQ.diag.make('E0119',it.line,it.col,{trait:name,type:owner}));curSelf=null;return;}
+    if(show(from)===owner||list.some(x=>show(x.from)===show(from))){errors.push(RQ.diag.make('E0119',it.line,it.col,{trait:name,type:owner}));curSelf=null;return;}
     let m=null;
     for(const f of it.items){
       if(f.t!=='Fn'||f.attrs.length){unsup('impl',f.line);continue;}
+      noVis(f);
       if(f.name!=='from'){errors.push(RQ.diag.make('E0407',f.line,f.col,{name:f.name,trait:'From'}));continue;}
       if(m){unsup('impl',f.line);continue;}
       const sig=fnSig(f,owner);
@@ -520,6 +544,7 @@ RQ.check=ast=>{
     if(!m){if(!it.items.length)errors.push(RQ.diag.make('E0046',it.line,it.col,{missing:['from']}));return;}
     list.push({from,key:m.key});methodNodes.set(m.key,m.node);fromImpls.push(m);
   }
+  const noVis=n=>{if(n.pub)errors.push(RQ.diag.make('E0449',n.pub.line,n.pub.col,{}));};
   function traitImpl(it){
     const tp=it.trait,st=it.selfTy;
     const fa=tp.t==='Path'&&tp.segs.length===1&&tp.segs[0].name==='From'&&!traits.has('From')&&tp.segs[0].args&&tp.segs[0].args.length===1&&tp.segs[0].args[0].t!=='Lifetime'?tp.segs[0].args[0]:null;
@@ -533,12 +558,14 @@ RQ.check=ast=>{
     traitImpls.set(tr.name,set);
     if(set.has(owner)){errors.push(RQ.diag.make('E0119',it.line,it.col,{trait:tr.name,type:owner}));return;}
     set.add(owner);adtRec(owner).impls.add(tr.name);
+    if(tr.name==='Drop'&&rec.der.includes('Copy'))errors.push(RQ.diag.make('E0184',rec.node.line,rec.node.col,{}));
     curSelf=owner;
     const mm=methods.get(owner)||new Map();
     methods.set(owner,mm);
     const given=new Set();
     for(const f of it.items){
       if(f.t!=='Fn'||f.attrs.length){unsup('impl',f.line);continue;}
+      noVis(f);
       const tm=tr.methods.get(f.name);
       if(!tm){errors.push(RQ.diag.make('E0407',f.line,f.col,{name:f.name,trait:tr.name}));continue;}
       if(mm.has(f.name)||given.has(f.name)){unsup('impl',f.line);continue;}
@@ -595,6 +622,7 @@ RQ.check=ast=>{
   }
   for(const it of ast.items)if(it.t==='Trait')traitSigs(it);
   for(const it of ast.items)if(it.t==='Impl'&&!it.trait)implDecl(it);
+  for(const it of ast.items)if(it.t==='Impl')noVis(it);
   for(const it of ast.items)if(it.t==='Impl'&&it.trait)traitImpl(it);
   // a tuple or unit struct is also a value, so it cannot share a name with a fn or a const
   for(const [name,rec] of structs)if(rec.kind!=='named'&&(fns.has(name)||consts.has(name)))unsup('struct',rec.node.line);
@@ -1535,6 +1563,7 @@ RQ.check=ast=>{
             I(e).sig={params,ret,from:m.from,more:m.more,key:m.key};
             return ret;
           }
+          if(adtRec(owner)&&sg[1].name==='default'&&adtRec(owner).tps.length&&adtRec(owner).der.includes('Default'))return unsup('derive',e.line);
           if(adtRec(owner)&&sg[1].name==='default'&&has(adtTy(owner),'Default')){
             if(ts.length)return unsup('wrong argument count',e.line);
             const ty=adtTy(owner);

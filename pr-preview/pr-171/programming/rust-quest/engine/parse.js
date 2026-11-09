@@ -535,7 +535,7 @@ RQ.parse=tokens=>{
   function item(at){
     at=at||attrs();
     const x=T();
-    const pub=vis();
+    const pub=vis()?x:false;
     const y=T();
     if(isK('fn')||((isK('const')||isK('async')||isK('unsafe')||isK('extern'))&&fnAhead()))return fnItem(at,pub);
     if(isK('struct')){
@@ -547,10 +547,10 @@ RQ.parse=tokens=>{
     if(isK('enum')){
       p++;const n=ident(),gs=generics();where();expP('{');const variants=[];
       while(!isP('}')){
-        const vat=attrs(),v=ident();let kind='unit',fields=[],disc=null;
+        const vat=attrs(),pv=isK('pub')?T():false;vis();const v=ident();let kind='unit',fields=[],disc=null;
         if(isP('(')){kind='tuple';fields=fieldsTuple();}else if(isP('{')){kind='named';fields=fieldsNamed();}
         if(eatP('='))disc=expr(false);
-        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat}));
+        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat,pub:pv}));
         if(!eatP(','))break;
       }
       expP('}');return mk('Enum',x,{name:n.v,generics:gs,variants,attrs:at,pub});
@@ -561,7 +561,7 @@ RQ.parse=tokens=>{
       if(eatK('for')){tr=first;self=ty();}
       const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at,where:wh});
+      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at,where:wh,pub});
     }
     if(isK('trait')){
       p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();const wh=where();expP('{');const items=[];
