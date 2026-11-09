@@ -100,7 +100,7 @@ function renderMission(){
     <p class="explain">${all?'Every mission in this chapter is done. ':'A few missions are still open: the dots below show which. '}You can now use these in a real Rust program:</p>
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     <p class="note">The editor is still live, so keep trying things as long as you like.</p>
-    ${last?`<p class="note">That is every chapter there is for now. Play Quick-fire to keep the facts fresh, or browse the field guide.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
+    ${last?`<p class="note">That is every chapter there is. Play Quick-fire to keep the facts fresh, or browse the field guide.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${dots}`;}
   else{const m=ch.missions[S.mi];
     h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[mkey()]?' · done ✓':''}</div>
@@ -170,8 +170,10 @@ fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)ret
 document.addEventListener('keydown',e=>{if(!fireOn||$('#tab-fire').hidden)return;if(/^[1-4]$/.test(e.key)&&fQ&&+e.key<=fQ.opts.length){e.preventDefault();pick(+e.key-1);}});
 
 function renderGuide(){const g=$('#guide');g.dataset.ready='1';
+  const section=(title,items)=>items.length?`<section class="gsec"><h3>${title}</h3><div class="cards">${items.map(x=>`<article class="card panel"><h4>${esc(x.c)}</h4><p>${x.what}</p><div class="ex">${x.ex.map(([code,note],k)=>`<div class="exrow"><button class="excmd" data-ex="${GUIDE.indexOf(x)}.${k}" title="Copy this example"><pre>${esc(code)}</pre><span class="try">Copy</span></button>${note?`<small>${note}</small>`:''}</div>`).join('')}</div></article>`).join('')}</div></section>`:'';
   g.innerHTML=`<div><h2>Field guide</h2><p class="lede">A quick reference for the words and error codes the missions teach. Copy an example, paste it into the editor and press <kbd>Run</kbd>.</p></div>
-  ${CH.map((c,ci)=>{const items=GUIDE.filter(x=>x.ch===ci);return items.length?`<section class="gsec"><h3>Chapter ${ci+1}: ${esc(c.name)}</h3><div class="cards">${items.map(x=>`<article class="card panel"><h4>${esc(x.c)}</h4><p>${x.what}</p><div class="ex">${x.ex.map(([code,note],k)=>`<div class="exrow"><button class="excmd" data-ex="${GUIDE.indexOf(x)}.${k}" title="Copy this example"><pre>${esc(code)}</pre><span class="try">Copy</span></button>${note?`<small>${note}</small>`:''}</div>`).join('')}</div></article>`).join('')}</div></section>`:'';}).join('')}
+  ${CH.map((c,ci)=>section(`Chapter ${ci+1}: ${esc(c.name)}`,GUIDE.filter(x=>x.ch===ci&&!x.gl))).join('')}
+  ${section('Error glossary',GUIDE.filter(x=>x.gl))}
   <section class="gsec"><h3>Your progress</h3><div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px"><p class="explain">Your code is saved in this browser with the rest of your progress, and goes into the progress backup file too.</p>
    <div class="actions"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`;}
 let armProg=0;

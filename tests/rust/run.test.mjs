@@ -188,6 +188,9 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(id('fn main() {\n    let x = 3000000000;\n}'), 'overflowing_literals@2');
     assert.equal(feature('fn main() {\n    let x = 1 + 1.0;\n}'), 'type checking@2');
   });
+  it('no hint promises a later chapter or says the feature is coming', () => {
+    for (const [f, h] of [...Object.entries(RQ.diag.UNSUPPORTED), ['default', RQ.diag.hint('anything else')]]) assert.doesNotMatch(h, /later chapter|for now|modeled yet|not yet|\byet\b/i, f);
+  });
   it('every feature the engine can report has a hint in the diag catalog', () => {
     for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES, ...RQ.BORROW_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);
     assert.ok(RQ.diag.hint('anything else').length > 0);
