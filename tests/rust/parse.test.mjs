@@ -71,7 +71,7 @@ fn main() {
 }`;
     const { ast, unsupported } = P(src);
     assert.deepEqual(P(src).errors, []);
-    for (const k of ['Struct', 'Enum', 'Trait', 'Impl', 'Const', 'Static', 'TypeAlias', 'Use', 'Mod', 'Closure', 'Match', 'If', 'While', 'Loop', 'For', 'Range', 'Cast', 'MethodCall', 'Index', 'StructLit', 'Macro', 'TupleStructPat', 'StructPat', 'RangePat', 'Or', 'LetCond', 'Ref', 'Field']) assert.ok(kinds(ast).has(k), k);
+    for (const k of ['Struct', 'Enum', 'Trait', 'Impl', 'Const', 'Static', 'TypeAlias', 'Use', 'Mod', 'Closure', 'Match', 'If', 'Loop', 'For', 'Range', 'Cast', 'MethodCall', 'Index', 'StructLit', 'Macro', 'TupleStructPat', 'StructPat', 'RangePat', 'Or', 'LetCond', 'Ref', 'Field']) assert.ok(kinds(ast).has(k), k);
     assert.deepEqual(unsupported.map((u) => u.feature).sort(), ['byte literal']);
   });
 

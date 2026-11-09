@@ -68,7 +68,7 @@ describe('saved state', () => {
   });
 
   it('unknown keys in done and codes are dropped, and non-string codes too', () => {
-    const S = L({ done: { '0.0': true, '0.99': true, '99.0': true, 'x': true, '0.1': 'yes', '0.2': false }, codes: { '0.0': 'ok', '0.99': 'no', '5.0': 'no', '0.1': 5, '__proto__': 'no', 'a.b': 'no' }, extra: 1 });
+    const S = L({ done: { '0.0': true, '0.99': true, '99.0': true, 'x': true, '0.1': 'yes', '0.2': false }, codes: { '0.0': 'ok', '0.99': 'no', '99.1': 'no', '0.1': 5, '__proto__': 'no', 'a.b': 'no' }, extra: 1 });
     assert.deepEqual(Object.keys(S.done), ['0.0']);
     assert.deepEqual(Object.keys(S.codes), ['0.0']);
     assert.equal('extra' in S, false);

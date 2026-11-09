@@ -334,13 +334,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     emit('assign',e,{l,rv:compound?{k:'op',args:[opnd(l),v]}:{k:'use',x:v}});
   }
 
-  // A name bound in a variant is a path below the scrutinee place, so an arm that moves a String leaves the enum partially moved, as in Rust
+  // A name bound in a pattern is a path below the scrutinee place, so an arm that moves a String leaves the scrutinee partially moved, as in Rust
   function matchEx(e,dest){
     const mi=info.get(e).match,t=tyOf(e);
     if(dest===undefined&&!isUnit(t))dest=temp(t);
     const sc=peel(e.scrut);
     let root;
-    if(mi.mode==='ref'){
+    if(mi.ref){
       const x=argOp(sc,true);
       if(x.k==='const'){un('temporary borrow',e);return NIL;}
       root=x.l;
@@ -356,27 +356,43 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         if(x.k==='const')emit('assign',sc,{l:root,rv:{k:'use',x}});
       }
     }
-    const viaRef=mi.mode==='move'&&(classify(sc).k==='via'||sc.t==='Deref');
-    if(mi.bindsMoved&&mi.mode==='move'&&dropped(root)){un('partial move',e);return fin(NIL,e,dest);}
-    emit('eval',sc,{rv:{k:'peek',x:{k:'copy',l:root}},grp:e.id});
+    const viaRef=!mi.ref&&(classify(sc).k==='via'||sc.t==='Deref');
+    if(mi.bindsMoved&&!mi.ref&&dropped(root)){un('partial move',e);return fin(NIL,e,dest);}
+    // the places a pattern looks at to choose an arm (a variant, a number) are read here; a name or `_` reads nothing
+    const looked=new Map();
+    for(const a of e.arms)RQ.walk(a.pat,n=>{const o=info.get(n);if(o&&o.tests)looked.set(o.tests.map(q=>q.sel).join('/'),o.tests);});
+    for(const path of looked.values())emit('eval',sc,{rv:{k:'peek',x:{k:'copy',l:mi.ref?root:path.reduce((b,q)=>pathLocal(b,q.sel,q.ty),root)}},grp:e.id});
     const arms=e.arms.map(()=>blk()),j=blk();
     B[cur].succ.push(...arms);
     e.arms.forEach((a,i)=>{
       cur=arms[i];
       scopes.push([]);
-      const bindOne=(sp,o)=>{
-        const id=declare(sp,sp,false,info.get(sp).ty);
-        const sel=info.get(sp).sel;
+      const binds=[];
+      RQ.walk(a.pat,n=>{if(n.t==='IdentPat'&&info.get(n)&&info.get(n).bpath!==undefined)binds.push(n);});
+      const ids=binds.map(sp=>declare(sp,sp,false,info.get(sp).ty));
+      // a guard reads the names before they take the value, so the move waits until the guard has passed
+      const bindAll=peek=>binds.forEach((sp,k)=>{
+        const o=info.get(sp);
         let x;
-        if(mi.mode==='ref'||viaRef&&RQ.types.hasRef(info.get(sp).ty))x=opnd(root);
+        if(o.bmode==='ref'||viaRef&&RQ.types.hasRef(o.ty))x=opnd(root);
         else if(viaRef)x=NIL;
-        else x=opnd(sel===''?root:pathLocal(root,sel,info.get(sp).ty));
-        emit('assign',sp,{l:id,rv:{k:'use',x},...o});
-      };
-      const p=a.pat;
-      if(p.t==='IdentPat'&&info.get(p)&&info.get(p).sel!==undefined)bindOne(p,{grp:e.id});
-      else if(p.t==='TupleStructPat'){for(const sp of p.pats)if(sp.t==='IdentPat')bindOne(sp,{grp:e.id});}
-      else if(p.t==='StructPat'){for(const f of p.fields)if(f.pat.t==='IdentPat')bindOne(f.pat,{grp:e.id});}
+        else{const l=o.bpath.reduce((b,q)=>pathLocal(b,q.sel,q.ty),root);x=peek?{k:'copy',l}:opnd(l);}
+        emit('assign',sp,{l:ids[k],rv:{k:'use',x},grp:e.id});
+      });
+      bindAll(!!a.guard);
+      if(a.guard){
+        const first=cur,from=B[cur].instrs.length,nb=B.length;
+        const g=ex(a.guard);
+        const used=new Set(ids.filter(l=>!isCopy(L[l].ty)));
+        const moves=n=>n&&typeof n==='object'&&(n.k==='move'&&used.has(n.l)||Object.values(n).some(moves));
+        if(used.size&&[...B[first].instrs.slice(from),...B.slice(nb).flatMap(b=>b.instrs)].some(moves)){un('match guard',a.guard);return;}
+        const ok=blk(),no=blk();
+        emit('branch',a.guard,{x:g});
+        B[cur].succ.push(ok,no);
+        if(i+1<arms.length)edge(no,arms[i+1]);
+        cur=ok;
+        bindAll(false);
+      }
       ex(a.body,dest);
       kill(scopes.pop(),a.body);
       edge(cur,j);

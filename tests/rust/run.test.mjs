@@ -163,7 +163,7 @@ describe('RQ.run: unsupported is not an error', () => {
   });
   it('constructs of later chapters give unsupported with a hint in the catalog', () => {
     assert.equal(feature('trait T {}\nfn main() {}'), 'trait@1');
-    assert.equal(feature('fn main() {\n    match 1 { _ => {} }\n}'), 'match@2');
+    assert.equal(feature('fn main() {\n    let v = [1];\n    match v { [a] => {} }\n}'), 'pattern@3');
     assert.equal(feature('fn main() {\n    assert!(true);\n}'), 'assert!@2');
     assert.equal(feature('fn main() {\n    let x: f32 = 2.5;\n}'), 'f32@2');
     assert.equal(feature('fn main() {\n    println!("{:x}", 1);\n}'), 'format spec@2');

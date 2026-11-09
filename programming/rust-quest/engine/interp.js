@@ -315,7 +315,7 @@ RQ.interp=(ast,opts)=>{
   const dropTemps=mark=>{while(temps.length>mark){const t=temps.pop(),v=t.cell?(t.cell.moved?null:t.cell.val):t.v;if(v)dropValue(v,null,t.line);}};
   // places: a path is the field names (or tuple indexes) below a variable's cell; a reference met on the way is followed (auto-deref)
   const step=(v,h)=>{
-    if(v.k==='ref')v=v.cell.val;
+    while(v.k==='ref')v=v.cell.val;
     if(v.k==='tuple')return {holder:{get val(){return v.v[Number(h)];},set val(x){v.v[Number(h)]=x;}}};
     return {holder:v.fields.find(f=>f.name===h)};
   };
@@ -696,10 +696,54 @@ RQ.interp=(ast,opts)=>{
     }
     return bug('method '+key);
   }
+  const patLitVal=n=>{
+    if(n.t==='Unary')return -patLitVal(n.expr);
+    if(n.t==='Path')return RQ.types.INT[n.segs[0].name][n.segs[1].name==='MIN'?0:1];
+    return n.kind==='int'?BigInt(n.v):n.v;
+  };
+  const patNum=v=>typeof v==='string'?BigInt(v.codePointAt(0)):v;
+  function pmatch(p,v){
+    tick();
+    const x=unref(v);
+    switch(p.t){
+      case 'Wild':return true;
+      case 'IdentPat':{
+        const o=info.get(p);
+        return !o||o.bpath===undefined?x.variant===p.name:!p.sub||pmatch(p.sub,v);
+      }
+      case 'Or':return p.alts.some(a=>pmatch(a,v));
+      case 'LitPat':{
+        return x.v===patLitVal(p.lit);
+      }
+      case 'RangePat':{
+        const n=patNum(x.v),lo=p.lo&&patNum(patLitVal(p.lo)),hi=p.hi&&patNum(patLitVal(p.hi));
+        return (lo===null||n>=lo)&&(hi===null||(p.inclusive?n<=hi:n<hi));
+      }
+      case 'TuplePat':{
+        const ri=p.pats.findIndex(q=>q.t==='Rest'),len=x.k==='unit'?0:x.v.length;
+        return p.pats.every((q,i)=>q.t==='Rest'||pmatch(q,x.v[ri>=0&&i>ri?len-(p.pats.length-i):i]));
+      }
+      case 'PathPat':return x.k==='struct'||x.variant===p.path.segs[p.path.segs.length-1].name;
+      case 'TupleStructPat':{
+        if(x.k==='enum'&&x.variant!==p.path.segs[p.path.segs.length-1].name)return false;
+        const ri=p.pats.findIndex(q=>q.t==='Rest'),len=x.fields.length;
+        return p.pats.every((q,i)=>q.t==='Rest'||pmatch(q,x.fields[ri>=0&&i>ri?len-(p.pats.length-i):i].val));
+      }
+      case 'StructPat':
+        if(x.k==='enum'&&x.variant!==p.path.segs[p.path.segs.length-1].name)return false;
+        return p.fields.every(f=>pmatch(f.pat,x.fields.find(y=>y.name===f.name).val));
+      default:return bug('pattern '+p.t);
+    }
+  }
+  const patBinds=p=>{
+    const out=[];
+    RQ.walk(p,n=>{if(n.t==='IdentPat'&&info.get(n)&&info.get(n).bpath!==undefined)out.push(n);});
+    return out;
+  };
   function matchEx(e,env){
-    const mi=info.get(e).match,sc=peel(e.scrut);
+    const mi=info.get(e).match,sc=peel(e.scrut),mark=temps.length;
     let val,cell,ref=null,base=null;
-    if(mi.mode==='ref'){
+    if(mi.ref){
       ref=ev(sc,env);cell=ref.cell;val=cell.val;
     }else{
       val=ev(sc,env);
@@ -709,43 +753,55 @@ RQ.interp=(ast,opts)=>{
         if(owns(val))temps.push({cell,line:e.line});
       }
     }
-    const arm=e.arms.find(a=>{
-      const p=a.pat;
-      if(p.t==='Wild'||p.t==='IdentPat'&&info.get(p).sel!==undefined)return true;
-      return val.variant===(p.t==='IdentPat'?p.name:p.path.segs[p.path.segs.length-1].name);
-    });
-    const scope=newScope(),p=arm.pat,bindings=[];
-    if(p.t==='IdentPat'&&info.get(p).sel==='')bindings.push([p,'']);
-    else if(p.t==='TupleStructPat'){for(const sp of p.pats)if(sp.t==='IdentPat')bindings.push([sp,info.get(sp).sel]);}
-    else if(p.t==='StructPat'){for(const f of p.fields)if(f.pat.t==='IdentPat')bindings.push([f.pat,info.get(f.pat).sel]);}
-    env.push(scope);
-    let abandon=false;
-    try{
-      for(const [sp,sel] of bindings){
-        const fname=sel.slice(sel.indexOf('.')+1);
+    const bindAll=(scope,a,moving)=>{
+      for(const sp of patBinds(a.pat)){
+        const o=info.get(sp),path=o.bpath.map(q=>q.f);
         let v;
-        if(sel===''){
+        if(o.bmode==='ref')v={k:'ref',cell:fieldCell(cell,path),mut:false,loan:ref.loan};
+        else if(!path.length){
           if(ref)v=ref;
+          else if(!moving)v=val;
           else if(mi.place)v=mv(e.scrut,env);
           else{v=val;if(!isCopy(typeOf(sp)))cell.moved=true;}
-        }else if(ref)v={k:'ref',cell:fieldCell(cell,[fname]),mut:false,loan:ref.loan};
-        else{
-          const fld=val.fields.find(f=>f.name===fname);
-          v=fld.val;
-          if(!isCopy(typeOf(sp))){
-            fld.val=MOVED;
-            note({t:'move',name:base&&base+'.'+fname,line:sp.line});
+        }else{
+          const h=holderAt(val,path);
+          v=h.val;
+          if(moving&&!isCopy(typeOf(sp))){
+            h.val=MOVED;
+            note({t:'move',name:base&&base+'.'+path.join('.'),line:sp.line});
           }
         }
         declare(scope,sp.name,{val:v,name:sp.name,ty:tyName(sp),line:sp.line});
       }
+    };
+    let arm=null;
+    for(const a of e.arms){
+      if(!pmatch(a.pat,val))continue;
+      if(a.guard){
+        const probe=newScope();
+        env.push(probe);
+        try{bindAll(probe,a,false);if(!cond(a.guard,env))continue;}finally{env.pop();}
+      }
+      arm=a;break;
+    }
+    if(!arm)return bug('match');
+    const scope=newScope();
+    env.push(scope);
+    let abandon=false;
+    const lastIfLet=e.kind==='iflet'&&arm===e.arms[1];
+    try{
+      bindAll(scope,arm,true);
+      if(e.kind==='let'||e.kind==='letelse'||lastIfLet)dropTemps(mark);
       return mv(arm.body,env);
     }catch(x){
       if(x instanceof Limit||x instanceof Unsup)abandon=true;
       throw x;
     }finally{
       env.pop();
-      if(!abandon)dropScope(scope);
+      if(!abandon){
+        dropScope(scope);
+        if(e.kind==='iflet'||e.kind==='whilelet')dropTemps(mark);
+      }
     }
   }
 
