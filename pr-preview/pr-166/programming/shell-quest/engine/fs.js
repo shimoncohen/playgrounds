@@ -392,12 +392,13 @@ function mkdirp(abs){if(tooLong(abs))return abs;let n=S.fs,path='';for(const s o
 function ensureDir(p){mkdirp(norm(p,HOME))}
 function ensureFile(p,c){const abs=norm(p,HOME);if(getNode(abs))return;const [,,pp]=parentOf(abs);if(mkdirp(pp))return;const [par,name]=parentOf(abs);if(par&&par.type==='dir'){par.children[name]=F(c);stateGrew(c.length);SQ.rt.changed.add(abs)}}
 const isNull=p=>norm(p)==='/dev/null';
-function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;if(SQ.rt.fdTab&&fdNode(abs))return `bash: ${shown}: Permission denied`;const wt=writeTarget(abs);if(wt===null)return `bash: ${shown}: Too many levels of symbolic links`;abs=wt;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
+function writeFile(abs,text,append,shown){if(abs==='/dev/null')return null;const asked=abs;if(SQ.rt.fdTab&&fdNode(abs))return `bash: ${shown}: Permission denied`;const wt=writeTarget(abs);if(wt===null)return `bash: ${shown}: Too many levels of symbolic links`;abs=wt;const n=getNode(abs);if(n&&n.type==='dir')return `bash: ${shown}: Is a directory`;
   const [par,name]=parentOf(abs);if(!par||par.type!=='dir')return `bash: ${shown}: No such file or directory`;
   if(!n&&tooLong(abs))return `bash: ${shown}: ${TOO_LONG}`;
   const old=n&&n.type==='file'?n.content:'',newLen=append&&old?old.length+1+text.length:text.length,delta=newLen-old.length;
   if(newLen>LIM.TEXT||(delta>1000&&stateOver(delta)))return `bash: ${shown}: file too large for this practice shell`;
-  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);stateGrew(delta);if(delta>0){SQ.rt.grewBy+=delta;grewCheck()}return null}
+  if(n){n.content=append&&n.content?n.content+'\n'+text:text}else par.children[name]=F(text);SQ.rt.changed.add(abs);(SQ.rt.log.wrote||(SQ.rt.log.wrote=[])).push({abs:asked,append:!!append}); /* hangs off the log array, so it resets with the log each line */
+  stateGrew(delta);if(delta>0){SQ.rt.grewBy+=delta;grewCheck()}return null}
 const cmpName=(x,y)=>x.replace(/^\./,'').toLowerCase().localeCompare(y.replace(/^\./,'').toLowerCase());
 function sortedKeys(n){return Object.keys(n.children).sort((a,b)=>{const da=n.children[a].type==='dir',db=n.children[b].type==='dir';return da!==db?(da?-1:1):cmpName(a,b)})}
 Object.assign(SQ,{stateOver,stateGrew,stateDrop,charge,tooLong,TOO_LONG,NAME_MAX,PATH_MAX,DEPTH_MAX,fdTable,fdNode,stateText,LIM,StepLimit,step,checkState,own,errOf,fatalText,isOverflow,NEST_DEEP,fixTree,grewCheck,safeRegex,regexRisky,regexFits,reGuard,reExec,watchRegex,trimRun,HOME,KEY,D,F,README,SECRET,JOURNAL,PEOPLE,GOLD,LOGS,makeWorld,fresh,save,norm,getNode,realPath,lstat,isLoop,modeOf,defMode,modeString,parentOf,bname,disp,join,clone,markTree,mkdirp,ensureDir,ensureFile,writeFile,cmpName,sortedKeys,isNull});
