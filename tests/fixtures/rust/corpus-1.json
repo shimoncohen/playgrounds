@@ -3472,5 +3472,29 @@
     "src": "fn main() {\n    let (a, b) = (250u8, 1u8);\n    println!(\"{}\", a + b);\n}\n",
     "expect": "ok", "out": "251\n", "err": "", "exit": 0,
     "why": "the same sum fits in u8", "pr": "P9"
+  },
+  {
+    "id": "guard-mut-method",
+    "src": "struct C {\n    n: u32,\n}\n\nimpl C {\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n}\n\nfn main() {\n    let mut c = C { n: 1 };\n    match c.n {\n        n if { c.bump(); true } => println!(\"{}\", n),\n        _ => {}\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 14}, "pair": "guard-mut-method-ok",
+    "why": "a guard may not call a &mut self method on the value being matched", "pr": "P9"
+  },
+  {
+    "id": "guard-mut-method-ok",
+    "src": "struct C {\n    n: u32,\n}\n\nimpl C {\n    fn bump(&mut self) {\n        self.n += 1;\n    }\n}\n\nfn main() {\n    let mut c = C { n: 1 };\n    match c.n {\n        n if { c.n > 0; true } => println!(\"{}\", n),\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a guard that only reads the value is fine", "pr": "P9"
+  },
+  {
+    "id": "guard-mut-ref",
+    "src": "fn main() {\n    let mut x = 1;\n    match x {\n        n if { let r = &mut x; *r += 1; true } => println!(\"{}\", n),\n        _ => {}\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "guard-mut-ref-ok",
+    "why": "a guard may not take &mut of the value being matched", "pr": "P9"
+  },
+  {
+    "id": "guard-mut-ref-ok",
+    "src": "fn main() {\n    let mut x = 1;\n    match x {\n        n if { let r = &x; *r > 0; true } => println!(\"{}\", n),\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a shared borrow in the guard is fine", "pr": "P9"
   }
 ]

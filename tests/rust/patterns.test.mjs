@@ -273,3 +273,17 @@ describe('a guard that assigns to the scrutinee', () => {
     assert.equal(out(main('let mut x = 1;', 'let y = 2;', 'match y {', '    n if { x += 1; true } => println!("{} {}", n, x),', '    _ => {}', '}')), '2 2\n');
   });
 });
+
+describe('a guard that borrows the scrutinee mutably', () => {
+  const C = ['struct C {', '    n: u32,', '}', 'impl C {', '    fn bump(&mut self) {', '        self.n += 1;', '    }', '}'];
+  it('is E0502 at the borrow, for &mut and for a &mut self method call', () => {
+    assert.equal(ids(RQ.run(P(...C, main('let mut c = C { n: 1 };', 'match c.n {', '    n if { c.bump(); true } => println!("{}", n),', '    _ => {}', '}')))), 'E0502@12');
+    assert.equal(ids(RQ.run(P(...C, main('let mut c = C { n: 1 };', 'match c.n {', '    n if { let r = &mut c; r.bump(); true } => println!("{}", n),', '    _ => {}', '}')))), 'E0502@12');
+    assert.equal(ids(RQ.run(main('let mut x = 1;', 'match x {', '    n if { let r = &mut x; *r += 1; true } => println!("{}", n),', '    _ => {}', '}'))), 'E0502@4');
+  });
+  it('a field or index of the scrutinee is unsupported, and a guard that only reads is fine', () => {
+    assert.equal(feature(main('let mut t = (Some(1), 2);', 'match t.0 {', '    Some(n) if { let r = &mut t.0; *r = None; true } => println!("{}", n),', '    _ => {}', '}')), 'match guard@4');
+    assert.equal(out(P(...C, main('let mut c = C { n: 1 };', 'match c.n {', '    n if { c.n > 0 } => println!("{}", n),', '    _ => {}', '}'))), '1\n');
+    assert.equal(out(P(...C, main('let mut c = C { n: 1 };', 'let k = 2;', 'match k {', '    n if { c.bump(); true } => println!("{} {}", n, c.n),', '    _ => {}', '}'))), '2 2\n');
+  });
+});

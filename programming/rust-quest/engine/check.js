@@ -618,6 +618,7 @@ RQ.check=ast=>{
     else if(sk==='val')adj='copy';else if(!r.mut)adj='val';
     else adj=sk==='&'?'reb':'val';
     const p=peel(e.recv);
+    if(sk==='&mut'&&guardRoot&&scrutRoot(p)===guardRoot){if(isRef)unsup('match guard',e.line);else guardBorrow(p,e.line,e.col);}
     I(e).um={key:m.key,self:sk,adj,kind:isRef?(p.t==='Path'?'refvar':'temp'):placeChain(e.recv)?'place':'temp',ref:isRef,text,from:m.from};
     // a &mut self method needs a mutable place: behind a shared reference, or through one to a field, it is E0596
     if(sk==='&mut'&&(isRef&&!r.mut||!isRef&&ch&&ch.via&&!ch.via.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:text,ref:true}));
@@ -808,6 +809,12 @@ RQ.check=ast=>{
       default:return {k:'opaque'};
     }
   }
+  // rustc holds a shared borrow of the matched place through every guard, so a guard may not take &mut of it (E0502)
+  let guardRoot=null;
+  function guardBorrow(n,line,col){
+    if(n.t==='Path')errors.push(RQ.diag.make('E0502',line,col,{name:guardRoot,mut:true}));
+    else unsup('match guard',line);
+  }
   const scrutRoot=n=>{while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'&&n.segs.length===1?n.segs[0].name:null;};
   function matchExpr(e){
     let st=ex(e.scrut);
@@ -824,9 +831,16 @@ RQ.check=ast=>{
       const ps={cov,viaRef,scrut:e.scrut,names:new Set(),binds:0};
       const ir=walkPat(a.pat,st,'move',[],ps);
       if(a.guard){
+        const root=scrutRoot(sc),was=guardRoot;
+        const named=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='IdentPat'&&x.name===root)f=true;});return f;};
+        const shadowed=root&&(named(a.pat)||named(a.guard));
+        guardRoot=root&&!shadowed?root:null;
         expect(ex(a.guard),T.bool,a.guard);
-        const root=scrutRoot(sc);
-        if(root)RQ.walk(a.guard,g=>{if(g.t==='Assign'&&scrutRoot(peel(g.lhs))===root)unsup('match guard',g.line);});
+        guardRoot=was;
+        if(root)RQ.walk(a.guard,g=>{
+          if(g.t==='Assign'&&scrutRoot(peel(g.lhs))===root)unsup('match guard',g.line);
+          if(shadowed&&(g.t==='MethodCall'||g.t==='Ref'&&g.mut))unsup('match guard',g.line);
+        });
       }
       rows.push({p:ir,g:!!a.guard});
       const bt=ex(a.body);
@@ -1045,6 +1059,7 @@ RQ.check=ast=>{
       }
       case 'Ref':{
         const sx=peel(e.expr);
+        if(e.mut&&guardRoot&&scrutRoot(sx)===guardRoot)guardBorrow(sx,e.line,e.col);
         if(sx.t==='Index'&&peel(sx.index).t==='Range')return slice(e,sx);
         const t=ex(e.expr),r=res(t);
         if(r.k==='ref'||r.k==='str')return unsup('reference to reference',e.line);
