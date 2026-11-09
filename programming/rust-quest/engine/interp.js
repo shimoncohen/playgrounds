@@ -458,7 +458,7 @@ RQ.interp=(ast,opts)=>{
       case 'array':return {k:'array',v:Array.from({length:t.n},()=>defaultVal(t.el,line))};
       case 'coll':return coll(t.name==='Vec'?'vec':'map',[],show(t),line,true);
       case 'enum':return ctorVal({adt:t.name,variant:t.builtin?0:adts.enums.get(t.name).defaultVi},[]);
-      case 'struct':return ctorVal({adt:t.name,variant:null},adts.structs.get(t.name).fields.map(f=>defaultVal(f.ty,line)));
+      case 'struct':{const r=adts.structs.get(t.name),m=r.tps.length?new Map(r.tps.map((p,i)=>[p,t.args[i]])):null;return ctorVal({adt:t.name,variant:null},r.fields.map(f=>defaultVal(m?RQ.types.subst(f.ty,m):f.ty,line)));}
       default:return UNIT;
     }
   }
@@ -763,6 +763,7 @@ RQ.interp=(ast,opts)=>{
   }
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
+    if(key==='Into::id')return rv;
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
@@ -1139,8 +1140,9 @@ RQ.interp=(ast,opts)=>{
       case 'Block':return block(e,env);
       case 'Return':throw new Ret(e.expr?mv(e.expr,env):UNIT);
       case 'Try':{
-        const v=mv(e.expr,env);
+        const v=mv(e.expr,env),conv=(info.get(e)||{}).conv;
         if(v.variant==='Ok'||v.variant==='Some')return v.fields[0].val;
+        if(conv)throw new Ret(ctorVal({adt:'Result',variant:1},[callFn(methodFns.get(conv),[v.fields[0].val],e.line,conv)]));
         throw new Ret(v);
       }
       case 'Tuple':return e.elems.length?{k:'tuple',v:mvAll(e.elems,env)}:UNIT;

@@ -12,7 +12,7 @@ const bitsOf=ty=>ty.endsWith('size')?64:+ty.slice(1);
 const T={
   int:ty=>({k:'int',ty}),float:{k:'float'},bool:{k:'bool'},char:{k:'char'},str:{k:'str'},string:{k:'String'},unit:{k:'unit'},never:{k:'never'},any:{k:'any'},
   ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n}),slice:el=>({k:'slice',el}),
-  ref:(mut,to,rg)=>({k:'ref',mut,to,rg}),struct:(name,der,lt)=>({k:'struct',name,der:der||[],lt:!!lt}),
+  ref:(mut,to,rg)=>({k:'ref',mut,to,rg}),struct:(name,der,lt,args)=>({k:'struct',name,args:args||[],der:der||[],lt:!!lt}),
   enum:(name,args,der,builtin)=>({k:'enum',name,args:args||[],der:der||[],builtin:!!builtin}),tvar:()=>({k:'tvar',ref:null}),coll:(name,args)=>({k:'coll',name,args}),param:(name,bounds)=>({k:'param',name,bounds}),fmtr:{k:'fmtr'}
 };
 const res=t=>{while(t.ref)t=t.ref;return t;};
@@ -21,7 +21,7 @@ function isCopy(t){
   t=res(t);
   switch(t.k){
     case 'String':case 'coll':case 'fmtr':return false;
-    case 'struct':return t.der.includes('Copy');
+    case 'struct':return t.der.includes('Copy')&&t.args.every(isCopy);
     case 'enum':return t.builtin?t.args.every(isCopy):t.der.includes('Copy');
     case 'ref':return !t.mut;
     case 'param':return t.bounds.has('Copy');
@@ -46,7 +46,7 @@ function has(t,tr){
     case 'tuple':return tr!=='IntoIterator'&&all(t.els);
     case 'array':return tr==='IntoIterator'||(tr==='Default'?t.n===0||t.n<=32&&has(t.el,tr):has(t.el,tr));
     case 'slice':return tr!=='Copy'&&tr!=='Clone'&&tr!=='Default'&&has(t.el,tr);
-    case 'struct':return t.der.includes(tr);
+    case 'struct':return t.der.includes(tr)&&all(t.args);
     case 'enum':
       if(tr==='IntoIterator'||tr==='Default'&&t.builtin)return t.builtin&&t.name==='Option';
       return t.der.includes(tr)&&all(t.args);
@@ -67,7 +67,7 @@ function has(t,tr){
 // a type that mentions a reference anywhere, so it can carry a loan
 function hasRef(t){
   t=res(t);
-  return t.k==='ref'||(t.k==='tuple'&&t.els.some(hasRef))||t.k==='struct'&&t.lt||(t.k==='array'&&hasRef(t.el))||((t.k==='enum'||t.k==='coll')&&t.args.some(hasRef));
+  return t.k==='ref'||(t.k==='tuple'&&t.els.some(hasRef))||t.k==='struct'&&(t.lt||t.args.some(hasRef))||(t.k==='array'&&hasRef(t.el))||((t.k==='enum'||t.k==='coll')&&t.args.some(hasRef));
 }
 // any and never agree with everything; a variable binds to a concrete type of its own family
 function unify(a,b){
@@ -86,8 +86,7 @@ function unify(a,b){
   if(a.k==='array')return a.n===b.n&&unify(a.el,b.el);
   if(a.k==='slice')return unify(a.el,b.el);
   if(a.k==='ref')return a.mut===b.mut&&unify(a.to,b.to);
-  if(a.k==='struct')return a.name===b.name;
-  if(a.k==='enum'||a.k==='coll')return a.name===b.name&&a.args.every((x,i)=>unify(x,b.args[i]));
+  if(a.k==='enum'||a.k==='coll'||a.k==='struct')return a.name===b.name&&a.args.every((x,i)=>unify(x,b.args[i]));
   return true;
 }
 // rustc writes an open number type as `integer` on its own and as `{integer}` inside another type
@@ -105,8 +104,7 @@ function show(t,nested){
     case 'array':return '['+sub(t.el)+'; '+t.n+']';
     case 'slice':return '['+sub(t.el)+']';
     case 'ref':return '&'+(t.mut?'mut ':'')+sub(t.to);
-    case 'struct':return t.name;
-    case 'enum':case 'coll':return t.name+(t.args.length?'<'+t.args.map(sub).join(', ')+'>':'');
+    case 'enum':case 'coll':case 'struct':return t.name+(t.args.length?'<'+t.args.map(sub).join(', ')+'>':'');
     case 'tvar':return '_';
     case 'param':return t.name;
     case 'fmtr':return "Formatter<'_>";
@@ -123,6 +121,7 @@ function subst(t,map){
     case 'slice':return T.slice(f(t.el));
     case 'ref':return T.ref(t.mut,f(t.to),t.rg);
     case 'enum':return t.args.length?T.enum(t.name,t.args.map(f),t.der,t.builtin):t;
+    case 'struct':return t.args.length?T.struct(t.name,t.der,t.lt,t.args.map(f)):t;
     case 'coll':return T.coll(t.name,t.args.map(f));
     default:return t;
   }

@@ -81,7 +81,7 @@ RQ.parse=tokens=>{
       attrs();const x=T();
       if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs,line:x.line,col:x.col});}
       else if(eatK('const')){const n=ident();expP(':');const t=ty();let d=null;if(eatP('='))d=unary(true);out.push({kind:'const',name:n.v,ty:t,default:d});}
-      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d});}
+      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d,line:n.line,col:n.col});}
       if(!eatP(','))break;
     }
     closeAngle();return out;

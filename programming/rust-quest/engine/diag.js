@@ -42,6 +42,11 @@ const ERRORS={
     },
     tip:'A `match` has to handle every possible value. Add an arm for each case the message lists, or a last arm with `_` to catch the rest.'
   },
+  E0107:{
+    title:'wrong number of generic arguments',
+    msg:o=>o.missing?'missing generics for '+o.kind+' `'+o.name+'`':o.kind+' takes '+o.want+' generic argument'+(o.want===1?'':'s')+' but '+o.got+' generic argument'+(o.got===1?' was':'s were')+' supplied',
+    tip:'A generic type has to be written with one type for each parameter it declares, like `Pair<i32>`.'
+  },
   E0046:{
     title:'an impl is missing a method of its trait',
     msg:o=>'not all trait items implemented, missing: '+o.missing.map(m=>'`'+m+'`').join(', '),
@@ -111,7 +116,7 @@ const ERRORS={
   },
   E0599:{
     title:'no such method or item',
-    msg:o=>o.what==='bounds'?'the method `'+o.name+'` exists for struct `'+o.type+'`, but its trait bounds were not satisfied':o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant, associated function, or constant':'associated function or constant')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
+    msg:o=>o.what==='bounds'?'the method `'+o.name+'` exists for '+(o.kind||'struct')+' `'+o.type+'`, but its trait bounds were not satisfied':o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant, associated function, or constant':'associated function or constant')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
     tipFor:o=>o.kind==='type parameter'?'Inside a generic function the type is only known by its bounds, so `'+o.name+'` has to come from a trait named in them. Add the trait that has `'+o.name+'`, as in `'+o.type+': TraitName`.':o.kind!=='enum'&&o.what==='method'&&o.trait?'`'+o.name+'` belongs to the trait `'+o.trait+'`, and `'+o.type+'` has no `impl '+o.trait+' for '+o.type+'`. Add that impl.':'',
     tip:'Rust cannot find that name on this type. Check the spelling, that it is defined in an `impl` block for the type, and that a method has `self` as its first parameter. `.clone()` also needs `#[derive(Clone)]` on the type.'
   },
@@ -156,8 +161,9 @@ const ERRORS={
     tip:'The function promises to return data that lives as long as a named lifetime, but this parameter was written without it, so Rust cannot promise that. Give the parameter the same lifetime name, like `y: &\'a str`.'
   },
   E0392:{
-    title:'a lifetime is declared but never used',
-    msg:o=>'lifetime parameter `\''+o.name+'` is never used',
+    title:'a generic parameter is declared but never used',
+    msg:o=>o.ty?'type parameter `'+o.name+'` is never used':'lifetime parameter `\''+o.name+'` is never used',
+    tipFor:o=>o.ty?'A generic type has to use each parameter, like `value: '+o.name+'`. If nothing uses it, remove it from the angle brackets.':'',
     tip:'A `struct` that declares a lifetime has to use it on a field, like `text: &\'a str`. If nothing in the `struct` borrows, remove the lifetime.'
   },
   E0726:{

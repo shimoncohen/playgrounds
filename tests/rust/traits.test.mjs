@@ -101,3 +101,63 @@ describe('Drop with any body', () => {
     assert.equal(rejects(P('struct G;', 'impl Drop for G { fn drop(&mut self) {} }', 'impl Drop for G { fn drop(&mut self) {} }', 'fn main() {}')), 'E0119@3');
   });
 });
+
+describe('From and ?', () => {
+  const ERR = ['#[derive(Debug)]', 'enum AppError { Parse(String), Neg(i32) }', '#[derive(Debug)]', 'struct ParseFail(String);',
+    'impl From<ParseFail> for AppError {', '    fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) }', '}',
+    'impl From<i32> for AppError {', '    fn from(n: i32) -> Self { AppError::Neg(n) }', '}',
+    'fn parse(s: &str) -> Result<i32, ParseFail> {', '    if s == "x" { Err(ParseFail(String::from("bad"))) } else { Ok(1) }', '}',
+    'fn neg(n: i32) -> Result<i32, i32> { if n < 0 { Err(n) } else { Ok(n) } }'];
+  it('? converts the error with the matching From impl, and From and into agree', () => {
+    const c = run(P(...ERR, 'fn run(s: &str, n: i32) -> Result<i32, AppError> {', '    let a = parse(s)?;', '    let b = neg(n)?;', '    Ok(a + b)', '}',
+      'fn main() {', '    println!("{:?}", run("ok", 2));', '    println!("{:?}", run("x", 2));', '    println!("{:?}", run("ok", -3));',
+      '    println!("{:?}", AppError::from(7));', '    let f: AppError = ParseFail(String::from("q")).into();', '    println!("{:?}", f);', '}'));
+    assert.equal(c.stdout, 'Ok(3)\nErr(Parse("bad"))\nErr(Neg(-3))\nNeg(7)\nParse("q")\n');
+  });
+  it('a ? with no From impl for that error is E0277, and so is into and from', () => {
+    assert.equal(rejects(P('#[derive(Debug)]', 'enum AppError { Parse(String) }', 'struct ParseFail(String);', 'fn parse(s: &str) -> Result<i32, ParseFail> { Err(ParseFail(String::from(s))) }',
+      'fn run(s: &str) -> Result<i32, AppError> {', '    let a = parse(s)?;', '    Ok(a)', '}', 'fn main() { println!("{:?}", run("x")); }')), 'E0277@6');
+    const M = ['#[derive(Debug)]', 'struct Meters(f64);', 'impl From<f64> for Meters { fn from(v: f64) -> Meters { Meters(v) } }'];
+    assert.equal(rejects(P(...M, 'fn main() {', '    let x: i32 = 5;', '    let o: Meters = x.into();', '}')), 'E0277@6');
+    assert.equal(rejects(P(...M, 'fn main() {', '    let m = Meters::from(String::from("a"));', '}')), 'E0277@5');
+  });
+  it('the impl must match From: its parameter, its result, a second impl', () => {
+    const E = ['#[derive(Debug)]', 'enum AppError { Parse(String) }', 'struct ParseFail(String);'];
+    assert.equal(rejects(P(...E, 'impl From<ParseFail> for AppError { fn from(e: i32) -> AppError { AppError::Parse(String::new()) } }', 'fn main() {}')), 'E0053@4');
+    assert.equal(rejects(P(...E, 'impl From<ParseFail> for AppError { fn from(e: ParseFail) -> i32 { 1 } }', 'fn main() {}')), 'E0053@4');
+    assert.equal(rejects(P(...E, 'impl From<ParseFail> for AppError { fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) } }', 'impl From<ParseFail> for AppError { fn from(e: ParseFail) -> AppError { AppError::Parse(e.0) } }', 'fn main() {}')), 'E0119@5');
+  });
+});
+
+describe('generic structs and enums', () => {
+  const PAIR = ['use std::fmt::Display;', '#[derive(Debug, Clone, PartialEq)]', 'struct Pair<T> { a: T, b: T }', 'impl<T> Pair<T> {', '    fn new(a: T, b: T) -> Pair<T> { Pair { a, b } }',
+    '    fn first(&self) -> &T { &self.a }', '    fn swap(self) -> Pair<T> { Pair { a: self.b, b: self.a } }', '}',
+    'impl<T: Display + PartialOrd> Pair<T> {', '    fn show_largest(&self) {', '        if self.a > self.b { println!("largest {}", self.a); } else { println!("largest {}", self.b); }', '    }', '}',
+    'impl Pair<f64> {', '    fn sum(&self) -> f64 { self.a + self.b }', '}'];
+  it('builds, infers and runs methods of a generic struct', () => {
+    const c = run(P(...PAIR, 'fn main() {', '    let p = Pair::new(3, 9);', '    p.show_largest();', '    println!("{} {:?}", p.first(), p.clone().swap());',
+      '    let q = Pair { a: 1.5, b: 2.0 };', '    println!("{}", q.sum());', '    let s = Pair::new(String::from("x"), String::from("y"));', '    println!("{:?} {}", s, s == s.clone());', '}'));
+    assert.equal(c.stdout, 'largest 9\n3 Pair { a: 9, b: 3 }\n3.5\nPair { a: "x", b: "y" } true\n');
+  });
+  it('runs a generic enum of your own', () => {
+    const c = run(P('#[derive(Debug)]', 'enum Maybe<T> { Nothing, Just(T) }', 'impl<T> Maybe<T> {', '    fn is_just(&self) -> bool { match self { Maybe::Just(_) => true, Maybe::Nothing => false } }',
+      '    fn or(self, d: T) -> T { match self { Maybe::Just(v) => v, Maybe::Nothing => d } }', '}',
+      'fn main() {', '    let m: Maybe<i32> = Maybe::Just(4);', '    let n: Maybe<i32> = Maybe::Nothing;', '    println!("{} {} {}", m.is_just(), n.is_just(), n.or(7));', '    println!("{:?}", Maybe::Just("hi"));', '}'));
+    assert.equal(c.stdout, 'true false 7\nJust("hi")\n');
+  });
+  it('mixed element types, wrong counts and unused parameters are rejected like rustc', () => {
+    assert.equal(rejects(P('struct Pair<T> { a: T, b: T }', 'fn main() { let p = Pair { a: 1, b: 2.5 }; }')), 'E0308@2');
+    assert.equal(rejects(P('struct Pair<T> { a: i32 }', 'fn main() {}')), 'E0392@1');
+    assert.equal(rejects(P('struct Pair<T> { a: T }', 'fn show(p: Pair) {}', 'fn main() {}')), 'E0107@2');
+    assert.equal(rejects(P('struct Pair<T> { a: T }', 'fn show(p: Pair<i32, i32>) {}', 'fn main() {}')), 'E0107@2');
+    assert.equal(rejects(P('struct W<T> { v: T }', 'impl<T> W<T> { fn get(&self) -> T { self.v } }', 'fn main() {}')), 'E0507@2');
+  });
+  it('a method of a narrower impl needs the type and the bounds it names', () => {
+    assert.equal(rejects(P('struct Pair<T> { a: T, b: T }', 'impl Pair<f64> { fn sum(&self) -> f64 { self.a + self.b } }', 'fn main() { let p = Pair { a: 1, b: 2 }; println!("{}", p.sum()); }')), 'E0599@3');
+    assert.equal(rejects(P('struct Pair<T> { a: T, b: T }', 'impl<T: std::fmt::Display> Pair<T> { fn show(&self) { println!("{} {}", self.a, self.b); } }', 'struct Q;', 'fn main() { let p = Pair { a: Q, b: Q }; p.show(); }')), 'E0599@4');
+  });
+  it('moves and Copy follow the type arguments', () => {
+    assert.equal(rejects(P('#[derive(Debug)]', 'struct W<T> { v: T }', 'fn main() { let w = W { v: String::from("a") }; let c = w; println!("{:?}", w); }')), 'E0382@3');
+    assert.equal(run(P('#[derive(Debug, Clone, Copy)]', 'struct W<T> { v: T }', 'fn main() { let w = W { v: 1 }; let c = w; println!("{:?} {:?}", w, c); }')).stdout, 'W { v: 1 } W { v: 1 }\n');
+  });
+});
