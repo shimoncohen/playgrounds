@@ -88,6 +88,8 @@ RQ.check=ast=>{
     if(g.k==='str'&&w.k==='ref'&&!w.mut&&res(w.to).k==='String'){mism(want,got,n);return false;}
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='coll'&&res(g.to).name==='Vec'&&res(w.to).k==='slice'&&unify(res(g.to).args[0],res(w.to).el))return true;
+    // &&T auto-derefs to &T, as when a `filter` closure passes its argument on
+    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='ref'&&!res(g.to).mut)return coerce(res(g.to),want,n);
     // rustc checks `vec![..]` against the annotation element by element and points at the element, which is not modeled
     if(g.k==='coll'&&w.k==='coll'&&g.name===w.name){unsup('type checking',n.line);return false;}
     // a shared reference never coerces to a &mut one; the other way round is a reborrow, which is not modeled
