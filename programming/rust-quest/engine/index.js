@@ -68,6 +68,7 @@ function errorView(c){
 }
 
 const PRINTS=['println','print','eprintln','eprint'];
+const peelP=e=>e.t==='Paren'?peelP(e.expr):e;
 function holes(ast){
   let n=0;
   RQ.walk(ast,m=>{
@@ -151,6 +152,27 @@ function context(d,ast,counts){
         if(prints)RQ.walk(m.arms[0].body,x=>{if(x.t==='Macro'&&PRINTS.includes(x.name))shown=true;});
         if(reads&&shown)n++;
       });
+      return n;
+    },
+    forOver:(fn,name)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(f)RQ.walk(f.body,m=>{if(m.t==='For'){let r=false;RQ.walk(m.iter,x=>{if(x.t==='Path'&&x.segs.length===1&&x.segs[0].name===name)r=true;});if(r)n++;}});
+      return n;
+    },
+    litArgs:what=>{
+      let n=0;
+      const lit=a=>{a=peelP(a);return a.t==='Lit'||a.t==='Unary'&&a.op==='-'&&peelP(a.expr).t==='Lit';};
+      if(ast)RQ.walk(ast,m=>{
+        if(what==='print'&&m.t==='Macro'&&PRINTS.includes(m.name)&&m.args)n+=m.args.slice(1).filter(lit).length;
+        else if(m.t==='MethodCall'&&m.name===what)n+=m.args.filter(lit).length;
+      });
+      return n;
+    },
+    countIn:(kind,fn)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),T={while:'While',loop:'Loop',for:'For'}[kind];
+      if(f)RQ.walk(f.body,m=>{if(m.t===T)n++;});
       return n;
     },
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},

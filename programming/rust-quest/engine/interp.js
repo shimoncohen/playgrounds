@@ -693,6 +693,7 @@ RQ.interp=(ast,opts)=>{
       if(f.host)cells.push(f.host);
       for(const sc of f.env)cells.push(...sc.own||[]);
       for(const c of cells){
+        if(c.name&&c.name[0]==='#')continue;
         const live=c.val!==null&&!c.moved&&!c.dropped;
         const rec={uid:recs.size,name:c.name,ty:c.ty||'',state:c.val===null?'uninit':c.dropped?'dropped':c.moved?'moved':'owned',leaves:[]};
         if(c.val!==null)leaves(c.val,'',rec.leaves,live);

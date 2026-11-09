@@ -71,6 +71,7 @@ function compare(p, real, c) {
     else { same('entry stdout', norm(e.out), real.stdout); same('entry stderr', norm(e.err), real.stderr); same('entry exit', e.exit, real.exit); }
   }
   if (!['ok', 'panic', 'exit'].includes(c.status)) bad.push(`RQ.run: expected a finished run, got status ${c.status}`);
+  else if (c.orderDependent) { if (e) bad.push('an order-dependent program cannot be a corpus entry'); }
   else { same('RQ.run stdout', norm(c.stdout), real.stdout); same('RQ.run stderr', norm(c.stderr), real.stderr); same('RQ.run exit', c.exit, real.exit); }
   return bad;
 }
