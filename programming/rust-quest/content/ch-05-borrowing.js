@@ -53,7 +53,7 @@ RQ.CH.push({
         {src:SHOUT('s: &String',''),wrongWhy:'check'},
         {src:SHOUT('s: &String','    println!("hey!");\n'),wrongWhy:'check'}
       ],
-      defines:['ref-type'],previews:[],
+      defines:['ref-type','borrow-note'],previews:[],
       check:c=>c.out()!=='hey!\nhey is still here\n'?'`shout` has to print the word with a `!`, and then `main` prints `hey is still here`.':!c.paramIsRef('shout',0)?'Make the parameter a reference, so `shout` borrows its `String` instead of taking it.':c.calls('shout')<1?'Keep the call to `shout` in `main`.':c.allocs('String')!==1?'The only `String` should be the one `main` builds. Borrow it; do not copy it.':!c.usesParam('shout',0)||c.count('hole')<2?'Print the `String` that `shout` was lent, through a `{}` hole.':true
     },
     {

@@ -32,7 +32,8 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
   'error conversion','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
-const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
+const dict=o=>Object.assign(Object.create(null),o); // tables keyed by learner text must not inherit Object.prototype names
+const PRINT=dict({println:false,print:false,eprintln:true,eprint:true}); // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
   StructLit:'struct literal',LetCond:'let condition',Await:'async',QPath:'qualified path'};
@@ -40,7 +41,7 @@ const TYPE_NODE={Slice:'slice',FnPtr:'fn pointer',ImplTrait:'impl Trait',QPath:'
 const COMPARE=new Set(['==','!=','<','>','<=','>=']);
 const ARITH=new Set(['+','-','*','/','%']);
 const MAX_ARRAY=10000;
-const COLL={Vec:1,HashMap:2};
+const COLL=dict({Vec:1,HashMap:2});
 const STD_TRAITS=['Debug','Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Hash'];
 
 RQ.check=ast=>{
@@ -344,7 +345,7 @@ RQ.check=ast=>{
   // Debug and Display need a `use`, so without one they are E0405 like any unknown name; the other prelude traits are not modeled as bounds
   const PRELUDE_TRAITS=new Set(['Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Default']);
   const OTHER_PRELUDE=new Set(['Send','Sync','Sized','Drop','Fn','FnMut','FnOnce','AsRef','AsMut','Into','From','Iterator','Extend','IntoIterator','DoubleEndedIterator','ExactSizeIterator','ToOwned','ToString','TryFrom','TryInto','FromIterator']);
-  const IMPLIED={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['Eq','PartialOrd','PartialEq']};
+  const IMPLIED=dict({Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['Eq','PartialOrd','PartialEq']});
   // '' is a fn, const or static, which rustc also reports as E0404; undefined is a name that does not exist (E0405)
   function nonTrait(name,ps){
     if(ps&&ps.has(name))return 'type parameter';
@@ -638,7 +639,7 @@ RQ.check=ast=>{
   }
 
   const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
-  const USE_NAMES={'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter'};
+  const USE_NAMES=dict({'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter'});
   const mapUse=ast.items.filter(useMap).length===1;
   for(const it of ast.items){
     if(it.t==='Struct')structDecl(it);
@@ -678,7 +679,7 @@ RQ.check=ast=>{
     return heldBy(t).some(x=>holds(x,seenS));
   };
   // an enum derives Default from its one `#[default]` unit variant, so its fields are not asked for Default
-  const NEEDS={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['PartialOrd','Eq']};
+  const NEEDS=dict({Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['PartialOrd','Eq']});
   const badDerive=(rec,all)=>{
     const en=rec.node.t==='Enum';
     return rec.der.some(tr=>(tr!=='Default'||!en)&&all.some(f=>!has(f.ty,tr))||(NEEDS[tr]||[]).some(r=>!rec.der.includes(r)))

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { loadRust, ROOT } from './harness.mjs';
 
@@ -18,7 +19,14 @@ function distance(a, b) {
   return prev[b.length];
 }
 
+// The corpus is append-only: the first SHIPPED entries keep their ids and order. Raise SHIPPED and the hash only when entries are appended and shipped.
+const SHIPPED = 1096, SHIPPED_IDS_SHA256 = '918027acdd26286032f42e75e72f753d3e9bae42e29e288b4d31266e1847c684';
 describe('corpus v0: shape', () => {
+  it('only grows: the shipped ids are still the first entries, in order', () => {
+    assert.ok(corpus.length >= SHIPPED, `the corpus shrank to ${corpus.length}`);
+    assert.equal(crypto.createHash('sha256').update(corpus.slice(0, SHIPPED).map((e) => e.id).join('\n')).digest('hex'), SHIPPED_IDS_SHA256);
+  });
+
   it('ids are unique and every entry has its authored fields', () => {
     assert.equal(byId.size, corpus.length);
     for (const e of corpus) {

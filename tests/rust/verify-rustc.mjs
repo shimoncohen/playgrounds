@@ -13,7 +13,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { loadRust, ROOT } from './harness.mjs';
-import { programs, record, verifiedJs } from './stamp-lib.mjs';
+import { programs, record, verifiedJs, sortGroups } from './stamp-lib.mjs';
 
 const EDITION = '2024';
 const RUN_TIMEOUT_S = 10;
@@ -43,7 +43,7 @@ function frames(r, nonce) {
 // the only normalization: drop the backtrace hint line, and a thread id if the real panic header has one
 const norm = (s) => s.split('\n').filter((l) => !l.startsWith('note: run with `RUST_BACKTRACE')).join('\n').replace(/^(thread '[^']*') \(\d+\) panicked/m, '$1 panicked');
 
-const unordered = (s) => norm(s).split('\n').map((l) => [...l].sort().join('')).sort().join('\n');
+const unordered = (s) => norm(s).split('\n').map(sortGroups).sort().join('\n');
 
 function realResult(f) {
   const diags = f.DIAG.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
@@ -75,7 +75,7 @@ function compare(p, real, c) {
   if (!['ok', 'panic', 'exit'].includes(c.status)) bad.push(`RQ.run: expected a finished run, got status ${c.status}`);
   else if (c.orderDependent) {
     if (e) bad.push('an order-dependent program cannot be a corpus entry');
-    // rustc's HashMap order is random, so compare what survives any order: the exit status, and each line with its characters sorted, as a multiset
+    // rustc's HashMap order is random, so compare what survives any order: the exit status, and the lines as a multiset, with the elements of each {...} or [...] group sorted
     same('RQ.run stdout (any order)', unordered(c.stdout), unordered(real.stdout));
     same('RQ.run stderr (any order)', unordered(c.stderr), unordered(real.stderr));
     same('RQ.run exit', c.exit, real.exit);
@@ -119,7 +119,7 @@ if (mismatches.length) {
   process.exit(1);
 }
 
-const rec = { rustc: version, edition: EDITION, date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
+const rec = { rustc: version, edition: EDITION, ...(process.env.RUST_IMAGE ? { image: process.env.RUST_IMAGE } : {}), date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
 fs.writeFileSync(path.join(ROOT, 'tests/fixtures/rust/verified.json'), JSON.stringify(rec, null, 2) + '\n');
 fs.writeFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), verifiedJs(rec));
 console.log(`rustc ${version} edition ${EDITION}: ${rec.counts.corpus} corpus + ${rec.counts.missions} mission programs, 0 mismatches`);

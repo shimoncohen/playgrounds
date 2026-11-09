@@ -1,12 +1,12 @@
 #!/bin/sh
 # Runs build-run.sh inside a throwaway container, so compile and run share one sandbox.
-#   RUST_IMAGE=rust:slim@sha256:<digest> docker-run.sh <dir> <edition> <run-timeout-s> <nonce>
-#   RUST_IMAGE=... docker-run.sh --version
-# The image must be pinned by digest.
+#   [RUST_IMAGE=rust@sha256:<digest>] docker-run.sh <dir> <edition> <run-timeout-s> <nonce>
+#   docker-run.sh --version
 # It runs as the invoking user: with CAP_DAC_OVERRIDE dropped, root could not read the owner-only (0700) temp dir.
 # no-new-privileges is left off on purpose: snap-packaged docker refuses it.
-# A timeout, an error or a signal removes the container by name, so none outlives its run. The nonce names the container.
-case ${RUST_IMAGE:-} in
+# A timeout, an error or a signal removes the container by name, so none outlives its run.
+RUST_IMAGE=${RUST_IMAGE:-rust@sha256:b8e062b1c3a80183df83d9ba187cadd2b5ab84bc78d453dbfeb2fccd5f982247}
+case $RUST_IMAGE in
   *@sha256:*) ;;
   *) echo "set RUST_IMAGE to a rust image pinned by @sha256 digest" >&2; exit 2 ;;
 esac

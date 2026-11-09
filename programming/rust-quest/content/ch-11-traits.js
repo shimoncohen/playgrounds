@@ -100,7 +100,7 @@ RQ.CH.push({
       lazy:[
         {src:J(CRY,CRAB,GULL,CLICKS,SQUAWKS,FN('fn announce<T: Cry>(x: &T)','let s = x.sound();')),wrongWhy:'check'}
       ],
-      defines:['generic-decl'],previews:[],
+      defines:['generic-decl','type-args'],previews:[],
       check:c=>{
         if(c.out()!=='Pip clicks\nGus squawks\n')return 'The program has to print `Pip clicks` and then `Gus squawks`.';
         if(!BOUND(c.genericOf('announce'),'Cry'))return 'Declare a type name after `announce`, like `<T: Cry>`, and write it as the parameter type, `&T`.';
@@ -224,7 +224,7 @@ RQ.CH.push({
       lazy:[
         {src:J(L('use std::fmt;'),SHELL,FMT('write!(f, "{}", self.size)')),wrongWhy:'check'}
       ],
-      defines:[],previews:[],
+      defines:['derive'],previews:[],
       check:c=>{
         if(c.out()!=='shell:4\nshell:12\n')return 'The program has to print `shell:4` and then `shell:12`.';
         if(!c.implOf('Display','Shell'))return 'Teach `Shell` to print with `<code>impl</code> fmt::Display for Shell`.';

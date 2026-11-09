@@ -334,8 +334,7 @@ RQ.run=(src,opts)=>{
     const o={...opts,info:c.info,adts:c.adts,loans:c.loans},d=RQ.interp(c.ast,{...o,seed:0});
     let orderDependent=false;
     if(d.hashIterated&&(d.status==='ok'||d.status==='panic')){
-      const r=RQ.interp(c.ast,{...o,seed:1,snap:false});
-      orderDependent=r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;
+      orderDependent=[1,2].some(seed=>{const r=RQ.interp(c.ast,{...o,seed,snap:false});return r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;});
     }
     return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive,info:c.info},ast,c.counts,src);
   }catch(e){

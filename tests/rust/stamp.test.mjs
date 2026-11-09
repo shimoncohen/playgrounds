@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { loadRust, ROOT } from './harness.mjs';
-import { programs, inputsHash, resultsHash, record, verifiedJs } from './stamp-lib.mjs';
+import { programs, inputsHash, resultsHash, record, verifiedJs, sortGroups } from './stamp-lib.mjs';
 
 const RQ = loadRust();
 const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8'));
@@ -60,8 +60,21 @@ describe('the hashes catch drift', () => {
     const run2 = (src) => { const c = RQ.run(src); return src === corpus[0].src ? { ...c, stdout: c.stdout + '!' } : c; };
     assert.notEqual(resultsHash(run2, progs), base.r);
   });
-  it('an engine change that alters no result leaves resultsHash alone', () => {
+  it('resultsHash is deterministic', () => {
     const run2 = (src) => RQ.run(src);
     assert.equal(resultsHash(run2, progs), base.r);
   });
+});
+
+describe('sortGroups, the any-order comparison for HashMap output', () => {
+  it('ignores the order of entries but not their values', () => {
+    assert.equal(sortGroups('{"b": 2, "a": 1}'), sortGroups('{"a": 1, "b": 2}'));
+    assert.notEqual(sortGroups('{"a": 1, "b": 2}'), sortGroups('{"a": 2, "b": 1}'));
+  });
+  it('keeps tuples whole, handles nesting and quoted commas', () => {
+    assert.equal(sortGroups('{(3, 4), (1, 2)}'), sortGroups('{(1, 2), (3, 4)}'));
+    assert.notEqual(sortGroups('{(1, 4), (3, 2)}'), sortGroups('{(1, 2), (3, 4)}'));
+    assert.equal(sortGroups('x [{"k": [2, 1]}, {"a, b": 0}]'), sortGroups('x [{"a, b": 0}, {"k": [1, 2]}]'));
+  });
+  it('leaves order outside brackets alone', () => assert.notEqual(sortGroups('a, b'), sortGroups('b, a')));
 });

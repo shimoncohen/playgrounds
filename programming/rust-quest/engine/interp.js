@@ -22,7 +22,7 @@ class Brk{constructor(v){this.v=v;}}
 class Cont{}
 class Panic{constructor(msg,e){this.msg=msg;this.line=e.line;this.col=e.col;}}
 const UNIT={k:'unit'},MOVED={k:'moved'};
-const BVARS={Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]]};
+const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]]});
 const MAX_EVENTS=200000,MAX_SNAPS=2000;
 const bool=v=>({k:'bool',v});
 const OPNAME={'+':'add','-':'subtract','*':'multiply'};

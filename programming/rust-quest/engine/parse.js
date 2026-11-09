@@ -496,7 +496,7 @@ RQ.parse=tokens=>{
       if(isP('<')){const t=ty();pa=t.t==='QPath'?t:fail('expected expression');}
       else pa=path(true);
       if(isP('!')&&!isP('=',pk())&&pa.t==='Path'){p++;return macroCall(pa,x);}
-      if(!ns&&isP('{')&&pa.t==='Path'&&/^[A-Z]/.test(pa.segs[pa.segs.length-1].name))return structLit(pa,x);
+      if(!ns&&isP('{')&&pa.t==='Path')return structLit(pa,x);
       return pa;
     }
     return fail('expected expression, found '+desc(x));
