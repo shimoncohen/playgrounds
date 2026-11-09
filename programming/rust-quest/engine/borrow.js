@@ -132,7 +132,7 @@ function mutability(F,errors,un){
     for(const i of b.instrs){
       const r=i.rv;
       if(!r)continue;
-      if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut){
+      if(r.k==='ref'&&r.mut&&!r.deref&&L[r.l].name!==null&&!L[r.l].mut){
         // rustc folds several of these on one variable into a single error, reported elsewhere than at each borrow
         const root=R[r.l];
         if(roots.has(root)&&roots.get(root)!==i.line+':'+i.col)un('repeated error',i);
@@ -154,7 +154,7 @@ function loanPass(F,errors,un,loans,stats){
   const B=F.blocks,L=F.locals,n=L.length,{A,D,R}=relations(L);
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
-  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,live:new Set(),span:[i.line,i.line]});}
+  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,deref:!!i.rv.deref,live:new Set(),span:[i.line,i.line]});}
   const onS=L.map(()=>0n),onM=L.map(()=>0n),sub=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(R[k]));
   // onS/onM: the loans an access to l conflicts with (on l, an ancestor or a descendant); sub: the loans on l and below, which a write to l ends
   lo.forEach((x,k)=>{
@@ -218,12 +218,13 @@ function loanPass(F,errors,un,loans,stats){
   const access=(l,kind,i,star)=>{
     const sh=lm&onS[l],mu=lm&onM[l];
     if(!(sh|mu))return;
+    const ownMut=!!mu&&lo.every((x,k)=>!(mu&lb[k])||x.deref);
     let code='';
     if(kind==='ref'){if(mu)code='E0502';}
     else if(kind==='mut')code=mu?'E0499':'E0502';
-    else if(kind==='reb'){if(mu)un('reborrow',i);else code='E0502';}
-    // a shared reborrow (callee takes `&`) only conflicts with a live `&mut` loan, which is not modelled for a reference local
-    else if(kind==='rebs'){if(mu)un('reborrow',i);}
+    // a loan made by a `for` over a reference local (`deref`) is modelled; any other live `&mut` loan on a reference local is not
+    else if(kind==='reb'){if(mu&&!ownMut)un('reborrow',i);else code=mu?'E0499':'E0502';}
+    else if(kind==='rebs'){if(mu&&!ownMut)un('reborrow',i);else if(mu)code='E0502';}
     else if(kind==='move')code='E0505';
     else if(kind==='write')code='E0506';
     // the `reborrow` arm is a backstop: no source shape reaches it (`&r` is a reference to a reference, which the checker rejects)
@@ -231,7 +232,7 @@ function loanPass(F,errors,un,loans,stats){
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
   };
   for(const b of B){
     if(!inn[b.id])continue;

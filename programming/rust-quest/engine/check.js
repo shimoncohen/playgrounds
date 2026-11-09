@@ -29,7 +29,7 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'String','Vec','HashMap','Option','Result','Box','str','collection method','hash key','hash map order','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
+  'String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
@@ -75,7 +75,9 @@ RQ.check=ast=>{
     if(unify(got,want))return true;
     const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
+    if(g.k==='str'&&w.k==='ref'&&!w.mut&&res(w.to).k==='String'){mism(want,got,n);return false;}
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
+    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='coll'&&res(g.to).name==='Vec'&&res(w.to).k==='slice'&&unify(res(g.to).args[0],res(w.to).el))return true;
     // rustc checks `vec![..]` against the annotation element by element and points at the element, which is not modeled
     if(g.k==='coll'&&w.k==='coll'&&g.name===w.name){unsup('type checking',n.line);return false;}
     // a shared reference never coerces to a &mut one; the other way round is a reborrow, which is not modeled
@@ -408,13 +410,48 @@ RQ.check=ast=>{
     if(!ts.every(t=>unify(t,T.int('usize'))))return unsup('type checking',e.line);
     if(b.k==='ref'&&b.mut)return unsup('reborrow',e.line);
     const base=b.k==='ref'?res(b.to):b;
-    if(base.k==='coll')return unsup('collection method',e.line);
+    if(base.k==='coll'&&base.name!=='Vec')return unsup('collection method',e.line);
     if(base.k==='String'||b.k==='str'){I(e).slice='str';return T.str;}
-    if(base.k==='array'||base.k==='slice'){I(e).slice='arr';return mkRef(false,T.slice(base.el));}
+    if(base.k==='array'||base.k==='slice'||base.k==='coll'){I(e).slice='arr';return mkRef(false,T.slice(base.k==='coll'?base.args[0]:base.el));}
     return unsup('type checking',e.line);
   }
 
-  function block(b){
+  // I(e).fi is {src (the node to borrow or move), mode (val moves it, ref and mut lend it), viaRef (src is already a reference), part ('kv', 'k' or 'v' of a map)}; mir.js and interp.js read it
+  function forItems(e,it){
+    let src=it,mode='val',part='kv',ty,viaRef=false;
+    if(it.t==='MethodCall'&&ITERS.includes(it.name)&&!it.args.length){
+      const rt=res(ex(it.recv)),base=rt.k==='ref'?res(rt.to):rt;
+      if(base.k!=='coll')return unsup('for iterable',it.line);
+      src=it.recv;ty=base;viaRef=rt.k==='ref';
+      if(it.name==='iter'||it.name==='keys'||it.name==='values')mode='ref';
+      else if(it.name==='iter_mut'||it.name==='values_mut')mode='mut';
+      else mode=viaRef?(rt.mut?'mut':'ref'):'val';
+      if(it.name==='keys')part='k';else if(it.name==='values'||it.name==='values_mut')part='v';
+      if(base.name==='Vec'&&part!=='kv')return unsup('for iterable',it.line);
+      if(viaRef&&!rt.mut&&mode==='mut')return unsup('for iterable',it.line);
+    }else if(it.t==='Ref'){
+      const x=peel(it.expr);
+      if(x.t==='Index'&&peel(x.index).t==='Range'){ex(e.iter);return unsup('for iterable',it.line);}
+      const rt=res(ex(it));
+      if(rt.k!=='ref')return T.any;
+      ty=res(rt.to);src=it.expr;mode=it.mut?'mut':'ref';
+      if(ty.k!=='coll')return unsup('for iterable',it.line);
+    }else{
+      const rt=res(ex(it));
+      if(rt.k==='any'||rt.k==='never')return T.any;
+      if(rt.k==='coll')ty=rt;
+      else if(rt.k==='ref'&&res(rt.to).k==='coll'){ty=res(rt.to);mode=rt.mut?'mut':'ref';viaRef=true;}
+      else return unsup('for iterable',it.line);
+    }
+    const [k,v]=ty.args,m=mode==='val'?x=>x:mode==='mut'?x=>mkRef(true,x):x=>mkRef(false,x);
+    I(e).fi={src,mode,viaRef,part,coll:ty.name};
+    if(ty.name==='Vec')return m(k);
+    if(part==='k')return mkRef(false,k);
+    if(part==='v')return mkRef(mode==='mut',v);
+    return mode==='val'?T.tuple([k,v]):T.tuple([mkRef(false,k),mkRef(mode==='mut',v)]);
+  }
+
+  function block(b,w){
     if(b.unsafe)return unsup('unsafe',b.line);
     if(b.label)return unsup('block label',b.line);
     scopes.push(new Map());
@@ -431,20 +468,21 @@ RQ.check=ast=>{
           if(b&&s.ty)b.deferred=true;
           continue;
         }
-        let t=ex(s.init);
+        const ann=s.ty?tyOf(s.ty):null;
+        let t=exW(s.init,ann);
         if(named&&lookup(pt.name)){
           shadows++;
           let reads=false;
           RQ.walk(s.init,n=>{if(n.t==='Path'&&n.segs.length===1&&n.segs[0].name===pt.name)reads=true;});
           if(reads)shadowUses++;
         }
-        if(s.ty){const a=tyOf(s.ty);coerce(t,a,s.init);t=a;}
+        if(ann){coerce(t,ann,s.init);t=ann;}
         if(named)bindVar(pt.name,pt.mut,'let',t,pt);
       }else if(s.t==='ExprStmt'){if(res(ex(s.expr)).k==='never')diverges=true;}
       else if(s.t==='ItemStmt')unsup('nested item',s.line);
       else unsup(s.t,s.line);
     }
-    const t=b.tail?ex(b.tail):diverges?T.never:T.unit;
+    const t=b.tail?exW(b.tail,w):diverges?T.never:T.unit;
     scopes.pop();
     return t;
   }
@@ -567,15 +605,47 @@ RQ.check=ast=>{
     return {root:e,name:e.segs[0].name,parts,via,text:[e.segs[0].name,...parts].join('.')};
   }
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
-  function builtinMethod(base,name){
+  const ITERS=['iter','iter_mut','into_iter','keys','values','values_mut'],STORES=['push','insert','entry.or_insert','entry.or_default'];
+  const MAP_KEYED=['insert','get','get_mut','contains_key','remove','entry.or_insert','entry.or_default'];
+  function builtinMethod(base,name,args){
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(base.k==='coll'){
-      const [k,v]=base.args,vec=base.name==='Vec';
+      const [k,v]=base.args,vec=base.name==='Vec',usz=T.int('usize');
       if(name==='len'||name==='is_empty')return rec('&',[],name==='len'?T.int('usize'):T.bool,-1);
-      if(vec&&name==='push')return rec('&mut',[k],T.unit,-1);
+      if(name==='clear')return rec('&mut',[],T.unit,-1);
+      if(name==='extend'){
+        const a=args.length===1?res(args[0]):null,el=a&&(a.k==='coll'&&a.name===base.name||a.k==='array')?(a.k==='array'?a.el:vec?a.args[0]:T.tuple(a.args)):a&&!vec&&a.k==='coll'&&a.name==='Vec'?a.args[0]:null;
+        return el&&unify(el,vec?k:T.tuple([k,v]))?rec('&mut',[args[0]],T.unit,-1):null;
+      }
+      if(vec){
+        switch(name){
+          case 'push':return rec('&mut',[k],T.unit,-1);
+          case 'pop':return rec('&mut',[],optTy(k),-1);
+          case 'insert':return rec('&mut',[usz,k],T.unit,-1);
+          case 'remove':return rec('&mut',[usz],k,-1);
+          case 'truncate':return rec('&mut',[usz],T.unit,-1);
+          case 'swap':return rec('&mut',[usz,usz],T.unit,-1);
+          case 'reverse':return rec('&mut',[],T.unit,-1);
+          case 'sort':return has(k,'Ord')?rec('&mut',[],T.unit,-1):null;
+          case 'contains':return has(k,'PartialEq')?rec('&',[mkRef(false,k)],T.bool,-1):null;
+          case 'get':return rec('&',[usz],optTy(mkRef(false,k)),0);
+          case 'get_mut':return rec('&mut',[usz],optTy(mkRef(true,k)),0);
+          case 'first':case 'last':return rec('&',[],optTy(mkRef(false,k)),0);
+        }
+        return null;
+      }
       // a key that is still open is judged when the fn ends (keyChecks)
-      if(!vec&&name==='insert'&&(isOpen(k,true)||has(k,'Eq')&&has(k,'Hash')))return rec('&mut',[k,v],optTy(v),-1);
+      if(!MAP_KEYED.includes(name)||!(isOpen(k,true)||has(k,'Eq')&&has(k,'Hash')))return null;
+      switch(name){
+        case 'insert':return rec('&mut',[k,v],optTy(v),-1);
+        case 'get':return rec('&',[mkRef(false,k)],optTy(mkRef(false,v)),0);
+        case 'get_mut':return rec('&mut',[mkRef(false,k)],optTy(mkRef(true,v)),0);
+        case 'contains_key':return rec('&',[mkRef(false,k)],T.bool,-1);
+        case 'remove':return rec('&mut',[mkRef(false,k)],optTy(v),-1);
+        case 'entry.or_insert':return rec('&mut',[k,v],mkRef(true,v),0);
+        case 'entry.or_default':return has(v,'Default')?rec('&mut',[k],mkRef(true,v),0):null;
+      }
       return null;
     }
     if(!base.builtin)return null;
@@ -584,6 +654,7 @@ RQ.check=ast=>{
     if(name==='is_ok'||name==='is_err')return opt?null:rec('&',[],T.bool,-1);
     // Result::unwrap and expect print the error, so they need it to be Debug
     const dbgOk=opt||has(b,'Debug');
+    if((name==='copied'||name==='cloned')&&opt&&res(a).k==='ref')return has(res(a).to,name==='copied'?'Copy':'Clone')?rec('val',[],optTy(res(a).to),-1):null;
     if(name==='unwrap')return dbgOk?rec('val',[],a):null;
     if(name==='expect')return dbgOk?rec('val',[T.str],a):null;
     if(name==='unwrap_or')return hasRef(base)?null:rec('val',[a],a);
@@ -591,13 +662,19 @@ RQ.check=ast=>{
   }
   function adtMethod(e,r,base,args){
     const isRef=r.k==='ref',name=e.name,own=base.builtin||base.k==='coll'?null:methods.get(base.name);
-    const m=(own&&own.get(name))||builtinMethod(base,name);
+    const m=(own&&own.get(name))||builtinMethod(base,name,args);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
       if(name==='clone'&&isRef&&!r.mut&&!args.length){I(e).um={key:'ref::clone',self:'&',adj:'val',kind:peel(e.recv).t==='Path'?'refvar':'temp',ref:true,text,from:0};return r;}
       if(base.k==='coll'){
         // the method exists but the elements lack a trait it needs; while an element type is open that is not judged
-        const map=base.name==='HashMap',bounded=name==='clone'&&!args.length||map&&name==='insert'&&args.length===2;
+        const map=base.name==='HashMap',bounded=name==='clone'&&!args.length||map&&MAP_KEYED.includes(name)&&!name.includes('.');
+        if(ITERS.includes(name)&&!args.length)return unsup('iterator',e.line);
+        const el=base.name==='Vec'?res(base.args[0]):null,need=el&&(name==='sort'&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null);
+        if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
+          errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{trait:need,type:show(el)}));
+          return need==='Ord'?T.unit:T.bool;
+        }
         if(!bounded)return unsup('collection method',e.line);
         if(isOpen(base,true))return unsup('inferred type',e.line);
         errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'bounds',name,type:show(base)}));
@@ -610,9 +687,12 @@ RQ.check=ast=>{
     const sk=m.selfKind;
     if(!sk){errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base),kind:base.k}));return T.any;}
     if(args.length!==m.params.length)return unsup('wrong argument count',e.line);
-    args.forEach((t,i)=>coerce(t,m.params[i].ty,e.args[i]));
-    if(base.k==='coll'&&args.some(holdsRef))return unsup('reference in collection',e.line);
-    if(base.k==='coll'&&name==='insert'&&isOpen(base.args[0],true))keyChecks.push([base.args[0],e.line]);
+    const keyIsText=base.k==='coll'&&base.name==='HashMap'&&res(base.args[0]).k==='String'&&['get','get_mut','contains_key','remove'].includes(name)&&res(args[0]).k==='str';
+    // a position that is not a plain usize is a range or another index type, which `get` takes and Rust Quest does not model
+    if(base.k==='coll'&&base.name==='Vec'&&(name==='get'||name==='get_mut')&&!unify(args[0],T.int('usize')))return unsup('collection method',e.line);
+    if(!keyIsText)args.forEach((t,i)=>coerce(t,m.params[i].ty,e.args[i]));
+    if(base.k==='coll'&&STORES.includes(name)&&args.some(holdsRef))return unsup('reference in collection',e.line);
+    if(base.k==='coll'&&base.name==='HashMap'&&MAP_KEYED.includes(name)&&isOpen(base.args[0],true))keyChecks.push([base.args[0],e.line]);
     let adj;
     if(!isRef)adj=sk;
     else if(sk==='val')adj='copy';else if(!r.mut)adj='val';
@@ -817,6 +897,7 @@ RQ.check=ast=>{
   }
   const scrutRoot=n=>{while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'&&n.segs.length===1?n.segs[0].name:null;};
   function matchExpr(e){
+    const w0=takeWant(),w=w0&&e.kind!=='letelse'&&e.kind!=='whilelet'&&!e.noElse?w0:null;
     let st=ex(e.scrut);
     if(e.annot){const a=tyOf(e.annot);coerce(st,a,e.scrut);st=a;}
     const s=res(st),broken=s.k==='any'||s.k==='never';
@@ -843,14 +924,15 @@ RQ.check=ast=>{
         });
       }
       rows.push({p:ir,g:!!a.guard});
-      const bt=ex(a.body);
+      const bt=exW(a.body,w);
       scopes.pop();
       if(nodeFor(a)){
         if(!['never','any'].includes(res(bt).k))errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:'letelse',expected:'!',found:show(bt)}));
         continue;
       }
       if(res(bt).k==='never'||e.noElse&&a===e.arms[1])continue;
-      if(rt===null)rt=bt;
+      if(w){coerce(bt,w,endNode(a.body));rt=w;}
+      else if(rt===null)rt=bt;
       else if(!unify(rt,bt)){
         if(!clashes(bt,rt))return unsup('reference coercion',a.body.line);
         errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:e.kind==='iflet'?'else':'match',expected:show(rt),found:show(bt)}));
@@ -885,6 +967,15 @@ RQ.check=ast=>{
     return ts.some(holdsRef)?unsup('reference in collection',e.line):T.coll('Vec',[el]);
   }
   function ex(e){const t=expr(e);I(e).ty=t;return t;}
+  // The type a coercion site (fn tail, return, annotated let, call argument) expects of a `match`, `if` or block; rustc coerces each arm to it
+  // and reports the arm that does not fit.
+  let want=null;
+  const takeWant=()=>{const w=want;want=null;return w&&!['any','never'].includes(res(w).k)?w:null;};
+  function exW(e,w){
+    const t=peel(e).t;
+    if(w&&(t==='Match'||t==='If'||t==='Block'))want=w;
+    return ex(e);
+  }
   const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   const placeChain=e=>{e=peel(e);return e.t==='Path'||((e.t==='Field'||e.t==='Index')&&placeChain(e.expr));};
   function expr(e){
@@ -961,6 +1052,13 @@ RQ.check=ast=>{
           const rt=res(info.get(e.lhs.expr).ty);
           if(rt.k==='ref'&&!rt.mut)return unsup('assignment target',e.line);
           if(rt.k!=='ref')return T.any;
+        }else if(peel(e.lhs).t==='Index'){
+          ty=ex(e.lhs);
+          // a Vec element is written through IndexMut, so the Vec must be owned or held by `&mut`
+          let b=peel(e.lhs);
+          while(b.t==='Index'&&I(b).vecIdx)b=peel(b.expr);
+          const bt=b.t==='Index'?null:info.get(b)&&info.get(b).ty&&res(info.get(b).ty);
+          if(!I(peel(e.lhs)).vecIdx||b.t==='Index'||!(b.t==='Path'||b.t==='Field')||bt&&bt.k==='ref'&&!bt.mut||b.t==='Field'&&(!chainOf(b)||chainOf(b).via&&!chainOf(b).via.mut))return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
         }else if(peel(e.lhs).t==='Field'){
           ty=ex(e.lhs);
           const ch=chainOf(e.lhs);
@@ -1044,7 +1142,7 @@ RQ.check=ast=>{
         }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
         const n=e.callee.segs[0].name,f=fns.get(n);
-        const ts=e.args.map(ex);
+        const ts=e.args.map((a,i)=>exW(a,f&&f.params.length===e.args.length?f.params[i].ty:null));
         if(lookup(n)||consts.has(n))return unsup('call',e.line);
         if(!f&&n==='drop'){
           if(ts.length!==1)return unsup('wrong argument count',e.line);
@@ -1101,10 +1199,10 @@ RQ.check=ast=>{
         e.args.forEach(ex);
         return unsup(e.name+'!',e.line);
       }
-      case 'Block':return block(e);
+      case 'Block':return block(e,takeWant());
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
-        if(coerce(ex(e.expr),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
+        if(coerce(exW(e.expr,curRet),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
         return T.never;
       }
       case 'Tuple':return e.elems.length?T.tuple(e.elems.map(ex)):T.unit;
@@ -1125,7 +1223,12 @@ RQ.check=ast=>{
         if(b.k==='any'||b.k==='never')return T.any;
         // through a `&[T]`; a `&[T; N]` keeps its length for the lint, so it is not indexed through the reference
         if(b.k==='ref'&&!b.mut&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
-        if((b.k==='ref'?res(b.to):b).k==='coll')return unsup('collection method',e.line);
+        const cb=b.k==='ref'?res(b.to):b;
+        if(cb.k==='coll'){
+          if(cb.name!=='Vec')return unsup('map index',e.line);
+          if(!unify(i,T.int('usize')))return unsup('collection method',e.line);
+          I(e).vecIdx=true;return cb.args[0];
+        }
         if(b.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
         I(e).alen=b.n;return b.el;
       }
@@ -1158,10 +1261,16 @@ RQ.check=ast=>{
       }
       case 'Match':return matchExpr(e);
       case 'If':{
+        const w=e.els?takeWant():(takeWant(),null);
         expect(ex(e.cond),T.bool,e.cond);
-        const a=block(e.then);
+        const a=block(e.then,w);
         if(!e.els){return ['unit','never','any'].includes(res(a).k)?T.unit:unsup('type checking',e.line);}
-        const b=e.els.t==='If'?ex(e.els):block(e.els);
+        const b=e.els.t==='If'?exW(e.els,w):block(e.els,w);
+        if(w){
+          if(res(a).k!=='never')coerce(a,w,endNode(e.then));
+          if(res(b).k!=='never')coerce(b,w,endNode(e.els));
+          return w;
+        }
         if(!unify(a,b)){
           // rustc coerces each arm to an annotation the arms are not yet checked against, so a clash between references is not a verdict
           if(!clashes(b,a))return unsup('reference coercion',e.line);
@@ -1185,16 +1294,12 @@ RQ.check=ast=>{
       }
       case 'For':{
         if(e.label)return unsup('block label',e.line);
-        const pt=e.pat,named=pt.t==='IdentPat'&&!pt.sub&&!pt.byRef;
-        if(!named&&pt.t!=='Wild')unsup('pattern',pt.line);
+        const pt=e.pat,named=pt.t==='IdentPat';
         const it=peel(e.iter);let el=T.any;
         if(it.t==='Range'&&it.from&&it.to){
           const a=ex(it.from),b=ex(it.to);
           if(!unify(a,b)||!['int','ivar','any'].includes(res(a).k))unsup('type checking',it.line);else el=a;
-        }else{
-          const t=res(ex(e.iter));
-          unsup(has(t,'IntoIterator')&&(t.k==='ref'?res(t.to):t).k==='coll'?'collection method':'for iterable',e.iter.line);
-        }
+        }else el=forItems(e,it);
         scopes.push(new Map());
         if(named)bindVar(pt.name,pt.mut,'let',el,pt);
         loops.push({ty:null,value:false});
@@ -1224,7 +1329,7 @@ RQ.check=ast=>{
     const r=f.node.ret;curStatic=!!r&&r.t==='Ref'&&r.lt==='static';
     if(f.selfTy)bindVar('self',f.selfMut,'param',f.selfTy,f.node.selfParam);
     for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty,p.pat);
-    const body=f.node.body,t=block(body);
+    const body=f.node.body,t=block(body,f.node.ret?f.ret:null);
     if(body.tail||f.node.ret){if(coerce(t,f.ret,body.tail?endNode(body.tail):f.node.ret)&&curStatic&&body.tail)staticLeaves(body.tail);}
     else if(!unify(t,f.ret))unsup('type checking',f.node.line);
     finish();

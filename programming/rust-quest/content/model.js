@@ -10,6 +10,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 RQ.CH=RQ.CH||[];
 
+const ORDER_TIP='Your output depends on `HashMap` order. Real Rust changes that order every run, so sort the keys first.';
 const program=(m,input)=>m.harness?input+'\n'+m.harness:input;
 
 // result is true or one friendly sentence; c is null for an empty editor. unsupported and internal never complete a mission.
@@ -24,6 +25,7 @@ RQ.evalMission=(m,input,opts)=>{
   }else if(c.status==='unsupported')result='Rust Quest does not model `'+c.unsupported.feature+'`. '+RQ.diag.hint(c.unsupported.feature);
   else if(c.status==='internal')result='This is a Rust Quest bug, not your code.';
   else if(c.status==='limit')result=c.limit==='string size'?'The program made a string too long for the practice runner and was stopped. Is a loop making it longer every time round?':c.limit==='output size'?'The program printed too much for the practice runner and was stopped. Is a loop printing every time round?':c.limit==='nesting'?'A value was nested too deeply for the practice runner and the program was stopped. Is a loop wrapping a value in itself every time round?':'The program ran for too long and was stopped. Is something calling itself forever?';
+  else if(c.orderDependent)result=ORDER_TIP;
   else if(c.status==='panic'&&m.expect!=='panic')result='The program stopped with a panic: '+c.panic.msg+' (line '+c.panic.line+').';
   else result=m.check(c);
   return {c,result,src:full};

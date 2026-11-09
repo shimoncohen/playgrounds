@@ -295,7 +295,14 @@ RQ.parse=tokens=>{
         if(n.k==='float'&&/^\d+\.\d+$/.test(n.v)){p++;for(const part of n.v.split('.'))e=mk('Field',n,{expr:e,name:part,line:e.line,col:e.col});continue;}
         const id=ident();let targs=null;
         if(isP('::')&&isP('<',pk())){p+=2;targs=genericArgs();}
-        if(isP('(')){p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});}
+        if(isP('(')){
+          p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});
+          // `m.entry(k).or_insert(v)` is one call to the checker; a bare `entry` has no type of its own, so it stays unsupported
+          const r=e.recv;
+          if((e.name==='or_insert'&&e.args.length===1||e.name==='or_default'&&!e.args.length)&&r.t==='MethodCall'&&r.name==='entry'&&r.args.length===1&&!r.targs){
+            e.recv=r.recv;e.args=[...r.args,...e.args];e.name='entry.'+e.name;
+          }
+        }
         else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col,nline:id.line});
         continue;
       }
@@ -367,7 +374,17 @@ RQ.parse=tokens=>{
       return mk('Loop',x,{body:mk('Block',x,{stmts:[],tail:m,unsafe:false,label:null}),label:null});
     }
     if(isK('loop')){p++;return mk('Loop',x,{body:block(),label:null});}
-    if(isK('for')){p++;const pt=pat();expK('in');const it=cond();return mk('For',x,{pat:pt,iter:it,body:block(),label:null});}
+    if(isK('for')){
+      p++;const pt=pat();expK('in');const it=cond();let body=block();
+      // a pattern other than a name is a let on a hidden name, so moves, borrows and E0004/E0005 follow the match rules
+      let pn=pt;
+      if(!(pt.t==='Wild'||pt.t==='IdentPat'&&!pt.sub&&!pt.byRef)){
+        pn=mk('IdentPat',pt,{name:'#for',mut:false,byRef:false,sub:null});
+        const sc=mk('Path',pt,{segs:[{name:'#for',args:null,fn:null,line:pt.line}],global:false});
+        body=mk('Block',body,{stmts:[],tail:mk('Match',pt,{scrut:sc,arms:[mk('Arm',pt,{pat:pt,guard:null,body})],kind:'let',annot:null}),unsafe:false,label:null});
+      }
+      return mk('For',x,{pat:pn,iter:it,body,label:null});
+    }
     if(isK('unsafe')){p++;feat('unsafe',x.line);const b=block();b.unsafe=true;return b;}
     return block();
   }

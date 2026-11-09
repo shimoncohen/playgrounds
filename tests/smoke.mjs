@@ -616,6 +616,46 @@ test('rust-quest: a HashMap heap box shows no quotes, an owner that reads as a k
   await ctx.close();
 });
 
+test('rust-quest: chapter 8 plays through: a loop shows its borrow of the Vec, a push in the loop is E0502, and a printed HashMap is refused for its order', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  const last = (n) => page.$eval('#memory input[type=range]', (e, v) => { e.value = e.max - v; e.dispatchEvent(new Event('input')); }, n);
+  await page.click('[data-ch="7"]');
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0502[\s\S]*cannot borrow bucket as mutable/);
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  let seen = false;
+  for (let i = 0; i < steps && !seen; i++) {
+    await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, i);
+    seen = await page.$('#memory .mv-var:has(.mv-name:text-is("shell"))') !== null;
+  }
+  assert.ok(seen, 'the loop variable shows in the memory view');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback');
+  assert.match(await page.textContent('#feedback'), /depends on `?HashMap`? order/);
+  assert.doesNotMatch(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.fill('#code', 'use std::collections::HashMap;\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(1, 2);\n    m.insert(3, 4);\n    println!("{:?}", m);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .note');
+  assert.match(await page.textContent('#result'), /depends on the order of a `?HashMap`?/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

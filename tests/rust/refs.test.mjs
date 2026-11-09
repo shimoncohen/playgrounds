@@ -135,7 +135,7 @@ describe('coercion', () => {
     assert.equal(un('    let mut s = String::new();\n    let r: &str = &mut s;'), 'reference coercion@4');
     assert.equal(un('    let mut x = 1;\n    let r: &i32 = &mut x;'), 'reference coercion@4');
     assert.equal(code('    let x = 1;\n    let r: &mut i32 = &x;'), 'E0308@4');
-    assert.equal(un('    let s = "a";\n    let r: &String = s;'), 'reference coercion@4');
+    assert.equal(code('    let s = "a";\n    let r: &String = s;'), 'E0308@4');
   });
   it('a reference to a &str is reference to reference, not E0308', () => {
     assert.equal(un('    let t: &str = "a";\n    show(&t);', 'fn show(s: &str) {}'), 'reference to reference@4');
@@ -488,9 +488,11 @@ describe(`a '-> &'static str' fn returns only string literals`, () => {
 });
 
 describe('if arms that rustc may coerce', () => {
-  it('a reference clash between the arms is unsupported, not E0308', () => {
-    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { &s } else { "x" };\n    println!("{}", r);'), 'reference coercion@5');
-    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { "x" } else { &s };\n    println!("{}", r);'), 'reference coercion@5');
+  it('a reference clash between the arms is unsupported, not E0308, until an annotation says what both coerce to', () => {
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r = if c { &s } else { "x" };\n    println!("{}", r);'), 'reference coercion@5');
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r = if c { "x" } else { &s };\n    println!("{}", r);'), 'reference coercion@5');
+    accepts('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { &s } else { "x" };\n    println!("{}", r);');
+    accepts('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { "x" } else { &s };\n    println!("{}", r);');
   });
   it('a clash of non-references stays E0308', () => {
     assert.equal(code('    let c = true;\n    let x = if c { 1 } else { "x" };'), 'E0308@4');

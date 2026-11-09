@@ -155,6 +155,47 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     const l=p.t==='Path'?lid(p):-1;
     return {base:p,l,idx};
   };
+  // A Vec is indexed through `Index::index(&v, i)`: a read borrows the whole collection for a moment, a write or `&mut v[i]` borrows it mutably.
+  const vecIdx=n=>{const o=n.t==='Index'&&info.get(n);return !!o&&!!o.vecIdx;};
+  const hasVecIdx=p=>{for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(vecIdx(p))return true;return false;};
+  function vecRoot(e){
+    const idx=[];let inner=null;
+    for(let n=peel(e);n.t==='Field'||n.t==='Index';n=peel(n.expr))if(n.t==='Index'){idx.unshift(n.index);inner=n;}
+    return {c:classify(inner.expr),idx,inner};
+  }
+  const fieldChain=x=>{const o=[];for(x=peel(x);x.t==='Field';x=peel(x.expr))o.unshift(x.name);return x.t==='Path'?[lid(x),...o]:null;};
+  const related=(q,b)=>q[0]===b[0]&&q.slice(1,Math.min(q.length,b.length)).every((y,k)=>y===b[k+1]);
+  function chainsOn(n,l,out=[]){
+    const q=fieldChain(n);
+    if(q&&q[0]===l)out.push(q);
+    else kidsOf(n).forEach(k=>chainsOn(k,l,out));
+    return out;
+  }
+  // Reborrows of a `&mut` local are not tracked, so an index operand that reads the collection being written cannot be judged
+  const readsPlace=(n,base)=>{const b=fieldChain(base);return !b||chainsOn(n,b[0]).some(q=>related(q,b));};
+  // an operand that borrows the collection at c; a reference local is reused, so its loans stay on the result
+  function vecRef(c,mut,nd,implicit,r){
+    const viaRef=c.k==='via'||(c.k==='local'||c.k==='path')&&L[c.l].ty.k==='ref';
+    if(mut&&r&&viaRef&&r.idx.some(x=>readsPlace(x,r.inner.expr))){un('reborrow',nd);return null;}
+    if(viaRef){const t=L[c.l].ty;return opnd(c.l,t.k==='ref'&&t.mut,!mut);}
+    if(c.k==='local'||c.k==='path')return put({k:'ref',l:c.l,mut,implicit},nd,undefined,T.ref(mut,L[c.l].ty,0));
+    un('temporary borrow',nd);return null;
+  }
+  const kidsOf=n=>Object.values(n).flatMap(v=>Array.isArray(v)?v:[v]).filter(x=>x&&typeof x==='object'&&typeof x.t==='string');
+  // A `&mut` method call may read its receiver while it computes the arguments (a two-phase borrow). The arguments then run before the
+  // `&mut` borrow starts here, so only reads of the receiver are allowed: a `&mut` use of it, or a move, is not modelled.
+  function twoPhaseOk(args,b){
+    const rooted=n=>{n=peel(n);while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'&&!!info.get(n)&&info.get(n).bind===b;};
+    const idxOf=n=>{const o=[];for(n=peel(n);n.t==='Field'||n.t==='Index';n=peel(n.expr))if(n.t==='Index')o.push(n.index);return o;};
+    const ok=n=>{
+      if(n.t==='Path')return !(info.get(n)&&info.get(n).bind===b);
+      if(n.t==='MethodCall'&&rooted(n.recv)){const u=info.get(n).um;return !!u&&u.self==='&'&&u.from<0&&u.adj!=='val'&&idxOf(n.recv).every(ok)&&n.args.every(ok);}
+      if(n.t==='Ref'&&rooted(n.expr))return !n.mut&&idxOf(n.expr).every(ok);
+      if((n.t==='Field'||n.t==='Index')&&rooted(n))return isCopy(tyOf(n))&&idxOf(n).every(ok);
+      return kidsOf(n).every(ok);
+    };
+    return args.every(ok);
+  }
   // format_args! takes `&arg` of every argument first, so a reference local is borrowed too and a later arg cannot reassign it
   const printLocal=(l,nd)=>put({k:'ref',l,mut:false,implicit:true},nd,undefined,T.ref(false,L[l].ty,0));
   function printArg(x,nd){
@@ -180,6 +221,17 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   }
 
   function place(e,dest){
+    if(hasVecIdx(e)){
+      const r=vecRoot(e);
+      if(!isCopy(tyOf(e))){
+        const bt=tyOf(r.inner.expr);
+        err('E0507',e,{index:true,type:RQ.types.show(bt.k==='ref'?bt.to:bt)});
+        return fin(NIL,e,dest);
+      }
+      const idx=r.idx.map(x=>ex(x)),ro=vecRef(r.c,false,e,true);
+      if(!ro)return fin(NIL,e,dest);
+      return put({k:'op',args:[ro,...idx]},e,dest,tyOf(e));
+    }
     const c=classify(e);
     if(c.k==='path'){
       if(!isCopy(tyOf(e))&&dropped(c.l)){un('partial move',e);return fin(NIL,e,dest);}
@@ -199,6 +251,17 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   }
 
   const chainText=e=>{const parts=[];for(e=peel(e);e.t==='Field';e=peel(e.expr))parts.unshift(e.name);return [e.t==='Path'?e.segs[0].name:'value',...parts].join('.');};
+  // `&1` or `&String::from("a")` as an argument of a Vec or HashMap method: the method only reads it during the call and its result never borrows from it
+  function stdArg(x,u,i){
+    const q=peel(x);
+    if(q.t!=='Ref'||q.mut||!/^(Vec|HashMap)::/.test(u.key)||u.from===i+1)return argOp(x,true);
+    const inner=peel(q.expr);
+    if(['Path','Field','Index','Deref'].includes(inner.t)||(inner.t==='Index'&&peel(inner.index).t==='Range'))return argOp(x,true);
+    const v=ex(inner),t=v.k==='const'||isCopy(tyOf(inner))?put({k:'use',x:v},q,undefined,tyOf(inner)):v;
+    return t.k==='const'?t:put({k:'ref',l:t.l,mut:false,implicit:true},q,undefined,T.ref(false,tyOf(inner),0));
+  }
+  const stdArgs=u=>{let i=0;return x=>stdArg(x,u,i++);};
+  const SLICE_MUT=new Set(['Vec::swap','Vec::get_mut']);
   function umethod(e,dest){
     const u=info.get(e).um,p=peel(e.recv);
     let ro,rest;
@@ -207,9 +270,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         const t=tyOf(e.recv);
         ro=put({k:'deref',x:argOp(e.recv)},e,undefined,t.k==='ref'?res(t.to):t);
       }else ro=argOp(e.recv,u.adj==='reb'||u.self==='&');
-      rest=seq(e.args,x=>argOp(x,true));
+      rest=seq(e.args,stdArgs(u));
     }else if(u.adj==='val'){
-      [ro,...rest]=seq([e.recv,...e.args],x=>x===e.recv?ex(x):argOp(x,true));
+      const nextArg=stdArgs(u);
+      [ro,...rest]=seq([e.recv,...e.args],x=>x===e.recv?ex(x):nextArg(x));
     }else{
       const mut=u.adj==='&mut',c=classify(e.recv);
       let target=-1;
@@ -225,20 +289,36 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
           const t=put({k:'use',x},e.recv,undefined,tyOf(e.recv));
           target=t.k==='const'?-1:t.l;
         }
+      }else if(c.k==='idx'&&hasVecIdx(e.recv)){
+        const r=vecRoot(e.recv);
+        ro=vecRef(r.c,mut,e,true,r);
+        if(!ro)return fin(NIL,e,dest);
+        emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x))]}});
       }else{un('borrow of a field',e);return fin(NIL,e,dest);}
+      let early=null;
       if(ro===undefined){
         if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
         if(mut){
           let q=p;
           while(q.t==='Field')q=peel(q.expr);
-          const b=q.t==='Path'?info.get(q).bind:null;let again=false;
-          RQ.walk(e.args,a=>{if(a.t==='Path'&&b&&info.get(a)&&info.get(a).bind===b)again=true;});
-          if(again)un('two-phase borrow',e);
+          const b=q.t==='Path'?info.get(q).bind:null;let again=false,shared=false,mutRef=false;
+          // a shared reference local read in the arguments may be a loan of the receiver, which a reservation allows until the call starts
+          RQ.walk(e.args,a=>{
+            if(a.t!=='Path')return;
+            if(b&&info.get(a)&&info.get(a).bind===b)again=true;
+            else{const l=lid(a),t=l>=0&&L[l].ty;if(t&&t.k==='ref'){if(t.mut)mutRef=true;else shared=true;}}
+          });
+          if(shared&&!mutRef)again=true;
+          // slice methods reach the Vec through DerefMut, which gets no two-phase borrow: the arguments run under a live `&mut`
+          if(again&&!SLICE_MUT.has(u.key)){
+            if(twoPhaseOk(e.args,b)){rebTwice(e.args,e);early=seq(e.args,stdArgs(u));}
+            else un('two-phase borrow',e);
+          }
         }
         ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
       }
-      rebTwice(e.args,e);
-      rest=seq(e.args,x=>argOp(x,true));
+      if(early)rest=early;
+      else{rebTwice(e.args,e);rest=seq(e.args,stdArgs(u));}
     }
     return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,method:true},e,dest,tyOf(e));
   }
@@ -264,6 +344,11 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
           const t=L[c.l].ty;
           ro=opnd(c.l,t.k==='ref'&&t.mut,!mut);
           text=chainText(e.recv);
+        }else if(c.k==='idx'&&hasVecIdx(e.recv)){
+          const vr=vecRoot(e.recv);
+          ro=vecRef(vr.c,mut,e,true,vr);
+          if(!ro)return fin(NIL,e,dest);
+          emit('eval',e,{rv:{k:'op',args:[ro,...vr.idx.map(x=>ex(x))]}});
         }else{un(p.t==='Deref'?'reborrow':'borrow of a field',e);return fin(NIL,e,dest);}
         if(mut&&target>=0){
           let q=p;
@@ -310,6 +395,12 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         v=put({k:'op',args:[put({k:'deref',x:r},e,undefined,t),v]},e,undefined,t);
       }
       emit('store',e,{ref:r,x:v});
+      return;
+    }
+    if(lhs.t==='Index'&&hasVecIdx(lhs)){
+      // IndexMut borrows first, then the index operands run: `v[v.len()-1] = 5` is E0502
+      const r=vecRoot(lhs),ro=vecRef(r.c,true,e,true,r);
+      if(ro)emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x)),v]}});
       return;
     }
     if(lhs.t==='Field'){
@@ -440,6 +531,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
 
   // `for i in a..b`: a hidden counter, a head that tests it, and an increment block that `continue` also reaches
   function forEx(e){
+    const fi=info.get(e).fi;
+    if(fi)return forColl(e,fi);
     const r=peel(e.iter);
     if(r.t!=='Range'||!r.from||!r.to){un('for iterable',e);return NIL;}
     const a=ex(r.from),b=ex(r.to),ty=tyOf(r.from),it=temp(ty);
@@ -456,6 +549,52 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     edge(cur,inc);loops.pop();
     cur=inc;emit('assign',e,{l:it,rv:{k:'op',args:[opnd(it)]}});
     edge(cur,h);cur=x;
+    return NIL;
+  }
+
+  // every turn reads the iterator, so a loan of the collection lasts as long as the loop
+  function forColl(e,fi){
+    const src=peel(fi.src);
+    let ro;
+    if(fi.mode==='val'||fi.viaRef){
+      const p=src,l=p.t==='Path'?lid(p):-1;
+      // a `&mut` variable that is lent, not moved, is reborrowed: the loan is on the variable, and no `mut` is needed to make it
+      if(l>=0&&fi.mode!=='val'&&peel(e.iter)!==src&&L[l].ty.k==='ref'&&L[l].ty.mut)ro=put({k:'ref',l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',L[l].ty,0));
+      else ro=l>=0?opnd(l):ex(src);
+      if(ro.k==='const'){un('temporary borrow',e);return NIL;}
+    }else if(hasVecIdx(src)){
+      const r=vecRoot(src);
+      emit('eval',e,{rv:{k:'op',args:r.idx.map(x=>ex(x))}});
+      ro=vecRef(r.c,fi.mode==='mut',e,peel(e.iter).t!=='Ref');
+      if(!ro)return NIL;
+    }else{
+      const c=classify(src);
+      if(c.k==='local'||c.k==='path')ro=put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:peel(e.iter).t!=='Ref'},e,undefined,T.ref(fi.mode==='mut',L[c.l].ty,0));
+      else if(c.k==='via'){
+        const t=L[c.l].ty;
+        // the field is reached through the reference, so the loan goes on the reference like a `for` over `&mut` variable
+        let loan=false;
+        if(t.k==='ref'&&t.mut){
+          const b=fieldChain(src),cs=chainsOn(e.body,c.l);
+          if(!b||cs.some(q=>!related(q,b))&&cs.some(q=>related(q,b))){un('reborrow',e);return NIL;}
+          loan=cs.some(q=>related(q,b));
+        }
+        ro=loan?put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',t,0)):opnd(c.l,t.k==='ref'&&t.mut,fi.mode!=='mut');
+      }else{un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return NIL;}
+    }
+    const it=temp(fi.mode==='val'?tyOf(src):T.ref(fi.mode==='mut',tyOf(src),0));
+    emit('assign',e,{l:it,rv:{k:'use',x:ro}});
+    const h=blk(),body=blk(),x=blk();
+    edge(cur,h);cur=h;
+    emit('branch',e,{x:put({k:'op',args:[{k:'copy',l:it}]},e,undefined,T.bool)});
+    B[cur].succ.push(body,x);
+    loops.push({brk:x,cont:h,depth:scopes.length});
+    scopes.push([]);cur=body;
+    if(e.pat.t==='IdentPat')emit('assign',e,{l:declare(e.pat,e,false,tyOf(e.pat)),rv:fi.mode==='val'?{k:'const'}:{k:'use',x:{k:'copy',l:it}}});
+    blockEx(e.body);
+    kill(scopes.pop(),e);
+    edge(cur,h);loops.pop();
+    cur=x;
     return NIL;
   }
 
@@ -528,6 +667,24 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       case 'Ref':{
         const x=peel(e.expr);
         if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,dest);
+        if(hasVecIdx(x)&&(x.t==='Index'||x.t==='Field')){
+          const r=vecRoot(x),c=r.c;
+          if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('temporary borrow',e);return fin(NIL,e,dest);}
+          const t=L[c.l].ty;
+          if(e.mut&&c.k!=='via'&&t.k!=='ref'){
+            const ro=vecRef(c,true,e,true,r);
+            if(!ro)return fin(NIL,e,dest);
+            emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(y=>ex(y))]}});
+            return put({k:'use',x:ro},e,dest,tyOf(e));
+          }
+          emit('eval',e,{rv:{k:'op',args:r.idx.map(y=>ex(y))}});
+          if(c.k==='via'||t.k==='ref'){
+            if(e.mut&&t.k==='ref'){un('reborrow',e);return fin(NIL,e,dest);}
+            if(c.k==='via'&&e.mut){un('reborrow',e);return fin(NIL,e,dest);}
+            return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
+          }
+          return put({k:'ref',l:c.l,mut:e.mut,slice:true},e,dest,tyOf(e));
+        }
         if(x.t==='Path'&&lid(x)>=0)return put({k:'ref',l:lid(x),mut:e.mut},e,dest,tyOf(e));
         if(x.t==='Field'){
           const c=classify(x);

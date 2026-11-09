@@ -24,6 +24,7 @@ UI.result=(root,ev)=>{
     if(c.status==='limit')root.append(h('p','note',c.limit==='string size'?'A string got too long for the practice runner, so Rust Quest stopped it. Is a loop making it longer every time round?':c.limit==='output size'?'It printed too much for the practice runner, so Rust Quest stopped it. Is a loop printing every time round?':c.limit==='nesting'?'A value was nested too deeply for the practice runner, so Rust Quest stopped it. Is a loop wrapping a value in itself every time round?':'It ran for too long, so Rust Quest stopped it. Is something calling itself forever?'));
     if(c.stdout)root.append(h('pre','stdout',c.stdout));else root.append(h('p','note','It printed nothing.'));
     if(c.stderr){root.append(h('h4',null,'Error output'));root.append(h('pre','stderr',c.stderr.replace(/^\n+/,'')));}
+    if(c.orderDependent)root.append(rich('p','note','This output depends on the order of a `HashMap`, and real Rust changes that order every run. Rust Quest ran it twice, with two orders, and got different output. Sort the keys first.'));
     if(c.status!=='limit')root.append(h('p','note','Exit code '+c.exit+'.'));
     return;
   }

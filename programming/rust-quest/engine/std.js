@@ -3,7 +3,6 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const MAX_PAD=1000;
 class Unmodeled extends Error{}
-const ORDER='hash order'; // printing a HashMap of two or more entries: rustc's order changes from run to run
 class Over extends Error{}
 const SPECS=[[/^$/,()=>({debug:false,prec:null,width:null})],[/^\?$/,()=>({debug:true,prec:null,width:null})],[/^#\?$/,()=>({debug:true,pretty:true,prec:null,width:null})],
   [/^\.(\d{1,3})$/,m=>({debug:false,prec:+m[1],width:null})],[/^>(\d{1,3})$/,m=>({debug:false,prec:null,width:+m[1]})]];
@@ -87,6 +86,18 @@ function quoted(s,q,room){
   }
   return o+q;
 }
+// The one entry point for a HashMap traversal (for, iter, keys, values, into_iter, extend, {:?}, drop): it sets the flag the two-seed rule reads.
+// Seed 1 rotates seed 0 by one place, so every position changes for two or more entries and one entry cannot differ.
+const session={seed:0,iterated:false};
+const hashSession=seed=>{session.seed=seed;session.iterated=false;return session;};
+const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0;return h;};
+function hashOrder(m){
+  session.iterated=true;
+  const h=m.v.map((en,i)=>{let t;try{t=debug(en.key);}catch(x){t=String(i);}return {en,h:fnv(t),i};});
+  h.sort((a,b)=>a.h-b.h||a.i-b.i);
+  const o=h.map(x=>x.en);
+  return session.seed&&o.length?[...o.slice(1),o[0]]:o;
+}
 const unref=v=>{while(v.k==='ref'){const t=v.cell.val;v=v.range?{k:'array',v:t.v.slice(v.range[0],v.range[1])}:t;}return v;};
 function display(v){
   v=unref(v);
@@ -116,9 +127,7 @@ function debug(v,tick,room=Infinity,pretty=false){
     case 'unit':return '()';
     case 'tuple':{const items=v.v.map(sub);return !pretty&&items.length===1?'('+items[0]+',)':wrap('','(',')',items,false);}
     case 'array':case 'vec':return v.v.length?wrap('','[',']',v.v.map(sub),false):'[]';
-    case 'map':
-      if(v.v.length>1)throw new Unmodeled(ORDER);
-      return v.v.length?wrap('','{','}',v.v.map(e=>sub(e.key)+': '+sub(e.val)),false):'{}';
+    case 'map':return v.v.length?wrap('','{','}',hashOrder(v).map(e=>sub(e.key)+': '+sub(e.val)),false):'{}';
     case 'struct':case 'enum':{
       const nm=v.k==='struct'?v.name:v.variant;
       const items=v.fields.map(f=>v.kind==='named'?f.name+': '+sub(f.val):sub(f.val));
@@ -145,5 +154,5 @@ const methods=new Map([
   ['as_str',{recv:'orm',self:'&',args:[],ret:T.str}], // on m it is a reborrow, which the checker reports
   ['push_str',{recv:'orm',self:'&mut',args:[T.str],ret:T.unit}]
 ]);
-RQ.std={parseFormat,display,debug,render,f64,Unmodeled,ORDER,Over,methods,unref};
+RQ.std={parseFormat,display,debug,render,f64,Unmodeled,Over,methods,unref,hashOrder,hashSession};
 })();

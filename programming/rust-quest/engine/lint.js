@@ -265,7 +265,7 @@ RQ.lint=(ast,info)=>{
       }
       case 'For':{
         const r=peel(e.iter);
-        if(r.from)ev(r.from);if(r.to)ev(r.to);
+        if(r.t==='Range'){if(r.from)ev(r.from);if(r.to)ev(r.to);}else ev(e.iter);
         loopBody(e,null);return null;
       }
       default:return null;

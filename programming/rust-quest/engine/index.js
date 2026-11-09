@@ -68,6 +68,7 @@ function errorView(c){
 }
 
 const PRINTS=['println','print','eprintln','eprint'];
+const peelP=e=>e.t==='Paren'?peelP(e.expr):e;
 function holes(ast){
   let n=0;
   RQ.walk(ast,m=>{
@@ -114,15 +115,17 @@ RQ.features=src=>{
   return tags;
 };
 
-function context(d,ast,counts){
+function context(d,ast,counts,src){
   const errors=d.errors||[];
   const c={
     status:d.status,errors,view:d.view||null,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
-    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],maxLive:kind=>(d.maxLive||{})[kind]||0,
+    unsupported:d.unsupported||null,unsupportedAll:d.unsupportedAll||(d.unsupported?[d.unsupported]:[]),limit:d.limit||null,message:d.message||null,hashIterated:!!d.hashIterated,orderDependent:!!d.orderDependent,events:d.events||[],snaps:d.snaps||[],loans:d.loans||[],maxLive:kind=>(d.maxLive||{})[kind]||0,
     compiles:()=>c.status!=='error'&&c.status!=='unsupported'&&c.status!=='internal',
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
     onlyError:id=>errors.length===1&&(errors[0].code===id||errors[0].lint===id),
     out:()=>c.stdout,
+    // runs the same program again with some text swapped, e.g. the input literals, so code that hard-codes the answer is caught; null if a swapped text is not in the source
+    rerun:(...pairs)=>src==null||pairs.some(([a])=>!src.includes(a))?null:RQ.run(pairs.reduce((t,[a,b])=>t.split(a).join(b),src)),
     moved:name=>c.events.some(e=>e.t==='move'&&e.name===name),
     allocs:kind=>c.events.filter(e=>e.t==='alloc'&&(kind===undefined||e.kind===kind)).length,
     dropOrder:()=>c.events.filter(e=>e.t==='drop'&&e.name&&!e.part).map(e=>e.name),
@@ -151,6 +154,27 @@ function context(d,ast,counts){
         if(prints)RQ.walk(m.arms[0].body,x=>{if(x.t==='Macro'&&PRINTS.includes(x.name))shown=true;});
         if(reads&&shown)n++;
       });
+      return n;
+    },
+    forOver:(fn,name)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(f)RQ.walk(f.body,m=>{if(m.t==='For'){let r=false;RQ.walk(m.iter,x=>{if(x.t==='Path'&&x.segs.length===1&&x.segs[0].name===name)r=true;});if(r)n++;}});
+      return n;
+    },
+    litArgs:what=>{
+      let n=0;
+      const lit=a=>{a=peelP(a);return a.t==='Lit'||a.t==='Unary'&&a.op==='-'&&peelP(a.expr).t==='Lit';};
+      if(ast)RQ.walk(ast,m=>{
+        if(what==='print'&&m.t==='Macro'&&PRINTS.includes(m.name)&&m.args)n+=m.args.slice(1).filter(lit).length;
+        else if(m.t==='MethodCall'&&m.name===what)n+=m.args.filter(lit).length;
+      });
+      return n;
+    },
+    countIn:(kind,fn)=>{
+      let n=0;
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),T={while:'While',loop:'Loop',for:'For'}[kind];
+      if(f)RQ.walk(f.body,m=>{if(m.t===T)n++;});
       return n;
     },
     usesMethod:name=>{let n=0;if(ast)RQ.walk(ast,m=>{if(m.t==='MethodCall'&&m.name===name)n++;});return n;},
@@ -193,7 +217,13 @@ RQ.run=(src,opts)=>{
     if(c.unsupported.length)return context({status:'unsupported',unsupported:c.unsupported[0],unsupportedAll:c.unsupported},ast,c.counts);
     if(c.diags.length)return context({status:'error',errors:c.diags,view:opts.snap?errorView(c):null},ast,c.counts);
     if(opts.testFault)opts.testFault();
-    return context({...RQ.interp(c.ast,{...opts,info:c.info,adts:c.adts,loans:c.loans}),loans:c.loans,maxLive:c.maxLive},ast,c.counts);
+    const o={...opts,info:c.info,adts:c.adts,loans:c.loans},d=RQ.interp(c.ast,{...o,seed:0});
+    let orderDependent=false;
+    if(d.hashIterated&&(d.status==='ok'||d.status==='panic')){
+      const r=RQ.interp(c.ast,{...o,seed:1,snap:false});
+      orderDependent=r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;
+    }
+    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive},ast,c.counts,src);
   }catch(e){
     // source nested thousands deep overflows a recursive pass; that is the learner's code, not a bug
     if(e instanceof RangeError&&!ast)return context({status:'unsupported',unsupported:{feature:'nesting',line:1},unsupportedAll:[{feature:'nesting',line:1}]},null);

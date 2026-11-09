@@ -139,3 +139,18 @@ describe('inlined files', () => {
     for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /<\/(script|style)/i, f);
   });
 });
+
+describe('the rerun check helper', () => {
+  const src = 'fn main() {\n    let v = vec![1, 2, 3];\n    println!("{}", v.len());\n}\n';
+  it('runs the program again with the swapped text', () => {
+    assert.equal(RQ.run(src).rerun(['vec![1, 2, 3]', 'vec![1, 2, 3, 4]']).out(), '4\n');
+  });
+  it('is null when the text to swap is not in the program', () => {
+    assert.equal(RQ.run(src).rerun(['vec![9]', 'vec![]']), null);
+  });
+  it('catches a fix mission that prints a typed-in answer', () => {
+    const m = RQ.CH[7].missions[4];
+    const decoy = 'fn main() {\n    let bucket = vec![4, 8, 15];\n    let mut total = 27;\n    for _shell in &bucket {\n        total += 0;\n    }\n    println!("{} shells, total {}", bucket.len(), total);\n}\n';
+    assert.match(RQ.evalMission(m, decoy).result, /only works for this bucket/);
+  });
+});

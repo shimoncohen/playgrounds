@@ -14,7 +14,7 @@
     { key: 'ds-quest-v1', name: 'Data Structures Quest', subject: 'programming', href: 'programming/ds-quest/', sep: '.', missions: [5, 4, 3, 4, 5, 5] },
     { key: 'net-quest-v1', name: 'Network Quest', subject: 'programming', href: 'programming/net-quest/', sep: '.', missions: [8, 5, 6, 6, 7] },
     { key: 'agent-quest-v1', name: 'Agent Quest', subject: 'programming', href: 'programming/agent-quest/', sep: '.', missions: [5, 5, 4, 5, 5, 4, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3] },
-    { key: 'rust-quest-v1', name: 'Rust Quest', subject: 'programming', href: 'programming/rust-quest/', sep: '.', missions: [6, 8, 8, 6, 9, 7, 12] },
+    { key: 'rust-quest-v1', name: 'Rust Quest', subject: 'programming', href: 'programming/rust-quest/', sep: '.', missions: [6, 8, 8, 6, 9, 7, 12, 9] },
     { key: 'math-arithmetic-v1', name: 'Arithmetic', subject: 'math', href: 'math/arithmetic/', sep: '.', missions: [5, 5, 5, 5, 5] },
     { key: 'math-algebra-v1', name: 'Algebra', subject: 'math', href: 'math/algebra/', sep: '.', missions: [5, 5, 5, 5, 5] },
     { key: 'math-geometry-v1', name: 'Geometry', subject: 'math', href: 'math/geometry/', sep: '.', missions: [5, 5, 5, 5] },
