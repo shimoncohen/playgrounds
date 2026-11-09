@@ -707,6 +707,12 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       case 'ArrayRepeat':return put({k:'agg',args:[ex(e.elem)]},e,dest,tyOf(e));
       case 'Macro':{
         if(e.name==='vec'&&e.args)return put({k:'agg',args:seq(e.repeat?[...e.args,e.repeat]:e.args,ex)},e,dest,tyOf(e));
+        if(e.name==='panic'&&e.args){
+          seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
+          emit('return',e,{x:null});
+          cur=blk();
+          return NIL;
+        }
         if(!(PRINT.has(e.name)||e.name==='format')||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
         const args=seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
         const caps=e.args[0]&&info.get(e.args[0])&&info.get(e.args[0]).caps||[];

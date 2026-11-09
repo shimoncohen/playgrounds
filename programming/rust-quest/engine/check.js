@@ -490,7 +490,7 @@ RQ.check=ast=>{
   function format(m){
     const name=m.name,line=m.line;
     if(!m.args.length){
-      if(name==='println'||name==='eprintln')return T.unit;
+      if(name==='println'||name==='eprintln'||name==='panic')return T.unit;
       syn(line,m.col,'requires at least a format string argument');return T.unit;
     }
     const f=m.args[0];
@@ -660,9 +660,9 @@ RQ.check=ast=>{
     if(name==='unwrap_or')return hasRef(base)?null:rec('val',[a],a);
     if(name==='unwrap_or_default')return hasRef(base)||!has(a,'Default')?null:rec('val',[],a);
     if(opt){
-      if(name!=='ok_or'||args.length!==1||hasRef(base))return null;
+      if(name!=='ok_or'||args.length!==1)return null;
       const lit=res(args[0]).k==='str';
-      return lit||!holdsRef(args[0])?rec('val',[args[0]],resTy(a,args[0]),lit?1:-1):null;
+      return lit||!holdsRef(args[0])?rec('val',[args[0]],resTy(a,args[0]),hasRef(base)?0:lit?1:-1):null;
     }
     if(name==='ok')return rec('val',[],optTy(a));
     if(name==='err')return rec('val',[],optTy(b));
@@ -1211,6 +1211,7 @@ RQ.check=ast=>{
         if(e.args===null)return T.any;
         if(e.name in PRINT)return format(e);
         if(e.name==='format'){format(e);return T.string;}
+        if(e.name==='panic'){format(e);return T.never;}
         if(e.name==='vec'&&!e.named.length)return vecMacro(e);
         e.args.forEach(ex);
         return unsup(e.name+'!',e.line);

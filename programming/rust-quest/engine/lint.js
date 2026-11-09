@@ -198,7 +198,9 @@ RQ.lint=(ast,info)=>{
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
         for(const a of args)ev(a);
-        barrier();return null;
+        barrier();
+        if(e.name==='panic')div=true;
+        return null;
       }
       case 'Index':{
         const a=ev(e.expr),i=ev(e.index),n=(info.get(e)||{}).alen;

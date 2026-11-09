@@ -162,3 +162,39 @@ describe('Result and Option methods without a closure', () => {
     assert.equal(feature(body('let r: Result<i32, i32> = Ok(1);', 'let n = r.map(|x| x + 1);')).split('@')[0], 'closure');
   });
 });
+
+describe('panic!', () => {
+  const main = (...l) => P('fn main() {', ...l.map((x) => '    ' + x), '}');
+  it('formats its message and points at the macro', () => {
+    const c = RQ.run(main('println!("start");', 'panic!("the shells {} must split", 7);'));
+    assert.equal(c.status, 'panic');
+    assert.equal(c.exit, 101);
+    assert.equal(c.stdout, 'start\n');
+    assert.equal(c.stderr, "\nthread 'main' panicked at src/main.rs:3:5:\nthe shells 7 must split\n");
+  });
+  it('without arguments says explicit panic', () => {
+    assert.equal(RQ.run(main('panic!();')).panic.msg, 'explicit panic');
+  });
+  it('has type never: it fits where a value is wanted and ends the code after it', () => {
+    run(P('fn pick(n: i32) -> i32 {', '    if n > 0 { n } else { panic!("not positive: {}", n) }', '}', 'fn main() { println!("{}", pick(3)); }'));
+    assert.equal(rejects(main('let s = String::from("a");', 'let t = s;', 'println!("{}", s);', 'panic!("x");')), 'E0382@4');
+    assert.equal(RQ.run(main('panic!("x");', 'let a: u8 = 255 + 1;')).status, 'panic');
+  });
+  it('unwinds and drops the locals', () => {
+    const c = RQ.run(P('struct G;', 'impl Drop for G { fn drop(&mut self) { println!("drop"); } }', 'fn main() {', '    let _g = G;', '    let x: i32 = panic!("boom");', '}'));
+    assert.equal(c.status, 'panic');
+    assert.equal(c.stdout, 'drop\n');
+  });
+  it('needs a string literal for its message', () => {
+    const c = RQ.run(main('let m = "x";', 'panic!(m);'));
+    assert.equal(c.status, 'error');
+    assert.match(c.errors[0].msg, /format argument must be a string literal/);
+  });
+});
+
+describe('? diagnostics carry their own tip', () => {
+  it('the tip names the fix for the case, not the Display one', () => {
+    const c = RQ.run(P('fn f() -> Result<i32, i32> { Ok(1) }', 'fn main() {', '    let v = f()?;', '}'));
+    assert.match(c.errors[0].tip, /return type/);
+  });
+});

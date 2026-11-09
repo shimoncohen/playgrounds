@@ -48,7 +48,8 @@ const ERRORS={
   E0277:{
     title:'a type is missing a trait this code needs',
     msg:o=>o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
-    tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field. `?` hands an error back to the caller, so the function must return a `Result` (or an `Option`, for an `Option`) and its error type must be the one `?` meets.'
+    tipFor:o=>o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
+    tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field.'
   },
   E0369:{
     title:'two values of this type cannot be compared',
@@ -279,7 +280,7 @@ RQ.diag={
   UNSUPPORTED:HINTS,
   hint:feature=>Object.hasOwn(HINTS,feature)?HINTS[feature]:DEFAULT_HINT,
   panicText,
-  make:(id,line,col,o)=>{const d=ERRORS[id],msg=d?d.msg(o||{}):id;return d&&d.lint?{lint:id,line,col,msg}:{code:id,line,col,msg};},
+  make:(id,line,col,o)=>{const d=ERRORS[id],msg=d?d.msg(o||{}):id,tip=d&&d.tipFor&&d.tipFor(o||{});return d&&d.lint?{lint:id,line,col,msg}:{code:id,line,col,msg,...tip&&{tip}};},
   tip:id=>(ERRORS[id]&&ERRORS[id].tip)||'',
   title:id=>(ERRORS[id]&&ERRORS[id].title)||''
 };

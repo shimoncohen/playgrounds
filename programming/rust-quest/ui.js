@@ -20,7 +20,7 @@ UI.result=(root,ev)=>{
   const c=ev.c;
   if(!c){root.append(h('p','note',ev.result));return;}
   if(c.status==='ok'||c.status==='limit'||c.status==='panic'){
-    root.append(h('h4',null,c.status==='ok'?'Your program ran':c.status==='panic'?'Your program stopped with a panic':'Your program was stopped'));
+    root.append(h('h4',null,c.status==='ok'?(c.exit?'Your program ended with an error':'Your program ran'):c.status==='panic'?'Your program stopped with a panic':'Your program was stopped'));
     if(c.status==='limit')root.append(h('p','note',c.limit==='string size'?'A string got too long for the practice runner, so Rust Quest stopped it. Is a loop making it longer every time round?':c.limit==='output size'?'It printed too much for the practice runner, so Rust Quest stopped it. Is a loop printing every time round?':c.limit==='nesting'?'A value was nested too deeply for the practice runner, so Rust Quest stopped it. Is a loop wrapping a value in itself every time round?':'It ran for too long, so Rust Quest stopped it. Is something calling itself forever?'));
     if(c.stdout)root.append(h('pre','stdout',c.stdout));else root.append(h('p','note','It printed nothing.'));
     if(c.stderr){root.append(h('h4',null,'Error output'));root.append(h('pre','stderr',c.stderr.replace(/^\n+/,'')));}
@@ -34,7 +34,7 @@ UI.result=(root,ev)=>{
       const d=h('div','diag');
       d.append(h('div','id',(e.code||e.lint?(e.code||e.lint)+' · ':'')+'line '+e.line));
       d.append(rich('p',null,e.msg));
-      const tip=RQ.diag.tip(e.code||e.lint);
+      const tip=e.tip||RQ.diag.tip(e.code||e.lint);
       if(tip)d.append(rich('p','note',tip));
       root.append(d);
     }

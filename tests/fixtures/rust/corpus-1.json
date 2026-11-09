@@ -4349,5 +4349,337 @@
     "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    let r = &v;\n    v.push(r.len());\n    println!(\"{}\", v.len());\n}\n",
     "expect": "ok", "out": "3\n", "err": "", "exit": 0,
     "why": "r is last read in the argument, before the push starts (two-phase borrow)", "pr": "P10"
+  },
+  {
+    "id": "try-chain-passes-ok-and-err",
+    "src": "fn check(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\nfn twice(n: i32) -> Result<i32, String> {\n    let v = check(n)?;\n    println!(\"checked {}\", v);\n    Ok(v * 2)\n}\nfn main() {\n    println!(\"{:?}\", twice(4));\n    println!(\"{:?}\", twice(-1));\n}\n",
+    "expect": "ok", "out": "checked 4\nOk(8)\nErr(\"negative\")\n", "err": "", "exit": 0,
+    "why": "? gives the value of an Ok and returns an Err from the fn; code after it runs only on Ok", "pr": "P11"
+  },
+  {
+    "id": "try-moves-result",
+    "src": "fn f() -> Result<String, String> { Ok(String::from(\"a\")) }\nfn g() -> Result<String, String> {\n    let r = f();\n    let s = r?;\n    println!(\"{:?}\", r);\n    Ok(s)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": {"code":"E0382","line":5},
+    "pair": "try-moves-result-clone-ok",
+    "why": "? takes the Result by value, so r is moved", "pr": "P11"
+  },
+  {
+    "id": "try-moves-result-clone-ok",
+    "src": "fn f() -> Result<String, String> { Ok(String::from(\"a\")) }\nfn g() -> Result<String, String> {\n    let r = f();\n    let s = r.clone()?;\n    println!(\"{:?}\", r);\n    Ok(s)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": "ok", "out": "Ok(\"a\")\nOk(\"a\")\n", "err": "", "exit": 0,
+    "why": "a clone is moved instead, so r stays usable", "pr": "P11"
+  },
+  {
+    "id": "try-field-moves-only-that-field",
+    "src": "struct S { r: Result<String, String>, n: i32 }\nfn f(s: S) -> Result<usize, String> {\n    let t = s.r?;\n    println!(\"{}\", s.n);\n    Ok(t.len())\n}\nfn main() { println!(\"{:?}\", f(S { r: Ok(String::from(\"abc\")), n: 7 })); }\n",
+    "expect": "ok", "out": "7\nOk(3)\n", "err": "", "exit": 0,
+    "why": "? on a field moves just that field; the other fields stay usable", "pr": "P11"
+  },
+  {
+    "id": "try-field-used-after-move",
+    "src": "struct S { r: Result<String, String>, n: i32 }\nfn f(s: S) -> Result<usize, String> {\n    let t = s.r?;\n    let u = s.r;\n    Ok(t.len())\n}\nfn main() { println!(\"{:?}\", f(S { r: Ok(String::from(\"abc\")), n: 7 })); }\n",
+    "expect": {"code":"E0382","line":4},
+    "pair": "try-field-used-after-move-ok",
+    "why": "the field s.r was moved by ?", "pr": "P11"
+  },
+  {
+    "id": "try-field-used-after-move-ok",
+    "src": "struct S { r: Result<String, String>, n: i32 }\nfn f(s: S) -> Result<usize, String> {\n    let t = s.r?;\n    let u = s.n;\n    Ok(t.len())\n}\nfn main() { println!(\"{:?}\", f(S { r: Ok(String::from(\"abc\")), n: 7 })); }\n",
+    "expect": "ok", "out": "Ok(3)\n", "err": "", "exit": 0,
+    "why": "a different field is still there", "pr": "P11"
+  },
+  {
+    "id": "try-drops-locals-on-early-return",
+    "src": "struct G(i32);\nimpl Drop for G {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn f(n: i32) -> Result<i32, String> {\n    let _a = G(1);\n    if n < 0 { return Err(String::from(\"x\")); }\n    Ok(n)\n}\nfn g(n: i32) -> Result<i32, String> {\n    let _g = G(2);\n    let v = f(n)?;\n    let _h = G(3);\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g(1));\n    println!(\"{:?}\", g(-1));\n}\n",
+    "expect": "ok", "out": "drop 1\ndrop 3\ndrop 2\nOk(1)\ndrop 1\ndrop 2\nErr(\"x\")\n", "err": "", "exit": 0,
+    "why": "the locals of every fn that ?/return leaves are dropped, innermost fn first; a local declared after the ? is not made on the Err path", "pr": "P11"
+  },
+  {
+    "id": "try-in-main-without-result",
+    "src": "fn main() {\n    let r: Result<i32, i32> = Ok(1);\n    let v = r?;\n    println!(\"{}\", v);\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "pair": "try-in-main-without-result-ok",
+    "why": "? needs a fn that returns Result or Option; main returns ()", "pr": "P11"
+  },
+  {
+    "id": "try-in-main-without-result-ok",
+    "src": "fn main() {\n    let r: Result<i32, i32> = Ok(1);\n    let v = r.is_ok();\n    println!(\"{}\", v);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "no ? in a unit fn", "pr": "P11"
+  },
+  {
+    "id": "try-in-fn-returning-bool",
+    "src": "fn g(r: Result<bool, i32>) -> bool {\n    let v = r?;\n    v\n}\nfn main() {\n    println!(\"{}\", g(Ok(true)));\n}\n",
+    "expect": {"code":"E0277","line":2},
+    "pair": "try-in-fn-returning-bool-ok",
+    "why": "? in a fn that returns a plain type is E0277, not E0308", "pr": "P11"
+  },
+  {
+    "id": "try-in-fn-returning-bool-ok",
+    "src": "fn g(r: Result<bool, i32>) -> bool {\n    let v = r.is_ok();\n    v\n}\nfn main() {\n    println!(\"{}\", g(Ok(true)));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "is_ok gives a bool", "pr": "P11"
+  },
+  {
+    "id": "try-option-in-option-fn",
+    "src": "fn g(o: Option<i32>) -> Option<i32> {\n    let a = o?;\n    if a > 3 { return None; }\n    let b = Some(a + 1)?;\n    Some(b)\n}\nfn main() { println!(\"{:?} {:?} {:?}\", g(Some(1)), g(None), g(Some(9))); }\n",
+    "expect": "ok", "out": "Some(2) None None\n", "err": "", "exit": 0,
+    "why": "? on an Option returns None early", "pr": "P11"
+  },
+  {
+    "id": "try-option-in-result-fn",
+    "src": "fn g(o: Option<i32>) -> Result<i32, i32> {\n    let v = o.clone()?;\n    Ok(v)\n}\nfn main() { println!(\"{:?}\", g(Some(1))); }\n",
+    "expect": {"code":"E0277","line":2},
+    "pair": "try-option-in-result-fn-ok",
+    "why": "an Option cannot be ? in a fn that returns Result", "pr": "P11"
+  },
+  {
+    "id": "try-option-in-result-fn-ok",
+    "src": "fn g(o: Option<i32>) -> Result<i32, i32> {\n    let v = o.ok_or(1)?;\n    Ok(v)\n}\nfn main() { println!(\"{:?}\", g(Some(1))); }\n",
+    "expect": "ok", "out": "Ok(1)\n", "err": "", "exit": 0,
+    "why": "ok_or turns the Option into a Result first", "pr": "P11"
+  },
+  {
+    "id": "try-result-in-option-fn",
+    "src": "fn g(r: Result<i32, i32>) -> Option<i32> {\n    let v = r.clone()?;\n    Some(v)\n}\nfn main() { println!(\"{:?}\", g(Ok(1))); }\n",
+    "expect": {"code":"E0277","line":2},
+    "pair": "try-result-in-option-fn-ok",
+    "why": "a Result cannot be ? in a fn that returns Option", "pr": "P11"
+  },
+  {
+    "id": "try-result-in-option-fn-ok",
+    "src": "fn g(r: Result<i32, i32>) -> Option<i32> {\n    let v = r.ok()?;\n    Some(v)\n}\nfn main() { println!(\"{:?}\", g(Ok(1))); }\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "ok turns the Result into an Option first", "pr": "P11"
+  },
+  {
+    "id": "try-error-types-differ",
+    "src": "#[derive(Debug)]\nenum A { X }\n#[derive(Debug)]\nenum B { Y }\nfn f() -> Result<i32, A> { Err(A::X) }\nfn g() -> Result<i32, B> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g());\n}\n",
+    "expect": {"code":"E0277","line":7},
+    "pair": "try-error-types-same-ok",
+    "why": "no From<A> for B, so ? cannot convert the error", "pr": "P11"
+  },
+  {
+    "id": "try-error-types-same-ok",
+    "src": "#[derive(Debug)]\nenum A { X }\n#[derive(Debug)]\nenum B { Y }\nfn f() -> Result<i32, A> { Err(A::X) }\nfn g() -> Result<i32, A> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g());\n}\n",
+    "expect": "ok", "out": "Err(X)\n", "err": "", "exit": 0,
+    "why": "the error type is the same, so no conversion is needed", "pr": "P11"
+  },
+  {
+    "id": "try-int-error-into-string",
+    "src": "fn f() -> Result<i32, i32> { Err(1) }\nfn g() -> Result<i32, String> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g());\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "pair": "try-int-error-same-ok",
+    "why": "String has no From<i32>", "pr": "P11"
+  },
+  {
+    "id": "try-int-error-same-ok",
+    "src": "fn f() -> Result<i32, i32> { Err(1) }\nfn g() -> Result<i32, i32> {\n    let v = f()?;\n    Ok(v)\n}\nfn main() {\n    println!(\"{:?}\", g());\n}\n",
+    "expect": "ok", "out": "Err(1)\n", "err": "", "exit": 0,
+    "why": "same error type", "pr": "P11"
+  },
+  {
+    "id": "try-result-checked-against-annotation",
+    "src": "fn f() -> Result<i32, String> { Ok(1) }\nfn g() -> Result<u8, String> {\n    let n: u8 = f()?;\n    Ok(n)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": {"code":"E0308","line":3},
+    "pair": "try-result-checked-against-annotation-ok",
+    "why": "the value ? gives is an i32, not the annotated u8", "pr": "P11"
+  },
+  {
+    "id": "try-result-checked-against-annotation-ok",
+    "src": "fn f() -> Result<u8, String> { Ok(1) }\nfn g() -> Result<u8, String> {\n    let n: u8 = f()?;\n    Ok(n)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": "ok", "out": "Ok(1)\n", "err": "", "exit": 0,
+    "why": "f gives a u8", "pr": "P11"
+  },
+  {
+    "id": "try-as-tail-expression",
+    "src": "fn f() -> Result<i32, String> { Ok(1) }\nfn g() -> Result<i32, String> {\n    f()?\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": {"code":"E0308","line":3},
+    "pair": "try-as-tail-expression-ok",
+    "why": "f()? is an i32, not the Result the fn returns", "pr": "P11"
+  },
+  {
+    "id": "try-as-tail-expression-ok",
+    "src": "fn f() -> Result<i32, String> { Ok(1) }\nfn g() -> Result<i32, String> {\n    f()\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": "ok", "out": "Ok(1)\n", "err": "", "exit": 0,
+    "why": "the Result itself is the tail", "pr": "P11"
+  },
+  {
+    "id": "try-unit-ok-value",
+    "src": "fn f() -> Result<(), String> { Ok(()) }\nfn g() -> Result<(), String> {\n    let x = f()?;\n    println!(\"{:?}\", x);\n    Ok(x)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": "ok", "out": "()\nOk(())\n", "err": "", "exit": 0,
+    "why": "? on Result<(), E> gives ()", "pr": "P11"
+  },
+  {
+    "id": "try-loop-method-and-operands",
+    "src": "fn check(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"negative\")) } else { Ok(n) }\n}\nstruct A { n: i32 }\nimpl A {\n    fn add(&mut self, k: i32) -> Result<i32, String> {\n        self.n += check(k)?;\n        Ok(self.n)\n    }\n}\nfn sum(items: Vec<i32>) -> Result<i32, String> {\n    let mut a = A { n: 0 };\n    for k in items {\n        a.add(k)?;\n    }\n    Ok(check(1)? + check(2)?)\n}\nfn main() {\n    println!(\"{:?}\", sum(vec![1, 2, 3]));\n    println!(\"{:?}\", sum(vec![1, -2, 3]));\n}\n",
+    "expect": "ok", "out": "Ok(3)\nErr(\"negative\")\n", "err": "", "exit": 0,
+    "why": "? works in a method, in a for loop and as an operand of +", "pr": "P11"
+  },
+  {
+    "id": "try-then-runtime-overflow",
+    "src": "fn f(n: u8) -> Result<u8, String> { Ok(n) }\nfn g() -> Result<u8, String> {\n    let a = f(200)?;\n    let b = f(100)?;\n    Ok(a + b)\n}\nfn main() { println!(\"{:?}\", g()); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:8:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the sum is a run-time panic, as without ?", "pr": "P11"
+  },
+  {
+    "id": "try-get-loan-held",
+    "src": "fn f() -> Option<()> {\n    let mut v = vec![1];\n    let x = v.get(0)?;\n    v.push(2);\n    println!(\"{}\", x);\n    Some(())\n}\nfn main() { f(); }\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "try-get-copied-ok",
+    "why": "the reference ? took out of get still borrows v", "pr": "P11"
+  },
+  {
+    "id": "try-get-copied-ok",
+    "src": "fn f() -> Option<()> {\n    let mut v = vec![1];\n    let x = *v.get(0)?;\n    v.push(2);\n    println!(\"{}\", x);\n    Some(())\n}\nfn main() { f(); }\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the number is copied out, so the loan ends before the push", "pr": "P11"
+  },
+  {
+    "id": "main-result-ok-runs-normally",
+    "src": "fn main() -> Result<(), String> {\n    println!(\"hi\");\n    Ok(())\n}\n",
+    "expect": "ok", "out": "hi\n", "err": "", "exit": 0,
+    "why": "main returning Ok(()) exits 0", "pr": "P11"
+  },
+  {
+    "id": "main-result-err-string",
+    "src": "fn main() -> Result<(), String> {\n    println!(\"start\");\n    Err(String::from(\"bad \\\"q\\\"\"))\n}\n",
+    "expect": "ok", "out": "start\n", "err": "Error: \"bad \\\"q\\\"\"\n", "exit": 1,
+    "why": "an Err from main prints Error: and the Debug text to stderr and exits 1; stdout stays", "pr": "P11"
+  },
+  {
+    "id": "main-result-try-enum-error",
+    "src": "#[derive(Debug)]\nenum E {\n    Neg(i32),\n    Big,\n}\nfn check(n: i32) -> Result<i32, E> {\n    if n < 0 { return Err(E::Neg(n)); }\n    if n > 100 { return Err(E::Big); }\n    Ok(n)\n}\nfn sum(a: i32, b: i32) -> Result<i32, E> {\n    let x = check(a)?;\n    let y = check(b)?;\n    Ok(x + y)\n}\nfn main() -> Result<(), E> {\n    println!(\"{:?}\", sum(1, 2));\n    println!(\"{:?}\", sum(-1, 2));\n    let t = sum(5, -7)?;\n    println!(\"{}\", t);\n    Ok(())\n}\n",
+    "expect": "ok", "out": "Ok(3)\nErr(Neg(-1))\n", "err": "Error: Neg(-7)\n", "exit": 1,
+    "why": "? in main leaves with a user enum error printed with {:?}", "pr": "P11"
+  },
+  {
+    "id": "main-result-drops-before-report",
+    "src": "struct G(i32);\nimpl Drop for G {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn f(n: i32) -> Result<i32, String> {\n    if n < 0 { Err(String::from(\"x\")) } else { Ok(n) }\n}\nfn main() -> Result<(), String> {\n    let _m = G(0);\n    f(1)?;\n    f(-1)?;\n    println!(\"unreached\");\n    Ok(())\n}\n",
+    "expect": "ok", "out": "drop 0\n", "err": "Error: \"x\"\n", "exit": 1,
+    "why": "main drops its locals before the Error: line is printed", "pr": "P11"
+  },
+  {
+    "id": "main-result-error-struct-debug",
+    "src": "#[derive(Debug)]\nstruct E {\n    code: i32,\n    why: String,\n}\nfn main() -> Result<(), E> {\n    Err(E { code: 3, why: String::from(\"no\") })\n}\n",
+    "expect": "ok", "out": "", "err": "Error: E { code: 3, why: \"no\" }\n", "exit": 1,
+    "why": "a struct error prints with its Debug text", "pr": "P11"
+  },
+  {
+    "id": "main-result-error-debug-ok",
+    "src": "#[derive(Debug)]\nstruct E;\nfn main() -> Result<(), E> {\n    Ok(())\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the error type derives Debug", "pr": "P11"
+  },
+  {
+    "id": "main-result-panic-still-101",
+    "src": "fn main() -> Result<(), String> {\n    let v: Vec<i32> = Vec::new();\n    let n = v.len() - 1;\n    println!(\"{}\", n);\n    Ok(())\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to subtract with overflow\n", "exit": 101,
+    "why": "a panic in a main that returns Result still exits 101", "pr": "P11"
+  },
+  {
+    "id": "panic-with-format-args",
+    "src": "fn main() {\n    println!(\"start\");\n    panic!(\"the shells {} must split\", 7);\n}\n",
+    "expect": "ok", "out": "start\n", "err": "\nthread 'main' panicked at src/main.rs:3:5:\nthe shells 7 must split\n", "exit": 101,
+    "why": "panic! formats its message and points at the macro", "pr": "P11"
+  },
+  {
+    "id": "panic-without-message",
+    "src": "fn main() {\n    panic!();\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nexplicit panic\n", "exit": 101,
+    "why": "panic!() says explicit panic", "pr": "P11"
+  },
+  {
+    "id": "panic-inline-name",
+    "src": "fn main() {\n    let name = \"tide\";\n    panic!(\"bad {name}\");\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:5:\nbad tide\n", "exit": 101,
+    "why": "an inline name in the format string", "pr": "P11"
+  },
+  {
+    "id": "panic-in-else-branch",
+    "src": "fn pick(n: i32) -> i32 {\n    if n > 0 { n } else { panic!(\"not positive: {}\", n) }\n}\nfn main() {\n    println!(\"{}\", pick(3));\n    let v = pick(-2);\n    println!(\"{}\", v);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "\nthread 'main' panicked at src/main.rs:2:27:\nnot positive: -2\n", "exit": 101,
+    "why": "panic! has type never, so it fits where a number is wanted", "pr": "P11"
+  },
+  {
+    "id": "panic-in-match-arm",
+    "src": "fn f(n: u32) -> u32 {\n    match n {\n        0 => panic!(\"zero\"),\n        k => k,\n    }\n}\nfn main() {\n    println!(\"{}\", f(1));\n    println!(\"{}\", f(0));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "\nthread 'main' panicked at src/main.rs:3:14:\nzero\n", "exit": 101,
+    "why": "a panic! arm needs no value", "pr": "P11"
+  },
+  {
+    "id": "panic-after-lets-binding-never",
+    "src": "struct G(i32);\nimpl Drop for G {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\nfn main() {\n    let _g = G(1);\n    let x: i32 = panic!(\"boom\");\n}\n",
+    "expect": "ok", "out": "drop 1\n", "err": "\nthread 'main' panicked at src/main.rs:9:18:\nboom\n", "exit": 101,
+    "why": "a panic unwinds and drops the locals", "pr": "P11"
+  },
+  {
+    "id": "panic-ends-lint-scan",
+    "src": "fn main() {\n    panic!(\"x\");\n    let a: u8 = 255 + 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nx\n", "exit": 101,
+    "why": "rustc does not lint the code after a panic!", "pr": "P11"
+  },
+  {
+    "id": "panic-after-move-error",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let t = s;\n    println!(\"{}\", s);\n    panic!(\"x\");\n}\n",
+    "expect": {"code":"E0382","line":4},
+    "pair": "panic-after-move-ok",
+    "why": "a moved value is still an error before a panic!", "pr": "P11"
+  },
+  {
+    "id": "panic-after-move-ok",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let t = s;\n    println!(\"{}\", t);\n    panic!(\"x\");\n}\n",
+    "expect": "ok", "out": "a\n", "err": "\nthread 'main' panicked at src/main.rs:5:5:\nx\n", "exit": 101,
+    "why": "the moved-to name is used", "pr": "P11"
+  },
+  {
+    "id": "result-ok-err-ok-or-default",
+    "src": "fn main() {\n    let r: Result<i32, String> = Err(String::from(\"boom\"));\n    println!(\"{:?} {:?}\", r.clone().ok(), r.clone().err());\n    let o: Option<i32> = None;\n    println!(\"{:?}\", o.ok_or(String::from(\"none\")));\n    println!(\"{:?}\", Some(2).ok_or(\"e\"));\n    let d: Result<i32, String> = Err(String::from(\"z\"));\n    println!(\"{}\", d.unwrap_or_default());\n    let s: Result<String, i32> = Err(1);\n    println!(\"{:?}\", s.unwrap_or_default());\n    let z: Option<String> = None;\n    println!(\"{:?}\", z.unwrap_or_default());\n    println!(\"{}\", r.unwrap_err());\n}\n",
+    "expect": "ok", "out": "None Some(\"boom\")\nErr(\"none\")\nOk(2)\n0\n\"\"\n\"\"\nboom\n", "err": "", "exit": 0,
+    "why": "ok, err, ok_or, unwrap_or_default and unwrap_err", "pr": "P11"
+  },
+  {
+    "id": "result-unwrap-err-on-ok",
+    "src": "fn main() {\n    let r: Result<i32, String> = Ok(3);\n    r.unwrap_err();\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:7:\ncalled `Result::unwrap_err()` on an `Ok` value: 3\n", "exit": 101,
+    "why": "unwrap_err on an Ok panics and shows the value", "pr": "P11"
+  },
+  {
+    "id": "result-expect-on-err",
+    "src": "fn main() {\n    let r: Result<i32, String> = Err(String::from(\"bad\"));\n    r.expect(\"it failed\");\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:7:\nit failed: \"bad\"\n", "exit": 101,
+    "why": "expect puts its text before the Debug of the error", "pr": "P11"
+  },
+  {
+    "id": "result-expect-err-on-ok",
+    "src": "fn main() {\n    let r: Result<i32, i32> = Ok(3);\n    r.expect_err(\"wanted err\");\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:7:\nwanted err: 3\n", "exit": 101,
+    "why": "expect_err on an Ok", "pr": "P11"
+  },
+  {
+    "id": "result-ok-consumes",
+    "src": "fn main() {\n    let r: Result<i32, String> = Ok(1);\n    let a = r.ok();\n    let b = r.ok();\n}\n",
+    "expect": {"code":"E0382","line":4},
+    "pair": "result-ok-clone-ok",
+    "why": "ok takes the Result by value", "pr": "P11"
+  },
+  {
+    "id": "result-ok-clone-ok",
+    "src": "fn main() {\n    let r: Result<i32, String> = Ok(1);\n    let a = r.clone().ok();\n    let b = r.ok();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the first ok takes a clone", "pr": "P11"
+  },
+  {
+    "id": "option-ok-or-with-loan",
+    "src": "fn main() {\n    let mut v = vec![4, 8];\n    let r = v.get(0).ok_or(\"none\");\n    v.push(1);\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "option-ok-or-copied-ok",
+    "why": "the Result from ok_or still holds the reference from get", "pr": "P11"
+  },
+  {
+    "id": "option-ok-or-copied-ok",
+    "src": "fn main() {\n    let mut v = vec![4, 8];\n    let r = v.get(0).ok_or(\"none\");\n    v.len();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": "ok", "out": "Ok(4)\n", "err": "", "exit": 0,
+    "why": "copied ends the loan", "pr": "P11"
   }
 ]

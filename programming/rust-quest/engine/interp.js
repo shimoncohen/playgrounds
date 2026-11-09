@@ -231,7 +231,7 @@ RQ.interp=(ast,opts)=>{
     if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
   function macro(e,env){
-    if(!e.args.length){emit(e.name,'');return UNIT;}
+    if(!e.args.length){if(e.name==='panic')throw panic('explicit panic',e);emit(e.name,'');return UNIT;}
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
@@ -256,6 +256,7 @@ RQ.interp=(ast,opts)=>{
       throw x;
     }
     if(e.name==='format')return string(s,undefined,e.line);
+    if(e.name==='panic')throw panic(s,e);
     note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
   }

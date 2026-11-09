@@ -195,7 +195,7 @@ function context(d,ast,counts,src){
       if(kind==='catch-all')return arms(a=>a.pat.t==='Wild'||a.pat.t==='IdentPat'&&!a.pat.sub&&a.pat.name!=='None');
       const KIND={iflet:'iflet',whilelet:'whilelet',letelse:'letelse',destructure:'let'}[kind];
       const T={let:'Let',assign:'Assign',macro:'Macro',fn:'Fn',const:'Const',op:'Binary',cast:'Cast',tuple:'Tuple',array:'Array',index:'Index',field:'Field',
-        if:'If',loop:'Loop',while:'While',for:'For',break:'Break',return:'Return',struct:'Struct',enum:'Enum',impl:'Impl'}[kind];
+        if:'If',loop:'Loop',while:'While',for:'For',break:'Break',return:'Return',try:'Try',struct:'Struct',enum:'Enum',impl:'Impl'}[kind];
       let n=0;
       if(kind==='match')RQ.walk(ast,m=>{if(m.t==='Match'&&!m.kind)n++;});
       else if(kind==='derive')RQ.walk(ast,m=>{if((m.t==='Struct'||m.t==='Enum')&&m.attrs.some(a=>/^derive\b/.test(a)))n++;});
