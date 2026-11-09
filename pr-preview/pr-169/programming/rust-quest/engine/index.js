@@ -1,4 +1,4 @@
-/* c.status: ok, panic (a runtime panic: exit 101, c.panic is {msg,line,col}), error, unsupported, internal or limit. `unsupported` (a construct the quest does not model) and `internal`
+/* c.status: ok (exit is 1 when main returned an Err), panic (a runtime panic: exit 101, c.panic is {msg,line,col}), error, unsupported, internal or limit. `unsupported` (a construct the quest does not model) and `internal`
    (an engine exception on code it should handle) are kept apart from a verdict, which is given only when every construct
    is modeled. An exception never leaves RQ.run. DOM-free. */
 (()=>{
@@ -115,6 +115,37 @@ RQ.features=src=>{
   return tags;
 };
 
+const readNames=n=>{
+  const s=new Set();
+  RQ.walk(n,m=>{
+    if(m.t==='Path'&&m.segs.length===1)s.add(m.segs[0].name);
+    else if(m.t==='Macro'&&m.args&&m.args[0]&&m.args[0].kind==='str')RQ.std.parseFormat(m.args[0].v).parts.forEach(q=>{if(q.name)s.add(q.name);});
+  });
+  return s;
+};
+const callsTo=(n,callee,param)=>{
+  let k=false;
+  RQ.walk(n,m=>{if(m.t==='Call'&&m.callee.t==='Path'&&m.callee.segs.length===1&&m.callee.segs[0].name===callee&&(!param||readNames(m.args).has(param)))k=true;});
+  return k;
+};
+// nodes of fn that pick accepts, not counting a value thrown away: a bare statement or a `let` whose name is never read
+function liveIn(ast,fn,pick){
+  const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+  if(!f)return 0;
+  const read=readNames(f.body),dead=new Set(),inits=new Map();
+  const mark=n=>{n=peelP(n);dead.add(n);if(n.t==='Try')mark(n.expr);else if(n.t==='MethodCall')mark(n.recv);};
+  RQ.walk(f.body,m=>{
+    if(m.t==='ExprStmt'&&m.semi)mark(m.expr);
+    else if(m.t==='Let'&&m.init){
+      if(m.pat.t==='IdentPat')inits.set(m.pat.name,m.init);
+      if(!(m.pat.t==='IdentPat'&&read.has(m.pat.name)))mark(m.init);
+    }
+  });
+  let n=0;
+  RQ.walk(f.body,m=>{if(!dead.has(m)&&pick(m,inits))n++;});
+  return n;
+}
+
 function context(d,ast,counts,src){
   const errors=d.errors||[];
   const c={
@@ -156,6 +187,14 @@ function context(d,ast,counts,src){
       });
       return n;
     },
+    tryOn:(fn,callee,param)=>liveIn(ast,fn,(m,inits)=>m.t==='Try'&&(callsTo(m.expr,callee,param)||[...readNames(m.expr)].some(v=>inits.has(v)&&callsTo(inits.get(v),callee,param)))),
+    chainOn:(fn,name,base)=>liveIn(ast,fn,m=>{
+      if(m.t!=='MethodCall'||m.name!==name)return false;
+      let k=false;
+      RQ.walk(m.recv,x=>{if(x.t==='MethodCall'&&x.name===base)k=true;});
+      return k;
+    }),
+    callsIn:(fn,callee)=>{const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);return f&&callsTo(f.body,callee)?1:0;},
     forOver:(fn,name)=>{
       let n=0;
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);

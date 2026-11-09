@@ -269,7 +269,14 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       if(u.adj==='copy'){
         const t=tyOf(e.recv);
         ro=put({k:'deref',x:argOp(e.recv)},e,undefined,t.k==='ref'?res(t.to):t);
-      }else ro=argOp(e.recv,u.adj==='reb'||u.self==='&');
+      }else{
+        const l=p.t==='Path'?lid(p):-1;
+        // a `&mut` variable whose method hands back a borrow of it: the loan is on `*v`, a reborrow of the variable
+        if(u.from===0&&l>=0&&L[l].ty.k==='ref'&&L[l].ty.mut){
+          const mut=u.self==='&mut';
+          ro=put({k:'ref',l,mut,implicit:true,deref:true},e,undefined,T.ref(mut,L[l].ty,0));
+        }else ro=argOp(e.recv,u.adj==='reb'||u.self==='&');
+      }
       rest=seq(e.args,stdArgs(u));
     }else if(u.adj==='val'){
       const nextArg=stdArgs(u);
@@ -681,6 +688,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
           if(c.k==='via'||t.k==='ref'){
             if(e.mut&&t.k==='ref'){un('reborrow',e);return fin(NIL,e,dest);}
             if(c.k==='via'&&e.mut){un('reborrow',e);return fin(NIL,e,dest);}
+            // a shared borrow through a `&mut` variable reborrows it; moving it would end its use
+            if(t.k==='ref'&&t.mut)return put({k:'ref',l:c.l,mut:false,implicit:true,deref:true},e,dest,tyOf(e));
             return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
           }
           return put({k:'ref',l:c.l,mut:e.mut,slice:true},e,dest,tyOf(e));
