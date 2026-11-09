@@ -21,7 +21,7 @@ RQ.compile=src=>{
   // E0384, E0594 and a shared-reference E0596 are borrowck errors in rustc, so the pass still runs when the checker found only those, or typeck errors confined to other fns
   if(!unsupported.length&&!global){
     const live=n=>!(n.t==='Fn'&&n.body&&inBad(n));
-    const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
+    const b=RQ.borrow(bad.length?{...r.ast,items:r.ast.items.filter(live).map(it=>it.t==='Impl'||it.t==='Trait'?{...it,items:it.items.filter(live)}:it)}:r.ast,ck.info);
     diags=[...diags,...b.errors.filter(e=>!inBad(e))].sort((a,b)=>a.line-b.line||a.col-b.col);
     unsupported.push(...b.unsupported.filter(u=>!inBad(u)));loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
@@ -150,6 +150,7 @@ function liveIn(ast,fn,pick){
   return n;
 }
 
+const lastName=p=>p&&p.segs?p.segs[p.segs.length-1].name:null;
 function context(d,ast,counts,src){
   const errors=d.errors||[];
   const c={
@@ -173,6 +174,27 @@ function context(d,ast,counts,src){
     sigOf:fn=>{
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),lt=t=>t&&t.t==='Ref'?t.lt:undefined;
       return f?{lts:f.generics.filter(g=>g.kind==='lt').map(g=>g.name),params:f.params.map(p=>lt(p.ty)),ret:lt(f.ret)}:null;
+    },
+    implOf:(trait,type)=>{
+      const m=ast&&ast.items.find(x=>x.t==='Impl'&&x.trait&&lastName(x.trait)===trait&&lastName(x.selfTy)===type);
+      return m?{methods:m.items.filter(f=>f.t==='Fn').map(f=>f.name),params:m.generics.filter(g=>g.kind==='ty').map(g=>g.name)}:null;
+    },
+    traitOf:name=>{
+      const t=ast&&ast.items.find(x=>x.t==='Trait'&&x.name===name);
+      return t?{methods:t.items.filter(f=>f.t==='Fn').map(f=>({name:f.name,body:!!f.body}))}:null;
+    },
+    // `where` bounds are merged only for a single-segment type parameter
+    genericOf:fn=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(!f)return null;
+      const tparams=f.generics.filter(g=>g.kind==='ty').map(g=>({name:g.name,bounds:g.bounds.map(lastName)}));
+      for(const w of f.where||[])if(w.ty&&w.ty.segs&&w.ty.segs.length===1){const t=tparams.find(x=>x.name===w.ty.segs[0].name);if(t)t.bounds.push(...w.bounds.map(lastName));}
+      const impl=t=>t.t==='ImplTrait'?t.bounds.map(lastName):t.t==='Ref'?impl(t.ty):null;
+      return {tparams,impl:f.params.map(p=>impl(p.ty))};
+    },
+    adtParams:name=>{
+      const s=ast&&ast.items.find(x=>(x.t==='Struct'||x.t==='Enum')&&x.name===name);
+      return s?s.generics.filter(g=>g.kind==='ty').map(g=>g.name):null;
     },
     structLt:name=>{
       const s=ast&&ast.items.find(x=>x.t==='Struct'&&x.name===name);

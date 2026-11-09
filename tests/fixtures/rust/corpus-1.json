@@ -5141,5 +5141,509 @@
     "src": "struct S {\n    n: i32,\n}\nfn main() {}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "without the unused lifetime it compiles", "pr": "P12"
+  },
+  {
+    "id": "trait-method-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    println!(\"{}\", Dog.sound());\n}\n",
+    "expect": "ok", "out": "woof\n", "err": "", "exit": 0,
+    "why": "a type that implements the trait has its method", "pr": "P13"
+  },
+  {
+    "id": "trait-method-missing-impl",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    println!(\"{}\", Cat.sound());\n}\n",
+    "expect": { "code": "E0599", "line": 13 }, "pair": "trait-method-ok",
+    "why": "a type without the impl has no method: E0599", "pr": "P13"
+  },
+  {
+    "id": "trait-two-impls-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nimpl Cry for Cat {\n    fn sound(&self) -> String {\n        String::from(\"meow\")\n    }\n}\nfn main() {\n    println!(\"{} {}\", Dog.sound(), Cat.sound());\n}\n",
+    "expect": "ok", "out": "woof meow\n", "err": "", "exit": 0,
+    "why": "two types can implement one trait", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-twice",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"meow\")\n    }\n}\nfn main() {\n    println!(\"{} {}\", Dog.sound(), Dog.sound());\n}\n",
+    "expect": { "code": "E0119", "line": 11 }, "pair": "trait-two-impls-ok",
+    "why": "a second impl of one trait for one type is E0119", "pr": "P13"
+  },
+  {
+    "id": "trait-default-ok",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn area(&self) -> u32 {\n        self.side() * self.side()\n    }\n    fn tag(&self) -> u32 {\n        0\n    }\n}\nstruct Sq(u32);\nstruct Big(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n}\nimpl Shape for Big {\n    fn side(&self) -> u32 {\n        self.0\n    }\n    fn tag(&self) -> u32 {\n        9\n    }\n}\nfn main() {\n    println!(\"{} {} {} {}\", Sq(3).area(), Big(4).area(), Sq(1).tag(), Big(1).tag());\n}\n",
+    "expect": "ok", "out": "9 16 0 9\n", "err": "", "exit": 0,
+    "why": "a default method is shared and an impl may override it", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-extra-method",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn area(&self) -> u32 {\n        self.side() * self.side()\n    }\n    fn tag(&self) -> u32 {\n        0\n    }\n}\nstruct Sq(u32);\nstruct Big(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n}\nimpl Shape for Big {\n    fn side(&self) -> u32 {\n        self.0\n    }\n    fn tog(&self) -> u32 {\n        9\n    }\n}\nfn main() {\n    println!(\"{} {} {} {}\", Sq(3).area(), Big(4).area(), Sq(1).tag(), Big(1).tag());\n}\n",
+    "expect": { "code": "E0407", "line": 21 }, "pair": "trait-default-ok",
+    "why": "a method the trait does not list is E0407", "pr": "P13"
+  },
+  {
+    "id": "trait-required-ok",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn tag(&self) -> u32 { 0 }\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n}\nfn main() {\n    println!(\"{} {}\", Sq(3).side(), Sq(3).tag());\n}\n",
+    "expect": "ok", "out": "3 0\n", "err": "", "exit": 0,
+    "why": "an impl defines every method without a body", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-missing-method",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn tag(&self) -> u32;\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n}\nfn main() {\n    println!(\"{} {}\", Sq(3).side(), Sq(3).tag());\n}\n",
+    "expect": { "code": "E0046", "line": 6 }, "pair": "trait-required-ok",
+    "why": "an impl that leaves out a required method is E0046", "pr": "P13"
+  },
+  {
+    "id": "trait-unknown-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    println!(\"declared\");\n}\n",
+    "expect": "ok", "out": "declared\n", "err": "", "exit": 0,
+    "why": "an impl names a trait that is declared", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-unknown-trait",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cri for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    println!(\"declared\");\n}\n",
+    "expect": { "code": "E0405", "line": 6 }, "pair": "trait-unknown-ok",
+    "why": "an impl of a trait that does not exist is E0405", "pr": "P13"
+  },
+  {
+    "id": "trait-assoc-fn-ok",
+    "src": "trait Make {\n    fn make(n: u32) -> Self;\n    fn show(&self) -> u32;\n}\nstruct Box1(u32);\nimpl Make for Box1 {\n    fn make(n: u32) -> Self {\n        Box1(n + 1)\n    }\n    fn show(&self) -> u32 {\n        self.0\n    }\n}\nfn main() {\n    let b = Box1::make(4);\n    println!(\"{}\", b.show());\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a trait may declare a function without self, and Self names the implementing type", "pr": "P13"
+  },
+  {
+    "id": "trait-path-call-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    let d = Dog;\n    println!(\"{}\", Cry::sound(&d));\n}\n",
+    "expect": "ok", "out": "woof\n", "err": "", "exit": 0,
+    "why": "Trait::method(&value) calls the method of the value's type", "pr": "P13"
+  },
+  {
+    "id": "trait-path-call-no-impl",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn main() {\n    let d = Cat;\n    println!(\"{}\", Cry::sound(&d));\n}\n",
+    "expect": { "code": "E0277", "line": 14 }, "pair": "trait-path-call-ok",
+    "why": "Trait::method on a type without the impl is E0277", "pr": "P13"
+  },
+  {
+    "id": "bound-user-trait-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nfn talk<T: Cry>(x: &T) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": "ok", "out": "woof\n", "err": "", "exit": 0,
+    "why": "a bound gives the body the trait's methods", "pr": "P13"
+  },
+  {
+    "id": "bound-user-trait-missing",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nfn talk<T>(x: &T) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": { "code": "E0599", "line": 12 }, "pair": "bound-user-trait-ok",
+    "why": "a method of a trait the bound does not name is E0599", "pr": "P13"
+  },
+  {
+    "id": "bound-user-trait-unknown",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nfn talk<T: Cri>(x: &T) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": { "code": "E0405", "line": 11 }, "pair": "bound-user-trait-ok",
+    "why": "a bound that names no trait is E0405", "pr": "P13"
+  },
+  {
+    "id": "bound-user-trait-unmet",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nfn talk<T: Cry>(x: &T) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Cat;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": { "code": "E0277", "line": 16 }, "pair": "bound-user-trait-ok",
+    "why": "a type that lacks the trait fails the bound: E0277", "pr": "P13"
+  },
+  {
+    "id": "bound-where-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\nfn talk<T>(x: &T) -> String\nwhere\n    T: Cry,\n{\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": "ok", "out": "woof\n", "err": "", "exit": 0,
+    "why": "a where clause is a bound written after the signature", "pr": "P13"
+  },
+  {
+    "id": "impl-trait-arg-ok",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn talk(x: &impl Cry) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": "ok", "out": "woof\n", "err": "", "exit": 0,
+    "why": "impl Trait in a parameter is a bound written where the type goes", "pr": "P13"
+  },
+  {
+    "id": "impl-trait-arg-by-value",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn talk(x: impl Cry) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Dog;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": { "code": "E0277", "line": 17 }, "pair": "impl-trait-arg-ok",
+    "why": "a reference to a type is not that type: E0277", "pr": "P13"
+  },
+  {
+    "id": "impl-trait-arg-no-impl",
+    "src": "trait Cry {\n    fn sound(&self) -> String;\n}\nstruct Dog;\nstruct Cat;\nimpl Cry for Dog {\n    fn sound(&self) -> String {\n        String::from(\"woof\")\n    }\n}\n\nfn talk(x: &impl Cry) -> String {\n    x.sound()\n}\nfn main() {\n    let d = Cat;\n    println!(\"{}\", talk(&d));\n}\n",
+    "expect": { "code": "E0277", "line": 17 }, "pair": "impl-trait-arg-ok",
+    "why": "impl Trait refuses a type without the trait: E0277", "pr": "P13"
+  },
+  {
+    "id": "bound-partialord-ok",
+    "src": "fn larger<T: PartialOrd>(a: T, b: T) -> T {\n    if a > b { a } else { b }\n}\nfn main() {\n    println!(\"{} {} {}\", larger(3, 9), larger(2.5, 1.5), larger('a', 'z'));\n}\n",
+    "expect": "ok", "out": "9 2.5 z\n", "err": "", "exit": 0,
+    "why": "PartialOrd opens the comparison operators", "pr": "P13"
+  },
+  {
+    "id": "bound-ord-ok",
+    "src": "fn larger<T: Ord>(a: T, b: T) -> T {\n    if a > b { a } else { b }\n}\nfn main() {\n    println!(\"{} {} {}\", larger(3, 9), larger(2, 1), larger('a', 'z'));\n}\n",
+    "expect": "ok", "out": "9 2 z\n", "err": "", "exit": 0,
+    "why": "Ord opens the comparison operators too", "pr": "P13"
+  },
+  {
+    "id": "bound-ord-missing",
+    "src": "fn larger<T>(a: T, b: T) -> T {\n    if a > b { a } else { b }\n}\nfn main() {\n    println!(\"{} {} {}\", larger(3, 9), larger(2, 1), larger('a', 'z'));\n}\n",
+    "expect": { "code": "E0369", "line": 2 }, "pair": "bound-ord-ok",
+    "why": "comparing a type parameter without a bound is E0369", "pr": "P13"
+  },
+  {
+    "id": "bound-partialeq-ok",
+    "src": "fn same<T: Eq>(a: T, b: T) -> bool {\n    a == b\n}\nfn main() {\n    println!(\"{} {}\", same(1, 1), same('a', 'b'));\n}\n",
+    "expect": "ok", "out": "true false\n", "err": "", "exit": 0,
+    "why": "Eq opens ==", "pr": "P13"
+  },
+  {
+    "id": "bound-partialeq-order",
+    "src": "fn same<T: Eq>(a: T, b: T) -> bool {\n    a < b\n}\nfn main() {\n    println!(\"{} {}\", same(1, 1), same('a', 'b'));\n}\n",
+    "expect": { "code": "E0369", "line": 2 }, "pair": "bound-partialeq-ok",
+    "why": "Eq does not open <: E0369", "pr": "P13"
+  },
+  {
+    "id": "bound-partialeq-missing",
+    "src": "fn same<T>(a: T, b: T) -> bool {\n    a == b\n}\nfn main() {\n    println!(\"{} {}\", same(1, 1), same('a', 'b'));\n}\n",
+    "expect": { "code": "E0369", "line": 2 }, "pair": "bound-partialeq-ok",
+    "why": "comparing a type parameter without a bound is E0369", "pr": "P13"
+  },
+  {
+    "id": "bound-add-missing-ok",
+    "src": "fn first<T>(a: T, b: T) -> T {\n    a\n}\nfn main() {\n    println!(\"{}\", first(1, 2));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a type parameter can be returned as it is", "pr": "P13"
+  },
+  {
+    "id": "bound-add-missing",
+    "src": "fn first<T>(a: T, b: T) -> T {\n    a + b\n}\nfn main() {\n    println!(\"{}\", first(1, 2));\n}\n",
+    "expect": { "code": "E0369", "line": 2 }, "pair": "bound-add-missing-ok",
+    "why": "adding two values of a type parameter is E0369", "pr": "P13"
+  },
+  {
+    "id": "bound-clone-ok",
+    "src": "fn twice<T: Clone>(a: T) -> (T, T) {\n    (a.clone(), a)\n}\nfn main() {\n    println!(\"{:?}\", twice(String::from(\"x\")));\n}\n",
+    "expect": "ok", "out": "(\"x\", \"x\")\n", "err": "", "exit": 0,
+    "why": "Clone opens .clone() on a value", "pr": "P13"
+  },
+  {
+    "id": "bound-clone-missing",
+    "src": "fn twice<T>(a: T) -> (T, T) {\n    (a.clone(), a)\n}\nfn main() {\n    println!(\"{:?}\", twice(String::from(\"x\")));\n}\n",
+    "expect": { "code": "E0599", "line": 2 }, "pair": "bound-clone-ok",
+    "why": ".clone() on a type parameter without Clone is E0599", "pr": "P13"
+  },
+  {
+    "id": "bound-copy-ok",
+    "src": "#[derive(Debug)]\nstruct NC;\nfn twice<T: Copy>(a: T) -> (T, T) {\n    (a, a)\n}\nfn main() {\n    println!(\"{:?}\", twice(7));\n}\n",
+    "expect": "ok", "out": "(7, 7)\n", "err": "", "exit": 0,
+    "why": "Copy lets a value be used twice", "pr": "P13"
+  },
+  {
+    "id": "bound-copy-missing",
+    "src": "#[derive(Debug)]\nstruct NC;\nfn twice<T>(a: T) -> (T, T) {\n    (a, a)\n}\nfn main() {\n    println!(\"{:?}\", twice(7));\n}\n",
+    "expect": { "code": "E0382", "line": 4 }, "pair": "bound-copy-ok",
+    "why": "using a type parameter value twice without Copy is E0382", "pr": "P13"
+  },
+  {
+    "id": "bound-copy-unmet",
+    "src": "#[derive(Debug)]\nstruct NC;\nfn twice<T: Copy>(a: T) -> (T, T) {\n    (a, a)\n}\nfn main() {\n    println!(\"{:?}\", twice(NC));\n}\n",
+    "expect": { "code": "E0277", "line": 7 }, "pair": "bound-copy-ok",
+    "why": "a type that is not Copy fails the bound: E0277", "pr": "P13"
+  },
+  {
+    "id": "bound-debug-ok",
+    "src": "use std::fmt::Debug;\nfn show<T: Debug>(x: T) {\n    println!(\"{:?}\", x);\n}\nfn main() {\n    show(1);\n    show(\"a\");\n}\n",
+    "expect": "ok", "out": "1\n\"a\"\n", "err": "", "exit": 0,
+    "why": "Debug opens {:?} and needs a use", "pr": "P13"
+  },
+  {
+    "id": "bound-debug-missing",
+    "src": "use std::fmt::Debug;\nfn show<T>(x: T) {\n    println!(\"{:?}\", x);\n}\nfn main() {\n    show(1);\n    show(\"a\");\n}\n",
+    "expect": { "code": "E0277", "line": 3 }, "pair": "bound-debug-ok",
+    "why": "printing a type parameter with {:?} without Debug is E0277", "pr": "P13"
+  },
+  {
+    "id": "bound-display-ok",
+    "src": "use std::fmt::Display;\nstruct P;\nfn show<T: Display>(x: T) {\n    println!(\"{}\", x);\n}\nfn main() {\n    show(1);\n    show(String::from(\"a\"));\n}\n",
+    "expect": "ok", "out": "1\na\n", "err": "", "exit": 0,
+    "why": "Display opens {}", "pr": "P13"
+  },
+  {
+    "id": "bound-display-unmet",
+    "src": "use std::fmt::Display;\nstruct P;\nfn show<T: Display>(x: T) {\n    println!(\"{}\", x);\n}\nfn main() {\n    show(P);\n    show(String::from(\"a\"));\n}\n",
+    "expect": { "code": "E0277", "line": 7 }, "pair": "bound-display-ok",
+    "why": "a type without Display fails a Display bound: E0277", "pr": "P13"
+  },
+  {
+    "id": "generic-pair-fn-ok",
+    "src": "fn swap<T, U>(p: (T, U)) -> (U, T) {\n    (p.1, p.0)\n}\nfn main() {\n    println!(\"{:?}\", swap((1, String::from(\"z\"))));\n}\n",
+    "expect": "ok", "out": "(\"z\", 1)\n", "err": "", "exit": 0,
+    "why": "a generic fn can take two type names", "pr": "P13"
+  },
+  {
+    "id": "generic-slice-ok",
+    "src": "fn largest<T: PartialOrd + Copy>(list: &[T]) -> T {\n    let mut big = list[0];\n    for i in 0..list.len() {\n        if list[i] > big {\n            big = list[i];\n        }\n    }\n    big\n}\nfn main() {\n    let a = [3, 9, 2];\n    let b = [1.5, 0.5];\n    println!(\"{} {}\", largest(&a), largest(&b));\n}\n",
+    "expect": "ok", "out": "9 1.5\n", "err": "", "exit": 0,
+    "why": "a bound with Copy lets a slice element be read out", "pr": "P13"
+  },
+  {
+    "id": "display-ok",
+    "src": "use std::fmt;\nstruct Point {\n    x: i32,\n    y: i32,\n}\nstruct Other;\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{}\", p);\n    println!(\"{}|\", p.to_string().len());\n}\n",
+    "expect": "ok", "out": "(1, -2)\n7|\n", "err": "", "exit": 0,
+    "why": "a hand-written Display feeds {} and to_string", "pr": "P13"
+  },
+  {
+    "id": "display-missing",
+    "src": "use std::fmt;\nstruct Point {\n    x: i32,\n    y: i32,\n}\nstruct Other;\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{}\", Other);\n    println!(\"{}|\", p.to_string().len());\n}\n",
+    "expect": { "code": "E0277", "line": 14 }, "pair": "display-ok",
+    "why": "a type without a Display impl cannot be printed with {}: E0277", "pr": "P13"
+  },
+  {
+    "id": "display-width-ok",
+    "src": "use std::fmt;\nstruct Point {\n    x: i32,\n    y: i32,\n}\nstruct Other;\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{:>10}|\", p);\n    println!(\"{}|\", p.to_string().len());\n}\n",
+    "expect": "ok", "out": "(1, -2)|\n7|\n", "err": "", "exit": 0,
+    "why": "width is ignored by a Display that uses write!", "pr": "P13"
+  },
+  {
+    "id": "display-enum-ok",
+    "src": "use std::fmt;\nenum Level {\n    Low,\n    High(i32),\n}\nimpl fmt::Display for Level {\n    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n        match self {\n            Level::Low => write!(f, \"low\"),\n            Level::High(n) => {\n                write!(f, \"high\")?;\n                write!(f, \"-{}\", n)\n            }\n        }\n    }\n}\nfn main() {\n    println!(\"{} {}\", Level::Low, Level::High(3));\n}\n",
+    "expect": "ok", "out": "low high-3\n", "err": "", "exit": 0,
+    "why": "an enum prints through Display with a match", "pr": "P13"
+  },
+  {
+    "id": "display-generic-ok",
+    "src": "use std::fmt;\nstruct Point {\n    x: i32,\n    y: i32,\n}\nstruct Other;\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn show<T: fmt::Display>(x: T) -> String {\n    format!(\"[{}]\", x)\n}\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{}\", p);\n    println!(\"{}\", show(p));\n}\n",
+    "expect": "ok", "out": "(1, -2)\n[(1, -2)]\n", "err": "", "exit": 0,
+    "why": "a Display bound accepts a type with the impl", "pr": "P13"
+  },
+  {
+    "id": "display-generic-unmet",
+    "src": "use std::fmt;\nstruct Point {\n    x: i32,\n    y: i32,\n}\nstruct Other;\nimpl fmt::Display for Point {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"({}, {})\", self.x, self.y)\n    }\n}\nfn show<T: fmt::Display>(x: T) -> String {\n    format!(\"[{}]\", x)\n}\nfn main() {\n    let p = Point { x: 1, y: -2 };\n    println!(\"{}\", p);\n    println!(\"{}\", show(Other));\n}\n",
+    "expect": { "code": "E0277", "line": 18 }, "pair": "display-generic-ok",
+    "why": "a Display bound refuses a type without the impl: E0277", "pr": "P13"
+  },
+  {
+    "id": "display-format-ok",
+    "src": "use std::fmt;\nstruct Id(u32);\nimpl fmt::Display for Id {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"#{}\", self.0)\n    }\n}\nstruct Pair(Id, Id);\nimpl fmt::Display for Pair {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        write!(f, \"{} and {}\", self.0, self.1)\n    }\n}\nfn main() {\n    let s = format!(\"{}\", Pair(Id(1), Id(2)));\n    println!(\"{} {}\", s, s.len());\n}\n",
+    "expect": "ok", "out": "#1 and #2 9\n", "err": "", "exit": 0,
+    "why": "format! and write! take the same impl", "pr": "P13"
+  },
+  {
+    "id": "drop-body-ok",
+    "src": "struct Guard {\n    name: String,\n}\nimpl Drop for Guard {\n    fn drop(&mut self) {\n        let n = self.name.len();\n        if n > 5 {\n            return;\n        }\n        println!(\"closing {}\", self.name);\n    }\n}\nfn main() {\n    let _a = Guard { name: String::from(\"a\") };\n    let b = Guard { name: String::from(\"b\") };\n    {\n        let _c = Guard { name: String::from(\"c\") };\n        println!(\"block\");\n    }\n    drop(b);\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "block\nclosing c\nclosing b\nend\nclosing a\n", "err": "", "exit": 0,
+    "why": "a Drop body can hold locals, conditions and a return", "pr": "P13"
+  },
+  {
+    "id": "drop-explicit-call",
+    "src": "struct Guard {\n    name: String,\n}\nimpl Drop for Guard {\n    fn drop(&mut self) {\n        let n = self.name.len();\n        if n > 5 {\n            return;\n        }\n        println!(\"closing {}\", self.name);\n    }\n}\nfn main() {\n    let _a = Guard { name: String::from(\"a\") };\n    let b = Guard { name: String::from(\"b\") };\n    {\n        let _c = Guard { name: String::from(\"c\") };\n        println!(\"block\");\n    }\n    b.drop();\n    println!(\"end\");\n}\n",
+    "expect": { "code": "E0040", "line": 20 }, "pair": "drop-body-ok",
+    "why": "calling drop by hand is E0040", "pr": "P13"
+  },
+  {
+    "id": "drop-two-types-ok",
+    "src": "struct A;\nstruct B;\nimpl Drop for A {\n    fn drop(&mut self) {\n        println!(\"a\");\n    }\n}\nimpl Drop for B {\n    fn drop(&mut self) {\n        println!(\"b\");\n    }\n}\nfn main() {\n    let _x = A;\n    let _y = B;\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "end\nb\na\n", "err": "", "exit": 0,
+    "why": "two types may each implement Drop", "pr": "P13"
+  },
+  {
+    "id": "drop-two-impls",
+    "src": "struct A;\nstruct B;\nimpl Drop for A {\n    fn drop(&mut self) {\n        println!(\"a\");\n    }\n}\nimpl Drop for A {\n    fn drop(&mut self) {\n        println!(\"b\");\n    }\n}\nfn main() {\n    let _x = A;\n    let _y = B;\n    println!(\"end\");\n}\n",
+    "expect": { "code": "E0119", "line": 8 }, "pair": "drop-two-types-ok",
+    "why": "two Drop impls for one type are E0119", "pr": "P13"
+  },
+  {
+    "id": "drop-field-order-ok",
+    "src": "struct Inner(u32);\nstruct Outer {\n    a: Inner,\n    b: Inner,\n}\nimpl Drop for Inner {\n    fn drop(&mut self) {\n        println!(\"inner {}\", self.0);\n    }\n}\nimpl Drop for Outer {\n    fn drop(&mut self) {\n        println!(\"outer\");\n    }\n}\nfn main() {\n    let _o = Outer { a: Inner(1), b: Inner(2) };\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "end\nouter\ninner 1\ninner 2\n", "err": "", "exit": 0,
+    "why": "the struct's own drop runs before its fields drop", "pr": "P13"
+  },
+  {
+    "id": "from-question-ok",
+    "src": "#[derive(Debug)]\nenum AppError {\n    Low(i32),\n    Parse(String),\n}\nstruct ParseFail(String);\nimpl From<i32> for AppError {\n    fn from(n: i32) -> Self {\n        AppError::Low(n)\n    }\n}\nfn bad(n: i32) -> Result<i32, f64> {\n    Err(n as f64)\n}\nimpl From<ParseFail> for AppError {\n    fn from(e: ParseFail) -> AppError {\n        AppError::Parse(e.0)\n    }\n}\nfn parse(s: &str) -> Result<i32, ParseFail> {\n    if s == \"x\" {\n        Err(ParseFail(String::from(\"bad\")))\n    } else {\n        Ok(1)\n    }\n}\nfn neg(n: i32) -> Result<i32, i32> {\n    if n < 0 {\n        Err(n)\n    } else {\n        Ok(n)\n    }\n}\nfn run(s: &str, n: i32) -> Result<i32, AppError> {\n    let a = parse(s)?;\n    let b = neg(n)?;\n    Ok(a + b)\n}\nfn main() {\n    println!(\"{:?}\", run(\"ok\", 2));\n    println!(\"{:?}\", run(\"x\", 2));\n    println!(\"{:?}\", run(\"ok\", -3));\n    println!(\"{:?}\", AppError::from(7));\n    let f: AppError = ParseFail(String::from(\"q\")).into();\n    println!(\"{:?}\", f);\n}\n",
+    "expect": "ok", "out": "Ok(3)\nErr(Parse(\"bad\"))\nErr(Low(-3))\nLow(7)\nParse(\"q\")\n", "err": "", "exit": 0,
+    "why": "impl From converts the error in ?, in from and in into", "pr": "P13"
+  },
+  {
+    "id": "from-question-no-impl",
+    "src": "#[derive(Debug)]\nenum AppError {\n    Low(i32),\n    Parse(String),\n}\nstruct ParseFail(String);\nimpl From<i32> for AppError {\n    fn from(n: i32) -> Self {\n        AppError::Low(n)\n    }\n}\nfn bad(n: i32) -> Result<i32, f64> {\n    Err(n as f64)\n}\nimpl From<ParseFail> for AppError {\n    fn from(e: ParseFail) -> AppError {\n        AppError::Parse(e.0)\n    }\n}\nfn parse(s: &str) -> Result<i32, ParseFail> {\n    if s == \"x\" {\n        Err(ParseFail(String::from(\"bad\")))\n    } else {\n        Ok(1)\n    }\n}\nfn neg(n: i32) -> Result<i32, i32> {\n    if n < 0 {\n        Err(n)\n    } else {\n        Ok(n)\n    }\n}\nfn run(s: &str, n: i32) -> Result<i32, AppError> {\n    let a = parse(s)?;\n    let b = bad(n)?;\n    Ok(a + b)\n}\nfn main() {\n    println!(\"{:?}\", run(\"ok\", 2));\n    println!(\"{:?}\", run(\"x\", 2));\n    println!(\"{:?}\", run(\"ok\", -3));\n    println!(\"{:?}\", AppError::from(7));\n    let f: AppError = ParseFail(String::from(\"q\")).into();\n    println!(\"{:?}\", f);\n}\n",
+    "expect": { "code": "E0277", "line": 36 }, "pair": "from-question-ok",
+    "why": "a ? with no From for that error type is E0277", "pr": "P13"
+  },
+  {
+    "id": "from-one-source-ok",
+    "src": "#[derive(Debug)]\nenum AppError {\n    Parse(String),\n}\nstruct ParseFail(String);\nimpl From<ParseFail> for AppError {\n    fn from(e: ParseFail) -> AppError {\n        AppError::Parse(e.0)\n    }\n}\nfn parse(s: &str) -> Result<i32, ParseFail> {\n    Err(ParseFail(String::from(s)))\n}\nfn run(s: &str) -> Result<i32, AppError> {\n    let a = parse(s)?;\n    Ok(a)\n}\nfn main() {\n    println!(\"{:?}\", run(\"x\"));\n}\n",
+    "expect": "ok", "out": "Err(Parse(\"x\"))\n", "err": "", "exit": 0,
+    "why": "a ? converts a user error type into another", "pr": "P13"
+  },
+  {
+    "id": "from-wrong-param-ok",
+    "src": "#[derive(Debug)]\nstruct Meters(f64);\nimpl From<f64> for Meters {\n    fn from(v: f64) -> Meters {\n        Meters(v)\n    }\n}\nfn main() {\n    let a = Meters::from(2.5);\n    let b: Meters = 4.0.into();\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "Meters(2.5) Meters(4.0)\n", "err": "", "exit": 0,
+    "why": "the from fn has the type the impl names", "pr": "P13"
+  },
+  {
+    "id": "from-literal-mismatch",
+    "src": "#[derive(Debug)]\nstruct Meters(f64);\nimpl From<f64> for Meters {\n    fn from(v: f64) -> Meters {\n        Meters(v)\n    }\n}\nfn main() {\n    let a = Meters::from(2);\n    let b: Meters = 4.0.into();\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": { "code": "E0277", "line": 9 }, "pair": "from-wrong-param-ok",
+    "why": "an integer literal is not an f64 for From: E0277", "pr": "P13"
+  },
+  {
+    "id": "from-str-ok",
+    "src": "#[derive(Debug)]\nstruct Name(String);\nimpl From<&str> for Name {\n    fn from(s: &str) -> Name {\n        Name(String::from(s))\n    }\n}\nfn main() {\n    let n: Name = \"bob\".into();\n    let m = Name::from(\"al\");\n    println!(\"{:?} {:?}\", n, m);\n}\n",
+    "expect": "ok", "out": "Name(\"bob\") Name(\"al\")\n", "err": "", "exit": 0,
+    "why": "From<&str> builds a type out of a literal", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-ok",
+    "src": "use std::fmt::Display;\n#[derive(Debug, Clone, PartialEq)]\nstruct Pair<T> {\n    a: T,\n    b: T,\n}\nstruct Q;\nimpl<T> Pair<T> {\n    fn new(a: T, b: T) -> Pair<T> {\n        Pair { a, b }\n    }\n    fn first(&self) -> &T {\n        &self.a\n    }\n    fn swap(self) -> Pair<T> {\n        Pair { a: self.b, b: self.a }\n    }\n}\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show_largest(&self) {\n        if self.a > self.b {\n            println!(\"largest {}\", self.a);\n        } else {\n            println!(\"largest {}\", self.b);\n        }\n    }\n}\nimpl Pair<f64> {\n    fn sum(&self) -> f64 {\n        self.a + self.b\n    }\n}\nfn main() {\n    let p = Pair::new(3, 9);\n    p.show_largest();\n    println!(\"{} {:?}\", p.first(), p.clone().swap());\n    let q = Pair { a: 1.5, b: 2.0 };\n    println!(\"{}\", q.sum());\n    let s = Pair::new(String::from(\"x\"), String::from(\"y\"));\n    println!(\"{:?} {}\", s, s == s.clone());\n    \n}\n",
+    "expect": "ok", "out": "largest 9\n3 Pair { a: 9, b: 3 }\n3.5\nPair { a: \"x\", b: \"y\" } true\n", "err": "", "exit": 0,
+    "why": "a generic struct with impl<T>, a bounded impl and a narrower impl", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-mixed",
+    "src": "use std::fmt::Display;\n#[derive(Debug, Clone, PartialEq)]\nstruct Pair<T> {\n    a: T,\n    b: T,\n}\nstruct Q;\nimpl<T> Pair<T> {\n    fn new(a: T, b: T) -> Pair<T> {\n        Pair { a, b }\n    }\n    fn first(&self) -> &T {\n        &self.a\n    }\n    fn swap(self) -> Pair<T> {\n        Pair { a: self.b, b: self.a }\n    }\n}\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show_largest(&self) {\n        if self.a > self.b {\n            println!(\"largest {}\", self.a);\n        } else {\n            println!(\"largest {}\", self.b);\n        }\n    }\n}\nimpl Pair<f64> {\n    fn sum(&self) -> f64 {\n        self.a + self.b\n    }\n}\nfn main() {\n    let p = Pair::new(3, 9);\n    p.show_largest();\n    println!(\"{} {:?}\", p.first(), p.clone().swap());\n    let q = Pair { a: 1.5, b: 2 };\n    println!(\"{}\", q.sum());\n    let s = Pair::new(String::from(\"x\"), String::from(\"y\"));\n    println!(\"{:?} {}\", s, s == s.clone());\n    \n}\n",
+    "expect": { "code": "E0308", "line": 37 }, "pair": "generic-struct-ok",
+    "why": "one T cannot be a decimal and a whole number: E0308", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-narrow",
+    "src": "use std::fmt::Display;\n#[derive(Debug, Clone, PartialEq)]\nstruct Pair<T> {\n    a: T,\n    b: T,\n}\nstruct Q;\nimpl<T> Pair<T> {\n    fn new(a: T, b: T) -> Pair<T> {\n        Pair { a, b }\n    }\n    fn first(&self) -> &T {\n        &self.a\n    }\n    fn swap(self) -> Pair<T> {\n        Pair { a: self.b, b: self.a }\n    }\n}\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show_largest(&self) {\n        if self.a > self.b {\n            println!(\"largest {}\", self.a);\n        } else {\n            println!(\"largest {}\", self.b);\n        }\n    }\n}\nimpl Pair<f64> {\n    fn sum(&self) -> f64 {\n        self.a + self.b\n    }\n}\nfn main() {\n    let p = Pair::new(3, 9);\n    p.show_largest();\n    println!(\"{} {:?}\", p.first(), p.clone().swap());\n    let q = Pair { a: 1, b: 2 };\n    println!(\"{}\", q.sum());\n    let s = Pair::new(String::from(\"x\"), String::from(\"y\"));\n    println!(\"{:?} {}\", s, s == s.clone());\n    \n}\n",
+    "expect": { "code": "E0599", "line": 38 }, "pair": "generic-struct-ok",
+    "why": "impl Pair<f64> gives sum to decimal pairs only: E0599", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-bound-ok",
+    "src": "use std::fmt::Display;\nstruct Pair<T> {\n    a: T,\n    b: T,\n}\nstruct Q;\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show(&self) {\n        if self.a > self.b {\n            println!(\"{}\", self.a);\n        } else {\n            println!(\"{}\", self.b);\n        }\n    }\n}\nfn main() {\n    let p = Pair { a: 3, b: 9 };\n    p.show();\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "a bounded impl gives its methods to types that meet the bound", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-bound",
+    "src": "use std::fmt::Display;\nstruct Pair<T> {\n    a: T,\n    b: T,\n}\nstruct Q;\nimpl<T: Display + PartialOrd> Pair<T> {\n    fn show(&self) {\n        if self.a > self.b {\n            println!(\"{}\", self.a);\n        } else {\n            println!(\"{}\", self.b);\n        }\n    }\n}\nfn main() {\n    let p = Pair { a: Q, b: Q };\n    p.show();\n}\n",
+    "expect": { "code": "E0599", "line": 18 }, "pair": "generic-struct-bound-ok",
+    "why": "a bounded impl needs the bound for its methods: E0599", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-unused-ok",
+    "src": "struct Tag<T> {\n    n: T,\n}\nfn main() {\n    println!(\"tag\");\n}\n",
+    "expect": "ok", "out": "tag\n", "err": "", "exit": 0,
+    "why": "a type parameter used in a field", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-unused",
+    "src": "struct Tag<T> {\n    n: i32,\n}\nfn main() {\n    println!(\"tag\");\n}\n",
+    "expect": { "code": "E0392", "line": 1 }, "pair": "generic-struct-unused-ok",
+    "why": "a type parameter no field uses is E0392", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-args-ok",
+    "src": "struct Tag<T> {\n    n: T,\n}\nfn main() {\n    let t: Tag<i32> = Tag { n: 1 };\n    println!(\"{}\", t.n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a generic type is written with its argument", "pr": "P13"
+  },
+  {
+    "id": "generic-struct-missing-args",
+    "src": "struct Tag<T> {\n    n: T,\n}\nfn main() {\n    let t: Tag = Tag { n: 1 };\n    println!(\"{}\", t.n);\n}\n",
+    "expect": { "code": "E0107", "line": 5 }, "pair": "generic-struct-args-ok",
+    "why": "a generic type written with no argument is E0107", "pr": "P13"
+  },
+  {
+    "id": "generic-enum-ok",
+    "src": "#[derive(Debug)]\nenum Maybe<T> {\n    Nothing,\n    Just(T),\n}\nimpl<T> Maybe<T> {\n    fn is_just(&self) -> bool {\n        match self {\n            Maybe::Just(_) => true,\n            Maybe::Nothing => false,\n        }\n    }\n    fn or(self, d: T) -> T {\n        match self {\n            Maybe::Just(v) => v,\n            Maybe::Nothing => d,\n        }\n    }\n}\nfn main() {\n    let m: Maybe<i32> = Maybe::Just(4);\n    let n: Maybe<i32> = Maybe::Nothing;\n    println!(\"{} {} {}\", m.is_just(), n.is_just(), n.or(7));\n    println!(\"{:?}\", Maybe::Just(\"hi\"));\n}\n",
+    "expect": "ok", "out": "true false 7\nJust(\"hi\")\n", "err": "", "exit": 0,
+    "why": "a generic enum with a match", "pr": "P13"
+  },
+  {
+    "id": "generic-move-ok",
+    "src": "#[derive(Debug)]\nstruct W<T> {\n    v: T,\n}\nfn main() {\n    let w = W { v: String::from(\"a\") };\n    let c = &w;\n    println!(\"{:?} {:?}\", w, c);\n}\n",
+    "expect": "ok", "out": "W { v: \"a\" } W { v: \"a\" }\n", "err": "", "exit": 0,
+    "why": "a generic struct moves unless it is Copy", "pr": "P13"
+  },
+  {
+    "id": "generic-move",
+    "src": "#[derive(Debug)]\nstruct W<T> {\n    v: T,\n}\nfn main() {\n    let w = W { v: String::from(\"a\") };\n    let c = w;\n    println!(\"{:?} {:?}\", w, c);\n}\n",
+    "expect": { "code": "E0382", "line": 8 }, "pair": "generic-move-ok",
+    "why": "a W<String> moves, so using it afterwards is E0382", "pr": "P13"
+  },
+  {
+    "id": "drop-no-copy-ok",
+    "src": "#[derive(Clone)]\nstruct D;\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let _d = D;\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "end\ndrop\n", "err": "", "exit": 0,
+    "why": "a type with Drop and no Copy", "pr": "P13"
+  },
+  {
+    "id": "drop-with-copy",
+    "src": "#[derive(Clone, Copy)]\nstruct D;\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let _d = D;\n    println!(\"end\");\n}\n",
+    "expect": { "code": "E0184", "line": 2 }, "pair": "drop-no-copy-ok",
+    "why": "Copy on a type with a destructor is E0184", "pr": "P13"
+  },
+  {
+    "id": "impl-trait-ok",
+    "src": "trait A {}\nstruct B;\nimpl A for B {}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named after impl", "pr": "P13"
+  },
+  {
+    "id": "impl-struct-as-trait",
+    "src": "struct A {}\nstruct B;\nimpl A for B {}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 3 }, "pair": "impl-trait-ok",
+    "why": "a struct after impl is E0404, not E0405", "pr": "P13"
+  },
+  {
+    "id": "bound-trait-ok",
+    "src": "trait A {}\nfn show<T: A>(_t: T) {}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named in a bound", "pr": "P13"
+  },
+  {
+    "id": "bound-struct-as-trait",
+    "src": "struct A {}\nfn show<T: A>(_t: T) {}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 2 }, "pair": "bound-trait-ok",
+    "why": "a struct as a bound is E0404", "pr": "P13"
+  },
+  {
+    "id": "where-trait-ok",
+    "src": "trait A {}\nfn show<T>(_t: T)\nwhere\n    T: A,\n{\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named in a where clause", "pr": "P13"
+  },
+  {
+    "id": "where-struct-as-trait",
+    "src": "struct A {}\nfn show<T>(_t: T)\nwhere\n    T: A,\n{\n}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 4 }, "pair": "where-trait-ok",
+    "why": "a struct in a where clause is E0404", "pr": "P13"
+  },
+  {
+    "id": "from-other-type-ok",
+    "src": "struct A;\nstruct B;\nimpl From<A> for B {\n    fn from(_a: A) -> B {\n        B\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": "ok", "out": "ok\n", "err": "", "exit": 0,
+    "why": "From another type is fine", "pr": "P13"
+  },
+  {
+    "id": "from-self",
+    "src": "struct A;\nstruct B;\nimpl From<A> for A {\n    fn from(a: A) -> A {\n        a\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": { "code": "E0119", "line": 3 }, "pair": "from-other-type-ok",
+    "why": "From<A> for A clashes with the blanket From<T> for T", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-private-ok",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct A;\nimpl T for A {\n    fn f(&self) -> i32 {\n        7\n    }\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait impl method carries no pub", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-pub-fn",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct A;\nimpl T for A {\n    pub fn f(&self) -> i32 {\n        7\n    }\n}\nfn main() {}\n",
+    "expect": { "code": "E0449", "line": 6 }, "pair": "trait-impl-private-ok",
+    "why": "pub on a trait impl method is E0449", "pr": "P13"
+  },
+  {
+    "id": "trait-item-private-ok",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait method carries no pub", "pr": "P13"
+  },
+  {
+    "id": "trait-item-pub-fn",
+    "src": "trait T {\n    pub fn f(&self) -> i32;\n}\nfn main() {}\n",
+    "expect": { "code": "E0449", "line": 2 }, "pair": "trait-item-private-ok",
+    "why": "pub on a trait method is E0449", "pr": "P13"
   }
 ]

@@ -19,6 +19,9 @@ RQ.walk=(n,f,parent)=>{
   for(const k of Object.keys(n)){const v=n[k];if(v&&typeof v==='object')RQ.walk(v,f,parent);}
 };
 
+RQ.fnItems=ast=>ast.items.flatMap(it=>it.t==='Fn'?[{f:it,name:it.name}]:it.t==='Impl'||it.t==='Trait'?it.items.filter(x=>x.t==='Fn').map(f=>({f,name:(it.t==='Trait'?it.name:it.selfTy.segs?it.selfTy.segs[0].name:'?')+'::'+f.name})):[]);
+RQ.isDropImpl=it=>it.t==='Impl'&&!!it.trait&&!!it.trait.segs&&it.trait.segs[it.trait.segs.length-1].name==='Drop';
+
 RQ.parse=tokens=>{
   const toks=tokens.slice(),un=[],seen=new Set();
   let p=0,nid=0;
@@ -78,7 +81,7 @@ RQ.parse=tokens=>{
       attrs();const x=T();
       if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs,line:x.line,col:x.col});}
       else if(eatK('const')){const n=ident();expP(':');const t=ty();let d=null;if(eatP('='))d=unary(true);out.push({kind:'const',name:n.v,ty:t,default:d});}
-      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d});}
+      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d,line:n.line,col:n.col});}
       if(!eatP(','))break;
     }
     closeAngle();return out;
@@ -532,7 +535,7 @@ RQ.parse=tokens=>{
   function item(at){
     at=at||attrs();
     const x=T();
-    const pub=vis();
+    const pub=vis()?x:false;
     const y=T();
     if(isK('fn')||((isK('const')||isK('async')||isK('unsafe')||isK('extern'))&&fnAhead()))return fnItem(at,pub);
     if(isK('struct')){
@@ -544,10 +547,10 @@ RQ.parse=tokens=>{
     if(isK('enum')){
       p++;const n=ident(),gs=generics();where();expP('{');const variants=[];
       while(!isP('}')){
-        const vat=attrs(),v=ident();let kind='unit',fields=[],disc=null;
+        const vat=attrs(),pv=isK('pub')?T():false;vis();const v=ident();let kind='unit',fields=[],disc=null;
         if(isP('(')){kind='tuple';fields=fieldsTuple();}else if(isP('{')){kind='named';fields=fieldsNamed();}
         if(eatP('='))disc=expr(false);
-        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat}));
+        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat,pub:pv}));
         if(!eatP(','))break;
       }
       expP('}');return mk('Enum',x,{name:n.v,generics:gs,variants,attrs:at,pub});
@@ -556,14 +559,14 @@ RQ.parse=tokens=>{
     if(isK('impl')){
       p++;const gs=generics();eatP('!');const first=ty();let tr=null,self=first;
       if(eatK('for')){tr=first;self=ty();}
-      const wh=where();void wh;expP('{');const items=[];
+      const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at});
+      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at,where:wh,pub});
     }
     if(isK('trait')){
-      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();where();expP('{');const items=[];
+      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub});
+      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub,where:wh});
     }
     if(isK('const')||isK('static')){
       const isStatic=isK('static');p++;let mut=false;

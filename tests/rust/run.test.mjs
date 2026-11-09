@@ -162,7 +162,7 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(feature('fn show(x: &dyn Show) {}\nfn main() {}'), 'dyn@1');
   });
   it('constructs of later chapters give unsupported with a hint in the catalog', () => {
-    assert.equal(feature('trait T {}\nfn main() {}'), 'trait@1');
+    assert.equal(feature('trait T: Clone {}\nfn main() {}'), 'trait@1');
     assert.equal(feature('fn main() {\n    let v = [1];\n    match v { [a] => {} }\n}'), 'pattern@3');
     assert.equal(feature('fn main() {\n    assert!(true);\n}'), 'assert!@2');
     assert.equal(feature('fn main() {\n    let x: f32 = 2.5;\n}'), 'f32@2');
@@ -176,7 +176,7 @@ describe('RQ.run: unsupported is not an error', () => {
     assert.equal(RQ.run('fn main() {\n    let x = Nope(1);\n}').onlyError('E0425'), true);
   });
   it('unsupported wins over an error found in the same program, and over a syntax-valid E0384', () => {
-    assert.equal(RQ.run('trait T {}\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
+    assert.equal(RQ.run('trait T: Clone {}\nfn main() {\n    let x = 1;\n    x = 2;\n}').status, 'unsupported');
   });
   it('the checker rejects what rustc rejects with a code or lint, and does not guess the rest', () => {
     const id = (src) => { const c = RQ.run(src); assert.equal(c.status, 'error', src); return `${c.errors[0].code || c.errors[0].lint}@${c.errors[0].line}`; };

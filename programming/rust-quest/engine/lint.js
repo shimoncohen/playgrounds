@@ -286,7 +286,7 @@ RQ.lint=(ast,info)=>{
   }
 
   for(const n of consts.keys())constKnown(n);
-  const fns=ast.items.flatMap(it=>it.t==='Fn'?[it]:it.t==='Impl'&&!it.trait?it.items:[]);
+  const fns=RQ.fnItems(ast).map(x=>x.f);
   for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
     st=new Map();dead=0;barriers=0;div=false;borrowed=new Set();

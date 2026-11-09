@@ -18,7 +18,8 @@ const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why ca
   ['Name the choices with an enum', 'A match must cover every variant', 'Variants that carry data', 'Option: a value that might be missing', 'Ranges and a last arm', 'A number match needs a last arm', 'A guard adds a test', 'Match a pair', 'if let: when only one case matters', 'while let: keep going until it runs out', 'let else: leave early', 'Take a pair apart with let'],
   ['A bucket that grows', 'A borrowed element blocks a push', 'Ask with get', 'Walk the bucket with for', 'for takes the bucket away', 'Change every shell in place', 'No pushing while you loop', 'Count with a HashMap', 'A HashMap keeps no order'],
   ['A step that can fail', 'Open a Result with match', 'Trust it with expect', 'Pass the error up with ?', 'A Result is used up by ?', '? needs a Result to return', 'Name your errors with an enum', 'A missing value becomes an error', 'Let main report the error'],
-  ['Name the lifetime', 'The answer needs both inputs', 'Only label what the answer uses', 'A parameter without the label', 'A reference that lasts the whole run', 'A struct that holds a reference', 'Methods on a struct with a lifetime', 'A struct cannot outlive its text', 'A method result keeps the text borrowed']];
+  ['Name the lifetime', 'The answer needs both inputs', 'Only label what the answer uses', 'A parameter without the label', 'A reference that lasts the whole run', 'A struct that holds a reference', 'Methods on a struct with a lifetime', 'A struct cannot outlive its text', 'A method result keeps the text borrowed'],
+  ['Give a type a trait', 'One function for many types', 'A default method to share', 'The bound opens the body', 'Say it with impl Trait', 'Teach a type to print with {}', 'Run code when a value goes', 'Turn one error into another', 'A struct that holds any type']];
 const want = (m) => m.expect || 'ok';
 
 describe('chapter and mission ids are append only', () => {
@@ -85,7 +86,7 @@ describe('the mission runner', () => {
   const m = RQ.CH[0].missions[0];
   it('an empty editor, unsupported code and engine bugs never complete a mission', () => {
     assert.equal(typeof RQ.runMission(m, ''), 'string');
-    assert.match(RQ.runMission(m, 'trait T {}\nfn main() {}'), /does not model `trait`/);
+    assert.match(RQ.runMission(m, 'trait T: Clone {}\nfn main() {}'), /does not model `trait`/);
     assert.match(RQ.runMission(m, 'fn main() {'), /would not accept/);
   });
   it('a hidden harness is appended to the learner code', () => {
