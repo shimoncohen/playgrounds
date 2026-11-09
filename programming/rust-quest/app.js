@@ -170,8 +170,10 @@ fStage.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)ret
 document.addEventListener('keydown',e=>{if(!fireOn||$('#tab-fire').hidden)return;if(/^[1-4]$/.test(e.key)&&fQ&&+e.key<=fQ.opts.length){e.preventDefault();pick(+e.key-1);}});
 
 function renderGuide(){const g=$('#guide');g.dataset.ready='1';
+  const section=(title,items)=>items.length?`<section class="gsec"><h3>${title}</h3><div class="cards">${items.map(x=>`<article class="card panel"><h4>${esc(x.c)}</h4><p>${x.what}</p><div class="ex">${x.ex.map(([code,note],k)=>`<div class="exrow"><button class="excmd" data-ex="${GUIDE.indexOf(x)}.${k}" title="Copy this example"><pre>${esc(code)}</pre><span class="try">Copy</span></button>${note?`<small>${note}</small>`:''}</div>`).join('')}</div></article>`).join('')}</div></section>`:'';
   g.innerHTML=`<div><h2>Field guide</h2><p class="lede">A quick reference for the words and error codes the missions teach. Copy an example, paste it into the editor and press <kbd>Run</kbd>.</p></div>
-  ${CH.map((c,ci)=>{const items=GUIDE.filter(x=>x.ch===ci);return items.length?`<section class="gsec"><h3>Chapter ${ci+1}: ${esc(c.name)}</h3><div class="cards">${items.map(x=>`<article class="card panel"><h4>${esc(x.c)}</h4><p>${x.what}</p><div class="ex">${x.ex.map(([code,note],k)=>`<div class="exrow"><button class="excmd" data-ex="${GUIDE.indexOf(x)}.${k}" title="Copy this example"><pre>${esc(code)}</pre><span class="try">Copy</span></button>${note?`<small>${note}</small>`:''}</div>`).join('')}</div></article>`).join('')}</div></section>`:'';}).join('')}
+  ${CH.map((c,ci)=>section(`Chapter ${ci+1}: ${esc(c.name)}`,GUIDE.filter(x=>x.ch===ci&&!x.gl))).join('')}
+  ${section('Error glossary',GUIDE.filter(x=>x.gl))}
   <section class="gsec"><h3>Your progress</h3><div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px"><p class="explain">Your code is saved in this browser with the rest of your progress, and goes into the progress backup file too.</p>
    <div class="actions"><button class="linkbtn" id="resetProgress">Reset all progress</button></div></div></section>`;}
 let armProg=0;

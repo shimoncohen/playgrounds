@@ -8,7 +8,8 @@ const MAIN=(...body)=>L('fn main() {',...body.map(l=>'    '+l),'}');
 const FN=(head,...body)=>L(head+' {',...body.map(l=>'    '+l),'}');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
 const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
-const BOUND=(g,name)=>!!g&&g.tparams.some(t=>t.bounds.includes(name));
+const EACH=(c,why,...cases)=>{for(const [want,...swaps] of cases){const r=OTHER(c,want,why,...swaps);if(r!==true)return r;}return true;};
+const BOUND=(g,name)=>!!g&&(g.tparams.some(t=>t.bounds.includes(name))||g.impl.some(b=>!!b&&b.includes(name)));
 const FN_BOUND=g=>!!g&&(g.tparams.some(t=>t.bounds.includes('Fn'))||g.impl.some(b=>!!b&&b.includes('Fn')));
 
 const KIND=L('#[derive(Debug)]','enum Kind {','    Shell,','    Pearl,','    Weed,','}');
@@ -71,6 +72,7 @@ const DAY_OK=DAY('let mut finds: Vec<Find> = Vec::new();','for e in entries.iter
 const DAY_PROG=(...body)=>J(TYPES,FIND_IMPL,ERRS,KIND_OF,MAKE_OK,DAY_PRICED,TOTAL_PRICE,ENTRY,DAY(...body));
 const ENT=(n,w)=>'Entry { name: String::from("'+n+'"), weight: '+w+' }';
 const DAY_MAIN=J('',MAIN('let good = vec!['+ENT('shell',4)+', '+ENT('pearl',2)+'];','let bad = vec!['+ENT('shell',4)+', '+ENT('gem',1)+', '+ENT('weed',99)+'];','let empty: Vec<Entry> = Vec::new();','println!("{:?}", day_total(&good));','println!("{:?}", day_total(&bad));','println!("{:?}", day_total(&empty));'));
+const GOOD='let good = vec!['+ENT('shell',4)+', '+ENT('pearl',2)+'];',EMPTY='let empty: Vec<Entry> = Vec::new();';
 const DAY_OUT='Ok(24)\nErr(Unknown("gem"))\nOk(0)\n';
 
 RQ.CH.push({
@@ -130,14 +132,15 @@ RQ.CH.push({
       ],
       lazy:[
         {src:J(TYPES,FIND_IMPL,TOTAL('fn total(finds: &Vec<Find>) -> u32','finds.iter()'),MAIN(FINDS3,'println!("24");','println!("{}", finds.len());')),wrongWhy:'check'},
-        {src:J(TYPES,FIND_IMPL,TOTAL('fn total(finds: &Vec<Find>) -> u32','finds.iter()'),MAIN(FINDS3,'println!("{}", total(&finds));','println!("3");')),wrongWhy:'check'}
+        {src:J(TYPES,FIND_IMPL,TOTAL('fn total(finds: &Vec<Find>) -> u32','finds.iter()'),MAIN(FINDS3,'println!("{}", total(&finds));','println!("3");')),wrongWhy:'check'},
+        {src:J(TYPES,FIND_IMPL,FN('fn total(finds: &Vec<Find>) -> u32','finds[0].value() + finds[1].value() + finds[2].value()'),OWN_MAIN('&finds')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!==OWN_OUT)return 'The program has to print `24` and then `3`.';
         if(!c.paramIsRef('total',0,'shared'))return 'Make `total` borrow the `Vec` with `&Vec<Find>`, and lend `finds` at the call with `&finds`.';
         if(c.usesMethod('len')<1||c.calls('total')<1)return 'Keep calling `total` on `finds`, then asking `finds` for its `len`.';
-        return OTHER(c,'33\n3\n','`total` has to add up the finds in the `Vec`, so another weight has to show up.',['Find::new(Kind::Weed, 9)','Find::new(Kind::Shell, 9)']);
+        return EACH(c,'`total` has to add up the finds in the `Vec`, whatever their weights and however many there are.',['33\n3\n',['Find::new(Kind::Weed, 9)','Find::new(Kind::Shell, 9)']],['29\n4\n',[FINDS3,FINDS3.replace('Weed, 9)]','Weed, 9), Find::new(Kind::Shell, 5)]')]]);
       }
     },
     {
@@ -154,25 +157,32 @@ RQ.CH.push({
       harness:TALLY_MAIN,
       starter:TALLY_PROG('HashMap::new()'),
       answer:TALLY_PROG(...TALLY_BODY),
-      alts:[TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    let slot = sums.entry(f.label()).or_insert(0);','    *slot = *slot + f.weight;','}','sums')],
+      alts:[TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    let slot = sums.entry(f.label()).or_insert(0);','    *slot = *slot + f.weight;','}','sums'),
+        TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    let key = f.label();','    if sums.contains_key(&key) {','        let slot = sums.get_mut(&key).unwrap();','        *slot += f.weight;','    } else {','        sums.insert(key, f.weight);','    }','}','sums'),
+        TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    let key = f.label();','    match sums.get_mut(&key) {','        Some(n) => {','            *n += f.weight;','        }','        None => {','            sums.insert(key, f.weight);','        }','    }','}','sums'),
+        TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    let key = f.label();','    let old = match sums.get(&key) {','        Some(n) => *n,','        None => 0,','    };','    sums.insert(key, old + f.weight);','}','sums')],
       wrong:[
         {src:TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    *sums.entry(f.label()).or_insert(0) += 1;','}','sums'),wrongWhy:'check'},
         {src:TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    sums.insert(f.label(), f.weight);','}','sums'),wrongWhy:'check'}
       ],
       lazy:[
         {src:TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','sums.insert(String::from("Shell"), 10);','sums.insert(String::from("Pearl"), 2);','sums.insert(String::from("Weed"), 9);','sums'),wrongWhy:'check'},
+        {src:TALLY_PROG(...TALLY_BODY.slice(0,3),'}','sums.insert(String::from("Pearl"), 2);','sums.insert(String::from("Weed"), 9);','sums'),wrongWhy:'check'},
         {src:TALLY_PROG('let mut sums: HashMap<String, u32> = HashMap::new();','for f in finds.iter() {','    *sums.entry(f.label()).or_insert(0) += 0;','}','sums.insert(String::from("Shell"), 10);','sums.insert(String::from("Pearl"), 2);','sums.insert(String::from("Weed"), 9);','sums'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!==TALLY_OUT)return 'The program has to print `Some(10)`, `Some(2)`, `Some(9)` and `None`: the weight of each kind, and nothing for a kind with no finds.';
-        if(c.forOver('tally','finds')<1||c.onRecv('tally','entry.or_insert','sums')<1)return 'Loop over `finds` and add each weight with `sums.entry(...).or_insert(0)`.';
-        return OTHER(c,'Some(11)\nSome(2)\nSome(9)\nNone\n','`tally` has to add up the weights of the finds in the `Vec`, so another weight has to show up.',['Find::new(Kind::Shell, 6)','Find::new(Kind::Shell, 7)']);
+        const W=(k,w)=>'Find::new(Kind::'+k+', '+w+')';
+        return EACH(c,'`tally` has to add up the weights of the finds in the `Vec`, whatever the weights are, and give nothing for a kind that has no finds.',
+          ['Some(11)\nSome(5)\nSome(1)\nNone\n',[W('Shell',6),W('Shell',7)],[W('Pearl',2),W('Pearl',5)],[W('Weed',9),W('Weed',1)]],
+          ['Some(10)\nNone\nSome(4)\nNone\n',[W('Pearl',2)+', ',''],[W('Weed',9),W('Weed',4)]],
+          ['Some(4)\nSome(5)\nNone\nNone\n',[W('Shell',6)+', '+W('Weed',9),W('Pearl',3)]]);
       }
     },
     {
       title:'Send the error up with ?',kind:'fix',
-      goal:`The function <code>make_find</code> turns a name and a weight into a <code>Find</code>, or into a <code>LogError</code>. It stops with <code>E0308</code>, because <code>kind_of</code> gives back a <code>Result</code> and <code>Find::new</code> wants a <code>Kind</code>. Fix <code>make_find</code> so that <code>main</code> prints the three answers: <code>Ok(...)</code> for a pearl, then the error for an unknown name and the error for a find that is too heavy.`,
+      goal:`The function <code>make_find</code> turns a name and a weight into a <code>Find</code>, or into a <code>LogError</code>. It stops with <code>E0308</code>, because <code>kind_of</code> gives back a <code>Result</code> and <code>Find::new</code> wants a <code>Kind</code>. Fix <code>make_find</code> with <code>?</code> so that <code>main</code> prints the three answers: <code>Ok(...)</code> for a pearl, then the error for an unknown name and the error for a find that is too heavy.`,
       how:[
         `The whole program has two functions that can fail. <code>kind_of</code> reads the name and fails with <code>Unknown</code> when it is not shell, pearl or weed. <code>make_find</code> fails with <code>TooHeavy</code> above 50, calls <code>kind_of</code>, and builds the <code>Find</code>.`,
         `<code>let kind = kind_of(name);</code> puts the whole <code>Result</code> in <code>kind</code>, and then <code>Find::new(kind, weight)</code> is a <code>Result&lt;Kind, LogError&gt;</code> where a <code>Kind</code> should be. That is <code>E0308</code>, the mismatch from chapter 3, in a new place.`,
@@ -192,13 +202,16 @@ RQ.CH.push({
       ],
       lazy:[
         {src:J(TYPES,IMPL(NEW),ERRS,KIND_OF,MAKE('if name == "gem" {','    return Err(LogError::Unknown(name.to_string()));','}','Ok(Find::new(Kind::Pearl, weight))')),wrongWhy:'check'},
-        {src:J(TYPES,IMPL(NEW),ERRS,KIND_OF,MAKE('let kind = match kind_of(name) {','    Ok(k) => k,','    Err(e) => return Err(e),','};','Ok(Find::new(kind, weight))')),wrongWhy:'check'}
+        {src:J(TYPES,IMPL(NEW),ERRS,KIND_OF,MAKE('let kind = match kind_of(name) {','    Ok(k) => k,','    Err(e) => return Err(e),','};','Ok(Find::new(kind, weight))')),wrongWhy:'check'},
+        {src:J(TYPES,IMPL(NEW),ERRS,KIND_OF,MAKE('let kind = kind_of(name)?;','if weight == 0 {','    return Ok(Find::new(kind, 0));','}','Ok(Find::new(Kind::Pearl, weight))')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         if(c.out()!==MAKE_OUT)return 'The program has to print `Ok(Find { kind: Pearl, weight: 3 })`, `Err(Unknown("gem"))` and `Err(TooHeavy(80))`.';
         if(!c.tryOn('make_find','kind_of'))return 'Open the `Result` from `kind_of` with `?`, so an `Err` leaves `make_find` and an `Ok` gives the `Kind`.';
-        return OTHER(c,'Ok(Find { kind: Pearl, weight: 3 })\nErr(Unknown("coral"))\nErr(TooHeavy(80))\n','`make_find` has to pass on what `kind_of` says about the name, so another name has to show up.',['"gem"','"coral"']);
+        return EACH(c,'`make_find` has to build the `Find` from the name and the weight it is given, and pass on the errors.',
+          ['Ok(Find { kind: Shell, weight: 5 })\nErr(Unknown("coral"))\nErr(TooHeavy(60))\n',['"pearl", 3','"shell", 5'],['"gem"','"coral"'],['"weed", 80','"weed", 60']],
+          ['Ok(Find { kind: Weed, weight: 50 })\nErr(TooHeavy(51))\nErr(Unknown("gem"))\n',['"pearl", 3','"weed", 50'],['"gem", 3','"pearl", 51'],['"weed", 80','"gem", 9']]);
       }
     },
     {
@@ -222,14 +235,20 @@ RQ.CH.push({
       ],
       lazy:[
         {src:J(TYPES,IMPL(NEW),FN(`fn heaviest<'a>(finds: &'a Vec<Find>, floor: &'a Find) -> &'a Find`,'if finds.len() > 2 {','    &finds[2]','} else {','    floor','}')),wrongWhy:'check'},
-        {src:J(TYPES,IMPL(NEW),FN(`fn heaviest<'a>(finds: &'a Vec<Find>, floor: &'a Find) -> &'a Find`,'if floor.weight == 20 {','    floor','} else {','    &finds[2]','}')),wrongWhy:'check'}
+        {src:J(TYPES,IMPL(NEW),FN(`fn heaviest<'a>(finds: &'a Vec<Find>, floor: &'a Find) -> &'a Find`,'if floor.weight == 20 {','    floor','} else {','    &finds[2]','}')),wrongWhy:'check'},
+        {src:J(TYPES,IMPL(NEW),FN(`fn heaviest<'a>(finds: &'a Vec<Find>, floor: &'a Find) -> &'a Find`,'if floor.weight > 9 {','    floor','} else {','    &finds[2]','}')),wrongWhy:'check'},
+        {src:J(TYPES,IMPL(NEW),FN(`fn heaviest<'a>(finds: &'a Vec<Find>, floor: &'a Find) -> &'a Find`,'if floor.weight == 3 {','    &finds[2]','} else {','    floor','}')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
       check:c=>{
         const s=c.sigOf('heaviest');
         if(c.out()!==HEAVY_OUT)return 'The program has to print `Find { kind: Weed, weight: 9 }` and then `Find { kind: Pearl, weight: 20 }`.';
         if(!s||!s.lts.length||!SAME_LT(s))return 'Declare a lifetime name after `heaviest`, like `<\'a>`, and write it on both parameters and on the result.';
-        return OTHER(c,'Find { kind: Weed, weight: 9 }\nFind { kind: Shell, weight: 25 }\n','`heaviest` has to compare every find in the `Vec` with the best so far, whatever the weights are.',['Find::new(Kind::Pearl, 20)','Find::new(Kind::Shell, 25)']);
+        const W=(k,w)=>'Find::new(Kind::'+k+', '+w+')';
+        return EACH(c,'`heaviest` has to compare every find in the `Vec` with the best so far, whatever the weights are and wherever the heaviest one sits.',
+          ['Find { kind: Shell, weight: 15 }\nFind { kind: Pearl, weight: 30 }\n',[W('Shell',4),W('Shell',15)],[W('Weed',3),W('Weed',11)],[W('Pearl',20),W('Pearl',30)]],
+          ['Find { kind: Pearl, weight: 13 }\nFind { kind: Pearl, weight: 13 }\n',[W('Pearl',2),W('Pearl',13)],[W('Weed',3),W('Shell',8)],[W('Pearl',20),W('Weed',1)]],
+          ['Find { kind: Shell, weight: 40 }\nFind { kind: Pearl, weight: 20 }\n',[W('Weed',3),W('Shell',40)]]);
       }
     },
     {
@@ -246,13 +265,14 @@ RQ.CH.push({
       starter:PRICE_PROG(SUM_PRICE('fn total_price<T>(items: &Vec<T>) -> u32')),
       starterErr:'E0599',
       answer:PRICE_PROG(SUM_PRICE('fn total_price<T: Priced>(items: &Vec<T>) -> u32')),
-      alts:[PRICE_PROG(L('fn total_price<T>(items: &Vec<T>) -> u32','where','    T: Priced,','{','    let mut total = 0;','    for i in items.iter() {','        total += i.price();','    }','    total','}')),PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','items.iter().map(|i: &T| i.price()).sum()'))],
+      alts:[PRICE_PROG(SUM_PRICE('fn total_price(items: &Vec<impl Priced>) -> u32')),PRICE_PROG(L('fn total_price<T>(items: &Vec<T>) -> u32','where','    T: Priced,','{','    let mut total = 0;','    for i in items.iter() {','        total += i.price();','    }','    total','}')),PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','items.iter().map(|i: &T| i.price()).sum()'))],
       wrong:[
         {src:PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','items[0].price()')),wrongWhy:'check'},
         {src:PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','let mut total = 0;','for i in items.iter() {','    total += i.price() + 1;','}','total')),wrongWhy:'check'}
       ],
       lazy:[
         {src:PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','if items.len() == 3 {','    24','} else {','    12','}')),wrongWhy:'check'},
+        {src:PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','let mut total = 0;','for i in items.iter() {','    total += i.price();','}','if items.len() == 3 {','    24','} else {','    total','}')),wrongWhy:'check'},
         {src:PRICE_PROG(FN('fn total_price<T: Priced>(items: &Vec<T>) -> u32','let mut total = 0;','for i in items.iter() {','    total += 0 * i.price();','}','if items.len() == 3 {','    24 + total','} else {','    12 + total','}')),wrongWhy:'check'}
       ],
       defines:[],previews:[],
@@ -260,25 +280,28 @@ RQ.CH.push({
         if(c.out()!==PRICE_OUT)return 'The program has to print `24` and then `12`.';
         if(!BOUND(c.genericOf('total_price'),'Priced'))return 'Give `total_price` a type name with the bound `Priced`, like `<T: Priced>`.';
         if(c.methodIn('total_price','price')<1)return 'Ask every item for its `price()` inside `total_price`.';
-        return OTHER(c,'24\n22\n','`total_price` has to add up the price of every item, whatever it is, so another count has to show up.',['Crate { count: 5 }','Crate { count: 10 }']);
+        return EACH(c,'`total_price` has to add up the price of every item, whatever it is and however many there are.',
+          ['33\n22\n',['Find::new(Kind::Weed, 9)','Find::new(Kind::Shell, 9)'],['Crate { count: 5 }','Crate { count: 10 }']],
+          ['30\n26\n',[FINDS3,'let finds = vec![Find::new(Kind::Pearl, 3)];'],['Crate { count: 1 }]','Crate { count: 1 }, Crate { count: 7 }]']]);
       }
     },
     {
       title:'A rule as a closure',kind:'write',
-      goal:`Write <code>count_where</code>: it takes the ledger and a closure <code>rule</code> that says <code>true</code> or <code>false</code> for a find, and gives back how many finds the rule says <code>true</code> for. The hidden <code>main</code> should print <code>2</code> and then <code>1</code>.`,
+      goal:`Write <code>count_where</code> with an iterator chain and no loop: it takes the ledger and a closure <code>rule</code> that says <code>true</code> or <code>false</code> for a find, and gives back how many finds the rule says <code>true</code> for. The hidden <code>main</code> should print <code>2</code> and then <code>1</code>.`,
       how:[
         `The whole program has a ledger of three finds and calls <code>count_where</code> twice with two different rules: finds heavier than a <code>limit</code> variable, and finds worth more than <code>10</code>. The function does not know the rules. It only knows how to count the finds a rule accepts.`,
         `The parameter <code>rule: F</code> with the bound <code>F: Fn(&amp;Find) -&gt; bool</code> takes any closure that reads a find and answers with a <code>bool</code>. The first rule also uses <code>limit</code> from <code>main</code>, so it captures a variable, which <code>Fn</code> allows when the closure only reads.`,
-        `Chain it: <code>finds.iter().filter(|f| rule(*f)).count()</code>. <code>iter()</code> gives <code>&amp;Find</code> items, <code>filter</code> hands the closure a reference to each item, so <code>f</code> is a <code>&amp;&amp;Find</code>, and the <code>*</code> peels one level off before calling <code>rule</code>. <code>count</code> then says how many got through.`
+        `Chain it: <code>finds.iter().filter(|f| rule(*f)).count()</code>. <code>iter()</code> gives <code>&amp;Find</code> items, <code>filter</code> hands the closure a reference to each item, so <code>f</code> is a <code>&amp;&amp;Find</code>, and the <code>*</code> peels one level off before calling <code>rule</code>. Rust also peels it for you, so <code>rule(f)</code> works too. <code>count</code> then says how many got through.`
       ],
       explain:`Passing the rule in keeps the function small and reusable: the caller decides what counts, and the closure may use variables around it. This is the same idea as <code>sort_by_key</code> or <code>retain</code> in the standard library, which take a rule and apply it to a collection.`,
       hint:`Write <code>finds.iter().filter(|f| rule(*f)).count()</code> as the whole body.`,
       harness:COUNT_MAIN,
       starter:COUNT_PROG('0'),
       answer:COUNT_PROG('finds.iter().filter(|f| rule(*f)).count()'),
-      alts:[COUNT_PROG('finds.iter().map(|f| rule(f)).filter(|ok| *ok).count()')],
+      alts:[COUNT_PROG('finds.iter().map(|f| rule(f)).filter(|ok| *ok).count()'),COUNT_PROG('finds.iter().filter(|f| rule(f)).count()'),COUNT_PROG('finds.iter().fold(0, |n, f| if rule(f) { n + 1 } else { n })')],
       wrong:[
         {src:COUNT_PROG('finds.iter().filter(|f| !rule(*f)).count()'),wrongWhy:'check'},
+        {src:COUNT_PROG('finds.iter().take(3).filter(|f| rule(f)).count()'),wrongWhy:'check'},
         {src:COUNT_PROG('finds.iter().count()'),wrongWhy:'check'}
       ],
       lazy:[
@@ -289,14 +312,14 @@ RQ.CH.push({
       check:c=>{
         if(c.out()!=='2\n1\n')return 'The program has to print `2` and then `1`: the finds heavier than `limit`, and the finds worth more than `10`.';
         if(!FN_BOUND(c.genericOf('count_where')))return 'Keep `rule` as a closure bound, `F: Fn(&Find) -> bool`.';
-        if(c.usesMethod('filter')<1||c.usesMethod('count')<1||c.countIn('for','count_where')+c.countIn('while','count_where')+c.countIn('loop','count_where')>0)return 'Count with the chain `iter()`, `filter` and `count`, with no loop in `count_where`.';
+        if(c.usesMethod('iter')<1||c.countIn('for','count_where')+c.countIn('while','count_where')+c.countIn('loop','count_where')>0)return 'Count with an iterator chain that starts with `iter()`, like `filter` and `count`, and no loop in `count_where`.';
         if(!c.closures().some(x=>x.caps.length>0))return 'Keep the first rule in `main` as a closure that uses `limit`.';
-        return OTHER(c,'1\n0\n','`count_where` has to count the finds the rule accepts, so other weights have to show up.',...COUNT_SWAPS);
+        return EACH(c,'`count_where` has to count the finds the rule accepts, whatever the weights are and however many finds there are.',['1\n0\n',...COUNT_SWAPS],['3\n2\n',[FINDS3,FINDS3.replace('Weed, 9)]','Weed, 9), Find::new(Kind::Shell, 20)]')]]);
       }
     },
     {
       title:'Add up a whole day',kind:'write',
-      goal:`Everything is written except <code>day_total</code>. It takes a <code>Vec</code> of <code>Entry</code> notes (a name and a weight each), turns each into a <code>Find</code> with <code>make_find</code>, and gives back the total price of the finds with <code>total_price</code>. If any note fails, the whole day fails with that error. The hidden <code>main</code> should print <code>Ok(24)</code>, then <code>Err(Unknown("gem"))</code>, then <code>Ok(0)</code>.`,
+      goal:`Everything is written except <code>day_total</code>. It takes a <code>Vec</code> of <code>Entry</code> notes (a name and a weight each), turns each into a <code>Find</code> with <code>make_find</code> and <code>?</code>, and gives back the total price of the finds with <code>total_price</code>. If any note fails, the whole day fails with that error. The hidden <code>main</code> should print <code>Ok(24)</code>, then <code>Err(Unknown("gem"))</code>, then <code>Ok(0)</code>.`,
       how:[
         `The whole program turns a day of notes into one number, or into the first thing that went wrong. <code>day_total</code> has to borrow the notes, build a <code>Vec&lt;Find&gt;</code> from them one at a time, and hand that <code>Vec</code> to the generic <code>total_price</code> from the last missions.`,
         `Make the empty <code>Vec</code> first, <code>let mut finds: Vec&lt;Find&gt; = Vec::new();</code>, then loop with <code>for e in entries.iter()</code>. Each <code>e</code> is a borrow of an <code>Entry</code>, so <code>&amp;e.name</code> lends its text to <code>make_find</code> and <code>e.weight</code> is a plain number.`,
@@ -316,6 +339,9 @@ RQ.CH.push({
       lazy:[
         {src:DAY_PROG('if entries.len() == 0 {','    return Ok(0);','}','if entries.len() == 2 {','    return Ok(24);','}','Err(LogError::Unknown(String::from("gem")))'),wrongWhy:'check'},
         {src:DAY_PROG('let mut finds: Vec<Find> = Vec::new();','for e in entries.iter() {','    let find = match make_find(&e.name, e.weight) {','        Ok(f) => f,','        Err(err) => return Err(err),','    };','    finds.push(find);','}','Ok(total_price(&finds))'),wrongWhy:'check'},
+        {src:DAY_PROG('if entries.len() == 3 {','    return Err(LogError::Unknown(String::from("gem")));','}','let mut finds: Vec<Find> = Vec::new();','for e in entries.iter() {','    let find = make_find(&e.name, e.weight)?;','    finds.push(find);','}','Ok(total_price(&finds))'),wrongWhy:'check'},
+        {src:DAY_PROG('let mut finds: Vec<Find> = Vec::new();','for e in entries.iter().take(2) {','    let find = make_find(&e.name, e.weight)?;','    finds.push(find);','}','Ok(total_price(&finds))'),wrongWhy:'check'},
+        {src:DAY_PROG('if entries.len() < 2 {','    return Ok(0);','}','let mut finds: Vec<Find> = Vec::new();','for e in entries.iter() {','    let find = make_find(&e.name, e.weight)?;','    finds.push(find);','}','Ok(total_price(&finds))'),wrongWhy:'check'},
         {src:DAY_PROG('let mut finds: Vec<Find> = Vec::new();','for e in entries.iter() {','    let find = make_find(&e.name, e.weight)?;','    finds.push(find);','}','let mut sum = 0;','for f in finds.iter() {','    sum += f.value();','}','Ok(sum)'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
@@ -323,7 +349,9 @@ RQ.CH.push({
         if(c.out()!==DAY_OUT)return 'The program has to print `Ok(24)` for the good day, `Err(Unknown("gem"))` for the bad day, and `Ok(0)` for the empty day.';
         if(!c.tryOn('day_total','make_find'))return 'Open each `Result` from `make_find` with `?`, so the first bad note ends `day_total`.';
         if(c.callsIn('day_total','total_price')<1)return 'Finish with `total_price` on the finds you collected, so the price comes from the `Priced` trait.';
-        return OTHER(c,'Ok(44)\nErr(Unknown("gem"))\nOk(0)\n','`day_total` has to price the finds the notes make, so other notes have to show up.',['"pearl"), weight: 2','"pearl"), weight: 4']);
+        return EACH(c,'`day_total` has to price the finds the notes make and stop at the first bad note, whatever the notes are and however many there are.',
+          ['Ok(44)\nErr(Unknown("coral"))\nOk(0)\n',['"pearl"), weight: 2','"pearl"), weight: 4'],[ENT('gem',1),ENT('coral',1)]],
+          ['Ok(4)\nErr(TooHeavy(70))\nOk(3)\n',[GOOD,'let good = vec!['+ENT('weed',7)+', '+ENT('shell',3)+', '+ENT('shell',1)+'];'],[ENT('gem',1),ENT('weed',70)],[EMPTY,'let empty: Vec<Entry> = vec!['+ENT('shell',3)+'];']]);
       }
     }
   ]

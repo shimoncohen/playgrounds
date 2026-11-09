@@ -192,7 +192,7 @@ function context(d,ast,counts,src){
       if(!f)return null;
       const tparams=f.generics.filter(g=>g.kind==='ty').map(g=>({name:g.name,bounds:g.bounds.map(lastName)}));
       for(const w of f.where||[])if(w.ty&&w.ty.segs&&w.ty.segs.length===1){const t=tparams.find(x=>x.name===w.ty.segs[0].name);if(t)t.bounds.push(...w.bounds.map(lastName));}
-      const impl=t=>t.t==='ImplTrait'?t.bounds.map(lastName):t.t==='Ref'?impl(t.ty):null;
+      const impl=t=>t.t==='ImplTrait'?t.bounds.map(lastName):t.t==='Ref'?impl(t.ty):t.t==='Path'?(t.segs[t.segs.length-1].args||[]).map(impl).find(Boolean)||null:null;
       return {tparams,impl:f.params.map(p=>impl(p.ty))};
     },
     adtParams:name=>{

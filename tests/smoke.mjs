@@ -792,6 +792,19 @@ test('rust-quest: chapter 13 plays through: an unopened Result is E0308, a missi
   await ctx.close();
 });
 
+test('rust-quest: the field guide lists the error glossary in a section of its own, after the chapters', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-guide');
+  await page.waitForSelector('#guide .gsec');
+  const heads = await page.$$eval('#guide .gsec h3', hs => hs.map(h => h.textContent.trim()));
+  assert.equal(heads.filter(h => h.startsWith('Chapter')).length, 12, 'chapter 13 has no section of its own');
+  assert.deepEqual(heads.slice(-2), ['Error glossary', 'Your progress']);
+  assert.equal(await page.$$eval('#guide .gsec:nth-last-child(2) .card', cs => cs.length), 9);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

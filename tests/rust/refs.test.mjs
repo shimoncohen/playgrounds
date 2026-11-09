@@ -519,3 +519,15 @@ describe('the limit message', () => {
     assert.match(RQ.evalMission(m, 'fn main() {\n    loop {}\n}\n').result, /calling itself forever/);
   });
 });
+
+describe('a && reference passed where a & is wanted', () => {
+  const P = (call) => `struct Find {\n    weight: u32,\n}\nfn heavy(f: &Find) -> bool {\n    f.weight > 3\n}\nfn main() {\n    let v = vec![Find { weight: 4 }, Find { weight: 2 }];\n    println!("{}", ${call});\n}\n`;
+  it('is auto-dereferenced, as rustc does, in a function call and in a closure bound call', () => {
+    assert.equal(RQ.run(P('v.iter().filter(|f| heavy(f)).count()')).out(), '1\n');
+    const c = RQ.run('fn count_where<F: Fn(&Find) -> bool>(finds: &Vec<Find>, rule: F) -> usize {\n    finds.iter().filter(|f| rule(f)).count()\n}\nstruct Find {\n    weight: u32,\n}\nfn main() {\n    let v = vec![Find { weight: 4 }, Find { weight: 2 }];\n    println!("{}", count_where(&v, |f| f.weight > 3));\n}\n');
+    assert.equal(c.out(), '1\n');
+  });
+  it('does not hide a mismatch: a & to another type is still E0308', () => {
+    assert.equal(RQ.run(P('{ let n: u32 = 5; heavy(&n) }')).onlyError('E0308'), true);
+  });
+});

@@ -133,9 +133,15 @@ describe('extras', () => {
   it('every quest chapter has at least 6 quick-fire questions', () => {
     RQ.CH.forEach((_, ci) => assert.ok(RQ.QF.filter((q) => q.ch === ci).length >= 6, `chapter ${ci}`));
   });
-  it('the top rank is reachable: it needs no more XP than finishing every mission gives', () => {
+  it('a quick-fire question only calls methods that its chapter, or an earlier one, has taught', () => {
+    for (const q of RQ.QF) {
+      const taught = RQ.CH.slice(0, q.ch + 1).flatMap((c) => c.missions).map((m) => [m.goal, ...m.how, m.explain, m.hint, m.answer].join(' ')).join(' ');
+      for (const [, name] of q.c.matchAll(/\.([a-z_]+)\(/g)) assert.ok(taught.includes(`.${name}(`) || taught.includes(`<code>${name}</code>`), `${q.c}: ${name}`);
+    }
+  });
+  it('the top rank needs exactly the XP of finishing every mission', () => {
     const total = RQ.CH.reduce((n, c) => n + c.missions.length, 0) * RQ.XP;
-    assert.ok(RQ.RANKS.at(-1)[0] <= total, `${RQ.RANKS.at(-1)[0]} XP is more than the ${total} the course gives`);
+    assert.equal(RQ.RANKS.at(-1)[0], total);
   });
   it('the guide explains every new error and lint id and panics', () => {
     const text = RQ.GUIDE.map((g) => g.c + g.what).join(' ');
@@ -147,6 +153,9 @@ describe('the guide glossary', () => {
   const ids = Object.keys(RQ.diag.ERRORS);
   const idsIn = (t) => t.match(/\bE\d{4}\b|\b[a-z]+(?:_[a-z]+)+\b/g) || [];
   const entries = RQ.GUIDE.filter((g) => g.ch === RQ.CH.length - 1 && /^E\d{4}/.test(g.c));
+  it('the glossary entries are flagged, so the guide shows them in their own section', () => {
+    assert.deepEqual(RQ.GUIDE.filter((g) => g.gl).map((g) => g.c), entries.map((g) => g.c));
+  });
   it('every error id and lint name the engine can emit is named in the title of a guide entry', () => {
     for (const id of ids) assert.ok(RQ.GUIDE.some((g) => idsIn(g.c).includes(id)), `${id} has no field guide entry`);
   });
