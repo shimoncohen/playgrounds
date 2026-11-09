@@ -17,7 +17,8 @@ const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why ca
   ['Name the parts with a struct', 'Fields change only on a mut variable', 'Print a whole struct', 'A function that belongs to a type', 'A method that reads its struct', 'A method that changes its struct', 'A method that takes self'],
   ['Name the choices with an enum', 'A match must cover every variant', 'Variants that carry data', 'Option: a value that might be missing', 'Ranges and a last arm', 'A number match needs a last arm', 'A guard adds a test', 'Match a pair', 'if let: when only one case matters', 'while let: keep going until it runs out', 'let else: leave early', 'Take a pair apart with let'],
   ['A bucket that grows', 'A borrowed element blocks a push', 'Ask with get', 'Walk the bucket with for', 'for takes the bucket away', 'Change every shell in place', 'No pushing while you loop', 'Count with a HashMap', 'A HashMap keeps no order'],
-  ['A step that can fail', 'Open a Result with match', 'Trust it with expect', 'Pass the error up with ?', 'A Result is used up by ?', '? needs a Result to return', 'Name your errors with an enum', 'A missing value becomes an error', 'Let main report the error']];
+  ['A step that can fail', 'Open a Result with match', 'Trust it with expect', 'Pass the error up with ?', 'A Result is used up by ?', '? needs a Result to return', 'Name your errors with an enum', 'A missing value becomes an error', 'Let main report the error'],
+  ['Name the lifetime', 'The answer needs both inputs', 'Only label what the answer uses', 'A parameter without the label', 'A reference that lasts the whole run', 'A struct that holds a reference', 'Methods on a struct with a lifetime', 'A struct cannot outlive its text', 'A method result keeps the text borrowed']];
 const want = (m) => m.expect || 'ok';
 
 describe('chapter and mission ids are append only', () => {

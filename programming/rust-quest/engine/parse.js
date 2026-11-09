@@ -76,7 +76,7 @@ RQ.parse=tokens=>{
     if(!eatP('<'))return out;
     while(!isCloseAngle()){
       attrs();const x=T();
-      if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs});}
+      if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs,line:x.line,col:x.col});}
       else if(eatK('const')){const n=ident();expP(':');const t=ty();let d=null;if(eatP('='))d=unary(true);out.push({kind:'const',name:n.v,ty:t,default:d});}
       else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d});}
       if(!eatP(','))break;
@@ -131,7 +131,7 @@ RQ.parse=tokens=>{
   function ty(){
     const x=T();
     if(isP('&')||isP('&&')){
-      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;
+      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;if(lt==='_')lt=null;
       const mut=!!eatK('mut');let r=mk('Ref',x,{mut,lt,ty:ty()});
       if(dbl)r=mk('Ref',x,{mut:false,lt:null,ty:r});
       return r;

@@ -409,7 +409,7 @@ describe('the unsupported list, end to end through RQ.run', () => {
   };
   const sweepAll = (rows) => rows.forEach(([src, feature, line]) => sweep(src, feature, line));
   it('checker triggers', () => sweepAll([
-    [P("fn f(s: &'a str) {}", 'fn main() {', '}'), 'explicit lifetime', 1],
+    [P("fn f<'a>(s: &'a mut String) {}", 'fn main() {', '}'), 'explicit lifetime', 1],
     [P('fn f(x: &mut i32) -> &mut i32 {', '    x', '}', 'fn main() {', '}'), 'lifetime elision', 1],
     [SIMPLE('let x = 1;', 'let r = &x;', 'let rr = &r;'), 'reference to reference', 4],
     [SIMPLE('let mut s = String::new();', 'let r: &String = &mut s;'), 'reference coercion', 3],

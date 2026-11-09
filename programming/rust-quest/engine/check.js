@@ -50,7 +50,8 @@ RQ.check=ast=>{
   const unsup=(f,line)=>{const k=f+'@'+line;if(!seen.has(k)){seen.add(k);un.push({feature:f,line});}return T.any;};
   const syn=(line,col,msg)=>errors.push({line,col,msg});
   const fns=new Map(),consts=new Map(),itemNames=new Set(),structs=new Map(),enums=new Map(),drops=new Map(),methods=new Map();
-  let curSelf=null;
+  let curSelf=null,sigLts=null,selfLt=null;
+  const ltSeen=new Set();
   // lets that rebind a visible name, those whose value reads the old one, and every read of a local variable
   let shadows=0,shadowUses=0,varUses=0;
   const defined=it=>{
@@ -102,18 +103,36 @@ RQ.check=ast=>{
 
   // the type nodes inside a type node; every walker below goes through it so a new type form is handled in one place
   const kids=n=>n.t==='Ref'||n.t==='Array'||n.t==='Slice'?[n.ty]:n.t==='Tuple'?n.tys:n.t==='Path'?n.segs.flatMap(g=>(g.args||[]).filter(a=>a.t!=='Lifetime'&&a.t!=='Binding'&&a.t!=='Lit')):[];
-  // a reference type with no lifetime written: in a return type that needs lifetime elision (E0106/E0515)
-  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):kids(n).some(bareRef);
-  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):kids(n).map(firstBare).find(Boolean)||null;
-  const countRefs=n=>n.t==='Ref'?1+countRefs(n.ty):kids(n).reduce((a,x)=>a+countRefs(x),0);
+  // a struct written without its lifetime, or with `'_`, is an elided position like a `&` with none
+  const ltStruct=n=>n.t==='Path'&&n.segs.length===1&&!n.segs[0].fn&&structs.has(n.segs[0].name)&&structs.get(n.segs[0].name).node.generics.some(g=>g.kind==='lt');
+  const lifeArgs=n=>(n.segs[0].args||[]).filter(a=>a.t==='Lifetime');
+  const elidedPath=n=>ltStruct(n)&&lifeArgs(n).every(a=>a.name==='_');
+  const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):elidedPath(n)||kids(n).some(bareRef);
+  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):elidedPath(n)?lifeArgs(n)[0]||n:kids(n).map(firstBare).find(Boolean)||null;
+  const countRefs=n=>(n.t==='Ref'||ltStruct(n)?1:0)+(n.t==='Ref'?countRefs(n.ty):kids(n).reduce((a,x)=>a+countRefs(x),0));
+  const mentionsSelf=n=>n.t==='Path'&&n.segs.length===1&&n.segs[0].name==='Self'||kids(n).some(mentionsSelf);
+  // `Self` in an `impl<'a> Name<'a>` carries 'a, so it counts as a mention
+  const namesIn=(n,out=new Set())=>{
+    if(selfLt&&selfLt!=='_'&&n.t==='Path'&&n.segs.length===1&&n.segs[0].name==='Self'&&!n.segs[0].args)out.add(selfLt);
+    if(n.t==='Ref'&&n.lt)out.add(n.lt);
+    if(n.t==='Path')for(const g of n.segs)for(const a of g.args||[])if(a.t==='Lifetime'&&a.name!=='_')out.add(a.name);
+    kids(n).forEach(k=>namesIn(k,out));
+    return out;
+  };
+  // a named lifetime is modeled only in a signature or a struct field, and must be declared there (E0261)
+  function lifetimeOk(node,name){
+    if(!sigLts)return false;
+    if(!sigLts.has(name)&&!ltSeen.has(node)){ltSeen.add(node);errors.push(RQ.diag.make('E0261',node.line,node.col,{name}));}
+    return true;
+  }
   const hasMutRef=n=>n.t==='Ref'?n.mut||hasMutRef(n.ty):kids(n).some(hasMutRef);
   const optTy=t=>T.enum('Option',[t],STD_TRAITS,true),resTy=(t,e)=>T.enum('Result',[t,e],STD_TRAITS,true);
   const adtRec=n=>structs.get(n)||enums.get(n);
-  const adtTy=n=>{const r=structs.get(n);return r?T.struct(n,r.der):T.enum(n,[],enums.get(n).der);};
+  const adtTy=n=>{const r=structs.get(n);return r?T.struct(n,r.der,r.node.generics.length>0):T.enum(n,[],enums.get(n).der);};
   // a collection's loans are not tracked, so no element may be, or hold, a reference or a &str
   const holdsRef=t=>{
     t=res(t);
-    return t.k==='ref'||t.k==='str'||t.k==='tuple'&&t.els.some(holdsRef)||(t.k==='array'||t.k==='slice')&&holdsRef(t.el)||(t.k==='enum'||t.k==='coll')&&t.args.some(holdsRef);
+    return t.k==='ref'||t.k==='str'||t.k==='struct'&&t.lt||t.k==='tuple'&&t.els.some(holdsRef)||(t.k==='array'||t.k==='slice')&&holdsRef(t.el)||(t.k==='enum'||t.k==='coll')&&t.args.some(holdsRef);
   };
   // a type that is still open, so a trait cannot be judged yet; fl also counts a float literal, which is not Eq or Hash once it settles
   const isOpen=(t,fl)=>{
@@ -126,6 +145,12 @@ RQ.check=ast=>{
     if(n.t==='Path'&&n.segs.length===1&&!n.global&&!n.segs[0].fn){
       const sg=n.segs[0],s=sg.name;
       if(sg.args){
+        if(sg.args.length&&sg.args.every(a=>a.t==='Lifetime')){
+          if(!ltStruct(n)||sg.args.length!==1)return unsup(adtRec(s)?'generics':s,n.line);
+          const a=sg.args[0];
+          if(a.name==='static'||a.name!=='_'&&!lifetimeOk(a,a.name))return unsup('explicit lifetime',n.line);
+          return adtTy(s);
+        }
         if(COLL[s]&&!adtRec(s)){
           if(s==='HashMap'&&!mapUse||sg.args.length!==COLL[s]||kids(n).length!==sg.args.length)return unsup(s,n.line);
           const as=sg.args.map(a=>tyOf(a));
@@ -148,7 +173,8 @@ RQ.check=ast=>{
     if(n.t==='Ref'){
       const to=n.ty,isStr=to.t==='Path'&&to.segs.length===1&&!to.segs[0].args&&to.segs[0].name==='str';
       if(to.t==='Ref')return unsup('reference to reference',n.line);
-      if(n.lt&&!(top&&n.lt==='static'&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);
+      if(n.lt==='static'){if(!(top&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);}
+      else if(n.lt&&(n.mut||!lifetimeOk(n,n.lt)))return unsup('explicit lifetime',n.line);
       if(isStr)return n.mut?unsup('reference',n.line):T.str;
       if(to.t==='Slice'){const el=tyOf(to.ty);return n.mut?unsup('reference',n.line):mkRef(false,T.slice(el));}
       return mkRef(n.mut,tyOf(to));
@@ -187,22 +213,34 @@ RQ.check=ast=>{
   const BUILTIN=new Set(['String','bool','char','f64','str','Vec','Option','Result','Box','HashMap','Self']);
   const refNode=n=>n.t==='Ref'||kids(n).some(refNode);
   const fieldList=(kind,fs)=>kind==='tuple'?fs.map((t,i)=>({name:String(i),ty:t})):fs;
-  // a field that is a reference needs a lifetime, which is not modeled
-  function fieldsOk(kind,fs){
+  // a struct field may hold a shared reference (a lifetime is then needed); any other field with a reference in it is not modeled
+  const refField=t=>t.t==='Ref'&&!t.mut&&t.ty.t!=='Ref';
+  function fieldsOk(kind,fs,refs){
     const names=new Set();
     for(const f of fieldList(kind,fs)){
-      if(names.has(f.name)||refNode(f.ty))return false;
+      if(names.has(f.name)||refNode(f.ty)&&!(refs&&refField(f.ty)))return false;
       names.add(f.name);
     }
     return true;
   }
+  const ltParams=g=>g.length===1&&g[0].kind==='lt'&&!g[0].bounds.length;
   function structDecl(it){
     const rec=structs.get(it.name);
     if(rec.node!==it)return;
     if(derivesOf(it)===null){unsup('derive',it.line);return;}
-    if(it.generics.length||BUILTIN.has(it.name)||isInt(it.name)||!fieldsOk(it.kind,it.fields)){unsup('struct',it.line);return;}
+    if(it.generics.length&&!ltParams(it.generics)||BUILTIN.has(it.name)||isInt(it.name)||!fieldsOk(it.kind,it.fields,true)){unsup('struct',it.line);return;}
     rec.kind=it.kind;
-    rec.fields=fieldList(it.kind,it.fields).map(f=>({name:f.name,ty:tyOf(f.ty)}));
+    sigLts=new Set(it.generics.map(g=>g.name));
+    const fl=fieldList(it.kind,it.fields);
+    let bare=false;
+    rec.fields=fl.map(f=>{
+      const at=firstBare(f.ty);
+      if(at){bare=true;errors.push(RQ.diag.make('E0106',at.line,at.col,{field:true}));}
+      return {name:f.name,ty:tyOf(f.ty)};
+    });
+    // rustc reports the missing lifetime only
+    if(!bare)for(const g of it.generics)if(!fl.some(f=>namesIn(f.ty).has(g.name)))errors.push(RQ.diag.make('E0392',g.line,g.col,{name:g.name}));
+    sigLts=null;
   }
   function enumDecl(it){
     const rec=enums.get(it.name);
@@ -231,9 +269,10 @@ RQ.check=ast=>{
   }
 
   // from is the index, among the call's arguments (the receiver first), of the one the result borrows
-  function fnSig(it,owner){
-    const sp=it.selfParam;
-    if(it.generics.length)unsup('generics',it.line);
+  function fnSig(it,owner,implLts){
+    const sp=it.selfParam,own=it.generics.filter(g=>g.kind==='lt'&&!g.bounds.length);
+    if(own.length!==it.generics.length||new Set(own.map(g=>g.name)).size!==own.length||own.some(g=>implLts&&implLts.has(g.name)))unsup('generics',it.line);
+    sigLts=new Set([...(implLts||[]),...own.map(g=>g.name)]);
     if(sp&&sp.lt)unsup('explicit lifetime',sp.line);
     else if(sp&&sp.ty)unsup('method',sp.line);
     const names=new Set();
@@ -246,8 +285,21 @@ RQ.check=ast=>{
     });
     const ret=it.ret?tyOf(it.ret,true):T.unit;
     const sh=sp?1:0;
-    let from=-1;
-    if(it.ret&&bareRef(it.ret)){
+    let from=-1,more=[],reg=null;
+    const argTys=[...(sp?[null]:[]),...it.params.map(p=>p.ty)],named=it.ret?[...namesIn(it.ret)].filter(x=>x!=='static'):[];
+    // the `'_` of `impl Name<'_>` is a lifetime of its own, which `Self` would carry
+    if(selfLt==='_'&&[...argTys,it.ret].some(t=>t&&mentionsSelf(t)))unsup('explicit lifetime',it.line);
+    // the body may return only data from the parameters that mention the result's lifetime
+    if(named.length){
+      const a=named[0];
+      if(named.length>1||bareRef(it.ret)||hasMutRef(it.ret)||sp&&implLts&&implLts.has(a))unsup('explicit lifetime',it.ret.line);
+      else{
+        const ties=argTys.flatMap((t,k)=>t&&namesIn(t).has(a)?[k]:[]);
+        [from=-1,...more]=ties;
+        reg={ret:a,allowed:ties};
+      }
+    }
+    else if(it.ret&&bareRef(it.ret)){
       // a &self or &mut self result borrows from self; otherwise one lifetime position among the parameters is the one the result borrows, and none or several is E0106
       const refs=it.params.map(p=>countRefs(p.ty)),total=refs.reduce((a,x)=>a+x,0);
       const sharedOnly=!hasMutRef(it.ret)&&(it.ret.t==='Ref'||it.ret.t==='Path'&&kids(it.ret).every(k=>k.t==='Ref'&&k.lt===null));
@@ -257,23 +309,36 @@ RQ.check=ast=>{
         const q=it.params[refs.indexOf(1)];
         if(sharedOnly&&q.ty.t==='Ref'&&!q.ty.mut&&q.ty.lt===null)from=refs.indexOf(1)+sh;else unsup('lifetime elision',it.ret.line);
       }
+      if(from>=0)reg={ret:null,allowed:[from]};
     }
+    if(reg){
+      reg.plain=argTys.map(t=>!!t&&t.t==='Ref'&&t.lt===null&&!namesIn(t).size);
+      reg.names=[...(sp?['self']:[]),...params.map(p=>p.name)];
+    }
+    sigLts=null;
     const selfTy=sp&&owner?(sp.ref?mkRef(sp.mut,adtTy(owner)):adtTy(owner)):null;
-    return {params,ret,from,selfKind:sp?(sp.ref?(sp.mut?'&mut':'&'):'val'):null,selfTy,selfMut:!!sp&&!sp.ref&&sp.mut};
+    return {params,ret,from,more,reg,selfKind:sp?(sp.ref?(sp.mut?'&mut':'&'):'val'):null,selfTy,selfMut:!!sp&&!sp.ref&&sp.mut};
   }
   function implDecl(it){
-    const st=it.selfTy,name=one(st)?st.segs[0].name:'';
-    const ok=!it.trait&&!it.generics.length&&!it.attrs.length&&!!adtRec(name)&&it.items.every(x=>x.t==='Fn'&&!x.attrs.length);
+    const st=it.selfTy,seg=st.t==='Path'&&st.segs.length===1&&!st.global&&!st.segs[0].fn?st.segs[0]:null;
+    const lt=!!seg&&ltStruct(st),gs=it.generics;
+    const name=seg&&(!seg.args||lt&&seg.args.length===1&&seg.args[0].t==='Lifetime')?seg.name:'';
+    const ok=!it.trait&&(!gs.length||lt&&ltParams(gs))&&!it.attrs.length&&!!adtRec(name)&&it.items.every(x=>x.t==='Fn'&&!x.attrs.length);
     if(!ok){unsup('impl',it.line);return;}
+    const implLts=new Set(gs.map(g=>g.name));
+    if(lt&&!seg.args)errors.push(RQ.diag.make('E0726',st.line,st.col,{name}));
+    else if(lt){sigLts=implLts;const a=seg.args[0];if(a.name==='static')unsup('explicit lifetime',a.line);else if(a.name!=='_')lifetimeOk(a,a.name);sigLts=null;}
+    selfLt=lt&&seg.args?seg.args[0].name:null;
     curSelf=name;
     const mm=methods.get(name)||new Map();
     methods.set(name,mm);
     for(const f of it.items){
       if(mm.has(f.name)){unsup('impl',f.line);continue;}
       if(!f.body)syn(f.line,f.col,'associated function in `impl` without body');
-      mm.set(f.name,{node:f,owner:name,key:name+'::'+f.name,...fnSig(f,name)});
+      mm.set(f.name,{node:f,owner:name,key:name+'::'+f.name,...fnSig(f,name,implLts)});
     }
     curSelf=null;
+    selfLt=null;
   }
 
   const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
@@ -287,7 +352,7 @@ RQ.check=ast=>{
       if(it.selfParam)unsup('method',it.line);
       if(it.name==='main'&&sg.params.length)unsup('main signature',it.line);
       if(!it.body)syn(it.line,it.col,'free function without a body');
-      if(defined(it))fns.set(it.name,{node:it,params:sg.params,ret:sg.ret,from:sg.from});
+      if(defined(it))fns.set(it.name,{node:it,params:sg.params,ret:sg.ret,from:sg.from,more:sg.more,reg:sg.reg});
     }else if(it.t==='Const'){
       const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
@@ -708,7 +773,7 @@ RQ.check=ast=>{
     else adj=sk==='&'?'reb':'val';
     const p=peel(e.recv);
     if(sk==='&mut'&&guardRoot&&scrutRoot(p)===guardRoot){if(isRef)unsup('match guard',e.line);else guardBorrow(p,e.line,e.col);}
-    I(e).um={key:m.key,self:sk,adj,kind:isRef?(p.t==='Path'?'refvar':'temp'):placeChain(e.recv)?'place':'temp',ref:isRef,text,from:m.from};
+    I(e).um={key:m.key,self:sk,adj,kind:isRef?(p.t==='Path'?'refvar':'temp'):placeChain(e.recv)?'place':'temp',ref:isRef,text,from:m.from,more:m.more};
     // a &mut self method needs a mutable place: behind a shared reference, or through one to a field, it is E0596
     if(sk==='&mut'&&(isRef&&!r.mut||!isRef&&ch&&ch.via&&!ch.via.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:text,ref:true}));
     // a by-value self takes the value away from behind the reference, which only a Copy type allows
@@ -1097,7 +1162,10 @@ RQ.check=ast=>{
           if(!operands(ty,r,{rhs:e.rhs,line:e.line}))return T.unit;
           const bit=op==='&'||op==='|'||op==='^',c=cls(ty);
           if(!(c==='any'||(bit?['int','ivar'].includes(res(ty).k):c==='num')))unsup('type checking',e.line);
-        }else if(!unify(ty,r))return unsup('type checking',e.line);
+        }else if(!unify(ty,r)){
+          const w=res(ty),g=res(r);
+          return unsup(w.k==='str'&&g.k==='ref'&&!g.mut&&res(g.to).k==='String'?'assigned string reference':'type checking',e.line);
+        }
         return T.unit;
       }
       case 'Call':{
@@ -1144,7 +1212,7 @@ RQ.check=ast=>{
             const params=(m.selfTy?[m.selfTy]:[]).concat(m.params.map(q=>q.ty));
             if(ts.length!==params.length)return unsup('wrong argument count',e.line);
             ts.forEach((t,i)=>coerce(t,params[i],e.args[i]));
-            I(e).sig={params,ret:m.ret,from:m.from,key:m.key};
+            I(e).sig={params,ret:m.ret,from:m.from,more:m.more,key:m.key};
             return m.ret;
           }
           if(adtRec(owner)&&sg[1].name==='default'&&has(adtTy(owner),'Default')){
@@ -1168,7 +1236,7 @@ RQ.check=ast=>{
         if(!f)return unknown(n,e.callee);
         if(ts.length!==f.params.length)return unsup('wrong argument count',e.line);
         ts.forEach((t,i)=>coerce(t,f.params[i].ty,e.args[i]));
-        I(e).sig={params:f.params.map(p=>p.ty),ret:f.ret,from:f.from};
+        I(e).sig={params:f.params.map(p=>p.ty),ret:f.ret,from:f.from,more:f.more};
         return f.ret;
       }
       case 'Ref':{
@@ -1360,6 +1428,7 @@ RQ.check=ast=>{
   function fnBody(f){
     if(!f.node.body)return;
     scopes=[new Map()];curRet=f.ret;loops=[];
+    if(f.reg)I(f.node).reg=f.reg;
     if(f.node.name==='main'&&f.node.ret){
       const m=res(f.ret);
       if(!(m.k==='enum'&&m.builtin&&m.name==='Result'&&res(m.args[0]).k==='unit'&&!isOpen(m.args[1],false)&&has(m.args[1],'Debug')))unsup('main signature',f.node.line);

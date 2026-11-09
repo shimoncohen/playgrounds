@@ -80,9 +80,13 @@ RQ.features=src=>{
   const r=RQ.parse(RQ.lex(src)),tags=new Set();
   if(!r.ast)return tags;
   let hasLet=false;
+  const generics=n=>{
+    if(n.generics.some(g=>g.kind==='lt'))tags.add('lifetime-param');
+    if(n.generics.some(g=>g.kind!=='lt'))tags.add('generic-decl');
+  };
   RQ.walk(r.ast,n=>{
     switch(n.t){
-      case 'Fn':tags.add(n.name==='main'?'fn-main':'fn-decl');if(n.params.length)tags.add('fn-params');if(n.ret)tags.add('fn-ret');if(n.generics.length)tags.add('generic-decl');break;
+      case 'Fn':tags.add(n.name==='main'?'fn-main':'fn-decl');if(n.params.length)tags.add('fn-params');if(n.ret)tags.add('fn-ret');generics(n);break;
       case 'Macro':tags.add('macro');if(PRINTS.includes(n.name))tags.add('println');
         if(n.args&&n.args[0]&&n.args[0].kind==='str')for(const p of RQ.std.parseFormat(n.args[0].v).parts){if(p.lit!==undefined)continue;tags.add(p.name!==undefined?'inline-hole':'hole');}
         break;
@@ -94,9 +98,9 @@ RQ.features=src=>{
       case 'Call':if(n.callee.t==='Path'&&n.callee.segs.length>1)tags.add('path-call');break;
       case 'MethodCall':tags.add('method-call');break;
       case 'Closure':tags.add('closure');break;
-      case 'Struct':tags.add('struct');if(n.attrs.some(a=>/^derive\b/.test(a)))tags.add('derive');break;
-      case 'Enum':tags.add('enum');if(n.attrs.some(a=>/^derive\b/.test(a)))tags.add('derive');break;
-      case 'Impl':tags.add(n.trait?'trait-impl':'impl');break;
+      case 'Struct':tags.add('struct');generics(n);if(n.attrs.some(a=>/^derive\b/.test(a)))tags.add('derive');break;
+      case 'Enum':tags.add('enum');generics(n);if(n.attrs.some(a=>/^derive\b/.test(a)))tags.add('derive');break;
+      case 'Impl':tags.add(n.trait?'trait-impl':'impl');generics(n);break;
       case 'Trait':tags.add('trait-decl');break;
       case 'Match':tags.add({iflet:'if-let',whilelet:'while-let',letelse:'let-else',let:'destructure'}[n.kind]||'match');break;
       case 'If':case 'LetCond':tags.add('if');break;
@@ -108,7 +112,7 @@ RQ.features=src=>{
       case 'Index':tags.add('index');break;
       case 'Try':tags.add('try');break;
       case 'Field':tags.add('field');break;
-      case 'Path':if(n.segs.some(s=>s.args))tags.add('type-args');break;
+      case 'Path':if(n.segs.some(s=>s.args&&s.args.some(a=>a.t!=='Lifetime')))tags.add('type-args');break;
     }
   });
   if(hasLet&&RQ.check(r.ast).shadows)tags.add('shadow');
@@ -164,6 +168,25 @@ function context(d,ast,counts,src){
     paramIsRef:(fn,i,kind)=>{
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];
       return !!p&&p.ty.t==='Ref'&&(kind==='mut'?p.ty.mut:kind==='shared'?!p.ty.mut:true);
+    },
+    // the lifetime written on each `&` parameter and on the result: a name, null for none, undefined where the type is not a `&`
+    sigOf:fn=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),lt=t=>t&&t.t==='Ref'?t.lt:undefined;
+      return f?{lts:f.generics.filter(g=>g.kind==='lt').map(g=>g.name),params:f.params.map(p=>lt(p.ty)),ret:lt(f.ret)}:null;
+    },
+    structLt:name=>{
+      const s=ast&&ast.items.find(x=>x.t==='Struct'&&x.name===name);
+      return s?{lts:s.generics.filter(g=>g.kind==='lt').map(g=>g.name),fields:s.fields.map(f=>f.ty&&f.ty.t==='Ref'?f.ty.lt:undefined)}:null;
+    },
+    implLt:name=>{
+      const m=ast&&ast.items.find(x=>x.t==='Impl'&&!x.trait&&x.selfTy.t==='Path'&&x.selfTy.segs[0].name===name),a=m&&(m.selfTy.segs[0].args||[]).find(g=>g.t==='Lifetime');
+      return m?{lts:m.generics.filter(g=>g.kind==='lt').map(g=>g.name),arg:a?a.name:null}:null;
+    },
+    // struct literals of `name` that give a field a borrow of something
+    borrowInit:name=>{
+      let n=0;
+      if(ast)RQ.walk(ast,m=>{if(m.t==='StructLit'&&m.path.segs[m.path.segs.length-1].name===name)n+=m.fields.filter(f=>f.expr&&peelP(f.expr).t==='Ref').length;});
+      return n;
     },
     usesParam:(fn,i)=>{
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),p=f&&f.params[i];

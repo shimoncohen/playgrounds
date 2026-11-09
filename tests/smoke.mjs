@@ -680,6 +680,31 @@ test('rust-quest: chapter 9 plays through: a used-up Result is E0382, ? in a pla
   await ctx.close();
 });
 
+test('rust-quest: chapter 10 plays through: a struct that outlives its text is E0597, a struct holding a reference draws an arrow to the text, and a missing lifetime is E0726', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="9"]');
+  await page.click('#mission .dot[data-mi="7"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0597[\s\S]*words does not live long enough/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0726[\s\S]*implicit elided lifetime not allowed here/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 3);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("note"))'), /text/);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("words"))'), /borrowed/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

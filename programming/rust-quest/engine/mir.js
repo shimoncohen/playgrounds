@@ -13,7 +13,7 @@
        dead   {l}             StorageDead of a named local, in reverse declaration order. Temps get none.
        branch {x}             the block has two succ: then, else (loop body, loop exit)
        return {x}             x is null for a unit fn
-     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args,from} | {k:'method',name,recv,args} | {k:'op',args}
+     rv     {k:'use',x} | {k:'const'} | {k:'ref',l,mut,implicit?} | {k:'call',fn,args,from,more} | {k:'method',name,recv,args} | {k:'op',args}
             | {k:'agg',args} | {k:'deref',x} | {k:'macro',name,args} | {k:'peek',x} (a match reads its scrutinee without moving it).
             A call to a method has the receiver as its first argument; `ref` of a path borrows just that field.  `ref` borrows the local l (`&l[a..b]` of an owned l too); from is the argument index a returned reference borrows from, or -1; a method call on an owned String
             gets a ref temp as recv, and `as_str` on it carries that ref in its result.
@@ -34,7 +34,7 @@ const hasUserDrop=ast=>!!ast&&ast.items.some(i=>i.t==='Fn'&&i.name==='drop');
 function analysed(fn,info,ast){
   const {isCopy,hasRef}=RQ.types;
   const userDrop=hasUserDrop(ast);
-  let hit=false;
+  let hit=!!(info.get(fn)&&info.get(fn).reg);
   RQ.walk(fn,n=>{
     if(hit)return false;
     if(n.t==='Ref'&&n.expr||n.t==='Deref'||n.t==='MethodCall'||n.t==='Let'&&!n.init)hit=true;
@@ -54,6 +54,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   const L=[],B=[],lm=new Map(),scopes=[],loops=[];
   let cur,count=0,retL;
   const tyOf=e=>{const o=info.get(e);return res(o&&o.ty||T.any);};
+  const carries=t=>RQ.types.hasRef(t)||t.k==='str';
   const isUnit=t=>t.k==='unit'||t.k==='never';
   const isBool=e=>{e=peel(e);return e.t==='Lit'&&e.kind==='bool';};
   const local=(name,ty,o)=>{
@@ -241,8 +242,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       if(c.k==='via')err('E0507',e,{name:chainText(e),mut:L[c.l].ty.mut});else un('partial move',e);
       return fin(NIL,e,dest);
     }
-    // a number read through a reference carries none of the reference's loans, but it still uses the reference
-    if(c.k==='via'&&!RQ.types.hasRef(tyOf(e))){emit('eval',e,{rv:{k:'peek',x:{k:'copy',l:c.l}}});return fin(NIL,e,dest);}
+    // a number read through a reference carries none of the reference's loans, but it still uses the reference; a `&str` field keeps them
+    if(c.k==='via'&&!carries(tyOf(e))){emit('eval',e,{rv:{k:'peek',x:{k:'copy',l:c.l}}});return fin(NIL,e,dest);}
     const r=rootOf(e);
     let base;
     if(r.l>=0)base={k:'copy',l:r.l};
@@ -327,7 +328,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       if(early)rest=early;
       else{rebTwice(e.args,e);rest=seq(e.args,stdArgs(u));}
     }
-    return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,method:true},e,dest,tyOf(e));
+    return put({k:'call',fn:u.key,args:[ro,...rest],from:u.from,more:u.more||[],method:true},e,dest,tyOf(e));
   }
 
   function method(e,dest){
@@ -472,7 +473,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       const bindAll=peek=>binds.forEach((sp,k)=>{
         const o=info.get(sp);
         let x;
-        if(o.bmode==='ref'||viaRef&&RQ.types.hasRef(o.ty))x=opnd(root);
+        if(o.bmode==='ref'||viaRef&&carries(o.ty))x=opnd(root);
         else if(viaRef)x=NIL;
         else{const l=o.bpath.reduce((b,q)=>pathLocal(b,q.sel,q.ty),root);x=peek?{k:'copy',l}:opnd(l);}
         emit('assign',sp,{l:ids[k],rv:{k:'use',x},grp:e.id});
@@ -668,7 +669,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         if((info.get(e)||{}).ctor)return put({k:'agg',args:seq(e.args,ex)},e,dest,tyOf(e));
         rebTwice(e.args,e);
         const sig=(info.get(e)||{}).sig;
-        return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1},e,dest,tyOf(e));
+        return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1,more:sig&&sig.more||[]},e,dest,tyOf(e));
       }
       case 'MethodCall':return method(e,dest);
       case 'Ref':{
@@ -763,11 +764,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     }
   }
 
+  const pl=[];
   try{
     cur=blk();
     scopes.push([]);
-    if(f.selfParam&&info.get(f.selfParam)&&info.get(f.selfParam).bind)declare(f.selfParam,f,false,info.get(f.selfParam).ty,true);
-    for(const p of f.params)if(p.pat.t==='IdentPat'&&info.get(p.pat)&&info.get(p.pat).bind)declare(p.pat,f,false,info.get(p.pat).ty,true);
+    const bound=p=>info.get(p)&&info.get(p).bind;
+    if(f.selfParam)pl.push(bound(f.selfParam)?declare(f.selfParam,f,false,info.get(f.selfParam).ty,true):undefined);
+    for(const p of f.params)pl.push(p.pat.t==='IdentPat'&&bound(p.pat)?declare(p.pat,f,false,info.get(p.pat).ty,true):undefined);
     const tl=f.body.tail,tt=tl&&tyOf(tl);
     blockEx(f.body,tl&&!isUnit(tt)?retDest(tt):undefined);
     kill(scopes.pop(),f);
@@ -780,7 +783,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   const seen=new Set([0]),st=[0];
   while(st.length)for(const s of B[st.pop()].succ)if(!seen.has(s)){seen.add(s);st.push(s);}
   for(const b of B)b.unreachable=!seen.has(b.id);
-  return {name:fname||f.name,ast:f.id,line:f.line,locals:L,blocks:B};
+  return {name:fname||f.name,ast:f.id,line:f.line,locals:L,blocks:B,pl,reg:(info.get(f)||{}).reg};
 }
 
 RQ.mir=(ast,info)=>{

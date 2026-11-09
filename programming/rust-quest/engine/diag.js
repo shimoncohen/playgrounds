@@ -106,9 +106,30 @@ const ERRORS={
     msg:o=>'`'+o.name+'` does not live long enough',
     tip:'A variable disappears at the end of the block that declares it, and a borrow of it cannot outlast that. Declare the variable in the outer block, or use the borrow before the block ends.'
   },
+  E0261:{
+    title:'a lifetime name was never declared',
+    msg:o=>'use of undeclared lifetime name `\''+o.name+'`',
+    tip:'A lifetime name has to be declared before it is used, in angle brackets after the name: `fn longest<\'a>(...)`, `struct Excerpt<\'a>` or `impl<\'a> Excerpt<\'a>`.'
+  },
+  E0621:{
+    title:'a parameter needs a lifetime name to be returned',
+    msg:o=>'explicit lifetime required in the type of `'+o.name+'`',
+    tip:'The function promises to return data that lives as long as a named lifetime, but this parameter was written without it, so Rust cannot promise that. Give the parameter the same lifetime name, like `y: &\'a str`.'
+  },
+  E0392:{
+    title:'a lifetime is declared but never used',
+    msg:o=>'lifetime parameter `\''+o.name+'` is never used',
+    tip:'A `struct` that declares a lifetime has to use it on a field, like `text: &\'a str`. If nothing in the `struct` borrows, remove the lifetime.'
+  },
+  E0726:{
+    title:'an `impl` for a struct with a lifetime leaves it out',
+    msg:()=>'implicit elided lifetime not allowed here',
+    tip:'A `struct` with a lifetime parameter needs it written in its `impl`: declare it with `impl<\'a> Name<\'a>`, or write `impl Name<\'_>` when the body never names it.'
+  },
   E0106:{
     title:'a returned reference has no lifetime to borrow from',
     msg:()=>'missing lifetime specifier',
+    tipFor:o=>o.field?'A `struct` that holds a reference has to say how long the reference must stay valid. Declare a lifetime on the struct, `struct Excerpt<\'a>`, and use it on the field: `part: &\'a str`.':'',
     tip:'A function that returns a reference has to say whose data it points at. With exactly one reference parameter Rust knows, but with none or with several it cannot guess. Return an owned value, like a `String`, instead.'
   },
   E0515:{
@@ -212,8 +233,9 @@ const HINTS={
   'slice of non-ASCII text':'Slicing text with accented letters, emoji or other non-English characters is not modeled, because one letter can take several bytes. Use plain English letters for now.',
   reference:'Only `&T` and `&mut T` on a `String` or a number are modeled, `&str` for text, and `&[T]` for a slice. Use one of those, or pass the value itself.',
   dereference:'`*` works on a reference, like `*r` where `r` is a `&i32` or `&mut i32`. This value is not a reference.',
-  'explicit lifetime':'Lifetime names like `\'a` are not modeled. Write `&T` and let Rust work the lifetime out, or return `&\'static str` from a `fn` for a string literal. `&\'static str` is modeled only as the return type of a `fn`.',
-  'lifetime elision':'A function that returns a reference is modeled only as `-> &T` with exactly one `&` (not `&mut`) parameter. Otherwise return an owned value, like a `String`.',
+  'explicit lifetime':'Lifetime names are modeled only as `&\'a T` (not `&\'a mut T`) on a `fn` or a `struct` field, with one lifetime in the result, and a method result tied to a lifetime of the `impl` is not modeled. Write `&T` and let Rust work the lifetime out, or return `&\'static str` from a `fn` for a string literal. `&\'static str` is modeled only as the return type of a `fn`.',
+  'lifetime elision':'A function that returns a reference is modeled only as `-> &T` with exactly one `&` (not `&mut`) parameter, or `&self`, and no lifetime names on the parameters. Otherwise name the lifetime, like `-> &\'a T`, or return an owned value, like a `String`.',
+  'lifetime mismatch':'This function returns data from a parameter whose lifetime is not the one the result promises. Rust stops it with an error that has no code (`lifetime may not live long enough`), which the quest does not model. Give that parameter the result\'s lifetime, or return something else.',
   'reference coercion':'Rust Quest only converts a `&String` into a `&str` for you. Pass the same kind of reference the function asks for.',
   'reference to reference':'A reference to a reference, like `&&str` or `&t` where `t` is already a `&str`, is not modeled. Pass `t` itself instead.',
   reborrow:'Reborrowing a `&mut`, like `&*r`, borrowing a field behind a `&mut`, like `&mut self.items`, or calling `as_str` on a `&mut String`, is not modeled. Use the `&mut` variable directly instead.',
@@ -233,6 +255,7 @@ const HINTS={
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
   'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
   'assignment target':'Assign to a variable, a field, or an element of a `Vec` you own or hold by `&mut`, like `v[0] = 1`.',
+  'assigned string reference':'Assigning a `&String` to a `&str` place is not modeled. Write `&b[..]` or `b.as_str()` instead of `&b`.',
   'type checking':'Rust Quest cannot tell yet whether these types fit together. Keep each value to one type for now.',
   'const initializer':'A `const` can only hold a literal, or simple maths on other constants, for now.',
   'integer overflow':'Dividing the smallest number of a type by `-1` overflows. Rust Quest does not model that case; use another divisor.',
