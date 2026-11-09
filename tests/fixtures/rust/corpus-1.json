@@ -5561,5 +5561,89 @@
     "src": "#[derive(Debug)]\nstruct W<T> {\n    v: T,\n}\nfn main() {\n    let w = W { v: String::from(\"a\") };\n    let c = w;\n    println!(\"{:?} {:?}\", w, c);\n}\n",
     "expect": { "code": "E0382", "line": 8 }, "pair": "generic-move-ok",
     "why": "a W<String> moves, so using it afterwards is E0382", "pr": "P13"
+  },
+  {
+    "id": "drop-no-copy-ok",
+    "src": "#[derive(Clone)]\nstruct D;\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let _d = D;\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "end\ndrop\n", "err": "", "exit": 0,
+    "why": "a type with Drop and no Copy", "pr": "P13"
+  },
+  {
+    "id": "drop-with-copy",
+    "src": "#[derive(Clone, Copy)]\nstruct D;\nimpl Drop for D {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let _d = D;\n    println!(\"end\");\n}\n",
+    "expect": { "code": "E0184", "line": 2 }, "pair": "drop-no-copy-ok",
+    "why": "Copy on a type with a destructor is E0184", "pr": "P13"
+  },
+  {
+    "id": "impl-trait-ok",
+    "src": "trait A {}\nstruct B;\nimpl A for B {}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named after impl", "pr": "P13"
+  },
+  {
+    "id": "impl-struct-as-trait",
+    "src": "struct A {}\nstruct B;\nimpl A for B {}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 3 }, "pair": "impl-trait-ok",
+    "why": "a struct after impl is E0404, not E0405", "pr": "P13"
+  },
+  {
+    "id": "bound-trait-ok",
+    "src": "trait A {}\nfn show<T: A>(_t: T) {}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named in a bound", "pr": "P13"
+  },
+  {
+    "id": "bound-struct-as-trait",
+    "src": "struct A {}\nfn show<T: A>(_t: T) {}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 2 }, "pair": "bound-trait-ok",
+    "why": "a struct as a bound is E0404", "pr": "P13"
+  },
+  {
+    "id": "where-trait-ok",
+    "src": "trait A {}\nfn show<T>(_t: T)\nwhere\n    T: A,\n{\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait named in a where clause", "pr": "P13"
+  },
+  {
+    "id": "where-struct-as-trait",
+    "src": "struct A {}\nfn show<T>(_t: T)\nwhere\n    T: A,\n{\n}\nfn main() {}\n",
+    "expect": { "code": "E0404", "line": 4 }, "pair": "where-trait-ok",
+    "why": "a struct in a where clause is E0404", "pr": "P13"
+  },
+  {
+    "id": "from-other-type-ok",
+    "src": "struct A;\nstruct B;\nimpl From<A> for B {\n    fn from(_a: A) -> B {\n        B\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": "ok", "out": "ok\n", "err": "", "exit": 0,
+    "why": "From another type is fine", "pr": "P13"
+  },
+  {
+    "id": "from-self",
+    "src": "struct A;\nstruct B;\nimpl From<A> for A {\n    fn from(a: A) -> A {\n        a\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": { "code": "E0119", "line": 3 }, "pair": "from-other-type-ok",
+    "why": "From<A> for A clashes with the blanket From<T> for T", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-private-ok",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct A;\nimpl T for A {\n    fn f(&self) -> i32 {\n        7\n    }\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait impl method carries no pub", "pr": "P13"
+  },
+  {
+    "id": "trait-impl-pub-fn",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nstruct A;\nimpl T for A {\n    pub fn f(&self) -> i32 {\n        7\n    }\n}\nfn main() {}\n",
+    "expect": { "code": "E0449", "line": 6 }, "pair": "trait-impl-private-ok",
+    "why": "pub on a trait impl method is E0449", "pr": "P13"
+  },
+  {
+    "id": "trait-item-private-ok",
+    "src": "trait T {\n    fn f(&self) -> i32;\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a trait method carries no pub", "pr": "P13"
+  },
+  {
+    "id": "trait-item-pub-fn",
+    "src": "trait T {\n    pub fn f(&self) -> i32;\n}\nfn main() {}\n",
+    "expect": { "code": "E0449", "line": 2 }, "pair": "trait-item-private-ok",
+    "why": "pub on a trait method is E0449", "pr": "P13"
   }
 ]

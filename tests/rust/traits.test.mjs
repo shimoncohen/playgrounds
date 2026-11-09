@@ -195,3 +195,37 @@ describe('a reference that could end up stored is not followed through a generic
     assert.equal(run(P('use std::fmt::Display;', 'fn show<T: Display>(x: T) { println!("{}", x); }', 'fn main() {', '    let mut s = String::from("a");', '    show(&s);', '    s.push_str("b");', '    show(&s);', '}')).stdout, 'a\nab\n');
   });
 });
+
+describe('names that resolve to the wrong kind, and conflicts with derives and std', () => {
+  it('Copy on a type with Drop is E0184 at the type', () => {
+    assert.equal(rejects(P('#[derive(Clone, Copy)]', 'struct D;', 'impl Drop for D { fn drop(&mut self) {} }', 'fn main() {}')), 'E0184@2');
+    run(P('#[derive(Clone)]', 'struct D;', 'impl Drop for D { fn drop(&mut self) {} }', 'fn main() {}'));
+  });
+  it('Type::default() on a generic type with a derived Default is unsupported, not judged', () => {
+    assert.equal(feature(P('#[derive(Default, Debug)]', 'struct W<T> { v: T }', 'fn main() {', '    let w: W<i32> = W::default();', '    println!("{:?}", w);', '}')), 'derive@4');
+    assert.equal(run(P('#[derive(Default, Debug)]', 'struct W { v: i32 }', 'fn main() {', '    println!("{:?}", W::default());', '}')).stdout, 'W { v: 0 }\n');
+  });
+  it('a struct, enum, builtin type, type parameter, fn or module after impl or in a bound is E0404', () => {
+    assert.equal(rejects(P('struct A;', 'struct B;', 'impl A for B {}', 'fn main() {}')), 'E0404@3');
+    assert.equal(rejects(P('enum A { X }', 'fn f<T: A>(_x: T) {}', 'fn main() {}')), 'E0404@2');
+    assert.equal(rejects(P('struct A;', 'fn f<T>(_x: T)', 'where', '    T: A,', '{}', 'fn main() {}')), 'E0404@4');
+    assert.equal(rejects(P('struct B;', 'impl String for B {}', 'fn main() {}')), 'E0404@2');
+    assert.equal(rejects(P('fn f<T, U: T>(_x: U) {}', 'fn main() {}')), 'E0404@1');
+    assert.equal(rejects(P('fn f<U: i32>(_x: U) {}', 'fn main() {}')), 'E0404@1');
+    assert.equal(rejects(P('struct B;', 'fn ff() {}', 'impl ff for B {}', 'fn main() {}')), 'E0404@3');
+    assert.equal(rejects(P('struct B;', 'impl Nope for B {}', 'fn main() {}')), 'E0405@2');
+  });
+  it('From<T> for T clashes with the blanket impl, From<A> for B does not', () => {
+    assert.equal(rejects(P('struct A;', 'impl From<A> for A { fn from(a: A) -> A { a } }', 'fn main() {}')), 'E0119@2');
+    assert.equal(rejects(P('enum A { X }', 'impl From<A> for A { fn from(a: A) -> A { a } }', 'fn main() {}')), 'E0119@2');
+    run(P('struct A;', 'struct B;', 'impl From<A> for B { fn from(_a: A) -> B { B } }', 'fn main() { let _b = B::from(A); }'));
+  });
+  it('pub inside a trait, a trait impl or on an impl is E0449', () => {
+    assert.equal(rejects(P('trait T { fn f(&self); }', 'struct A;', 'impl T for A {', '    pub fn f(&self) {}', '}', 'fn main() {}')), 'E0449@4');
+    assert.equal(rejects(P('trait T {', '    pub fn f(&self);', '}', 'fn main() {}')), 'E0449@2');
+    assert.equal(rejects(P('struct A;', 'impl From<i32> for A {', '    pub fn from(_n: i32) -> A { A }', '}', 'fn main() {}')), 'E0449@3');
+    assert.equal(rejects(P('struct B;', 'pub impl B {}', 'fn main() {}')), 'E0449@2');
+    assert.equal(rejects(P('enum E {', '    pub X,', '}', 'fn main() {}')), 'E0449@2');
+    run(P('struct B;', 'impl B { pub fn f(&self) {} }', 'fn main() { B.f(); }'));
+  });
+});

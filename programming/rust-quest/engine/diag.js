@@ -67,6 +67,21 @@ const ERRORS={
     msg:o=>'cannot find trait `'+o.name+'` in this scope',
     tip:'Check the spelling, and that the trait is declared with `trait '+'Name { .. }` in this file. `Debug` and `Display` need `use std::fmt::Debug;` or `use std::fmt::Display;` first.'
   },
+  E0404:{
+    title:'that name is not a trait',
+    msg:o=>o.kind?'expected trait, found '+o.kind+' `'+o.name+'`':'cannot find trait `'+o.name+'` in this scope',
+    tip:'After `impl` and after a `:` bound, only a trait name fits. A `struct`, an `enum` or a function with that name is not one: declare a `trait` or use the right name.'
+  },
+  E0184:{
+    title:'Copy on a type with a destructor',
+    msg:o=>'the trait `Copy` cannot be implemented for this type; the type has a destructor',
+    tip:'A type with `impl Drop` runs code when it goes away, so it cannot be copied bit by bit. Remove `Copy` from the derive, or give the type no `Drop` code.'
+  },
+  E0449:{
+    title:'visibility on a trait item',
+    msg:o=>'visibility qualifiers are not permitted here',
+    tip:'The items of a trait, and of any `impl Trait for Type` block, are as visible as the trait itself. Remove the `pub`.'
+  },
   E0053:{
     title:'a method does not match its trait',
     msg:o=>'method `'+o.name+'` has an incompatible type for trait',
