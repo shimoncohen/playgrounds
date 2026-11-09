@@ -733,6 +733,17 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         cur=blk();
         return NIL;
       }
+      case 'Try':{
+        const x=ex(e.expr),bad=blk(),good=blk();
+        emit('branch',e,{x:NIL});
+        B[cur].succ.push(bad,good);
+        cur=bad;
+        emit('assign',e,{l:retDest(tyOf(e.expr)),rv:{k:'const'}});
+        deads(0,e);
+        emit('return',e,{x:opnd(retL)});
+        cur=good;
+        return put({k:'use',x},e,dest,tyOf(e));
+      }
       default:un(e.t,e);return fin(NIL,e,dest);
     }
   }

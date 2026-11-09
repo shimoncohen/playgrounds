@@ -175,6 +175,7 @@ RQ.lint=(ast,info)=>{
         for(const a of e.args)ev(a);
         barrier();return null;
       }
+      case 'Try':ev(e.expr);barrier();return null;
       case 'Assign':{
         // a write to a field leaves the folded value of its root unknown
         if(e.lhs.t==='Field'||e.lhs.t==='Index'){

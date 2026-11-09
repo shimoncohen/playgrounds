@@ -29,7 +29,7 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
+  'error conversion','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
 const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
@@ -58,7 +58,7 @@ RQ.check=ast=>{
     itemNames.add(it.name);return true;
   };
   const peel=e=>e.t==='Paren'?peel(e.expr):e;
-  const mism=(want,got,n,what)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got),what}));
+  const mism=(want,got,n,what)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got),what:what||(peel(n).t==='Try'?'try':undefined)}));
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
   // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
   // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
@@ -285,7 +285,7 @@ RQ.check=ast=>{
     else if(it.t==='Fn'){
       const sg=fnSig(it,null);
       if(it.selfParam)unsup('method',it.line);
-      if(it.name==='main'&&(sg.params.length||it.ret))unsup('main signature',it.line);
+      if(it.name==='main'&&sg.params.length)unsup('main signature',it.line);
       if(!it.body)syn(it.line,it.col,'free function without a body');
       if(defined(it))fns.set(it.name,{node:it,params:sg.params,ret:sg.ret,from:sg.from});
     }else if(it.t==='Const'){
@@ -658,6 +658,15 @@ RQ.check=ast=>{
     if(name==='unwrap')return dbgOk?rec('val',[],a):null;
     if(name==='expect')return dbgOk?rec('val',[T.str],a):null;
     if(name==='unwrap_or')return hasRef(base)?null:rec('val',[a],a);
+    if(name==='unwrap_or_default')return hasRef(base)||!has(a,'Default')?null:rec('val',[],a);
+    if(opt){
+      if(name!=='ok_or'||args.length!==1||hasRef(base))return null;
+      const lit=res(args[0]).k==='str';
+      return lit||!holdsRef(args[0])?rec('val',[args[0]],resTy(a,args[0]),lit?1:-1):null;
+    }
+    if(name==='ok')return rec('val',[],optTy(a));
+    if(name==='err')return rec('val',[],optTy(b));
+    if(name==='unwrap_err'||name==='expect_err')return has(a,'Debug')?rec('val',name==='expect_err'?[T.str]:[],b):null;
     return null;
   }
   function adtMethod(e,r,base,args){
@@ -970,6 +979,13 @@ RQ.check=ast=>{
   // The type a coercion site (fn tail, return, annotated let, call argument) expects of a `match`, `if` or block; rustc coerces each arm to it
   // and reports the arm that does not fit.
   let want=null;
+  // `?` converts the error with From. Std has no From into a type the learner declares, and none from a number, bool or unit into String
+  const noFrom=(from,to)=>{
+    const user=x=>x.k==='struct'||x.k==='enum'&&!x.builtin;
+    if(user(to))return true;
+    if(user(from))return ['int','float','bool','char','unit','String'].includes(to.k);
+    return to.k==='String'&&['int','float','bool','unit'].includes(from.k);
+  };
   const takeWant=()=>{const w=want;want=null;return w&&!['any','never'].includes(res(w).k)?w:null;};
   function exW(e,w){
     const t=peel(e).t;
@@ -1200,6 +1216,23 @@ RQ.check=ast=>{
         return unsup(e.name+'!',e.line);
       }
       case 'Block':return block(e,takeWant());
+      case 'Try':{
+        const t=res(ex(e.expr)),rt=res(curRet);
+        if(t.k==='any'||t.k==='never')return T.any;
+        const kind=x=>x.k==='enum'&&x.builtin?x.name:null,tk=kind(t);
+        if(!tk||hasRef(rt))return unsup('try operator',e.line);
+        const ok=t.args[0];
+        if(rt.k==='any'||rt.k==='never')return ok;
+        const rk=kind(rt);
+        if(!rk||rk!==tk){errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:rk?'try-kind':'try-ret',from:tk,ret:show(rt)}));return ok;}
+        if(tk==='Option')return ok;
+        const [,from]=t.args,[,to]=rt.args;
+        if(isOpen(from,false))return unsup('inferred type',e.line);
+        if(unify(from,to))return ok;
+        if(noFrom(res(from),res(to)))errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:'try-convert',to:show(to),from:show(from)}));
+        else unsup('error conversion',e.line);
+        return ok;
+      }
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
         if(coerce(exW(e.expr,curRet),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
@@ -1326,6 +1359,10 @@ RQ.check=ast=>{
   function fnBody(f){
     if(!f.node.body)return;
     scopes=[new Map()];curRet=f.ret;loops=[];
+    if(f.node.name==='main'&&f.node.ret){
+      const m=res(f.ret);
+      if(!(m.k==='enum'&&m.builtin&&m.name==='Result'&&res(m.args[0]).k==='unit'&&!isOpen(m.args[1],false)&&has(m.args[1],'Debug')))unsup('main signature',f.node.line);
+    }
     const r=f.node.ret;curStatic=!!r&&r.t==='Ref'&&r.lt==='static';
     if(f.selfTy)bindVar('self',f.selfMut,'param',f.selfTy,f.node.selfParam);
     for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty,p.pat);
