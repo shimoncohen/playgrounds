@@ -116,6 +116,11 @@ const ERRORS={
     msg:o=>'explicit lifetime required in the type of `'+o.name+'`',
     tip:'The function promises to return data that lives as long as a named lifetime, but this parameter was written without it, so Rust cannot promise that. Give the parameter the same lifetime name, like `y: &\'a str`.'
   },
+  E0392:{
+    title:'a lifetime is declared but never used',
+    msg:o=>'lifetime parameter `\''+o.name+'` is never used',
+    tip:'A `struct` that declares a lifetime has to use it on a field, like `text: &\'a str`. If nothing in the `struct` borrows, remove the lifetime.'
+  },
   E0726:{
     title:'an `impl` for a struct with a lifetime leaves it out',
     msg:()=>'implicit elided lifetime not allowed here',
@@ -250,6 +255,7 @@ const HINTS={
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
   'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
   'assignment target':'Assign to a variable, a field, or an element of a `Vec` you own or hold by `&mut`, like `v[0] = 1`.',
+  'assigned string reference':'Assigning a `&String` to a `&str` place is not modeled. Write `&b[..]` or `b.as_str()` instead of `&b`.',
   'type checking':'Rust Quest cannot tell yet whether these types fit together. Keep each value to one type for now.',
   'const initializer':'A `const` can only hold a literal, or simple maths on other constants, for now.',
   'integer overflow':'Dividing the smallest number of a type by `-1` overflows. Rust Quest does not model that case; use another divisor.',

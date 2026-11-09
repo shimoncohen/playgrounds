@@ -5021,5 +5021,125 @@
     "src": "struct Person {\n    name: String,\n}\nstruct Badge<'a> {\n    owner: &'a Person,\n}\nfn main() {\n    let p = Person { name: String::from(\"Ann\") };\n    let b = Badge { owner: &p };\n    println!(\"{}\", b.owner.name);\n}\n",
     "expect": "ok", "out": "Ann\n", "err": "", "exit": 0,
     "why": "a struct borrows another struct", "pr": "P12"
+  },
+  {
+    "id": "life-struct-reassign-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let r: &str = &s;\n    let mut e = Excerpt { part: \"x\" };\n    e.part = r;\n    e = Excerpt { part: \"y\" };\n    s.push_str(\"x\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": "ok", "out": "y\n", "err": "", "exit": 0,
+    "why": "a struct that is assigned whole no longer holds what its field held", "pr": "P12"
+  },
+  {
+    "id": "life-struct-reassign-block-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    {\n        let r: &str = &s;\n        e.part = r;\n    }\n    e = Excerpt { part: \"y\" };\n    s.push_str(\"x\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": "ok", "out": "y\n", "err": "", "exit": 0,
+    "why": "the same when the borrow was made in an inner block", "pr": "P12"
+  },
+  {
+    "id": "life-field-assign-mutate-e0502",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    e.part = &s[..];\n    s.push_str(\"x\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": { "code": "E0502", "line": 8 }, "pair": "life-field-assign-mutate-ok",
+    "why": "a field assigned a borrow keeps the text borrowed while the struct is used", "pr": "P12"
+  },
+  {
+    "id": "life-field-assign-mutate-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    e.part = &s[..];\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ax\n", "err": "", "exit": 0,
+    "why": "the text may change once the struct is not used again", "pr": "P12"
+  },
+  {
+    "id": "life-field-assign-drop-e0505",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let s = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    e.part = &s[..];\n    drop(s);\n    println!(\"{}\", e.part);\n}\n",
+    "expect": { "code": "E0505", "line": 8 }, "pair": "life-field-assign-drop-ok",
+    "why": "a field assigned a borrow keeps the text borrowed, so it cannot be moved", "pr": "P12"
+  },
+  {
+    "id": "life-field-assign-drop-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let s = String::from(\"a\");\n    let mut e = Excerpt { part: \"x\" };\n    e.part = &s[..];\n    drop(s);\n    println!(\"{}\", 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the text may be dropped once the struct is not used again", "pr": "P12"
+  },
+  {
+    "id": "life-ref-read-drop-e0505",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let s = String::from(\"a\");\n    let e = Excerpt { part: &s };\n    let r = &e;\n    let p = r.part;\n    drop(s);\n    println!(\"{}\", p);\n}\n",
+    "expect": { "code": "E0505", "line": 9 }, "pair": "life-ref-read-drop-ok",
+    "why": "a &str read through a reference to a struct is still borrowed from the text", "pr": "P12"
+  },
+  {
+    "id": "life-ref-read-drop-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn main() {\n    let s = String::from(\"a\");\n    let e = Excerpt { part: &s };\n    let r = &e;\n    let p = r.part;\n    drop(s);\n    println!(\"{}\", 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the text may be dropped once the copied &str is not used again", "pr": "P12"
+  },
+  {
+    "id": "life-ref-field-plain-e0621",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn f<'a>(x: &'a str, y: &Excerpt) -> &'a str { y.part }\nfn main() {}\n",
+    "expect": { "code": "E0621", "line": 4 }, "pair": "life-ref-field-named-ok",
+    "why": "a &str read out of a plain reference parameter is not tied to the result lifetime", "pr": "P12"
+  },
+  {
+    "id": "life-ref-field-named-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn f<'a>(x: &'a str, y: &Excerpt<'a>) -> &'a str { y.part }\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the struct parameter carries the result lifetime", "pr": "P12"
+  },
+  {
+    "id": "life-ref-field-anon-e0621",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nfn f<'a>(x: &'a str, y: &Excerpt<'_>) -> &'a str { y.part }\nfn main() {}\n",
+    "expect": { "code": "E0621", "line": 4 }, "pair": "life-ref-field-named-ok",
+    "why": "an anonymous lifetime on the struct is no better", "pr": "P12"
+  },
+  {
+    "id": "life-self-new-e0502",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(p: &'a str) -> Self { Excerpt { part: p } }\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let e = Excerpt::new(&s);\n    s.push_str(\"x\");\n    println!(\"{}\", e.part);\n}\n",
+    "expect": { "code": "E0502", "line": 10 }, "pair": "life-self-new-ok",
+    "why": "a constructor that returns Self keeps the text borrowed", "pr": "P12"
+  },
+  {
+    "id": "life-self-new-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(p: &'a str) -> Self { Excerpt { part: p } }\n}\nfn main() {\n    let mut s = String::from(\"a\");\n    let e = Excerpt::new(&s);\n    s.push_str(\"x\");\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "ax\n", "err": "", "exit": 0,
+    "why": "the text may change once the struct is not used again", "pr": "P12"
+  },
+  {
+    "id": "life-self-plain-param-e0621",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(p: &str) -> Self { Excerpt { part: p } }\n}\nfn main() {}\n",
+    "expect": { "code": "E0621", "line": 5 }, "pair": "life-self-named-param-ok",
+    "why": "a parameter without the lifetime cannot go into Self", "pr": "P12"
+  },
+  {
+    "id": "life-self-named-param-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nimpl<'a> Excerpt<'a> {\n    fn new(p: &'a str) -> Self { Excerpt { part: p } }\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the parameter carries the lifetime of Self", "pr": "P12"
+  },
+  {
+    "id": "life-field-struct-bare-e0106",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nstruct O {\n    e: Excerpt,\n}\nfn main() {}\n",
+    "expect": { "code": "E0106", "line": 5 }, "pair": "life-field-struct-named-ok",
+    "why": "a field that holds a struct with a lifetime needs a lifetime too", "pr": "P12"
+  },
+  {
+    "id": "life-field-struct-anon-e0106",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nstruct O<'a> {\n    e: Excerpt<'_>,\n}\nfn main() {}\n",
+    "expect": { "code": "E0106", "line": 5 }, "pair": "life-field-struct-named-ok",
+    "why": "an anonymous lifetime in a field is not allowed", "pr": "P12"
+  },
+  {
+    "id": "life-field-struct-named-ok",
+    "src": "struct Excerpt<'a> {\n    part: &'a str,\n}\nstruct O<'a> {\n    e: Excerpt<'a>,\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the field names the struct's lifetime", "pr": "P12"
+  },
+  {
+    "id": "life-unused-e0392",
+    "src": "struct S<'a> {\n    n: i32,\n}\nfn main() {}\n",
+    "expect": { "code": "E0392", "line": 1 }, "pair": "life-unused-removed-ok",
+    "why": "a lifetime that no field uses is an error", "pr": "P12"
+  },
+  {
+    "id": "life-unused-removed-ok",
+    "src": "struct S {\n    n: i32,\n}\nfn main() {}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "without the unused lifetime it compiles", "pr": "P12"
   }
 ]

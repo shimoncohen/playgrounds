@@ -181,6 +181,7 @@ function loanPass(F,errors,un,loans,stats){
     const kill=~sub[i.l];
     for(let k=0;k<n;k++)s[k]&=kill;
     if(i.op!=='dead')s[i.l]=v&kill;
+    for(const d of D[i.l])s[d]=0n;
     if(i.op==='assign'&&L[i.l].path)s[R[i.l]]|=v&kill;
   };
   const inn=B.map(()=>null),q=[0],queued=new Set(q);
