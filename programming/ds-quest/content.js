@@ -152,13 +152,13 @@ const CH=[
 {name:'Maps & sets',badge:'Vault Door Number',story:'The ledger room lists every item by name, so you look things up by name instead of searching, count Mo\'s riddle words, and find the vault\'s door number.',intro:'The ledger room lists every lost item by name, so nobody has to search the shelves. A <code>Map</code> stores pairs: look up a <b>key</b>, get its <b>value</b>, almost instantly, no matter how many pairs there are. A <code>Set</code> stores unique values and answers "is it in here?" just as fast. Both use a trick called hashing (turning the key into a number that says where to look), so searching a huge pile takes about the same time as searching a tiny one.',
  learned:['Map set/get/has','Set add/has','counting with a Map','spotting duplicates','looking up a partner'],
  missions:[
- {title:'Name tags',goal:'Create a <code>Map</code> called <code>shelf</code> that says which shelf each item lives on. Store <code>"umbrella"</code> → <code>3</code> and <code>"hat"</code> → <code>7</code>, then print the umbrella\'s shelf by looking it up.',
-  anat:[['shelf','var'],['.set','fn'],['("umbrella", 3)','str']],
+ {title:'Name tags',goal:'Create a <code>Map</code> called <code>aisle</code> that says which aisle each item lives in. Store <code>"umbrella"</code> → <code>3</code> and <code>"hat"</code> → <code>7</code>, then print the umbrella\'s aisle by looking it up.',
+  anat:[['aisle','var'],['.set','fn'],['("umbrella", 3)','str']],
   explain:'<code>map.set(key, value)</code> stores a pair, and <code>map.get(key)</code> finds the value again. Setting an existing key replaces its value. A missing key gives <code>undefined</code>.',
-  starter:'const shelf = new Map();\n',answer:'const shelf = new Map();\nshelf.set("umbrella", 3);\nshelf.set("hat", 7);\nprint(shelf.get("umbrella"));',
-  check:c=>{const m=c.vars.shelf;if(!(m instanceof Map))return 'shelf must stay a Map, made with new Map().';
-    if(m.size!==2||m.get('umbrella')!==3||m.get('hat')!==7)return 'shelf should hold exactly two pairs: umbrella → 3 and hat → 7.';
-    return c.printed('3')&&has(c,/\.get\(/)?true:'Print the result of shelf.get("umbrella"). It should show 3.'}},
+  starter:'const aisle = new Map();\n',answer:'const aisle = new Map();\naisle.set("umbrella", 3);\naisle.set("hat", 7);\nprint(aisle.get("umbrella"));',
+  check:c=>{const m=c.vars.aisle;if(!(m instanceof Map))return 'aisle must stay a Map, made with new Map().';
+    if(m.size!==2||m.get('umbrella')!==3||m.get('hat')!==7)return 'aisle should hold exactly two pairs: umbrella → 3 and hat → 7.';
+    return c.printed('3')&&has(c,/\.get\(/)?true:'Print the result of aisle.get("umbrella"). It should show 3.'}},
  {title:'Is it in here?',goal:'The ledger notes each item\'s tag code. Add the codes <code>3</code>, <code>5</code> and <code>3</code> again to the Set <code>seen</code>. Then print <code>seen.size</code> on one line and <code>seen.has(5)</code> on the next.',
   explain:'A Set keeps each value <b>once</b>. Adding something it already has changes nothing. <code>has</code> answers true or false.',
   starter:'const seen = new Set();\n',answer:'const seen = new Set();\nseen.add(3);\nseen.add(5);\nseen.add(3);\nprint(seen.size);\nprint(seen.has(5));',

@@ -372,7 +372,7 @@
 
   MQ.content = {
     track: 'arithmetic',
-    ranks: [[0, 'Counter'], [30, 'Bracket Breaker'], [75, 'Order Keeper'], [150, 'Sign Switcher'], [225, 'Fraction Fixer'], [300, 'Power Player'], [375, 'Ratio Ranger']],
+    ranks: [[0, 'Counter'], [30, 'Bracket Breaker'], [75, 'Price Chalker'], [150, 'Sign Switcher'], [225, 'Pie Slicer'], [300, 'Tile Setter'], [375, 'Ratio Ranger']],
     chapters: [{
       id: 'arithmetic.order', name: 'Order of operations', badge: 'Price Card',
       story: 'The price board has many sums chalked on it, so you work each in the right order to open the card that lists Pim\'s first stall and find the price card.',
