@@ -5,7 +5,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const OUT_NAMES=['HashSet','VecDeque','BTreeMap','BTreeSet','BinaryHeap','LinkedList','Rc','Arc','Weak','RefCell','Cell','OnceCell','Mutex','RwLock','Cow','Pin','i128','u128','f32'];
 const OUT=new Set(OUT_NAMES);
-RQ.PARSE_FEATURES=[...OUT_NAMES,'unsafe','dyn','async','static mut','union','macro_rules','dbg!','other macro','byte literal','raw pointer','extern','const fn','higher-ranked bound','lifetime bound','never type'];
+RQ.PARSE_FEATURES=[...OUT_NAMES,'unsafe','dyn','async','static mut','union','macro_rules','dbg!','other macro','byte literal','raw pointer','extern','const fn','higher-ranked bound','lifetime bound','never type','nesting'];
 const MACROS=new Set('println print eprintln eprint format panic assert assert_eq assert_ne debug_assert debug_assert_eq vec write writeln todo unimplemented unreachable'.split(' '));
 const BIN={'||':4,'&&':5,'==':6,'!=':6,'<':6,'>':6,'<=':6,'>=':6,'|':7,'^':8,'&':9,'<<':10,'>>':10,'+':11,'-':11,'*':12,'/':12,'%':12};
 const ASSIGN=new Set(['=','+=','-=','*=','/=','%=','^=','&=','|=','<<=','>>=']);
@@ -18,6 +18,9 @@ RQ.walk=(n,f,parent)=>{
   if(typeof n.t==='string'){if(f(n,parent)===false)return;parent=n;}
   for(const k of Object.keys(n)){const v=n[k];if(v&&typeof v==='object')RQ.walk(v,f,parent);}
 };
+
+RQ.fnItems=ast=>ast.items.flatMap(it=>it.t==='Fn'?[{f:it,name:it.name}]:it.t==='Impl'||it.t==='Trait'?it.items.filter(x=>x.t==='Fn').map(f=>({f,name:(it.t==='Trait'?it.name:it.selfTy.segs?it.selfTy.segs[0].name:'?')+'::'+f.name})):[]);
+RQ.isDropImpl=it=>it.t==='Impl'&&!!it.trait&&!!it.trait.segs&&it.trait.segs[it.trait.segs.length-1].name==='Drop';
 
 RQ.parse=tokens=>{
   const toks=tokens.slice(),un=[],seen=new Set();
@@ -76,9 +79,9 @@ RQ.parse=tokens=>{
     if(!eatP('<'))return out;
     while(!isCloseAngle()){
       attrs();const x=T();
-      if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs});}
+      if(x.k==='lifetime'){p++;let bs=[];if(eatP(':')){feat('lifetime bound',x.line);bs=bounds();}out.push({kind:'lt',name:x.v,bounds:bs,line:x.line,col:x.col});}
       else if(eatK('const')){const n=ident();expP(':');const t=ty();let d=null;if(eatP('='))d=unary(true);out.push({kind:'const',name:n.v,ty:t,default:d});}
-      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d});}
+      else{const n=ident();let bs=[],d=null;if(eatP(':'))bs=bounds();if(eatP('='))d=ty();out.push({kind:'ty',name:n.v,bounds:bs,default:d,line:n.line,col:n.col});}
       if(!eatP(','))break;
     }
     closeAngle();return out;
@@ -131,7 +134,7 @@ RQ.parse=tokens=>{
   function ty(){
     const x=T();
     if(isP('&')||isP('&&')){
-      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;
+      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;if(lt==='_')lt=null;
       const mut=!!eatK('mut');let r=mk('Ref',x,{mut,lt,ty:ty()});
       if(dbl)r=mk('Ref',x,{mut:false,lt:null,ty:r});
       return r;
@@ -191,11 +194,13 @@ RQ.parse=tokens=>{
     while(isP('|')){p++;alts.push(patNoOr());}
     return alts.length>1?mk('Or',s,{alts}):alts[0];
   }
+  const rangeEnd=()=>T().k==='ident'&&isP('::',pk())?path(true):litExpr();
+  const atRangeEnd=()=>['int','char','float'].includes(T().k)||isP('-')||T().k==='ident'&&isP('::',pk());
   function patNoOr(){
     const x=T();
     if(x.k==='ident'&&x.v==='_'&&!isP('::',pk())){p++;return mk('Wild',x);}
-    if(isP('..')&&!(pk().k==='int'||pk().k==='char'||pk().k==='float')){p++;return mk('Rest',x);}
-    if(isP('..=')){p++;return mk('RangePat',x,{lo:null,hi:litExpr(),inclusive:true});}
+    if(isP('..')&&!(['int','char','float'].includes(pk().k)||isP('-',pk())||pk().k==='ident'&&isP('::',pk(2)))){p++;return mk('Rest',x);}
+    if(isP('..=')||isP('..')){const inclusive=isP('..=');p++;return mk('RangePat',x,{lo:null,hi:rangeEnd(),inclusive});}
     if(isP('&')||isP('&&')){
       const dbl=isP('&&');p++;const mut=!!eatK('mut');let r=mk('RefPat',x,{mut,pat:patNoOr()});
       if(dbl)r=mk('RefPat',x,{mut:false,pat:r});return r;
@@ -209,8 +214,9 @@ RQ.parse=tokens=>{
     if(['int','float','str','char'].includes(x.k)||isP('-')||isK('true')||isK('false')){
       const lo=litExpr();
       if(isP('..=')||isP('..')||isP('...')){
+        if(isP('...'))feat('pattern',x.line);
         const inclusive=!isP('..');p++;
-        const hi=['int','float','char'].includes(T().k)||isP('-')?litExpr():null;
+        const hi=atRangeEnd()?rangeEnd():null;
         return mk('RangePat',x,{lo,hi,inclusive});
       }
       return mk('LitPat',x,{lit:lo});
@@ -234,7 +240,7 @@ RQ.parse=tokens=>{
       }
       expP('}');return mk('StructPat',x,{path:pa,fields,rest});
     }
-    if(isP('..=')||isP('..')){const inclusive=isP('..=');p++;return mk('RangePat',x,{lo:pa,hi:['int','char','float'].includes(T().k)?litExpr():null,inclusive});}
+    if(isP('..=')||isP('..')){const inclusive=isP('..=');p++;return mk('RangePat',x,{lo:pa,hi:atRangeEnd()?rangeEnd():null,inclusive});}
     return mk('PathPat',x,{path:pa});
   }
 
@@ -282,7 +288,7 @@ RQ.parse=tokens=>{
   function postfix(e,ns){
     for(;;){
       const x=T();
-      if(isP('?')){p++;e=mk('Try',x,{expr:e,line:e.line,col:e.col});continue;}
+      if(isP('?')){p++;e=mk('Try',x,{expr:e,line:e.line,col:e.col,qline:x.line,qcol:x.col});continue;}
       if(isP('(')){p++;const args=exprList(')');e=mk('Call',x,{callee:e,args,line:e.line,col:e.col});continue;}
       if(isP('[')){p++;const i=expr(false);expP(']');e=mk('Index',x,{expr:e,index:i,line:e.line,col:e.col,bline:x.line,bcol:x.col});continue;}
       if(isP('.')){
@@ -292,7 +298,14 @@ RQ.parse=tokens=>{
         if(n.k==='float'&&/^\d+\.\d+$/.test(n.v)){p++;for(const part of n.v.split('.'))e=mk('Field',n,{expr:e,name:part,line:e.line,col:e.col});continue;}
         const id=ident();let targs=null;
         if(isP('::')&&isP('<',pk())){p+=2;targs=genericArgs();}
-        if(isP('(')){p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});}
+        if(isP('(')){
+          p++;e=mk('MethodCall',id,{recv:e,name:id.v,targs,args:exprList(')'),line:e.line,col:e.col,nline:id.line,ncol:id.col});
+          // `m.entry(k).or_insert(v)` is one call to the checker; a bare `entry` has no type of its own, so it stays unsupported
+          const r=e.recv;
+          if((e.name==='or_insert'&&e.args.length===1||e.name==='or_insert_with'&&e.args.length===1||e.name==='or_default'&&!e.args.length)&&r.t==='MethodCall'&&r.name==='entry'&&r.args.length===1&&!r.targs){
+            e.recv=r.recv;e.args=[...r.args,...e.args];e.name='entry.'+e.name;
+          }
+        }
         else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col,nline:id.line});
         continue;
       }
@@ -333,6 +346,16 @@ RQ.parse=tokens=>{
       semi();
     }
     expP('}');
+    // a destructuring let (or let-else) becomes a match whose arm holds the rest of the block, so the names it binds are in scope there
+    for(let i=stmts.length-1;i>=0;i--){
+      const s=stmts[i];
+      if(s.t!=='Let'||!s.init||(s.pat.t==='Wild'||s.pat.t==='IdentPat'&&!s.pat.sub&&!s.pat.byRef)&&!s.els)continue;
+      const rest=mk('Block',s,{stmts:stmts.slice(i+1),tail,unsafe:false,label:null});
+      const arms=[mk('Arm',s,{pat:s.pat,guard:null,body:rest})];
+      if(s.els)arms.push(mk('Arm',s,{pat:mk('Wild',s),guard:null,body:s.els}));
+      tail=mk('Match',s,{scrut:s.init,arms,kind:s.els?'letelse':'let',annot:s.ty});
+      stmts.length=i;
+    }
     return mk('Block',x,{stmts,tail,unsafe:false,label:null});
   }
   function isBlockLike(){
@@ -346,15 +369,33 @@ RQ.parse=tokens=>{
     if(x.k==='lifetime'){p+=2;const e=blockLike();e.label=x.v;return e;}
     if(isK('if'))return ifExpr();
     if(isK('match'))return matchExpr();
-    if(isK('while')){p++;const c=cond();return mk('While',x,{cond:c,body:block(),label:null});}
+    if(isK('while')){
+      p++;const c=cond(),body=block();
+      if(c.t!=='LetCond')return mk('While',x,{cond:c,body,label:null});
+      const brk=mk('Break',x,{label:null,expr:null});
+      const m=mk('Match',x,{scrut:c.expr,arms:[mk('Arm',x,{pat:c.pat,guard:null,body}),mk('Arm',x,{pat:mk('Wild',x),guard:null,body:brk})],kind:'whilelet'});
+      return mk('Loop',x,{body:mk('Block',x,{stmts:[],tail:m,unsafe:false,label:null}),label:null});
+    }
     if(isK('loop')){p++;return mk('Loop',x,{body:block(),label:null});}
-    if(isK('for')){p++;const pt=pat();expK('in');const it=cond();return mk('For',x,{pat:pt,iter:it,body:block(),label:null});}
+    if(isK('for')){
+      p++;const pt=pat();expK('in');const it=cond();let body=block();
+      // a pattern other than a name is a let on a hidden name, so moves, borrows and E0004/E0005 follow the match rules
+      let pn=pt;
+      if(!(pt.t==='Wild'||pt.t==='IdentPat'&&!pt.sub&&!pt.byRef)){
+        pn=mk('IdentPat',pt,{name:'#for',mut:false,byRef:false,sub:null});
+        const sc=mk('Path',pt,{segs:[{name:'#for',args:null,fn:null,line:pt.line}],global:false});
+        body=mk('Block',body,{stmts:[],tail:mk('Match',pt,{scrut:sc,arms:[mk('Arm',pt,{pat:pt,guard:null,body})],kind:'let',annot:null}),unsafe:false,label:null});
+      }
+      return mk('For',x,{pat:pn,iter:it,body,label:null});
+    }
     if(isK('unsafe')){p++;feat('unsafe',x.line);const b=block();b.unsafe=true;return b;}
     return block();
   }
+  const emptyBlock=x=>mk('Block',x,{stmts:[],tail:null,unsafe:false,label:null});
   function ifExpr(){
     const x=expK('if');const c=cond(),then=block();let els=null;
     if(eatK('else'))els=isK('if')?ifExpr():block();
+    if(c.t==='LetCond')return mk('Match',x,{scrut:c.expr,arms:[mk('Arm',x,{pat:c.pat,guard:null,body:then}),mk('Arm',x,{pat:mk('Wild',x),guard:null,body:els||emptyBlock(x)})],kind:'iflet',noElse:!els});
     return mk('If',x,{cond:c,then,els});
   }
   function matchExpr(){
@@ -371,10 +412,28 @@ RQ.parse=tokens=>{
     expP('}');return mk('Match',x,{scrut,arms});
   }
   function closure(){
-    const x=T();const mv=!!eatK('move');const params=[];
-    if(!eatP('||')){expP('|');while(!isP('|')){const pt=patNoOr();let t=null;if(eatP(':'))t=ty();params.push({pat:pt,ty:t});if(!eatP(','))break;}expP('|');}
+    const x=T();const mv=!!eatK('move');const params=[],lets=[],derefs=[];
+    if(!eatP('||')){expP('|');while(!isP('|')){const pt=patNoOr();let t=null;if(eatP(':'))t=ty();
+      // a pattern other than a name is a let on a hidden name, like a `for` pattern
+      let core=pt,depth=0;
+      while(core.t==='RefPat'&&!core.mut){core=core.pat;depth++;}
+      if(pt.t==='IdentPat'&&!pt.sub&&!pt.byRef)params.push({pat:pt,ty:t});
+      else if(depth&&(core.t==='Wild'||core.t==='IdentPat'&&!core.sub&&!core.byRef)){
+        // `|&x|` copies the value out of the reference: a let on a hidden name
+        const nm='#cl'+params.length;
+        params.push({pat:mk('IdentPat',pt,{name:nm,mut:false,byRef:false,sub:null}),ty:t});
+        if(core.t==='IdentPat'){
+          let init=mk('Path',pt,{segs:[{name:nm,args:null,fn:null,line:pt.line}],global:false});
+          for(let i=0;i<depth;i++)init=mk('Deref',pt,{expr:init});
+          derefs.push(mk('Let',pt,{pat:core,ty:null,init,els:null}));
+        }
+      }
+      else{const nm='#cl'+params.length;params.push({pat:mk('IdentPat',pt,{name:nm,mut:false,byRef:false,sub:null}),ty:t});if(pt.t!=='Wild')lets.push([pt,mk('Path',pt,{segs:[{name:nm,args:null,fn:null,line:pt.line}],global:false})]);}
+      if(!eatP(','))break;}expP('|');}
     let ret=null,body;
     if(eatP('->')){ret=ty();body=block();}else body=expr(false);
+    if(derefs.length){if(body.t==='Block'&&!body.label)body.stmts=[...derefs,...body.stmts];else body=mk('Block',body,{stmts:derefs,tail:body,unsafe:false,label:null});}
+    for(const [pt,sc] of lets.reverse())body=mk('Match',pt,{scrut:sc,arms:[mk('Arm',pt,{pat:pt,guard:null,body})],kind:'let',annot:null});
     return mk('Closure',x,{move:mv,params,ret,body});
   }
   function structLit(pa,x){
@@ -494,7 +553,7 @@ RQ.parse=tokens=>{
   function item(at){
     at=at||attrs();
     const x=T();
-    const pub=vis();
+    const pub=vis()?x:false;
     const y=T();
     if(isK('fn')||((isK('const')||isK('async')||isK('unsafe')||isK('extern'))&&fnAhead()))return fnItem(at,pub);
     if(isK('struct')){
@@ -506,10 +565,10 @@ RQ.parse=tokens=>{
     if(isK('enum')){
       p++;const n=ident(),gs=generics();where();expP('{');const variants=[];
       while(!isP('}')){
-        const vat=attrs(),v=ident();let kind='unit',fields=[],disc=null;
+        const vat=attrs(),pv=isK('pub')?T():false;vis();const v=ident();let kind='unit',fields=[],disc=null;
         if(isP('(')){kind='tuple';fields=fieldsTuple();}else if(isP('{')){kind='named';fields=fieldsNamed();}
         if(eatP('='))disc=expr(false);
-        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat}));
+        variants.push(mk('Variant',v,{name:v.v,kind,fields,disc,attrs:vat,pub:pv}));
         if(!eatP(','))break;
       }
       expP('}');return mk('Enum',x,{name:n.v,generics:gs,variants,attrs:at,pub});
@@ -518,14 +577,14 @@ RQ.parse=tokens=>{
     if(isK('impl')){
       p++;const gs=generics();eatP('!');const first=ty();let tr=null,self=first;
       if(eatK('for')){tr=first;self=ty();}
-      const wh=where();void wh;expP('{');const items=[];
+      const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at});
+      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at,where:wh,pub});
     }
     if(isK('trait')){
-      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();where();expP('{');const items=[];
+      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub});
+      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub,where:wh});
     }
     if(isK('const')||isK('static')){
       const isStatic=isK('static');p++;let mut=false;

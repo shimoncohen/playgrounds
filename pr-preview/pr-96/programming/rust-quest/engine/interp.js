@@ -43,14 +43,16 @@ RQ.interp=(ast,opts)=>{
   const maxSteps=opts.maxSteps??100000,maxDepth=opts.maxDepth??64,info=opts.info||new Map();
   const {fits,INT,wrap,isCopy,res,show}=RQ.types,adts=opts.adts;
   let steps=0,depth=0,out='',err='';
+  const sess=RQ.std.hashSession(opts.seed||0);
   const fns=new Map(),consts=new Map(),cval=new Map(),decls=new Map(),dropImpl=new Map(),enumDecl=new Map(),methodFns=new Map();
   for(const it of ast.items){
     if(it.t==='Fn')fns.set(it.name,it);else if(it.t==='Const')consts.set(it.name,it);
     else if(it.t==='Struct')decls.set(it.name,it);
     else if(it.t==='Enum')enumDecl.set(it.name,it);
-    else if(it.t==='Impl'&&it.trait)dropImpl.set(it.selfTy.segs[0].name,it.items[0]);
-    else if(it.t==='Impl')for(const f of it.items)methodFns.set(it.selfTy.segs[0].name+'::'+f.name,f);
+    else if(RQ.isDropImpl(it))dropImpl.set(it.selfTy.segs[0].name,it.items[0]);
+    if(it.t==='Impl')for(const f of it.items)methodFns.set(it.selfTy.segs[0].name+'::'+f.name,f);
   }
+  for(const [k,f] of (adts&&adts.methodNodes)||[])methodFns.set(k,f);
   const declFields=d=>d.kind==='tuple'?d.fields.map((_,i)=>String(i)):d.kind==='unit'?[]:d.fields.map(f=>f.name);
   const variantInfo=(adt,vi)=>{
     if(BVARS[adt]){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
@@ -119,6 +121,38 @@ RQ.interp=(ast,opts)=>{
     let c=(e.t==='Path'&&find(env,e.segs[0].name))||{val:ev(e,env)};
     while(read(c,e.line).k==='ref')c=c.val.cell;
     return c;
+  }
+
+  const isVecIdx=n=>{const o=info.get(n);return !!o&&!!o.vecIdx;};
+  function indexCell(e,env){
+    const b=peel(e.expr);
+    let vec,c=null;
+    if(b.t==='Index'&&isVecIdx(b)){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
+    else{
+      vec=unref(ev(b,env));
+      if(b.t==='Path')c=find(env,b.segs[0].name);
+      else if(b.t==='Field'){const pl=placeOf(b,env);c=pl&&fieldCell(pl.cell,pl.path);}
+      while(c&&c.val&&c.val.k==='ref')c=c.val.cell;
+    }
+    const i=ev(e.index,env);
+    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,{line:e.bline,col:e.bcol});
+    const k=Number(i.v);
+    return elemCell(vec,k,c);
+  }
+  function elemCell(vec,k,pc){
+    const root=pc&&(pc.proxy?pc.parent:pc),label=(pc&&pc.proxy?pc.label:'')+'['+k+']';
+    return {proxy:true,parent:root||null,label,name:root&&root.name?root.name+(pc.proxy?'.'+pc.label:'')+'['+k+']':null,
+      get val(){return vec.v[k];},set val(x){vec.v[k]=x;}};
+  }
+  function entryCell(m,en,pc,part){
+    const root=pc&&(pc.proxy?pc.parent:pc),at=entryAt(m,en);
+    return {proxy:true,parent:root||null,label:(pc&&pc.proxy?pc.label:'')+'['+(part==='key'?at:'value of '+at)+']',
+      get val(){return part==='key'?en.key:en.val;},set val(x){if(part==='key')en.key=x;else en.val=x;}};
+  }
+  // a map entry is named by its key in the memory view when the key is a scalar, else by its place in key-text order
+  function entryAt(m,en){
+    const k=en.key;
+    return ['int','bool','char','String'].includes(k.k)?'key '+(k.k==='String'?'"'+clip(k.v)+'"':scalar(k)):'entry '+entries(m).indexOf(en);
   }
 
   function intOp(op,a,b,e){
@@ -197,8 +231,22 @@ RQ.interp=(ast,opts)=>{
     if(name==='println'||name==='print')out+=s;else err+=s;
     if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
+  const PLAIN={debug:false,pretty:false,prec:null,width:null};
+  function userDisplay(v,via){
+    const f=methodFns.get(v.name+'::fmt');
+    if(!f)bug('display of '+v.name);
+    const fm={k:'fmtr',buf:''};
+    let r=via;
+    while(r&&r.k==='ref'&&r.cell.val&&r.cell.val.k==='ref')r=r.cell.val;
+    const self=r&&r.k==='ref'&&!r.range?{k:'ref',cell:r.cell,mut:false,loan:r.loan}:{k:'ref',cell:{val:v},mut:false};
+    callFn(f,[self,{k:'ref',cell:{val:fm},mut:true}],f.line,v.name+'::fmt');
+    return fm.buf;
+  }
   function macro(e,env){
-    if(!e.args.length){emit(e.name,'');return UNIT;}
+    const wr=e.name==='write'||e.name==='writeln';
+    const dst=wr?unref(ev(e.args[0],env)):null;
+    if(wr)e={...e,args:e.args.slice(1)};
+    if(!e.args.length){if(wr){dst.buf+=e.name==='writeln'?'\n':'';return okUnit();}if(e.name==='panic')throw panic('explicit panic',e);emit(e.name,'');return UNIT;}
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
@@ -208,21 +256,27 @@ RQ.interp=(ast,opts)=>{
     try{
       for(const p of parts){
         if(p.lit!==undefined)s+=p.lit;
-        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
+        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length,userDisplay);
         else{
           let v=named.get(p.name);
           if(!v){const c=find(env,p.name);v=c?read(c,e.line):consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
-          s+=RQ.std.render(v,p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
+          s+=RQ.std.render(v,p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length,userDisplay);
         }
         // a line built from many big parts stops here; emit sees the total over the cap and throws
         if(out.length+err.length+s.length>MAX_OUTPUT)break;
       }
     }catch(x){
-      if(x instanceof RQ.std.Unmodeled)throw new Unsup(x.message===RQ.std.ORDER?'hash map order':'format spec',e.line);
+      if(x instanceof RQ.std.Unmodeled)throw new Unsup('format spec',e.line);
       if(x instanceof RQ.std.Over)throw new Limit('output size');
       throw x;
     }
+    if(wr){
+      dst.buf+=s+(e.name==='writeln'?'\n':'');
+      if(dst.buf.length>MAX_OUTPUT)throw new Limit('output size');
+      return okUnit();
+    }
     if(e.name==='format')return string(s,undefined,e.line);
+    if(e.name==='panic')throw panic(s,e);
     note({t:'print',name:e.name,line:e.line});
     emit(e.name,s);return UNIT;
   }
@@ -248,13 +302,14 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(x instanceof Panic)throw new Unsup('const initializer',c.line);throw x;}
     return cval.get(n);
   }
-  const owns=v=>v.k==='String'||v.k==='struct'||v.k==='enum'||v.k==='vec'||v.k==='map'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
+  const owns=v=>v.k==='String'||v.k==='iter'&&v.heap||v.k==='closure'&&v.owned.some(c=>c.val!==null&&!c.moved&&!c.dropped&&owns(c.val))||v.k==='struct'||v.k==='enum'||v.k==='vec'||v.k==='map'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
   const hasDrop=v=>{
     switch(v.k){
       case 'struct':return dropImpl.has(v.name)||v.fields.some(f=>hasDrop(f.val));
       case 'enum':return v.fields.some(f=>hasDrop(f.val));
       case 'tuple':case 'array':case 'vec':return v.v.some(hasDrop);
       case 'map':return v.v.some(en=>hasDrop(en.key)||hasDrop(en.val));
+      case 'closure':return v.owned.some(c=>hasDrop(c.val));
       default:return false;
     }
   };
@@ -291,11 +346,11 @@ RQ.interp=(ast,opts)=>{
         if(!v.fields.some(f=>f.val.k==='moved'))note({t:'drop',name,ty:v.name,line,part});
         for(const f of v.fields)dropValue(f.val,name&&name+'.'+f.name,line,true);
         break;
+      case 'closure':dropClosure(v,line);break;
+      case 'iter':v.drop(line);break;
       case 'vec':case 'map':
-        // a map drops its entries in an order rustc does not fix, which a Drop impl that prints would show
-        if(v.k==='map'&&v.v.length>1&&v.v.some(en=>hasDrop(en.key)||hasDrop(en.val)))throw new Unsup('hash map order',line);
         note({t:'drop',name,ty:v.ty,line,part});
-        entries(v).forEach((x,i)=>{
+        (v.k==='map'&&v.v.length>1&&v.v.some(en=>hasDrop(en.key)||hasDrop(en.val))?RQ.std.hashOrder(v):entries(v)).forEach((x,i)=>{
           if(v.k==='vec')dropValue(x,name&&name+'['+i+']',line,true);
           else{dropValue(x.key,name&&name+'[key '+i+']',line,true);dropValue(x.val,name&&name+'[value '+i+']',line,true);}
         });
@@ -315,7 +370,7 @@ RQ.interp=(ast,opts)=>{
   const dropTemps=mark=>{while(temps.length>mark){const t=temps.pop(),v=t.cell?(t.cell.moved?null:t.cell.val):t.v;if(v)dropValue(v,null,t.line);}};
   // places: a path is the field names (or tuple indexes) below a variable's cell; a reference met on the way is followed (auto-deref)
   const step=(v,h)=>{
-    if(v.k==='ref')v=v.cell.val;
+    while(v.k==='ref')v=v.cell.val;
     if(v.k==='tuple')return {holder:{get val(){return v.v[Number(h)];},set val(x){v.v[Number(h)]=x;}}};
     return {holder:v.fields.find(f=>f.name===h)};
   };
@@ -409,7 +464,7 @@ RQ.interp=(ast,opts)=>{
       case 'array':return {k:'array',v:Array.from({length:t.n},()=>defaultVal(t.el,line))};
       case 'coll':return coll(t.name==='Vec'?'vec':'map',[],show(t),line,true);
       case 'enum':return ctorVal({adt:t.name,variant:t.builtin?0:adts.enums.get(t.name).defaultVi},[]);
-      case 'struct':return ctorVal({adt:t.name,variant:null},adts.structs.get(t.name).fields.map(f=>defaultVal(f.ty,line)));
+      case 'struct':{const r=adts.structs.get(t.name),m=r.tps.length?new Map(r.tps.map((p,i)=>[p,t.args[i]])):null;return ctorVal({adt:t.name,variant:null},r.fields.map(f=>defaultVal(m?RQ.types.subst(f.ty,m):f.ty,line)));}
       default:return UNIT;
     }
   }
@@ -439,6 +494,7 @@ RQ.interp=(ast,opts)=>{
       if(c){
         const v=read(c,x.line);
         if(t&&!isCopy(t)&&res(t).k!=='ref'){c.moved=true;note({t:'move',name:c.name,line:x.line});}
+        else if(v.k==='closure'&&v.owned.length)return copyClosure(v,x.line);
         return v;
       }
     }
@@ -468,7 +524,7 @@ RQ.interp=(ast,opts)=>{
     const host={val:v,name:name||'a temporary',ty:v.name,line};
     declare(fenv[0],'self',{val:{k:'ref',cell:host,mut:true},name:'self',ty:'&mut '+v.name,line});
     frames.push({fn:'drop',env:fenv,stmt:null,host});
-    try{block(f.body,fenv);}finally{depth--;frames.pop();}
+    try{block(f.body,fenv);}catch(x){if(!(x instanceof Ret))throw x;}finally{depth--;frames.pop();}
   }
   function callFn(f,args,line,label){
     tick();
@@ -531,6 +587,86 @@ RQ.interp=(ast,opts)=>{
       if(!abandon)dropScope(scope);
     }
   }
+  // a moved collection (val) drops the elements a `break` or a panic leaves, then frees its buffer
+  function forColl(e,fi,env){
+    const src=peel(fi.src),box={v:UNIT},val=fi.mode==='val',map=fi.coll==='HashMap';
+    let coll,pc=null,loan=e.id;
+    if(val||fi.viaRef){
+      const rv=val?mv(fi.src,env):ev(fi.src,env);
+      coll=unref(rv);
+      if(rv.k==='ref'){pc=rv.cell;loan=rv.loan;}
+    }else if(src.t==='Index'&&isVecIdx(src)){pc=indexCell(src,env);coll=pc.val;}
+    else if(src.t==='Field'){const pl=placeOf(src,env);pc=pl&&fieldCell(pl.cell,pl.path);coll=unref(pc?read(pc,e.line):ev(src,env));}
+    else{pc=src.t==='Path'&&find(env,src.segs[0].name);coll=unref(pc?read(pc,e.line):ev(src,env));}
+    while(pc&&pc.val&&pc.val.k==='ref')pc=pc.val.cell;
+    const mut=fi.mode==='mut';
+    const list=map?RQ.std.hashOrder(coll):coll.v.slice();
+    const itemAt=i=>{
+      if(!map)return val?list[i]:{k:'ref',cell:elemCell(coll,i,pc),mut,loan};
+      const en=list[i];
+      if(val)return fi.part==='k'?en.key:fi.part==='v'?en.val:{k:'tuple',v:[en.key,en.val]};
+      const kr={k:'ref',cell:entryCell(coll,en,pc,'key'),mut:false,loan},vr={k:'ref',cell:entryCell(coll,en,pc,'value'),mut,loan};
+      return fi.part==='k'?kr:fi.part==='v'?vr:{k:'tuple',v:[kr,vr]};
+    };
+    const dropItem=x=>{if(map&&val&&fi.part==='kv'){dropValue(x.v[0],null,e.line);dropValue(x.v[1],null,e.line);}else dropValue(x,null,e.line);};
+    let i=0,bail=false;
+    try{
+      for(;i<(map?list.length:coll.v.length);){
+        tick();
+        const item=itemAt(i++),sc=newScope();
+        env.push(sc);
+        if(e.pat.t==='IdentPat')declare(sc,e.pat.name,{val:item,name:e.pat.name,ty:tyName(e.pat),line:e.line});
+        let abandon=false,stop;
+        try{stop=body(e.body,env,box);}
+        catch(x){abandon=x instanceof Limit||x instanceof Unsup;throw x;}
+        finally{
+          env.pop();
+          if(!abandon){
+            if(e.pat.t==='IdentPat')dropScope(sc);
+            else if(val)dropItem(item);
+          }
+        }
+        if(stop)break;
+      }
+    }catch(x){
+      bail=x instanceof Limit||x instanceof Unsup;
+      throw x;
+    }finally{
+      if(val&&!bail){
+        for(;i<list.length;i++)dropItem(itemAt(i));
+        heap.delete(coll.id);note({t:'free',id:coll.id,line:e.line});
+      }
+    }
+    return UNIT;
+  }
+  function forIter(e,env){
+    const it=unref(mv(e.iter,env)),box={v:UNIT};
+    let bail=false;
+    try{
+      for(;;){
+        tick();
+        const item=it.next();
+        if(item===undefined)break;
+        const sc=newScope();
+        env.push(sc);
+        if(e.pat.t==='IdentPat')declare(sc,e.pat.name,{val:item,name:e.pat.name,ty:tyName(e.pat),line:e.line});
+        let abandon=false,stop;
+        try{stop=body(e.body,env,box);}
+        catch(x){abandon=x instanceof Limit||x instanceof Unsup;throw x;}
+        finally{
+          env.pop();
+          if(!abandon){if(e.pat.t==='IdentPat')dropScope(sc);else dropValue(item,null,e.line);}
+        }
+        if(stop)break;
+      }
+    }catch(x){
+      bail=x instanceof Limit||x instanceof Unsup;
+      throw x;
+    }finally{
+      if(!bail)it.drop(e.line);
+    }
+    return UNIT;
+  }
   function body(b,env,box){
     try{block(b,env);}
     catch(x){
@@ -568,6 +704,8 @@ RQ.interp=(ast,opts)=>{
         });
         break;
       case 'moved':out.push({path,text:'moved'});break;
+      case 'closure':out.push({path,text:'closure'});break;
+      case 'iter':out.push({path,text:'iterator'});break;
       case 'tuple':case 'array':
         v.v.slice(0,8).forEach((x,i)=>leaves(x,path+(v.k==='array'?'['+i+']':(path?'.':'')+i),out,live));
         if(v.v.length>8)out.push({path:path+'…',text:'… '+(v.v.length-8)+' more'});
@@ -600,6 +738,7 @@ RQ.interp=(ast,opts)=>{
     return set;
   };
   const at=(name,path)=>!path?name:path[0]==='['?name+path:name+'.'+path;
+  const lab=c=>c.label[0]==='['?c.label:'.'+c.label;
   function snapshot(line,end){
     if(!opts.snap)return;
     if(snaps.length>=MAX_SNAPS-(end?0:1))return;
@@ -609,6 +748,7 @@ RQ.interp=(ast,opts)=>{
       if(f.host)cells.push(f.host);
       for(const sc of f.env)cells.push(...sc.own||[]);
       for(const c of cells){
+        if(c.name&&c.name[0]==='#')continue;
         const live=c.val!==null&&!c.moved&&!c.dropped;
         const rec={uid:recs.size,name:c.name,ty:c.ty||'',state:c.val===null?'uninit':c.dropped?'dropped':c.moved?'moved':'owned',leaves:[]};
         if(c.val!==null)leaves(c.val,'',rec.leaves,live);
@@ -623,11 +763,11 @@ RQ.interp=(ast,opts)=>{
       const px=!!l.cell.proxy,to=recs.get(px?l.cell.parent:l.cell),st=loanOf.get(l.loan);
       // without the borrow pass's region a loan is shown as live
       const live=!st||frames.some(f=>f.stmt&&st.live.some(id=>idsOf(f.stmt).has(id)));
-      loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:at(rec.name,l.path),place:to?to.name+(px?'.'+l.cell.label:''):null,live,line:st?st.line:0});
+      loans.push({id:l.loan,kind:l.mut?'mut':'shared',ref:at(rec.name,l.path),place:to?to.name+(px?lab(l.cell):''):null,live,line:st?st.line:0});
       // a borrow of one field does not make the whole variable look borrowed
       if(to&&live&&!px&&!seen.has(to)){seen.add(to);to.n=0;}
       if(to&&live&&!px){to.n++;if(to.state==='owned')to.state=l.mut?'mutBorrowed':'shared';}
-      l.to=to?to.uid:null;l.toName=to?to.name+(px?'.'+l.cell.label:''):null;
+      l.to=to?to.uid:null;l.toName=to?to.name+(px?lab(l.cell):''):null;
     }
     for(const rec of recs.values())for(const l of rec.leaves){delete l.cell;if(l.ref&&l.to===undefined){l.to=null;l.toName=null;}}
     snaps.push({step:steps,line,end:!!end,frames:frs,
@@ -636,42 +776,407 @@ RQ.interp=(ast,opts)=>{
     lastEv=events.length;
   }
 
+  // A closure is {k:'closure',node,scope,owned,kind}: scope holds the cells it captured (shared for a borrow, its own
+  // for a move or copy) and owned lists the latter. An iterator is {k:'iter',next,back,len,drop,heap}: next gives the next item or undefined, so
+  // every adapter pulls from the one before it and side effects happen in the order Rust runs them.
+  const optVal=x=>ctorVal({adt:'Option',variant:x===undefined?0:1},x===undefined?[]:[x]);
+  function dropClosure(c,line){
+    for(let i=c.owned.length-1;i>=0;i--){
+      const x=c.owned[i];
+      if(x.val!==null&&!x.moved&&!x.dropped){x.dropped=true;dropValue(x.val,x.name,line,true);}
+    }
+  }
+  // a Copy closure that owns captures hands each copy its own state
+  function copyClosure(c,line){
+    const scope=new Map(c.scope),owned=c.owned.map(x=>({...x,val:cloneVal(x.val,line)}));
+    c.owned.forEach((x,i)=>{for(const [k,cell] of scope)if(cell===x)scope.set(k,owned[i]);});
+    return {...c,scope,owned};
+  }
+  function makeClosure(e,env){
+    const cl=info.get(e).cl,scope=new Map(),owned=[];
+    for(const c of cl.caps){
+      const outer=find(env,c.name);
+      if(!outer)return bug('capture '+c.name);
+      if(c.mode==='ref'||c.mode==='mut'){scope.set(c.name,outer);continue;}
+      const v=read(outer,e.line);
+      if(hasDrop(v))throw new Unsup('closure that owns a value with Drop',e.line);
+      if(c.mode==='move'){outer.moved=true;note({t:'move',name:c.name,line:e.line});}
+      const cell={val:v,name:c.name,ty:outer.ty,line:outer.line};
+      scope.set(c.name,cell);owned.push(cell);
+    }
+    return {k:'closure',node:e,scope,owned,kind:cl.kind};
+  }
+  let closureCalls=0;
+  function callClosure(f,args,line){
+    closureCalls++;
+    tick();
+    if(depth+1>maxDepth)throw new Limit('depth');
+    depth++;
+    const e=f.node,sc=newScope(),fenv=[f.scope,sc];
+    e.params.forEach((p,i)=>declare(sc,p.pat.name,{val:args[i],name:p.pat.name,ty:tyName(p.pat),line:p.pat.line}));
+    frames.push({fn:'closure',env:fenv,stmt:null});
+    let r,abandon=false;
+    try{r=peel(e.body).t==='Block'?ev(e.body,fenv):mv(e.body,fenv);}
+    catch(x){
+      if(x instanceof Ret)r=x.v;
+      else{if(x instanceof Limit||x instanceof Unsup)abandon=true;throw x;}
+    }
+    finally{
+      if(!abandon)dropScope(sc);
+      depth--;frames.pop();
+    }
+    return r;
+  }
+  // FnOnce takes the closure, so what it still owns drops after the call
+  function closureCall(e,env){
+    const c=peel(e.callee),t=res(typeOf(c)),kind=t.k==='param'?t.fnb.kind:t.kind;
+    const fv=c.t==='Path'&&kind==='FnOnce'?mv(c,env):ev(c,env);
+    const f=unref(fv);
+    const args=mvAll(e.args,env);
+    const r=callClosure(f,args,e.line);
+    if(kind==='FnOnce')dropClosure(f,e.line);
+    return r;
+  }
+  const mkIter=(o,heap)=>({k:'iter',heap:!!heap,...o});
+  const usize=n=>int(BigInt(n),'usize');
+  function rangeIter(lo,hi,ty){
+    return mkIter({next:()=>lo<hi?int(lo++,ty):undefined,back:()=>lo<hi?int(--hi,ty):undefined,len:()=>Number(hi>lo?hi-lo:0n),drop(){}});
+  }
+  function collOf(rv){
+    let r=rv,rg=null,pc=null;
+    while(r.k==='ref'){
+      if(r.range)rg=r.range;
+      pc=r.cell;
+      r=r.cell.val;
+    }
+    return {coll:r,pc,rg,ref:rv.k==='ref',mut:rv.k==='ref'&&rv.mut,loan:rv.k==='ref'?rv.loan:null};
+  }
+  function srcIter(key,e,rv){
+    const name=key.slice(5),line=e.line;
+    if(name==='chars'){
+      const cs=Array.from(unref(rv).v);
+      let lo=0,hi=cs.length;
+      return mkIter({next:()=>lo<hi?{k:'char',v:cs[lo++]}:undefined,back:()=>lo<hi?{k:'char',v:cs[--hi]}:undefined,len:()=>hi-lo,drop(){}});
+    }
+    const w=collOf(rv),coll=w.coll,map=coll.k==='map';
+    const owned=!w.ref&&name==='into_iter',mut=name==='iter_mut'||name==='values_mut'||w.mut&&name==='into_iter';
+    const loan=w.loan??e.id;
+    if(owned&&(map?coll.v.some(en=>hasDrop(en.key)||hasDrop(en.val)):coll.v.some(hasDrop)))throw new Unsup('iterator over values with Drop',line);
+    if(!map){
+      let lo=w.rg?w.rg[0]:0,hi=w.rg?w.rg[1]:coll.v.length;
+      const item=i=>owned?coll.v[i]:{k:'ref',cell:elemCell(coll,i,w.pc),mut,loan};
+      return mkIter({
+        next:()=>lo<hi?item(lo++):undefined,back:()=>lo<hi?item(--hi):undefined,len:()=>hi-lo,
+        drop(l){
+          if(!owned)return;
+          for(;lo<hi;lo++)dropValue(coll.v[lo],null,l);
+          if(coll.id!==undefined){heap.delete(coll.id);note({t:'free',id:coll.id,line:l});}
+        }
+      },owned&&coll.k==='vec');
+    }
+    const list=RQ.std.hashOrder(coll);
+    let lo=0,hi=list.length;
+    const item=i=>{
+      const en=list[i];
+      if(owned)return {k:'tuple',v:[en.key,en.val]};
+      const kr={k:'ref',cell:entryCell(coll,en,w.pc,'key'),mut:false,loan},vr={k:'ref',cell:entryCell(coll,en,w.pc,'value'),mut,loan};
+      return name==='keys'?kr:name==='values'||name==='values_mut'?vr:{k:'tuple',v:[kr,vr]};
+    };
+    return mkIter({
+      next:()=>lo<hi?item(lo++):undefined,back:()=>undefined,len:()=>hi-lo,
+      drop(l){
+        if(!owned)return;
+        for(;lo<hi;lo++){const en=list[lo];dropValue(en.key,null,l);dropValue(en.val,null,l);}
+        heap.delete(coll.id);note({t:'free',id:coll.id,line:l});
+      }
+    },owned);
+  }
+  const itemRef=(x,e)=>({k:'ref',cell:{val:x},mut:false,loan:e.id});
+  function sumOf(it,e,prod){
+    const t=res(typeOf(e));
+    let acc=t.k==='float'?{k:'float',v:prod?1:0}:int(prod?1n:0n,t.ty);
+    for(let x=it.next();x!==undefined;x=it.next()){
+      tick();
+      const y=unref(x);
+      if(acc.k==='float')acc={k:'float',v:prod?acc.v*y.v:acc.v+y.v};
+      else{
+        const r=prod?acc.v*y.v:acc.v+y.v;
+        if(!fits(r,t.ty))throw new Unsup('iterator sum overflow',e.line);
+        acc=int(r,t.ty);
+      }
+    }
+    return acc;
+  }
+  function collectInto(it,e){
+    const t=res(typeOf(e)),items=[];
+    for(let x=it.next();x!==undefined;x=it.next()){tick();items.push(x);}
+    if(t.k==='String'){
+      let s='';
+      for(const x of items){s+=unref(x).v;dropValue(x,null,e.line);}
+      return string(s,undefined,e.line);
+    }
+    if(t.k==='coll'&&t.name==='Vec')return coll('vec',items,show(t),e.line,!items.length);
+    const m=coll('map',[],show(t),e.line,!items.length);
+    for(const x of items){
+      const [k,v]=x.v,old=mapFind(m,k);
+      if(!old)m.v.push({key:k,val:v});
+      else{const prev=old.val;old.val=v;dropValue(k,null,e.line);dropValue(prev,null,e.line);}
+    }
+    return m;
+  }
+  function iterOp(key,e,rv,args){
+    const name=key.slice(6),line=e.line,src=unref(rv);
+    const f=args[0];
+    const wrap=o=>mkIter({drop(l){src.drop(l);if(f&&f.k==='closure')dropClosure(f,l);},len:()=>src.len(),...o},src.heap);
+    switch(name){
+      case 'map':return wrap({next:()=>{const x=src.next();return x===undefined?undefined:callClosure(f,[x],line);},back:()=>{const x=src.back();return x===undefined?undefined:callClosure(f,[x],line);}});
+      case 'filter':{
+        const pull=get=>()=>{for(;;){const x=get();if(x===undefined)return undefined;if(callClosure(f,[itemRef(x,e)],line).v)return x;dropValue(x,null,line);}};
+        return wrap({next:pull(()=>src.next()),back:pull(()=>src.back())});
+      }
+      case 'take_while':{
+        let done=false;
+        return wrap({next:()=>{
+          if(done)return undefined;
+          const x=src.next();
+          if(x===undefined)return undefined;
+          if(callClosure(f,[itemRef(x,e)],line).v)return x;
+          done=true;dropValue(x,null,line);return undefined;
+        }});
+      }
+      case 'skip_while':{
+        let going=true;
+        return wrap({next:()=>{
+          for(;;){
+            const x=src.next();
+            if(x===undefined)return undefined;
+            if(going&&callClosure(f,[itemRef(x,e)],line).v){dropValue(x,null,line);continue;}
+            going=false;return x;
+          }
+        }});
+      }
+      case 'enumerate':{
+        let i=0;
+        return wrap({next:()=>{const x=src.next();return x===undefined?undefined:{k:'tuple',v:[usize(i++),x]};},
+          back:()=>{const n=src.len(),x=src.back();return x===undefined?undefined:{k:'tuple',v:[usize(i+n-1),x]};}});
+      }
+      case 'rev':return mkIter({next:()=>src.back(),back:()=>src.next(),len:()=>src.len(),drop:l=>src.drop(l)},src.heap);
+      case 'take':case 'skip':{
+        let n=Number(unref(f).v),started=false;
+        const first=()=>{if(name==='skip'&&!started){started=true;for(;n>0;n--){const x=src.next();if(x===undefined)break;dropValue(x,null,line);}}};
+        return mkIter({next:()=>{
+          if(name==='take'){if(n<=0)return undefined;n--;return src.next();}
+          first();return src.next();
+        },len:()=>name==='take'?Math.min(n,src.len()):Math.max(0,src.len()-(started?0:n)),drop:l=>src.drop(l)},src.heap);
+      }
+      case 'zip':{
+        const o=f.k==='iter'?f:srcIter('Src::into_iter',e,f);
+        return mkIter({next:()=>{
+          const before=closureCalls,a=src.next(),ranA=closureCalls!==before;
+          if(a===undefined)return undefined;
+          const b=o.next();
+          // rustc skips this extra left pull for exact-size random-access sides but not for filter, chars() and the like, so a closure run here is not modelled
+          if(b===undefined){if(ranA)throw new Unsup('zip with a side effect on its longer side',line);dropValue(a,null,line);return undefined;}
+          return {k:'tuple',v:[a,b]};
+        },len:()=>Math.min(src.len(),o.len()),drop:l=>{src.drop(l);o.drop(l);}},src.heap||o.heap);
+      }
+      case 'copied':case 'cloned':{
+        const cp=x=>{const y=unref(x);return name==='cloned'?cloneVal(y,line):y;};
+        return wrap({next:()=>{const x=src.next();return x===undefined?undefined:cp(x);},back:()=>{const x=src.back();return x===undefined?undefined:cp(x);}});
+      }
+      case 'count':{let n=0;for(let x=src.next();x!==undefined;x=src.next()){tick();n++;dropValue(x,null,line);}src.drop(line);return usize(n);}
+      case 'sum':case 'product':{const r=sumOf(src,e,name==='product');src.drop(line);return r;}
+      case 'collect':{const r=collectInto(src,e);src.drop(line);return r;}
+      case 'last':{let l;for(let x=src.next();x!==undefined;x=src.next()){tick();if(l!==undefined)dropValue(l,null,line);l=x;}src.drop(line);return optVal(l);}
+      case 'min':case 'max':{
+        let best;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          if(best===undefined){best=x;continue;}
+          const c=cmpv(x,best);
+          if(name==='min'?c<0:c>=0){dropValue(best,null,line);best=x;}else dropValue(x,null,line);
+        }
+        src.drop(line);return optVal(best);
+      }
+      case 'fold':{
+        let acc=args[0];
+        for(let x=src.next();x!==undefined;x=src.next()){tick();acc=callClosure(args[1],[acc,x],line);}
+        src.drop(line);dropClosure(args[1],line);return acc;
+      }
+      case 'for_each':{for(let x=src.next();x!==undefined;x=src.next()){tick();callClosure(f,[x],line);}src.drop(line);dropClosure(f,line);return UNIT;}
+      case 'any':case 'all':{
+        let r=name==='all';
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          const y=callClosure(f,[x],line).v;
+          if(name==='any'&&y){r=true;break;}
+          if(name==='all'&&!y){r=false;break;}
+        }
+        dropClosure(f,line);return bool(r);
+      }
+      case 'position':{
+        let i=0,r;
+        for(let x=src.next();x!==undefined;x=src.next(),i++){tick();if(callClosure(f,[x],line).v){r=usize(i);break;}}
+        dropClosure(f,line);return optVal(r);
+      }
+      case 'find':{
+        let r;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          if(callClosure(f,[itemRef(x,e)],line).v){r=x;break;}
+          dropValue(x,null,line);
+        }
+        dropClosure(f,line);return optVal(r);
+      }
+      case 'next':return optVal(src.next());
+    }
+    return bug('iterator '+name);
+  }
   function userMethod(e,env){
     const u=info.get(e).um;
     let rv;
     if(u.ref)rv=u.adj==='copy'?read(ev(e.recv,env).cell,e.line):ev(e.recv,env);
     else if(u.adj==='val')rv=mv(e.recv,env);
     else{
-      const pl=isPlace(e.recv)&&placeOf(e.recv,env);
+      const pl=isPlace(e.recv)&&placeOf(e.recv,env),r0=peel(e.recv);
       if(pl){read(pl.cell,e.line);rv={k:'ref',cell:fieldCell(pl.cell,pl.path),mut:u.adj==='&mut',loan:pl.loan??e.id};}
+      else if(r0.t==='Index'&&isVecIdx(r0))rv={k:'ref',cell:indexCell(r0,env),mut:u.adj==='&mut',loan:e.id};
       else{
         const v=ev(e.recv,env);
         if(owns(v))temps.push({v,line:e.line});
         rv={k:'ref',cell:{val:v},mut:u.adj==='&mut',loan:e.id};
       }
     }
-    const args=mvAll(e.args,env),f=methodFns.get(u.key);
-    if(f)return callFn(f,[rv,...args],e.line,u.key);
+    const args=mvAll(e.args,env);
+    let key=u.key;
+    if(key.startsWith('dyn:')){const v=unref(rv);key=(v.k==='struct'||v.k==='enum'?v.name:v.k)+key.slice(key.lastIndexOf('::'));}
+    const f=methodFns.get(key);
+    if(f)return callFn(f,[rv,...args],e.line,key);
     return builtinMethod(u.key,e,rv,args);
   }
+  const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
-    const at={line:e.nline,col:e.ncol};
+    if(key==='Into::id')return rv;
+    if(key.startsWith('Src::'))return srcIter(key,e,rv);
+    if(key.startsWith('Iter::'))return iterOp(key,e,rv,args);
+    if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
+    const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
     if(key==='Clone::clone'||key.endsWith('::clone'))return cloneVal(rv,e.line);
     if(key.startsWith('Vec::')||key.startsWith('HashMap::')){
       const c=unref(rv);
+      const none=()=>ctorVal({adt:'Option',variant:0},[]),some=x=>ctorVal({adt:'Option',variant:1},[x]);
+      const cell=(function(){let r=rv;while(r.cell.val.k==='ref')r=r.cell.val;return r.cell;})();
+      const eref=(k,mut)=>({k:'ref',cell:elemCell(c,k,cell),mut,loan:e.id});
+      const vref=(en,mut)=>({k:'ref',cell:entryCell(c,en,cell,'value'),mut,loan:e.id});
+      const at=n=>Number(unref(n).v);
+      const insertEntry=(k,v)=>{
+        const old=mapFind(c,k);
+        if(!old){c.v.push({key:k,val:v});return null;}
+        const prev=old.val;
+        old.val=v;
+        dropValue(k,null,e.line);
+        return prev;
+      };
+      const consume=a=>{if(a.k==='vec'||a.k==='map'){heap.delete(a.id);note({t:'free',id:a.id,line:e.line});}};
       switch(key.slice(key.indexOf('::')+2)){
         case 'len':return int(BigInt(c.v.length),'usize');
         case 'is_empty':return bool(!c.v.length);
         case 'push':c.v.push(args[0]);return UNIT;
         case 'insert':{
-          const old=mapFind(c,args[0]);
-          if(!old){c.v.push({key:args[0],val:args[1]});return ctorVal({adt:'Option',variant:0},[]);}
-          // the map keeps its first key and drops the new one
-          const prev=old.val;
-          old.val=args[1];
-          dropValue(args[0],null,e.line);
-          return ctorVal({adt:'Option',variant:1},[prev]);
+          if(c.k==='vec'){
+            const k=at(args[0]);
+            if(k>c.v.length)throw panic('insertion index (is '+k+') should be <= len (is '+c.v.length+')',at0);
+            c.v.splice(k,0,args[1]);return UNIT;
+          }
+          const prev=insertEntry(args[0],args[1]);
+          return prev===null?none():some(prev);
+        }
+        case 'pop':return c.v.length?some(c.v.pop()):none();
+        case 'clear':{
+          const es=c.v.splice(0);
+          if(c.k==='vec')es.forEach(x=>dropValue(x,null,e.line));
+          else(es.length>1&&es.some(en=>hasDrop(en.key)||hasDrop(en.val))?RQ.std.hashOrder({v:es}):es).forEach(en=>{dropValue(en.key,null,e.line);dropValue(en.val,null,e.line);});
+          return UNIT;
+        }
+        case 'remove':{
+          if(c.k==='vec'){
+            const k=at(args[0]);
+            if(k>=c.v.length)throw panic('removal index (is '+k+') should be < len (is '+c.v.length+')',at0);
+            return c.v.splice(k,1)[0];
+          }
+          const i=c.v.findIndex(en=>eqv(en.key,args[0]));
+          if(i<0)return none();
+          const [en]=c.v.splice(i,1);
+          dropValue(en.key,null,e.line);
+          return some(en.val);
+        }
+        case 'truncate':{
+          const k=at(args[0]);
+          if(k<c.v.length)c.v.splice(k).forEach(x=>dropValue(x,null,e.line));
+          return UNIT;
+        }
+        case 'swap':{
+          const a=at(args[0]),b=at(args[1]);
+          for(const k of [a,b])if(k>=c.v.length)throw panic('index out of bounds: the len is '+c.v.length+' but the index is '+k,at0);
+          [c.v[a],c.v[b]]=[c.v[b],c.v[a]];return UNIT;
+        }
+        case 'reverse':c.v.reverse();return UNIT;
+        case 'sort_by_key':{
+          const f=args[0];
+          if(f.kind!=='Fn')throw new Unsup('sort_by_key with side effects',e.line);
+          const ks=c.v.map((_,i)=>callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line));
+          const order=c.v.map((_,i)=>i).sort((a,b)=>cmpv(ks[a],ks[b])||a-b);
+          const old=c.v.slice();
+          order.forEach((o,i)=>{c.v[i]=old[o];});
+          dropClosure(f,e.line);
+          return UNIT;
+        }
+        case 'retain':{
+          const f=args[0],map=c.k==='map',keep=[];
+          const all=map?RQ.std.hashOrder(c):c.v.slice();
+          all.forEach((x,i)=>{
+            const r=map?callClosure(f,[{k:'ref',cell:entryCell(c,x,cell,'key'),mut:false,loan:e.id},{k:'ref',cell:entryCell(c,x,cell,'value'),mut:true,loan:e.id}],e.line)
+              :callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line);
+            if(r.v)keep.push(x);
+            else if(map){dropValue(x.key,null,e.line);dropValue(x.val,null,e.line);}
+            else dropValue(x,null,e.line);
+          });
+          c.v.splice(0,c.v.length,...(map?c.v.filter(en=>keep.includes(en)):keep));
+          dropClosure(f,e.line);
+          return UNIT;
+        }
+        case 'sort':c.v.sort((x,y)=>cmpv(x,y));return UNIT;
+        case 'contains':return bool(c.v.some(x=>eqv(x,args[0])));
+        case 'contains_key':return bool(!!mapFind(c,args[0]));
+        case 'get':case 'get_mut':{
+          const mut=key.endsWith('get_mut');
+          if(c.k==='vec'){const k=at(args[0]);return k<c.v.length?some(eref(k,mut)):none();}
+          const en=mapFind(c,args[0]);
+          return en?some(vref(en,mut)):none();
+        }
+        case 'first':return c.v.length?some(eref(0,false)):none();
+        case 'last':return c.v.length?some(eref(c.v.length-1,false)):none();
+        case 'extend':{
+          const a=unref(args[0]);
+          if(c.k==='vec')for(const x of a.v)c.v.push(x);
+          else if(a.k==='map')for(const en of RQ.std.hashOrder(a)){const prev=insertEntry(en.key,en.val);if(prev!==null)dropValue(prev,null,e.line);}
+          else for(const t of a.v){const prev=insertEntry(t.v[0],t.v[1]);if(prev!==null)dropValue(prev,null,e.line);}
+          consume(a);
+          return UNIT;
+        }
+        case 'entry.or_insert_with':{
+          let en=mapFind(c,args[0]);
+          if(en){dropValue(args[0],null,e.line);dropClosure(args[1],e.line);}
+          else{en={key:args[0],val:callClosure(args[1],[],e.line)};c.v.push(en);dropClosure(args[1],e.line);}
+          return vref(en,true);
+        }
+        case 'entry.or_insert':case 'entry.or_default':{
+          let en=mapFind(c,args[0]);
+          const dflt=key.endsWith('default');
+          if(en){dropValue(args[0],null,e.line);if(!dflt)dropValue(args[1],null,e.line);}
+          else{en={key:args[0],val:dflt?defaultVal(res(typeOf(e)).to,e.line):args[1]};c.v.push(en);}
+          return vref(en,true);
         }
       }
       return bug('method '+key);
@@ -679,6 +1184,25 @@ RQ.interp=(ast,opts)=>{
     const v=unref(rv),opt=key.startsWith('Option::');
     const ok=opt?v.variant==='Some':v.variant==='Ok';
     switch(key.slice(key.indexOf('::')+2)){
+      case 'map':case 'and_then':case 'unwrap_or_else':case 'filter':case 'is_some_and':case 'ok_or_else':case 'map_or':case 'map_err':{
+        const nm=key.slice(key.indexOf('::')+2),f=nm==='map_or'?args[1]:args[0],line=e.line;
+        const mk=(variant,x)=>ctorVal({adt:opt?'Option':'Result',variant},x===undefined?[]:[x]);
+        const pay=v.fields.length?v.fields[0].val:undefined;
+        let r;
+        if(nm==='map')r=ok?mk(opt?1:0,callClosure(f,[pay],line)):v;
+        else if(nm==='map_err')r=ok?v:mk(1,callClosure(f,[pay],line));
+        else if(nm==='and_then')r=ok?callClosure(f,[pay],line):v;
+        else if(nm==='unwrap_or_else')r=ok?pay:callClosure(f,opt?[]:[pay],line);
+        else if(nm==='is_some_and')r=bool(ok&&callClosure(f,[pay],line).v);
+        else if(nm==='ok_or_else')r=ok?ctorVal({adt:'Result',variant:0},[pay]):ctorVal({adt:'Result',variant:1},[callClosure(f,[],line)]);
+        else if(nm==='map_or'){if(ok){dropValue(args[0],null,line);r=callClosure(f,[pay],line);}else r=args[0];}
+        else{
+          if(ok&&callClosure(f,[itemRef(pay,e)],line).v)r=v;
+          else{if(ok)dropValue(pay,null,line);r=mk(0);}
+        }
+        dropClosure(f,line);
+        return r;
+      }
       case 'is_some':case 'is_none':case 'is_ok':case 'is_err':return bool(key.endsWith('some')||key.endsWith('is_ok')?ok:!ok);
       case 'unwrap':case 'expect':{
         if(ok)return v.fields[0].val;
@@ -686,7 +1210,34 @@ RQ.interp=(ast,opts)=>{
         const why=opt?msg??'called `Option::unwrap()` on a `None` value'
           :(msg??'called `Result::unwrap()` on an `Err` value')+': '+RQ.std.debug(v.fields[0].val,tick,MAX_OUTPUT);
         if(!opt)dropValue(v.fields[0].val,null,e.line);
-        throw panic(why,at);
+        throw panic(why,at0);
+      }
+      case 'copied':case 'cloned':{
+        if(!ok)return v;
+        const x=unref(v.fields[0].val);
+        return ctorVal({adt:'Option',variant:1},[key.endsWith('cloned')?cloneVal(x,e.line):x]);
+      }
+      case 'ok':case 'err':{
+        const keep=key.endsWith('::ok')===ok,x=v.fields[0].val;
+        if(keep)return ctorVal({adt:'Option',variant:1},[x]);
+        dropValue(x,null,e.line);
+        return ctorVal({adt:'Option',variant:0},[]);
+      }
+      case 'ok_or':{
+        if(ok){dropValue(args[0],null,e.line);return ctorVal({adt:'Result',variant:0},[v.fields[0].val]);}
+        return ctorVal({adt:'Result',variant:1},[args[0]]);
+      }
+      case 'unwrap_err':case 'expect_err':{
+        const x=v.fields[0].val;
+        if(!ok)return x;
+        const why=(key.endsWith('expect_err')?unref(args[0]).v:'called `Result::unwrap_err()` on an `Ok` value')+': '+RQ.std.debug(x,tick,MAX_OUTPUT);
+        dropValue(x,null,e.line);
+        throw panic(why,at0);
+      }
+      case 'unwrap_or_default':{
+        if(ok)return v.fields[0].val;
+        if(!opt)dropValue(v.fields[0].val,null,e.line);
+        return defaultVal(res(typeOf(e)),e.line);
       }
       case 'unwrap_or':{
         if(ok){dropValue(args[0],null,e.line);return v.fields[0].val;}
@@ -696,10 +1247,54 @@ RQ.interp=(ast,opts)=>{
     }
     return bug('method '+key);
   }
+  const patLitVal=n=>{
+    if(n.t==='Unary')return -patLitVal(n.expr);
+    if(n.t==='Path')return RQ.types.INT[n.segs[0].name][n.segs[1].name==='MIN'?0:1];
+    return n.kind==='int'?BigInt(n.v):n.v;
+  };
+  const patNum=v=>typeof v==='string'?BigInt(v.codePointAt(0)):v;
+  function pmatch(p,v){
+    tick();
+    const x=unref(v);
+    switch(p.t){
+      case 'Wild':return true;
+      case 'IdentPat':{
+        const o=info.get(p);
+        return !o||o.bpath===undefined?x.variant===p.name:!p.sub||pmatch(p.sub,v);
+      }
+      case 'Or':return p.alts.some(a=>pmatch(a,v));
+      case 'LitPat':{
+        return x.v===patLitVal(p.lit);
+      }
+      case 'RangePat':{
+        const n=patNum(x.v),lo=p.lo&&patNum(patLitVal(p.lo)),hi=p.hi&&patNum(patLitVal(p.hi));
+        return (lo===null||n>=lo)&&(hi===null||(p.inclusive?n<=hi:n<hi));
+      }
+      case 'TuplePat':{
+        const ri=p.pats.findIndex(q=>q.t==='Rest'),len=x.k==='unit'?0:x.v.length;
+        return p.pats.every((q,i)=>q.t==='Rest'||pmatch(q,x.v[ri>=0&&i>ri?len-(p.pats.length-i):i]));
+      }
+      case 'PathPat':return x.k==='struct'||x.variant===p.path.segs[p.path.segs.length-1].name;
+      case 'TupleStructPat':{
+        if(x.k==='enum'&&x.variant!==p.path.segs[p.path.segs.length-1].name)return false;
+        const ri=p.pats.findIndex(q=>q.t==='Rest'),len=x.fields.length;
+        return p.pats.every((q,i)=>q.t==='Rest'||pmatch(q,x.fields[ri>=0&&i>ri?len-(p.pats.length-i):i].val));
+      }
+      case 'StructPat':
+        if(x.k==='enum'&&x.variant!==p.path.segs[p.path.segs.length-1].name)return false;
+        return p.fields.every(f=>pmatch(f.pat,x.fields.find(y=>y.name===f.name).val));
+      default:return bug('pattern '+p.t);
+    }
+  }
+  const patBinds=p=>{
+    const out=[];
+    RQ.walk(p,n=>{if(n.t==='IdentPat'&&info.get(n)&&info.get(n).bpath!==undefined)out.push(n);});
+    return out;
+  };
   function matchEx(e,env){
-    const mi=info.get(e).match,sc=peel(e.scrut);
+    const mi=info.get(e).match,sc=peel(e.scrut),mark=temps.length;
     let val,cell,ref=null,base=null;
-    if(mi.mode==='ref'){
+    if(mi.ref){
       ref=ev(sc,env);cell=ref.cell;val=cell.val;
     }else{
       val=ev(sc,env);
@@ -709,43 +1304,55 @@ RQ.interp=(ast,opts)=>{
         if(owns(val))temps.push({cell,line:e.line});
       }
     }
-    const arm=e.arms.find(a=>{
-      const p=a.pat;
-      if(p.t==='Wild'||p.t==='IdentPat'&&info.get(p).sel!==undefined)return true;
-      return val.variant===(p.t==='IdentPat'?p.name:p.path.segs[p.path.segs.length-1].name);
-    });
-    const scope=newScope(),p=arm.pat,bindings=[];
-    if(p.t==='IdentPat'&&info.get(p).sel==='')bindings.push([p,'']);
-    else if(p.t==='TupleStructPat'){for(const sp of p.pats)if(sp.t==='IdentPat')bindings.push([sp,info.get(sp).sel]);}
-    else if(p.t==='StructPat'){for(const f of p.fields)if(f.pat.t==='IdentPat')bindings.push([f.pat,info.get(f.pat).sel]);}
-    env.push(scope);
-    let abandon=false;
-    try{
-      for(const [sp,sel] of bindings){
-        const fname=sel.slice(sel.indexOf('.')+1);
+    const bindAll=(scope,a,moving)=>{
+      for(const sp of patBinds(a.pat)){
+        const o=info.get(sp),path=o.bpath.map(q=>q.f);
         let v;
-        if(sel===''){
+        if(o.bmode==='ref')v={k:'ref',cell:fieldCell(cell,path),mut:false,loan:ref.loan};
+        else if(!path.length){
           if(ref)v=ref;
+          else if(!moving)v=val;
           else if(mi.place)v=mv(e.scrut,env);
           else{v=val;if(!isCopy(typeOf(sp)))cell.moved=true;}
-        }else if(ref)v={k:'ref',cell:fieldCell(cell,[fname]),mut:false,loan:ref.loan};
-        else{
-          const fld=val.fields.find(f=>f.name===fname);
-          v=fld.val;
-          if(!isCopy(typeOf(sp))){
-            fld.val=MOVED;
-            note({t:'move',name:base&&base+'.'+fname,line:sp.line});
+        }else{
+          const h=holderAt(val,path);
+          v=h.val;
+          if(moving&&!isCopy(typeOf(sp))){
+            h.val=MOVED;
+            note({t:'move',name:base&&base+'.'+path.join('.'),line:sp.line});
           }
         }
         declare(scope,sp.name,{val:v,name:sp.name,ty:tyName(sp),line:sp.line});
       }
+    };
+    let arm=null;
+    for(const a of e.arms){
+      if(!pmatch(a.pat,val))continue;
+      if(a.guard){
+        const probe=newScope();
+        env.push(probe);
+        try{bindAll(probe,a,false);if(!cond(a.guard,env))continue;}finally{env.pop();}
+      }
+      arm=a;break;
+    }
+    if(!arm)return bug('match');
+    const scope=newScope();
+    env.push(scope);
+    let abandon=false;
+    const lastIfLet=e.kind==='iflet'&&arm===e.arms[1];
+    try{
+      bindAll(scope,arm,true);
+      if(e.kind==='let'||e.kind==='letelse'||lastIfLet)dropTemps(mark);
       return mv(arm.body,env);
     }catch(x){
       if(x instanceof Limit||x instanceof Unsup)abandon=true;
       throw x;
     }finally{
       env.pop();
-      if(!abandon)dropScope(scope);
+      if(!abandon){
+        dropScope(scope);
+        if(e.kind==='iflet'||e.kind==='whilelet')dropTemps(mark);
+      }
     }
   }
 
@@ -790,6 +1397,14 @@ RQ.interp=(ast,opts)=>{
           const rv=ev(e.lhs.expr,env);
           if(rv.k!=='ref')throw new Unsup('assignment target',e.line);
           cell=rv.cell;
+        }else if(peel(e.lhs).t==='Index'){
+          let r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env),ic;
+          try{ic=indexCell(peel(e.lhs),env);}catch(x){if(x instanceof Panic&&e.op==='=')dropValue(r,null,e.line);throw x;}
+          const old=ic.val;
+          if(e.op!=='=')r=binop(e.op.slice(0,-1),old,r,e);
+          else dropValue(old,ic.name,e.line,true);
+          ic.val=r;
+          return UNIT;
         }else if(peel(e.lhs).t==='Field'){
           const pl=placeOf(e.lhs,env);
           if(!pl)throw new Unsup('assignment target',e.line);
@@ -806,8 +1421,14 @@ RQ.interp=(ast,opts)=>{
         else if(cell.val!==null&&!cell.moved&&!cell.dropped)dropValue(cell.val,cell.name,e.line);
         cell.val=r;cell.moved=false;cell.dropped=false;return UNIT;
       }
+      case 'Closure':return makeClosure(e,env);
+      case 'Range':{
+        const a=ev(e.from,env),b=ev(e.to,env);
+        return rangeIter(a.v,e.inclusive?b.v+1n:b.v,a.ty);
+      }
       case 'Call':{
         const o=info.get(e)||{};
+        if(o.cc)return closureCall(e,env);
         if(o.ctor)return ctorVal(o.ctor,mvAll(e.args,env));
         if(o.dflt)return defaultVal(o.dflt,e.line);
         if(o.sig&&o.sig.key)return callFn(methodFns.get(o.sig.key),mvAll(e.args,env),e.line,o.sig.key);
@@ -834,7 +1455,10 @@ RQ.interp=(ast,opts)=>{
           read(pl.cell,x.line);
           return {k:'ref',cell:fieldCell(pl.cell,pl.path),mut:e.mut,loan:pl.loan??e.id};
         }
-        if(x.t==='Index')throw new Unsup('borrow of a field',e.line);
+        if(x.t==='Index'){
+          if(!isVecIdx(x))throw new Unsup('borrow of a field',e.line);
+          return {k:'ref',cell:indexCell(x,env),mut:e.mut,loan:e.id};
+        }
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
@@ -850,12 +1474,12 @@ RQ.interp=(ast,opts)=>{
         if(!RQ.std.methods.has(e.name))throw new Unsup('method call',e.line);
         if(e.name==='push_str'){
           const r=peel(e.recv);
-          if(r.t==='Index')throw new Unsup('borrow of a field',e.line);
-          const c=cellOf(r,env),add=unref(ev(e.args[0],env)).v;
+          if(r.t==='Index'&&!isVecIdx(r))throw new Unsup('borrow of a field',e.line);
+          const c=r.t==='Index'?indexCell(r,env):cellOf(r,env),add=unref(ev(e.args[0],env)).v;
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
         const rv=ev(e.recv,env);
-        if(e.name==='len'&&(rv.k==='array'||rv.k==='ref'&&rv.cell.val.k==='array'))return int(BigInt(view(rv).len),'usize');
+        if(e.name==='len'&&(rv.k==='array'||rv.k==='ref'&&(rv.cell.val.k==='array'||rv.cell.val.k==='vec')))return int(BigInt(view(rv).len),'usize');
         const s=unref(rv).v;
         if(rv.k==='String'&&!isPlace(e.recv))temps.push({v:rv,line:e.line});
         if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
@@ -865,6 +1489,12 @@ RQ.interp=(ast,opts)=>{
       case 'Macro':return e.name==='vec'?vecMacro(e,env):macro(e,env);
       case 'Block':return block(e,env);
       case 'Return':throw new Ret(e.expr?mv(e.expr,env):UNIT);
+      case 'Try':{
+        const v=mv(e.expr,env),conv=(info.get(e)||{}).conv;
+        if(v.variant==='Ok'||v.variant==='Some')return v.fields[0].val;
+        if(conv)throw new Ret(ctorVal({adt:'Result',variant:1},[callFn(methodFns.get(conv),[v.fields[0].val],e.line,conv)]));
+        throw new Ret(v);
+      }
       case 'Tuple':return e.elems.length?{k:'tuple',v:mvAll(e.elems,env)}:UNIT;
       case 'Array':return {k:'array',v:mvAll(e.elems,env)};
       case 'StructLit':{
@@ -876,7 +1506,7 @@ RQ.interp=(ast,opts)=>{
       case 'ArrayRepeat':{const v=ev(e.elem,env);return {k:'array',v:Array(Number(e.len.v)).fill(v)};}
       case 'Index':{
         const a=view(ev(e.expr,env)),i=ev(e.index,env);
-        if(i.v>=BigInt(a.len))throw panic('index out of bounds: the len is '+a.len+' but the index is '+i.v,e);
+        if(i.v>=BigInt(a.len))throw panic('index out of bounds: the len is '+a.len+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
         return a.arr[a.off+Number(i.v)];
       }
       case 'Field':{
@@ -896,6 +1526,9 @@ RQ.interp=(ast,opts)=>{
         for(;;){tick();if(!cond(e.cond,env)||body(e.body,env,box))return UNIT;}
       }
       case 'For':{
+        const fi=info.get(e).fi;
+        if(fi)return forColl(e,fi,env);
+        if(info.get(e).iterFor)return forIter(e,env);
         const r=peel(e.iter),from=ev(r.from,env),to=ev(r.to,env),box={v:UNIT},end=r.inclusive?to.v+1n:to.v;
         for(let i=from.v;i<end;i++){
           tick();
@@ -911,12 +1544,17 @@ RQ.interp=(ast,opts)=>{
     }
   }
 
-  const extra=()=>({events,snaps});
+  const extra=()=>({events,snaps,hashIterated:sess.iterated});
   try{
     // rustc range-checks every const; the lint pass reports an overflow, so a const only fails here on a shape it cannot model
     for(const n of consts.keys())constVal(n);
-    callFn(fns.get('main'),[],1);
+    const ret=callFn(fns.get('main'),[],1);
     snapshot(snaps.length?snaps[snaps.length-1].line:1,true);
+    if(ret&&ret.variant==='Err'){
+      err+='Error: '+RQ.std.debug(ret.fields[0].val,tick,MAX_OUTPUT)+'\n';
+      dropValue(ret,null,1);
+      return {status:'ok',stdout:out,stderr:err,exit:1,...extra()};
+    }
     return {status:'ok',stdout:out,stderr:err,exit:0,...extra()};
   }catch(x){
     // a value nested thousands deep overflows the JS stack in drop, clone, == or Debug

@@ -80,6 +80,12 @@ RQ.lint=(ast,info)=>{
     return r===undefined?null:boolv(r,amb2(a,b));
   }
 
+  // the arm of a desugared destructuring let holds the rest of the block, so it is straight-line code
+  function destructure(p,v,fresh){
+    if(p.t==='IdentPat'){const bd=!p.sub&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
+    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i,false),fresh));
+  }
+
   function block(b){
     for(const s of b.stmts){
       if(div)return null;
@@ -169,6 +175,7 @@ RQ.lint=(ast,info)=>{
         for(const a of e.args)ev(a);
         barrier();return null;
       }
+      case 'Try':ev(e.expr);barrier();return null;
       case 'Assign':{
         // a write to a field leaves the folded value of its root unknown
         if(e.lhs.t==='Field'||e.lhs.t==='Index'){
@@ -191,13 +198,24 @@ RQ.lint=(ast,info)=>{
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
         for(const a of args)ev(a);
-        barrier();return null;
+        barrier();
+        if(e.name==='panic')div=true;
+        return null;
       }
       case 'Index':{
         const a=ev(e.expr),i=ev(e.index),n=(info.get(e)||{}).alen;
         if(i&&i.k==='int'&&n!==undefined&&i.v>=BigInt(n))trap('unconditional_panic',e,{why:'index out of bounds: the length is '+n+' but the index is '+i.v},i.amb);
         barrier();
         return i&&i.k==='int'&&part(a,Number(i.v),i.amb);
+      }
+      case 'Closure':{
+        // the body runs later and its captures are unknown here, but a lint inside it is still rustc's
+        const keep=st,was=div;
+        st=new Map();div=false;
+        ev(e.body);
+        st=keep;div=was;
+        forget(assignedIn(e));barrier();
+        return null;
       }
       case 'Tuple':case 'Array':return {k:'agg',els:e.elems.map(ev)};
       case 'StructLit':for(const f of e.fields)ev(f.expr);return null;
@@ -227,6 +245,11 @@ RQ.lint=(ast,info)=>{
         return null;
       }
       case 'Match':{
+        if(e.kind==='let'){
+          const before=barriers,v=ev(e.scrut);
+          destructure(e.arms[0].pat,v,barriers===before);
+          return ev(e.arms[0].body);
+        }
         ev(e.scrut);barrier();
         const base=snap();
         let all=e.arms.length>0;
@@ -254,7 +277,7 @@ RQ.lint=(ast,info)=>{
       }
       case 'For':{
         const r=peel(e.iter);
-        if(r.from)ev(r.from);if(r.to)ev(r.to);
+        if(r.t==='Range'){if(r.from)ev(r.from);if(r.to)ev(r.to);}else ev(e.iter);
         loopBody(e,null);return null;
       }
       default:return null;
@@ -272,7 +295,7 @@ RQ.lint=(ast,info)=>{
   }
 
   for(const n of consts.keys())constKnown(n);
-  const fns=ast.items.flatMap(it=>it.t==='Fn'?[it]:it.t==='Impl'&&!it.trait?it.items:[]);
+  const fns=RQ.fnItems(ast).map(x=>x.f);
   for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
     st=new Map();dead=0;barriers=0;div=false;borrowed=new Set();
@@ -281,6 +304,12 @@ RQ.lint=(ast,info)=>{
       if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr
       else if(n.t==='MethodCall'){const r=(info.get(n)||{}).recv;if(r&&r.adj!=='val')root=rootBind(n.recv);}
       if(root)borrowed.add(root);
+      if(n.t==='Closure'&&!n.move){
+        // a non-move closure holds the outer vars it names by reference, as a Ref does
+        const own=new Set(),used=[];
+        RQ.walk(n,x=>{if(x.t==='IdentPat'){const b=bindOf(x);if(b)own.add(b);}else if(x.t==='Path'){const b=bindOf(x);if(b)used.push(b);}});
+        for(const b of used)if(!own.has(b))borrowed.add(b);
+      }
     });
     block(it.body);
   }

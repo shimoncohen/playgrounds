@@ -11,11 +11,14 @@
    Loans: every `ref` assign is a loan. A second forward may-dataflow gives holds[local], the loans a local carries: a copy or move of a
    local passes them on, `as_str` passes its receiver's, a call, op or macro result carries none. A backward liveness pass gives the
    locals live at each instr (its own uses count). A loan is live at an instr iff a live local holds it, and an access to the loan's
-   local then conflicts: see access(). Locals are bits of a BigInt mask, loans are bits of a BigInt mask. */
+   local then conflicts: see access(). Locals are bits of a BigInt mask, loans are bits of a BigInt mask.
+   A fn whose result carries a lifetime has a reg (check.js fnSig): the params its result may borrow from. A second, order-free pass finds which params
+   each local may point into; a returned value reaching another param is E0621 (a plain `&T` param, a named result) or the unsupported `lifetime mismatch`
+   (rustc's error with no code). */
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
-RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate','repeated error');
+RQ.BORROW_FEATURES.push('use while borrowed','reference in aggregate','repeated error','lifetime mismatch');
 const MOVED=1,UNINIT=2,EVER=4;
 const VISITS=50;
 
@@ -132,7 +135,7 @@ function mutability(F,errors,un){
     for(const i of b.instrs){
       const r=i.rv;
       if(!r)continue;
-      if(r.k==='ref'&&r.mut&&L[r.l].name!==null&&!L[r.l].mut){
+      if(r.k==='ref'&&r.mut&&!r.deref&&!r.cap&&L[r.l].name!==null&&!L[r.l].mut){
         // rustc folds several of these on one variable into a single error, reported elsewhere than at each borrow
         const root=R[r.l];
         if(roots.has(root)&&roots.get(root)!==i.line+':'+i.col)un('repeated error',i);
@@ -154,7 +157,7 @@ function loanPass(F,errors,un,loans,stats){
   const B=F.blocks,L=F.locals,n=L.length,{A,D,R}=relations(L);
   const cap=VISITS*B.length+500;
   const lo=[],at=new Map();
-  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,live:new Set(),span:[i.line,i.line]});}
+  for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'&&i.rv.k==='ref'){at.set(i,lo.length);lo.push({i,l:i.rv.l,mut:i.rv.mut,implicit:!!i.rv.implicit,deref:!!i.rv.deref,cap:!!i.rv.cap,live:new Set(),span:[i.line,i.line]});}
   const onS=L.map(()=>0n),onM=L.map(()=>0n),sub=L.map(()=>0n),lb=lo.map((_,k)=>bit(k)),nb=L.map((_,k)=>bit(R[k]));
   // onS/onM: the loans an access to l conflicts with (on l, an ancestor or a descendant); sub: the loans on l and below, which a write to l ends
   lo.forEach((x,k)=>{
@@ -164,10 +167,13 @@ function loanPass(F,errors,un,loans,stats){
 
   // the loans the value assigned by i carries; a call gives back its `from` argument's, a slice of a reference its base's
   // a field carries what its root carries
-  const val=(s,i)=>{
-    const r=i.rv,from=r.k==='call'&&r.from>=0?r.args[r.from]:null;
-    return r.k==='ref'?lb[at.get(i)]|s[R[r.l]]:r.k==='use'&&r.x.k!=='const'?s[R[r.x.l]]:r.k==='method'&&r.name==='as_str'&&r.recv.k!=='const'?s[R[r.recv.l]]:from&&from.k!=='const'?s[R[from.l]]:0n;
+  // a struct literal carries what its fields carry; a result tied to several arguments (`more`) carries them all
+  const flow=(o,i)=>{
+    const r=i.rv,g=x=>x&&x.k!=='const'?o[R[x.l]]:0n;
+    return r.k==='use'?g(r.x):r.k==='method'&&r.name==='as_str'?g(r.recv):r.k==='agg'?r.args.reduce((m,x)=>m|g(x),0n)
+      :r.k==='call'&&r.src!==undefined?o[R[r.src]]:r.k==='call'&&r.from>=0?[r.from,...r.more||[]].reduce((m,k)=>m|g(r.args[k]),0n):0n;
   };
+  const val=(s,i)=>i.rv.k==='ref'?lb[at.get(i)]|s[R[i.rv.l]]:flow(s,i);
   // a new value in l (decl, assign) or its death ends every loan on l, so no other local may carry them on
   const hold=(s,i)=>{
     if(i.op!=='decl'&&i.op!=='assign'&&i.op!=='dead')return;
@@ -175,6 +181,8 @@ function loanPass(F,errors,un,loans,stats){
     const kill=~sub[i.l];
     for(let k=0;k<n;k++)s[k]&=kill;
     if(i.op!=='dead')s[i.l]=v&kill;
+    for(const d of D[i.l])s[d]=0n;
+    if(i.op==='assign'&&L[i.l].path)s[R[i.l]]|=v&kill;
   };
   const inn=B.map(()=>null),q=[0],queued=new Set(q);
   inn[0]=L.map(()=>0n);
@@ -212,18 +220,33 @@ function loanPass(F,errors,un,loans,stats){
     }
   }
 
+  // the parameters a value may point into, in no order: rustc checks a returned reference against the signature without following the flow
+  const reg=F.reg,pbit=k=>1n<<BigInt(k),orig=L.map(()=>0n);
+  const ro=i=>i.rv.k==='ref'?orig[R[i.rv.l]]:flow(orig,i);
+  if(reg){
+    F.pl.forEach((l,k)=>{if(l!==undefined&&(refy(L[l].ty)||RQ.types.hasRef(L[l].ty)))orig[l]=pbit(k);});
+    for(let ch=true,w=0;ch;){
+      ch=false;
+      if(++w>VISITS)return false;
+      for(const b of B)if(!b.unreachable)for(const i of b.instrs)if(i.op==='assign'){
+        const d=R[i.l],v=ro(i);
+        if((orig[d]|v)!==orig[d]){orig[d]|=v;ch=true;}
+      }
+    }
+  }
   const seen=new Set();
   let lm=0n;
   // star: the access goes through the reference local `l`, so rustc names `*l`
   const access=(l,kind,i,star)=>{
     const sh=lm&onS[l],mu=lm&onM[l];
     if(!(sh|mu))return;
+    const ownMut=!!mu&&lo.every((x,k)=>!(mu&lb[k])||x.deref);
     let code='';
     if(kind==='ref'){if(mu)code='E0502';}
     else if(kind==='mut')code=mu?'E0499':'E0502';
-    else if(kind==='reb'){if(mu)un('reborrow',i);else code='E0502';}
-    // a shared reborrow (callee takes `&`) only conflicts with a live `&mut` loan, which is not modelled for a reference local
-    else if(kind==='rebs'){if(mu)un('reborrow',i);}
+    // a loan made by a `for` over a reference local (`deref`) is modelled; any other live `&mut` loan on a reference local is not
+    else if(kind==='reb'){if(mu&&!ownMut)un('reborrow',i);else code=mu?'E0499':'E0502';}
+    else if(kind==='rebs'){if(mu&&!ownMut)un('reborrow',i);else if(mu)code='E0502';}
     else if(kind==='move')code='E0505';
     else if(kind==='write')code='E0506';
     // the `reborrow` arm is a backstop: no source shape reaches it (`&r` is a reference to a reference, which the checker rejects)
@@ -231,7 +254,7 @@ function loanPass(F,errors,un,loans,stats){
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
   };
   for(const b of B){
     if(!inn[b.id])continue;
@@ -256,11 +279,24 @@ function loanPass(F,errors,un,loans,stats){
       }
       if(i.op==='assign'&&L[i.l].ret){
         const held=val(s,i);
-        const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty));
-        if(k>=0){
+        const k=lo.findIndex((x,q)=>held&lb[q]&&!refy(L[x.l].ty)&&!L[x.l].cap);
+        if(k>=0&&lo[k].cap){
+          const key='E0373@'+lo[k].i.line+':'+lo[k].i.col;
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0373',lo[k].i.line,lo[k].i.col,{name:L[lo[k].l].name}));}
+        }else if(k>=0){
           const key='E0515@'+i.line+':'+i.col;
           if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param,path:!!L[lo[k].l].path}));}
         }
+      }
+      if(reg&&i.op==='assign'&&L[i.l].ret){
+        const o=ro(i);
+        F.pl.forEach((l,k)=>{
+          const key='R'+k+'@'+i.line+':'+i.col;
+          if(l===undefined||!(o&pbit(k))||reg.allowed.includes(k)||seen.has(key))return;
+          seen.add(key);
+          if(reg.ret&&reg.plain[k])errors.push(RQ.diag.make('E0621',i.line,i.col,{name:reg.names[k]}));
+          else un('lifetime mismatch',i);
+        });
       }
       uses(i,(l,_mv,kind)=>access(l,kind,i));
       if(i.op==='store'&&i.ref.k!=='const')access(i.ref.l,'write',i,true);
@@ -273,7 +309,7 @@ function loanPass(F,errors,un,loans,stats){
       }
       if(i.op==='assign'){
         access(i.l,'write',i);
-        if(i.rv.k==='agg')for(const x of i.rv.args)if(x.k!=='const'&&(s[x.l]||refy(L[x.l].ty)||RQ.types.hasRef(L[x.l].ty)))un('reference in aggregate',i);
+        if(i.rv.k==='agg'&&!(L[i.l].ty.k==='struct'&&L[i.l].ty.lt))for(const x of i.rv.args)if(x.k!=='const'&&(s[x.l]||refy(L[x.l].ty)||RQ.types.hasRef(L[x.l].ty)))un('reference in aggregate',i);
       }
       hold(s,i);
     });
