@@ -37,7 +37,7 @@ describe('structs and Drop: drop order', () => {
 describe('structs and Drop: what stays unsupported', () => {
   it('reports the construct instead of guessing', () => {
     assert.equal(feature('#[derive(Ord)]\nstruct P {\n    x: i32,\n}\nfn main() {}'), 'derive');
-    assert.equal(feature('struct P {\n    x: &str,\n}\nfn main() {}'), 'struct');
+    assert.equal(feature('struct P {\n    x: &mut str,\n}\nfn main() {}'), 'struct');
     assert.equal(feature('struct P {\n    p: P,\n}\nfn main() {}'), 'struct');
     assert.equal(feature('struct P {\n    x: i32,\n}\nimpl P {\n    const A: i32 = 1;\n}\nfn main() {}'), 'impl');
     assert.equal(feature(P(...N.slice(0, 3), 'impl Drop for N {', '    fn drop(&mut self) {', '        let x = 1;', '    }', '}', 'fn main() {}')), 'impl');

@@ -32,7 +32,7 @@ describe('structs: named, tuple and unit', () => {
   });
   it('shapes that are not modeled stay unsupported with a hint', () => {
     assert.equal(feature(P('struct P<T> {', '    x: T,', '}', 'fn main() {}')), 'struct@1');
-    assert.equal(feature(P('struct P {', '    x: &str,', '}', 'fn main() {}')), 'struct@1');
+    assert.equal(feature(P('struct P<'+"'a"+'> {', '    x: &'+"'a"+' mut str,', '}', 'fn main() {}')), 'struct@1');
     assert.equal(feature(P('struct P {', '    o: Option<&str>,', '}', 'fn main() {}')), 'struct@1');
     assert.equal(feature(P('struct P {', '    o: Option<P>,', '}', 'fn main() {}')), 'struct@1');
     assert.equal(feature(P('struct P(i32);', 'fn P() {}', 'fn main() {}')), 'struct@1');

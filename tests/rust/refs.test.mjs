@@ -146,9 +146,9 @@ describe('coercion', () => {
 
 describe('checker-stage unsupported triggers', () => {
   it('lifetimes', () => {
-    assert.equal(un('', "fn f(s: &'a str) {}"), 'explicit lifetime@1');
+    assert.equal(un('', "fn f<'a>(s: &'a mut String) {}"), 'explicit lifetime@1');
     assert.equal(un('', "fn f(s: &'static String) {}"), 'explicit lifetime@1');
-    assert.equal(un('', "fn f(s: &'a str) -> &'a str { s }"), 'explicit lifetime@1');
+    assert.equal(un('', "fn f<'a>(s: &'a String) -> &'a mut String { s }"), 'explicit lifetime@1');
   });
   it('lifetime elision: only a shared reference tied to one shared parameter is modeled', () => {
     assert.equal(un('', 'fn f(x: &mut i32) -> &mut i32 { x }'), 'lifetime elision@1');

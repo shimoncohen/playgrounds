@@ -131,7 +131,7 @@ RQ.parse=tokens=>{
   function ty(){
     const x=T();
     if(isP('&')||isP('&&')){
-      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;
+      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;if(lt==='_')lt=null;
       const mut=!!eatK('mut');let r=mk('Ref',x,{mut,lt,ty:ty()});
       if(dbl)r=mk('Ref',x,{mut:false,lt:null,ty:r});
       return r;
