@@ -54,6 +54,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   const L=[],B=[],lm=new Map(),scopes=[],loops=[];
   let cur,count=0,retL;
   const tyOf=e=>{const o=info.get(e);return res(o&&o.ty||T.any);};
+  const carries=t=>RQ.types.hasRef(t)||t.k==='str';
   const isUnit=t=>t.k==='unit'||t.k==='never';
   const isBool=e=>{e=peel(e);return e.t==='Lit'&&e.kind==='bool';};
   const local=(name,ty,o)=>{
@@ -241,8 +242,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       if(c.k==='via')err('E0507',e,{name:chainText(e),mut:L[c.l].ty.mut});else un('partial move',e);
       return fin(NIL,e,dest);
     }
-    // a number read through a reference carries none of the reference's loans, but it still uses the reference
-    if(c.k==='via'&&!RQ.types.hasRef(tyOf(e))){emit('eval',e,{rv:{k:'peek',x:{k:'copy',l:c.l}}});return fin(NIL,e,dest);}
+    // a number read through a reference carries none of the reference's loans, but it still uses the reference; a `&str` field keeps them
+    if(c.k==='via'&&!carries(tyOf(e))){emit('eval',e,{rv:{k:'peek',x:{k:'copy',l:c.l}}});return fin(NIL,e,dest);}
     const r=rootOf(e);
     let base;
     if(r.l>=0)base={k:'copy',l:r.l};
@@ -472,7 +473,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       const bindAll=peek=>binds.forEach((sp,k)=>{
         const o=info.get(sp);
         let x;
-        if(o.bmode==='ref'||viaRef&&RQ.types.hasRef(o.ty))x=opnd(root);
+        if(o.bmode==='ref'||viaRef&&carries(o.ty))x=opnd(root);
         else if(viaRef)x=NIL;
         else{const l=o.bpath.reduce((b,q)=>pathLocal(b,q.sel,q.ty),root);x=peek?{k:'copy',l}:opnd(l);}
         emit('assign',sp,{l:ids[k],rv:{k:'use',x},grp:e.id});

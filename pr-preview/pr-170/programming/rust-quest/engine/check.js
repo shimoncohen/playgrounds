@@ -50,7 +50,7 @@ RQ.check=ast=>{
   const unsup=(f,line)=>{const k=f+'@'+line;if(!seen.has(k)){seen.add(k);un.push({feature:f,line});}return T.any;};
   const syn=(line,col,msg)=>errors.push({line,col,msg});
   const fns=new Map(),consts=new Map(),itemNames=new Set(),structs=new Map(),enums=new Map(),drops=new Map(),methods=new Map();
-  let curSelf=null,sigLts=null;
+  let curSelf=null,sigLts=null,selfLt=null;
   const ltSeen=new Set();
   // lets that rebind a visible name, those whose value reads the old one, and every read of a local variable
   let shadows=0,shadowUses=0,varUses=0;
@@ -103,16 +103,17 @@ RQ.check=ast=>{
 
   // the type nodes inside a type node; every walker below goes through it so a new type form is handled in one place
   const kids=n=>n.t==='Ref'||n.t==='Array'||n.t==='Slice'?[n.ty]:n.t==='Tuple'?n.tys:n.t==='Path'?n.segs.flatMap(g=>(g.args||[]).filter(a=>a.t!=='Lifetime'&&a.t!=='Binding'&&a.t!=='Lit')):[];
-  // a struct with a lifetime parameter named with no lifetime (or `'_`) is an elided lifetime position, like a `&` with none
+  // a struct written without its lifetime, or with `'_`, is an elided position like a `&` with none
   const ltStruct=n=>n.t==='Path'&&n.segs.length===1&&!n.segs[0].fn&&structs.has(n.segs[0].name)&&structs.get(n.segs[0].name).node.generics.some(g=>g.kind==='lt');
   const lifeArgs=n=>(n.segs[0].args||[]).filter(a=>a.t==='Lifetime');
   const elidedPath=n=>ltStruct(n)&&lifeArgs(n).every(a=>a.name==='_');
-  // a lifetime left out in a return type needs lifetime elision (E0106/E0515)
   const bareRef=n=>n.t==='Ref'?n.lt===null||bareRef(n.ty):elidedPath(n)||kids(n).some(bareRef);
-  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):elidedPath(n)?n:kids(n).map(firstBare).find(Boolean)||null;
+  const firstBare=n=>n.t==='Ref'?(n.lt===null?n:firstBare(n.ty)):elidedPath(n)?lifeArgs(n)[0]||n:kids(n).map(firstBare).find(Boolean)||null;
   const countRefs=n=>(n.t==='Ref'||ltStruct(n)?1:0)+(n.t==='Ref'?countRefs(n.ty):kids(n).reduce((a,x)=>a+countRefs(x),0));
-  // the named lifetimes a type node mentions, `'static` included
+  const mentionsSelf=n=>n.t==='Path'&&n.segs.length===1&&n.segs[0].name==='Self'||kids(n).some(mentionsSelf);
+  // `Self` in an `impl<'a> Name<'a>` carries 'a, so it counts as a mention
   const namesIn=(n,out=new Set())=>{
+    if(selfLt&&selfLt!=='_'&&n.t==='Path'&&n.segs.length===1&&n.segs[0].name==='Self'&&!n.segs[0].args)out.add(selfLt);
     if(n.t==='Ref'&&n.lt)out.add(n.lt);
     if(n.t==='Path')for(const g of n.segs)for(const a of g.args||[])if(a.t==='Lifetime'&&a.name!=='_')out.add(a.name);
     kids(n).forEach(k=>namesIn(k,out));
@@ -147,7 +148,7 @@ RQ.check=ast=>{
         if(sg.args.length&&sg.args.every(a=>a.t==='Lifetime')){
           if(!ltStruct(n)||sg.args.length!==1)return unsup(adtRec(s)?'generics':s,n.line);
           const a=sg.args[0];
-          if(a.name!=='_'&&!lifetimeOk(a,a.name))return unsup('explicit lifetime',n.line);
+          if(a.name==='static'||a.name!=='_'&&!lifetimeOk(a,a.name))return unsup('explicit lifetime',n.line);
           return adtTy(s);
         }
         if(COLL[s]&&!adtRec(s)){
@@ -230,10 +231,15 @@ RQ.check=ast=>{
     if(it.generics.length&&!ltParams(it.generics)||BUILTIN.has(it.name)||isInt(it.name)||!fieldsOk(it.kind,it.fields,true)){unsup('struct',it.line);return;}
     rec.kind=it.kind;
     sigLts=new Set(it.generics.map(g=>g.name));
-    rec.fields=fieldList(it.kind,it.fields).map(f=>{
-      if(refField(f.ty)&&f.ty.lt===null)errors.push(RQ.diag.make('E0106',f.ty.line,f.ty.col,{field:true}));
+    const fl=fieldList(it.kind,it.fields);
+    let bare=false;
+    rec.fields=fl.map(f=>{
+      const at=firstBare(f.ty);
+      if(at){bare=true;errors.push(RQ.diag.make('E0106',at.line,at.col,{field:true}));}
       return {name:f.name,ty:tyOf(f.ty)};
     });
+    // rustc reports the missing lifetime only
+    if(!bare)for(const g of it.generics)if(!fl.some(f=>namesIn(f.ty).has(g.name)))errors.push(RQ.diag.make('E0392',g.line,g.col,{name:g.name}));
     sigLts=null;
   }
   function enumDecl(it){
@@ -281,7 +287,9 @@ RQ.check=ast=>{
     const sh=sp?1:0;
     let from=-1,more=[],reg=null;
     const argTys=[...(sp?[null]:[]),...it.params.map(p=>p.ty)],named=it.ret?[...namesIn(it.ret)].filter(x=>x!=='static'):[];
-    // a named lifetime in the result ties it to every parameter that mentions that lifetime; the body may return only data from those
+    // the `'_` of `impl Name<'_>` is a lifetime of its own, which `Self` would carry
+    if(selfLt==='_'&&[...argTys,it.ret].some(t=>t&&mentionsSelf(t)))unsup('explicit lifetime',it.line);
+    // the body may return only data from the parameters that mention the result's lifetime
     if(named.length){
       const a=named[0];
       if(named.length>1||bareRef(it.ret)||hasMutRef(it.ret)||sp&&implLts&&implLts.has(a))unsup('explicit lifetime',it.ret.line);
@@ -319,7 +327,8 @@ RQ.check=ast=>{
     if(!ok){unsup('impl',it.line);return;}
     const implLts=new Set(gs.map(g=>g.name));
     if(lt&&!seg.args)errors.push(RQ.diag.make('E0726',st.line,st.col,{name}));
-    else if(lt){sigLts=implLts;const a=seg.args[0];if(a.name!=='_')lifetimeOk(a,a.name);sigLts=null;}
+    else if(lt){sigLts=implLts;const a=seg.args[0];if(a.name==='static')unsup('explicit lifetime',a.line);else if(a.name!=='_')lifetimeOk(a,a.name);sigLts=null;}
+    selfLt=lt&&seg.args?seg.args[0].name:null;
     curSelf=name;
     const mm=methods.get(name)||new Map();
     methods.set(name,mm);
@@ -329,6 +338,7 @@ RQ.check=ast=>{
       mm.set(f.name,{node:f,owner:name,key:name+'::'+f.name,...fnSig(f,name,implLts)});
     }
     curSelf=null;
+    selfLt=null;
   }
 
   const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
@@ -1152,7 +1162,10 @@ RQ.check=ast=>{
           if(!operands(ty,r,{rhs:e.rhs,line:e.line}))return T.unit;
           const bit=op==='&'||op==='|'||op==='^',c=cls(ty);
           if(!(c==='any'||(bit?['int','ivar'].includes(res(ty).k):c==='num')))unsup('type checking',e.line);
-        }else if(!unify(ty,r))return unsup('type checking',e.line);
+        }else if(!unify(ty,r)){
+          const w=res(ty),g=res(r);
+          return unsup(w.k==='str'&&g.k==='ref'&&!g.mut&&res(g.to).k==='String'?'assigned string reference':'type checking',e.line);
+        }
         return T.unit;
       }
       case 'Call':{
