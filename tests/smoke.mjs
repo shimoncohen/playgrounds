@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { CHAPTERS } from './trophy/chapters.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent'];
@@ -2088,6 +2089,54 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
     assert.deepEqual(errors, []);
     await ctx.close();
   }
+});
+
+const trailText = page => page.evaluate(() => {
+  const e = document.querySelector('.trail').cloneNode(true);
+  e.querySelector('.trail-tag').remove();
+  return e.textContent;
+});
+const plainText = html => html.replace(/<[^>]+>/g, '');
+
+test('the trail strip shows the chapter story on a later mission of every playground', async () => {
+  for (const url of PAGES) {
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
+      const { ctx, page, errors } = await open(`${base}/${url}`, { viewport });
+      const key = await page.evaluate(() => window.PROGRESS.key);
+      await page.locator('.dots .dot').nth(1).click();
+      await page.locator('.trail').waitFor({ state: 'visible' });
+      assert.equal(await page.textContent('.trail-tag'), 'The trail', url);
+      assert.equal(await trailText(page), plainText(CHAPTERS[key]()[0].story), `${url} at ${viewport.width}px`);
+      assert.equal(await overflow(page), false, `${url} at ${viewport.width}px`);
+      assert.deepEqual(errors, [], url);
+      await ctx.close();
+    }
+  }
+});
+
+test('Story button hides the trail strip, remembers the choice across reloads and playgrounds', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
+  const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-story'));
+  assert.equal(await attr(), 'on');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: On');
+  await page.locator('.dots .dot').nth(1).click();
+  assert.ok(await page.locator('.trail').isVisible());
+  await page.click('.story-toggle');
+  assert.equal(await attr(), 'off');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
+  assert.ok(await page.locator('.trail').isHidden());
+  await page.reload();
+  assert.equal(await attr(), 'off', 'choice survives a reload');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
+  const other = await ctx.newPage();
+  await other.goto(`${base}/math/arithmetic/`);
+  assert.equal(await other.evaluate(() => document.documentElement.getAttribute('data-story')), 'off', 'one setting for every playground');
+  await other.locator('.dots .dot').nth(1).click();
+  assert.ok(await other.locator('.trail').isHidden());
+  await other.click('.story-toggle');
+  assert.ok(await other.locator('.trail').isVisible());
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
