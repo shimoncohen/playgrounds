@@ -65,7 +65,7 @@ RQ.check=ast=>{
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
   // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
   // converts. Two plainly different types are E0308 as always; a reference pair rustc might still convert is not guessed.
-  const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','slice','String'].includes(t.k)?t.k:null;};
+  const headOf=t=>{t=res(t);return ['int','ivar','float','fvar','bool','char','unit'].includes(t.k)?'scalar':['tuple','array','slice','String'].includes(t.k)?t.k:t.k==='struct'||t.k==='enum'&&!t.builtin||t.k==='param'?t.k+':'+t.name:null;};
   const isRef=t=>{t=res(t);return t.k==='ref'||t.k==='str';};
   function clashes(g,w){
     g=res(g);w=res(w);
@@ -565,7 +565,8 @@ RQ.check=ast=>{
     const missing=[...tr.methods.values()].filter(m=>!m.hasBody&&!given.has(m.name)).map(m=>m.name);
     if(missing.length)errors.push(RQ.diag.make('E0046',it.line,it.col,{missing}));
     for(const tm of tr.methods.values()){
-      if(!tm.hasBody||given.has(tm.name))continue;
+      if(given.has(tm.name))continue;
+      if(!tm.hasBody&&tr.builtin)continue;
       if(mm.has(tm.name)){unsup('impl',it.line);continue;}
       const m={node:tm.node,owner,key:owner+'::'+tm.name,...fnSig(tm.node,owner),dflt:true};
       mm.set(tm.name,m);methodNodes.set(m.key,tm.node);
@@ -669,6 +670,7 @@ RQ.check=ast=>{
       default:return false;
     }
   };
+  const peelRefs=t=>{t=res(t);return t.k==='ref'?peelRefs(t.to):t;};
   // rustc names the first element type that lacks Debug, not the Vec or HashMap around it
   const lacksDebug=t=>{
     t=res(t);
@@ -677,7 +679,7 @@ RQ.check=ast=>{
     return bad?lacksDebug(bad):t;
   };
   function finish(){
-    for(const f of fmts)f.shown=show(f.fmt.debug?lacksDebug(f.t):f.t);
+    for(const f of fmts)f.shown=show(f.fmt.debug?lacksDebug(f.t):peelRefs(f.t));
     for(const v of vars){const r=res(v);if(r.k==='ivar')r.ref=T.int('i32');else if(r.k==='fvar')r.ref=T.float;}
     for(const [v,line] of tvs)if(res(v).k==='tvar')unsup('inferred type',line);
     for(const {e,src,tgt} of intos){
@@ -690,9 +692,12 @@ RQ.check=ast=>{
       else unsup('into',e.line);
     }
     intos.length=0;
+    const methodSeen=new Set();
     for(const o of obligs){
       const r=res(o.ty);
       if(r.k==='tvar'||isOpen(r,false))continue;
+      if(o.method&&methodSeen.has(o.line+':'+o.col))continue;
+      if(o.method&&!meets(r,o.tr))methodSeen.add(o.line+':'+o.col);
       if(o.ret){if(r.k==='str'||hasRef(r))unsup('generic reference',o.line);}
       else if(!meets(r,o.tr))errors.push(o.method?RQ.diag.make('E0599',o.line,o.col,{what:'bounds',name:o.method,type:o.shown(),kind:o.kind==='enum'?'enum':'struct'}):RQ.diag.make('E0277',o.line,o.col,{what:'bound',trait:o.tr,type:show(r)}));
     }

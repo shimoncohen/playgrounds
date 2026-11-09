@@ -100,13 +100,14 @@ function hashOrder(m){
 }
 const unref=v=>{while(v.k==='ref'){const t=v.cell.val;v=v.range?{k:'array',v:t.v.slice(v.range[0],v.range[1])}:t;}return v;};
 function display(v,user){
+  const via=v;
   v=unref(v);
   switch(v.k){
     case 'int':return v.v.toString();
     case 'float':return f64(v.v,'');
     case 'bool':return v.v?'true':'false';
     case 'char':case 'str':case 'String':return v.v;
-    case 'struct':case 'enum':if(user)return user(v);
+    case 'struct':case 'enum':if(user)return user(v,via);
     default:throw new Error('display of '+v.k);
   }
 }

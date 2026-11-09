@@ -705,6 +705,37 @@ test('rust-quest: chapter 10 plays through: a struct that outlives its text is E
   await ctx.close();
 });
 
+test('rust-quest: chapter 11 plays through: a missing trait method is E0599, a type without Display is E0277, and a hand-written Display and a Drop run in the memory view', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="10"]');
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0599[\s\S]*no method named .?sound.? found for .?struct.? .?Crab/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0277[\s\S]*Shell.? doesn't implement/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /shell:4[\s\S]*shell:12/);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 4);
+  assert.match(await page.textContent('#memory'), /Shell::fmt/);
+  assert.match(await page.textContent('#memory'), /Formatter/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /closing inner[\s\S]*after the block[\s\S]*closing outer/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

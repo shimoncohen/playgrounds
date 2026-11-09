@@ -150,6 +150,7 @@ function liveIn(ast,fn,pick){
   return n;
 }
 
+const lastName=p=>p&&p.segs?p.segs[p.segs.length-1].name:null;
 function context(d,ast,counts,src){
   const errors=d.errors||[];
   const c={
@@ -173,6 +174,27 @@ function context(d,ast,counts,src){
     sigOf:fn=>{
       const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn),lt=t=>t&&t.t==='Ref'?t.lt:undefined;
       return f?{lts:f.generics.filter(g=>g.kind==='lt').map(g=>g.name),params:f.params.map(p=>lt(p.ty)),ret:lt(f.ret)}:null;
+    },
+    implOf:(trait,type)=>{
+      const m=ast&&ast.items.find(x=>x.t==='Impl'&&x.trait&&lastName(x.trait)===trait&&lastName(x.selfTy)===type);
+      return m?{methods:m.items.filter(f=>f.t==='Fn').map(f=>f.name),params:m.generics.filter(g=>g.kind==='ty').map(g=>g.name)}:null;
+    },
+    traitOf:name=>{
+      const t=ast&&ast.items.find(x=>x.t==='Trait'&&x.name===name);
+      return t?{methods:t.items.filter(f=>f.t==='Fn').map(f=>({name:f.name,body:!!f.body}))}:null;
+    },
+    // a fn's type parameters with the trait names bounding each (from the list and from `where`), and the bounds of each `impl Trait` parameter
+    genericOf:fn=>{
+      const f=ast&&ast.items.find(x=>x.t==='Fn'&&x.name===fn);
+      if(!f)return null;
+      const tparams=f.generics.filter(g=>g.kind==='ty').map(g=>({name:g.name,bounds:g.bounds.map(lastName)}));
+      for(const w of f.where||[])if(w.ty&&w.ty.segs&&w.ty.segs.length===1){const t=tparams.find(x=>x.name===w.ty.segs[0].name);if(t)t.bounds.push(...w.bounds.map(lastName));}
+      const impl=t=>t.t==='ImplTrait'?t.bounds.map(lastName):t.t==='Ref'?impl(t.ty):null;
+      return {tparams,impl:f.params.map(p=>impl(p.ty))};
+    },
+    adtParams:name=>{
+      const s=ast&&ast.items.find(x=>(x.t==='Struct'||x.t==='Enum')&&x.name===name);
+      return s?s.generics.filter(g=>g.kind==='ty').map(g=>g.name):null;
     },
     structLt:name=>{
       const s=ast&&ast.items.find(x=>x.t==='Struct'&&x.name===name);

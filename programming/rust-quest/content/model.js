@@ -21,7 +21,8 @@ RQ.evalMission=(m,input,opts)=>{
   let result;
   if(c.status==='error'){
     const e=c.errors[0];
-    result=e.code||e.lint?'The compiler would stop here: '+e.msg+' (line '+e.line+').':'The compiler would not accept this: '+e.msg+' (line '+e.line+').';
+    const msg=e.msg.replace(/ for (struct|enum) /,' for `$1` ');
+    result=e.code||e.lint?'The compiler would stop here: '+msg+' (line '+e.line+').':'The compiler would not accept this: '+msg+' (line '+e.line+').';
   }else if(c.status==='unsupported')result='Rust Quest does not model `'+c.unsupported.feature+'`. '+RQ.diag.hint(c.unsupported.feature);
   else if(c.status==='internal')result='This is a Rust Quest bug, not your code.';
   else if(c.status==='limit')result=c.limit==='string size'?'The program made a string too long for the practice runner and was stopped. Is a loop making it longer every time round?':c.limit==='output size'?'The program printed too much for the practice runner and was stopped. Is a loop printing every time round?':c.limit==='nesting'?'A value was nested too deeply for the practice runner and the program was stopped. Is a loop wrapping a value in itself every time round?':'The program ran for too long and was stopped. Is something calling itself forever?';

@@ -232,11 +232,14 @@ RQ.interp=(ast,opts)=>{
     if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
   const PLAIN={debug:false,pretty:false,prec:null,width:null};
-  function userDisplay(v){
+  function userDisplay(v,via){
     const f=methodFns.get(v.name+'::fmt');
     if(!f)bug('display of '+v.name);
     const fm={k:'fmtr',buf:''};
-    callFn(f,[{k:'ref',cell:{val:v},mut:false},{k:'ref',cell:{val:fm},mut:true}],f.line,v.name+'::fmt');
+    let r=via;
+    while(r&&r.k==='ref'&&r.cell.val&&r.cell.val.k==='ref')r=r.cell.val;
+    const self=r&&r.k==='ref'&&!r.range?{k:'ref',cell:r.cell,mut:false,loan:r.loan}:{k:'ref',cell:{val:v},mut:false};
+    callFn(f,[self,{k:'ref',cell:{val:fm},mut:true}],f.line,v.name+'::fmt');
     return fm.buf;
   }
   function macro(e,env){
