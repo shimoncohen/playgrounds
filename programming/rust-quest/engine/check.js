@@ -451,7 +451,7 @@ RQ.check=ast=>{
     return mode==='val'?T.tuple([k,v]):T.tuple([mkRef(false,k),mkRef(mode==='mut',v)]);
   }
 
-  function block(b){
+  function block(b,w){
     if(b.unsafe)return unsup('unsafe',b.line);
     if(b.label)return unsup('block label',b.line);
     scopes.push(new Map());
@@ -468,20 +468,21 @@ RQ.check=ast=>{
           if(b&&s.ty)b.deferred=true;
           continue;
         }
-        let t=ex(s.init);
+        const ann=s.ty?tyOf(s.ty):null;
+        let t=exW(s.init,ann);
         if(named&&lookup(pt.name)){
           shadows++;
           let reads=false;
           RQ.walk(s.init,n=>{if(n.t==='Path'&&n.segs.length===1&&n.segs[0].name===pt.name)reads=true;});
           if(reads)shadowUses++;
         }
-        if(s.ty){const a=tyOf(s.ty);coerce(t,a,s.init);t=a;}
+        if(ann){coerce(t,ann,s.init);t=ann;}
         if(named)bindVar(pt.name,pt.mut,'let',t,pt);
       }else if(s.t==='ExprStmt'){if(res(ex(s.expr)).k==='never')diverges=true;}
       else if(s.t==='ItemStmt')unsup('nested item',s.line);
       else unsup(s.t,s.line);
     }
-    const t=b.tail?ex(b.tail):diverges?T.never:T.unit;
+    const t=b.tail?exW(b.tail,w):diverges?T.never:T.unit;
     scopes.pop();
     return t;
   }
@@ -669,6 +670,11 @@ RQ.check=ast=>{
         // the method exists but the elements lack a trait it needs; while an element type is open that is not judged
         const map=base.name==='HashMap',bounded=name==='clone'&&!args.length||map&&MAP_KEYED.includes(name)&&!name.includes('.');
         if(ITERS.includes(name)&&!args.length)return unsup('iterator',e.line);
+        const el=base.name==='Vec'?res(base.args[0]):null,need=el&&(name==='sort'&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null);
+        if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
+          errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{trait:need,type:show(el)}));
+          return need==='Ord'?T.unit:T.bool;
+        }
         if(!bounded)return unsup('collection method',e.line);
         if(isOpen(base,true))return unsup('inferred type',e.line);
         errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'bounds',name,type:show(base)}));
@@ -891,6 +897,7 @@ RQ.check=ast=>{
   }
   const scrutRoot=n=>{while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'&&n.segs.length===1?n.segs[0].name:null;};
   function matchExpr(e){
+    const w0=takeWant(),w=w0&&e.kind!=='letelse'&&e.kind!=='whilelet'&&!e.noElse?w0:null;
     let st=ex(e.scrut);
     if(e.annot){const a=tyOf(e.annot);coerce(st,a,e.scrut);st=a;}
     const s=res(st),broken=s.k==='any'||s.k==='never';
@@ -917,14 +924,15 @@ RQ.check=ast=>{
         });
       }
       rows.push({p:ir,g:!!a.guard});
-      const bt=ex(a.body);
+      const bt=exW(a.body,w);
       scopes.pop();
       if(nodeFor(a)){
         if(!['never','any'].includes(res(bt).k))errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:'letelse',expected:'!',found:show(bt)}));
         continue;
       }
       if(res(bt).k==='never'||e.noElse&&a===e.arms[1])continue;
-      if(rt===null)rt=bt;
+      if(w){coerce(bt,w,endNode(a.body));rt=w;}
+      else if(rt===null)rt=bt;
       else if(!unify(rt,bt)){
         if(!clashes(bt,rt))return unsup('reference coercion',a.body.line);
         errors.push(RQ.diag.make('E0308',endNode(a.body).line,endNode(a.body).col,{what:e.kind==='iflet'?'else':'match',expected:show(rt),found:show(bt)}));
@@ -959,6 +967,15 @@ RQ.check=ast=>{
     return ts.some(holdsRef)?unsup('reference in collection',e.line):T.coll('Vec',[el]);
   }
   function ex(e){const t=expr(e);I(e).ty=t;return t;}
+  // The type a coercion site (fn tail, return, annotated let, call argument) expects of a `match`, `if` or block; rustc coerces each arm to it
+  // and reports the arm that does not fit.
+  let want=null;
+  const takeWant=()=>{const w=want;want=null;return w&&!['any','never'].includes(res(w).k)?w:null;};
+  function exW(e,w){
+    const t=peel(e).t;
+    if(w&&(t==='Match'||t==='If'||t==='Block'))want=w;
+    return ex(e);
+  }
   const place=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   const placeChain=e=>{e=peel(e);return e.t==='Path'||((e.t==='Field'||e.t==='Index')&&placeChain(e.expr));};
   function expr(e){
@@ -1125,7 +1142,7 @@ RQ.check=ast=>{
         }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
         const n=e.callee.segs[0].name,f=fns.get(n);
-        const ts=e.args.map(ex);
+        const ts=e.args.map((a,i)=>exW(a,f&&f.params.length===e.args.length?f.params[i].ty:null));
         if(lookup(n)||consts.has(n))return unsup('call',e.line);
         if(!f&&n==='drop'){
           if(ts.length!==1)return unsup('wrong argument count',e.line);
@@ -1182,10 +1199,10 @@ RQ.check=ast=>{
         e.args.forEach(ex);
         return unsup(e.name+'!',e.line);
       }
-      case 'Block':return block(e);
+      case 'Block':return block(e,takeWant());
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
-        if(coerce(ex(e.expr),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
+        if(coerce(exW(e.expr,curRet),curRet,e.expr)&&curStatic)staticLeaves(e.expr);
         return T.never;
       }
       case 'Tuple':return e.elems.length?T.tuple(e.elems.map(ex)):T.unit;
@@ -1208,7 +1225,8 @@ RQ.check=ast=>{
         if(b.k==='ref'&&!b.mut&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
         const cb=b.k==='ref'?res(b.to):b;
         if(cb.k==='coll'){
-          if(cb.name!=='Vec'||!unify(i,T.int('usize')))return unsup('collection method',e.line);
+          if(cb.name!=='Vec')return unsup('map index',e.line);
+          if(!unify(i,T.int('usize')))return unsup('collection method',e.line);
           I(e).vecIdx=true;return cb.args[0];
         }
         if(b.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
@@ -1243,10 +1261,16 @@ RQ.check=ast=>{
       }
       case 'Match':return matchExpr(e);
       case 'If':{
+        const w=e.els?takeWant():(takeWant(),null);
         expect(ex(e.cond),T.bool,e.cond);
-        const a=block(e.then);
+        const a=block(e.then,w);
         if(!e.els){return ['unit','never','any'].includes(res(a).k)?T.unit:unsup('type checking',e.line);}
-        const b=e.els.t==='If'?ex(e.els):block(e.els);
+        const b=e.els.t==='If'?exW(e.els,w):block(e.els,w);
+        if(w){
+          if(res(a).k!=='never')coerce(a,w,endNode(e.then));
+          if(res(b).k!=='never')coerce(b,w,endNode(e.els));
+          return w;
+        }
         if(!unify(a,b)){
           // rustc coerces each arm to an annotation the arms are not yet checked against, so a clash between references is not a verdict
           if(!clashes(b,a))return unsup('reference coercion',e.line);
@@ -1305,7 +1329,7 @@ RQ.check=ast=>{
     const r=f.node.ret;curStatic=!!r&&r.t==='Ref'&&r.lt==='static';
     if(f.selfTy)bindVar('self',f.selfMut,'param',f.selfTy,f.node.selfParam);
     for(const p of f.params)bindVar(p.name,p.mut,'param',p.ty,p.pat);
-    const body=f.node.body,t=block(body);
+    const body=f.node.body,t=block(body,f.node.ret?f.ret:null);
     if(body.tail||f.node.ret){if(coerce(t,f.ret,body.tail?endNode(body.tail):f.node.ret)&&curStatic&&body.tail)staticLeaves(body.tail);}
     else if(!unify(t,f.ret))unsup('type checking',f.node.line);
     finish();

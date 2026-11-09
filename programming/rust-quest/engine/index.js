@@ -115,7 +115,7 @@ RQ.features=src=>{
   return tags;
 };
 
-function context(d,ast,counts){
+function context(d,ast,counts,src){
   const errors=d.errors||[];
   const c={
     status:d.status,errors,view:d.view||null,stdout:d.stdout||'',stderr:d.stderr||'',exit:d.exit??null,panic:d.panic||null,
@@ -124,6 +124,8 @@ function context(d,ast,counts){
     hasError:(id,line)=>errors.some(e=>(e.code===id||e.lint===id)&&(line==null||e.line===line)),
     onlyError:id=>errors.length===1&&(errors[0].code===id||errors[0].lint===id),
     out:()=>c.stdout,
+    // runs the same program again with some text swapped, e.g. the input literals, so code that hard-codes the answer is caught; null if a swapped text is not in the source
+    rerun:(...pairs)=>src==null||pairs.some(([a])=>!src.includes(a))?null:RQ.run(pairs.reduce((t,[a,b])=>t.split(a).join(b),src)),
     moved:name=>c.events.some(e=>e.t==='move'&&e.name===name),
     allocs:kind=>c.events.filter(e=>e.t==='alloc'&&(kind===undefined||e.kind===kind)).length,
     dropOrder:()=>c.events.filter(e=>e.t==='drop'&&e.name&&!e.part).map(e=>e.name),
@@ -221,7 +223,7 @@ RQ.run=(src,opts)=>{
       const r=RQ.interp(c.ast,{...o,seed:1,snap:false});
       orderDependent=r.status!==d.status||r.stdout!==d.stdout||r.stderr!==d.stderr;
     }
-    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive},ast,c.counts);
+    return context({...d,orderDependent,loans:c.loans,maxLive:c.maxLive},ast,c.counts,src);
   }catch(e){
     // source nested thousands deep overflows a recursive pass; that is the learner's code, not a bug
     if(e instanceof RangeError&&!ast)return context({status:'unsupported',unsupported:{feature:'nesting',line:1},unsupportedAll:[{feature:'nesting',line:1}]},null);

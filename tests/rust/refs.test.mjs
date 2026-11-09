@@ -488,9 +488,11 @@ describe(`a '-> &'static str' fn returns only string literals`, () => {
 });
 
 describe('if arms that rustc may coerce', () => {
-  it('a reference clash between the arms is unsupported, not E0308', () => {
-    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { &s } else { "x" };\n    println!("{}", r);'), 'reference coercion@5');
-    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { "x" } else { &s };\n    println!("{}", r);'), 'reference coercion@5');
+  it('a reference clash between the arms is unsupported, not E0308, until an annotation says what both coerce to', () => {
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r = if c { &s } else { "x" };\n    println!("{}", r);'), 'reference coercion@5');
+    assert.equal(un('    let s = String::from("a");\n    let c = true;\n    let r = if c { "x" } else { &s };\n    println!("{}", r);'), 'reference coercion@5');
+    accepts('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { &s } else { "x" };\n    println!("{}", r);');
+    accepts('    let s = String::from("a");\n    let c = true;\n    let r: &str = if c { "x" } else { &s };\n    println!("{}", r);');
   });
   it('a clash of non-references stays E0308', () => {
     assert.equal(code('    let c = true;\n    let x = if c { 1 } else { "x" };'), 'E0308@4');

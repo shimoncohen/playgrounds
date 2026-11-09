@@ -4096,5 +4096,258 @@
     "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let mut w = vec![4];\n    let first = v.first();\n    w.clear();\n    println!(\"{:?} {:?}\", first, w);\n}\n",
     "expect": "ok", "out": "Some(1) []\n", "err": "", "exit": 0,
     "why": "clearing another Vec is fine", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-write",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v[v.len() - 1] = 5;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-self-write-ok",
+    "why": "the index runs after v[..] is borrowed mutably, so reading v in it conflicts", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-write-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v[len - 1] = 5;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 5]\n", "err": "", "exit": 0,
+    "why": "the length is read before the write", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-compound",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v[v.len() - 1] += 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-self-compound-ok",
+    "why": "the same holds for a compound assignment", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-compound-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v[len - 1] += 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 4]\n", "err": "", "exit": 0,
+    "why": "the length is read before the compound assignment", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-method",
+    "src": "fn main() {\n    let mut v = vec![String::new()];\n    let len = v.len();\n    v[v.len() - 1].push_str(\"!\");\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-self-method-ok",
+    "why": "a &mut method on v[..] borrows v before the index runs", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-method-ok",
+    "src": "fn main() {\n    let mut v = vec![String::new()];\n    let len = v.len();\n    v[len - 1].push_str(\"!\");\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[\"!\"]\n", "err": "", "exit": 0,
+    "why": "the length is read before the method call", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-refmut",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    let last = &mut v[v.len() - 1];\n    *last = 9;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-self-refmut-ok",
+    "why": "&mut v[..] borrows v before the index runs", "pr": "P10"
+  },
+  {
+    "id": "vec-index-self-refmut-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    let last = &mut v[len - 1];\n    *last = 9;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 9]\n", "err": "", "exit": 0,
+    "why": "the length is read before the borrow", "pr": "P10"
+  },
+  {
+    "id": "vec-index-nested-self",
+    "src": "fn main() {\n    let mut v = vec![1, 0, 2];\n    let w = vec![1];\n    v[v[0]] = 7;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-nested-self-ok",
+    "why": "v[v[0]] = .. reads v inside the index of a write", "pr": "P10"
+  },
+  {
+    "id": "vec-index-nested-self-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 0, 2];\n    let w = vec![1];\n    v[w[0]] = 7;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 7, 2]\n", "err": "", "exit": 0,
+    "why": "the index reads another Vec", "pr": "P10"
+  },
+  {
+    "id": "vec-index-2d-self",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3]];\n    let len = v[0].len();\n    v[0][v[0].len() - 1] = 3;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-index-2d-self-ok",
+    "why": "the inner index reads v while v[0] is borrowed mutably", "pr": "P10"
+  },
+  {
+    "id": "vec-index-2d-self-ok",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3]];\n    let len = v[0].len();\n    v[0][len - 1] = 3;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[1, 3], [3]]\n", "err": "", "exit": 0,
+    "why": "the length is read before the write", "pr": "P10"
+  },
+  {
+    "id": "vec-index-rhs-read-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let i = 0;\n    v[i] = v[1];\n    v[0] += v[1];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[4, 2, 3]\n", "err": "", "exit": 0,
+    "why": "the right side is read before the write borrow starts", "pr": "P10"
+  },
+  {
+    "id": "vec-swap-self-len",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v.swap(0, v.len() - 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-swap-self-len-ok",
+    "why": "swap is a slice method behind DerefMut, which gets no two-phase borrow", "pr": "P10"
+  },
+  {
+    "id": "vec-swap-self-len-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    v.swap(0, len - 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\n", "err": "", "exit": 0,
+    "why": "the length is read before the call", "pr": "P10"
+  },
+  {
+    "id": "vec-get-mut-self-len",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    if let Some(x) = v.get_mut(v.len() - 1) {\n        *x = 0;\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-get-mut-self-len-ok",
+    "why": "get_mut is a slice method behind DerefMut, which gets no two-phase borrow", "pr": "P10"
+  },
+  {
+    "id": "vec-get-mut-self-len-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3];\n    let len = v.len();\n    if let Some(x) = v.get_mut(len - 1) {\n        *x = 0;\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 0]\n", "err": "", "exit": 0,
+    "why": "the length is read before the call", "pr": "P10"
+  },
+  {
+    "id": "for-field-self-push",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn run(&mut self) {\n        for x in &self.items {\n            self.items.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": {"code":"E0502","line":8},
+    "pair": "for-field-self-push-ok",
+    "why": "a loop over &self.items holds a shared loan, so pushing to self.items is E0502", "pr": "P10"
+  },
+  {
+    "id": "for-field-self-push-ok",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn run(&mut self) {\n        for x in &self.items {\n            self.log.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": "ok", "out": "[1, 2] [1, 2]\n", "err": "", "exit": 0,
+    "why": "pushing to another field is fine", "pr": "P10"
+  },
+  {
+    "id": "for-field-self-method",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn peek(&self) -> usize {\n        self.log.len()\n    }\n    fn bump(&mut self) {\n        self.log.push(0);\n    }\n    fn run(&mut self) {\n        for _x in &self.items {\n            self.bump();\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": {"code":"E0502","line":14},
+    "pair": "for-field-self-method-ok",
+    "why": "a &mut self method call takes *self while the loop holds a loan on a field of it", "pr": "P10"
+  },
+  {
+    "id": "for-field-self-method-ok",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn peek(&self) -> usize {\n        self.log.len()\n    }\n    fn bump(&mut self) {\n        self.log.push(0);\n    }\n    fn run(&mut self) {\n        for _x in &self.items {\n            self.peek();\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": "ok", "out": "[1, 2] []\n", "err": "", "exit": 0,
+    "why": "a &self method call only reads", "pr": "P10"
+  },
+  {
+    "id": "for-field-param-push",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nfn run(s: &mut S) {\n    for x in &s.items {\n        s.items.push(*x);\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    run(&mut s);\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": {"code":"E0502","line":7},
+    "pair": "for-field-param-push-ok",
+    "why": "the same through a &mut S parameter", "pr": "P10"
+  },
+  {
+    "id": "for-field-param-push-ok",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nfn run(s: &mut S) {\n    for x in &s.items {\n        s.log.push(*x);\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    run(&mut s);\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": "ok", "out": "[1, 2] [1, 2]\n", "err": "", "exit": 0,
+    "why": "pushing to another field is fine", "pr": "P10"
+  },
+  {
+    "id": "for-field-mut-self-push",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn run(&mut self) {\n        for x in &mut self.items {\n            self.items.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": {"code":"E0499","line":8},
+    "pair": "for-field-mut-self-push-ok",
+    "why": "a &mut loop over a field is exclusive, so pushing to it is E0499", "pr": "P10"
+  },
+  {
+    "id": "for-field-mut-self-push-ok",
+    "src": "struct S {\n    items: Vec<i32>,\n    log: Vec<i32>,\n}\nimpl S {\n    fn run(&mut self) {\n        for x in &mut self.items {\n            self.log.push(*x);\n        }\n    }\n}\nfn main() {\n    let mut s = S { items: vec![1, 2], log: vec![] };\n    s.run();\n    println!(\"{:?} {:?}\", s.items, s.log);\n}\n",
+    "expect": "ok", "out": "[1, 2] [1, 2]\n", "err": "", "exit": 0,
+    "why": "pushing to another field of self is fine in a &mut loop", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-tail",
+    "src": "fn first(v: &Vec<u32>) -> u32 {\n    match v.get(0) {\n        Some(x) => x,\n        None => 0,\n    }\n}\nfn main() {\n    let v = vec![7];\n    println!(\"{}\", first(&v));\n}\n",
+    "expect": {"code":"E0308","line":3},
+    "pair": "match-arm-ref-tail-ok",
+    "why": "the fn tail expects u32, so the first arm (&u32) is the one error, and the 0 arm is fine", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-tail-ok",
+    "src": "fn first(v: &Vec<u32>) -> u32 {\n    match v.get(0) {\n        Some(x) => *x,\n        None => 0,\n    }\n}\nfn main() {\n    let v = vec![7];\n    println!(\"{}\", first(&v));\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "the arm reads the value", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-let",
+    "src": "fn main() {\n    let v = vec![7u32];\n    let n: u32 = match v.get(0) {\n        Some(x) => x,\n        None => 0,\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "pair": "match-arm-ref-let-ok",
+    "why": "the annotated let expects u32, so the first arm is the one error", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-let-ok",
+    "src": "fn main() {\n    let v = vec![7u32];\n    let n: u32 = match v.get(0) {\n        Some(x) => *x,\n        None => 0,\n    };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "the arm reads the value", "pr": "P10"
+  },
+  {
+    "id": "if-arm-ref-let",
+    "src": "fn main() {\n    let v = vec![7u32];\n    let c = v.len() > 0;\n    let n: u32 = if c { &v[0] } else { 0 };\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "pair": "if-arm-ref-let-ok",
+    "why": "the annotated let expects u32, so the then branch is the one error", "pr": "P10"
+  },
+  {
+    "id": "if-arm-ref-let-ok",
+    "src": "fn main() {\n    let v = vec![7u32];\n    let c = v.len() > 0;\n    let n: u32 = if c { v[0] } else { 0 };\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "the branch reads the value", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-arg",
+    "src": "fn show(n: u32) {\n    println!(\"{}\", n);\n}\nfn main() {\n    let v = vec![7u32];\n    show(match v.get(0) {\n        Some(x) => x,\n        None => 0,\n    });\n}\n",
+    "expect": {"code":"E0308","line":7},
+    "pair": "match-arm-ref-arg-ok",
+    "why": "a call argument expects the parameter type, so the first arm is the one error", "pr": "P10"
+  },
+  {
+    "id": "match-arm-ref-arg-ok",
+    "src": "fn show(n: u32) {\n    println!(\"{}\", n);\n}\nfn main() {\n    let v = vec![7u32];\n    show(match v.get(0) {\n        Some(x) => *x,\n        None => 0,\n    });\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "the arm reads the value", "pr": "P10"
+  },
+  {
+    "id": "vec-sort-float",
+    "src": "fn main() {\n    let mut v: Vec<f64> = vec![2.0, 1.0];\n    v.sort();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "pair": "vec-sort-float-ok",
+    "why": "f64 has no Ord because of NaN, so sort needs another way", "pr": "P10"
+  },
+  {
+    "id": "vec-sort-float-ok",
+    "src": "fn main() {\n    let mut v: Vec<i32> = vec![2, 1];\n    v.sort();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "integers are Ord", "pr": "P10"
+  },
+  {
+    "id": "vec-contains-no-partialeq",
+    "src": "#[derive(Debug, Hash)]\nstruct P {\n    n: i32,\n}\nfn main() {\n    let v = vec![P { n: 1 }];\n    println!(\"{}\", v.contains(&P { n: 1 }));\n}\n",
+    "expect": {"code":"E0277","line":7},
+    "pair": "vec-contains-no-partialeq-ok",
+    "why": "contains compares elements, which needs PartialEq", "pr": "P10"
+  },
+  {
+    "id": "vec-contains-no-partialeq-ok",
+    "src": "#[derive(Debug, PartialEq)]\nstruct P {\n    n: i32,\n}\nfn main() {\n    let v = vec![P { n: 1 }];\n    println!(\"{}\", v.contains(&P { n: 1 }));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "with PartialEq derived, contains works", "pr": "P10"
+  },
+  {
+    "id": "vec-two-phase-shared-loan",
+    "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    let r = &v;\n    v.push(r.len());\n    println!(\"{}\", r.len());\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "vec-two-phase-shared-loan-ok",
+    "why": "the loan r is still used after the push, so the push cannot start", "pr": "P10"
+  },
+  {
+    "id": "vec-two-phase-shared-loan-ok",
+    "src": "fn main() {\n    let mut v = vec![1usize, 2];\n    let r = &v;\n    v.push(r.len());\n    println!(\"{}\", v.len());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "r is last read in the argument, before the push starts (two-phase borrow)", "pr": "P10"
   }
 ]

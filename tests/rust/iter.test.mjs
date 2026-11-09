@@ -20,6 +20,11 @@ describe('the two-seed rule for HashMap order', () => {
     assert.equal(c.hashIterated, true);
     assert.equal(c.orderDependent, true);
   });
+  it('printing only the middle key of a three-key map is order dependent', () => {
+    const c = RQ.run(P(USE, main(...MAP3, 'let mut ks = Vec::new();', 'for k in m.keys() {', '    ks.push(*k);', '}', 'println!("{}", ks[1]);')));
+    assert.equal(c.status, 'ok');
+    assert.equal(c.orderDependent, true);
+  });
   it('a map of one entry or none prints the same either way and passes', () => {
     for (const n of [0, 1]) {
       const c = RQ.run(P(USE, main('let mut m: HashMap<i32, i32> = HashMap::new();', ...(n ? ['m.insert(1, 2);'] : []), 'println!("{:?} {:#?}", m, m);')));
@@ -56,7 +61,7 @@ describe('the two-seed rule for HashMap order', () => {
     const c = RQ.run(P(USE, '#[derive(Debug)]', 'struct W {', '    m: HashMap<i32, i32>,', '}', main(...MAP3, 'let w = W { m };', 'println!("{:?}", w);')));
     assert.equal(c.orderDependent, true);
   });
-  it('std.hashOrder gives the reverse order for seed 1, and the flag is per session', () => {
+  it('std.hashOrder rotates the order by one for seed 1, and the flag is per session', () => {
     const m = { k: 'map', v: [1, 2, 3, 4].map((i) => ({ key: { k: 'int', v: BigInt(i), ty: 'i32' }, val: { k: 'int', v: BigInt(i), ty: 'i32' } })) };
     const s0 = RQ.std.hashSession(0);
     assert.equal(s0.iterated, false);
@@ -64,7 +69,8 @@ describe('the two-seed rule for HashMap order', () => {
     assert.equal(s0.iterated, true);
     RQ.std.hashSession(1);
     const b = RQ.std.hashOrder(m).map((e) => e.key.v);
-    assert.deepEqual(b.map(String), a.slice().reverse().map(String));
+    assert.deepEqual(b.map(String), [...a.slice(1), a[0]].map(String));
+    for (const [i, x] of a.entries()) assert.notEqual(String(b[i]), String(x), `position ${i} keeps its key`);
     assert.equal(RQ.std.debug(m).includes('1: 1'), true);
     RQ.std.hashSession(0);
   });
@@ -195,7 +201,7 @@ describe('indexing a Vec', () => {
   });
   it('an index that is not a usize, a HashMap index and a Vec of references stay unsupported', () => {
     assert.equal(feature(main('let v = vec![1];', 'let i: i32 = 0;', 'let x = v[i];')), 'collection method@4');
-    assert.equal(feature(P(USE, main('let mut m: HashMap<i32, i32> = HashMap::new();', 'let x = m[&1];'))), 'collection method@4');
+    assert.equal(feature(P(USE, main('let mut m: HashMap<i32, i32> = HashMap::new();', 'let x = m[&1];'))), 'map index@4');
     assert.equal(feature(main('let v = vec![1];', 'let x = v.get(0..1);')), 'range expression@3');
   });
 });
@@ -208,9 +214,11 @@ describe('the non-closure methods', () => {
   it('get and get_mut give references, copied and cloned give owned values, and pop moves the element out', () => {
     assert.equal(out(main('let mut v = vec![1, 2];', 'if let Some(x) = v.get_mut(1) {', '    *x += 40;', '}', 'let a = v.get(1).copied();', 'let b = v.first().copied().unwrap_or(0);', 'let s = vec![String::from("x")];', 'let c = s.first().cloned();', 'let p = v.pop();', 'println!("{:?} {:?} {} {:?} {:?}", v, a, b, c, p);')), '[1] Some(42) 1 Some("x") Some(42)\n');
   });
-  it('sort needs an ordered element, contains an equal one, and a get index must be a usize', () => {
-    assert.equal(feature(main('let mut v = vec![1.5, 0.5];', 'v.sort();')), 'collection method@3');
-    assert.equal(feature(P('struct S;', main('let v = vec![S];', 'println!("{}", v.contains(&S));'))), 'collection method@4');
+  it('sort needs an ordered element, contains an equal one (E0277 as rustc), and a get index must be a usize', () => {
+    assert.equal(ids(RQ.run(main('let mut v: Vec<f64> = vec![1.5, 0.5];', 'v.sort();'))), 'E0277@3');
+    assert.match(RQ.run(main('let mut v: Vec<f64> = vec![1.5, 0.5];', 'v.sort();')).errors[0].msg, /`f64: Ord`/);
+    assert.equal(ids(RQ.run(P('struct S;', main('let v = vec![S];', 'println!("{}", v.contains(&S));')))), 'E0277@4');
+    assert.match(RQ.run(P('struct S;', main('let v = vec![S];', 'println!("{}", v.contains(&S));'))).errors[0].msg, /can't compare `S` with `S`/);
     assert.equal(feature(main('let v = vec![1];', 'let i: i32 = 0;', 'let x = v.get(i);')), 'collection method@4');
     assert.equal(ids(RQ.run(main('let v = vec![String::from("a")];', 'let s = String::from("a");', 'println!("{}", v.contains(s));'))), 'E0308@4');
   });
@@ -246,5 +254,55 @@ describe('two-phase borrows', () => {
   it('a borrow passed in the argument is still live at the call, so it is E0502; a mutation or move in it is not modeled', () => {
     assert.equal(feature(main('let mut v = vec![1];', 'v.push(v.pop().unwrap());')), 'two-phase borrow@3');
     assert.equal(feature(main('let mut s = String::from("a");', 's.push_str(&s);')), 'two-phase borrow@3');
+  });
+});
+
+describe('the index runs after the &mut borrow of an indexed write', () => {
+  const S = ['struct S {', '    items: Vec<i32>,', '    total: i32,', '}'];
+  it('a Vec behind a &mut reference whose index reads it is unsupported, not accepted', () => {
+    assert.equal(feature(P('fn f(v: &mut Vec<i32>) {', '    v[v.len() - 1] = 5;', '}', 'fn main() {', '    let mut v = vec![1];', '    f(&mut v);', '}')), 'reborrow@2');
+    assert.equal(feature(P(...S, 'impl S {', '    fn g(&mut self) {', '        self.items[self.items.len() - 1] = 5;', '    }', '}', 'fn main() {', '    let mut s = S { items: vec![1], total: 0 };', '    s.g();', '}')), 'reborrow@7');
+  });
+  it('an index that reads another field or a local is fine behind a reference', () => {
+    assert.equal(out(P(...S, 'impl S {', '    fn g(&mut self) {', '        let n = self.items.len() - 1;', '        self.items[n] = 5;', '        self.items[0] = self.items[n];', '        self.total = 1;', '    }', '}', 'fn main() {', '    let mut s = S { items: vec![1, 2], total: 0 };', '    s.g();', '    println!("{:?} {}", s.items, s.total);', '}')), '[5, 5] 1\n');
+  });
+});
+
+describe('a for loop over a field behind a reference', () => {
+  const S = ['struct S {', '    items: Vec<i32>,', '    total: i32,', '}'];
+  const run = (...body) => P(...S, 'impl S {', '    fn peek(&self) -> i32 {', '        self.total', '    }', '    fn g(&mut self) {', ...body.map((l) => '        ' + l), '    }', '}', 'fn main() {', '    let mut s = S { items: vec![1, 2], total: 0 };', '    s.g();', '    println!("{} {:?}", s.total, s.items);', '}');
+  it('holds a loan on the field: pushing to it or calling a &mut method is E0502, a &mut loop gives E0499', () => {
+    assert.equal(ids(RQ.run(run('for x in &self.items {', '    self.items.push(*x);', '}'))), 'E0502@11');
+    assert.equal(ids(RQ.run(run('for x in &mut self.items {', '    self.items.push(*x);', '}'))), 'E0499@11');
+  });
+  it('a write to another field, or a & method call, is fine', () => {
+    assert.equal(out(run('for x in &self.items {', '    self.total += *x;', '}')), '3 [1, 2]\n');
+    assert.equal(out(run('for x in &mut self.items {', '    *x += self.total;', '}')), '0 [1, 2]\n');
+  });
+  it('a mix of the loop field and another field in the body is unsupported', () => {
+    assert.equal(feature(run('for x in &self.items {', '    self.total += *x + self.peek();', '}')), 'reborrow@10');
+  });
+});
+
+describe('slice methods behind DerefMut get no two-phase borrow', () => {
+  it('swap and get_mut with a read of the Vec in the arguments are E0502', () => {
+    assert.equal(ids(RQ.run(main('let mut v = vec![1, 2, 3];', 'v.swap(0, v.len() - 1);'))), 'E0502@3');
+    assert.equal(ids(RQ.run(main('let mut v = vec![1, 2, 3];', 'if let Some(x) = v.get_mut(v.len() - 1) {', '    *x = 0;', '}'))), 'E0502@3');
+  });
+  it('push, insert and truncate keep their two-phase borrow, also with a shared loan read in the argument', () => {
+    assert.equal(out(main('let mut v = vec![1usize, 2];', 'v.push(v.len());', 'v.insert(v.len(), 0);', 'v.truncate(v.len() - 1);', 'println!("{:?}", v);')), '[1, 2, 2]\n');
+    assert.equal(out(main('let mut v = vec![1usize, 2];', 'let r = &v;', 'v.push(r.len());', 'println!("{:?}", v);')), '[1, 2, 2]\n');
+    assert.equal(ids(RQ.run(main('let mut v = vec![1usize, 2];', 'let r = &mut v;', 'v.push(r.len());', 'r.push(1);'))), 'E0499@4');
+  });
+});
+
+describe('the expected type of a coercion site reaches the arms of a match or if', () => {
+  it('one E0308, at the first arm that does not fit', () => {
+    const c = RQ.run(P('fn first(v: &Vec<u32>) -> u32 {', '    match v.get(0) {', '        Some(x) => x,', '        None => 0,', '    }', '}', 'fn main() {', '    let v = vec![7];', '    println!("{}", first(&v));', '}'));
+    assert.equal(ids(c), 'E0308@3');
+    assert.equal(ids(RQ.run(main('let v = vec![7u32];', 'let c = true;', 'let n: u32 = if c { &v[0] } else { 0 };'))), 'E0308@4');
+  });
+  it('without an expectation the arms are still compared with each other', () => {
+    assert.equal(ids(RQ.run(main('let c = true;', 'let x = if c { 1 } else { "x" };'))), 'E0308@3');
   });
 });
