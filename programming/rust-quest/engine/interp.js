@@ -302,13 +302,14 @@ RQ.interp=(ast,opts)=>{
     catch(x){if(x instanceof Panic)throw new Unsup('const initializer',c.line);throw x;}
     return cval.get(n);
   }
-  const owns=v=>v.k==='String'||v.k==='struct'||v.k==='enum'||v.k==='vec'||v.k==='map'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
+  const owns=v=>v.k==='String'||v.k==='iter'&&v.heap||v.k==='closure'&&v.owned.some(c=>c.val!==null&&!c.moved&&!c.dropped&&owns(c.val))||v.k==='struct'||v.k==='enum'||v.k==='vec'||v.k==='map'||(v.k==='tuple'&&v.v.some(owns))||(v.k==='array'&&v.v.length>0&&owns(v.v[0]));
   const hasDrop=v=>{
     switch(v.k){
       case 'struct':return dropImpl.has(v.name)||v.fields.some(f=>hasDrop(f.val));
       case 'enum':return v.fields.some(f=>hasDrop(f.val));
       case 'tuple':case 'array':case 'vec':return v.v.some(hasDrop);
       case 'map':return v.v.some(en=>hasDrop(en.key)||hasDrop(en.val));
+      case 'closure':return v.owned.some(c=>hasDrop(c.val));
       default:return false;
     }
   };
@@ -345,6 +346,8 @@ RQ.interp=(ast,opts)=>{
         if(!v.fields.some(f=>f.val.k==='moved'))note({t:'drop',name,ty:v.name,line,part});
         for(const f of v.fields)dropValue(f.val,name&&name+'.'+f.name,line,true);
         break;
+      case 'closure':dropClosure(v,line);break;
+      case 'iter':v.drop(line);break;
       case 'vec':case 'map':
         note({t:'drop',name,ty:v.ty,line,part});
         (v.k==='map'&&v.v.length>1&&v.v.some(en=>hasDrop(en.key)||hasDrop(en.val))?RQ.std.hashOrder(v):entries(v)).forEach((x,i)=>{
@@ -635,6 +638,34 @@ RQ.interp=(ast,opts)=>{
     }
     return UNIT;
   }
+  function forIter(e,env){
+    const it=unref(mv(e.iter,env)),box={v:UNIT};
+    let bail=false;
+    try{
+      for(;;){
+        tick();
+        const item=it.next();
+        if(item===undefined)break;
+        const sc=newScope();
+        env.push(sc);
+        if(e.pat.t==='IdentPat')declare(sc,e.pat.name,{val:item,name:e.pat.name,ty:tyName(e.pat),line:e.line});
+        let abandon=false,stop;
+        try{stop=body(e.body,env,box);}
+        catch(x){abandon=x instanceof Limit||x instanceof Unsup;throw x;}
+        finally{
+          env.pop();
+          if(!abandon){if(e.pat.t==='IdentPat')dropScope(sc);else dropValue(item,null,e.line);}
+        }
+        if(stop)break;
+      }
+    }catch(x){
+      bail=x instanceof Limit||x instanceof Unsup;
+      throw x;
+    }finally{
+      if(!bail)it.drop(e.line);
+    }
+    return UNIT;
+  }
   function body(b,env,box){
     try{block(b,env);}
     catch(x){
@@ -672,6 +703,8 @@ RQ.interp=(ast,opts)=>{
         });
         break;
       case 'moved':out.push({path,text:'moved'});break;
+      case 'closure':out.push({path,text:'closure'});break;
+      case 'iter':out.push({path,text:'iterator'});break;
       case 'tuple':case 'array':
         v.v.slice(0,8).forEach((x,i)=>leaves(x,path+(v.k==='array'?'['+i+']':(path?'.':'')+i),out,live));
         if(v.v.length>8)out.push({path:path+'…',text:'… '+(v.v.length-8)+' more'});
@@ -742,6 +775,253 @@ RQ.interp=(ast,opts)=>{
     lastEv=events.length;
   }
 
+  // Closures and iterators. A closure is {k:'closure',node,scope,owned,kind}: scope holds the cells it captured (shared for a borrow, its own
+  // for a move or copy) and owned lists the latter. An iterator is {k:'iter',next,back,len,drop,heap}: next gives the next item or undefined, so
+  // every adapter pulls from the one before it and side effects happen in the order Rust runs them.
+  const optVal=(x,ty)=>ctorVal({adt:'Option',variant:x===undefined?0:1},x===undefined?[]:[x]);
+  function dropClosure(c,line){
+    for(let i=c.owned.length-1;i>=0;i--){
+      const x=c.owned[i];
+      if(x.val!==null&&!x.moved&&!x.dropped){x.dropped=true;dropValue(x.val,x.name,line,true);}
+    }
+  }
+  function makeClosure(e,env){
+    const cl=info.get(e).cl,scope=new Map(),owned=[];
+    for(const c of cl.caps){
+      const outer=find(env,c.name);
+      if(!outer)return bug('capture '+c.name);
+      if(c.mode==='ref'||c.mode==='mut'){scope.set(c.name,outer);continue;}
+      const v=read(outer,e.line);
+      if(hasDrop(v))throw new Unsup('closure that owns a value with Drop',e.line);
+      if(c.mode==='move'){outer.moved=true;note({t:'move',name:c.name,line:e.line});}
+      const cell={val:v,name:c.name,ty:outer.ty,line:outer.line};
+      scope.set(c.name,cell);owned.push(cell);
+    }
+    return {k:'closure',node:e,scope,owned,kind:cl.kind};
+  }
+  function callClosure(f,args,line){
+    tick();
+    if(depth+1>maxDepth)throw new Limit('depth');
+    depth++;
+    const e=f.node,sc=newScope(),fenv=[f.scope,sc];
+    e.params.forEach((p,i)=>declare(sc,p.pat.name,{val:args[i],name:p.pat.name,ty:tyName(p.pat),line:p.pat.line}));
+    frames.push({fn:'closure',env:fenv,stmt:null});
+    let r,abandon=false;
+    try{r=peel(e.body).t==='Block'?ev(e.body,fenv):mv(e.body,fenv);}
+    catch(x){
+      if(x instanceof Ret)r=x.v;
+      else{if(x instanceof Limit||x instanceof Unsup)abandon=true;throw x;}
+    }
+    finally{
+      if(!abandon)dropScope(sc);
+      depth--;frames.pop();
+    }
+    return r;
+  }
+  // FnOnce takes the closure, so what it still owns drops after the call
+  function closureCall(e,env){
+    const c=peel(e.callee),t=res(typeOf(c)),kind=t.k==='param'?t.fnb.kind:t.kind;
+    const fv=c.t==='Path'&&kind==='FnOnce'?mv(c,env):ev(c,env);
+    const f=unref(fv);
+    const args=mvAll(e.args,env);
+    const r=callClosure(f,args,e.line);
+    if(kind==='FnOnce')dropClosure(f,e.line);
+    return r;
+  }
+  const mkIter=(o,heap)=>({k:'iter',heap:!!heap,...o});
+  const usize=n=>int(BigInt(n),'usize');
+  function rangeIter(lo,hi,ty){
+    return mkIter({next:()=>lo<hi?int(lo++,ty):undefined,back:()=>lo<hi?int(--hi,ty):undefined,len:()=>Number(hi>lo?hi-lo:0n),drop(){}});
+  }
+  function collOf(rv){
+    let r=rv,rg=null,pc=null;
+    while(r.k==='ref'){
+      if(r.range)rg=r.range;
+      pc=r.cell;
+      r=r.cell.val;
+    }
+    return {coll:r,pc,rg,ref:rv.k==='ref',mut:rv.k==='ref'&&rv.mut,loan:rv.k==='ref'?rv.loan:null};
+  }
+  function srcIter(key,e,rv){
+    const name=key.slice(5),line=e.line;
+    if(name==='chars'){
+      const cs=Array.from(unref(rv).v);
+      let lo=0,hi=cs.length;
+      return mkIter({next:()=>lo<hi?{k:'char',v:cs[lo++]}:undefined,back:()=>lo<hi?{k:'char',v:cs[--hi]}:undefined,len:()=>hi-lo,drop(){}});
+    }
+    const w=collOf(rv),coll=w.coll,map=coll.k==='map';
+    const owned=!w.ref&&name==='into_iter',mut=name==='iter_mut'||name==='values_mut'||w.mut&&name==='into_iter';
+    const loan=w.loan??e.id;
+    if(owned&&(map?coll.v.some(en=>hasDrop(en.key)||hasDrop(en.val)):coll.v.some(hasDrop)))throw new Unsup('iterator over values with Drop',line);
+    if(!map){
+      let lo=w.rg?w.rg[0]:0,hi=w.rg?w.rg[1]:coll.v.length;
+      const item=i=>owned?coll.v[i]:{k:'ref',cell:elemCell(coll,i,w.pc),mut,loan};
+      return mkIter({
+        next:()=>lo<hi?item(lo++):undefined,back:()=>lo<hi?item(--hi):undefined,len:()=>hi-lo,
+        drop(l){
+          if(!owned)return;
+          for(;lo<hi;lo++)dropValue(coll.v[lo],null,l);
+          if(coll.id!==undefined){heap.delete(coll.id);note({t:'free',id:coll.id,line:l});}
+        }
+      },owned&&coll.k==='vec');
+    }
+    const list=RQ.std.hashOrder(coll);
+    let lo=0,hi=list.length;
+    const item=i=>{
+      const en=list[i];
+      if(owned)return {k:'tuple',v:[en.key,en.val]};
+      const kr={k:'ref',cell:entryCell(coll,en,w.pc,'key'),mut:false,loan},vr={k:'ref',cell:entryCell(coll,en,w.pc,'value'),mut,loan};
+      return name==='keys'?kr:name==='values'||name==='values_mut'?vr:{k:'tuple',v:[kr,vr]};
+    };
+    return mkIter({
+      next:()=>lo<hi?item(lo++):undefined,back:()=>undefined,len:()=>hi-lo,
+      drop(l){
+        if(!owned)return;
+        for(;lo<hi;lo++){const en=list[lo];dropValue(en.key,null,l);dropValue(en.val,null,l);}
+        heap.delete(coll.id);note({t:'free',id:coll.id,line:l});
+      }
+    },owned);
+  }
+  const itemRef=(x,e)=>({k:'ref',cell:{val:x},mut:false,loan:e.id});
+  function sumOf(it,e,prod){
+    const t=res(typeOf(e));
+    let acc=t.k==='float'?{k:'float',v:prod?1:0}:int(prod?1n:0n,t.ty);
+    for(let x=it.next();x!==undefined;x=it.next()){
+      tick();
+      const y=unref(x);
+      if(acc.k==='float')acc={k:'float',v:prod?acc.v*y.v:acc.v+y.v};
+      else{
+        const r=prod?acc.v*y.v:acc.v+y.v;
+        if(!fits(r,t.ty))throw new Unsup('iterator sum overflow',e.line);
+        acc=int(r,t.ty);
+      }
+    }
+    return acc;
+  }
+  function collectInto(it,e){
+    const t=res(typeOf(e)),items=[];
+    for(let x=it.next();x!==undefined;x=it.next()){tick();items.push(x);}
+    if(t.k==='String'){
+      let s='';
+      for(const x of items){s+=unref(x).v;dropValue(x,null,e.line);}
+      return string(s,undefined,e.line);
+    }
+    if(t.k==='coll'&&t.name==='Vec')return coll('vec',items,show(t),e.line,!items.length);
+    const m=coll('map',[],show(t),e.line,!items.length);
+    for(const x of items){
+      const [k,v]=x.v,old=mapFind(m,k);
+      if(!old)m.v.push({key:k,val:v});
+      else{const prev=old.val;old.val=v;dropValue(k,null,e.line);dropValue(prev,null,e.line);}
+    }
+    return m;
+  }
+  function iterOp(key,e,rv,args){
+    const name=key.slice(6),line=e.line,src=unref(rv);
+    const f=args[0];
+    const wrap=o=>mkIter({drop(l){src.drop(l);if(f&&f.k==='closure')dropClosure(f,l);},len:()=>src.len(),...o},src.heap);
+    switch(name){
+      case 'map':return wrap({next:()=>{const x=src.next();return x===undefined?undefined:callClosure(f,[x],line);},back:()=>{const x=src.back();return x===undefined?undefined:callClosure(f,[x],line);}});
+      case 'filter':{
+        const pull=get=>()=>{for(;;){const x=get();if(x===undefined)return undefined;if(callClosure(f,[itemRef(x,e)],line).v)return x;dropValue(x,null,line);}};
+        return wrap({next:pull(()=>src.next()),back:pull(()=>src.back())});
+      }
+      case 'take_while':{
+        let done=false;
+        return wrap({next:()=>{
+          if(done)return undefined;
+          const x=src.next();
+          if(x===undefined)return undefined;
+          if(callClosure(f,[itemRef(x,e)],line).v)return x;
+          done=true;dropValue(x,null,line);return undefined;
+        }});
+      }
+      case 'skip_while':{
+        let going=true;
+        return wrap({next:()=>{
+          for(;;){
+            const x=src.next();
+            if(x===undefined)return undefined;
+            if(going&&callClosure(f,[itemRef(x,e)],line).v){dropValue(x,null,line);continue;}
+            going=false;return x;
+          }
+        }});
+      }
+      case 'enumerate':{
+        let i=0;
+        return wrap({next:()=>{const x=src.next();return x===undefined?undefined:{k:'tuple',v:[usize(i++),x]};},
+          back:()=>{const n=src.len(),x=src.back();return x===undefined?undefined:{k:'tuple',v:[usize(i+n-1),x]};}});
+      }
+      case 'rev':return mkIter({next:()=>src.back(),back:()=>src.next(),len:()=>src.len(),drop:l=>src.drop(l)},src.heap);
+      case 'take':case 'skip':{
+        let n=Number(unref(f).v),started=false;
+        const first=()=>{if(name==='skip'&&!started){started=true;for(;n>0;n--){const x=src.next();if(x===undefined)break;dropValue(x,null,line);}}};
+        return mkIter({next:()=>{
+          if(name==='take'){if(n<=0)return undefined;n--;return src.next();}
+          first();return src.next();
+        },len:()=>name==='take'?Math.min(n,src.len()):Math.max(0,src.len()-(started?0:n)),drop:l=>src.drop(l)},src.heap);
+      }
+      case 'zip':{
+        const o=f.k==='iter'?f:srcIter('Src::into_iter',e,f);
+        return mkIter({next:()=>{
+          const a=src.next();
+          if(a===undefined)return undefined;
+          const b=o.next();
+          if(b===undefined){dropValue(a,null,line);return undefined;}
+          return {k:'tuple',v:[a,b]};
+        },len:()=>Math.min(src.len(),o.len()),drop:l=>{src.drop(l);o.drop(l);}},src.heap||o.heap);
+      }
+      case 'copied':case 'cloned':{
+        const cp=x=>{const y=unref(x);return name==='cloned'?cloneVal(y,line):y;};
+        return wrap({next:()=>{const x=src.next();return x===undefined?undefined:cp(x);},back:()=>{const x=src.back();return x===undefined?undefined:cp(x);}});
+      }
+      case 'count':{let n=0;for(let x=src.next();x!==undefined;x=src.next()){tick();n++;dropValue(x,null,line);}src.drop(line);return usize(n);}
+      case 'sum':case 'product':{const r=sumOf(src,e,name==='product');src.drop(line);return r;}
+      case 'collect':{const r=collectInto(src,e);src.drop(line);return r;}
+      case 'last':{let l;for(let x=src.next();x!==undefined;x=src.next()){tick();if(l!==undefined)dropValue(l,null,line);l=x;}src.drop(line);return optVal(l);}
+      case 'min':case 'max':{
+        let best;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          if(best===undefined){best=x;continue;}
+          const c=cmpv(x,best);
+          if(name==='min'?c<0:c>=0){dropValue(best,null,line);best=x;}else dropValue(x,null,line);
+        }
+        src.drop(line);return optVal(best);
+      }
+      case 'fold':{
+        let acc=args[0];
+        for(let x=src.next();x!==undefined;x=src.next()){tick();acc=callClosure(args[1],[acc,x],line);}
+        src.drop(line);dropClosure(args[1],line);return acc;
+      }
+      case 'for_each':{for(let x=src.next();x!==undefined;x=src.next()){tick();callClosure(f,[x],line);}src.drop(line);dropClosure(f,line);return UNIT;}
+      case 'any':case 'all':{
+        let r=name==='all';
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          const y=callClosure(f,[x],line).v;
+          if(name==='any'&&y){r=true;break;}
+          if(name==='all'&&!y){r=false;break;}
+        }
+        dropClosure(f,line);return bool(r);
+      }
+      case 'position':{
+        let i=0,r;
+        for(let x=src.next();x!==undefined;x=src.next(),i++){tick();if(callClosure(f,[x],line).v){r=usize(i);break;}}
+        dropClosure(f,line);return optVal(r);
+      }
+      case 'find':{
+        let r;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          if(callClosure(f,[itemRef(x,e)],line).v){r=x;break;}
+          dropValue(x,null,line);
+        }
+        dropClosure(f,line);return optVal(r);
+      }
+      case 'next':return optVal(src.next());
+    }
+    return bug('iterator '+name);
+  }
   function userMethod(e,env){
     const u=info.get(e).um;
     let rv;
@@ -767,6 +1047,8 @@ RQ.interp=(ast,opts)=>{
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
     if(key==='Into::id')return rv;
+    if(key.startsWith('Src::'))return srcIter(key,e,rv);
+    if(key.startsWith('Iter::'))return iterOp(key,e,rv,args);
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
@@ -830,6 +1112,30 @@ RQ.interp=(ast,opts)=>{
           [c.v[a],c.v[b]]=[c.v[b],c.v[a]];return UNIT;
         }
         case 'reverse':c.v.reverse();return UNIT;
+        case 'sort_by_key':{
+          const f=args[0];
+          if(f.kind!=='Fn')throw new Unsup('sort_by_key with side effects',e.line);
+          const ks=c.v.map((_,i)=>callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line));
+          const order=c.v.map((_,i)=>i).sort((a,b)=>cmpv(ks[a],ks[b])||a-b);
+          const old=c.v.slice();
+          order.forEach((o,i)=>{c.v[i]=old[o];});
+          dropClosure(f,e.line);
+          return UNIT;
+        }
+        case 'retain':{
+          const f=args[0],map=c.k==='map',keep=[];
+          const all=map?RQ.std.hashOrder(c):c.v.slice();
+          all.forEach((x,i)=>{
+            const r=map?callClosure(f,[{k:'ref',cell:entryCell(c,x,cell,'key'),mut:false,loan:e.id},{k:'ref',cell:entryCell(c,x,cell,'value'),mut:true,loan:e.id}],e.line)
+              :callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line);
+            if(r.v)keep.push(x);
+            else if(map){dropValue(x.key,null,e.line);dropValue(x.val,null,e.line);}
+            else dropValue(x,null,e.line);
+          });
+          c.v.splice(0,c.v.length,...(map?c.v.filter(en=>keep.includes(en)):keep));
+          dropClosure(f,e.line);
+          return UNIT;
+        }
         case 'sort':c.v.sort((x,y)=>cmpv(x,y));return UNIT;
         case 'contains':return bool(c.v.some(x=>eqv(x,args[0])));
         case 'contains_key':return bool(!!mapFind(c,args[0]));
@@ -849,6 +1155,12 @@ RQ.interp=(ast,opts)=>{
           consume(a);
           return UNIT;
         }
+        case 'entry.or_insert_with':{
+          let en=mapFind(c,args[0]);
+          if(en){dropValue(args[0],null,e.line);dropClosure(args[1],e.line);}
+          else{en={key:args[0],val:callClosure(args[1],[],e.line)};c.v.push(en);dropClosure(args[1],e.line);}
+          return vref(en,true);
+        }
         case 'entry.or_insert':case 'entry.or_default':{
           let en=mapFind(c,args[0]);
           const dflt=key.endsWith('default');
@@ -862,6 +1174,25 @@ RQ.interp=(ast,opts)=>{
     const v=unref(rv),opt=key.startsWith('Option::');
     const ok=opt?v.variant==='Some':v.variant==='Ok';
     switch(key.slice(key.indexOf('::')+2)){
+      case 'map':case 'and_then':case 'unwrap_or_else':case 'filter':case 'is_some_and':case 'ok_or_else':case 'map_or':case 'map_err':{
+        const nm=key.slice(key.indexOf('::')+2),f=nm==='map_or'?args[1]:args[0],line=e.line;
+        const mk=(variant,x)=>ctorVal({adt:opt?'Option':'Result',variant},x===undefined?[]:[x]);
+        const pay=v.fields.length?v.fields[0].val:undefined;
+        let r;
+        if(nm==='map')r=ok?mk(opt?1:0,callClosure(f,[pay],line)):v;
+        else if(nm==='map_err')r=ok?v:mk(1,callClosure(f,[pay],line));
+        else if(nm==='and_then')r=ok?callClosure(f,[pay],line):v;
+        else if(nm==='unwrap_or_else')r=ok?pay:callClosure(f,opt?[]:[pay],line);
+        else if(nm==='is_some_and')r=bool(ok&&callClosure(f,[pay],line).v);
+        else if(nm==='ok_or_else')r=ok?ctorVal({adt:'Result',variant:0},[pay]):ctorVal({adt:'Result',variant:1},[callClosure(f,[],line)]);
+        else if(nm==='map_or'){if(ok){dropValue(args[0],null,line);r=callClosure(f,[pay],line);}else r=args[0];}
+        else{
+          if(ok&&callClosure(f,[itemRef(pay,e)],line).v)r=v;
+          else{if(ok)dropValue(pay,null,line);r=mk(0);}
+        }
+        dropClosure(f,line);
+        return r;
+      }
       case 'is_some':case 'is_none':case 'is_ok':case 'is_err':return bool(key.endsWith('some')||key.endsWith('is_ok')?ok:!ok);
       case 'unwrap':case 'expect':{
         if(ok)return v.fields[0].val;
@@ -1080,8 +1411,14 @@ RQ.interp=(ast,opts)=>{
         else if(cell.val!==null&&!cell.moved&&!cell.dropped)dropValue(cell.val,cell.name,e.line);
         cell.val=r;cell.moved=false;cell.dropped=false;return UNIT;
       }
+      case 'Closure':return makeClosure(e,env);
+      case 'Range':{
+        const a=ev(e.from,env),b=ev(e.to,env);
+        return rangeIter(a.v,e.inclusive?b.v+1n:b.v,a.ty);
+      }
       case 'Call':{
         const o=info.get(e)||{};
+        if(o.cc)return closureCall(e,env);
         if(o.ctor)return ctorVal(o.ctor,mvAll(e.args,env));
         if(o.dflt)return defaultVal(o.dflt,e.line);
         if(o.sig&&o.sig.key)return callFn(methodFns.get(o.sig.key),mvAll(e.args,env),e.line,o.sig.key);
@@ -1181,6 +1518,7 @@ RQ.interp=(ast,opts)=>{
       case 'For':{
         const fi=info.get(e).fi;
         if(fi)return forColl(e,fi,env);
+        if(info.get(e).iterFor)return forIter(e,env);
         const r=peel(e.iter),from=ev(r.from,env),to=ev(r.to,env),box={v:UNIT},end=r.inclusive?to.v+1n:to.v;
         for(let i=from.v;i<end;i++){
           tick();

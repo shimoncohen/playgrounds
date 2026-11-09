@@ -168,7 +168,7 @@ describe('what stays unsupported, and odd shapes never throw', () => {
     assert.equal(feature(P('use std::fmt::Display;', 'fn f<T: Display>(x: T) -> impl Display { x }', 'fn main() {}')), 'impl Trait@2');
     assert.equal(feature(P('fn f<T: std::ops::Add>(a: T, b: T) {}', 'fn main() {}')), 'bounds@1');
     assert.equal(feature(P('fn f<const N: usize>() {}', 'fn main() {}')), 'generics@1');
-    assert.equal(feature(P('fn f<T: Clone>(x: T) -> T { x }', 'fn main() {', '    let g = |a: i32| a;', '}')), 'closure@3');
+    assert.equal(feature(P('fn f() -> impl Fn(&str) -> &str { |a| a }', 'fn main() {}')), 'closure returning a reference@1');
     assert.equal(feature(P('use std::fmt;', 'struct W<T>(T);', 'impl<T: fmt::Display> fmt::Display for W<T> {', '    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self.0) }', '}', 'fn main() {}')), 'impl@3');
     assert.equal(feature(P('struct S;', 'impl std::fmt::Debug for S {', '    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { write!(f, "S") }', '}', 'fn main() {}')), 'impl@2');
     assert.equal(feature(P('fn id<T>(x: T) -> T { x }', 'fn main() {', '    let a = id::<i32>(1);', '}')), 'path call@3');

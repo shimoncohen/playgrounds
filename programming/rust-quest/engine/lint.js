@@ -208,6 +208,15 @@ RQ.lint=(ast,info)=>{
         barrier();
         return i&&i.k==='int'&&part(a,Number(i.v),i.amb);
       }
+      case 'Closure':{
+        // the body runs later and its captures are unknown here, but a lint inside it is still rustc's
+        const keep=st,was=div;
+        st=new Map();div=false;
+        ev(e.body);
+        st=keep;div=was;
+        forget(assignedIn(e));barrier();
+        return null;
+      }
       case 'Tuple':case 'Array':return {k:'agg',els:e.elems.map(ev)};
       case 'StructLit':for(const f of e.fields)ev(f.expr);return null;
       case 'ArrayRepeat':return {k:'agg',els:Array(Number(e.len.v)).fill(ev(e.elem))};

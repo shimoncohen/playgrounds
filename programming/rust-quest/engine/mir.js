@@ -22,7 +22,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
-RQ.BORROW_FEATURES=['borrow of a field','temporary borrow','partial move','move out of reference','two-phase borrow','constant condition','program too large'];
+RQ.BORROW_FEATURES=['borrow of a field','temporary borrow','partial move','move out of reference','two-phase borrow','constant condition','program too large','closure capture of a field','closure capture of a mutable reference'];
 const MAX_INSTRS=5000,MAX_LOCALS=300;
 const PRINT=new Set(['println','print','eprintln','eprint']);
 const peel=e=>e.t==='Paren'?peel(e.expr):e;
@@ -37,7 +37,7 @@ function analysed(fn,info,ast){
   let hit=!!(info.get(fn)&&info.get(fn).reg);
   RQ.walk(fn,n=>{
     if(hit)return false;
-    if(n.t==='Ref'&&n.expr||n.t==='Deref'||n.t==='MethodCall'||n.t==='Let'&&!n.init)hit=true;
+    if(n.t==='Ref'&&n.expr||n.t==='Deref'||n.t==='MethodCall'||n.t==='Closure'||n.t==='Let'&&!n.init)hit=true;
     else if(n.t==='Call'&&n.callee.t==='Path'){
       const sg=n.callee.segs.map(s=>s.name).join('::');
       if(sg==='String::from'||sg==='String::new'||sg==='drop'&&!userDrop)hit=true;
@@ -49,7 +49,7 @@ function analysed(fn,info,ast){
   return hit;
 }
 
-function lowerFn(f,info,un,err,userDrop,dropTys,fname){
+function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   const {T,res,isCopy}=RQ.types;
   const L=[],B=[],lm=new Map(),scopes=[],loops=[];
   let cur,count=0,retL;
@@ -70,7 +70,18 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
     B[cur].instrs.push({op,ast:nd.id,line:nd.line,col:nd.col,...o});
   };
   const opnd=(l,reb,sh)=>reb?{k:'copy',l,reb:true,sh:!!sh}:{k:isCopy(L[l].ty)?'copy':'move',l};
-  const lid=p=>{const o=info.get(p),b=o&&o.bind;return b&&lm.has(b)?lm.get(b):-1;};
+  // a closure body sees the locals of the fn around it as captures: a local of its own that starts out holding the value
+  const caps=new Map();
+  const lidBind=b=>{
+    if(lm.has(b))return lm.get(b);
+    const pl=ctx?ctx.lidBind(b):-1;
+    if(pl<0)return -1;
+    const o=ctx.L[pl];
+    const id=local(o.name,o.ty,{bind:b,mut:o.mut,param:true,cap:true,line:o.line});
+    lm.set(b,id);caps.set(b,id);
+    return id;
+  };
+  const lid=p=>{const o=info.get(p),b=o&&o.bind;return b?lidBind(b):-1;};
   const put=(rv,nd,dest,ty)=>{
     if(dest===undefined){
       if(isUnit(res(ty))){emit('eval',nd,{rv});return NIL;}
@@ -219,6 +230,83 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
       }
     }
     return ex(x);
+  }
+
+  const RANK={Fn:0,FnMut:1,FnOnce:2};
+  function captureUse(F){
+    const root=l=>{while(F.locals[l].parent!==undefined)l=F.locals[l].parent;return l;};
+    const ids=new Set(F.locals.filter(l=>l.cap).map(l=>l.id)),use=new Map([...ids].map(l=>[l,{mv:null,mut:null,field:false}]));
+    const note=(l,kind,i)=>{
+      const r=root(l);
+      if(!ids.has(r))return;
+      const m=use.get(r);
+      if(r!==l)m.field=true;
+      if(kind==='move'&&!m.mv)m.mv=i;
+      if((kind==='mut'||kind==='write')&&!m.mut)m.mut={i,write:kind==='write'};
+    };
+    for(const b of F.blocks)for(const i of b.instrs){
+      const o=x=>{if(x&&x.k!=='const')note(x.l,x.k==='move'?'move':x.reb&&!x.sh?'mut':'copy',i);};
+      const rv=r=>{
+        if(r.k==='ref')note(r.l,r.mut?'mut':'ref',i);
+        else if(r.k==='use'||r.k==='deref'||r.k==='peek')o(r.x);
+        else if(r.k==='method'){o(r.recv);r.args.forEach(o);}
+        else if(r.args)r.args.forEach(o);
+      };
+      if(i.rv)rv(i.rv);
+      else if(i.op==='store'){o(i.ref);o(i.x);}
+      else if(i.op==='branch'||i.op==='return')o(i.x);
+      if(i.op==='assign')note(i.l,'write',i);
+    }
+    return use;
+  }
+  function closureEx(e,dest){
+    const ty=tyOf(e);
+    const body=e.body.t==='Block'?e.body:{t:'Block',id:e.body.id,line:e.body.line,col:e.body.col,stmts:[],tail:e.body};
+    const sub=lowerFn({t:'Fn',id:e.id,line:e.line,col:e.col,params:e.params,selfParam:null,body},info,un,err,userDrop,dropTys,'closure at line '+e.line,sink,{lidBind,L});
+    if(!sub)return fin(NIL,e,dest);
+    sink.push(sub);
+    const use=captureUse(sub),o=info.get(e);
+    o.cl={caps:[],move:e.move};
+    let kind='Fn',first=null;
+    const ops=[],copy=[];
+    for(const [bind,il] of sub.caps){
+      const u=use.get(il),pl=lm.get(bind),t=L[pl].ty;
+      if(t.k==='ref'&&t.mut){un('closure capture of a mutable reference',e);return fin(NIL,e,dest);}
+      if(u.field){un('closure capture of a field',e);return fin(NIL,e,dest);}
+      const byRef=t.k==='ref'||t.k==='str';
+      let mode;
+      if(u.mv){kind='FnOnce';if(!first)first={i:u.mv,name:L[pl].name,move:true};}
+      else if(u.mut&&kind!=='FnOnce'){kind='FnMut';if(!first)first={i:u.mut.i,name:L[pl].name,write:u.mut.write};}
+      if(byRef){mode='copy';ops.push(opnd(pl));copy.push(true);}
+      else if(e.move||u.mv){mode=isCopy(t)?'copy':'move';ops.push(opnd(pl));copy.push(isCopy(t));}
+      else if(u.mut){mode='mut';ops.push(put({k:'ref',l:pl,mut:true,cap:true},e,undefined,T.ref(true,t,0)));copy.push(false);}
+      else{mode='ref';ops.push(put({k:'ref',l:pl,mut:false,cap:true},e,undefined,T.ref(false,t,0)));copy.push(true);}
+      o.cl.caps.push({name:L[pl].name,bind,mode});
+    }
+    ty.kind=kind;ty.copy=copy.every(Boolean);
+    o.cl.kind=kind;
+    // a closure written where a trait is expected takes its kind from it, so the body is what breaks; one named first is judged where it is passed
+    if(ty.exp){
+      if(RANK[ty.exp]<RANK[kind]&&first){
+        const at={line:first.i.line,col:first.i.col};
+        if(first.move)err('E0507',at,{name:first.name,closure:ty.exp});
+        else err(first.write?'E0594':'E0596',at,{name:first.name,closure:ty.exp});
+      }
+    }else if(ty.need&&RANK[ty.need]<RANK[kind])err('E0525',e,{want:ty.need,has:kind});
+    return put({k:'call',fn:'closure',args:ops,from:ops.length?0:-1,more:ops.slice(1).map((_,i)=>i+1)},e,dest,ty);
+  }
+  function closureCall(e,dest){
+    const c=peel(e.callee);
+    let l,x;
+    if(c.t==='Path')l=lid(c);
+    else{x=ex(c);l=x.k==='const'?-1:x.l;}
+    if(l<0){un('call',e);return fin(NIL,e,dest);}
+    const t=L[l].ty,kind=t.k==='param'&&t.fnb?t.fnb.kind:t.kind;
+    if(!kind){un('call',e);return fin(NIL,e,dest);}
+    const callee=kind==='Fn'?{k:'copy',l}:kind==='FnMut'?put({k:'ref',l,mut:true,implicit:true},e,undefined,T.ref(true,t,0)):opnd(l);
+    rebTwice(e.args,e);
+    const args=seq(e.args,argOp);
+    return put({k:'call',fn:'closure',args:[callee,...args],from:-1,more:[]},e,dest,tyOf(e));
   }
 
   function place(e,dest){
@@ -538,7 +626,28 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   }
 
   // `for i in a..b`: a hidden counter, a head that tests it, and an increment block that `continue` also reaches
+  // every turn reads the iterator, so the loans it holds last as long as the loop
+  function forIter(e){
+    const x=ex(e.iter);
+    if(x.k==='const'){un('for iterable',e);return NIL;}
+    const it=temp(tyOf(e.iter));
+    emit('assign',e,{l:it,rv:{k:'use',x}});
+    const h=blk(),body=blk(),out=blk();
+    edge(cur,h);cur=h;
+    emit('branch',e,{x:put({k:'op',args:[{k:'copy',l:it}]},e,undefined,T.bool)});
+    B[cur].succ.push(body,out);
+    loops.push({brk:out,cont:h,depth:scopes.length});
+    scopes.push([]);cur=body;
+    const ty=tyOf(e.pat);
+    if(e.pat.t==='IdentPat')emit('assign',e,{l:declare(e.pat,e,false,ty),rv:carries(ty)?{k:'use',x:{k:'copy',l:it}}:{k:'const'}});
+    blockEx(e.body);
+    kill(scopes.pop(),e);
+    edge(cur,h);loops.pop();
+    cur=out;
+    return NIL;
+  }
   function forEx(e){
+    if(info.get(e).iterFor)return forIter(e);
     const fi=info.get(e).fi;
     if(fi)return forColl(e,fi);
     const r=peel(e.iter);
@@ -662,7 +771,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
         return put({k:'op',args:seq([e.lhs,e.rhs],ex)},e,dest,tyOf(e));
       }
       case 'Assign':assign(e);return fin(NIL,e,dest);
+      case 'Closure':return closureEx(e,dest);
+      case 'Range':return put({k:'op',args:seq([e.from,e.to],ex)},e,dest,tyOf(e));
       case 'Call':{
+        if((info.get(e)||{}).cc)return closureCall(e,dest);
         const c=e.callee;
         if(c.t!=='Path'){un('call',e);return fin(NIL,e,dest);}
         const fn=c.segs.map(s=>s.name).join('::');
@@ -790,7 +902,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
   const seen=new Set([0]),st=[0];
   while(st.length)for(const s of B[st.pop()].succ)if(!seen.has(s)){seen.add(s);st.push(s);}
   for(const b of B)b.unreachable=!seen.has(b.id);
-  return {name:fname||f.name,ast:f.id,line:f.line,locals:L,blocks:B,pl,reg:(info.get(f)||{}).reg};
+  return {name:fname||f.name,ast:f.id,line:f.line,locals:L,blocks:B,pl,reg:(info.get(f)||{}).reg,caps};
 }
 
 RQ.mir=(ast,info)=>{
@@ -800,7 +912,7 @@ RQ.mir=(ast,info)=>{
   const err=(code,nd,o)=>{const k=code+'@'+nd.line+':'+nd.col;if(!seen.has(k)){seen.add(k);errors.push(RQ.diag.make(code,nd.line,nd.col,o));}};
   const userDrop=hasUserDrop(ast);
   const dropTys=new Set(ast.items.filter(RQ.isDropImpl).map(i=>i.selfTy.segs&&i.selfTy.segs[0].name));
-  const add=(f,name)=>{if(f.t==='Fn'&&f.body&&analysed(f,info,ast)){const m=lowerFn(f,info,un,err,userDrop,dropTys,name);if(m)fns.push(m);}};
+  const add=(f,name)=>{if(f.t==='Fn'&&f.body&&analysed(f,info,ast)){const m=lowerFn(f,info,un,err,userDrop,dropTys,name,fns);if(m)fns.push(m);}};
   for(const {f,name} of RQ.fnItems(ast))add(f,name);
   return {fns,unsupported,errors};
 };
