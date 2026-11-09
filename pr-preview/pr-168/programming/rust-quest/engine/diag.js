@@ -46,9 +46,9 @@ const ERRORS={
     tip:'A bare name in a pattern is a new variable that matches anything, not the variant. Write the variant by its full path, like `Shape::Circle`, or rename the variable.'
   },
   E0277:{
-    title:'a value cannot be printed this way',
-    msg:o=>'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
-    tip:'`{}` needs the type to know how to show itself, and your own types do not. Print it with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one.'
+    title:'a type is missing a trait this code needs',
+    msg:o=>o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field.'
   },
   E0369:{
     title:'two values of this type cannot be compared',
@@ -252,6 +252,7 @@ const HINTS={
   String:'Only a plain `String` is modeled, with no type arguments or path in front. Build one with `String::from("hi")` or `String::new()`.',
   Vec:'Write `Vec<T>` with its element type, like `Vec<i32>`, and build one with `Vec::new()` or `vec![1, 2, 3]`. The elements cannot be references.',
   HashMap:'Add `use std::collections::HashMap;` at the top, then write `HashMap<K, V>` with both types, like `HashMap<String, i32>`, and build one with `HashMap::new()`.',
+  'map index':'Indexing a `HashMap` with `m[&key]` is not modeled yet: a missing key panics inside the standard library. Use `m.get(&key)`, which gives an `Option`, and match on it.',
   'collection method':'Modeled on a `Vec`: `push`, `pop`, `len`, `is_empty`, `insert`, `remove`, `clear`, `truncate`, `swap`, `reverse`, `sort`, `contains`, `get`, `get_mut`, `first`, `last`, `extend` and `clone`. On a `HashMap`: `insert`, `get`, `get_mut`, `contains_key`, `remove`, `extend`, `len`, `is_empty`, `clear`, `clone` and `entry(k).or_insert(v)`. Closures and iterator adapters wait for a later chapter.',
   iterator:'`iter()`, `iter_mut()`, `keys()`, `values()` and `values_mut()` are modeled right after `for ... in`, like `for x in v.iter()`. An iterator in a variable, or with `map`, `filter` and the like, is not modeled yet. Loop over the collection instead.',
   'hash key':'A `HashMap` key must be `Eq` and `Hash`, and Rust Quest could not tell whether this key is. Write the map\'s type out, like `let mut m: HashMap<String, i32> = HashMap::new();`.',
