@@ -723,6 +723,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname){
           cur=blk();
           return NIL;
         }
+        if((e.name==='write'||e.name==='writeln')&&e.args&&e.args.length){
+          const to=argOp(e.args[0],false);
+          const rest=seq([...e.args.slice(2),...e.named.map(x=>x.expr)],x=>printArg(x,e));
+          const caps=e.args[1]&&info.get(e.args[1])&&info.get(e.args[1]).caps||[];
+          for(const c of caps)if(c.bind&&lm.has(c.bind))rest.push(printLocal(lm.get(c.bind),e));
+          return put({k:'macro',name:e.name,args:[to,...rest]},e,dest,tyOf(e));
+        }
         if(!(PRINT.has(e.name)||e.name==='format')||!e.args){un(e.name+'!',e);return fin(NIL,e,dest);}
         const args=seq([...e.args.slice(1),...e.named.map(x=>x.expr)],x=>printArg(x,e));
         const caps=e.args[0]&&info.get(e.args[0])&&info.get(e.args[0]).caps||[];
@@ -792,12 +799,9 @@ RQ.mir=(ast,info)=>{
   const fns=[],errors=[];
   const err=(code,nd,o)=>{const k=code+'@'+nd.line+':'+nd.col;if(!seen.has(k)){seen.add(k);errors.push(RQ.diag.make(code,nd.line,nd.col,o));}};
   const userDrop=hasUserDrop(ast);
-  const dropTys=new Set(ast.items.filter(i=>i.t==='Impl'&&i.trait).map(i=>i.selfTy.segs&&i.selfTy.segs[0].name));
+  const dropTys=new Set(ast.items.filter(RQ.isDropImpl).map(i=>i.selfTy.segs&&i.selfTy.segs[0].name));
   const add=(f,name)=>{if(f.t==='Fn'&&f.body&&analysed(f,info,ast)){const m=lowerFn(f,info,un,err,userDrop,dropTys,name);if(m)fns.push(m);}};
-  for(const it of ast.items){
-    if(it.t==='Fn')add(it,it.name);
-    else if(it.t==='Impl'&&!it.trait)for(const f of it.items)add(f,it.selfTy.segs[0].name+'::'+f.name);
-  }
+  for(const {f,name} of RQ.fnItems(ast))add(f,name);
   return {fns,unsupported,errors};
 };
 RQ.mir.analysed=analysed;

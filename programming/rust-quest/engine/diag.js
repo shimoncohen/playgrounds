@@ -4,6 +4,8 @@
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
 
+const BOUND=o=>o.trait==='Display'?'`'+o.type+'` doesn\'t implement `std::fmt::Display`':o.trait==='Debug'?'`'+o.type+'` doesn\'t implement `Debug`':o.trait==='PartialEq'||o.trait==='PartialOrd'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'the trait bound `'+o.type+': '+o.trait+'` is not satisfied';
+const ARITH_WORD={'+':['add','to'],'-':['subtract','from'],'*':['multiply','by'],'/':['divide','by'],'%':['calculate the remainder of','divided by']};
 const ERRORS={
   E0384:{
     title:'assigned twice to an immutable variable',
@@ -40,6 +42,41 @@ const ERRORS={
     },
     tip:'A `match` has to handle every possible value. Add an arm for each case the message lists, or a last arm with `_` to catch the rest.'
   },
+  E0046:{
+    title:'an impl is missing a method of its trait',
+    msg:o=>'not all trait items implemented, missing: '+o.missing.map(m=>'`'+m+'`').join(', '),
+    tip:'`impl Trait for Type` has to write every method the trait declares without a body. Add the missing ones, or give them a default body in the `trait`.'
+  },
+  E0407:{
+    title:'a method is not part of the trait',
+    msg:o=>'method `'+o.name+'` is not a member of trait `'+o.trait+'`',
+    tip:'An `impl Trait for Type` block may only hold the methods the trait declares. Move this one to a plain `impl Type` block, or add it to the trait.'
+  },
+  E0119:{
+    title:'two impls of one trait for one type',
+    msg:o=>'conflicting implementations of trait `'+o.trait+'` for type `'+o.type+'`',
+    tip:'A type can implement a trait only once. Merge the two blocks into one.'
+  },
+  E0405:{
+    title:'no trait with that name',
+    msg:o=>'cannot find trait `'+o.name+'` in this scope',
+    tip:'Check the spelling, and that the trait is declared with `trait '+'Name { .. }` in this file. `Debug` and `Display` need `use std::fmt::Debug;` or `use std::fmt::Display;` first.'
+  },
+  E0053:{
+    title:'a method does not match its trait',
+    msg:o=>'method `'+o.name+'` has an incompatible type for trait',
+    tip:'The `impl` has to repeat the trait\'s signature exactly: the same parameter types and the same return type.'
+  },
+  E0050:{
+    title:'a method has the wrong number of parameters',
+    msg:o=>'method `'+o.name+'` has '+o.got+' parameter'+(o.got===1?'':'s')+' but the declaration in trait `'+o.trait+'::'+o.name+'` has '+o.want,
+    tip:'The `impl` has to take the same parameters as the trait declares, `self` included.'
+  },
+  E0040:{
+    title:'a destructor cannot be called by hand',
+    msg:()=>'explicit use of destructor method',
+    tip:'Rust runs `drop` for you when the value goes out of scope. To drop a value earlier, call `drop(value)`, the free function, which takes it by value.'
+  },
   E0170:{
     title:'a pattern name is also a variant',
     msg:o=>'pattern binding `'+o.name+'` is named the same as one of the variants of the type `'+o.enum+'`',
@@ -47,13 +84,14 @@ const ERRORS={
   },
   E0277:{
     title:'a type is missing a trait this code needs',
-    msg:o=>o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
-    tipFor:o=>o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
+    msg:o=>o.what==='try-ret'?'the `?` operator can only be used in a function that returns `Result` or `Option` (or another type that implements `FromResidual`)':o.what==='try-kind'?'the `?` operator can only be used on `'+(o.from==='Option'?'Result`s, not `Option`s':'Option`s, not `Result`s')+', in a function that returns `'+(o.from==='Option'?'Result':'Option')+'`':o.what==='try-convert'?'`?` couldn\'t convert the error to `'+o.to+'`':o.what==='bound'?BOUND(o):o.trait==='Ord'?'the trait bound `'+o.type+': Ord` is not satisfied':o.trait==='PartialEq'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'`'+o.type+'` doesn\'t implement '+(o.debug?'`Debug`':'`std::fmt::Display`'),
+    tipFor:o=>o.what==='bound'?'A bound such as `T: '+o.trait+'` is a promise the caller keeps: the type you pass in has to have an `impl '+o.trait+' for '+o.type+'`'+(o.trait==='Display'||o.trait==='Debug'||o.trait==='Clone'||o.trait==='PartialEq'||o.trait==='PartialOrd'?' (or a derive, where the trait can be derived)':'')+'. Add the impl, or pass a type that has it.':o.what==='try-convert'?'`?` hands the error to the caller as the error type that the function returns. Rust Quest has no conversion between your own error types yet, so make the error type of the call and of the function the same.':o.what&&o.what.startsWith('try-')?'`?` hands an `Err` (or a `None`) back to the caller, so the function must return a `Result` for a `Result` and an `Option` for an `Option`. Change its return type and end the happy path with `Ok(...)` or `Some(...)`.':'',
     tip:'`{}` needs the type to know how to show itself, and your own types do not: print with `{:?}` after adding `#[derive(Debug)]` above the type, or print its fields one by one. `contains` needs `PartialEq`, and `sort` needs `Ord`, which a decimal number never has because of `NaN`: derive them above the type, or compare and sort by a field.'
   },
   E0369:{
     title:'two values of this type cannot be compared',
-    msg:o=>'binary operation `'+o.op+'` cannot be applied to type `'+o.type+'`',
+    msg:o=>ARITH_WORD[o.op]?'cannot '+ARITH_WORD[o.op][0]+' `'+o.type+'` '+ARITH_WORD[o.op][1]+' `'+o.type+'`':'binary operation `'+o.op+'` cannot be applied to type `'+o.type+'`',
+    tipFor:o=>o.param?'A type parameter only has what its bounds give it. Add `'+o.type+': '+(o.op==='=='||o.op==='!='?'PartialEq':ARITH_WORD[o.op]?'std::ops::Add':'PartialOrd')+'` to the bounds, or compare something the bounds already allow.':'',
     tip:'`==` needs the type to say what equal means. Add `#[derive(PartialEq)]` above the type, or compare the fields one by one.'
   },
   E0594:{
@@ -74,6 +112,7 @@ const ERRORS={
   E0599:{
     title:'no such method or item',
     msg:o=>o.what==='bounds'?'the method `'+o.name+'` exists for struct `'+o.type+'`, but its trait bounds were not satisfied':o.what==='method'?'no method named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope':'no '+(o.kind==='enum'?'variant, associated function, or constant':'associated function or constant')+' named `'+o.name+'` found for '+o.kind+' `'+o.type+'` in the current scope',
+    tipFor:o=>o.kind==='type parameter'?'Inside a generic function the type is only known by its bounds, so `'+o.name+'` has to come from a trait named in them. Add the trait that has `'+o.name+'`, as in `'+o.type+': TraitName`.':o.kind!=='enum'&&o.what==='method'&&o.trait?'`'+o.name+'` belongs to the trait `'+o.trait+'`, and `'+o.type+'` has no `impl '+o.trait+' for '+o.type+'`. Add that impl.':'',
     tip:'Rust cannot find that name on this type. Check the spelling, that it is defined in an `impl` block for the type, and that a method has `self` as its first parameter. `.clone()` also needs `#[derive(Clone)]` on the type.'
   },
   E0499:{

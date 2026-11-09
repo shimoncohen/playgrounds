@@ -13,17 +13,18 @@ const T={
   int:ty=>({k:'int',ty}),float:{k:'float'},bool:{k:'bool'},char:{k:'char'},str:{k:'str'},string:{k:'String'},unit:{k:'unit'},never:{k:'never'},any:{k:'any'},
   ivar:()=>({k:'ivar',ref:null}),fvar:()=>({k:'fvar',ref:null}),tuple:els=>({k:'tuple',els}),array:(el,n)=>({k:'array',el,n}),slice:el=>({k:'slice',el}),
   ref:(mut,to,rg)=>({k:'ref',mut,to,rg}),struct:(name,der,lt)=>({k:'struct',name,der:der||[],lt:!!lt}),
-  enum:(name,args,der,builtin)=>({k:'enum',name,args:args||[],der:der||[],builtin:!!builtin}),tvar:()=>({k:'tvar',ref:null}),coll:(name,args)=>({k:'coll',name,args})
+  enum:(name,args,der,builtin)=>({k:'enum',name,args:args||[],der:der||[],builtin:!!builtin}),tvar:()=>({k:'tvar',ref:null}),coll:(name,args)=>({k:'coll',name,args}),param:(name,bounds)=>({k:'param',name,bounds}),fmtr:{k:'fmtr'}
 };
 const res=t=>{while(t.ref)t=t.ref;return t;};
 // Copy: scalars, &str, &T, tuples and arrays of Copy, and a user type that derives Copy. String and &mut T move. any stands for an error already reported
 function isCopy(t){
   t=res(t);
   switch(t.k){
-    case 'String':case 'coll':return false;
+    case 'String':case 'coll':case 'fmtr':return false;
     case 'struct':return t.der.includes('Copy');
     case 'enum':return t.builtin?t.args.every(isCopy):t.der.includes('Copy');
     case 'ref':return !t.mut;
+    case 'param':return t.bounds.has('Copy');
     case 'tuple':return t.els.every(isCopy);
     case 'array':return isCopy(t.el);
     default:return true;
@@ -59,6 +60,7 @@ function has(t,tr){
       return false;
     }
     case 'tvar':return false;
+    case 'param':return t.bounds.has(tr);
     default:return tr!=='IntoIterator';
   }
 }
@@ -78,7 +80,7 @@ function unify(a,b){
     return false;
   }
   if(b.k==='ivar'||b.k==='fvar')return unify(b,a);
-  if(a.k!==b.k)return false;
+  if(a.k!==b.k||a.k==='param')return false;
   if(a.k==='int')return a.ty===b.ty;
   if(a.k==='tuple')return a.els.length===b.els.length&&a.els.every((x,i)=>unify(x,b.els[i]));
   if(a.k==='array')return a.n===b.n&&unify(a.el,b.el);
@@ -106,10 +108,26 @@ function show(t,nested){
     case 'struct':return t.name;
     case 'enum':case 'coll':return t.name+(t.args.length?'<'+t.args.map(sub).join(', ')+'>':'');
     case 'tvar':return '_';
+    case 'param':return t.name;
+    case 'fmtr':return "Formatter<'_>";
     default:return t.k;
   }
 }
-RQ.types={INT,isInt,T,unify,res,show,isCopy,has,hasRef,DEFAULT_INT:'i32',
+function subst(t,map){
+  t=res(t);
+  const f=x=>subst(x,map);
+  switch(t.k){
+    case 'param':return map.get(t)||t;
+    case 'tuple':return T.tuple(t.els.map(f));
+    case 'array':return T.array(f(t.el),t.n);
+    case 'slice':return T.slice(f(t.el));
+    case 'ref':return T.ref(t.mut,f(t.to),t.rg);
+    case 'enum':return t.args.length?T.enum(t.name,t.args.map(f),t.der,t.builtin):t;
+    case 'coll':return T.coll(t.name,t.args.map(f));
+    default:return t;
+  }
+}
+RQ.types={INT,subst,isInt,T,unify,res,show,isCopy,has,hasRef,DEFAULT_INT:'i32',
   fits:(v,ty)=>{const r=INT[ty||'i32'];return v>=r[0]&&v<=r[1];},
   wrap:(v,ty)=>(ty[0]==='i'?BigInt.asIntN:BigInt.asUintN)(bitsOf(ty),v),
   isSigned:ty=>ty[0]==='i'};

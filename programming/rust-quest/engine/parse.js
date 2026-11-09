@@ -19,6 +19,9 @@ RQ.walk=(n,f,parent)=>{
   for(const k of Object.keys(n)){const v=n[k];if(v&&typeof v==='object')RQ.walk(v,f,parent);}
 };
 
+RQ.fnItems=ast=>ast.items.flatMap(it=>it.t==='Fn'?[{f:it,name:it.name}]:it.t==='Impl'||it.t==='Trait'?it.items.filter(x=>x.t==='Fn').map(f=>({f,name:(it.t==='Trait'?it.name:it.selfTy.segs?it.selfTy.segs[0].name:'?')+'::'+f.name})):[]);
+RQ.isDropImpl=it=>it.t==='Impl'&&!!it.trait&&!!it.trait.segs&&it.trait.segs[it.trait.segs.length-1].name==='Drop';
+
 RQ.parse=tokens=>{
   const toks=tokens.slice(),un=[],seen=new Set();
   let p=0,nid=0;
@@ -556,14 +559,14 @@ RQ.parse=tokens=>{
     if(isK('impl')){
       p++;const gs=generics();eatP('!');const first=ty();let tr=null,self=first;
       if(eatK('for')){tr=first;self=ty();}
-      const wh=where();void wh;expP('{');const items=[];
+      const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at});
+      expP('}');return mk('Impl',x,{generics:gs,trait:tr,selfTy:self,items,attrs:at,where:wh});
     }
     if(isK('trait')){
-      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();where();expP('{');const items=[];
+      p++;const n=ident(),gs=generics();let sup=[];if(eatP(':'))sup=bounds();const wh=where();expP('{');const items=[];
       while(!isP('}')){if(T().k==='eof')fail('this file contains an unclosed delimiter');items.push(item());}
-      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub});
+      expP('}');return mk('Trait',x,{name:n.v,generics:gs,supers:sup,items,attrs:at,pub,where:wh});
     }
     if(isK('const')||isK('static')){
       const isStatic=isK('static');p++;let mut=false;

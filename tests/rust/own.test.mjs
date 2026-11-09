@@ -40,7 +40,6 @@ describe('structs and Drop: what stays unsupported', () => {
     assert.equal(feature('struct P {\n    x: &mut str,\n}\nfn main() {}'), 'struct');
     assert.equal(feature('struct P {\n    p: P,\n}\nfn main() {}'), 'struct');
     assert.equal(feature('struct P {\n    x: i32,\n}\nimpl P {\n    const A: i32 = 1;\n}\nfn main() {}'), 'impl');
-    assert.equal(feature(P(...N.slice(0, 3), 'impl Drop for N {', '    fn drop(&mut self) {', '        let x = 1;', '    }', '}', 'fn main() {}')), 'impl');
     assert.equal(feature(P(...N, 'fn main() {', '    let n = N { id: 1 };', '    println!("{}", make(2).id);', '}')), 'field of a temporary');
     assert.equal(feature(P(...N, 'fn main() {', '    let n = N {};', '}')), 'struct literal');
     assert.equal(RQ.run(P(...N, 'fn main() {', '    let n = N { id: 1 };', '    println!("{}", n);', '}')).onlyError('E0277'), true);

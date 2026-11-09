@@ -49,9 +49,10 @@ RQ.interp=(ast,opts)=>{
     if(it.t==='Fn')fns.set(it.name,it);else if(it.t==='Const')consts.set(it.name,it);
     else if(it.t==='Struct')decls.set(it.name,it);
     else if(it.t==='Enum')enumDecl.set(it.name,it);
-    else if(it.t==='Impl'&&it.trait)dropImpl.set(it.selfTy.segs[0].name,it.items[0]);
-    else if(it.t==='Impl')for(const f of it.items)methodFns.set(it.selfTy.segs[0].name+'::'+f.name,f);
+    else if(RQ.isDropImpl(it))dropImpl.set(it.selfTy.segs[0].name,it.items[0]);
+    if(it.t==='Impl')for(const f of it.items)methodFns.set(it.selfTy.segs[0].name+'::'+f.name,f);
   }
+  for(const [k,f] of (adts&&adts.methodNodes)||[])methodFns.set(k,f);
   const declFields=d=>d.kind==='tuple'?d.fields.map((_,i)=>String(i)):d.kind==='unit'?[]:d.fields.map(f=>f.name);
   const variantInfo=(adt,vi)=>{
     if(BVARS[adt]){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
@@ -230,8 +231,19 @@ RQ.interp=(ast,opts)=>{
     if(name==='println'||name==='print')out+=s;else err+=s;
     if(out.length+err.length>MAX_OUTPUT)throw new Limit('output size');
   }
+  const PLAIN={debug:false,pretty:false,prec:null,width:null};
+  function userDisplay(v){
+    const f=methodFns.get(v.name+'::fmt');
+    if(!f)bug('display of '+v.name);
+    const fm={k:'fmtr',buf:''};
+    callFn(f,[{k:'ref',cell:{val:v},mut:false},{k:'ref',cell:{val:fm},mut:true}],f.line,v.name+'::fmt');
+    return fm.buf;
+  }
   function macro(e,env){
-    if(!e.args.length){if(e.name==='panic')throw panic('explicit panic',e);emit(e.name,'');return UNIT;}
+    const wr=e.name==='write'||e.name==='writeln';
+    const dst=wr?unref(ev(e.args[0],env)):null;
+    if(wr)e={...e,args:e.args.slice(1)};
+    if(!e.args.length){if(wr){dst.buf+=e.name==='writeln'?'\n':'';return okUnit();}if(e.name==='panic')throw panic('explicit panic',e);emit(e.name,'');return UNIT;}
     const parts=RQ.std.parseFormat(e.args[0].v).parts;
     const pos=e.args.slice(1).map(x=>ev(x,env)),named=new Map();
     for(const x of e.named)named.set(x.name,ev(x.expr,env));
@@ -241,11 +253,11 @@ RQ.interp=(ast,opts)=>{
     try{
       for(const p of parts){
         if(p.lit!==undefined)s+=p.lit;
-        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
+        else if(p.idx!==undefined)s+=RQ.std.render(pos[p.idx],p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length,userDisplay);
         else{
           let v=named.get(p.name);
           if(!v){const c=find(env,p.name);v=c?read(c,e.line):consts.has(p.name)?constVal(p.name):bug('name '+p.name);}
-          s+=RQ.std.render(v,p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length);
+          s+=RQ.std.render(v,p.fmt,tick,MAX_OUTPUT-out.length-err.length-s.length,userDisplay);
         }
         // a line built from many big parts stops here; emit sees the total over the cap and throws
         if(out.length+err.length+s.length>MAX_OUTPUT)break;
@@ -254,6 +266,11 @@ RQ.interp=(ast,opts)=>{
       if(x instanceof RQ.std.Unmodeled)throw new Unsup('format spec',e.line);
       if(x instanceof RQ.std.Over)throw new Limit('output size');
       throw x;
+    }
+    if(wr){
+      dst.buf+=s+(e.name==='writeln'?'\n':'');
+      if(dst.buf.length>MAX_OUTPUT)throw new Limit('output size');
+      return okUnit();
     }
     if(e.name==='format')return string(s,undefined,e.line);
     if(e.name==='panic')throw panic(s,e);
@@ -500,7 +517,7 @@ RQ.interp=(ast,opts)=>{
     const host={val:v,name:name||'a temporary',ty:v.name,line};
     declare(fenv[0],'self',{val:{k:'ref',cell:host,mut:true},name:'self',ty:'&mut '+v.name,line});
     frames.push({fn:'drop',env:fenv,stmt:null,host});
-    try{block(f.body,fenv);}finally{depth--;frames.pop();}
+    try{block(f.body,fenv);}catch(x){if(!(x instanceof Ret))throw x;}finally{depth--;frames.pop();}
   }
   function callFn(f,args,line,label){
     tick();
@@ -737,11 +754,16 @@ RQ.interp=(ast,opts)=>{
         rv={k:'ref',cell:{val:v},mut:u.adj==='&mut',loan:e.id};
       }
     }
-    const args=mvAll(e.args,env),f=methodFns.get(u.key);
-    if(f)return callFn(f,[rv,...args],e.line,u.key);
+    const args=mvAll(e.args,env);
+    let key=u.key;
+    if(key.startsWith('dyn:')){const v=unref(rv);key=(v.k==='struct'||v.k==='enum'?v.name:v.k)+key.slice(key.lastIndexOf('::'));}
+    const f=methodFns.get(key);
+    if(f)return callFn(f,[rv,...args],e.line,key);
     return builtinMethod(u.key,e,rv,args);
   }
+  const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
+    if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
     if(key==='Clone::clone'||key.endsWith('::clone'))return cloneVal(rv,e.line);

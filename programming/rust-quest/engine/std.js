@@ -99,13 +99,14 @@ function hashOrder(m){
   return session.seed&&o.length?[...o.slice(1),o[0]]:o;
 }
 const unref=v=>{while(v.k==='ref'){const t=v.cell.val;v=v.range?{k:'array',v:t.v.slice(v.range[0],v.range[1])}:t;}return v;};
-function display(v){
+function display(v,user){
   v=unref(v);
   switch(v.k){
     case 'int':return v.v.toString();
     case 'float':return f64(v.v,'');
     case 'bool':return v.v?'true':'false';
     case 'char':case 'str':case 'String':return v.v;
+    case 'struct':case 'enum':if(user)return user(v);
     default:throw new Error('display of '+v.k);
   }
 }
@@ -138,9 +139,11 @@ function debug(v,tick,room=Infinity,pretty=false){
   }
 }
 // width counts characters, as Rust does
-function render(v,fmt,tick,room){
-  const s=fmt.debug?debug(v,tick,room,fmt.pretty):fmt.prec!==null?f64(unref(v).v,'.'+fmt.prec):display(v);
-  if(fmt.width===null)return s;
+function render(v,fmt,tick,room,user){
+  const u=unref(v),own=!fmt.debug&&(u.k==='struct'||u.k==='enum');
+  const s=fmt.debug?debug(v,tick,room,fmt.pretty):own?display(v,user):fmt.prec!==null?f64(u.v,'.'+fmt.prec):display(v);
+  // a hand-written Display gets the width and precision but only a `pad` call would use them, which is not modeled
+  if(fmt.width===null||own)return s;
   return ' '.repeat(Math.max(0,Math.min(fmt.width,MAX_PAD)-Array.from(s).length))+s;
 }
 // The methods the checker knows. The name is user text, so this is a Map (a plain object would answer `constructor`).

@@ -85,7 +85,7 @@ describe('the mission runner', () => {
   const m = RQ.CH[0].missions[0];
   it('an empty editor, unsupported code and engine bugs never complete a mission', () => {
     assert.equal(typeof RQ.runMission(m, ''), 'string');
-    assert.match(RQ.runMission(m, 'trait T {}\nfn main() {}'), /does not model `trait`/);
+    assert.match(RQ.runMission(m, 'trait T: Clone {}\nfn main() {}'), /does not model `trait`/);
     assert.match(RQ.runMission(m, 'fn main() {'), /would not accept/);
   });
   it('a hidden harness is appended to the learner code', () => {
