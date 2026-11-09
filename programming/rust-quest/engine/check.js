@@ -291,7 +291,6 @@ RQ.check=ast=>{
         reg={ret:a,allowed:ties};
       }
     }
-    else if(it.ret&&bareRef(it.ret)&&it.params.some(p=>namesIn(p.ty).size))unsup('lifetime elision',it.ret.line);
     else if(it.ret&&bareRef(it.ret)){
       // a &self or &mut self result borrows from self; otherwise one lifetime position among the parameters is the one the result borrows, and none or several is E0106
       const refs=it.params.map(p=>countRefs(p.ty)),total=refs.reduce((a,x)=>a+x,0);

@@ -45,7 +45,9 @@ const ROWS = {
   'duplicate lifetime names are not modeled': ["fn f<'a, 'a>(x: &'a str) -> &'a str { x }\nfn main() {}\n", 'unsupported:generics@1'],
   'a lifetime on a &mut is not modeled': ["fn f<'a>(x: &'a mut String, y: &'a str) -> &'a str { y }\nfn main() {}\n", 'unsupported:explicit lifetime@1'],
   'a lifetime in a let annotation is not modeled': ['fn main() {\n    let r: &\'static str = "a";\n}\n', 'unsupported:explicit lifetime@2'],
-  'a named lifetime on a parameter with an elided result is not modeled': ["fn f<'a>(x: &'a str, y: &str) -> &str { x }\nfn main() {}\n", 'unsupported:lifetime elision@1'],
+  'a named and a plain parameter with an elided result are two lifetimes: E0106': ["fn f<'a>(x: &'a str, y: &str) -> &str { x }\nfn main() {}\n", 'E0106@1'],
+  'the same named lifetime twice, with an elided result, is E0106 too': ["fn f<'a>(x: &'a str, y: &'a str) -> &str { x }\nfn main() {}\n", 'E0106@1'],
+  'one named parameter with an elided result is not modeled': ["fn f<'a>(x: &'a str) -> &str { x }\nfn main() {}\n", 'unsupported:lifetime elision@1'],
   'the same with two plain parameters is E0106': ["fn f<'a>(x: &str, y: &str) -> &str { x }\nfn main() {}\n", 'E0106@1'],
 
   'a struct holds a reference with a lifetime': [EXC + main('let novel = String::from("Call me Ishmael.");', 'let e = Excerpt { part: &novel[..4] };', 'println!("{}", e.part);'), 'ok:Call\n'],
