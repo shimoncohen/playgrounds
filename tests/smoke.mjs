@@ -762,6 +762,36 @@ test('rust-quest: chapter 12 plays through: a closure that outlives its function
   await ctx.close();
 });
 
+test('rust-quest: chapter 13 plays through: an unopened Result is E0308, a missing lifetime is E0106, and the last mission adds up a day', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="12"]');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0308[\s\S]*mismatched types/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0106[\s\S]*missing lifetime specifier/);
+  await page.click('#mission .dot[data-mi="7"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result');
+  assert.doesNotMatch(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /Ok\(24\)[\s\S]*Err\(Unknown\("gem"\)\)[\s\S]*Ok\(0\)/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');

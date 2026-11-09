@@ -20,7 +20,8 @@ const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why ca
   ['A step that can fail', 'Open a Result with match', 'Trust it with expect', 'Pass the error up with ?', 'A Result is used up by ?', '? needs a Result to return', 'Name your errors with an enum', 'A missing value becomes an error', 'Let main report the error'],
   ['Name the lifetime', 'The answer needs both inputs', 'Only label what the answer uses', 'A parameter without the label', 'A reference that lasts the whole run', 'A struct that holds a reference', 'Methods on a struct with a lifetime', 'A struct cannot outlive its text', 'A method result keeps the text borrowed'],
   ['Give a type a trait', 'One function for many types', 'A default method to share', 'The bound opens the body', 'Say it with impl Trait', 'Teach a type to print with {}', 'Run code when a value goes', 'Turn one error into another', 'A struct that holds any type'],
-  ['A closure in a variable', 'A closure borrows what it reads', 'A closure that changes what it captured', 'Take a closure as a parameter', 'Fn, FnMut or FnOnce', 'Hand a closure back', 'Iterators are lazy', 'Filter and add up', 'Closures in std methods']];
+  ['A closure in a variable', 'A closure borrows what it reads', 'A closure that changes what it captured', 'Take a closure as a parameter', 'Fn, FnMut or FnOnce', 'Hand a closure back', 'Iterators are lazy', 'Filter and add up', 'Closures in std methods'],
+  ['Value a find', 'Lend the ledger, do not hand it over', 'Tally the finds by kind', 'Send the error up with ?', 'The heaviest find lives on', 'One total for every kind of thing', 'A rule as a closure', 'Add up a whole day']];
 const want = (m) => m.expect || 'ok';
 
 describe('chapter and mission ids are append only', () => {
@@ -129,9 +130,50 @@ describe('extras', () => {
   it('a guide example that panics says so, and one that says so does panic', () => {
     for (const g of RQ.GUIDE) for (const [code, , declared] of g.ex) assert.equal(RQ.run(code).status === 'panic', declared === 'panic', code);
   });
+  it('every quest chapter has at least 6 quick-fire questions', () => {
+    RQ.CH.forEach((_, ci) => assert.ok(RQ.QF.filter((q) => q.ch === ci).length >= 6, `chapter ${ci}`));
+  });
+  it('the top rank is reachable: it needs no more XP than finishing every mission gives', () => {
+    const total = RQ.CH.reduce((n, c) => n + c.missions.length, 0) * RQ.XP;
+    assert.ok(RQ.RANKS.at(-1)[0] <= total, `${RQ.RANKS.at(-1)[0]} XP is more than the ${total} the course gives`);
+  });
   it('the guide explains every new error and lint id and panics', () => {
     const text = RQ.GUIDE.map((g) => g.c + g.what).join(' ');
     for (const w of ['E0308', 'E0425', 'E0382', 'E0502', 'E0596', 'E0106', 'E0515', 'arithmetic_overflow', 'overflowing_literals', 'unconditional_panic', 'panic']) assert.ok(text.includes(w), w);
+  });
+});
+
+describe('the guide glossary', () => {
+  const ids = Object.keys(RQ.diag.ERRORS);
+  const idsIn = (t) => t.match(/\bE\d{4}\b|\b[a-z]+(?:_[a-z]+)+\b/g) || [];
+  const entries = RQ.GUIDE.filter((g) => g.ch === RQ.CH.length - 1 && /^E\d{4}/.test(g.c));
+  it('every error id and lint name the engine can emit is named in the title of a guide entry', () => {
+    for (const id of ids) assert.ok(RQ.GUIDE.some((g) => idsIn(g.c).includes(id)), `${id} has no field guide entry`);
+  });
+  it('every error id the engine source names is a row of the diagnostics table', () => {
+    const dir = path.join(DIR, 'engine');
+    for (const f of fs.readdirSync(dir)) for (const [, id] of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/['"](E\d{4})['"]/g)) assert.ok(ids.includes(id), `${f} names ${id}`);
+  });
+  it('every error id the corpus expects is a row of the diagnostics table', () => {
+    const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8'));
+    for (const e of corpus) if (e.expect !== 'ok') assert.ok(ids.includes(e.expect.code || e.expect.lint), e.id);
+  });
+  it('a glossary title lists only real ids, and each of its examples fails with one of them', () => {
+    assert.ok(entries.length >= 8);
+    for (const g of entries) {
+      const listed = idsIn(g.c);
+      for (const id of listed) assert.ok(ids.includes(id), `${g.c}: ${id}`);
+      for (const [code] of g.ex) {
+        const r = RQ.run(code);
+        assert.equal(r.status, 'error', code);
+        assert.ok(listed.some((id) => r.hasError(id)), `${g.c}: ${code}`);
+      }
+      assert.deepEqual(listed.filter((id) => !g.ex.some(([code]) => RQ.run(code).hasError(id))), [], `${g.c}: an id has no example`);
+    }
+  });
+  it('a glossary example is a corpus program, so a real rustc has seen it', () => {
+    const srcs = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8')).map((e) => e.src));
+    for (const g of entries) for (const [code] of g.ex) assert.ok(srcs.has(code), `${g.c}: ${code}`);
   });
 });
 

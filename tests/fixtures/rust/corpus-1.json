@@ -6551,5 +6551,65 @@
     "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![1, 2];\n    let n = a.iter().zip(b.iter()).count();\n    println!(\"{}\", n);\n}\n",
     "expect": "ok", "out": "2\n", "err": "", "exit": 0,
     "why": "a longer left side without a closure has no side effect to count", "pr": "P14"
+  },
+  {
+    "id": "gl-impl-wrong-type",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> i32 {\n        3\n    }\n}\nfn main() {\n    println!(\"{}\", Sq(3).side());\n}\n",
+    "expect": {"code": "E0053", "line": 6}, "pair": "gl-impl-wrong-type-ok",
+    "why": "an impl method whose return type differs from the trait is E0053", "pr": "P15"
+  },
+  {
+    "id": "gl-impl-wrong-type-ok",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        3\n    }\n}\nfn main() {\n    println!(\"{}\", Sq(3).side());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P15"
+  },
+  {
+    "id": "gl-impl-wrong-arity",
+    "src": "trait Shape {\n    fn scale(&self, k: u32) -> u32;\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn scale(&self) -> u32 {\n        self.0\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": {"code": "E0050", "line": 6}, "pair": "gl-impl-wrong-arity-ok",
+    "why": "an impl method with fewer parameters than the trait declares is E0050", "pr": "P15"
+  },
+  {
+    "id": "gl-impl-wrong-arity-ok",
+    "src": "trait Shape {\n    fn scale(&self, k: u32) -> u32;\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn scale(&self, k: u32) -> u32 {\n        self.0\n    }\n}\nfn main() {\n    println!(\"ok\");\n}\n",
+    "expect": "ok", "out": "ok\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P15"
+  },
+  {
+    "id": "gl-impl-extra-method",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn tag(&self) -> u32 {\n        0\n    }\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n    fn tog(&self) -> u32 {\n        9\n    }\n}\nfn main() {\n    println!(\"{} {}\", Sq(3).side(), Sq(3).tag());\n}\n",
+    "expect": {"code": "E0407", "line": 12}, "pair": "gl-impl-extra-method-ok",
+    "why": "a method the trait does not list is E0407, here a typo of tag", "pr": "P15"
+  },
+  {
+    "id": "gl-impl-extra-method-ok",
+    "src": "trait Shape {\n    fn side(&self) -> u32;\n    fn tag(&self) -> u32 {\n        0\n    }\n}\nstruct Sq(u32);\nimpl Shape for Sq {\n    fn side(&self) -> u32 {\n        self.0\n    }\n    fn tag(&self) -> u32 {\n        9\n    }\n}\nfn main() {\n    println!(\"{} {}\", Sq(3).side(), Sq(3).tag());\n}\n",
+    "expect": "ok", "out": "3 9\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P15"
+  },
+  {
+    "id": "gl-explicit-drop",
+    "src": "struct Guard;\nimpl Drop for Guard {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let g = Guard;\n    g.drop();\n    println!(\"end\");\n}\n",
+    "expect": {"code": "E0040", "line": 9}, "pair": "gl-explicit-drop-ok",
+    "why": "calling drop as a method is E0040; drop(g) is the way", "pr": "P15"
+  },
+  {
+    "id": "gl-explicit-drop-ok",
+    "src": "struct Guard;\nimpl Drop for Guard {\n    fn drop(&mut self) {\n        println!(\"drop\");\n    }\n}\nfn main() {\n    let g = Guard;\n    drop(g);\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "drop\nend\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P15"
+  },
+  {
+    "id": "gl-lifetime-plain-param",
+    "src": "fn pick<'a>(x: &'a str, y: &str) -> &'a str {\n    y\n}\nfn main() {\n    println!(\"{}\", pick(\"a\", \"b\"));\n}\n",
+    "expect": {"code": "E0621", "line": 2}, "pair": "gl-lifetime-plain-param-ok",
+    "why": "a plain reference parameter returned as the labelled result is E0621", "pr": "P15"
+  },
+  {
+    "id": "gl-lifetime-plain-param-ok",
+    "src": "fn pick<'a>(x: &'a str, y: &'a str) -> &'a str {\n    y\n}\nfn main() {\n    println!(\"{}\", pick(\"a\", \"b\"));\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P15"
   }
 ]
