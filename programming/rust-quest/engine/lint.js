@@ -304,6 +304,12 @@ RQ.lint=(ast,info)=>{
       if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr
       else if(n.t==='MethodCall'){const r=(info.get(n)||{}).recv;if(r&&r.adj!=='val')root=rootBind(n.recv);}
       if(root)borrowed.add(root);
+      if(n.t==='Closure'&&!n.move){
+        // a non-move closure holds the outer vars it names by reference, as a Ref does
+        const own=new Set(),used=[];
+        RQ.walk(n,x=>{if(x.t==='IdentPat'){const b=bindOf(x);if(b)own.add(b);}else if(x.t==='Path'){const b=bindOf(x);if(b)used.push(b);}});
+        for(const b of used)if(!own.has(b))borrowed.add(b);
+      }
     });
     block(it.body);
   }

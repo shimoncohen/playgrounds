@@ -284,6 +284,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       o.cl.caps.push({name:L[pl].name,bind,mode});
     }
     ty.kind=kind;ty.copy=copy.every(Boolean);
+    if(!ty.copy&&ty.needCopy)err('E0277',ty.needCopy,{what:'bound',trait:'Copy',type:'{closure}'});
+    ty.sharedCap=o.cl.caps.some(c=>c.mode==='ref');ty.mutCap=o.cl.caps.some(c=>c.mode==='mut');
     o.cl.kind=kind;
     // a closure written where a trait is expected takes its kind from it, so the body is what breaks; one named first is judged where it is passed
     if(ty.exp){
@@ -398,11 +400,11 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           let q=p;
           while(q.t==='Field')q=peel(q.expr);
           const b=q.t==='Path'?info.get(q).bind:null;let again=false,shared=false,mutRef=false;
-          // a shared reference local read in the arguments may be a loan of the receiver, which a reservation allows until the call starts
+          // a shared reference local, or a closure holding shared captures, read in the arguments may be a loan of the receiver, which a reservation allows until the call starts
           RQ.walk(e.args,a=>{
             if(a.t!=='Path')return;
             if(b&&info.get(a)&&info.get(a).bind===b)again=true;
-            else{const l=lid(a),t=l>=0&&L[l].ty;if(t&&t.k==='ref'){if(t.mut)mutRef=true;else shared=true;}}
+            else{const l=lid(a),t=l>=0&&L[l].ty;if(t&&t.k==='ref'){if(t.mut)mutRef=true;else shared=true;}else if(t&&t.k==='closure'){if(t.mutCap)mutRef=true;else if(t.sharedCap)shared=true;}}
           });
           if(shared&&!mutRef)again=true;
           // slice methods reach the Vec through DerefMut, which gets no two-phase borrow: the arguments run under a live `&mut`

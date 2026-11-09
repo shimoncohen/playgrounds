@@ -6443,5 +6443,113 @@
     "src": "fn main() {\n    let mut v = vec![15, 5];\n    v.sort_by_key(|x| *x);\n    println!(\"{:?}\", v);\n}\n",
     "expect": "ok", "out": "[5, 15]\n", "err": "", "exit": 0,
     "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-move-copy-still-lints",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let f = move || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4}, "pair": "cl-move-copy-still-lints-ok",
+    "why": "a move closure copies x, so x stays a known constant", "pr": "P14"
+  },
+  {
+    "id": "cl-move-copy-still-lints-ok",
+    "src": "fn main() {\n    let x: u8 = 254;\n    let f = move || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": "ok", "out": "255 254\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-push-reads-vec-late",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let f = || v.len();\n    v.push(f());\n    println!(\"{:?} {}\", v, f());\n}\n",
+    "expect": {"code": "E0502", "line": 4}, "pair": "cl-push-reads-vec-ok",
+    "why": "the closure is called again after the push, so its borrow is still live", "pr": "P14"
+  },
+  {
+    "id": "cl-push-reads-vec-ok",
+    "src": "fn main() {\n    let mut v = vec![1];\n    let f = || v.len();\n    v.push(f());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 1]\n", "err": "", "exit": 0,
+    "why": "the last call of the closure comes inside the push, a two-phase borrow", "pr": "P14"
+  },
+  {
+    "id": "cl-named-arith-closure-map-ok",
+    "src": "fn main() {\n    let v = vec![1, 2];\n    let f = |x| x * 2;\n    let r: Vec<i32> = v.into_iter().map(f).collect();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": "ok", "out": "[2, 4]\n", "err": "", "exit": 0,
+    "why": "a closure named first and passed to map", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fn-mutates",
+    "src": "fn make() -> impl Fn() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": {"code": "E0594", "line": 3}, "pair": "cl-return-fnmut-mutates-ok",
+    "why": "a returned impl Fn cannot change what it captured", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fnmut-mutates-ok",
+    "src": "fn make() -> impl FnMut() -> i32 {\n    let mut c = 0;\n    move || { c += 1; c }\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fn-moves-out",
+    "src": "fn make() -> impl Fn() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": {"code": "E0507", "line": 3}, "pair": "cl-return-fnonce-moves-out-ok",
+    "why": "a returned impl Fn cannot move a capture out", "pr": "P14"
+  },
+  {
+    "id": "cl-return-fnonce-moves-out-ok",
+    "src": "fn make() -> impl FnOnce() -> String {\n    let s = String::from(\"x\");\n    move || s\n}\nfn main() {\n    let mut f = make();\n    println!(\"{:?}\", f());\n}\n",
+    "expect": "ok", "out": "\"x\"\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-move-string",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(move || n.len() as i32));\n}\n",
+    "expect": {"code": "E0277", "line": 6}, "pair": "cl-copy-bound-borrow-string-ok",
+    "why": "a closure that moves a String in is not Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-borrow-string-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = String::from(\"a\");\n    println!(\"{}\", apply(|| n.len() as i32));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a closure that only borrows is Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-no-capture-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    println!(\"{}\", apply(|| 5));\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "a closure that captures nothing is Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-bound-move-copy-ok",
+    "src": "fn apply<F: Copy + Fn() -> i32>(f: F) -> i32 {\n    f() + f()\n}\nfn main() {\n    let n = 3;\n    println!(\"{}\", apply(move || n));\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "a move of a Copy number stays Copy", "pr": "P14"
+  },
+  {
+    "id": "cl-copy-closure-own-state-ok",
+    "src": "fn main() {\n    let mut n = 0;\n    let mut f = move || { n += 1; n };\n    let mut g = f;\n    println!(\"{} {} {}\", f(), g(), f());\n}\n",
+    "expect": "ok", "out": "1 1 2\n", "err": "", "exit": 0,
+    "why": "each copy of a Copy closure counts on its own", "pr": "P14"
+  },
+  {
+    "id": "cl-annotated-param-float-arg",
+    "src": "fn main() {\n    let y = 1;\n    let f = |x: i32| x + y;\n    println!(\"{}\", f(1.5));\n}\n",
+    "expect": {"code": "E0308", "line": 4}, "pair": "cl-annotated-param-int-arg-ok",
+    "why": "the argument is a float, the parameter an integer", "pr": "P14"
+  },
+  {
+    "id": "cl-annotated-param-int-arg-ok",
+    "src": "fn main() {\n    let y = 1;\n    let f = |x: i32| x + y;\n    println!(\"{}\", f(2));\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the edit removes the error", "pr": "P14"
+  },
+  {
+    "id": "cl-zip-shorter-left-ok",
+    "src": "fn main() {\n    let a = vec![1, 2];\n    let b = vec![1, 2, 3];\n    let n = a.iter().map(|x| { println!(\"a{}\", x); *x }).zip(b.iter().map(|x| { println!(\"b{}\", x); *x })).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "a1\nb1\na2\nb2\n2\n", "err": "", "exit": 0,
+    "why": "the shorter side is on the left, so no side effect runs for the leftover item", "pr": "P14"
+  },
+  {
+    "id": "cl-zip-longer-left-plain-ok",
+    "src": "fn main() {\n    let a = vec![1, 2, 3];\n    let b = vec![1, 2];\n    let n = a.iter().zip(b.iter()).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "a longer left side without a closure has no side effect to count", "pr": "P14"
   }
 ]

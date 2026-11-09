@@ -362,6 +362,8 @@ const HINTS={
   'const folding':'Rust Quest cannot tell whether the compiler would catch this overflow before the program runs. Pass the value in as a function parameter, or use numbers that cannot overflow.',
   'range expression':'A range like `0..5` is modeled right after `for ... in`, inside `&text[0..5]` to take a slice, and as the start of an iterator chain like `(0..5).map(...)`. Put the range in parentheses to call a method on it.',
   'closure kind':'A parameter that is itself an `Fn`, `FnMut` or `FnOnce` value can only be passed on to a bound of the same kind or a weaker one. Pass a closure instead.',
+  'closure bound':'A closure passed where `Clone` is required is not modeled. Pass a closure that captures nothing as a `fn` item, or drop the `Clone` bound.',
+  'zip with a side effect on its longer side':'Rust decides whether `zip` pulls one more item from its longer side by how the iterators are built, and Rust Quest does not model that when a closure would run. Keep the closures out of the longer side, or make both sides the same length.',
   'closure returning a reference':'A closure that gives back a reference, or a bound like `Fn(&str) -> &str`, is not modeled, because the lifetime of the result would have to be worked out. Return an owned value, like a number or a `String`.',
   'closure capture of a field':'A closure that moves or changes a field of a `struct` it captures is not modeled. Capture the whole variable, or copy the field into a variable first.',
   'closure capture of a mutable reference':'A closure that uses a `&mut` variable is not modeled. Change the value through a plain variable, or call the function that takes the `&mut` directly.',

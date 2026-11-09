@@ -229,3 +229,90 @@ describe('new engine paths: ranges and operators', () => {
     assert.equal(out(main('let v = vec![1, 2];', 'let mut t = 0;', 'for x in v.iter() {', '    t += x;', '}', 'println!("{}", t);')), '3\n');
   });
 });
+
+describe('review fixes: what rustc decides after a closure', () => {
+  it('a non-move closure makes the variables it names address-taken for the lints; a move of a Copy value still lints', () => {
+    assert.equal(feature(main('let x: u8 = 255;', 'let f = || x;', 'let y = x + 1;', 'println!("{} {}", y, f());')), 'const folding@4');
+    assert.equal(feature(main('let d = 0;', 'let f = || d;', 'println!("{}", 5 / d);')), 'const folding@4');
+    assert.equal(rejects(main('let x: u8 = 255;', 'let f = move || x;', 'let y = x + 1;', 'println!("{} {}", y, f());')), 'arithmetic_overflow@4');
+    assert.equal(rejects(main('let f = || { let a: u8 = 255; a + 1 };', 'println!("{}", f());')), 'arithmetic_overflow@2');
+  });
+  it('zip pulls one more item from a longer left side only when a closure would run, which is not modeled', () => {
+    const zip = (left, right) => main('let a = vec![1, 2, 3];', 'let b = vec![1, 2];', `let n = ${left}.zip(${right}).count();`, 'println!("{}", n);');
+    const noisy = 'a.iter().map(|x| { println!("a{}", x); *x })';
+    assert.equal(feature(zip(noisy, 'b.iter()')), 'zip with a side effect on its longer side@4');
+    assert.equal(feature(zip('a.iter().filter(|x| { println!("a{}", x); true })', 'b.iter()')), 'zip with a side effect on its longer side@4');
+    assert.equal(out(zip('a.iter()', 'b.iter()')), '2\n');
+    assert.equal(out(zip('b.iter().map(|x| { println!("b{}", x); *x })', 'a.iter()')), 'b1\nb2\n2\n');
+    assert.equal(out(zip('b.iter().map(|x| { println!("b{}", x); *x })', 'a.iter().map(|x| { println!("a{}", x); *x })')), 'b1\na1\nb2\na2\n2\n');
+    assert.ok(RQ.diag.hint('zip with a side effect on its longer side').length > 30);
+  });
+  it('a closure that only reads a Vec may be called in the arguments of a push on it (two-phase borrow)', () => {
+    assert.equal(out(main('let mut v = vec![1];', 'let f = || v.len();', 'v.push(f());', 'println!("{:?}", v);')), '[1, 1]\n');
+    assert.equal(rejects(main('let mut v = vec![1];', 'let f = || v.len();', 'v.push(f());', 'println!("{:?} {}", v, f());')), 'E0502@4');
+    assert.equal(rejects(main('let mut v = vec![1];', 'let mut f = || v.push(2);', 'v.push(1);', 'f();')), 'E0499@4');
+  });
+  it('a named closure that an operator used passes through map; the engine does not guess the settled type', () => {
+    const body = (call) => main('let v = vec![1, 2];', 'let f = |x| x * 2;', call, 'println!("{:?}", r);');
+    assert.equal(out(body('let r: Vec<i32> = v.into_iter().map(f).collect();')), '[2, 4]\n');
+    assert.equal(feature(body('let r: Vec<i32> = v.iter().map(f).collect();')), 'inferred type@4');
+    assert.equal(feature(body('let r = v.iter().map(f).collect::<Vec<i32>>();')), 'inferred type@4');
+  });
+  it('a returned impl Fn judges the closure body against its own kind', () => {
+    const mk = (kind, body, ret = 'i32') => P(`fn make() -> impl ${kind}() -> ${ret} {`, ...body.map((l) => '    ' + l), '}', main('let mut f = make();', 'println!("{:?}", f());'));
+    const counter = ['let mut c = 0;', 'move || { c += 1; c }'];
+    assert.equal(rejects(mk('Fn', counter)), 'E0594@3');
+    assert.equal(out(mk('FnMut', counter)), '1\n');
+    const mover = ['let s = String::from("x");', 'move || s'];
+    assert.equal(rejects(mk('Fn', mover, 'String')), 'E0507@3');
+    assert.equal(rejects(mk('FnMut', mover, 'String')), 'E0507@3');
+    assert.equal(out(mk('FnOnce', mover, 'String')), '"x"\n');
+    assert.equal(rejects(P('fn make() -> impl Fn() -> i32 {', '    let mut c = 0;', '    return move || { c += 1; c };', '}', main('println!("{}", make()());'))), 'E0594@3');
+    assert.equal(feature(P('fn make(b: bool) -> impl Fn() -> i32 {', '    let mut c = 0;', '    if b { return move || { c += 1; c }; }', '    move || 1', '}', main('println!("{}", make(true)());'))), 'closure kind@4');
+  });
+  it('a closure is Copy when no capture is a move of a non-Copy value or a mutable borrow', () => {
+    const apply = (bound) => `fn apply<F: ${bound}>(f: F) -> i32 { f() + f() }`;
+    const run = (arg, setup = []) => P(apply('Copy + Fn() -> i32'), main(...setup, `println!("{}", apply(${arg}));`));
+    assert.equal(out(run('|| 5')), '10\n');
+    assert.equal(out(run('|| n', ['let n = 3;'])), '6\n');
+    assert.equal(out(run('move || n', ['let n = 3;'])), '6\n');
+    assert.equal(out(run('|| n.len() as i32', ['let n = String::from("a");'])), '2\n');
+    assert.equal(rejects(run('move || n.len() as i32', ['let n = String::from("a");'])), 'E0277@4');
+    assert.equal(rejects(run('|| { n += 1; n }', ['let mut n = 3;'])), 'E0277@4');
+    assert.equal(feature(P(apply('Clone + Fn() -> i32'), main('println!("{}", apply(|| 5));'))), 'closure bound@3');
+  });
+  it('copying a Copy closure copies the state it captured by value', () => {
+    assert.equal(out(main('let mut n = 0;', 'let mut f = move || { n += 1; n };', 'let mut g = f;', 'println!("{} {} {}", f(), g(), f());')), '1 1 2\n');
+    assert.equal(out(P('fn bump<F: FnMut() -> i32>(mut f: F) -> i32 { f() + f() }', main('let mut n = 0;', 'let f = move || { n += 1; n };', 'println!("{} {}", bump(f), bump(f));'))), '3 3\n');
+  });
+  it('the code of a wrong call or argument type matches rustc, or the case is unsupported', () => {
+    assert.equal(feature(main('let y = 1;', 'let f = |x| x + y;', 'println!("{}", f(1.5));')), 'inferred type@4');
+    assert.equal(rejects(main('let y = 1;', 'let f = |x| x + y;', 'println!("{}", f(1));', 'println!("{}", f(1.5));')), 'E0308@5');
+    assert.equal(rejects(main('let y = 1;', 'let f = |x: i32| x + y;', 'println!("{}", f(1.5));')), 'E0308@4');
+    assert.equal(feature(main('let v = vec![1, 2];', 'let n = v.iter().map(|x: i32| x + 1).count();', 'println!("{}", n);')), 'type checking@3');
+    assert.equal(rejects(P('fn apply<F: Fn(i32) -> i32>(f: F) -> i32 { f(1) }', main('println!("{}", apply(|x: i64| x));'))), 'E0631@3');
+    assert.equal(feature(main('let f = || 1;', 'println!("{}", f.call());')), 'method call@3');
+  });
+});
+
+describe('review fixes: mission checks cannot be passed with a decoy', () => {
+  const missions = RQ.CH.find((c) => c.name === 'Closures and iterators').missions;
+  const verdict = (i, src) => RQ.evalMission(missions[i], src).result;
+  it('the context helpers count what they say', () => {
+    const c = RQ.run(P('fn main() {', '    let mut v = vec![3, 1];', '    let f = |x: i32| { println!("f{}", x); x };', '    v.retain(|n| f(*n) > 1);', '    println!("{:?}", v);', '}'));
+    assert.equal(c.status, 'ok');
+    assert.equal(JSON.stringify(c.closures().map((x) => x.caps.map((k) => k.name + ':' + k.mode))), '[[],["f:ref"]]');
+    assert.equal(c.printsIn(true), 1);
+    assert.equal(c.printsIn(false), 1);
+    assert.equal(c.printedCalls('f'), 0);
+    assert.equal(c.onRecv('main', 'retain', 'v'), 1);
+    assert.equal(c.onRecv('main', 'retain', 'w'), 0);
+    assert.equal(c.callArg('apply', 'f'), 0);
+  });
+  it('every shipped answer still passes and each decoy of the review fails its mission', () => {
+    missions.forEach((m, i) => {
+      assert.equal(verdict(i, m.answer), true, `M${i + 1} answer`);
+      for (const w of m.lazy) assert.notEqual(verdict(i, w.src), true, `M${i + 1} decoy: ${w.src}`);
+    });
+  });
+});
