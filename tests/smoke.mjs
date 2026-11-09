@@ -2119,6 +2119,26 @@ test('shell-quest editor: the discard prompt resets after a timeout and when typ
   await ctx.close();
 });
 
+test('shell-quest editor: an unchanged Save does not count as writing the file', async () => {
+  const { ctx, page, errors, type, waitScreen, screen } = await shellPage({ viewport: { width: 1280, height: 900 } });
+  await page.click('#chapters [data-ch="1"]');
+  await type('mkdir camp && echo "Day 1" > camp/diary.txt && echo "Day 2" > camp/notes.txt');
+  await waitScreen(/Mission complete: Build a camp/);
+  await type('cat camp/notes.txt >> camp/diary.txt');
+  await page.click('#mission .dot[data-mi="4"]');
+  assert.match(await page.textContent('#mission h2'), /Add a second entry/);
+  await type('nano camp/diary.txt');
+  await page.waitForSelector('#editor:not([hidden])');
+  await page.click('#edSave');
+  await waitScreen(/Saved camp\/diary\.txt/);
+  assert.doesNotMatch(await screen(), /Mission complete: Add a second entry/);
+  await page.fill('#edText', 'Day 1\nDay 2\nDay 3\n');
+  await page.click('#edSave');
+  await waitScreen(/Mission complete: Add a second entry/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('shell-quest editor: a failed save shows the error and leaves the editor open and unsaved', async () => {
   const { ctx, page, errors, type, waitScreen } = await shellPage({ viewport: { width: 1280, height: 900 } });
   await type('mkdir sub');
@@ -3665,4 +3685,57 @@ test('agent-quest: long lines and unresolved paths show inline errors, and learn
   assert.equal(await o.xp(), '0 XP');
   assert.deepEqual(o.errors, []);
   await o.ctx.close();
+});
+
+// A mission is completed by the learner's own input, never by state left over from other missions or a replay.
+test('script-quest: after the whole chapter is built, an unrelated input completes no mission, and each mission\'s own answer still does', async () => {
+  const hook = 'window.__t={CH,S,setChapter,goMission,runShell,submit,cmd,mk,INITIAL_FILES,openFile,saveFile,ed,get MODE(){return MODE},clearRun(){RUN=null}};})();';
+  const prep = ctx => ctx.route('**/script-quest/app.js', async r => {
+    const body = (await r.fetch()).text();
+    await r.fulfill({ contentType: 'text/javascript', body: (await body).replace(/\}\)\(\);\s*$/, hook) });
+  });
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, {}, prep);
+  const bad = await page.evaluate(async () => {
+    const { CH, S, setChapter, goMission, runShell, submit, cmd, mk, INITIAL_FILES, openFile, saveFile, ed } = window.__t;
+    const alt = { '2.1': ['let a = 1, coins = 0', 'let coins\ncoins = 0'], '6.1': ['const { bag } = { bag: ["a", "b"] }'], '8.4': ['Object.defineProperty(performer, "act", { value: "tightrope", enumerable: true })'] };
+    const bad = [], tick = () => new Promise(r => setTimeout(r, 50));
+    const play = async m => {
+      if (window.__t.MODE !== 'sh') { cmd.value = m.code; await submit(); return; }
+      if (!m.editFile) { runShell(m.code); return; }
+      if (m.editFile === 'package.json') return;
+      openFile(m.editFile); ed.value = m.code; saveFile();
+      if (m.run) runShell(m.run);
+    };
+    for (let c = 0; c < CH.length; c++) {
+      S.done = {}; S.cur = {}; setChapter(c);
+      const sh = window.__t.MODE === 'sh';
+      if (sh) { S.files = { ...INITIAL_FILES }; S.pkgs = []; }
+      const reset = () => { S.done = {}; S.cur = {}; setChapter(c); if (sh) { S.files = { ...INITIAL_FILES }; S.pkgs = []; } };
+      for (const m of CH[c].missions) await play(m);
+      for (let j = 0; j < CH[c].missions.length; j++) {
+        const m = CH[c].missions[j];
+        for (const input of sh ? ['ls', 'node -v', 'node -e "1"', 'npm -v'] : ['true']) {
+          if (m.code.startsWith(input.slice(0, 7))) continue;
+          S.done = {}; S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+          cmd.value = input; await submit();
+          if (S.done[mk(c, j)]) bad.push(`${c + 1}.${j + 1} ${m.title}: unrelated input ${input} completed it`);
+        }
+        for (const code of [m.code, ...(alt[`${c + 1}.${j + 1}`] || [])]) {
+        reset();
+        for (const p of CH[c].missions.slice(0, j)) await play(p);
+        S.done = {}; S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+        await play({ ...m, code });
+        for (let w = 0; w < 80 && !S.done[mk(c, j)]; w++) await tick();
+        // the code of the package.json mission is a fragment to paste in, not a whole file, so play() skips it
+        if (!S.done[mk(c, j)] && m.editFile !== 'package.json') bad.push(`${c + 1}.${j + 1} ${m.title}: answer ${JSON.stringify(code)} did not complete it`);
+        }
+        reset();
+        for (const p of CH[c].missions) await play(p);
+      }
+    }
+    return bad;
+  });
+  assert.deepEqual(bad, []);
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });

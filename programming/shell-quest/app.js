@@ -16,9 +16,9 @@ const isScript=m=>m.kind==='script'||m.kind==='challenge';
 function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;const m=ch.missions[S.mi];let good=false,failed=null;
   if(S.done[S.ch+'.'+S.mi])return; /* revisiting a finished mission (clicked in the list) never celebrates it again */
   const explain=!!opts.feedback&&isScript(m)&&!!m.file&&opts.ranAbs===norm(m.file,HOME);
-  if(m.steps){try{const r=SQ.stepsApply(m,S.ch+'.'+S.mi,ctxFor(line));good=r.all;
+  if(m.steps){try{const r=SQ.stepsApply(m,S.ch+'.'+S.mi,ctxFor(line,{saved:opts.saved}));good=r.all;
       if(r.newly.length&&!good){const left=m.steps.length-SQ.stepsDone(S.ch+'.'+S.mi).length;addLine(renderText(`✓ Step done: ${m.title}. ${left} more to go.`),'win');SQ.ui.setPop()}}catch(e){}}
-  else try{const v=SQ.missionVerdict(m,ctxFor(line),explain);good=v.good;failed=v.failed}catch(e){}
+  else try{const v=SQ.missionVerdict(m,ctxFor(line,{saved:opts.saved}),explain);good=v.good;failed=v.failed}catch(e){}
   if(!good){if(failed&&explain)addLine(renderText(SQ.scriptFailLine(m,failed)),'err');return}
   const key=S.ch+'.'+S.mi,isNew=!S.done[key];S.done[key]=1;const mx=SQ.tiers.missionXp(S.ch);if(isNew)S.xp+=mx;
   addLine(renderText(`✓ Mission complete: ${m.title}${isNew?'   +'+mx+' XP':''}`),'win');
@@ -27,7 +27,9 @@ function checkMission(line,opts){opts=opts||{};const ch=CH[S.ch];if(S.mi>=ch.mis
   else{const firstOpen=ch.missions.findIndex((x,j)=>!S.done[S.ch+'.'+j]);
     if(firstOpen>=0)S.mi=firstOpen;
     else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=SQ.tiers.chapterBadgeXp;addLine(renderText(`★ Chapter complete! Badge earned: ${ch.badge}   +${SQ.tiers.chapterBadgeXp} XP`),'win big')}}}
-  SQ.ui.setPop()}
+  SQ.ui.setPop();landOn()}
+
+function landOn(){const made=SQ.landOn();if(made)addLine(renderText(`(Set up for this mission: ${made}.)`),'sys')}
 
 /* One typed or generated line: echo it (unless echo:false), run it (optional stdin text), show the output, check the mission.
    opts.feedback is for script missions (a failed test case is explained); the typed prompt never sets it. */
@@ -44,12 +46,12 @@ const run=line=>runLine(line,{echo:true});
 /* the editor panel: nano/edit/vi/vim ask for it, Save writes through the same writeFile the shell uses */
 function openFor(abs,isNew){const n=getNode(abs);SQ.ui.openEditor(abs,n&&n.type==='file'?n.content:'#!/bin/bash\n',{isNew:!n})}
 const shownPath=abs=>{const r=rel(abs);return r==='.'?disp(abs):r};
-SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs);SQ.rt.changed=new Set();SQ.rt.grewBy=0; /* a Save is judged on its own, never on the line typed before it */
+SQ.editorSave=function(abs,text){text=String(text).replace(/\r\n?/g,'\n');const shown=shownPath(abs),was=(getNode(abs)||{}).content;SQ.rt.changed=new Set();SQ.rt.grewBy=0; /* a Save is judged on its own, never on the line typed before it */
   const e=text.length>SQ.LIM.TEXT?`bash: ${shown}: file too large for this practice shell`:SQ.writeFile(abs,text,false,shown);
   if(e){addLine(renderText(e),'err');scrollDown();return false}
   addLine(renderText('Saved '+shown),'sys');
   SQ.rt.grewBy=0;SQ.rt.log=[];SQ.rt.lastOut='';SQ.rt.lastErr='';SQ.rt.lineTook=0;SQ.rt.prevLast=S.last;
-  checkMission('(saved '+shown+')');renderAll();save();scrollDown();return true};
+  checkMission('(saved '+shown+')',{saved:was===text?null:abs}); /* an unchanged Save is not the learner writing the file */renderAll();save();scrollDown();return true};
 const quoteArg=p=>/^[\w@%+=:,./-]+$/.test(p)&&!p.startsWith('-')?p:"'"+p.replace(/'/g,"'\\''")+"'";
 SQ.editorRun=function(abs,args,stdin){let p=shownPath(abs);if(p.startsWith('~')||p.startsWith('-'))p=abs;
   runLine('bash '+quoteArg(p)+(args?' '+args:''),{echo:true,stdin,feedback:true,ranAbs:abs})};
@@ -59,7 +61,7 @@ function rel(abs){const cw=S.cwd;if(abs===cw)return '.';const a=abs.split('/').f
 
 /* a chapter switch, like Reset world, starts with no jobs, traps or shell options and the clock at 0 (SQ.resetProcs, procs.js); files and variables stay */
 function goChapter(i){S.ch=i;const open=CH[i].missions.findIndex((m,j)=>!S.done[i+'.'+j]);S.mi=open<0?CH[i].missions.length:open;SQ.resetProcs();
-  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');renderAll();save();scrollDown()}
+  SQ.rt.changed=new Set();SQ.setupChapter(CH[i]);if(SQ.rt.changed.size)addLine(renderText(`(Chapter ${i+1} set up: missing files were put back in place.)`),'sys');landOn();renderAll();save();scrollDown()}
 
 /* tab completion */
 function complete(){const v=cmdIn.value,pos=cmdIn.selectionStart??v.length,before=v.slice(0,pos),after=v.slice(pos);const word=before.match(/(\S*)$/)[1];
@@ -92,7 +94,7 @@ crumbsEl.addEventListener('click',e=>{const b=e.target.closest('[data-cd]');if(b
 mapEl.addEventListener('click',e=>{const b=e.target.closest('[data-path]');if(!b)return;const abs=b.dataset.path,n=getNode(abs);if(!n)return;fill((n.type==='dir'?'cd ':'cat ')+rel(abs))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(b)goChapter(+b.dataset.ch)});
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.mi!=null){S.mi=+b.dataset.mi;renderMission();save();return}
+  if(b.dataset.mi!=null){S.mi=+b.dataset.mi;landOn();renderAll();save();scrollDown();return}
   const a=b.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(a==='hint'){const h=$('#hintBox');h.hidden=!h.hidden;b.setAttribute('aria-expanded',String(!h.hidden));b.textContent=h.hidden?'Show a hint':'Hide the hint'}
   else if(a==='fill'&&m){if(isScript(m)&&m.file){const abs=norm(m.file,HOME);SQ.ui.openEditor(abs,m.answer,{isNew:!getNode(abs),fill:true})}else fill(m.steps?m.steps[SQ.stepNext(m,S.ch+'.'+S.mi)].answer:m.answer)}
@@ -101,7 +103,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
 let armT=null;const rw=$('#resetWorld');
 rw.addEventListener('click',()=>{if(!rw.classList.contains('armed')){rw.classList.add('armed');rw.textContent='Click again to reset the world';clearTimeout(armT);armT=setTimeout(()=>{rw.classList.remove('armed');rw.textContent='Reset world'},3500);return}
   clearTimeout(armT);rw.classList.remove('armed');rw.textContent='Reset world';S.fs=makeWorld();S.cwd=HOME;S.oldpwd=HOME;S.vars={};delete S.exp;delete S.fns;S.last=0;SQ.resetProcs();SQ.rt.changed=new Set();SQ.setupChapter(CH[S.ch]);SQ.rt.changed=new Set();
-  addLine('World reset to its starting state. Your progress and XP are kept.','sys');renderAll();save();scrollDown()});
+  addLine('World reset to its starting state. Your progress and XP are kept.','sys');landOn();renderAll();save();scrollDown()});
 
 /* tabs */
 function showTab(t){for(const id of ['quest','fire','guide']){$('#tab-'+id).hidden=id!==t;$('#t-'+id).setAttribute('aria-selected',String(id===t))}
@@ -162,7 +164,7 @@ SQ.rt.onSaveFail=e=>{const storage=!!e&&(e.name==='QuotaExceededError'||e.name==
 if(!S.seen){SQ.setupChapter(CH[S.ch]);S.seen=true}
 SQ.rt.changed=new Set();
 welcome();if(S.hist.length)addLine(renderText(`Welcome back. You are on chapter ${S.ch+1}: ${CH[S.ch].name}.`),'tip');
-renderAll();renderGuide();fireIdle();save();
+landOn();renderAll();renderGuide();fireIdle();save();
 const h=(location.hash||'').slice(1);if(h==='guide'||h==='quickfire'||h==='fire')showTab(h==='guide'?'guide':'fire');
 else if(matchMedia('(pointer:fine)').matches)cmdIn.focus({preventScroll:true});
 })();

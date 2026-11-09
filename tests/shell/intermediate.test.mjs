@@ -196,9 +196,9 @@ describe('round 2: tighter checks', () => {
     yes(T9, 7, 'grep zzz journal.txt; echo $?');
     yes(T9, 7, 'ls nothing; echo "$?"');
   });
-  it('9.6 text tells you to export first', () => {
+  it('9.6 sets up the export when jumped to', () => {
     const m = loadShell().content.chapters[T9].missions[5];
-    assert.match(m.goal + (m.note || ''), /export GREETING/);
+    assert.match(m.pre.join(), /export GREETING/);
   });
 });
 
@@ -272,7 +272,8 @@ describe('chapter 10 checks', () => {
     pass(T10, 1, 'chmod 600 secrets.txt');
     pass(T10, 1, 'chmod u=rw,go= secrets.txt');
     pass(T10, 1, 'chmod go-r secrets.txt');
-    pass(T10, 1, 'chmod 644 secrets.txt', 'chmod 600 ./secrets.txt', 'ls -l'); // multi-line
+    pass(T10, 1, 'chmod 644 secrets.txt', 'chmod 600 ./secrets.txt');
+    fail(T10, 1, 'chmod 600 secrets.txt', 'ls -l');
     fail(T10, 1, 'echo 600');
     fail(T10, 1, 'chmod 660 secrets.txt');
     fail(T10, 1, 'chmod 700 secrets.txt');
@@ -283,7 +284,7 @@ describe('chapter 10 checks', () => {
     pass(T10, 2, 'chmod u+x notes.txt');
     pass(T10, 2, 'chmod +x notes.txt');
     pass(T10, 2, 'chmod 755 notes.txt');
-    pass(T10, 2, 'chmod u+x notes.txt', 'ls -l notes.txt');
+    fail(T10, 2, 'chmod u+x notes.txt', 'ls -l notes.txt');
     fail(T10, 2, 'chmod g+x notes.txt');
     fail(T10, 2, 'chmod 600 notes.txt');
     fail(T10, 2, 'chmod u+x secrets.txt');

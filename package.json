@@ -11,7 +11,7 @@
     "build": "python3 tools/build.py",
     "check": "python3 tools/build.py --check",
     "test:engine": "node --test \"tests/shell/*.test.mjs\" \"tests/ds/*.test.mjs\" \"tests/net/*.test.mjs\" \"tests/python/*.test.mjs\" \"tests/script/*.test.mjs\" \"tests/cpp/*.test.mjs\" \"tests/harbor/*.test.mjs\" \"tests/math/*.test.mjs\" \"tests/agent/*.test.mjs\" \"tests/rust/*.test.mjs\" \"tests/trophy/*.test.mjs\" \"tests/tools/*.test.mjs\"",
-    "test:browser": "node tests/smoke.mjs && node tests/shell-golden.mjs && node tests/math/scene.browser.mjs && node tests/math/input.browser.mjs",
+    "test:browser": "node tests/smoke.mjs && node tests/shell-golden.mjs && node tests/shell/landing.browser.mjs && node tests/math/scene.browser.mjs && node tests/math/input.browser.mjs",
     "test": "npm run test:engine && npm run test:browser",
     "prepare": "husky",
     "commitlint": "commitlint"
