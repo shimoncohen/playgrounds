@@ -72,6 +72,34 @@
         ];
       },
     },
+    story: {
+      title: 'The cold cellar thermometer',
+      live: s => { const { a, b } = s.params; return `At dusk the cellar thermometer reads ${signed(a)}°. Overnight it changes by ${signed(b)}°. What does Wick read at dawn?`; },
+      draw: {
+        kind: '2d', view: [-7, 7, -12, 12], box: [400, 340],
+        items: s => {
+          const { a, b } = s.params, t = a + b, ticks = [];
+          for (let v = -10; v <= 10; v += 2) if (v) ticks.push({ type: 'text', x: -2.3, y: v, s: signed(v) + '°', small: true, anchor: 'end' });
+          return [
+            { type: 'polygon', pts: [[-7, -12], [7, -12], [7, 0], [-7, 0]] },
+            { type: 'text', x: 4.6, y: 10.6, s: 'the street', small: true },
+            { type: 'text', x: 4.6, y: -10.8, s: 'the cold cellar', small: true },
+            { type: 'icon', name: 'lantern', x: 5.8, y: -8, size: 32 },
+            { type: 'text', x: 4.6, y: 0.9, s: '0°: water freezes', small: true },
+            { type: 'polygon', pts: [[-1.9, -11], [-0.7, -11], [-0.7, 11], [-1.9, 11]] },
+            { type: 'polygon', pts: [[-1.75, -11], [-0.85, -11], [-0.85, t], [-1.75, t]], term: 'sum' },
+            ...ticks,
+            { type: 'vector', from: [0.4, 0], to: [0.4, a], term: 'a' },
+            { type: 'text', x: 0.9, y: a / 2 || 0.5, s: 'dusk ' + signed(a) + '°', small: true, anchor: 'start', term: 'a' },
+            { type: 'vector', from: [2.4, a], to: [2.4, t], term: 'b' },
+            { type: 'text', x: 2.9, y: a + b / 2 || a + 0.5, s: 'night ' + signed(b) + '°', small: true, anchor: 'start', term: 'b' },
+            { type: 'point', x: -1.3, y: t, term: 'sum' },
+            { type: 'icon', name: t < 0 ? 'snowflake' : 'sun', x: -5.8, y: t, term: 'sum' },
+            { type: 'text', x: -5.2, y: t, s: 'dawn', small: true, anchor: 'start', term: 'sum' },
+          ];
+        },
+      },
+    },
   };
 
   const D = (label, value) => ({ min: 2, max: 6, step: 1, value, label });

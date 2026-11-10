@@ -30,6 +30,13 @@
     return e;
   };
 
+  // Stroke paths on a 24-unit grid; add a name here only when a story picture uses it.
+  S.icons = {
+    snowflake: 'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5',
+    sun: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
+    lantern: 'M9 3h6M12 3v3M8 6h8l1 3v10H7V9zM7 9h10M12 12c1.4 1.4 1.4 3.6 0 5c-1.4-1.4-1.4-3.6 0-5z',
+  };
+
   S.draw = (svg, def, state, colorOf, set) => {
     const [x0, x1, y0, y1] = def.view, [W, H] = def.box || [400, 300];
     const X = x => (x - x0) / (x1 - x0) * W, Y = y => H - (y - y0) / (y1 - y0) * H;
@@ -93,6 +100,9 @@
           svg.addEventListener('pointerup', up);
           svg.addEventListener('pointercancel', up);
         });
+      } else if (it.type === 'icon') {
+        const k = (it.size || 22) / 24;
+        paint(el('path', { class: 'shape icon', d: S.icons[it.name], fill: 'none', 'stroke-width': 2 / k, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', transform: `translate(${X(it.x) - 12 * k} ${Y(it.y) - 12 * k}) scale(${k})` }, svg), it.term, 'stroke');
       } else if (it.type === 'grid') {
         const g = el('g', { class: 'grid' }, svg);
         for (let v = Math.ceil(x0); v <= x1; v++) el('line', { x1: X(v), x2: X(v), y1: 0, y2: H }, g);

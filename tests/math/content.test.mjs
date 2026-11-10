@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMath } from './harness.mjs';
 
-const BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
+const BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'scene/svg2d.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
 const TRACKS = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
 
@@ -30,6 +30,18 @@ for (const track of TRACKS) {
     }
   });
 
+  test(`${track}: every story picture is a 2D drawing over a 2D scene and only uses built-in icons`, () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.story);
+    for (const sc of scenes) {
+      assert.ok(sc.story.title && typeof sc.story.live === 'function', `${sc.id}: story needs a title and a live line`);
+      assert.equal(sc.draw.kind, '2d', `${sc.id}: story needs a 2D scene`);
+      assert.equal(sc.story.draw.kind, '2d', `${sc.id}: story draw`);
+      assert.equal(typeof sc.story.draw.items, 'function', `${sc.id}: story draw has no items function`);
+      const st = MQ.scene.model(sc).state();
+      for (const it of sc.story.draw.items(st)) if (it.type === 'icon') assert.ok(MQ.svg2d.icons[it.name], `${sc.id}: unknown icon ${it.name}`);
+    }
+  });
+
   C.chapters.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
     const id = `${track} ${ci}.${mi} ${m.title}`;
     test(`${id}: answer passes, wrong and lazy fail`, () => {
@@ -53,6 +65,12 @@ for (const track of TRACKS) {
       if (def.t) model.set('t', def.t.max);
       const st = model.state(), drawn = def.draw.kind === '2d' ? def.draw.items(st).filter(i => i.type === 'text').map(i => i.s) : [];
       const text = [model.live(), model.describe(), ...drawn].join(' | ').replace(/−/g, '-');
+      assert.doesNotMatch(text, new RegExp(`(?<![\\d.])${ans[1].replace('.', '\\.')}(?![\\d.])`), `${id}: ${text}`);
+    });
+    const sc = m.scene || ch.scene;
+    if (m.kind !== 'scene' && ans && sc.story) test(`${id}: the unsolved story picture does not show the answer ${ans[1]}`, () => {
+      const def = MQ.scene.forMission(ch, m, false, false), model = MQ.scene.model(def), st = model.state();
+      const text = [def.story.live(st), ...def.story.draw.items(st).filter(i => i.type === 'text' && !/^[−\d]+°$/.test(i.s)).map(i => i.s)].join(' | ').replace(/−/g, '-');
       assert.doesNotMatch(text, new RegExp(`(?<![\\d.])${ans[1].replace('.', '\\.')}(?![\\d.])`), `${id}: ${text}`);
     });
     if (m.kind !== 'scene') test(`${id}: the explanation, shown before solving, does not state the answer`, () => {
