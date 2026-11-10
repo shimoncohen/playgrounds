@@ -110,7 +110,7 @@ const ERRORS={
   },
   E0369:{
     title:'two values of this type cannot be compared',
-    msg:o=>ARITH_WORD[o.op]?'cannot '+ARITH_WORD[o.op][0]+' `'+o.type+'` '+ARITH_WORD[o.op][1]+' `'+o.type+'`':'binary operation `'+o.op+'` cannot be applied to type `'+o.type+'`',
+    msg:o=>ARITH_WORD[o.op]?'cannot '+ARITH_WORD[o.op][0]+' `'+({integer:'{integer}','floating-point number':'{float}'}[o.right]||o.right||o.type)+'` '+ARITH_WORD[o.op][1]+' `'+o.type+'`':'binary operation `'+o.op+'` cannot be applied to type `'+o.type+'`',
     tipFor:o=>o.param?'A type parameter only has what its bounds give it. Add `'+o.type+': '+(o.op==='=='||o.op==='!='?'PartialEq':ARITH_WORD[o.op]?'std::ops::Add':'PartialOrd')+'` to the bounds, or compare something the bounds already allow.':'',
     tip:'`==` needs the type to say what equal means. Add `#[derive(PartialEq)]` above the type, or compare the fields one by one.'
   },

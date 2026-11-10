@@ -52,10 +52,11 @@ RQ.CH.push({
         {src:SHOUT('s: &String','    let t = format!("{}", s);\n    println!("{}!", t);\n'),wrongWhy:'check'},
         {src:SHOUT('s: &String','    let t = Clone::clone(s);\n    println!("{}!", t);\n'),wrongWhy:'check'},
         {src:SHOUT('s: &String',''),wrongWhy:'check'},
-        {src:SHOUT('s: &String','    println!("hey!");\n'),wrongWhy:'check'}
+        {src:SHOUT('s: &String','    println!("hey!");\n'),wrongWhy:'check'},
+        {src:SHOUT('s: &String','    if s.len() == 3 {\n        println!("{}!", "hey");\n    }\n'),wrongWhy:'check'}
       ],
       defines:['ref-type','borrow-note'],previews:[],
-      check:c=>c.out()!=='hey!\nhey is still here\n'?'`shout` has to print the word with a `!`, and then `main` prints `hey is still here`.':!c.paramIsRef('shout',0)?'Make the parameter a reference, so `shout` borrows its `String` instead of taking it.':c.calls('shout')<1?'Keep the call to `shout` in `main`.':c.allocs('String')!==1?'The only `String` should be the one `main` builds. Borrow it; do not copy it.':!c.usesParam('shout',0)||c.count('hole')<2?'Print the `String` that `shout` was lent, through a `{}` hole.':true
+      check:c=>c.out()!=='hey!\nhey is still here\n'?'`shout` has to print the word with a `!`, and then `main` prints `hey is still here`.':!c.paramIsRef('shout',0)?'Make the parameter a reference, so `shout` borrows its `String` instead of taking it.':c.calls('shout')<1?'Keep the call to `shout` in `main`.':c.allocs('String')!==1?'The only `String` should be the one `main` builds. Borrow it; do not copy it.':!c.usesParam('shout',0)||c.count('hole')<2?'Print the `String` that `shout` was lent, through a `{}` hole.':OTHER(c,'ahoy!\nahoy is still here\n','`shout` has to print any word it is lent, not only `hey`.',['String::from("hey")','String::from("ahoy")'])
     },
     {
       title:'Borrow it to change it',kind:'fix',
@@ -81,10 +82,11 @@ RQ.CH.push({
       lazy:[
         {src:'fn shout(s: &mut String) {\n}\n\nfn main() {\n    let mut word = String::from("hey");\n    shout(&mut word);\n    word.push_str("!");\n    println!("{}", word);\n}\n',wrongWhy:'check'},
         {src:'fn shout(s: &mut String) {\n    s.push_str("!");\n}\n\nfn main() {\n    let mut word = String::from("hey!");\n    println!("{}", word);\n}\n',wrongWhy:'check'},
-        {src:'fn shout(s: &mut String) {\n    s.push_str("!");\n}\n\nfn main() {\n    println!("hey!");\n}\n',wrongWhy:'check'}
+        {src:'fn shout(s: &mut String) {\n    s.push_str("!");\n}\n\nfn main() {\n    println!("hey!");\n}\n',wrongWhy:'check'},
+        {src:'fn shout(s: &mut String) {\n    if s.len() == 3 {\n        s.push_str("!");\n    } else {\n        s.push_str("?");\n    }\n}\n\nfn main() {\n    let mut word = String::from("hey");\n    shout(&mut word);\n    println!("{}", word);\n}\n',wrongWhy:'check'}
       ],
       defines:[],previews:[],
-      check:c=>c.out()!=='hey!\n'?'The program has to print `hey!` on one line.':!c.paramIsRef('shout',0,'mut')?'`shout` has to take a `&mut String`, so it is allowed to change the text.':c.methodIn('shout','push_str')<1?'Let `shout` itself add the `!` with `push_str`.':c.calls('shout')<1?'Call `shout` from `main`.':c.allocs('String')!==1?'Keep the single `String`: do not copy it.':true
+      check:c=>c.out()!=='hey!\n'?'The program has to print `hey!` on one line.':!c.paramIsRef('shout',0,'mut')?'`shout` has to take a `&mut String`, so it is allowed to change the text.':c.methodIn('shout','push_str')<1?'Let `shout` itself add the `!` with `push_str`.':c.calls('shout')<1?'Call `shout` from `main`.':c.allocs('String')!==1?'Keep the single `String`: do not copy it.':OTHER(c,'ahoy!\n','`shout` has to add the `!` to any word, not only to `hey`.',['String::from("hey")','String::from("ahoy")'])
     },
     {
       title:'Many readers at once',kind:'write',
@@ -218,10 +220,11 @@ RQ.CH.push({
       lazy:[
         {src:LOCKED('    println!("hello");\n    println!("hello cove!");\n'),wrongWhy:'check'},
         {src:HEAD+'\nfn main() {\n    let mut s = String::from("hello cove");\n    let word = String::from(head(&s, 5));\n    s.push_str("!");\n    println!("{}", word);\n    println!("{}", s);\n}\n',wrongWhy:'check'},
-        {src:HEAD+'\nfn main() {\n    let mut s = String::from("hello cove");\n    let word = head(&s, 5).to_string();\n    s.push_str("!");\n    println!("{}", word);\n    println!("{}", s);\n}\n',wrongWhy:'check'}
+        {src:HEAD+'\nfn main() {\n    let mut s = String::from("hello cove");\n    let word = head(&s, 5).to_string();\n    s.push_str("!");\n    println!("{}", word);\n    println!("{}", s);\n}\n',wrongWhy:'check'},
+        {src:'fn head(s: &str, n: usize) -> &str {\n    if n == 5 {\n        &s[..5]\n    } else {\n        &s[..3]\n    }\n}\n\nfn main() {\n    let mut s = String::from("hello cove");\n    let word = head(&s, 5);\n    println!("{}", word);\n    s.push_str("!");\n    println!("{}", s);\n}\n',wrongWhy:'check'}
       ],
       defines:[],previews:[],
-      check:c=>c.out()!=='hello\nhello cove!\n'?'The program has to print `hello` and then `hello cove!`, one per line.':c.allocs('String')!==1?'Keep a single `String`: do not copy the word into a new one.':c.calls('head')<1?'Take the word with `head`, as the program does.':c.methodIn('main','push_str')<1?'Keep the `push_str` that adds the `!`.':true
+      check:c=>c.out()!=='hello\nhello cove!\n'?'The program has to print `hello` and then `hello cove!`, one per line.':c.allocs('String')!==1?'Keep a single `String`: do not copy the word into a new one.':c.calls('head')<1?'Take the word with `head`, as the program does.':c.methodIn('main','push_str')<1?'Keep the `push_str` that adds the `!`.':OTHER(c,'hell\nhello cove!\n','`head` has to give back the first `n` letters it is asked for, not only five.',['head(&s, 5)','head(&s, 4)'])
     },
     {
       title:'Which input does it borrow from?',kind:'fix',
@@ -274,10 +277,11 @@ RQ.CH.push({
       ],
       lazy:[
         {src:TWO('    if s == "ahoy" {\n        "ah"\n    } else {\n        "wo"\n    }\n'),wrongWhy:'check'},
-        {src:TWO('    s\n'),wrongWhy:'check'}
+        {src:TWO('    s\n'),wrongWhy:'check'},
+        {src:TWO('    let _ = &s[..2];\n    if s.len() == 4 {\n        "ah"\n    } else {\n        "wo"\n    }\n'),wrongWhy:'check'}
       ],
       defines:[],previews:[],
-      check:c=>c.out()!=='ah\nwo\n'?'`first_two` has to give back the first two letters: `ah` and then `wo`.':c.count('index')<1?'Take the first two letters with a slice, like `&s[..2]`.':true
+      check:c=>c.out()!=='ah\nwo\n'?'`first_two` has to give back the first two letters: `ah` and then `wo`.':c.count('index')<1?'Take the first two letters with a slice, like `&s[..2]`.':OTHER(c,'re\nti\n','`first_two` has to give back the first two letters of any text, not only of `ahoy` and `world`.',['"ahoy"','"reef"'],['"world"','"tide"'])
     }
   ]
 });

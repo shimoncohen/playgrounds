@@ -170,9 +170,9 @@ RQ.CH.push({
       answer:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, age);'),
       alts:[L(PET.trim(),'','impl Critter {','    fn new(name: &str, age: u32) -> Critter {','        Critter { name: String::from(name), age }','    }','','    fn into_name(&self) -> String {','        self.name.clone()','    }','}',MAIN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, pet.age);').trim())],
       wrong:[{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, pet.age);'),wrongWhy:'E0382'},{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", age, name);'),wrongWhy:'check'}],
-      lazy:[{src:OWN('println!("Pip was 3");'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, 3);'),wrongWhy:'check'}],
+      lazy:[{src:OWN('println!("Pip was 3");'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, 3);'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, if age == 3 { 3 } else { 0 });'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='Pip was 3\n'?'The program has to print `Pip was 3`: the name first, and then the age.':c.usesMethod('into_name')<1?'Keep using `into_name` to get the name.':c.count('field')<2?'Read the age out of the `pet` itself, instead of typing it again.':true
+      check:c=>c.out()!=='Pip was 3\n'?'The program has to print `Pip was 3`: the name first, and then the age.':c.usesMethod('into_name')<1?'Keep using `into_name` to get the name.':c.count('field')<2?'Read the age out of the `pet` itself, instead of typing it again.':OTHER(c,'Bo was 7\n','The program has to print the name and the age of whichever `Critter` it builds, not only Pip.',['"Pip", 3','"Bo", 7'])
     }
   ]
 });

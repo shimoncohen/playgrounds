@@ -54,9 +54,9 @@ RQ.CH.push({
       answer:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',
       alts:['fn add_one(n: i32) -> i32 {\n    return n + 1;\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n'],
       wrong:[{src:'fn add_one(n: i32) -> i32 {\n    n + 2\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> u8 {\n    n + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'E0308'}],
-      lazy:[{src:'fn add_one(n: i32) -> i32 {\n    42\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("42");\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    41 + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn add_one(n: i32) -> i32 {\n    42\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("42");\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    41 + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    42 + n - n\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.calls('add_one')<1?'Keep calling `add_one` from `main`.':c.count('op')<1||c.count('var-use')<1?'Keep the maths inside `add_one`: it should work out `n + 1` from its parameter.':true
+      check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.calls('add_one')<1?'Keep calling `add_one` from `main`.':c.count('op')<1||c.count('var-use')<1?'Keep the maths inside `add_one`: it should work out `n + 1` from its parameter.':OTHER(c,'11\n','`add_one` has to add one to any number, not only to `41`.',['add_one(41)','add_one(10)'])
     },
     {
       title:'Choose with if and else',kind:'write',

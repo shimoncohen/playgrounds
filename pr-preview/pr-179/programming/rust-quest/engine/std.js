@@ -86,8 +86,7 @@ function quoted(s,q,room){
   }
   return o+q;
 }
-// The one entry point for a HashMap traversal (for, iter, keys, values, into_iter, extend, {:?}, drop): it sets the flag the two-seed rule reads.
-// Seed 1 rotates seed 0 and seed 2 reverses it. Rotation keeps the rest in order when a program skips the first entry; reversal keeps the middle of an odd count in place.
+// Seed 1 rotates seed 0's order and seed 2 reverses it: rotation alone misses a program that skips the first entry, reversal alone keeps an odd count's middle in place.
 const session={seed:0,iterated:false};
 const hashSession=seed=>{session.seed=seed;session.iterated=false;return session;};
 const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0;return h;};
