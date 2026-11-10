@@ -355,3 +355,17 @@ test('algebra: an unsolved quadratic shows the curve without its crossing dots o
     assert.ok(after.some(i => i.type === 'point') && after.find(i => i.type === 'axes').xTicks !== false, m.title);
   }
 });
+
+test('geometry: every 2D Geometry scene has a story picture, reveal scenes included', () => {
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  const scenes = MQ.content.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.draw.kind === '2d');
+  assert.ok(scenes.length >= 20);
+  for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+});
+
+test('trigonometry: every 2D scene has a story picture', () => {
+  const C = loadMath([...BASE, 'trigonometry/content.js']).content;
+  const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.draw.kind === '2d');
+  assert.ok(scenes.length >= 5);
+  for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+});
