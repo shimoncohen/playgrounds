@@ -39,13 +39,18 @@ RQ.lint=(ast,info)=>{
   const snap=()=>new Map([...st].map(([k,s])=>[k,{...s}]));
   // rustc follows only the taken edge of a branch on a known condition, so a trap in the other one is never linted;
   // a trap in a match arm, whose scrutinee rustc may also fold, is not judged
-  function trap(id,n,o){
+  function trap(id,n,o,d){
     if(constLine)unsup('const initializer',constLine);
+    else if(d)unsup('const folding',n.line);
     else if(skip)return;
     else if(dead)unsup('const folding',n.line);
     else flag(id,n,o);
   }
-  const int=(v,ty)=>({k:'int',v,ty});
+  const int=(v,ty,d)=>({k:'int',v,ty,d});
+  const dbt=(a,b)=>!!((a&&a.d)||(b&&b.d));
+  // rustc folds one level of aggregate: a value inside a nested one is known to this pass but not verified, so it only blocks a verdict
+  const deep=v=>v&&v.k==='agg'?{k:'agg',d:true,els:v.els.map(deep)}:v&&{...v,d:true};
+  const nest=els=>els.map(v=>v&&v.k==='agg'?deep(v):v);
   const boolv=v=>({k:'bool',v});
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
@@ -63,18 +68,18 @@ RQ.lint=(ast,info)=>{
     return false;
   };
   const hasBreak=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Break')f=true;if(x.t==='Loop'||x.t==='While'||x.t==='For')return false;});return f;};
-  const part=(a,i)=>a&&a.k==='agg'?a.els[i]||null:null;
+  const part=(a,i)=>{const v=a&&a.k==='agg'?a.els[i]||null:null;return v&&a.d?deep(v):v;};
   function arith(op,a,b,e){
     if(op==='/'||op==='%'){
-      if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'});
+      if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'},dbt(a,b));
       else if(a&&b&&a.k==='int'&&b.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]&&b.v===-1n)unsup('integer overflow',e.line);
-      else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty);
+      else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty,dbt(a,b));
       return null;
     }
     if(!a||!b||a.k!=='int'||b.k!=='int')return null;
     const r=op==='+'?a.v+b.v:op==='-'?a.v-b.v:a.v*b.v;
-    if(!fits(r,a.ty)){trap('arithmetic_overflow',e,{});return null;}
-    return int(r,a.ty);
+    if(!fits(r,a.ty)){trap('arithmetic_overflow',e,{},dbt(a,b));return null;}
+    return int(r,a.ty,dbt(a,b));
   }
   function compare(op,a,b){
     if(!a||!b||a.k!==b.k||(a.k!=='int'&&a.k!=='bool'))return null;
@@ -107,9 +112,9 @@ RQ.lint=(ast,info)=>{
   }
 
   // the arm of a desugared destructuring let holds the rest of the block, so it is straight-line code
-  function destructure(p,v,fresh){
-    if(p.t==='IdentPat'){const bd=!p.sub&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
-    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i),fresh));
+  function destructure(p,v,fresh,sub){
+    if(p.t==='IdentPat'){const bd=(sub||!p.sub)&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
+    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i),fresh,sub));
   }
 
   function stmt(s){
@@ -130,14 +135,17 @@ RQ.lint=(ast,info)=>{
     }
     return div||!b.tail?null:ev(b.tail);
   }
-  // a loop whose body has an unlabeled break as a direct statement has no back edge: rustc sees straight-line code up to the
-  // break, and nothing after the loop is reachable when the body diverges first
+  // a loop whose body has an unlabeled break as a direct statement reaches it in straight-line code, and nothing after the loop is
+  // reachable when the body diverges first; an earlier break or continue merges paths, which is not modeled
   function straightLoop(b){
     const items=[...b.stmts,...(b.tail?[b.tail]:[])];
     for(const s of items){
       if(div)return null;
       const x=s.t==='ExprStmt'?s.expr:s;
-      if(x.t==='Break'){return x.expr?ev(x.expr):null;}
+      if(x.t==='Break')return x.expr?ev(x.expr):null;
+      let exit=false;
+      RQ.walk(s,n=>{if(n.t==='Break'||n.t==='Continue')exit=true;});
+      if(exit){unsup('const folding',s.line);return null;}
       if(s===b.tail)ev(s);else stmt(s);
     }
     return null;
@@ -184,9 +192,9 @@ RQ.lint=(ast,info)=>{
         if(e.op==='-'&&x.t==='Lit'&&x.kind==='int')return badLit.has(x)?null:int(-BigInt(x.v),rtyOf(x));
         const a=ev(e.expr);
         if(e.op==='!')return a&&a.k==='bool'?boolv(!a.v):null;
-        if(a&&a.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]){trap('arithmetic_overflow',e,{});barrier();return null;}
+        if(a&&a.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]){trap('arithmetic_overflow',e,{},a.d);barrier();return null;}
         barrier();
-        return a&&a.k==='int'?int(-a.v,a.ty):null;
+        return a&&a.k==='int'?int(-a.v,a.ty,a.d):null;
       }
       case 'Binary':{
         const op=e.op;
@@ -201,13 +209,14 @@ RQ.lint=(ast,info)=>{
         const a=ev(e.lhs),b=ev(e.rhs);
         if(ARITH[op]||op==='/'||op==='%'){const r=arith(op,a,b,e);barrier();return r;}
         if(op==='&'||op==='|'||op==='^'){
-          return a&&b&&a.k==='int'&&b.k==='int'?int(op==='&'?a.v&b.v:op==='|'?a.v|b.v:a.v^b.v,a.ty):null;
+          return a&&b&&a.k==='int'&&b.k==='int'?int(op==='&'?a.v&b.v:op==='|'?a.v|b.v:a.v^b.v,a.ty,dbt(a,b)):null;
         }
+        if(dbt(a,b))unsup('const folding',e.line);
         return compare(op,a,b);
       }
       case 'Cast':{
         const a=ev(e.expr),t=e.ty.t==='Path'?e.ty.segs[0].name:'';
-        return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t):null;
+        return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.d):null;
       }
       case 'Ref':{
         ev(e.expr);
@@ -252,7 +261,7 @@ RQ.lint=(ast,info)=>{
       }
       case 'Index':{
         const a=ev(e.expr),i=ev(e.index),n=(info.get(e)||{}).alen;
-        if(i&&i.k==='int'&&n!==undefined&&i.v>=BigInt(n))trap('unconditional_panic',e,{why:'index out of bounds: the length is '+n+' but the index is '+i.v});
+        if(i&&i.k==='int'&&n!==undefined&&i.v>=BigInt(n))trap('unconditional_panic',e,{why:'index out of bounds: the length is '+n+' but the index is '+i.v},i.d);
         barrier();
         return i&&i.k==='int'&&part(a,Number(i.v));
       }
@@ -265,9 +274,9 @@ RQ.lint=(ast,info)=>{
         forget(assignedIn(e));
         return null;
       }
-      case 'Tuple':case 'Array':return {k:'agg',els:e.elems.map(ev)};
+      case 'Tuple':case 'Array':return {k:'agg',els:nest(e.elems.map(ev))};
       case 'StructLit':for(const f of e.fields)ev(f.expr);return null;
-      case 'ArrayRepeat':return {k:'agg',els:Array(Number(e.len.v)).fill(ev(e.elem))};
+      case 'ArrayRepeat':return {k:'agg',els:nest(Array(Number(e.len.v)).fill(ev(e.elem)))};
       case 'Field':return part(ev(e.expr),Number(e.name));
       case 'Block':return block(e);
       case 'Return':case 'Break':if(e.expr)ev(e.expr);div=true;return null;
@@ -305,13 +314,14 @@ RQ.lint=(ast,info)=>{
           return ev(a0.body);
         }
         if(pk==='maybe')unsup('const folding',e.line);
-        ev(e.scrut);barrier();
+        const sv=ev(e.scrut);barrier();
         const base=snap();
         let all=e.arms.length>0;
         // rustc may fold the scrutinee and drop the arms it rules out, which the lint pass cannot tell, so no arm is judged
         for(const a of e.arms){
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
           const was=div;
+          destructure(a.pat,sv,false,true);
           dead++;
           if(a.body.t==='Block')block(a.body);else ev(a.body);
           dead--;

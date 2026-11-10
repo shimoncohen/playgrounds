@@ -92,7 +92,7 @@ describe('round 2 probes: reachability and aggregates', () => {
   });
   it('t: tuple fields fold', () => {
     lint('    let t = (255u8, 1u8);\n    let y = t.0 + t.1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
-    lint('    let t = ((255u8, 1u8), 2u8);\n    let y = t.0.0 + t.0.1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
+    folding('    let t = ((255u8, 1u8), 2u8);\n    let y = t.0.0 + t.0.1;\n    println!("{}", y);');
     assert.equal(ok('    let t = (254u8, 1u8);\n    let y = t.0 + t.1;\n    println!("{}", y);').out(), '255\n');
   });
   it('u: array elements fold', () => {
@@ -203,6 +203,27 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
   it('the one store of a deferred let is known after a branch that holds it', () => {
     lint('    f(true);', 'arithmetic_overflow', 8, 'fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 255;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!("{}", b);\n}');
     compiles('    f(true);', 'fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 1;\n    } else {\n        a = 255;\n    }\n    let b = a + 1;\n    println!("{}", b);\n}');
+  });
+  it('a loop value or store is known only when no break or continue comes before the direct break', () => {
+    const I = 'fn idb(b: bool) -> bool {\n    b\n}\n\nfn idu(x: u8) -> u8 {\n    x\n}';
+    const V = (loop) => `    let v: u8 = ${loop};\n    println!("{}", v + 1);`;
+    for (const loop of ['loop { if idb(false) { break 1; } break 255; }', 'loop { if idb(true) { break 1; } break 255; }', 'loop { match idu(1) { 1 => { break 3; } _ => {} } break 255; }', 'loop { let k = idu(0); if k == 1 { break k; } break 255; }']) folding(V(loop), I);
+    folding('    let mut x: u8 = 255;\n    x = x;\n    loop {\n        if idb(true) {\n            x = 0;\n            break;\n        }\n        x = 255;\n        break;\n    }\n    let y = x + 1;\n    println!("{}", y);', I);
+    folding('    let mut x: u8 = 255;\n    x = x;\n    loop { continue; break; }\n    let y = x + 1;\n    println!("{}", y);');
+    lint(V('loop { println!("a"); break 255; }'), 'arithmetic_overflow', 4);
+  });
+  it('rustc folds one level of tuple or array: a value inside a nested one blocks a verdict', () => {
+    for (const body of [
+      '    match (255u8, (1u8, 2u8)) {\n        (a, (b, _)) => {\n            println!("{}", a + b);\n        }\n    }',
+      '    let ((a, b), c) = ((255u8, 1u8), 2u8);\n    println!("{}", a + b);',
+      '    let x = ((255u8, 1u8), 2u8);\n    match x {\n        (p, q) => {\n            println!("{}", p.0 + 1);\n        }\n    }',
+      '    let a = [[255u8, 1u8], [2u8, 3u8]];\n    let y = a[0][0] + 1;\n    println!("{}", y);'
+    ]) folding(body);
+    lint('    let (a, b) = (255u8, (1u8, 2u8));\n    println!("{}", a + 1);', 'arithmetic_overflow', 4);
+  });
+  it('a binding in an arm of a switching match is known to rustc, so a trap in the arm is not judged', () => {
+    folding('    match (255u8, 1u8) {\n        (a, 1) => {\n            println!("{}", a + 1);\n        }\n        _ => {}\n    }');
+    folding('    match 1u8 {\n        n @ 0..=255 => {\n            println!("{}", n + 255);\n        }\n        _ => {}\n    }');
   });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
