@@ -2773,6 +2773,37 @@ test('Story setting hides the trail strip, remembers the choice across reloads a
   await ctx.close();
 });
 
+test('ds-quest field guide: the code each explainer ran keeps its lines whole on a phone', async () => {
+  // The web fonts that open() blocks are wider, and learners see them, so only they show the wrap.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const page = await ctx.newPage(), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(`${base}/programming/ds-quest/`);
+  await page.click('.tabs button[data-tab="guide"]');
+  await page.waitForSelector('#demo-tree .dbtn');
+  // The mono face loads only once code is on screen, so wait for it before measuring.
+  const mono = await page.evaluate(() => document.fonts.load('12.5px "JetBrains Mono"').then(f => f.length > 0));
+  assert.ok(mono, 'the web fonts did not load, so this layout check cannot run');
+  const wrapped = id => page.evaluate(id => {
+    const e = document.querySelector(`#demo-${id} .democode`), cs = getComputedStyle(e), lines = e.textContent.replace(/\n$/, '').split('\n').length;
+    return e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) > (lines + 0.5) * parseFloat(cs.lineHeight) ? e.textContent : '';
+  }, id);
+  for (const id of ['array', 'stack', 'queue', 'list', 'map', 'set', 'tree']) {
+    assert.equal(await wrapped(id), '', `${id} before any operation runs`);
+    const n = await page.locator(`#demo-${id} .dbtn`).count();
+    for (let i = 0; i < n; i++) {
+      const btn = page.locator(`#demo-${id} .dbtn`).nth(i);
+      if (await btn.isDisabled()) continue;
+      await btn.click();
+      await until(async () => !(await page.$(`#demo-${id} .dbtn:disabled`)));
+      assert.equal(await wrapped(id), '', `${id}, button ${i + 1}`);
+    }
+  }
+  assert.equal(await overflow(page), false);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 } });
   await page.waitForSelector('#mission');
