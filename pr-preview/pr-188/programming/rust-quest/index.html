@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rust Quest</title>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../../shared/progress.css">
+<link rel="stylesheet" href="../../shared/nav.css">
+<link rel="stylesheet" href="../../shared/trail.css">
+<link rel="stylesheet" href="../../shared/how.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo">fn</span>Rust Quest</div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-quest" aria-selected="true" data-tab="quest">Quest</button>
+    <button role="tab" id="t-fire" aria-selected="false" data-tab="fire">Quick-fire</button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Field guide</button>
+  </nav>
+  <div class="xp" aria-live="polite"><span class="rank" id="rank">Tide-Pool Newcomer</span><div class="xpbar"><i id="xpFill"></i></div><span id="xpText">0 XP</span></div>
+</header>
+<p class="banner" id="banner" hidden></p>
+
+<main>
+<section id="tab-quest" class="quest" role="tabpanel" aria-labelledby="t-quest">
+  <aside class="missionCol">
+    <nav class="chapters" id="chapters" aria-label="Chapters"></nav>
+    <article class="mission panel" id="mission" aria-live="polite"></article>
+  </aside>
+  <div class="codeCol" id="codePanel">
+    <div class="edhead"><span class="file">src/main.rs</span><span class="sp"></span><button type="button" class="linkbtn" id="bCopy">Copy code</button><a class="linkbtn" href="https://play.rust-lang.org/" target="_blank" rel="noopener noreferrer">Open the Rust Playground</a><button type="button" class="linkbtn" id="bReset">Reset to starter</button></div>
+    <div class="editor"><div class="gutter" id="gutter" aria-hidden="true" hidden></div><textarea id="code" rows="12" aria-label="Rust code editor" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" wrap="off"></textarea></div>
+    <div class="keys" id="keys" aria-label="Extra keys"></div>
+    <div class="actions"><button type="button" class="btn" id="bRun">Run <kbd>Ctrl</kbd>+<kbd>Enter</kbd></button></div>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+  </div>
+  <aside class="mapCol">
+    <div class="panel">
+      <section class="outPanel" aria-labelledby="outTitle">
+        <h3 id="outTitle">Result</h3>
+        <div id="result" class="result" aria-live="polite"><p class="note">Press <b>Run</b> to see what your program prints, or what the compiler says.</p></div>
+      </section>
+    </div>
+    <div class="panel" id="memPanel" hidden>
+      <section class="memSection" aria-labelledby="memTitle">
+        <h3 id="memTitle">Memory view</h3>
+        <div id="memory" class="memory" hidden></div>
+      </section>
+    </div>
+  </aside>
+</section>
+
+<section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
+  <div class="fire">
+    <div><h2>Quick-fire</h2><p class="lede">Quick questions on what the missions have taught you, opened once you finish them. Race the clock, build a streak, beat your best. Just for fun: it does not change your XP.</p></div>
+    <div class="fireCard panel">
+      <div class="fstats"><span>Score<b id="fScore">0</b></span><span>Streak<b id="fStreak">0</b></span><span>Best<b id="fBest">0</b></span><span>Time<b id="fTime">75</b></span></div>
+      <div class="timer"><i id="fTimer"></i></div>
+      <div id="fStage"></div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-guide" role="tabpanel" aria-labelledby="t-guide" hidden>
+  <div class="guide" id="guide"></div>
+</section>
+</main>
+</div>
+<script>window.PROGRESS={key:"rust-quest-v1",name:"Rust Quest"}</script>
+<script src="../../shared/theme.js"></script>
+<script src="../../shared/trail.js"></script>
+<script src="../../shared/nav.js"></script>
+<script src="../../shared/progress.js"></script>
+<script src="../../shared/how.js"></script>
+<script src="engine/lex.js"></script>
+<script src="engine/parse.js"></script>
+<script src="engine/types.js"></script>
+<script src="engine/exhaust.js"></script>
+<script src="engine/check.js"></script>
+<script src="engine/lint.js"></script>
+<script src="engine/mir.js"></script>
+<script src="engine/borrow.js"></script>
+<script src="engine/interp.js"></script>
+<script src="engine/std.js"></script>
+<script src="engine/diag.js"></script>
+<script src="engine/index.js"></script>
+<script src="content/state.js"></script>
+<script src="content/model.js"></script>
+<script src="content/ch-01-hello.js"></script>
+<script src="content/ch-02-types.js"></script>
+<script src="content/ch-03-functions.js"></script>
+<script src="content/ch-04-ownership.js"></script>
+<script src="content/ch-05-borrowing.js"></script>
+<script src="content/ch-06-structs.js"></script>
+<script src="content/ch-07-enums.js"></script>
+<script src="content/ch-08-collections.js"></script>
+<script src="content/ch-09-errors.js"></script>
+<script src="content/ch-10-lifetimes.js"></script>
+<script src="content/ch-11-traits.js"></script>
+<script src="content/ch-12-closures.js"></script>
+<script src="content/ch-13-capstone.js"></script>
+<script src="content/extras.js"></script>
+<script src="content/verified.js"></script>
+<script src="ui.js"></script>
+<script src="memview.js"></script>
+<script src="editor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
