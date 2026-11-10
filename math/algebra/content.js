@@ -21,7 +21,7 @@
   const R = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
   const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
-  const WOOD = '#9a6a3a', SAND = '#c9b98f', IRON = '#6f7b84';
+  const WOOD = '#9a6a3a', SAND = '#c9b98f', IRON = '#6f7b84', WATER = '#3b93b8', EARTH = '#8a6a45';
   const rr = (x0, y0, x1, y1, r, o) => ({ type: 'rrect', x0, y0, x1, y1, r, ...o });
   const disc = (x, y, r, o) => ({ type: 'circle', x, y, r, ...o });
   const label = (x, y, s, anchor) => ({ type: 'text', x, y, s, small: true, anchor });
@@ -294,6 +294,7 @@
     return [(-b - Math.sqrt(D)) / 2, (-b + Math.sqrt(D)) / 2];
   };
   const fmt = v => String(+v.toFixed(2)).replace(/^-/, '−');
+  const eqOf = (b, c) => `y = x²${b ? ` ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x` : ''}${c ? ` ${c < 0 ? '−' : '+'} ${Math.abs(c)}` : ''}`;
   const parabola = (view, cMin, ask) => { const plain = {
     id: 'parabola', title: 'The curve y = x² + bx + c and where it crosses the x-axis',
     params: { b: { min: -6, max: 6, step: 1, value: 0, label: 'b' }, c: { min: cMin, max: 9, step: 1, value: 3, label: 'c' } },
@@ -301,7 +302,7 @@
     derived: p => ({ crossings: rootsOf(p.b, p.c).length }),
     formula: '\\term{curve}{y} = x^2+\\term{b}{b}\\,x+\\term{c}{c}\\qquad\\term{root}{y = 0}',
     live: s => {
-      const r = rootsOf(s.params.b, s.params.c), { b, c } = s.params, eq = `y = x²${b ? ` ${b < 0 ? '−' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x` : ''}${c ? ` ${c < 0 ? '−' : '+'} ${Math.abs(c)}` : ''}`;
+      const r = rootsOf(s.params.b, s.params.c), eq = eqOf(s.params.b, s.params.c);
       return ask ? `${eq}: where does it meet the x-axis?` : `${eq}: ${!r.length ? 'it never reaches the x-axis' : r.length === 1 ? `it touches the x-axis at x = ${fmt(r[0])}` : `it crosses the x-axis at x = ${r.map(fmt).join(' and x = ')}`}`;
     },
     draw: {
@@ -313,6 +314,22 @@
       ],
     },
   };
+  const [x0, x1, y0] = view;
+  const bed = (b, c, lo, hi) => Array.from({ length: 97 }, (_, i) => { const x = lo + (hi - lo) * i / 96; return [x, Math.min(x * x + b * x + c, view[3] + 1)]; });
+  plain.story = dressed(plain, 'The millpond bed y = x² + bx + c and where the water meets the bank',
+    s => {
+      const r = rootsOf(s.params.b, s.params.c), eq = eqOf(s.params.b, s.params.c);
+      return ask ? `The pond bed ${eq}: where does the water meet the bank?` : `The pond bed ${eq}: ${!r.length ? 'it stays above the water line, so the dip is dry' : r.length === 1 ? `it just touches the water at x = ${fmt(r[0])}` : `the water meets the bank at x = ${r.map(fmt).join(' and x = ')}`}`;
+    },
+    (items, { params: { b, c } }) => {
+      const r = rootsOf(b, c);
+      return [
+        { type: 'polygon', pts: [...bed(b, c, x0, x1), [x1, y0 - 1], [x0, y0 - 1]], color: EARTH, alpha: 0.35, stroke: false },
+        ...(r.length === 2 ? [{ type: 'polygon', pts: [...bed(b, c, r[0], r[1]), [r[0], 0]], color: WATER, alpha: 0.5, stroke: false }] : []),
+        { type: 'polygon', pts: [[x0, 0], [x1, 0]], color: WATER, w: 3, dash: '7 5' },
+        ...items, label(x0 + 0.3, 0.55, 'water line', 'start'),
+      ];
+    });
   return plain; };
 
   MQ.content = {
@@ -608,8 +625,8 @@
       ],
     }, {
       id: 'algebra.quadratics', name: 'Quadratic equations', badge: 'Strongbox',
-      story: 'The arch of the bridge over the mill stream touches the water in two places, so you solve for both spots to find the strongbox.',
-      intro: 'The key fits a strongbox hidden under the arch of the bridge over the mill stream. A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
+      story: 'The bed of the millpond dips below the water line, so you solve for both spots where the water meets the bank to find the strongbox.',
+      intro: 'The key fits a strongbox Odd sank in the millpond, where its bed dips below the water. A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
       scene: parabola([-6, 6, -7, 10], 0),
       missions: [
         { title: 'Factor, then split', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: 5, c: 6 }, reveal: true, question: 'x^2+5x+6=0',
@@ -658,7 +675,7 @@
           hint: 'Factor it the way you factored <code>x² − 4x + 4</code>.',
           answer: 'x=3', wrong: 'x=-3', lazy: 'x^2-6x+9=0', check: MQ.check.final.roots([3]) },
         { title: 'Roots on the curve', kind: 'scene',
-          goal: 'Move <code>b</code> and <code>c</code> until the bridge arch, the curve, crosses the x-axis at <code>x = 1</code> and <code>x = 4</code>.',
+          goal: 'Move <code>b</code> and <code>c</code> until the pond bed, the curve, crosses the x-axis at <code>x = 1</code> and <code>x = 4</code>.',
           how: [
             'The curve crosses the x-axis where <code>x² + bx + c = 0</code>, so its crossing points are the solutions of that equation.',
             'You want the solutions 1 and 4, so the equation is <code>(x − 1)(x − 4) = 0</code>: each bracket is 0 at one of them.',
