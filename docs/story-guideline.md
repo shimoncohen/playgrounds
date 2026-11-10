@@ -64,7 +64,7 @@ Giving an existing playground its story changes text and, where the checks allow
 
 - [ ] `story.js` exists with world, places, cast and treasure, and the playground is removed from `STORY_PENDING`.
 - [ ] Every chapter has a `story` line, and its intro gives the clue and its badge names the find.
-- [ ] The strip shows the chapter's story line on every mission (first and later ones, desktop and 390px wide), and Story: Off hides it.
+- [ ] The strip shows the chapter's story line on every mission (first and later ones, desktop and 390px wide), and Story Off in the Settings panel hides it.
 - [ ] Missions use world names and values; no `foo`/`bar` left where a world value fits.
 - [ ] No story sentence uses a term before it is taught.
 - [ ] No mission moved, no key renamed, no fixture touched; `npm run check && npm test` pass.

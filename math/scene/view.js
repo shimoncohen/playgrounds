@@ -18,7 +18,7 @@
     return e;
   };
 
-  // A page without trail.js has no data-story attribute: default to Story.
+  // A page without settings.js has no data-story attribute: default to Story.
   const storyOn = () => document.documentElement.getAttribute('data-story') !== 'off';
 
   MQ.scene.mount = (el, base, { onChange } = {}) => {
