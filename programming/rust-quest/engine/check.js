@@ -943,7 +943,8 @@ RQ.check=ast=>{
     if(d.k==='any'||s.k==='any'||s.k==='never')return to;
     const lit=bareLit(e.expr);
     if(lit&&d.k==='int'){
-      if(!fits(lit.v,d.ty))return unsup('const folding',e.line);
+      // `-1 as u8` is E0600, which Rust Quest does not model
+      if(lit.v<0n&&d.ty[0]==='u')return unsup('const folding',e.line);
       unify(src,to);return to;
     }
     if(lit&&d.k==='char'){if(fits(lit.v,'u8')){unify(src,T.int('u8'));return to;}return unsup('cast',e.line);}

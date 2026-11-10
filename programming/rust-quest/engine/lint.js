@@ -7,6 +7,7 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 const peel=RQ.peel;
 const ARITH={'+':1,'-':1,'*':1};
+const FORMATS=new Set(['println','print','eprintln','eprint','format','panic','write','writeln']);
 
 RQ.lint=(ast,info)=>{
   const {INT,fits,wrap}=RQ.types;
@@ -30,60 +31,53 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),dead=0,barriers=0,div=false,constLine=0;
+  let st=new Map(),dead=0,skip=0,barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
   const barrier=()=>{barriers++;for(const s of st.values())s.fresh=false;};
   const snap=()=>new Map([...st].map(([k,s])=>[k,{...s}]));
-  // a trap in a branch rustc may drop, or on a value whose folding is not verified, is not judged
-  function trap(id,n,o,amb){
+  // rustc follows only the taken edge of a branch on a known condition, so a trap in the other one is never linted;
+  // a trap in a match arm, whose scrutinee rustc may also fold, is not judged
+  function trap(id,n,o){
     if(constLine)unsup('const initializer',constLine);
-    else if(dead||amb)unsup('const folding',n.line);
+    else if(skip)return;
+    else if(dead)unsup('const folding',n.line);
     else flag(id,n,o);
   }
-  const int=(v,ty,amb)=>({k:'int',v,ty,amb});
-  const boolv=(v,amb)=>({k:'bool',v,amb});
-  const amb2=(a,b)=>!!((a&&a.amb)||(b&&b.amb));
+  const int=(v,ty)=>({k:'int',v,ty});
+  const boolv=v=>({k:'bool',v});
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x);if(b)s.add(b);}});return s;};
+  // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
+  // of its last store; it keeps none for a local whose address is taken anywhere in the fn
+  const valueOf=(b,s)=>s.val&&!borrowed.has(b)&&(b.assigns===0||s.fresh)?s.val:null;
   const forget=bs=>{for(const b of bs)if(st.has(b))st.get(b).val=null;};
   // a break inside a nested loop leaves that loop, not this one
   const hasBreak=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Break')f=true;if(x.t==='Loop'||x.t==='While'||x.t==='For')return false;});return f;};
-  // a doubtful aggregate or index makes the element doubtful
-  const part=(a,i,amb)=>{
-    const v=a&&a.k==='agg'?a.els[i]:null;
-    return v?{...v,amb:v.amb||a.amb||amb}:null;
-  };
-
-  // rustc (1.99.1) does not fold a condition that reads a let mut the way it folds an immutable one
-  const doubtful=(cond,c)=>{
-    let m=c.amb;
-    RQ.walk(cond,x=>{if(x.t==='Path'){const b=bindOf(x);if(b&&b.mut)m=true;}});
-    return !!m;
-  };
+  const part=(a,i)=>a&&a.k==='agg'?a.els[i]||null:null;
   function arith(op,a,b,e){
     if(op==='/'||op==='%'){
-      if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'},b.amb||amb2(a,b));
+      if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'});
       else if(a&&b&&a.k==='int'&&b.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]&&b.v===-1n)unsup('integer overflow',e.line);
-      else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty,amb2(a,b));
+      else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty);
       return null;
     }
     if(!a||!b||a.k!=='int'||b.k!=='int')return null;
     const r=op==='+'?a.v+b.v:op==='-'?a.v-b.v:a.v*b.v;
-    if(!fits(r,a.ty)){trap('arithmetic_overflow',e,{},amb2(a,b));return null;}
-    return int(r,a.ty,amb2(a,b));
+    if(!fits(r,a.ty)){trap('arithmetic_overflow',e,{});return null;}
+    return int(r,a.ty);
   }
   function compare(op,a,b){
     if(!a||!b||a.k!==b.k||(a.k!=='int'&&a.k!=='bool'))return null;
     const x=a.v,y=b.v;
     const r={'==':x===y,'!=':x!==y,'<':x<y,'>':x>y,'<=':x<=y,'>=':x>=y}[op];
-    return r===undefined?null:boolv(r,amb2(a,b));
+    return r===undefined?null:boolv(r);
   }
 
   // the arm of a desugared destructuring let holds the rest of the block, so it is straight-line code
   function destructure(p,v,fresh){
     if(p.t==='IdentPat'){const bd=!p.sub&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
-    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i,false),fresh));
+    else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i),fresh));
   }
 
   function block(b){
@@ -91,8 +85,8 @@ RQ.lint=(ast,info)=>{
       if(div)return null;
       if(s.t==='Let'){
         if(!s.init)continue; // a deferred let has no value to fold
-        const before=barriers,v=ev(s.init);
-        if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:barriers===before});}
+        const v=ev(s.init);
+        if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:true});}
       }else if(s.t==='ExprStmt')ev(s.expr);
     }
     return div||!b.tail?null:ev(b.tail);
@@ -100,9 +94,9 @@ RQ.lint=(ast,info)=>{
   // the live branch runs as written; a branch the condition rules out is judged only as far as rustc is known to ignore it
   function branch(b,live){
     const was=div;
-    if(!live)dead++;
+    if(!live)skip++;
     block(b);
-    if(!live)dead--;
+    if(!live)skip--;
     const d=div;div=was;return d;
   }
   function loopBody(n,cond){
@@ -127,22 +121,20 @@ RQ.lint=(ast,info)=>{
         if(b){
           const s=st.get(b);
           if(!s||!s.val)return null;
-          // a local whose address is taken anywhere in the fn: rustc's folding of it is not verified
-          return {...s.val,amb:s.val.amb||borrowed.has(b)||(b.mut&&(b.assigns===0||!s.fresh))};
+          return valueOf(b,s);
         }
         const n=e.segs[0].name;
         if(!consts.has(n))return null;
-        const v=constKnown(n);
-        return v&&{...v,amb:true};
+        return constKnown(n);
       }
       case 'Unary':{
         const x=peel(e.expr);
         if(e.op==='-'&&x.t==='Lit'&&x.kind==='int')return badLit.has(x)?null:int(-BigInt(x.v),rtyOf(x));
         const a=ev(e.expr);
-        if(e.op==='!')return a&&a.k==='bool'?boolv(!a.v,a.amb):null;
-        if(a&&a.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]){trap('arithmetic_overflow',e,{},a.amb);barrier();return null;}
+        if(e.op==='!')return a&&a.k==='bool'?boolv(!a.v):null;
+        if(a&&a.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]){trap('arithmetic_overflow',e,{});barrier();return null;}
         barrier();
-        return a&&a.k==='int'?int(-a.v,a.ty,a.amb):null;
+        return a&&a.k==='int'?int(-a.v,a.ty):null;
       }
       case 'Binary':{
         const op=e.op;
@@ -150,18 +142,18 @@ RQ.lint=(ast,info)=>{
           const a=ev(e.lhs);
           if(a&&a.k==='bool'&&a.v===(op==='||'))return a;
           const b=ev(e.rhs);
-          return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v,amb2(a,b)):null;
+          return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v):null;
         }
         const a=ev(e.lhs),b=ev(e.rhs);
         if(ARITH[op]||op==='/'||op==='%'){const r=arith(op,a,b,e);barrier();return r;}
         if(op==='&'||op==='|'||op==='^'){
-          return a&&b&&a.k==='int'&&b.k==='int'?int(op==='&'?a.v&b.v:op==='|'?a.v|b.v:a.v^b.v,a.ty,amb2(a,b)):null;
+          return a&&b&&a.k==='int'&&b.k==='int'?int(op==='&'?a.v&b.v:op==='|'?a.v|b.v:a.v^b.v,a.ty):null;
         }
         return compare(op,a,b);
       }
       case 'Cast':{
         const a=ev(e.expr),t=e.ty.t==='Path'?e.ty.segs[0].name:'';
-        return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.amb):null;
+        return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t):null;
       }
       case 'Ref':{
         ev(e.expr);
@@ -186,13 +178,13 @@ RQ.lint=(ast,info)=>{
         }
         // *r = v: lints in v still fire, but nothing is stored and nothing folded (the Deref's .bind is the reference, not the target)
         if(e.lhs.t==='Deref'){ev(e.rhs);barrier();return null;}
-        const b=bindOf(e),before=barriers;
+        const b=bindOf(e);
         let r=ev(e.rhs);
         if(e.op!=='='){
-          const s=b&&st.get(b),cur=s&&s.val&&{...s.val,amb:s.val.amb||!s.fresh};
+          const s=b&&st.get(b),cur=s&&valueOf(b,s);
           r=arith(e.op.slice(0,-1),cur,r,e);barrier();
         }
-        if(b&&st.has(b)){const s=st.get(b);s.val=r;s.fresh=barriers===before;}
+        if(b&&st.has(b)){const s=st.get(b);s.val=r;s.fresh=true;}
         return null;
       }
       case 'Call':case 'Macro':{
@@ -204,9 +196,9 @@ RQ.lint=(ast,info)=>{
       }
       case 'Index':{
         const a=ev(e.expr),i=ev(e.index),n=(info.get(e)||{}).alen;
-        if(i&&i.k==='int'&&n!==undefined&&i.v>=BigInt(n))trap('unconditional_panic',e,{why:'index out of bounds: the length is '+n+' but the index is '+i.v},i.amb);
+        if(i&&i.k==='int'&&n!==undefined&&i.v>=BigInt(n))trap('unconditional_panic',e,{why:'index out of bounds: the length is '+n+' but the index is '+i.v});
         barrier();
-        return i&&i.k==='int'&&part(a,Number(i.v),i.amb);
+        return i&&i.k==='int'&&part(a,Number(i.v));
       }
       case 'Closure':{
         // the body runs later and its captures are unknown here, but a lint inside it is still rustc's
@@ -233,15 +225,14 @@ RQ.lint=(ast,info)=>{
         let de=false;
         if(e.els&&e.els.t==='If'){
           const was=div;
-          if(known&&c.v)dead++;
+          if(known&&c.v)skip++;
           ev(e.els);
-          if(known&&c.v)dead--;
+          if(known&&c.v)skip--;
           de=div;div=was;
         }else if(e.els)de=branch(e.els,!known||!c.v);
         forget(assignedIn(e));barrier();
         // rustc follows only the taken edge of an if on a known condition, so a diverging taken branch ends the block
         div=known?(c.v?dt:!!e.els&&de):!!e.els&&dt&&de;
-        if(known&&div&&doubtful(e.cond,c)){unsup('const folding',e.cond.line);div=false;}
         return null;
       }
       case 'Match':{
@@ -272,7 +263,6 @@ RQ.lint=(ast,info)=>{
         const c=loopBody(e,e.cond);
         // rustc treats a while on a known-true condition with no break like loop {}: nothing after it is reachable
         div=!!c&&c.k==='bool'&&c.v===true&&!hasBreak(e.body);
-        if(div&&doubtful(e.cond,c)){unsup('const folding',e.cond.line);div=false;}
         return null;
       }
       case 'For':{
@@ -287,10 +277,10 @@ RQ.lint=(ast,info)=>{
   function constKnown(n){
     if(constVals.has(n))return constVals.get(n);
     constVals.set(n,null);
-    const c=consts.get(n),keep=[st,constLine,dead];
-    st=new Map();constLine=c.line;dead=0;
+    const c=consts.get(n),keep=[st,constLine,dead,skip];
+    st=new Map();constLine=c.line;dead=0;skip=0;
     const v=ev(c.init);
-    [st,constLine,dead]=keep;
+    [st,constLine,dead,skip]=keep;
     constVals.set(n,v);return v;
   }
 
@@ -298,12 +288,22 @@ RQ.lint=(ast,info)=>{
   const fns=RQ.fnItems(ast).map(x=>x.f);
   for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
-    st=new Map();dead=0;barriers=0;div=false;borrowed=new Set();
+    st=new Map();dead=skip=0;barriers=0;div=false;borrowed=new Set();
     RQ.walk(it.body,n=>{
       let root=null;
       if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr
-      else if(n.t==='MethodCall'){const r=(info.get(n)||{}).recv;if(r&&r.adj!=='val')root=rootBind(n.recv);}
+      else if(n.t==='MethodCall'){
+        const i=info.get(n)||{},r=i.recv,u=i.um;
+        if(r&&r.adj!=='val'||u&&!u.ref&&(u.adj==='&'||u.adj==='&mut'))root=rootBind(n.recv);
+      }
       if(root)borrowed.add(root);
+      if(n.t==='Macro'&&n.args&&FORMATS.has(n.name)){
+        // format_args! takes `&arg` for every argument, and for every `{name}` it captures
+        const at=n.name==='write'||n.name==='writeln'?1:0;
+        for(const a of [...n.args.slice(at+1),...n.named.map(x=>x.expr)]){const b=rootBind(a);if(b)borrowed.add(b);}
+        const f=n.args[at];
+        if(f&&f.t==='Lit'&&f.kind==='str')for(const c of (info.get(f)||{}).caps||[])if(c.bind)borrowed.add(c.bind);
+      }
       if(n.t==='Closure'&&!n.move){
         // a non-move closure holds the outer vars it names by reference, as a Ref does
         const own=new Set(),used=[];

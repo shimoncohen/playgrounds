@@ -8531,5 +8531,183 @@
     "src": "fn main() {\n    let c = \"a\" + 5;\n}\n",
     "expect": {"code": "E0369", "line": 2},
     "why": "a number added to a &str is E0369", "pr": "unit"
+  },
+  {
+    "id": "fold-const-add",
+    "src": "const N: u8 = 255;\n\nfn main() {\n    let y = N + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-const-add-ok",
+    "why": "a const item is a known operand of the lint", "pr": "P4"
+  },
+  {
+    "id": "fold-const-add-ok",
+    "src": "const N: u8 = 254;\n\nfn main() {\n    let y = N + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-const-div0",
+    "src": "const Z: i32 = 0;\n\nfn main() {\n    println!(\"{}\", 5 / Z);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "fold-const-div0-ok",
+    "why": "a const divisor of zero is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "fold-const-div0-ok",
+    "src": "const Z: i32 = 1;\n\nfn main() {\n    println!(\"{}\", 5 / Z);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the same shape with a divisor that is not zero", "pr": "P4"
+  },
+  {
+    "id": "fold-const-index",
+    "src": "const I: usize = 7;\n\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", a[I]);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "fold-const-index-ok",
+    "why": "a const index past the end of an array is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "fold-const-index-ok",
+    "src": "const I: usize = 2;\n\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", a[I]);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the same shape inside the array", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-lit",
+    "src": "fn main() {\n    let x = 256 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "overflowing_literals", "line": 2},
+    "pair": "fold-cast-lit-ok",
+    "why": "a literal cast takes the target type, so 256 as u8 is overflowing_literals", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-lit-ok",
+    "src": "fn main() {\n    let x = 255 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same cast that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-neg",
+    "src": "fn main() {\n    let x = -129 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "overflowing_literals", "line": 2},
+    "pair": "fold-cast-neg-ok",
+    "why": "a negative literal cast to a signed type is judged as one literal", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-neg-ok",
+    "src": "fn main() {\n    let x = -128 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-128\n", "err": "", "exit": 0,
+    "why": "the same cast that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-assign-add",
+    "src": "fn main() {\n    let mut x: u8 = 250;\n    x += 3;\n    let y = x + 3;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-assign-add-ok",
+    "why": "a value stored by += is known in the block that follows", "pr": "P4"
+  },
+  {
+    "id": "fold-assign-add-ok",
+    "src": "fn main() {\n    let mut x: u8 = 250;\n    x += 3;\n    let y = x + 2;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-live-true",
+    "src": "fn main() {\n    if true {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3},
+    "pair": "fold-dead-false",
+    "why": "the branch a known-true condition takes is linted", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-false",
+    "src": "fn main() {\n    if false {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the branch a known-false condition rules out is never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-else-live",
+    "src": "fn main() {\n    let n = 3;\n    if n > 5 {\n        println!(\"a\");\n    } else {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 6},
+    "pair": "fold-else-dead",
+    "why": "an else branch on a known-false condition is live and linted", "pr": "P4"
+  },
+  {
+    "id": "fold-else-dead",
+    "src": "fn main() {\n    let n = 3;\n    if n > 1 {\n        println!(\"a\");\n    } else {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "an else branch on a known-true condition is dead and never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-mut-single",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-mut-single-ok",
+    "why": "a let mut assigned once is folded across a call", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-single-ok",
+    "src": "fn main() {\n    let mut x: u8 = 254;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "a\n255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-div0",
+    "src": "fn main() {\n    let mut d = 0;\n    println!(\"a\");\n    println!(\"{}\", 5 / d);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "fold-mut-div0-ok",
+    "why": "a let mut divisor assigned once is folded across a call", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-div0-ok",
+    "src": "fn main() {\n    let mut d = 1;\n    println!(\"a\");\n    println!(\"{}\", 5 / d);\n}\n",
+    "expect": "ok", "out": "a\n5\n", "err": "", "exit": 0,
+    "why": "the same shape with a divisor that is not zero", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-cond-dead",
+    "src": "fn main() {\n    let mut c = false;\n    if c {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a let mut condition assigned once is folded, so the branch it rules out is never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-println",
+    "src": "fn main() {\n    let x: u8 = 255;\n    println!(\"{}\", x);\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "println! borrows x, so rustc does not fold it and the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-inline",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let y = x + 1;\n    println!(\"{x} {y}\");\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an inline {x} borrows x as well", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-ref",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let r = &x;\n    let y = x + 1;\n    println!(\"{} {}\", y, r);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a & of x anywhere in the fn stops rustc folding x", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-later",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let y = x + 1;\n    let r = &x;\n    println!(\"{} {}\", y, r);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a & of x after the operation stops the folding too", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-closure",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let f = || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a closure that names x holds it by reference", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-method",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let s = x.to_string();\n    let y = x + 1;\n    println!(\"{} {}\", y, s);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "to_string takes &self, an autoref of x", "pr": "unit"
+  },
+  {
+    "id": "fold-multi-call",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a local assigned twice is not known after a call", "pr": "unit"
   }
 ]

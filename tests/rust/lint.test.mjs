@@ -15,6 +15,7 @@ const lint = (body, id, line, items) => {
   assert.equal(c.hasError(id, line), true);
 };
 const ok = (body, items) => { const c = RQ.run(main(body, items)); assert.equal(c.status, 'ok', `${body} -> ${c.status} ${JSON.stringify(c.errors)} ${JSON.stringify(c.unsupported)}`); return c; };
+const compiles = (body, items) => { const c = RQ.run(main(body, items)); assert.ok(c.compiles(), `${body} -> ${c.status} ${JSON.stringify(c.errors)} ${JSON.stringify(c.unsupported)}`); };
 const folding = (body, items) => { const c = RQ.run(main(body, items)); assert.equal(c.status, 'unsupported', body); assert.equal(c.unsupported.feature, 'const folding', body); };
 
 describe('lints are reported as lint, never as code', () => {
@@ -105,8 +106,8 @@ describe('round 2 probes: reachability and aggregates', () => {
     const d = RQ.run(main('    println!("{}", g(0));', 'fn g(i: usize) -> u8 {\n    let a = [255u8, 1u8];\n    a[i] + a[1]\n}'));
     assert.equal(d.status, 'panic');
   });
-  it('a mutable aggregate read after a barrier is unsupported const folding', () => {
-    folding('    let mut t = (255u8, 1u8);\n    t = t;\n    println!("a");\n    let y = t.0 + t.1;');
+  it('a multi-assigned aggregate read after a barrier is not folded', () => {
+    compiles('    let mut t = (255u8, 1u8);\n    t = t;\n    println!("a");\n    let y = t.0 + t.1;');
   });
   it('v: a break in an inner loop does not exit the outer one, so nothing after it is linted', () => {
     const c = RQ.run(main('    loop {\n        loop {\n            break;\n        }\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);'), { maxSteps: 1000 });
@@ -122,10 +123,12 @@ describe('round 2 probes: reachability and aggregates', () => {
     lint('    while true {\n        break;\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);', 'arithmetic_overflow', 6);
     lint('    println!("hi");', 'arithmetic_overflow', 4, 'fn f(c: bool) {\n    while c {\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);\n}');
   });
-  it('x1, x3: a mutable condition that would end the reachable code is not judged', () => {
-    folding('    let mut t = true;\n    if t {\n        return;\n    }\n    t = false;\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
-    folding('    let mut t = true;\n    t = t;\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
-    folding('    let mut t = true;\n    t = t;\n    while t {\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
+  it('x1, x2: a condition rustc folds to true ends the reachable code, even through a let mut', () => {
+    compiles('    let mut t = true;\n    if t {\n        return;\n    }\n    t = false;\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
+    compiles('    let mut t = true;\n    t = t;\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
+  });
+  it('x3: a while on a mut condition that is read once is still live code after it', () => {
+    lint('    let mut t = true;\n    t = t;\n    while t {\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);', 'arithmetic_overflow', 7);
   });
   it('x2, x4: a mutable condition that does not end the code, and a parameter condition, still lint what follows', () => {
     lint('    let mut t = true;\n    t = false;\n    if t {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);', 'arithmetic_overflow', 8);
@@ -136,30 +139,63 @@ describe('round 2 probes: reachability and aggregates', () => {
   });
 });
 
-describe('ambiguity: an unverified rustc folding shape is unsupported, never ok', () => {
-  it('D1: a multi-assigned local after a call, a trapping op or control flow', () => {
-    folding('    let mut x: u8 = 250;\n    x += 3;\n    x += 3;');
-    folding('    let mut x: u8 = 255;\n    x = x;\n    println!("a");\n    let y = x + 1;');
+describe('rustc folding shapes, each probed on the pinned image', () => {
+  it('a local assigned more than once is known only until the next block boundary', () => {
+    lint('    let mut x: u8 = 250;\n    x += 3;\n    let y = x + 3;\n    println!("{}", y);', 'arithmetic_overflow', 5);
+    lint('    let mut x: u8 = 254;\n    x = x + 1;\n    let y = x + 2;\n    println!("{}", y);', 'arithmetic_overflow', 5);
+    lint('    let mut x: u8 = 255;\n    x = x;\n    let y = x + 1;\n    println!("{}", y);', 'arithmetic_overflow', 5);
+    compiles('    let mut x: u8 = 255;\n    x = x;\n    println!("a");\n    let y = x + 1;\n    println!("{}", y);');
+    compiles('    let mut x: u8 = 250;\n    x += 3;\n    println!("a");\n    let y = x + 3;\n    println!("{}", y);');
   });
-  it('D2: an if or while on a known constant condition with a trap in the dead branch', () => {
-    folding('    if false {\n        let x: u8 = 255 + 1;\n    }');
-    folding('    while false {\n        let x: u8 = 255 + 1;\n    }');
+  it('a local that is borrowed anywhere, a println argument included, is not folded', () => {
+    compiles('    let x: u8 = 255;\n    println!("{}", x);\n    let y = x + 1;\n    println!("{}", y);');
+    compiles('    let x: u8 = 255;\n    let y = x + 1;\n    println!("{x} {y}");');
+    compiles('    let x: u8 = 255;\n    let s = x.to_string();\n    let y = x + 1;\n    println!("{} {}", y, s);');
+    compiles('    let t = (255u8, 1u8);\n    println!("{}", t.0);\n    let y = t.0 + t.1;\n    println!("{}", y);');
+    compiles('    let mut x: u8 = 250;\n    x += 3;\n    x += 3;\n    println!("{}", x);');
+    lint('    let x: u8 = 255;\n    let y = x + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
+  });
+  it('a let mut that is never reassigned is folded across blocks', () => {
+    lint('    let mut x: u8 = 255;\n    let y = x + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
+    lint('    let mut x: u8 = 255;\n    println!("a");\n    let y = x + 1;\n    println!("{}", y);', 'arithmetic_overflow', 5);
+    lint('    let mut d = 0;\n    println!("a");\n    println!("{}", 5 / d);', 'unconditional_panic', 5);
+    assert.equal(ok('    let mut x: u8 = 1;\n    let y = x + 1;\n    println!("{}", y);').out(), '2\n');
+  });
+  it('a trap in the branch a known condition rules out is never linted; the live branch is', () => {
+    for (const body of [
+      '    if false {\n        let x: u8 = 255 + 1;\n    }',
+      '    while false {\n        let x: u8 = 255 + 1;\n    }',
+      '    let n = 3;\n    if n > 1 {\n        println!("a");\n    } else {\n        let x: u8 = 255 + 1;\n    }',
+      '    let n = 3;\n    if n < 2 {\n        println!("a");\n    } else if n < 3 {\n        let x: u8 = 255 + 1;\n    }',
+      '    let mut c = true;\n    c = true;\n    if c {\n        println!("a");\n    } else {\n        let x: u8 = 255 + 1;\n    }',
+      '    let c = 0;\n    if c == 1 {\n        let d = 0;\n        println!("{}", 5 / d);\n    }',
+      '    let a = [1, 2, 3];\n    if false {\n        println!("{}", a[7]);\n    }'
+    ]) compiles(body);
     lint('    let c = 3;\n    if c > 2 {\n        let x: u8 = 255 + 1;\n    }', 'arithmetic_overflow', 5);
-    folding('    let n = 3;\n    if n > 1 {\n        println!("a");\n    } else {\n        let x: u8 = 255 + 1;\n    }');
+    lint('    let n = 3;\n    if n > 5 {\n        println!("a");\n    } else {\n        let x: u8 = 255 + 1;\n    }', 'arithmetic_overflow', 7);
+    lint('    if false {\n        let d = 0;\n        println!("{}", 5 / d);\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);', 'arithmetic_overflow', 7);
   });
-  it('D3: a const item as an operand of a trapping op', () => {
-    folding('    let y = N + 1;', 'const N: u8 = 255;');
+  it('a condition no longer known after a block boundary leaves both branches live', () => {
+    lint('    let mut c = false;\n    c = false;\n    println!("a");\n    if c {\n        let x: u8 = 255 + 1;\n    }', 'arithmetic_overflow', 7);
+  });
+  it('a trap in a match arm is still unsupported const folding', () => {
+    folding('    let n = 3;\n    match n {\n        4 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
+  });
+  it('a const item is a known operand', () => {
+    lint('    let y = N + 1;\n    println!("{}", y);', 'arithmetic_overflow', 3, 'const N: u8 = 255;');
+    lint('    let y = 1 + N;\n    println!("{}", y);', 'arithmetic_overflow', 3, 'const N: u8 = 255;');
+    lint('    let y = N * 2;\n    println!("{}", y);', 'arithmetic_overflow', 3, 'const N: i32 = 2147483647;');
+    lint('    let y = M + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4, 'const N: u8 = 254;\nconst M: u8 = N + 1;');
+    lint('    let x = N;\n    let y = x + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4, 'const N: u8 = 255;');
+    lint('    println!("{}", 5 / Z);', 'unconditional_panic', 3, 'const Z: i32 = 0;');
+    lint('    let a = [1, 2, 3];\n    println!("{}", a[I]);', 'unconditional_panic', 4, 'const I: usize = 7;');
     assert.equal(ok('    let y = N + 1;\n    println!("{}", y);', 'const N: u8 = 2;').out(), '3\n');
   });
-  it('D4: a bare unsuffixed literal cast that does not fit the target', () => {
-    folding('    let x = 256 as u8;');
-    folding('    let x = -1 as u8;');
-    assert.equal(ok('    let x = 255 as u8;\n    println!("{}", x);').out(), '255\n');
+  it('a literal that does not fit its cast target is overflowing_literals; a negative one cast to an unsigned type stays unsupported', () => {
+    for (const src of ['256 as u8', '300 as u8', '-129 as i8', '128 as i8', '65536 as u16', '3000000000 as i32', '(256) as u8', '256 as u8 as u32']) lint(`    let x = ${src};\n    println!("{}", x);`, 'overflowing_literals', 3);
+    for (const src of ['-1 as u8', '-1 as u32', '(-1) as u8']) folding(`    let x = ${src};\n    println!("{}", x);`);
+    for (const [src, out] of [['255 as u8', '255'], ['-128 as i8', '-128'], ['256 as u16', '256'], ['300u16 as u8', '44']]) assert.equal(ok(`    let x = ${src};\n    println!("{}", x);`).out(), out + '\n');
     assert.equal(ok('    let n = 256;\n    println!("{}", n as u8);').out(), '0\n');
-  });
-  it('D5: a let mut never reassigned, used in a trapping op', () => {
-    folding('    let mut x: u8 = 255;\n    let y = x + 1;');
-    assert.equal(ok('    let mut x: u8 = 1;\n    let y = x + 1;\n    println!("{}", y);').out(), '2\n');
   });
   it('MIN / -1 and MIN % -1 are unsupported integer overflow', () => {
     for (const op of ['/', '%']) {
