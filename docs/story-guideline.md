@@ -36,7 +36,7 @@ Each playground has one story outline with these parts. Write it before the cour
   ```
 
   The values above are an illustration, not Shell Quest's real outline. The page does not load it today. Keep it bundle-safe anyway (AGENTS.md rule 2): no `</script` or `</style` in it, and if a page ever loads it, use a relative `<script src="story.js">`.
-- **Each leg**: a `story` string on its chapter object, next to `intro` and `badge`. One sentence: the clue, the puzzle and the find (`'A note in the clearing points to a cave; learn to look around and walk between folders, and find the cave entrance.'`). It is for authors and reviewers; showing it to learners is a separate decision.
+- **Each leg**: a `story` string on its chapter object, next to `intro` and `badge`. One sentence: the clue, the puzzle and the find (`'A note in the clearing points to a cave; learn to look around and walk between folders, and find the cave entrance.'`). Learners see it on every mission as "The trail" strip (`shared/trail.js`, `shared/trail.css`; a playground renders it with `Trail.html(ch.story)` at the top of the mission view), and a global Story setting in the header (On by default, one `localStorage` key for every playground) hides it. Write the line to be read on its own, since it sits above every mission of its chapter. Playgrounds whose pictures cannot carry world data (the math scenes) will give scenes an optional story picture that follows the same Story setting.
 
 `tests/trophy/catalog.test.mjs` checks both: every playground in `shared/catalog.js` has a `story.js` with a non-empty world, places, cast and treasure, and every chapter has a non-empty `story`. Playgrounds that have not been given their story yet are listed in `STORY_PENDING` in that test; the PR that writes a playground's story removes it from the list, and the test fails if a listed playground already has a `story.js`.
 
@@ -64,6 +64,7 @@ Giving an existing playground its story changes text and, where the checks allow
 
 - [ ] `story.js` exists with world, places, cast and treasure, and the playground is removed from `STORY_PENDING`.
 - [ ] Every chapter has a `story` line, and its intro gives the clue and its badge names the find.
+- [ ] The strip shows the chapter's story line on every mission (first and later ones, desktop and 390px wide), and Story: Off hides it.
 - [ ] Missions use world names and values; no `foo`/`bar` left where a world value fits.
 - [ ] No story sentence uses a term before it is taught.
 - [ ] No mission moved, no key renamed, no fixture touched; `npm run check && npm test` pass.

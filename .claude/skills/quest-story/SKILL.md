@@ -30,4 +30,4 @@ For each mission in the chapter:
 - Never reorder or renumber chapters or missions, never rename a `localStorage` key, never regenerate `tests/fixtures/`. Rewrite a leg in place instead of moving it.
 - Rename world data only where every check, test and fixture still agrees. If a Shell Quest fixture records a file name, keep that name.
 - Remove the playground from `STORY_PENDING` in `tests/trophy/catalog.test.mjs`.
-- Run `npm run check && npm test`, then play two chapters (`playtest`) and read only the story lines: do they read as one trail to one treasure?
+- Run `npm run check && npm test`, then play two chapters (`playtest`) and read only the story lines: do they read as one trail to one treasure? Check "The trail" strip on screen: mission 1 and a later mission, desktop and about 390px wide, and that Story: Off hides it.

@@ -1046,7 +1046,7 @@ function renderMission(pop){
       <p class="note">Click any numbered dot to replay a mission. Replays do not add XP, but the practice counts.</p>${dotsHTML(c,-1)}`;
   }else{
     const m=ch.missions[j];
-    missionEl.innerHTML=`<div class="eyebrow">Chapter ${c+1} · Mission ${j+1} of ${ch.missions.length}${S.done[mk(c,j)]?' · replay':''}</div>
+    missionEl.innerHTML=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${c+1} · Mission ${j+1} of ${ch.missions.length}${S.done[mk(c,j)]?' · replay':''}</div>
       <h2>${esc(m.title)}</h2>
       ${j===0?'<p class="intro">'+HowSteps.tick(ch.intro,esc)+'</p>':''}
       <div class="goal"><div class="label">${m.editFile?'Your mission · edit '+esc(m.editFile):'Your mission'}</div><p>${HowSteps.tick(m.goal,esc)}</p><pre>${MODE==='sh'&&!m.editFile?esc(m.code):hl(m.code)}</pre></div>

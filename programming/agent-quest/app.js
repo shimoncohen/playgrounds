@@ -142,7 +142,7 @@ function renderMission(){
   }else{
     const m=ch.missions[S.mi];
     const srcs=(m.facts||[]).map(id=>AQ.facts.byId(id)).filter(Boolean).map(f=>`<p class="srcs">${esc(f.text)} <a href="${esc(f.docUrl)}" target="_blank" rel="noopener noreferrer">Read the docs</a> (checked ${esc(f.checked)}).</p>`).join('');
-    bodyEl.innerHTML=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[mkey()]?' · done ✓':''}</div>
+    bodyEl.innerHTML=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[mkey()]?' · done ✓':''}</div>
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${HowSteps.html(m.how)}
