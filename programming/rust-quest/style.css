@@ -167,7 +167,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .exrow{display:flex;flex-direction:column;gap:4px;min-width:0}
 .exrow small{color:var(--muted);font-size:13px}
 .excmd{display:flex;align-items:flex-start;gap:8px;border:0;text-align:left;background:var(--term-bg);color:var(--term-fg);border-radius:8px;padding:8px 10px;min-width:0}
-.excmd pre{margin:0;font-family:var(--font-mono);font-size:12.5px;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
+.excmd pre{margin:0;font-family:var(--font-mono);font-size:12.5px;white-space:pre;overflow-x:auto;flex:1;min-width:0}
 .try{border:0;background:var(--surface-2);color:var(--ink);border-radius:6px;font-size:12px;font-weight:700;padding:3px 8px;flex:none;margin-left:auto}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

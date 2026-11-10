@@ -430,6 +430,22 @@ test('rust-quest: a bad saved shape loads with no console errors', async () => {
   await ctx.close();
 });
 
+test('rust-quest field guide: example code keeps each line whole and scrolls sideways instead of wrapping', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width, height: 900 } });
+    await page.click('#t-guide');
+    await page.waitForSelector('#guide .excmd pre');
+    const wrapped = await page.evaluate(() => [...document.querySelectorAll('#guide .excmd pre')].filter(e => {
+      const cs = getComputedStyle(e), lines = e.textContent.replace(/\n$/, '').split('\n').length;
+      return e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) > (lines + 0.5) * parseFloat(cs.lineHeight);
+    }).map(e => e.textContent.split('\n')[1] || e.textContent));
+    assert.deepEqual(wrapped, [], `wrapped examples at ${width}px`);
+    assert.equal(await overflow(page), false, `${width}px`);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('rust-quest: typed code survives a reload and reset restores the starter', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
   await page.waitForSelector('#mission');
