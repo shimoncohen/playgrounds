@@ -793,7 +793,7 @@ test('math-algebra: missions open their scene on their own numbers', async () =>
   assert.match(await live(), /k = 2: 9 units do not split into 2 equal rows/);
   await page.fill('#scene input[type=range]', '3');
   assert.match(await live(), /k = 3: 6 x-pieces and 9 units both split into 3 equal rows/);
-  assert.match(await at('factoring', 2), /x = 6: 36 − 9 = 27$/);
+  assert.match(await at('factoring', 2), /x = 6 on a side, with a 3 by 3 corner fenced off: 36 − 9 = 27$/);
   assert.match(await at('factoring', 3), /25 − 10 − 10 \+ 4 = 9$/);
   assert.match(await at('quadratics', 1), /y = x² − 16: where does it meet the x-axis\?/);
   assert.match(await at('quadratics', 2), /y = x² − 3x: where does it meet the x-axis\?/);
