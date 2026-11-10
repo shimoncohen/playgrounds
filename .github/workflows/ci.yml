@@ -34,7 +34,7 @@ jobs:
 
       - name: JavaScript syntax
         run: |
-          for f in */app.js programming/*/app.js math/*.js math/scene/*.js math/input/*.js math/*/app.js math/*/content.js programming/ds-quest/*.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs tests/math/*.mjs tests/fixtures/*.js programming/agent-quest/*.js programming/agent-quest/engine/*.js programming/agent-quest/content/*.js tests/agent/*.mjs tests/trophy/*.mjs; do
+          for f in */app.js programming/*/app.js math/*.js math/scene/*.js math/input/*.js math/*/app.js math/*/content.js programming/ds-quest/*.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs programming/rust-quest/*.js programming/rust-quest/engine/*.js programming/rust-quest/content/*.js tests/rust/*.mjs tests/math/*.mjs tests/fixtures/*.js programming/agent-quest/*.js programming/agent-quest/engine/*.js programming/agent-quest/content/*.js tests/agent/*.mjs tests/trophy/*.mjs; do
             node --check "$f" || exit 1
           done
 
