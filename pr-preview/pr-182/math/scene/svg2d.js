@@ -36,11 +36,7 @@
     sun: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
     coin: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9',
     board: 'M3 4h18v12H3zM7 8h6M7 12h10M8 20l2-4M16 20l-2-4',
-    pie: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 12V3M12 12l7.8 4.5M12 12l-7.8 4.5',
     loaf: 'M3 15c0-5 4-8 9-8s9 3 9 8v2H3zM8 11l1.5 3M12 10l1.5 3M16 11l1.5 3',
-    tile: 'M4 4h16v16H4zM12 4v16M4 12h16',
-    star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
-    tag: 'M3 12V4h8l10 10-8 8zM7.5 8h.01',
   };
 
   S.draw = (svg, def, state, colorOf, set) => {
@@ -49,6 +45,19 @@
     const focused = document.activeElement && svg.contains(document.activeElement) ? document.activeElement.getAttribute('data-id') : null;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.replaceChildren();
+    // Optional style on every shape: `color` fills (and strokes), `edge` strokes, `w` stroke width, `dash` a dash pattern.
+    const dress = (e, it) => {
+      if (it.color) { e.style.fill = it.color; if (it.stroke !== false) e.style.stroke = it.edge || it.color; } else if (it.edge && it.stroke !== false) e.style.stroke = it.edge;
+      if (it.w) e.style.strokeWidth = it.w;
+      if (it.dash) e.setAttribute('stroke-dasharray', it.dash);
+      return e;
+    };
+    const solid = (e, it) => {
+      paint(e, it.term, 'stroke');
+      e.setAttribute('fill', it.term ? colorOf(it.term) : 'currentColor');
+      if (it.stroke === false) e.setAttribute('stroke', 'none');
+      return dress(e, it);
+    };
     const paint = (e, term, attr) => { if (term) e.setAttribute('data-term', term); e.setAttribute(attr, term ? colorOf(term) : 'currentColor'); return e; };
 
     def.items(state).forEach((it, i) => {
@@ -61,11 +70,15 @@
       } else if (it.type === 'fn') {
         for (const seg of S.sample(it.f, x0, x1)) paint(el('polyline', { class: 'shape fn', fill: 'none', points: seg.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');
       } else if (it.type === 'polygon') {
-        const poly = paint(el('polygon', { class: 'shape', 'fill-opacity': it.alpha ?? '.25', 'stroke-width': 2, points: it.pts.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');
-        poly.setAttribute('fill', it.term ? colorOf(it.term) : 'currentColor');
-        if (it.stroke === false) poly.setAttribute('stroke', 'none');
+        solid(el('polygon', { class: 'shape', 'fill-opacity': it.alpha ?? '.25', 'stroke-width': 2, points: it.pts.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it);
+      } else if (it.type === 'rrect') {
+        solid(el('rect', { class: 'shape', 'fill-opacity': it.alpha ?? '.25', 'stroke-width': 2, x: X(it.x0), y: Y(it.y1), width: X(it.x1) - X(it.x0), height: Y(it.y0) - Y(it.y1), rx: it.r || 0 }, svg), it);
+      } else if (it.type === 'circle') {
+        solid(el('ellipse', { class: 'shape', 'fill-opacity': it.alpha ?? '.25', 'stroke-width': 2, cx: X(it.x), cy: Y(it.y), rx: it.r, ry: it.ry || it.r }, svg), it);
       } else if (it.type === 'text') {
-        el('text', { class: 'label' + (it.small ? ' small' : ''), x: X(it.x), y: Y(it.y), 'text-anchor': it.anchor || 'middle', 'dominant-baseline': 'central', 'data-term': it.term }, svg).textContent = it.s;
+        const t = el('text', { class: 'label' + (it.small ? ' small' : ''), x: X(it.x), y: Y(it.y), 'text-anchor': it.anchor || 'middle', 'dominant-baseline': 'central', 'data-term': it.term }, svg);
+        t.textContent = it.s;
+        if (it.color) t.style.fill = it.color;
       } else if (it.type === 'vector') {
         const [a, b] = [it.from, it.to], ang = Math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])), h = 9;
         const tip = [X(b[0]), Y(b[1])];
@@ -110,7 +123,8 @@
         });
       } else if (it.type === 'icon') {
         const k = (it.size || 22) / 24;
-        paint(el('path', { class: 'shape icon', d: S.icons[it.name], fill: 'none', 'stroke-width': 2 / k, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', transform: `translate(${X(it.x) - 12 * k} ${Y(it.y) - 12 * k}) scale(${k})` }, svg), it.term, 'stroke');
+        const ic = paint(el('path', { class: 'shape icon', d: S.icons[it.name], fill: 'none', 'stroke-width': 2 / k, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', transform: `translate(${X(it.x) - 12 * k} ${Y(it.y) - 12 * k}) scale(${k})` }, svg), it.term, 'stroke');
+        if (it.color) ic.style.stroke = it.color;
       } else if (it.type === 'grid') {
         const g = el('g', { class: 'grid' }, svg);
         for (let v = Math.ceil(x0); v <= x1; v++) el('line', { x1: X(v), x2: X(v), y1: 0, y2: H }, g);
