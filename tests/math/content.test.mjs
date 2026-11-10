@@ -56,11 +56,18 @@ for (const track of TRACKS) {
     for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
   });
 
-  const ALGEBRA_PLAIN = { parabola: 'an upward-opening curve that can sit anywhere has no world object yet (#186)' };
   if (track === 'algebra') test('algebra: every 2D scene has a story picture', () => {
     const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.draw.kind === '2d');
-    for (const sc of scenes) assert.ok(sc.story || ALGEBRA_PLAIN[sc.id], `${sc.id} has no story picture`);
-    for (const id of Object.keys(ALGEBRA_PLAIN)) assert.ok(scenes.some(sc => sc.id === id && !sc.story), `${id} has a story picture now: remove it from ALGEBRA_PLAIN`);
+    for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+  });
+
+  if (track === 'algebra') test('algebra: the millpond fills only the dip below the water line, between the two roots', () => {
+    const sc = C.chapters.find(ch => ch.id === 'algebra.quadratics').scene;
+    const water = params => sc.story.draw.items(stateOf(MQ, sc, params)).filter(it => it.type === 'polygon' && it.color === '#3b93b8' && it.alpha);
+    assert.equal(water({ b: 0, c: 3 }).length, 0, 'no roots: the dip is dry');
+    assert.equal(water({ b: -6, c: 9 }).length, 0, 'one root: the bed only touches the water');
+    const [pond] = water({ b: -5, c: 4 });
+    for (const [x, y] of pond.pts) assert.ok(x >= 1 - 1e-9 && x <= 4 + 1e-9 && y <= 1e-9, `pond point ${x},${y} outside the dip`);
   });
 
   test(`${track}: a story picture keeps the plain picture's x-range, vectors and points where they are`, () => {
