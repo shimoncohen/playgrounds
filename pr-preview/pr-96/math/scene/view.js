@@ -18,7 +18,14 @@
     return e;
   };
 
-  MQ.scene.mount = (el, def, { onChange } = {}) => {
+  // A page without settings.js has no data-story attribute: default to Story.
+  const storyOn = () => document.documentElement.getAttribute('data-story') !== 'off';
+
+  MQ.scene.mount = (el, base, { onChange } = {}) => {
+    // A story picture swaps only title, live line and drawing, so the model, formula, checks and description are shared.
+    const story = base.story && base.draw.kind === '2d' && base.story.draw.kind === '2d' ? base.story : null;
+    const look = () => { const { title, live, draw } = story && storyOn() ? story : base; return { title, live, draw }; };
+    const def = { ...base, ...look() };
     const model = MQ.scene.model(def), id = 'mqs' + ++uid;
     const colorOf = model.colorOf;
     const is3d = def.draw.kind === '3d';
@@ -116,7 +123,7 @@
     el.addEventListener('mouseout', () => hl(null));
     el.addEventListener('focusout', () => hl(null));
 
-    function update() {
+    function update(silent) {
       const st = model.state();
       for (const n in inputs) inputs[n].forEach(i => { if (document.activeElement !== i) i.value = n === 't' ? st.t : st.params[n]; });
       live.textContent = model.live();
@@ -125,8 +132,15 @@
       if (is3d) MQ.three3d.show(stage, def.draw, st, colorOf, { onHover: hl });
       else MQ.svg2d.draw(svg, def.draw, st, colorOf, set);
       if (!is3d) { const t = el.querySelector('.hl'); if (t) hl(t.dataset.term); }
-      if (onChange) onChange(st);
+      if (onChange && !silent) onChange(st);
     }
+
+    const onStory = () => {
+      Object.assign(def, look());
+      if (svg) svg.setAttribute('aria-label', def.title || 'graph');
+      update(true);
+    };
+    if (story) document.addEventListener('playgrounds:story', onStory);
 
     let io;
     if (typeof IntersectionObserver !== 'undefined') {
@@ -140,6 +154,6 @@
     update();
     sync();
 
-    return { model, destroy() { playing = false; if (raf) cancelAnimationFrame(raf); if (io) io.disconnect(); if (is3d) MQ.three3d.hide(stage); el.replaceChildren(); } };
+    return { model, destroy() { document.removeEventListener('playgrounds:story', onStory); playing = false; if (raf) cancelAnimationFrame(raf); if (io) io.disconnect(); if (is3d) MQ.three3d.hide(stage); el.replaceChildren(); } };
   };
 })();

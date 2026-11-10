@@ -72,6 +72,37 @@
         ];
       },
     },
+    story: {
+      title: 'The cold cellar thermometer',
+      live: s => { const { a, b } = s.params; return `At dusk the cellar thermometer reads ${signed(a)}°. Overnight it changes by ${signed(b)}°. What does Wick read at dawn?`; },
+      draw: {
+        kind: '2d', view: [-11, 11, -1.9, 1.2], box: [400, 217],
+        items: s => {
+          const { a, b } = s.params, t = a + b;
+          // Labels are ~0.42 units a character: keep the night label above its arrow, off the 0° edge and inside the picture.
+          const nightS = 'night ' + signed(b) + '°', w = nightS.length * 0.42;
+          let nightX = a + b / 2;
+          if (nightX - w / 2 < 0 && nightX + w / 2 > 0) nightX = (nightX < 0 ? -1 : 1) * (w / 2 + 0.2);
+          nightX = Math.min(11 - w / 2 - 0.2, Math.max(-11 + w / 2 + 0.2, nightX));
+          const mark = v => ({ type: 'text', x: v, y: -0.5, s: v ? signed(v) + '°' : '0°: water freezes', small: true });
+          return [
+            { type: 'polygon', pts: [[-11, -1.9], [0, -1.9], [0, 1.2], [-11, 1.2]], alpha: 0.12, stroke: false },
+            { type: 'polygon', pts: [[-10.5, -0.15], [10.5, -0.15], [10.5, 0.15], [-10.5, 0.15]] },
+            { type: 'polygon', pts: [[-10.5, -0.15], [t, -0.15], [t, 0.15], [-10.5, 0.15]], term: 'sum' },
+            ...[-10, 0, 10].map(mark),
+            { type: 'vector', from: [0, 0.35], to: [a, 0.35], term: 'a' },
+            { type: 'text', x: a > 0 ? -0.3 : 0.3, y: 0.35, s: 'dusk ' + signed(a) + '°', small: true, anchor: a > 0 ? 'end' : 'start', term: 'a' },
+            { type: 'vector', from: [a, 0.75], to: [t, 0.75], term: 'b' },
+            { type: 'text', x: nightX, y: 0.97, s: nightS, small: true, term: 'b' },
+            { type: 'point', x: t, y: 0, term: 'sum' },
+            { type: 'icon', name: t < 0 ? 'snowflake' : 'sun', x: t, y: -0.95, term: 'sum' },
+            { type: 'text', x: Math.min(10.2, Math.max(-10.2, t)), y: -1.27, s: 'dawn', small: true, term: 'sum' },
+            { type: 'text', x: -10.8, y: -1.7, s: 'colder ← the cellar', small: true, anchor: 'start' },
+            { type: 'text', x: 10.8, y: -1.7, s: 'warmer → the street', small: true, anchor: 'end' },
+          ];
+        },
+      },
+    },
   };
 
   const D = (label, value) => ({ min: 2, max: 6, step: 1, value, label });
@@ -143,49 +174,78 @@
   const br = v => (v < 0 ? `(${signed(v)})` : String(v));
   const sq = (x0, y0, w, h, term) => rect(x0, y0, x0 + w, y0 + h, term);
 
-  const chain = (id, tex, stages) => ({
-    id, title: 'The line, one step at a time',
-    params: {},
-    terms: ['now'],
-    t: { min: 0, max: stages.length - 1, step: 0.01, value: 0, speed: 0.5, label: 'step' },
-    formula: tex,
-    live: s => { const k = Math.floor(s.t); return `Line ${k + 1} of ${stages.length}: ${stages[k][0]}`; },
-    draw: {
-      kind: '2d', view: [0, 10, 0, stages.length * 1.2], box: [420, 52 * stages.length],
-      items: s => {
-        const k = Math.floor(s.t), out = [];
-        for (let i = 0; i <= k; i++) {
-          const y = (stages.length - i - 0.5) * 1.2;
-          if (i === k) out.push(rect(0.05, y - 0.55, 9.95, y + 0.55, 'now'));
-          out.push({ type: 'text', x: 0.3, y: y + 0.22, s: stages[i][0], anchor: 'start' }, { type: 'text', x: 0.3, y: y - 0.3, s: stages[i][1], small: true, anchor: 'start' });
-        }
-        return out;
-      },
-    },
+  const WOOD = '#9a6a3a', GOLD = '#d6a21e', GOLD_EDGE = '#9c7414', CRUST = '#c98f45', SLATE = '#2d3b41', CHALK = '#f2efe4', CHALK2 = '#aab7ba', PLUM = '#8d3b72', SAND = '#c9b98f';
+  const wash = (x0, y0, x1, y1, color) => ({ ...rect(x0, y0, x1, y1), alpha: color ? 0.2 : 0.12, stroke: false, color });
+  const rr = (x0, y0, x1, y1, r, o) => ({ type: 'rrect', x0, y0, x1, y1, r, ...o });
+  const disc = (x, y, r, o) => ({ type: 'circle', x, y, r, ...o });
+  const seg = (a, b, o) => ({ type: 'polygon', pts: [a, b], ...o });
+  const icon = (name, x, y, size = 20, color) => ({ type: 'icon', name, x, y, size, color });
+  const rounded = (items, r, skip) => items.map(it => {
+    if (it.type !== 'polygon' || it.pts.length !== 4 || it.term === skip || it.pts[0][1] !== it.pts[1][1] || it.pts[1][0] !== it.pts[2][0]) return it;
+    const xs = it.pts.map(q => q[0]), ys = it.pts.map(q => q[1]);
+    return rr(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), r, { term: it.term, alpha: it.alpha, stroke: it.stroke });
   });
+  const chalk = items => items.map(it => (it.type === 'text' ? { ...it, color: it.small ? CHALK2 : CHALK } : it));
+  const board = (x0, y0, x1, y1) => rr(x0, y0, x1, y1, 10, { color: SLATE, edge: WOOD, alpha: 1, w: 5 });
+  const coinStack = (cx, cy) => [0, 1, 2].map(k => rr(cx - 0.32, cy - 0.28 + k * 0.19, cx + 0.32, cy - 0.12 + k * 0.19, 3, { color: GOLD, edge: GOLD_EDGE, alpha: 0.9, w: 1.5 }));
+  // Rounds only the left end, so a shaded piece sits flush against the loaf's crust.
+  const bevel = (x0, y0, x1, y1, rx, ry, o) => {
+    const pts = [];
+    for (let j = 0; j <= 4; j++) { const a = Math.PI / 2 * (1 + j / 4); pts.push([x0 + rx + rx * Math.cos(a), y1 - ry + ry * Math.sin(a)]); }
+    for (let j = 0; j <= 4; j++) { const a = Math.PI / 2 * (2 + j / 4); pts.push([x0 + rx + rx * Math.cos(a), y0 + ry + ry * Math.sin(a)]); }
+    return { type: 'polygon', pts: [...pts, [x1, y0], [x1, y1]], ...o };
+  };
+  // The story draw must keep the plain picture's arrows, points and mission-named marks in place (tests check it).
+  const dressed = (plain, title, live, build, look) => ({ title, live, draw: { ...plain.draw, ...look, items: s => build(plain.draw.items(s), s) } });
+
+  const chain = (id, tex, stages, world) => {
+    const plain = {
+      id, title: 'The line, one step at a time',
+      params: {},
+      terms: ['now'],
+      t: { min: 0, max: stages.length - 1, step: 0.01, value: 0, speed: 0.5, label: 'step' },
+      formula: tex,
+      live: s => { const k = Math.floor(s.t); return `Line ${k + 1} of ${stages.length}: ${stages[k][0]}`; },
+      draw: {
+        kind: '2d', view: [0, 10, 0, stages.length * 1.2], box: [420, 52 * stages.length],
+        items: s => {
+          const k = Math.floor(s.t), out = [];
+          for (let i = 0; i <= k; i++) {
+            const y = (stages.length - i - 0.5) * 1.2;
+            if (i === k) out.push(rect(0.05, y - 0.55, 9.95, y + 0.55, 'now'));
+            out.push({ type: 'text', x: 0.3, y: y + 0.22, s: stages[i][0], anchor: 'start' }, { type: 'text', x: 0.3, y: y - 0.3, s: stages[i][1], small: true, anchor: 'start' });
+          }
+          return out;
+        },
+      },
+    };
+    plain.story = dressed(plain, world.title, s => `${world.line} ${Math.floor(s.t) + 1} of ${stages.length}: ${stages[Math.floor(s.t)][0]}`,
+      items => [board(0.05, 0.05, 9.95, stages.length * 1.2 - 0.05), icon(world.icon, 9.6, (stages.length - 0.5) * 1.2 + 0.2, 20, CHALK), ...chalk(rounded(items, 4))]);
+    return plain;
+  };
   const orderChain = chain('order-chain', '1 \\times 2 - 3 \\times 2 + 10 \\div (2 - 1)', [
     ['1 × 2 − 3 × 2 + 10 ÷ (2 − 1)', 'the line to work out'],
     ['1 × 2 − 3 × 2 + 10 ÷ 1', 'bracket first: 2 − 1 is 1'],
     ['2 − 6 + 10', '× and ÷ next: 1 × 2, 3 × 2, 10 ÷ 1'],
     ['−4 + 10', '+ and − from the left: 2 − 6 is −4'],
-  ]);
+  ], { title: 'Pim\'s chalk board, one line at a time', line: 'Chalk line', icon: 'board' });
   const plusChain = chain('plus-minus-chain', '10 - 4 + 2 \\times 3', [
     ['10 − 4 + 2 × 3', 'the line to work out'],
     ['10 − 4 + 6', '× first: 2 × 3 is 6'],
     ['6 + 6', '+ and − from the left: 10 − 4 is 6'],
-  ]);
+  ], { title: 'Pim\'s chalk board, one line at a time', line: 'Chalk line', icon: 'board' });
   const negChain = chain('negative-chain', '8 - (3 - 10) + (-2) \\times 3', [
     ['8 − (3 − 10) + (−2) × 3', 'the line to work out'],
     ['8 − (−7) + (−2) × 3', 'bracket first: 3 − 10 is −7'],
     ['8 − (−7) + (−6)', '× next: (−2) × 3 is −6'],
     ['15 + (−6)', 'taking away −7 is adding 7'],
-  ]);
+  ], { title: 'The cellar tally, one line at a time', line: 'Tally line', icon: 'coin' });
   const fracChain = chain('fraction-chain', '\\frac{1}{2} + \\frac{3}{4} \\times \\frac{2}{3} - \\frac{1}{3}', [
     ['1/2 + 3/4 × 2/3 − 1/3', 'the line to work out'],
     ['1/2 + 6/12 − 1/3', '× first: tops 3 × 2, bottoms 4 × 3'],
     ['1/2 + 1/2 − 1/3', '6/12 simplifies to 1/2'],
     ['1 − 1/3', '1/2 + 1/2 is 1'],
-  ]);
+  ], { title: 'The baker\'s slate, one line at a time', line: 'Slate line', icon: 'loaf' });
 
   const divTimes = {
     id: 'divide-then-times', title: 'Cut into parts, then take copies',
@@ -229,6 +289,10 @@
     },
   };
 
+  const debtCoins = (d, k) => {
+    const rows = Math.ceil(d / k), cell = Math.min(0.7, 5 / rows), cw = Math.min(0.7, 10 / k * 0.6);
+    return Array.from({ length: d }, (_, i) => [10 / k * (i % k + 0.5) - cw / 2, 1.3 + Math.floor(i / k) * cell, cw * 0.9, cell * 0.85]);
+  };
   const debt = {
     id: 'shared-debt', title: 'A debt shared out',
     params: { d: { min: 1, max: 24, step: 1, value: 12, label: 'd: coins owed' }, k: { min: 1, max: 6, step: 1, value: 3, label: 'k: friends' } },
@@ -238,8 +302,8 @@
     draw: {
       kind: '2d', view: [0, 10, 0, 7], box: [400, 260],
       items: s => {
-        const { d, k } = s.params, rows = Math.ceil(d / k), cell = Math.min(0.7, 5 / rows), cw = Math.min(0.7, 10 / k * 0.6), out = [];
-        for (let i = 0; i < d; i++) out.push(...dash(10 / k * (i % k + 0.5) - cw / 2, 1.3 + Math.floor(i / k) * cell, cw * 0.9, cell * 0.85, 'share'));
+        const { d, k } = s.params, out = [];
+        for (const c of debtCoins(d, k)) out.push(...dash(c[0], c[1], c[2], c[3], 'share'));
         for (let g = 0; g < k; g++) out.push({ type: 'text', x: 10 / k * (g + 0.5), y: 0.6, s: `friend ${g + 1}`, small: true });
         return out;
       },
@@ -349,26 +413,129 @@
     },
   };
 
-  const percent = grow => ({
-    id: grow ? 'percent-increase' : 'percent-of', title: grow ? 'A bar that grows by a percentage' : 'A percentage of a bar',
-    params: { base: { min: 10, max: 200, step: 10, value: grow ? 40 : 80, label: 'base: the amount' }, pct: { min: 5, max: grow ? 50 : 100, step: 5, value: grow ? 25 : 15, label: 'pct: percent' } },
-    terms: ['part'],
-    formula: grow ? '\\term{base}{\\text{base}} + \\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}}' : '\\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}} = \\term{part}{\\text{the shaded part}}',
-    live: s => { const { base, pct } = s.params; return grow ? `${base} grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `${pct}% of ${base} is the shaded part of the bar.`; },
-    draw: {
-      kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 150],
-      items: s => {
-        const { base, pct } = s.params, W = grow ? 10 / 1.5 : 10, w = W * pct / 100;
-        return grow
-          ? [sq(0, 1.4, W, 1.2, 'base'), sq(W, 1.4, w, 1.2, 'part'),
-            { type: 'text', x: W / 2, y: 0.7, s: String(base), small: true, term: 'base' }, { type: 'text', x: W + w / 2, y: 0.7, s: `+${pct}%`, small: true, term: 'part' },
-            { type: 'text', x: 0, y: 3.4, s: `${base} grown by ${pct}%`, small: true, anchor: 'start' }]
-          : [sq(0, 1.4, W, 1.2, 'base'), sq(0, 1.4, w, 1.2, 'part'),
-            { type: 'text', x: w / 2, y: 0.7, s: `${pct}%`, small: true, term: 'part' }, { type: 'text', x: 10, y: 0.7, s: String(base), small: true, anchor: 'end' },
-            { type: 'text', x: 0, y: 3.4, s: `${pct}% of ${base}`, small: true, anchor: 'start' }];
+  const percent = grow => {
+    const plain = {
+      id: grow ? 'percent-increase' : 'percent-of', title: grow ? 'A bar that grows by a percentage' : 'A percentage of a bar',
+      params: { base: { min: 10, max: 200, step: 10, value: grow ? 40 : 80, label: 'base: the amount' }, pct: { min: 5, max: grow ? 50 : 100, step: 5, value: grow ? 25 : 15, label: 'pct: percent' } },
+      terms: ['part'],
+      formula: grow ? '\\term{base}{\\text{base}} + \\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}}' : '\\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}} = \\term{part}{\\text{the shaded part}}',
+      live: s => { const { base, pct } = s.params; return grow ? `${base} grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `${pct}% of ${base} is the shaded part of the bar.`; },
+      draw: {
+        kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 150],
+        items: s => {
+          const { base, pct } = s.params, W = grow ? 10 / 1.5 : 10, w = W * pct / 100;
+          return grow
+            ? [sq(0, 1.4, W, 1.2, 'base'), sq(W, 1.4, w, 1.2, 'part'),
+              { type: 'text', x: W / 2, y: 0.7, s: String(base), small: true, term: 'base' }, { type: 'text', x: W + w / 2, y: 0.7, s: `+${pct}%`, small: true, term: 'part' },
+              { type: 'text', x: 0, y: 3.4, s: `${base} grown by ${pct}%`, small: true, anchor: 'start' }]
+            : [sq(0, 1.4, W, 1.2, 'base'), sq(0, 1.4, w, 1.2, 'part'),
+              { type: 'text', x: w / 2, y: 0.7, s: `${pct}%`, small: true, term: 'part' }, { type: 'text', x: 10, y: 0.7, s: String(base), small: true, anchor: 'end' },
+              { type: 'text', x: 0, y: 3.4, s: `${pct}% of ${base}`, small: true, anchor: 'start' }];
+        },
       },
+    };
+    plain.story = dressed(plain, grow ? 'The jacket price tag, grown' : 'The jacket price tag',
+      s => { const { base, pct } = s.params; return grow ? `The jacket costs ${base} coins, grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `The jacket costs ${base} coins: ${pct}% of ${base} is the shaded part of the price tag.`; },
+      (items, s) => {
+        const { base, pct } = s.params, W = 10 / 1.5;
+        return [
+          rr(-0.2, 0.15, 10.2, 3.85, 14, { edge: 'currentColor', alpha: 0.08, w: 2 }), disc(9.8, 3.4, 6, { color: SAND, edge: WOOD, alpha: 1, w: 2 }), seg([9.8, 3.4], [10.1, 3.95], { edge: WOOD, w: 2 }),
+          ...rounded(items.map(it => (it.y === 3.4 ? { ...it, s: grow ? `the jacket's ${base} coins, grown by ${pct}%` : `${pct}% of the jacket's ${base} coins` } : it)), 4),
+          ...(grow ? [rr(W - 0.12, 1.3, W + 0.12, 2.7, 2, { color: '#e8d9a0', edge: '#c9b36a', alpha: 0.85, w: 1.5 })] : []),
+        ];
+      });
+    return plain;
+  };
+
+  order.story = dressed(order, 'The price board: two chalk rows',
+    s => { const [r1, r2] = rows(s.params, s.t); return `Pim chalks two rows on the price board. Step ${Math.min(2, Math.floor(s.t))}:  ${line(r1)}   and   ${line(r2)}`; },
+    items => [board(0.08, 0.08, 9.92, 4.42), seg([0.4, 2.45], [9.6, 2.45], { color: CHALK2, w: 1.5, dash: '3 5' }),
+      ...chalk(rounded(items, 5)).map(it => (it.type === 'text' && it.anchor === 'start' ? { ...it, x: it.x + 0.25, y: it.y > 4 ? 3.95 : it.y, s: { 'No brackets': 'Row 1: no brackets', 'With brackets': 'Row 2: with brackets' }[it.s] } : it))]);
+
+  const loaf = (y, d, n, term) => [rr(0, y, 10, y + 1, 16, { color: CRUST, alpha: 0.3 }), bevel(0, y, 10 / d, y + 1, 0.42, 0.41, { term, alpha: 0.4 }), ...bar(y, d, n, term).slice(2)];
+  const pie = (y, d, n, term) => [
+    rr(0, y, 10, y + 1, 5, { color: CRUST, edge: CRUST, alpha: 0.2 }),
+    ...Array.from({ length: 25 }, (_, k) => disc(0.2 + 0.4 * k, y + 1, 4.5, { color: CRUST, alpha: 0.5, w: 1.5 })),
+    rr(0, y, 10 / d, y + 1, 5, { term, alpha: 0.4 }), ...bar(y, d, n, term).slice(2)];
+  bars.story = dressed(bars, 'Pim\'s pie and the baker\'s loaf, cut in pieces',
+    s => { const { a, b, n } = s.params; return `The baker's loaf and Pim's pie, ${n} piece${n === 1 ? '' : 's'} each: the loaf, ${fits(a, n)}; the pie, ${fits(b, n)}`; },
+    (items, s) => {
+      const { a, b, n } = s.params;
+      return [...loaf(2.4, a, n, 'a'), ...pie(0.4, b, n, 'b'),
+        { type: 'text', x: 1.3, y: 3.8, s: 'the baker\'s loaf', small: true, anchor: 'start' }, { type: 'text', x: 1.3, y: 1.8, s: 'Pim\'s pie', small: true, anchor: 'start' }];
+    });
+
+  tiles.story = dressed(tiles, 'The tile-sellers\' yard',
+    s => { const { n } = s.params; return `Wick lays ${n} row${n === 1 ? '' : 's'} of ${n} tile${n === 1 ? '' : 's'} in the yard: ${n} × ${n} = ${n}² = ${n * n} tiles`; },
+    (items, s) => {
+      const { n } = s.params, ghost = [];
+      for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) if (i >= n || j >= n) ghost.push(rr(i + 0.06, j + 0.06, i + 0.94, j + 0.94, 3, { alpha: 0.08, stroke: false }));
+      return [rr(-0.12, -0.12, 10.12, 10.12, 8, { color: SAND, edge: WOOD, alpha: 0.28, w: 4 }), ...ghost, ...rounded(items, 3).map(it => (it.type === 'text' ? { ...it, y: -0.7 } : it))];
     },
-  });
+    { view: [-0.6, 10.6, -1.2, 10.3], box: [300, 308] });
+
+  ratioBar.story = dressed(ratioBar, 'Stickers shared between Wick and Dot',
+    s => { const { a, b } = s.params, t = a + b; return `Wick and Dot share stickers ${a} : ${b}. Wick gets ${a} of ${t} parts, ${pct(a, t)}%. Dot gets ${b} of ${t}, ${pct(b, t)}%.`; },
+    (items, s) => {
+      const { a, b } = s.params, t = a + b, w = 10 / t, r = Math.min(18, 0.34 * w * 37.7);
+      return [rr(0, 1.15, a * w - 0.05, 2.45, 8, { term: 'a', alpha: 0.18 }), rr(a * w + 0.05, 1.15, 10, 2.45, 8, { term: 'b', alpha: 0.18 }),
+        ...Array.from({ length: t }, (_, i) => disc((i + 0.5) * w, 1.8, r, { term: i < a ? 'a' : 'b', alpha: 0.55 })),
+        ...items.filter(it => it.type === 'text'),
+        { type: 'text', x: 0.1, y: 2.85, s: 'Wick\'s stickers', small: true, anchor: 'start', term: 'a' }, { type: 'text', x: 10, y: 2.85, s: 'Dot\'s stickers', small: true, anchor: 'end', term: 'b' }];
+    },
+    { view: [-0.3, 10.3, 0, 3.4], box: [400, 136] });
+
+  divTimes.story = dressed(divTimes, 'Wick\'s coin piles',
+    s => { const { a, b, c } = s.params; return `${a} coins cut into ${b} equal pile${b === 1 ? '' : 's'}, then ${c} of those piles. Compare the two bars.`; },
+    items => {
+      const parts = rounded(items, 5), stacks = parts.filter(it => it.type === 'rrect').flatMap(it => coinStack((it.x0 + it.x1) / 2, (it.y0 + it.y1) / 2));
+      return [...parts, ...stacks].map(it => (it.type === 'text' ? { ...it, s: it.s.replace(' cut into', ' coins cut into').replace(/parts?/, m => (m === 'parts' ? 'piles' : 'pile')) } : it));
+    });
+
+  const owed = (x0, y0, w, h) => disc(x0 + w / 2, y0 + h / 2, w / 2 * 40, { term: 'share', alpha: 0.01, dash: '3 3', w: 2, ry: h / 2 * 37.1 });
+  product.story = dressed(product, 'Pim\'s coin board',
+    s => {
+      const { a, b } = s.params;
+      return a && b ? `${br(a)} × ${br(b)} coins: ${Math.abs(a)} across, ${Math.abs(b)} up. A filled rectangle is coins in the purse, a dashed one is coins taken away.` : `${br(a)} × ${br(b)} coins: a zero makes the rectangle flat.`;
+    },
+    (items, s) => {
+      const { a, b } = s.params;
+      const coins = [[1.5, 4.5], [2.5, 5.5], [3.5, 5.5], [-1.5, -4.5], [-2.5, -5.5], [-3.5, -5.5]].filter(([x, y]) => Math.hypot(x - a, y - b) > 0.8 && !(x * (x - a) < 0 && y * (y - b) < 0));
+      return [rr(-5.9, -5.9, 5.9, 5.9, 8, { color: WOOD, edge: WOOD, alpha: 0.12, w: 5 }), wash(0, 0, 6, 6, PLUM), wash(-6, -6, 0, 0, PLUM),
+        ...coins.map(([x, y]) => disc(x, y, 7, { color: GOLD, edge: GOLD_EDGE, alpha: 0.9, w: 1.5 })), ...items];
+    });
+
+  debt.story = dressed(debt, 'Coins owed between the stalls',
+    s => { const { d, k } = s.params; return `${d} coin${d === 1 ? '' : 's'} owed, dealt out one at a time to ${k} stall${k === 1 ? '' : 's'}. Dashed coins are owed coins.${d % k ? ' They do not share out evenly.' : ''}`; },
+    (items, s) => {
+      const { d, k } = s.params;
+      return [rr(0.1, 0.05, 9.9, 1, 6, { color: WOOD, edge: WOOD, alpha: 0.25, w: 2 }), ...debtCoins(d, k).map(c => owed(...c)),
+        ...items.filter(it => it.type === 'text').map(it => ({ ...it, s: it.s.replace('friend', 'stall') }))];
+    });
+
+  areaModel.story = dressed(areaModel, 'The baker\'s tray cut both ways',
+    s => { const { b, d } = s.params, a = Math.min(s.params.a, b), c = Math.min(s.params.c, d); return `${a}/${b} × ${c}/${d} of the baker's tray: ${a} of ${b} columns and ${c} of ${d} rows. Count the cells shaded both ways, and all the cells. (A top above its bottom stops at the whole tray.)`; },
+    items => [rr(0.95, 1.25, 9.45, 9.65, 8, { color: '#8a96a0', edge: '#8a96a0', alpha: 0.12, w: 5 }), ...rounded(items, 2).map(it => (it.type === 'text' && it.y < 1 ? { ...it, y: it.y - 0.1 } : it)), { type: 'text', x: 1.2, y: 10.2, s: 'the baker\'s tray', small: true, anchor: 'start' }],
+    { view: [-0.5, 10.5, -1.2, 10.9], box: [320, 350] });
+
+  groups.story = dressed(groups, 'Pim\'s pie in groups of pieces',
+    s => `Pim's pie: ${groups.live(s)}`,
+    items => [rr(-0.1, 1.15, 10.1, 2.85, 6, { color: CRUST, edge: CRUST, alpha: 0.3 }), ...rounded(items, 3, 'cut').map(it => (it.type === 'text' ? { ...it, s: it.s.replace(/ pieces$/, ' pieces of Pim\'s pie') } : it))]);
+
+  cube.story = dressed(cube, 'The tile-sellers\' stack',
+    s => { const { n, e } = s.params; return `${n}${sup(e)}: ${e} cop${e === 1 ? 'y' : 'ies'} of ${n} multiplied. Count the tiles in the tile-sellers' stack.`; },
+    (items, s) => [wash(-0.5, -1.3, 8.5, 0, SAND), rr(-0.2, -0.28, s.params.n + 0.2, 0, 2, { color: WOOD, edge: WOOD, alpha: 0.7, w: 1.5 }),
+      ...[0, 1, 2, 3, 4].map(k => rr(7.1, k * 0.24, 8.3, k * 0.24 + 0.2, 2, { color: SAND, edge: SAND, alpha: 0.5, w: 1.5 })),
+      ...[7.6, 8.05].map(y => seg([-0.4, y], [8.4, y], { color: WOOD, w: 3 })), ...[0, 1, 2, 3, 4, 5].map(k => seg([k * 1.6 - 0.2, 7.3], [k * 1.6 - 0.2, 8.25], { color: WOOD, w: 4 })),
+      ...rounded(items, 3)]);
+
+  squares.story = dressed(squares, 'Two tile stacks in the yard',
+    s => `Two tile stacks. ${squares.live(s)}`,
+    items => [rr(0.1, 0.15, 9.9, 1.3, 6, { color: SAND, edge: SAND, alpha: 0.25, w: 2 }), { type: 'text', x: 5, y: 0.7, s: 'the tile-sellers\' yard', small: true }, ...rounded(items, 3)]);
+
+  sameBase.story = dressed(sameBase, 'Tiles stamped with one base',
+    s => { const { b, p, q } = s.params; return `${b}${sup(p)} × ${b}${sup(q)}: ${p} copies of ${b} and ${q} copies of ${b}, one tile each. Count the tiles in the bottom row.`; },
+    items => [...[5.4, 3.1, 0.8].map(y => seg([0.1, y], [9.9, y], { color: WOOD, w: 4 })), ...rounded(items, 4)]);
 
   MQ.content = {
     track: 'arithmetic',

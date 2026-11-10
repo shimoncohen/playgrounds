@@ -21,7 +21,22 @@
   const R = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
   const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
-  const rect = (id, title, [a, b, c, d]) => ({
+  const WOOD = '#9a6a3a', SAND = '#c9b98f', IRON = '#6f7b84';
+  const rr = (x0, y0, x1, y1, r, o) => ({ type: 'rrect', x0, y0, x1, y1, r, ...o });
+  const disc = (x, y, r, o) => ({ type: 'circle', x, y, r, ...o });
+  const label = (x, y, s, anchor) => ({ type: 'text', x, y, s, small: true, anchor });
+  const rounded = (items, r) => items.map(it => {
+    if (it.type !== 'polygon' || it.pts.length !== 4 || it.pts[0][1] !== it.pts[1][1] || it.pts[1][0] !== it.pts[2][0]) return it;
+    const xs = it.pts.map(q => q[0]), ys = it.pts.map(q => q[1]);
+    return rr(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), r, { term: it.term, alpha: it.alpha, stroke: it.stroke });
+  });
+  // The story draw must keep the plain picture's arrows, points and mission-named marks in place (tests check it).
+  const dressed = (plain, title, live, build, look) => ({ title, live, draw: { ...plain.draw, ...look, items: s => build(plain.draw.items(s), s) } });
+  const bench = (x0, x1, y0) => rr(x0, y0, x1, y0 + 0.43, 3, { color: WOOD, edge: WOOD, alpha: 0.7, w: 2 });
+  const BENCH = { title: 'The bench top in four planks', line: 'Four planks make the bench top', place: 'the carpentry bench', color: WOOD };
+  const YARD = { title: 'The factor yard in four paved patches', line: 'Four paved patches fill the factor yard', place: 'the factor yard', color: SAND };
+
+  const rect = (id, title, [a, b, c, d], world) => { const plain = {
     id, title,
     params: { a: R('a', a), b: R('b', b), c: R('c', c), d: R('d', d) },
     // The palette has 6 colors for 8 terms, so bd shares a's color and ac shares b's: each sits away from the side it shares with.
@@ -43,14 +58,24 @@
         ];
       },
     },
-  });
+  };
+  plain.story = dressed(plain, world.title,
+    ({ params: { a, b, c, d }, derived: v }) => `${world.line}: (${a} + ${b})(${c} + ${d}) = ${v.ac} + ${v.ad} + ${v.bc} + ${v.bd} = ${v.area}`,
+    (items, { params: p }) => {
+      const k = 10 / Math.max(p.a + p.b, p.c + p.d), [a, b, c, d] = [p.a, p.b, p.c, p.d].map(n => n * k);
+      const L = (10 - c - d) / 2, T = 10 - (10 - a - b) / 2;
+      return [rr(L - 0.15, T - a - b - 0.15, L + c + d + 0.15, T + 0.15, 5, { color: world.color, edge: world.color, alpha: 0.18, w: 4 }),
+        ...rounded(items, 3), label(5, -0.9, world.place)];
+    },
+    { view: [-1.2, 10.4, -1.4, 11.2], box: [360, 394] });
+  return plain; };
 
   // Each box weighs X, the mission's solution; the learner never sees X, only whether the scale is level.
   const W = (label, value, max) => ({ min: 0, max, step: 1, value, label });
   const side = (n, u) => (n ? `${n === 1 ? '' : n}x${u ? ' + ' + u : ''}` : String(u));
   // Rounded so a fraction weight like 5/3 still balances exactly: 3 · 5/3 + 2 − 7 is not quite 0 in floating point.
   const tiltAt = X => p => Math.sign(+((p.bl - p.br) * X + p.ul - p.ur).toFixed(9));
-  const balance = X => { const tilt = tiltAt(X); return {
+  const balance = X => { const tilt = tiltAt(X); const plain = {
     id: 'balance', title: 'A balance scale with x boxes and unit weights',
     params: { bl: W('p: boxes on the left', 2, 4), ul: W('q: weights on the left', 3, 12), br: W('r: boxes on the right', 0, 4), ur: W('s: weights on the right', 9, 12) },
     derived: p => ({ scale: ['right side down', 'level', 'left side down'][tilt(p) + 1] }),
@@ -79,9 +104,23 @@
         ];
       },
     },
-  }; };
+  };
+  plain.story = dressed(plain, 'Odd\'s workshop scale',
+    s => `Odd's scale in the balance room, each crate weighing x: ${plain.live(s)}`,
+    items => [
+      rr(-1.5, -0.32, 1.5, 0, 2, { color: IRON, edge: IRON, alpha: 0.6, w: 2 }),
+      ...items.map(it => {
+        if (it.type !== 'polygon') return it;
+        if (it.pts.length === 3) return { ...it, color: IRON, alpha: 0.5 };
+        if (!it.term) return { ...it, color: WOOD, alpha: 0.8 };
+        const [[x0, y0], [x1, y1]] = [it.pts[0], it.pts[2]];
+        return /^u/.test(it.term) ? disc((x0 + x1) / 2, (y0 + y1) / 2, 6, { term: it.term, alpha: 0.5 }) : rounded([it], 3)[0];
+      }),
+      label(-5.8, 5.6, 'the balance room', 'start'),
+    ]);
+  return plain; };
 
-  const U = (max, value, label = 'x', min = 1) => ({ min, max, step: 1, value, label });
+  const U =(max, value, label = 'x', min = 1) => ({ min, max, step: 1, value, label });
   const tx = (x, y, s, term, small) => ({ type: 'text', x, y, s, term, small });
   // The svg has no dashed or unfilled shape: a two-point polygon draws as a bare line, so dashes are short segments.
   const dashed = (x0, y0, x1, y1, term) => {
@@ -108,6 +147,10 @@
       },
     },
   };
+  likeTerms.story = dressed(likeTerms, 'Two crates on the crate store shelf',
+    s => { const { a } = s.params, v = s.derived; return `Two crates on the crate store shelf, a = ${a}: 2a + 3a = ${v.n2} + ${v.n3} = ${v.V}`; },
+    items => [bench(-0.4, 17.4, -0.47), ...rounded(items, 3), label(-0.3, 1.8, 'the crate store', 'start')],
+    { view: [-0.5, 17.5, -1.6, 2.4], box: [400, 95] });
 
   const bracket = {
     id: 'bracket', title: 'A rectangle 3 tall and x + 2 wide',
@@ -125,6 +168,10 @@
       ],
     },
   };
+  bracket.story = dressed(bracket, 'The bench board, 3 tall and x + 2 wide',
+    s => { const { x } = s.params, v = s.derived; return `A bench board 3 tall and x + 2 wide, x = ${x}: 3 × ${x + 2} = ${v.p1} + ${v.p2} = ${v.total}`; },
+    items => [bench(-1.2, 13.2, -0.55), ...rounded(items, 3), label(13.3, 3.6, 'the carpentry bench', 'end')],
+    { view: [-1.5, 13.5, -0.9, 4.3], box: [400, 139] });
 
   const commonFactor = {
     id: 'common-factor', title: 'Share 6x + 9 into equal rows',
@@ -154,6 +201,10 @@
       },
     },
   };
+  commonFactor.story = dressed(commonFactor, 'Fen\'s cut pieces in the factor yard',
+    s => `Fen lays the cut pieces out in the factor yard. ${commonFactor.live(s)}`,
+    items => [rr(-0.3, -0.3, 15.3, 9.4, 8, { color: SAND, edge: SAND, alpha: 0.2, w: 3 }), ...rounded(items, 3), label(15.1, 9.95, 'the factor yard', 'end')],
+    { view: [-0.5, 15.5, -0.5, 10.5], box: [400, 275] });
 
   const cutOff = {
     id: 'cut-off', title: 'A rectangle 2 tall with a 2 by 4 part cut off',
@@ -171,6 +222,11 @@
       ],
     },
   };
+  cutOff.story = dressed(cutOff, 'A plank with a corner sawn off',
+    s => { const { x } = s.params; return `A bench board 2 tall with a 2 by 4 offcut sawn away, x = ${x}: 2 × ${x - 4} = ${s.derived.kept}`; },
+    (items, s) => [bench(-1.2, 11.2, -0.55), rr(s.params.x - 4, 0, s.params.x, 2, 3, { color: SAND, edge: SAND, alpha: 0.3, stroke: false }),
+      ...rounded(items, 3), label(11.3, 2.6, 'the carpentry bench', 'end')],
+    { view: [-1.5, 11.5, -1, 3.4], box: [400, 135] });
 
   const diffSquares = {
     id: 'diff-squares', title: 'A square with a 3 by 3 corner cut out',
@@ -192,6 +248,14 @@
       },
     },
   };
+  diffSquares.story = dressed(diffSquares, 'The factor yard with a corner fenced off',
+    s => { const { x } = s.params; return `A square yard, x = ${x} on a side, with a 3 by 3 corner fenced off: ${x ** 2} − 9 = ${s.derived.left}`; },
+    (items, s) => {
+      const k = 9 / s.params.x;
+      return [rr(-0.15, -0.15, 9.15, 9.15, 6, { color: SAND, edge: SAND, alpha: 0.18, w: 4 }), rr((s.params.x - 3) * k, 0, 9, 3 * k, 3, { color: WOOD, edge: WOOD, alpha: 0.3, stroke: false }),
+        ...items, label(4.5, 9.75, 'the factor yard')];
+    },
+    { view: [-1.2, 10.4, -1.1, 10.4], box: [360, 357] });
 
   const perfectSquare = {
     id: 'perfect-square', title: 'A square with two strips taken off',
@@ -214,6 +278,14 @@
       },
     },
   };
+  perfectSquare.story = dressed(perfectSquare, 'The factor yard with two strips taken off',
+    s => { const { x } = s.params; return `A square yard, x = ${x} on a side, with two strips taken off: ${x ** 2} − ${2 * x} − ${2 * x} + 4 = ${s.derived.left}`; },
+    (items, s) => {
+      const k = 9 / s.params.x, strip = { color: WOOD, edge: WOOD, alpha: 0.25, stroke: false };
+      return [rr(-0.15, -0.15, 9.15, 9.15, 6, { color: SAND, edge: SAND, alpha: 0.18, w: 4 }), rr(0, 0, 9, 2 * k, 3, strip), rr((s.params.x - 2) * k, 0, 9, 9, 3, strip),
+        ...rounded(items, 3), label(4.5, 9.75, 'the factor yard')];
+    },
+    { view: [-1.2, 10.4, -1.1, 10.4], box: [360, 357] });
 
   const rootsOf = (b, c) => {
     const D = b * b - 4 * c;
@@ -222,7 +294,7 @@
     return [(-b - Math.sqrt(D)) / 2, (-b + Math.sqrt(D)) / 2];
   };
   const fmt = v => String(+v.toFixed(2)).replace(/^-/, '−');
-  const parabola = (view, cMin, ask) => ({
+  const parabola = (view, cMin, ask) => { const plain = {
     id: 'parabola', title: 'The curve y = x² + bx + c and where it crosses the x-axis',
     params: { b: { min: -6, max: 6, step: 1, value: 0, label: 'b' }, c: { min: cMin, max: 9, step: 1, value: 3, label: 'c' } },
     terms: ['curve', 'root'],
@@ -240,7 +312,8 @@
         ...(ask ? [] : rootsOf(b, c).map(x => ({ type: 'point', x, y: 0, term: 'root' }))),
       ],
     },
-  });
+  };
+  return plain; };
 
   MQ.content = {
     track: 'algebra',
@@ -320,7 +393,7 @@
       id: 'algebra.expanding', name: 'Expanding brackets', badge: 'Plank Plan',
       story: 'Odd\'s bench plans are written inside brackets, so you multiply them out at the carpentry bench to read the plank lengths and find the plank plan.',
       intro: 'At the carpentry bench, Odd\'s plans for the planks are written inside brackets. A bracket groups a sum so it can be multiplied as one piece: <code>3(x + 2)</code> means 3 times the whole of <code>x + 2</code>. <b>Expanding</b> means multiplying out until no bracket is left around a sum: <code>3(x + 2) = 3x + 6</code>. The rectangle on this page shows why it works. Its sides are <code>a + b</code> and <code>c + d</code>, so it splits into four smaller rectangles, and its area is the sum of theirs: <code>ac + ad + bc + bd</code>, where two letters side by side, like <code>ac</code>, mean <code>a · c</code>. Each part has the same color in the picture and in the formula.',
-      scene: rect('area-split', 'A rectangle split into four parts', [2, 1, 3, 2]),
+      scene: rect('area-split', 'A rectangle split into four parts', [2, 1, 3, 2], BENCH),
       missions: [
         { title: 'One number times a bracket', kind: 'expr', scene: bracket, vars: ['x'], question: '3(x+2)',
           goal: 'A bench board is a rectangle 3 tall and <code>x + 2</code> wide, so its area is <code>3(x + 2)</code>. Write that area with no brackets left.',
@@ -462,7 +535,7 @@
       id: 'algebra.factoring', name: 'Factoring', badge: 'Strongbox Key',
       story: 'Fen has a heap of cut pieces to share into equal rows in the factor yard, so you write each sum as brackets to find the key to the strongbox.',
       intro: 'In the factor yard, Fen has a heap of cut planks to share into equal rows, and the strongbox key hangs on the right arrangement. <b>Factoring</b> is expanding run backwards. You start with a sum, like <code>x² + 5x + 6</code>, and write it as a product, like <code>(x + 2)(x + 3)</code>. Each thing being multiplied is a <b>factor</b>: 2 and 3 are factors of 6, and <code>x + 2</code> is a factor of <code>x² + 5x + 6</code>. Remember that <code>x²</code> means <code>x · x</code>. In the scene you know the four parts of the rectangle, and you look for its sides.',
-      scene: rect('area-backwards', 'Find the sides from the four parts', [1, 1, 1, 1]),
+      scene: rect('area-backwards', 'Find the sides from the four parts', [1, 1, 1, 1], YARD),
       missions: [
         { title: 'Take out a common factor', kind: 'expr', scene: commonFactor, vars: ['x'], question: '6x+9',
           goal: 'Write <code>6x + 9</code> as a whole number times a bracket. Find the biggest number that divides both 6 and 9 exactly, and take it out in front. In the scene, 6 pieces of <code>x</code> and 9 single units are shared into <code>k</code> equal rows: the pieces that do not fit wait below.',
