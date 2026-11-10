@@ -672,7 +672,7 @@ test('rust-quest: chapter 9 plays through: a used-up Result is E0382, ? in a pla
   await page.click('[data-act="fill"]');
   await page.click('#bRun');
   await page.waitForSelector('#result .stderr');
-  assert.match(await page.textContent('#result'), /Your program ended with an error[\s\S]*each kid gets 4[\s\S]*Error: Odd\(7\)[\s\S]*Exit code 1/);
+  assert.match(await page.textContent('#result'), /Your program ended with an error[\s\S]*Pip and Gus each get 4[\s\S]*Error: Odd\(7\)[\s\S]*Exit code 1/);
   await page.waitForSelector('#memory .mv-ctl input[type=range]');
   assert.match(await page.textContent('#feedback'), /Mission complete/);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
