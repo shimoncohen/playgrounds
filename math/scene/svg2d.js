@@ -34,7 +34,6 @@
   S.icons = {
     snowflake: 'M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5',
     sun: 'M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
-    lantern: 'M9 3h6M12 3v3M8 6h8l1 3v10H7V9zM7 9h10M12 12c1.4 1.4 1.4 3.6 0 5c-1.4-1.4-1.4-3.6 0-5z',
   };
 
   S.draw = (svg, def, state, colorOf, set) => {
@@ -55,7 +54,9 @@
       } else if (it.type === 'fn') {
         for (const seg of S.sample(it.f, x0, x1)) paint(el('polyline', { class: 'shape fn', fill: 'none', points: seg.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');
       } else if (it.type === 'polygon') {
-        paint(el('polygon', { class: 'shape', 'fill-opacity': '.25', 'stroke-width': 2, points: it.pts.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke').setAttribute('fill', it.term ? colorOf(it.term) : 'currentColor');
+        const poly = paint(el('polygon', { class: 'shape', 'fill-opacity': it.alpha ?? '.25', 'stroke-width': 2, points: it.pts.map(q => `${X(q[0])},${Y(q[1])}`).join(' ') }, svg), it.term, 'stroke');
+        poly.setAttribute('fill', it.term ? colorOf(it.term) : 'currentColor');
+        if (it.stroke === false) poly.setAttribute('stroke', 'none');
       } else if (it.type === 'text') {
         el('text', { class: 'label' + (it.small ? ' small' : ''), x: X(it.x), y: Y(it.y), 'text-anchor': it.anchor || 'middle', 'dominant-baseline': 'central', 'data-term': it.term }, svg).textContent = it.s;
       } else if (it.type === 'vector') {

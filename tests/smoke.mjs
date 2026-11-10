@@ -608,7 +608,7 @@ test('math-arithmetic: the cold-cellar story picture follows the Story setting i
   const icons = () => page.locator('#scene svg .icon').count();
   assert.match(await live(), /^At dusk the cellar thermometer reads −3°\. Overnight it changes by −5°/);
   assert.equal(await label(), 'The cold cellar thermometer');
-  assert.ok(await icons() >= 2, 'a lantern and the dawn mark');
+  assert.equal(await icons(), 1, 'the dawn mark');
   await page.fill('#scene input[type=number][aria-label="a value"]', '1');
   await page.dispatchEvent('#scene input[type=number][aria-label="a value"]', 'input');
   assert.match(await live(), /reads 1°/);

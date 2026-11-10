@@ -39,6 +39,7 @@ for (const track of TRACKS) {
       assert.equal(typeof sc.story.draw.items, 'function', `${sc.id}: story draw has no items function`);
       const st = MQ.scene.model(sc).state();
       for (const it of sc.story.draw.items(st)) if (it.type === 'icon') assert.ok(MQ.svg2d.icons[it.name], `${sc.id}: unknown icon ${it.name}`);
+      for (const it of sc.story.draw.items(st)) if (it.alpha !== undefined) assert.ok(it.alpha > 0 && it.alpha <= 1, `${sc.id}: alpha ${it.alpha}`);
     }
   });
 
