@@ -5,11 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadShell } from '../shell/harness.mjs';
-import { loadNet } from '../net/harness.mjs';
-import { loadAgent } from '../agent/harness.mjs';
-import { loadRust } from '../rust/harness.mjs';
-import { loadMath } from '../math/harness.mjs';
+import { CHAPTERS } from './chapters.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = rel => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -20,41 +16,9 @@ vm.runInContext(read('shared/catalog.js'), sandbox);
 const plain = x => JSON.parse(JSON.stringify(x));
 const { QUESTS, SUBJECTS } = plain(sandbox.Catalog);
 
-const between = (src, a, b) => {
-  const i = src.indexOf(a), j = src.indexOf(b, i);
-  assert.ok(i >= 0 && j > i, `content marker moved: ${JSON.stringify(a)} .. ${JSON.stringify(b)}`);
-  return src.slice(i, j);
-};
-const appOf = q => read(`programming/${q}/app.js`);
-const MATH_BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
-const math = track => () => loadMath([...MATH_BASE, `${track}/content.js`]).content.chapters;
-
-// Script, Python, C++ and Harbor keep CH inside app.js, so cut it out by the markers their teach tests use.
-const CHAPTERS = {
-  'script-quest-v1': () => new Function('const tagOf=v=>Object.prototype.toString.call(v).slice(8,-1);\n'
-    + between(appOf('script-quest'), 'const isArr=', '// ================= UI =================') + '\nreturn CH;')(),
-  'python-quest-v1': () => new Function(between(appOf('python-quest'), '', 'const ERRS={') + '\nreturn CH;')(),
-  'cpp-quest-v1': () => new Function(between(appOf('cpp-quest'), '', '(()=>{\nconst KEY=') + '\nreturn CH;')(),
-  'shell-quest-v1': () => loadShell().content.chapters,
-  'harbor-quest-v1': () => new Function(between(appOf('harbor-quest'), 'const CH=[', '\nCH.forEach') + '\nreturn CH;')(),
-  'ds-quest-v1': () => {
-    const sb = {};
-    vm.createContext(sb);
-    for (const f of ['engine.js', 'content.js']) vm.runInContext(read(`programming/ds-quest/${f}`), sb);
-    return sb.DSQ.CH;
-  },
-  'net-quest-v1': () => loadNet().CH,
-  'agent-quest-v1': () => loadAgent().CH,
-  'rust-quest-v1': () => loadRust().CH,
-  'math-arithmetic-v1': math('arithmetic'),
-  'math-algebra-v1': math('algebra'),
-  'math-geometry-v1': math('geometry'),
-  'math-trigonometry-v1': math('trigonometry'),
-};
-
 for (const q of QUESTS) {
   test(`catalog: ${q.name} has the real mission count of every chapter`, () => {
-    assert.ok(CHAPTERS[q.key], `add a loader for ${q.key} to CHAPTERS in this file`);
+    assert.ok(CHAPTERS[q.key], `add a loader for ${q.key} to CHAPTERS in tests/trophy/chapters.mjs`);
     assert.deepEqual(plain(CHAPTERS[q.key]().map(c => c.missions.length)), q.missions);
   });
 }
@@ -103,3 +67,13 @@ for (const q of QUESTS) {
     CHAPTERS[q.key]().forEach((c, i) => assert.ok(filled(c.story), `${q.key} chapter ${i}: missing story line`));
   });
 }
+
+test('story: every playground page loads the trail files and renders the strip from a script it loads', () => {
+  for (const q of QUESTS) {
+    const html = read(`${q.href}index.html`);
+    assert.match(html, /<link rel="stylesheet" href="(\.\.\/)+shared\/trail\.css">/, `${q.href}: load shared/trail.css`);
+    assert.match(html, /<script src="(\.\.\/)+shared\/trail\.js"><\/script>/, `${q.href}: load shared/trail.js`);
+    const scripts = [...html.matchAll(/<script src="([^":]+)"><\/script>/g)].map(m => path.join(q.href, m[1]));
+    assert.ok(scripts.some(f => read(f).includes('Trail.html(')), `${q.href}: render the strip with Trail.html(ch.story)`);
+  }
+});

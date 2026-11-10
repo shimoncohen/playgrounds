@@ -9,6 +9,24 @@
   const num = v => String(+v.toFixed(2));
   const side = (term, a, b) => ({ type: 'polygon', term, pts: [a, b] });
 
+  const WOOD = '#9a6a3a', GOLD = '#d6a21e', GOLD_EDGE = '#9c7414', STONE = '#a89a7c', GLASS = '#5aa9c9', STEEL = '#7d8f99', PLUM = '#8d3b72', SLATE = '#5f7380';
+  const poly = (pts, o) => ({ type: 'polygon', pts, ...o });
+  const wash = (x0, y0, x1, y1, color, alpha) => poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], { color, alpha, stroke: false });
+  const seg = (a, b, o) => poly([a, b], o);
+  const rr = (x0, y0, x1, y1, r, o) => ({ type: 'rrect', x0, y0, x1, y1, r, ...o });
+  const disc = (x, y, r, o) => ({ type: 'circle', x, y, r, ...o });
+  const arc = (cx, cy, r, from, to) => Array.from({ length: 61 }, (_, i) => { const d = rad(from + (to - from) * i / 60); return [cx + r * Math.cos(d), cy + r * Math.sin(d)]; });
+  // Always 54 items (the most a 12 by 9 floor has): a draggable point's id is its item index, so a changing count before it would drop its focus.
+  const paving = (w, h, keep = () => true) => {
+    const cells = Array.from({ length: w * h }, (_, n) => [n % w, Math.floor(n / w)]).filter(([i, j]) => (i + j) % 2 && keep(i, j));
+    return Array.from({ length: 54 }, (_, n) => (cells[n] ? wash(cells[n][0], cells[n][1], cells[n][0] + 1, cells[n][1] + 1, STONE, 0.28) : wash(0, 0, 0, 0, STONE, 0.28)));
+  };
+  const LEAD = '#4a4f57', IRON = '#55646d';
+  const pad = (list, n) => [...list, ...Array.from({ length: Math.max(0, n - list.length) }, () => wash(0, 0, 0, 0, STONE, 0.28))];
+  const spokes = (r0, r1, n, o, from = 0, to = 360) => Array.from({ length: n }, (_, i) => { const d = from + (to - from) * (i + 0.5) / n; return seg(at(d, r0), at(d, r1), o); });
+  // The story draw must keep the plain picture's arrows, points and mission-named marks in place (tests check it).
+  const dressed = (plain, title, live, build) => ({ title, live, draw: { ...plain.draw, items: s => build(plain.draw.items(s), s) } });
+
   const shapes = {
     id: 'rect-tri', title: 'A rectangle and a triangle on a grid of 1 by 1 squares',
     params: {
@@ -37,9 +55,14 @@
     },
   };
 
+  shapes.story = dressed(shapes, 'The great floor, tiled, with a gold triangle on it',
+    ({ params: { b, h } }) => `The floor: A = ${b} × ${h} = ${b * h} tiles, perimeter = ${2 * (b + h)}.   The gold triangle: A = ½ × ${b} × ${h} = ${num(b * h / 2)}.`,
+    (items, { params: { b, h } }) => [wash(-3, -1, 13, 10, STONE, 0.07), poly([[0, 0], [b, 0], [b, h], [0, h]], { color: STONE, edge: WOOD, alpha: 0.12, w: 3 }), ...paving(b, h), ...items.map(it => (it.term === 'h' && it.type === 'text' ? { ...it, x: -0.5 } : it))]);
+
   // Same picture, but the live line only gives what the mission gives, not the area it asks for.
-  const shapesWith = live => ({ ...shapes, live });
+  const shapesWith = (live, storyLive) => ({ ...shapes, live, story: { ...shapes.story, live: storyLive } });
   const given = ({ params: { b, h } }) => `Base b = ${b}, height h = ${h}.`;
+  const floorGiven = ({ params: { b, h } }) => `The floor: base b = ${b} tiles, height h = ${h} tiles.`;
 
   const R = 4.9, rad = d => d * Math.PI / 180, at = (d, r) => [r * Math.cos(rad(d)), r * Math.sin(rad(d))];
   const wedge = (from, to, term) => ({ type: 'polygon', term, pts: [[0, 0], ...Array.from({ length: 13 }, (_, i) => at(from + (to - from) * i / 12, 1.3))] });
@@ -199,10 +222,11 @@
     },
   };
 
+  const withStory = (plain, make) => ({ ...plain, story: make(plain) });
   const wholeRoot = n => Math.round(Math.sqrt(n)) ** 2 === n;
   // The view is sized so the squares on the longest legs and on the hypotenuse still fit.
   // ask 'c': the hypotenuse is the question, so c² stays hidden. A number: the hypotenuse to aim for while moving a leg.
-  const squares = (max, ask) => ({
+  const squares = (max, ask) => withStory({
     id: 'right-tri', title: 'A right triangle with a square drawn on each of its three sides',
     params: {
       a: { min: 2, max, step: 1, value: 3, label: 'leg a' },
@@ -228,29 +252,97 @@
         { type: 'point', x: 0, y: b, term: 'b', drag: { y: 'b' }, label: 'leg b' },
       ],
     },
-  });
+  }, plain => dressed(plain, 'The hall roof: a beam across a right triangle, a tiled panel on each side',
+    ({ params: { a, b }, derived: d }) => ask === 'c' ? `The roof beam: a² = ${d['a²']}, b² = ${d['b²']}, c² = ?`
+      : `The roof beam: ${a}² + ${b}² = ${d['a²']} + ${d['b²']} = ${d['c²']}, so c = ${wholeRoot(d['c²']) ? d.c : `√${d['c²']} ≈ ${num(d.c)}`}${ask ? `. Aim for c = ${ask}.` : ''}`,
+    (items, { params: { a, b } }) => {
+      const ppu = 440 / (3 * max + 2), half = 11.5 / ppu, top = 2 * max + 1;
+      const put = (it, x, y, anchor) => ({ ...it, x, y, ...(anchor ? { anchor } : {}) });
+      const mapped = items.map(it => {
+        if (it.type === 'polygon') return it.term ? { ...it, edge: WOOD, w: 3 } : it.pts.length === 3 ? { ...it, color: WOOD, edge: WOOD, alpha: 0.25 } : it;
+        if (it.type !== 'text') return it;
+        if (it.term === 'a') return a + 0.25 + 2 * half <= max + 0.75 ? put(it, a / 2, -a - 0.25 - half) : it;
+        if (it.term === 'b') return put(it, -0.2, b + 8 / ppu + 0.15 + half, 'end');
+        return a + b + 0.25 + 2 * half <= top - 0.5 ? put(it, b, a + b + 0.25 + half, 'start') : it;
+      });
+      // Courses of slates on a leg square, left open where its label sits.
+      const slates = (x0, y0, n, term) => {
+        const t = mapped.find(it => it.type === 'text' && it.term === term), wu = 12 * t.s.length / ppu + 0.2;
+        const lx0 = t.anchor === 'end' ? t.x - 2 * wu : t.anchor === 'start' ? t.x : t.x - wu, lx1 = lx0 + 2 * wu, ly0 = t.y - half - 0.15, ly1 = t.y + half + 0.15;
+        const o = { color: SLATE, alpha: 1, w: 1 }, out = [];
+        for (let j = 1; j <= n; j++) {
+          const ya = y0 + j - 1, yb = y0 + j, clash = yb > ly0 && ya < ly1;
+          if (j < n) for (const [u, v] of yb > ly0 && yb < ly1 ? [[x0, lx0], [lx1, x0 + n]] : [[x0, x0 + n]]) if (v > u) out.push(seg([u, yb], [v, yb], o));
+          for (let i = j % 2 || 2; i < n; i += 2) if (!(clash && x0 + i > lx0 && x0 + i < lx1)) out.push(seg([x0 + i, ya], [x0 + i, yb], o));
+        }
+        return out;
+      };
+      const courses = (lo, hi) => Array.from({ length: Math.ceil((hi - lo) / 4) }, (_, j) => wash(lo, lo + 4 * j, hi, Math.min(hi, lo + 4 * j + 2), SLATE, 0.07));
+      const cap = 2 * (max - 1) + max * Math.ceil(max / 2);
+      return [
+        wash(-max - 1, -max - 1, top, top, STONE, 0.07), ...courses(-max - 1, top),
+        ...pad(slates(0, -a, a, 'a'), cap), ...pad(slates(-b, 0, b, 'b'), cap),
+        seg([0, 0], [a, 0], { color: WOOD, alpha: 1, w: 8 }), seg([0, 0], [0, b], { color: WOOD, alpha: 1, w: 8 }),
+        ...mapped,
+        seg([a, 0], [0, b], { color: WOOD, alpha: 1, w: 9 }),
+      ];
+    }));
 
   const radiusOnly = ({ params: { r }, derived: d }) => `Radius r = ${r}, diameter d = ${d.d}.`;
-  const circle = (step, liveLine) => ({
-    id: 'circle', title: 'A circle with its radius and diameter marked',
-    params: { r: { min: 1, max: 8, step, value: 3, label: 'radius r' } },
-    terms: ['d', 'C', 'A'],
-    derived: ({ r }) => ({ d: 2 * r, C: +(2 * Math.PI * r).toFixed(2), A: +(Math.PI * r * r).toFixed(2) }),
-    formula: '\\begin{aligned}\\term{d}{d} &= 2\\times\\term{r}{r}\\\\ \\term{C}{C} &= 2\\times\\pi\\times\\term{r}{r}\\\\ \\term{A}{A} &= \\pi\\times\\term{r}{r}\\times\\term{r}{r}\\end{aligned}',
-    live: liveLine || (({ params: { r }, derived: d }) => `r = ${r}, d = ${d.d}.   C = 2 × π × ${r} ≈ ${num(d.C)}.   A = π × ${r} × ${r} ≈ ${num(d.A)}.`),
-    draw: {
-      kind: '2d', view: [-9, 9, -9, 9], box: [400, 400],
-      items: ({ params: { r } }) => [
-        { type: 'polygon', term: 'A', pts: Array.from({ length: 90 }, (_, i) => [r * Math.cos(i * Math.PI / 45), r * Math.sin(i * Math.PI / 45)]) },
-        { type: 'polygon', term: 'd', pts: [[-r, 0], [r, 0]] },
-        { type: 'vector', term: 'r', from: [0, 0], to: [r, 0] },
-        { type: 'text', x: r / 2, y: 0.8, s: `r = ${r}`, term: 'r' },
-        { type: 'text', x: -r / 2, y: -0.8, s: `d = ${2 * r}`, term: 'd' },
-        { type: 'point', x: 0, y: 0 },
-        { type: 'point', x: r, y: 0, term: 'r', drag: { x: 'r', stepX: step }, label: 'radius r' },
+  const ring = (cx, r, o) => poly(Array.from({ length: 90 }, (_, i) => [cx + r * Math.cos(i * Math.PI / 45), r * Math.sin(i * Math.PI / 45)]), o);
+  const circleLabels = (items, r) => items.map(it => {
+    if (it.type !== 'text') return it;
+    const wu = 0.27 * it.s.length;
+    return r / 2 + wu <= r - 0.5 && Math.hypot(r / 2 + wu, 1.52) <= r - 0.6 ? { ...it, y: it.y > 0 ? 1 : -1 } : { ...it, x: (it.term === 'r' ? 1 : -1) * (r + 0.65 + wu), y: 0 };
+  });
+  const KERB = '#8c7f63';
+  const LOOKS = {
+    pool: {
+      title: 'The round fountain in its court, with the Last Tile at the centre',
+      under: r => [
+        ring(0, r + 0.5, { color: STONE, edge: KERB, alpha: 0.3, w: 2 }), ...spokes(r + 0.05, r + 0.5, 24, { color: KERB, alpha: 1, w: 1.5 }),
+        ...pad(r >= 2.5 ? [-1, 1].map(n => ({ type: 'icon', name: 'wave', x: -0.45 * r * n, y: 0.45 * r * n, size: Math.min(24, r * 10), color: '#2f7c9c' })) : [], 2),
+        rr(-0.45, -0.45, 0.45, 0.45, 2, { color: GOLD, edge: GOLD_EDGE, alpha: 0.9, w: 1.5 }),
       ],
     },
-  });
+    rug: {
+      title: 'A round carpet on the guild hall floor',
+      under: r => [
+        wash(-9, -9, 9, 9, WOOD, 0.1), ring(0, Math.max(0.5, r - 0.3), { color: PLUM, edge: PLUM, alpha: 0.12, dash: '3 4', w: 2 }),
+        ...spokes(r - 0.3, r + 0.25, 40, { color: PLUM, alpha: 1, w: 1.5 }), ...spokes(r + 0.1, r + 0.25, 40, { color: GOLD_EDGE, alpha: 1, w: 3 }),
+      ],
+    },
+    path: {
+      title: 'The ring path round the fountain court',
+      under: r => [ring(0, r, { color: STONE, edge: STONE, alpha: 0.05, w: 12 }), ...spokes(r - 0.28, r + 0.28, 60, { color: KERB, alpha: 1, w: 1.5 })],
+    },
+  };
+  const circle = (step, liveLine, look = 'pool', storyLine) => {
+    const plain = {
+      id: 'circle', title: 'A circle with its radius and diameter marked',
+      params: { r: { min: 1, max: 8, step, value: 3, label: 'radius r' } },
+      terms: ['d', 'C', 'A'],
+      derived: ({ r }) => ({ d: 2 * r, C: +(2 * Math.PI * r).toFixed(2), A: +(Math.PI * r * r).toFixed(2) }),
+      formula: '\\begin{aligned}\\term{d}{d} &= 2\\times\\term{r}{r}\\\\ \\term{C}{C} &= 2\\times\\pi\\times\\term{r}{r}\\\\ \\term{A}{A} &= \\pi\\times\\term{r}{r}\\times\\term{r}{r}\\end{aligned}',
+      live: liveLine || (({ params: { r }, derived: d }) => `r = ${r}, d = ${d.d}.   C = 2 × π × ${r} ≈ ${num(d.C)}.   A = π × ${r} × ${r} ≈ ${num(d.A)}.`),
+      draw: {
+        kind: '2d', view: [-9, 9, -9, 9], box: [400, 400],
+        items: ({ params: { r } }) => [
+          ring(0, r, { term: 'A' }),
+          { type: 'polygon', term: 'd', pts: [[-r, 0], [r, 0]] },
+          { type: 'vector', term: 'r', from: [0, 0], to: [r, 0] },
+          { type: 'text', x: r / 2, y: 0.8, s: `r = ${r}`, term: 'r' },
+          { type: 'text', x: -r / 2, y: -0.8, s: `d = ${2 * r}`, term: 'd' },
+          { type: 'point', x: 0, y: 0 },
+          { type: 'point', x: r, y: 0, term: 'r', drag: { x: 'r', stepX: step }, label: 'radius r' },
+        ],
+      },
+    };
+    const { title, under } = LOOKS[look];
+    plain.story = dressed(plain, title, storyLine || (({ params: { r }, derived: d }) => `The fountain: r = ${r}, d = ${d.d}.   Round the rim, C = 2 × π × ${r} ≈ ${num(d.C)}.   The water covers A = π × ${r} × ${r} ≈ ${num(d.A)}.`),
+      (items, { params: { r } }) => [wash(-9, -9, 9, 9, STONE, 0.07), ...under(r), ...circleLabels(items, r)]);
+    return plain;
+  };
 
   // The table is measured across (its diameter), so the radius is not shown: halving it is the learner's step.
   const tableTop = {
@@ -270,6 +362,101 @@
     },
   };
 
+  tableTop.story = dressed(tableTop, 'A round table top in the guild hall',
+    ({ params: { d } }) => `The table top is d = ${d} across.`,
+    (items, { params: { d } }) => [
+      wash(-1, -8.5, 17, 8.5, STONE, 0.07), ring(d / 2, d / 2 + 0.4, { color: WOOD, edge: WOOD, alpha: 0.12, w: 1 }),
+      ...pad([0.72, -0.72, 0.42, -0.42].filter(f => Math.abs(f) > 0.5 || d >= 10).map(f => { const y = f * d / 2, hw = 0.94 * Math.sqrt((d / 2) ** 2 - y * y); return seg([d / 2 - hw, y], [d / 2 + hw, y], { color: WOOD, alpha: 1, w: 1 }); }), 4),
+      ...items.map(it => {
+        if (it.type === 'polygon') return !it.term && it.pts.length > 2 ? { ...it, color: WOOD, edge: '#6f4a24', alpha: 0.3, w: 4 } : it;
+        return it.type === 'text' && Math.sqrt(Math.max(0, (d / 2) ** 2 - 1.96)) < 0.1225 * it.s.length + 0.3 ? { ...it, y: -d / 2 - 1.05 } : it;
+      }),
+    ]);
+
+  // `room`: units a label needs between the lines around it. A narrower wedge moves it under the baseline (`floor`) or past its edge (`dir` 1: `to`, -1: `from`).
+  // Returns the label, and a leader line from the wedge when the label sits outside it.
+  const fitTag = (from, to, { base, rmax, room, floor }, s, term, dir) => {
+    const half = rad((to - from) / 2), need = room / (2 * Math.sin(Math.min(half, Math.PI / 2)));
+    if (Math.max(base, need) <= rmax) return [tag(0, 0, from, to, Math.max(base, need), s, term)];
+    const step = Math.asin(room / 2 / rmax) * 180 / Math.PI, d = rad(dir > 0 ? to + step : from - step);
+    const out = floor && (from === 0 || to === 180) ? [from === 0 ? floor : -floor, -0.5] : [rmax * Math.cos(d), rmax * Math.sin(d)];
+    const start = at((from + to) / 2, 1.5), len = Math.hypot(out[0] - start[0], out[1] - start[1]), end = [out[0] - (out[0] - start[0]) * 0.85 / len, out[1] - (out[1] - start[1]) * 0.85 / len];
+    return [seg(start, end, { term, w: 2 }), { type: 'text', x: out[0], y: out[1], s, term }];
+  };
+  const noText = items => items.filter(it => it.type !== 'text');
+  const rimPanes = (r0, r1, n, from, to) => Array.from({ length: n }, (_, i) => {
+    const a0 = from + (to - from) * i / n, a1 = from + (to - from) * (i + 1) / n;
+    return poly([...arc(0, 0, r1, a0, a1).filter((_, j) => j % 10 === 0 || j === 60), ...arc(0, 0, r0, a1, a0).filter((_, j) => j % 10 === 0 || j === 60)], { color: [GOLD, GLASS, PLUM][i % 3], edge: LEAD, alpha: 0.3, w: 1.5 });
+  });
+  const fanTags = { base: 2.1, rmax: 3.7, room: 1.5, floor: 3.2 };
+  const fan = (items, tags) => [
+    wash(-5.5, -1, 5.5, 0, STONE, 0.2), poly(arc(0, 0, 5.2, 0, 180), { color: GLASS, edge: WOOD, alpha: 0.13, w: 4 }),
+    ...rimPanes(4.65, 5.2, 12, 0, 180),
+    ...noText(items), ...tags.flat(),
+  ];
+
+  rays.story = dressed(rays, 'The fan window: glass split by two bars into three wedges',
+    ({ derived: d }) => `The fan window: ${d.a}° + ${d.b}° + ${d.c}° = ${d['a + b + c']}°`,
+    (items, { params }) => {
+      const { lo, hi, a, b, c } = split(params);
+      return fan(items, [fitTag(0, lo, fanTags, `${a}°`, 'a', 1), ...(b ? [fitTag(lo, hi, fanTags, `${b}°`, 'b', a > c ? -1 : 1)] : []), fitTag(hi, 180, fanTags, `${c}°`, 'c', -1)]);
+    });
+
+  lineRay.story = dressed(lineRay, 'The fan window: glass split by one bar into two wedges',
+    ({ derived: d }) => `The fan window: ${d.a}° + x = 180°`,
+    (items, { params: { r } }) => fan(items, [fitTag(0, r, fanTags, `${r}°`, 'a', 1), fitTag(r, 180, fanTags, 'x', 'x', -1)]));
+
+  pointRays.story = dressed(pointRays, 'The rose window: four panes of glass round one hub',
+    ({ derived: d }) => `The rose window: ${d.a}° + ${d.b}° + ${d.c}° + x = 360°`,
+    (items, { params }) => {
+      const { cuts } = around(params), names = ['a', 'b', 'c', 'x'], w = names.map((_, i) => cuts[i + 1] - cuts[i]), open = w.map((v, i) => i).filter(i => w[i] > 0);
+      const tags = open.map((i, n) => fitTag(cuts[i], cuts[i + 1], { base: 2.7, rmax: 3.9, room: 1.6 }, i === 3 ? 'x' : `${w[i]}°`, names[i], w[open[(n + 1) % open.length]] >= w[open[(n + open.length - 1) % open.length]] ? 1 : -1));
+      return [
+        poly(arc(0, 0, 5.2, 0, 360), { color: GLASS, edge: WOOD, alpha: 0.13, w: 4 }), ...rimPanes(4.75, 5.2, 24, 0, 360), disc(0, 0, 10, { color: GOLD, edge: GOLD_EDGE, alpha: 1, w: 2 }), ...noText(items), ...tags.flat(),
+      ];
+    });
+
+  // The plain corner labels collide on a narrow triangle and cross the base on a flat one.
+  triangle.story = dressed(triangle, 'Bram\'s glass triangle on his cutting bench',
+    ({ params: { a, b } }) => `Bram's pane: ${a}° + ${b}° + x = 180°`,
+    (items, { params }) => {
+      const { a, b } = params, { s, L, R: Rt, T } = triangleAt(params), r = Math.min(1.2, 0.25 * s);
+      const at2 = (c, from, to, len) => { const d = rad((from + to) / 2), n = Math.max(r + 0.6, (0.3 * len + 0.35) / (2 * Math.sin(Math.min(rad((to - from) / 2), Math.PI / 2)))); return [c[0] + n * Math.cos(d), c[1] + n * Math.sin(d)]; };
+      const [lx, ly] = at2(L, 0, a, 3), [rx, ry] = at2(Rt, 180 - b, 180, 3), [tx, ty] = at2(T, 180 + a, 360 - b, 1), crowd = rx - lx < 1.4;
+      return [
+        wash(-5.5, -1.5, 5.5, 0, WOOD, 0.15), seg([-5.5, 0], [5.5, 0], { color: WOOD, alpha: 1, w: 3 }),
+        poly([L, Rt, T], { color: GLASS, edge: '#8fcbe0', alpha: 0.22, w: 8 }), poly([L, Rt, T], { color: GLASS, edge: '#2f7c9c', alpha: 0.01, w: 2 }),
+        { type: 'icon', name: 'cutter', x: 4.3, y: -0.78, size: 46, color: IRON },
+        sector(...L, 0, a, r, 'a'), sector(...Rt, 180 - b, 180, r, 'b'), sector(...T, 180 + a, 360 - b, r, 'x'),
+        { type: 'text', x: crowd ? L[0] - 0.8 : lx, y: crowd ? 0.6 : ly, s: `${a}°`, term: 'a' }, { type: 'text', x: crowd ? Rt[0] + 0.8 : rx, y: crowd ? 0.6 : ry, s: `${b}°`, term: 'b' },
+        ty > 0.75 ? { type: 'text', x: tx, y: ty, s: 'x', term: 'x' } : { type: 'text', x: T[0], y: T[1] + 0.8, s: 'x', term: 'x' },
+      ];
+    });
+
+  const nippers = k => {
+    // Local width w is positive on the outer side; the inner edge is the cutting bevel.
+    const jaw = (d, o) => { const e = (r, w) => [r * Math.cos(rad(d)) - o * w * Math.sin(rad(d)), r * Math.sin(rad(d)) + o * w * Math.cos(rad(d))]; return poly([[0.4, 0.3], [3.4, 0.3], [4.2, 0.62], [5.2, 0.5], [5.2, -0.05], [4.4, -0.32], [0.4, -0.3]].map(q => e(...q)), { color: STEEL, edge: IRON, alpha: 1, w: 2 }); };
+    const grip = d => { const [x, y] = at(d, 4); return [seg([0, 0], at(d, 3), { color: STEEL, alpha: 1, w: 9 }), rr(x - 1.35, y - 0.32, x + 1.35, y + 0.32, 9, { color: WOOD, edge: '#6f4a24', alpha: 1, w: 2, rot: d })]; };
+    return [...grip(180), ...grip(k + 180), jaw(0, -1), jaw(k, 1), disc(0, 0, 14, { color: STEEL, edge: IRON, alpha: 1, w: 2 }), disc(0, 0, 8, { color: GOLD, edge: GOLD_EDGE, alpha: 1, w: 2 })];
+  };
+  crossing.story = dressed(crossing, 'Bram\'s tile nippers, opened wide',
+    ({ derived: d }) => `Bram's nippers: the two opposite angles of ${d.x}° are ${2 * d.x}° together. Aim for 76°.`,
+    (items, { params: { k } }) => {
+      const t = { base: 2.7, rmax: 4, room: 2.8 };
+      return [
+        wash(-5.5, -5.5, 5.5, 5.5, STONE, 0.07), ...nippers(k), ...noText(items).map(it => (it.type === 'polygon' && it.pts.length === 2 ? { ...it, edge: LEAD, w: 1.5 } : it)),
+        ...[fitTag(0, k, t, `${k}°`, 'x', 1), fitTag(k, 180, t, `${180 - k}°`, 'y', 1), fitTag(180, 180 + k, t, `${k}°`, 'x', 1), fitTag(180 + k, 360, t, `${180 - k}°`, 'y', 1)].flat(),
+      ];
+    });
+
+  lRoom.story = dressed(lRoom, 'The guild\'s L-shaped room, tiled, with its corner cut off',
+    ({ params: { w, h, u, v } }) => `The room starts as ${w} × ${h} tiles. The dashed corner is cut off: ${u} × ${v}.`,
+    (items, { params: { w, h, u, v } }) => [
+      wash(-3, -1, 13, 10, STONE, 0.07),
+      poly([[0, 0], [w, 0], [w, h - v], [w - u, h - v], [w - u, h], [0, h]], { color: STONE, edge: WOOD, alpha: 0.12, w: 4 }),
+      ...paving(w, h, (i, j) => i < w - u || j < h - v), ...items.map(it => (it.type === 'text' && it.term === 'cut' ? { ...it, anchor: 'end', x: w - 0.6, y: h + 0.55 } : it)),
+    ]);
+
   MQ.content = {
     track: 'geometry',
     ranks: [[0, 'Dot Joiner'], [40, 'Shape Builder'], [100, 'Angle Ace'], [200, 'Right-Angle Pro'], [300, 'Geometer']],
@@ -288,7 +475,7 @@
             'Adding the sides all the way round, <code>12 + 7 + 12 + 7</code>, gives 38. That is the perimeter, the length of the edge, which measures something else.',
           ],
           explain: 'The scene shows this floor, 12 by 7: count the 7 rows of 12 squares. Drag the top right corner to try other floors.',
-          hint: 'How many rows of tiles are there, and how many tiles are in each row?', scene: shapesWith(given), reveal: true, at: { b: 12, h: 7 },
+          hint: 'How many rows of tiles are there, and how many tiles are in each row?', scene: shapesWith(given, floorGiven), reveal: true, at: { b: 12, h: 7 },
           answer: '84', wrong: '38', lazy: '12*7', check: finalNumber(84) },
         { title: 'Half a rectangle', kind: 'number', question: '1/2*10*9', tex: 'A = \\tfrac{1}{2} \\times b \\times h \\;\\text{ with }\\; b = 10,\\ h = 9',
           goal: 'A triangle has a base of 10 and a height of 9. Work out its area <code>A = ½ × b × h</code>, where <code>½</code> means one half.',
@@ -299,7 +486,7 @@
             'Half of 90 is 45, the area of the triangle. Forgetting the <code>½</code> gives 90, the whole rectangle.',
           ],
           explain: 'The height of a triangle goes straight up from the base to the top corner, not along a sloping side. In the scene, slide the top corner of the triangle along: the base and height stay the same, and so does the area.',
-          hint: 'First find the rectangle, <code>10 × 9</code>. The triangle is half of it.', scene: shapesWith(given), reveal: true, at: { b: 10, h: 9 },
+          hint: 'First find the rectangle, <code>10 × 9</code>. The triangle is half of it.', scene: shapesWith(given, floorGiven), reveal: true, at: { b: 10, h: 9 },
           answer: '45', wrong: '90', lazy: '1/2*10*9', check: finalNumber(45) },
         { title: 'An L-shaped room', kind: 'number', question: '10*8-4*3', tex: '\\text{a } 10 \\times 8 \\text{ rectangle with a } 4 \\times 3 \\text{ corner cut off}',
           goal: 'A room is shaped like an L: a rectangle 10 wide and 8 tall with a 4 by 3 corner cut off at the top right. Work out its area. The scene shows the room: the whole rectangle, with the cut corner in a second colour.',
@@ -321,7 +508,7 @@
             'Check it: <code>9 × 6</code> is 54, so the height is 6. Taking away, <code>54 − 9</code>, gives 45, which does not fit.',
           ],
           explain: 'This is how a builder finds a missing length: if you know the area and one side, divide the area by that side.',
-          hint: 'Which number times 9 gives 54?', scene: shapesWith(({ params: { b, h } }) => `Base ${b}, height ${h}: area ${b * h}. The area you need is 54.`), at: { b: 9, h: 3 },
+          hint: 'Which number times 9 gives 54?', scene: shapesWith(({ params: { b, h } }) => `Base ${b}, height ${h}: area ${b * h}. The area you need is 54.`, ({ params: { b, h } }) => `The floor: base ${b}, height ${h}: ${b * h} tiles. The area you need is 54 tiles.`), at: { b: 9, h: 3 },
           answer: '6', wrong: '45', lazy: '54/9', check: finalNumber(6) },
         { title: 'Area 24, perimeter 20', kind: 'scene',
           goal: 'Drag the top right corner of the rectangle until its area is 24 squares and its perimeter is 20.',
@@ -482,7 +669,7 @@
             'Leaving out the 2 gives 15.7, which is only half of the way round.',
           ],
           explain: 'The scene opens on this fountain, radius 5: read <code>C</code> in the live line. Double the radius and the circumference doubles too.',
-          hint: 'Two times pi times the radius. Type pi as <code>pi</code>.', scene: circle(0.5, radiusOnly), reveal: true, at: { r: 5 },
+          hint: 'Two times pi times the radius. Type pi as <code>pi</code>.', scene: circle(0.5, radiusOnly, 'pool', ({ params: { r }, derived: d }) => `The fountain's radius is r = ${r}, so its diameter is d = ${d.d}.`), reveal: true, at: { r: 5 },
           answer: '31.4', wrong: '15.7', lazy: '2*pi*5', check: finalRounded('2*pi*5', 1) },
         { title: 'Covering a circle', kind: 'number', round: 1, question: 'pi*3^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = 3',
           goal: 'A round carpet has a radius of 3. How much floor does it cover? Work out the area <code>A = π × r²</code>, rounded to 1 decimal place.',
@@ -493,7 +680,7 @@
             'Mixing it up with the circumference, <code>2 × π × 3</code>, gives 18.8, a length, not an area.',
           ],
           explain: 'Area counts squares, so the radius is multiplied by itself. Double the radius and the area gets four times as big.',
-          hint: 'Square the radius first, then multiply by pi.', scene: circle(0.5, radiusOnly), reveal: true,
+          hint: 'Square the radius first, then multiply by pi.', scene: circle(0.5, radiusOnly, 'rug', ({ params: { r }, derived: d }) => `The carpet's radius is r = ${r}, so its diameter is d = ${d.d}.`), reveal: true,
           answer: '28.3', wrong: '18.8', lazy: 'pi*3^2', check: finalRounded('pi*3^2', 1) },
         { title: 'From the diameter', kind: 'number', round: 1, question: 'pi*(14/2)^2', tex: 'A = \\pi \\times r^2 \\;\\text{ with }\\; r = \\tfrac{14}{2}',
           goal: 'A round table is 14 wide all the way across, its diameter. What is the area of its top, rounded to 1 decimal place?',
@@ -515,7 +702,7 @@
             'Dividing by 2 alone, <code>30 ÷ 2 = 15</code>, forgets π.',
           ],
           explain: 'Check it by putting your radius back in: <code>2 × π × r</code> should come out close to 30. A small gap is from rounding.',
-          hint: 'Divide the circumference by <code>2 × π</code>.', scene: circle(0.1, ({ params: { r }, derived: d }) => `r = ${r}, C = 2 × π × ${r} ≈ ${num(d.C)}. The length you need is 30.`),
+          hint: 'Divide the circumference by <code>2 × π</code>.', scene: circle(0.1, ({ params: { r }, derived: d }) => `r = ${r}, C = 2 × π × ${r} ≈ ${num(d.C)}. The length you need is 30.`, 'path', ({ params: { r }, derived: d }) => `The ring path: r = ${r}, C = 2 × π × ${r} ≈ ${num(d.C)}. The path you need is 30 long.`),
           answer: '4.8', wrong: '15.0', lazy: '30/(2*pi)', check: finalRounded('30/(2*pi)', 1) },
         { title: 'Area of about 78', kind: 'scene',
           goal: 'Drag the radius tip until the area is between 75 and 80.',

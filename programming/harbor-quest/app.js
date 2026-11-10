@@ -1330,7 +1330,7 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;const el=$('#mis
     ${last?`<p class="note">Next: play Quick-fire until the commands come from memory, solve the puzzles, then install Docker for real. The field guide shows how.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button></div>`}${picH(false)}${dotsH}`}
   else{const m=ch.missions[S.mi];const mk=S.ch+'.'+S.mi,done=S.done[mk],cur=curOf(m,mk),st=m.steps;
-    h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${st&&!done?` · ${stepsDone(mk).length} of ${st.length} steps done`:''}${done?' · done':''}</div><h2>${esc(m.t)}</h2><p class="intro">${m.i}</p>
+    h=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${st&&!done?` · ${stepsDone(mk).length} of ${st.length} steps done`:''}${done?' · done':''}</div><h2>${esc(m.t)}</h2><p class="intro">${m.i}</p>
     <div class="goal"><div class="label">Your move</div><p>${m.g}</p>${st?stepList(m,mk,!!done):''}</div>${cur.a?anatomy(cur.a):''}${HowSteps.html(m.how)}
     <div class="actions"><button class="btn ghost" data-act="hint">${hintOpen?'Hide hint':'Hint'}</button><button class="btn ghost" data-act="show">Fill it in for me</button>${done?`<button class="btn ghost" data-act="skip">Next mission</button>`:''}</div>
     ${hintOpen?`<p class="hint">${esc(cur.h)}</p>`:''}${picH(S.mi===0)}${dotsH}`}

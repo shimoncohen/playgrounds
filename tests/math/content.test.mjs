@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadMath } from './harness.mjs';
 
-const BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'input/mathjs-setup.js', 'input/check.js'];
+const BASE = ['../math/vendor/mathjs/math.js', 'rng.js', 'graph.js', 'scene/palette.js', 'scene/model.js', 'scene/svg2d.js', 'input/mathjs-setup.js', 'input/check.js'];
 const plain = x => JSON.parse(JSON.stringify(x));
 const TRACKS = ['arithmetic', 'algebra', 'geometry', 'trigonometry'];
 
@@ -30,6 +30,54 @@ for (const track of TRACKS) {
     }
   });
 
+  test(`${track}: every story picture is a 2D drawing over a 2D scene and only uses built-in icons`, () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.story);
+    for (const sc of scenes) {
+      assert.ok(sc.story.title && typeof sc.story.live === 'function', `${sc.id}: story needs a title and a live line`);
+      assert.equal(sc.draw.kind, '2d', `${sc.id}: story needs a 2D scene`);
+      assert.equal(sc.story.draw.kind, '2d', `${sc.id}: story draw`);
+      assert.equal(typeof sc.story.draw.items, 'function', `${sc.id}: story draw has no items function`);
+      const st = MQ.scene.model(sc).state();
+      for (const it of sc.story.draw.items(st)) if (it.type === 'icon') assert.ok(MQ.svg2d.icons[it.name], `${sc.id}: unknown icon ${it.name}`);
+      for (const it of sc.story.draw.items(st)) {
+        assert.ok(['axes', 'grid', 'fn', 'polygon', 'text', 'vector', 'point', 'icon', 'rrect', 'circle'].includes(it.type), `${sc.id}: unknown item ${it.type}`);
+        const nums = it.type === 'rrect' ? [it.x0, it.y0, it.x1, it.y1, it.r] : it.type === 'circle' ? [it.x, it.y, it.r] : [];
+        if (it.rot !== undefined) assert.ok(['rrect', 'icon'].includes(it.type) && Number.isFinite(it.rot), `${sc.id}: rot is a number on an rrect or icon`);
+        if (it.type === 'icon') assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y) && (it.size === undefined || it.size > 0), `${sc.id}: icon needs a position and a positive size`);
+        for (const v of nums) assert.ok(Number.isFinite(v), `${sc.id}: ${it.type} needs finite numbers`);
+        if (it.type === 'rrect') assert.ok(it.x1 > it.x0 && it.y1 > it.y0, `${sc.id}: rrect needs a positive size`);
+      }
+      for (const it of sc.story.draw.items(st)) if (it.alpha !== undefined) assert.ok(it.alpha > 0 && it.alpha <= 1, `${sc.id}: alpha ${it.alpha}`);
+    }
+  });
+
+  if (track === 'arithmetic') test('arithmetic: every 2D scene has a story picture', () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.draw.kind === '2d');
+    for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+  });
+
+  const ALGEBRA_PLAIN = { parabola: 'an upward-opening curve that can sit anywhere has no world object yet (#186)' };
+  if (track === 'algebra') test('algebra: every 2D scene has a story picture', () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.draw.kind === '2d');
+    for (const sc of scenes) assert.ok(sc.story || ALGEBRA_PLAIN[sc.id], `${sc.id} has no story picture`);
+    for (const id of Object.keys(ALGEBRA_PLAIN)) assert.ok(scenes.some(sc => sc.id === id && !sc.story), `${id} has a story picture now: remove it from ALGEBRA_PLAIN`);
+  });
+
+  test(`${track}: a story picture keeps the plain picture's x-range, vectors and points where they are`, () => {
+    const corners = sc => Object.keys(sc.params).reduce((acc, n) => acc.flatMap(p => [...new Set([sc.params[n].min, sc.params[n].value, sc.params[n].max])].map(v => ({ ...p, [n]: v }))), [{}]);
+    const key = it => JSON.stringify(it.type === 'vector' ? [it.type, it.from, it.to, it.term] : [it.type, it.x, it.y, it.term]);
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.story);
+    for (const sc of scenes) {
+      assert.deepEqual(plain(sc.story.draw.view.slice(0, 2)), plain(sc.draw.view.slice(0, 2)), `${sc.id}: x-range differs`);
+      for (const params of corners(sc)) {
+        const m = MQ.scene.model(sc);
+        for (const [k, v] of Object.entries(params)) m.set(k, v);
+        const st = m.state(), inStory = new Set(sc.story.draw.items(st).map(key));
+        for (const it of sc.draw.items(st)) if (it.type === 'vector' || it.type === 'point') assert.ok(inStory.has(key(it)), `${sc.id} ${JSON.stringify(params)}: story lacks ${key(it)}`);
+      }
+    }
+  });
+
   C.chapters.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
     const id = `${track} ${ci}.${mi} ${m.title}`;
     test(`${id}: answer passes, wrong and lazy fail`, () => {
@@ -53,6 +101,12 @@ for (const track of TRACKS) {
       if (def.t) model.set('t', def.t.max);
       const st = model.state(), drawn = def.draw.kind === '2d' ? def.draw.items(st).filter(i => i.type === 'text').map(i => i.s) : [];
       const text = [model.live(), model.describe(), ...drawn].join(' | ').replace(/−/g, '-');
+      assert.doesNotMatch(text, new RegExp(`(?<![\\d.])${ans[1].replace('.', '\\.')}(?![\\d.])`), `${id}: ${text}`);
+    });
+    const sc = m.scene || ch.scene;
+    if (m.kind !== 'scene' && ans && sc.story) test(`${id}: the unsolved story picture does not show the answer ${ans[1]}`, () => {
+      const def = MQ.scene.forMission(ch, m, false, false), model = MQ.scene.model(def), st = model.state();
+      const text = [def.story.live(st), ...def.story.draw.items(st).filter(i => i.type === 'text' && !/^[−\d]+°$/.test(i.s)).map(i => i.s)].join(' | ').replace(/−/g, '-');
       assert.doesNotMatch(text, new RegExp(`(?<![\\d.])${ans[1].replace('.', '\\.')}(?![\\d.])`), `${id}: ${text}`);
     });
     if (m.kind !== 'scene') test(`${id}: the explanation, shown before solving, does not state the answer`, () => {
@@ -308,5 +362,32 @@ test('algebra: an unsolved quadratic shows the curve without its crossing dots o
     assert.equal(before.filter(i => i.type === 'point').length, 0, m.title);
     assert.equal(before.find(i => i.type === 'axes').xTicks, false, m.title);
     assert.ok(after.some(i => i.type === 'point') && after.find(i => i.type === 'axes').xTicks !== false, m.title);
+  }
+});
+
+test('geometry: every 2D Geometry scene has a story picture, reveal scenes included', () => {
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  const scenes = MQ.content.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.draw.kind === '2d');
+  assert.ok(scenes.length >= 20);
+  for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+});
+
+test('trigonometry: every 2D scene has a story picture', () => {
+  const C = loadMath([...BASE, 'trigonometry/content.js']).content;
+  const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.draw.kind === '2d');
+  assert.ok(scenes.length >= 5);
+  for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+});
+
+test('geometry: a story picture adds a fixed number of items before the first draggable point', () => {
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  const scenes = MQ.content.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.story);
+  const first = items => items.findIndex(it => it.type === 'point' && it.drag);
+  for (const sc of scenes) {
+    const m = MQ.scene.model(sc), extra = () => first(sc.story.draw.items(m.state())) - first(sc.draw.items(m.state())), base = extra();
+    for (const [k, p] of Object.entries(sc.params)) for (const v of [p.min, p.max]) {
+      m.set(k, v);
+      assert.equal(extra(), base, `${sc.id}: a changing item count before a draggable point drops its focus (${k}=${v})`);
+    }
   }
 });

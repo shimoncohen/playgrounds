@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { CHAPTERS } from './trophy/chapters.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
@@ -1113,19 +1114,63 @@ test('math-arithmetic: each mission opens its picture on its own numbers', async
   await go(0, 0);
   assert.match(await live(), /Step 0: {2}6 \+ 4 × 3 {3}and {3}\(6 \+ 4\) × 3/);
   await go(0, 1);
-  assert.match(await live(), /12 cut into 2 equal parts, then 3 of those parts/);
+  assert.match(await live(), /12 coins cut into 2 equal piles, then 3 of those piles/);
   await go(0, 4);
   assert.match(await live(), /Step 0: {2}2 \+ 3 × 4/, 'a scene mission keeps the chapter picture');
   await go(1, 1);
-  assert.match(await live(), /\(−4\) × \(−2\): 4 across, 2 up/);
+  assert.match(await live(), /\(−4\) × \(−2\) coins: 4 across, 2 up/);
   await go(2, 1);
-  assert.match(await live(), /2\/3 × 4\/5: 2 of 3 columns and 4 of 5 rows/);
+  assert.match(await live(), /2\/3 × 4\/5 of the baker's tray: 2 of 3 columns and 4 of 5 rows/);
   await go(3, 0);
   assert.match(await live(), /2³: 3 copies of 2 multiplied/);
   await go(4, 3);
-  assert.match(await live(), /40 grown by 25%/);
+  assert.match(await live(), /jacket costs 40 coins, grown by 25%/);
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+test('math-arithmetic: the cold-cellar story picture follows the Story setting in place and keeps the sliders', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: 1, mi: 0, done: {}, badges: {} })));
+  await page.reload();
+  await page.waitForSelector('#scene .mq-live');
+  const live = () => page.textContent('#scene .mq-live'), label = () => page.getAttribute('#scene svg', 'aria-label');
+  const icons = () => page.locator('#scene svg .icon').count();
+  assert.match(await live(), /^At dusk the cellar thermometer reads −3°\. Overnight it changes by −5°/);
+  assert.equal(await label(), 'The cold cellar thermometer');
+  assert.equal(await icons(), 1, 'the dawn mark');
+  await page.fill('#scene input[type=number][aria-label="a value"]', '1');
+  await page.dispatchEvent('#scene input[type=number][aria-label="a value"]', 'input');
+  assert.match(await live(), /reads 1°/);
+  await page.click('.story-toggle');
+  assert.match(await live(), /^Start at 0, move 1, then move −5/);
+  assert.equal(await label(), 'Two arrows along the number line');
+  assert.equal(await icons(), 0);
+  assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1', 'the slider keeps its value');
+  assert.equal(await page.locator('#feedback .msg').count(), 0, 'swapping fires no check');
+  await page.click('.story-toggle');
+  assert.match(await live(), /reads 1°/);
+  assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: a scene mission on a story picture still completes, with Story On and Off', async () => {
+  for (const mode of ['on', 'off']) {
+    const { ctx, page, errors } = await open(`${base}/math/arithmetic/`, {}, c => c.addInitScript(m => {
+      localStorage.setItem('playgrounds-story', m);
+      if (!localStorage.getItem('math-arithmetic-v1')) localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: 1, mi: 4, done: {}, badges: {} }));
+    }, mode));
+    await page.waitForSelector('#scene .mq-live');
+    assert.equal(await page.locator('#scene svg .icon').count() > 0, mode === 'on');
+    for (const [n, v] of [['a', '-3'], ['b', '-4']]) {
+      await page.fill(`#scene input[type=number][aria-label="${n} value"]`, v);
+      await page.dispatchEvent(`#scene input[type=number][aria-label="${n} value"]`, 'input');
+    }
+    await page.waitForSelector('#feedback .msg.win');
+    assert.deepEqual(errors, [], mode);
+    await ctx.close();
+  }
 });
 
 test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
@@ -1133,26 +1178,26 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   const live = () => page.textContent('#scene .mq-live');
   await page.waitForSelector('#scene .mq-live');
   assert.ok((await page.$$('#scene .grid line')).length > 10, 'the area scene has a grid');
-  assert.equal(await live(), 'Base b = 12, height h = 7.', 'the first mission opens on its own 12 by 7 floor, without the area it asks for');
+  assert.equal(await live(), 'The floor: base b = 12 tiles, height h = 7 tiles.', 'the first mission opens on its own 12 by 7 floor, without the area it asks for');
   const corner = '#scene circle.drag[aria-label="top right corner of the rectangle"]';
   await page.focus(corner);
   await page.keyboard.press('ArrowLeft');
-  assert.equal(await live(), 'Base b = 11, height h = 7.');
+  assert.equal(await live(), 'The floor: base b = 11 tiles, height h = 7 tiles.');
   await page.keyboard.press('ArrowDown');
-  assert.equal(await live(), 'Base b = 11, height h = 6.');
+  assert.equal(await live(), 'The floor: base b = 11 tiles, height h = 6 tiles.');
   assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), 'top right corner of the rectangle', 'focus survives the redraw');
   await page.click('#mission .dot[data-mi="2"]');
   await page.waitForFunction(() => /10 × 8/.test(document.querySelector('#scene .mq-live').textContent));
-  assert.equal(await live(), 'Whole rectangle 10 × 8. Dashed corner cut off: 4 × 3.', 'the L-shaped room has its own picture');
+  assert.equal(await live(), 'The room starts as 10 × 8 tiles. The dashed corner is cut off: 4 × 3.', 'the L-shaped room has its own picture');
 
   await page.goto(`${base}/math/geometry/#ch=geometry.angles`);
   await page.click('#mission .dot[data-mi="4"]');
   await page.waitForSelector('#work', { state: 'hidden' });
-  assert.equal(await live(), '40° + 70° + 70° = 180°');
+  assert.equal(await live(), 'The fan window: 40° + 70° + 70° = 180°');
   const first = '#scene circle.drag[aria-label="first ray"]', second = '#scene circle.drag[aria-label="second ray"]';
   await page.focus(first);
   await page.keyboard.press('ArrowLeft');
-  assert.equal(await live(), '50° + 60° + 70° = 180°');
+  assert.equal(await live(), 'The fan window: 50° + 60° + 70° = 180°');
   assert.equal(await page.getAttribute(first, 'aria-valuetext'), '50°');
   const box = await page.locator('#scene svg').boundingBox(), dot = await page.locator(first).boundingBox();
   const screen = (x, y) => [box.x + (x + 5.5) / 11 * box.width, box.y + (5.5 - y) / 6.5 * box.height];
@@ -1160,10 +1205,10 @@ test('math-geometry: scene points move with the arrow keys and a pointer, and th
   await page.mouse.down();
   await page.mouse.move(...screen(4 * Math.cos(Math.PI / 3), 4 * Math.sin(Math.PI / 3)), { steps: 5 });
   await page.mouse.up();
-  assert.equal(await live(), '60° + 50° + 70° = 180°');
+  assert.equal(await live(), 'The fan window: 60° + 50° + 70° = 180°');
   await page.focus(second);
   await page.keyboard.press('ArrowLeft');
-  assert.equal(await live(), '60° + 60° + 60° = 180°');
+  assert.equal(await live(), 'The fan window: 60° + 60° + 60° = 180°');
   await page.waitForSelector('#feedback .msg.win');
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -1173,15 +1218,15 @@ test('math-geometry: each angle mission opens on its own picture and numbers', a
   const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.angles`);
   const live = () => page.textContent('#scene .mq-live');
   await page.waitForSelector('#scene .mq-live');
-  assert.equal(await live(), '47° + x = 180°');
-  const want = [[1, '110° + 95° + 80° + x = 360°'], [2, '58° + 71° + x = 180°'], [3, 'The two opposite angles of 60° are 120° together. Aim for 76°.']];
+  assert.equal(await live(), 'The fan window: 47° + x = 180°');
+  const want = [[1, 'The rose window: 110° + 95° + 80° + x = 360°'], [2, 'Bram\'s pane: 58° + 71° + x = 180°'], [3, 'Bram\'s nippers: the two opposite angles of 60° are 120° together. Aim for 76°.']];
   for (const [i, text] of want) {
     await page.click(`#mission .dot[data-mi="${i}"]`);
     await page.waitForFunction(t => document.querySelector('#scene .mq-live').textContent === t, text);
   }
   await page.focus('#scene circle.drag[aria-label="angle between the lines"]');
   await page.keyboard.press('ArrowLeft');
-  assert.equal(await live(), 'The two opposite angles of 61° are 122° together. Aim for 76°.');
+  assert.equal(await live(), 'Bram\'s nippers: the two opposite angles of 61° are 122° together. Aim for 76°.');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -1190,18 +1235,18 @@ test('math-geometry: Pythagoras passes a rounded mission in text mode, and a leg
   const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.pythagoras`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
-  assert.equal(await live(), 'a² = 9, b² = 16, c² = ?');
+  assert.equal(await live(), 'The roof beam: a² = 9, b² = 16, c² = ?');
   const leg = '#scene circle.drag[aria-label="leg a"]';
   await page.focus(leg);
   await page.keyboard.press('ArrowRight');
-  assert.equal(await live(), 'a² = 16, b² = 16, c² = ?');
+  assert.equal(await live(), 'The roof beam: a² = 16, b² = 16, c² = ?');
   await page.click('#mission .dot[data-mi="2"]');
-  await page.waitForFunction(() => /^8² \+ 5²/.test(document.querySelector('#scene .mq-live').textContent));
-  assert.equal(await live(), '8² + 5² = 64 + 25 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
+  await page.waitForFunction(() => /^The roof beam: 8² \+ 5²/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'The roof beam: 8² + 5² = 64 + 25 = 89, so c = √89 ≈ 9.43. Aim for c = 13.', 'the missing-leg mission opens on the 5 leg and the 13 to reach');
   await page.click('#mission .dot[data-mi="3"]');
   await page.waitForSelector('#work input.mq-field');
   assert.match(await page.textContent('#mission h2'), /Not a whole number/);
-  assert.equal(await live(), 'a² = 25, b² = 49, c² = ?');
+  assert.equal(await live(), 'The roof beam: a² = 25, b² = 49, c² = ?');
   await page.click('#work input.mq-field');
   await page.keyboard.type('sqrt(5^2+7^2)');
   await page.keyboard.press('Enter');
@@ -1217,15 +1262,15 @@ test('math-geometry: Circles passes a rounded mission in text mode, and the radi
   const { ctx, page, errors } = await open(`${base}/math/geometry/#ch=geometry.circles`, {}, c => c.addInitScript(() => localStorage.setItem('math-prefs-v1', '{"input":"text"}')));
   await page.waitForSelector('#work input.mq-field');
   const live = () => page.textContent('#scene .mq-live');
-  assert.equal(await live(), 'Radius r = 5, diameter d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
+  assert.equal(await live(), 'The fountain\'s radius is r = 5, so its diameter is d = 10.', 'the first mission opens on its pond, radius 5, without the circumference it asks for');
   await page.focus('#scene circle.drag[aria-label="radius r"]');
   await page.keyboard.press('ArrowRight');
-  assert.equal(await live(), 'Radius r = 5.5, diameter d = 11.');
+  assert.equal(await live(), 'The fountain\'s radius is r = 5.5, so its diameter is d = 11.');
   await page.click('#mission .dot[data-mi="2"]');
-  await page.waitForFunction(() => document.querySelector('#scene .mq-live').textContent === 'Diameter d = 14.');
+  await page.waitForFunction(() => document.querySelector('#scene .mq-live').textContent === 'The table top is d = 14 across.');
   await page.click('#mission .dot[data-mi="3"]');
-  await page.waitForFunction(() => /length you need is 30/.test(document.querySelector('#scene .mq-live').textContent));
-  assert.equal(await live(), 'r = 3, C = 2 × π × 3 ≈ 18.85. The length you need is 30.');
+  await page.waitForFunction(() => /path you need is 30 long/.test(document.querySelector('#scene .mq-live').textContent));
+  assert.equal(await live(), 'The ring path: r = 3, C = 2 × π × 3 ≈ 18.85. The path you need is 30 long.');
   await page.click('#mission .dot[data-mi="0"]');
   await page.waitForSelector('#work input.mq-field');
   await page.click('#work input.mq-field');
@@ -1278,7 +1323,7 @@ test('math-algebra: missions open their scene on their own numbers', async () =>
   assert.match(await live(), /k = 2: 9 units do not split into 2 equal rows/);
   await page.fill('#scene input[type=range]', '3');
   assert.match(await live(), /k = 3: 6 x-pieces and 9 units both split into 3 equal rows/);
-  assert.match(await at('factoring', 2), /x = 6: 36 − 9 = 27$/);
+  assert.match(await at('factoring', 2), /x = 6 on a side, with a 3 by 3 corner fenced off: 36 − 9 = 27$/);
   assert.match(await at('factoring', 3), /25 − 10 − 10 \+ 4 = 9$/);
   assert.match(await at('quadratics', 1), /y = x² − 16: where does it meet the x-axis\?/);
   assert.match(await at('quadratics', 2), /y = x² − 3x: where does it meet the x-axis\?/);
@@ -2618,6 +2663,54 @@ test('theme button cycles auto, light, dark, remembers the choice and sets data-
     assert.deepEqual(errors, []);
     await ctx.close();
   }
+});
+
+const trailText = page => page.evaluate(() => {
+  const e = document.querySelector('.trail').cloneNode(true);
+  e.querySelector('.trail-tag').remove();
+  return e.textContent;
+});
+const plainText = html => html.replace(/<[^>]+>/g, '');
+
+test('the trail strip shows the chapter story on a later mission of every playground', async () => {
+  for (const url of PAGES) {
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
+      const { ctx, page, errors } = await open(`${base}/${url}`, { viewport });
+      const key = await page.evaluate(() => window.PROGRESS.key);
+      await page.locator('.dots .dot').nth(1).click();
+      await page.locator('.trail').waitFor({ state: 'visible' });
+      assert.equal(await page.textContent('.trail-tag'), 'The trail', url);
+      assert.equal(await trailText(page), plainText(CHAPTERS[key]()[0].story), `${url} at ${viewport.width}px`);
+      assert.equal(await overflow(page), false, `${url} at ${viewport.width}px`);
+      assert.deepEqual(errors, [], url);
+      await ctx.close();
+    }
+  }
+});
+
+test('Story button hides the trail strip, remembers the choice across reloads and playgrounds', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
+  const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-story'));
+  assert.equal(await attr(), 'on');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: On');
+  await page.locator('.dots .dot').nth(1).click();
+  assert.ok(await page.locator('.trail').isVisible());
+  await page.click('.story-toggle');
+  assert.equal(await attr(), 'off');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
+  assert.ok(await page.locator('.trail').isHidden());
+  await page.reload();
+  assert.equal(await attr(), 'off', 'choice survives a reload');
+  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
+  const other = await ctx.newPage();
+  await other.goto(`${base}/math/arithmetic/`);
+  assert.equal(await other.evaluate(() => document.documentElement.getAttribute('data-story')), 'off', 'one setting for every playground');
+  await other.locator('.dots .dot').nth(1).click();
+  assert.ok(await other.locator('.trail').isHidden());
+  await other.click('.story-toggle');
+  assert.ok(await other.locator('.trail').isVisible());
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 test('ds-quest field guide: each explainer runs its operations and examples draw a picture', async () => {
