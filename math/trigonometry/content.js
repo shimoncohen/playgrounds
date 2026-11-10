@@ -10,9 +10,16 @@
   const r1 = v => +v.toFixed(1), r2 = v => v.toFixed(2);
   const side = (term, a, b) => ({ type: 'polygon', term, pts: [a, b] });
 
+  const WORLD = {
+    ramp: { title: 'Ilse\'s kite-launch ramp', name: 'The ramp', hyp: 'the ramp', adj: 'the ground it covers', opp: 'how high it climbs', ground: 'the hill', wall: '' },
+    ladder: { title: 'The ladder against the wall', name: 'The ladder', hyp: 'the ladder', adj: 'its foot to the wall', opp: 'how high it reaches', ground: 'the ladder yard', wall: 'the wall' },
+    tower: { title: 'The watchtower seen from the ground', name: 'The tower', hyp: 'your line of sight', adj: 'the ground between you and the tower', opp: 'the tower\'s height', ground: 'the foot of the tower', wall: 'the tower' },
+  };
+
   // `ask` is the side a mission asks for: it reads "?" in the picture and the live line. `byAdj` sets the triangle by its
   // adjacent side instead of the hypotenuse, for a mission that gives the distance along the ground.
-  const tri = ({ hypMax = 10, ask, byAdj } = {}) => ({
+  const tri = ({ hypMax = 10, ask, byAdj, world = byAdj ? 'tower' : 'ladder' } = {}) => {
+    const sc = {
     id: 'right-triangle', title: 'A right triangle with a draggable angle and a hypotenuse slider',
     params: {
       ang: { min: 5, max: byAdj ? 50 : 85, step: 5, value: 30, label: 'angle' },
@@ -54,7 +61,48 @@
         ];
       },
     },
-  });
+    };
+    const W = WORLD[world], sides = { opp: 'opposite', adj: 'adjacent', hyp: 'hypotenuse' };
+    const plainDraw = sc.draw;
+    sc.story = {
+      title: W.title,
+      live: s => {
+        const { ang } = s.params, d = s.derived;
+        if (!ask) return `${W.name}: ${sc.live(s)}`;
+        return `Angle ${ang}°, ${byAdj ? `adjacent ${d.adj}` : `hypotenuse ${d.hyp}`}, ${byAdj ? W.adj : W.hyp}. The ${sides[ask]} side, ${W[ask]}, is yours to find.`;
+      },
+      draw: {
+        ...plainDraw,
+        items: s => {
+          const ang = s.params.ang, hyp = byAdj ? s.params.adj / Math.cos(rad(ang)) : s.params.hyp, x = hyp * Math.cos(rad(ang)), y = hyp * Math.sin(rad(ang));
+          const [vx0, vx1, vy0, vy1] = plainDraw.view, wall = world !== 'ramp', k = hypMax / 10, flat = y < 3 * k, tight = !flat && y < 6.4 * k;
+          const scenery = [
+            { type: 'rrect', x0: vx0, y0: vy0, x1: vx1, y1: 0, r: 0, color: '#7fa650', alpha: 0.22, stroke: false },
+            { type: 'icon', name: 'sun', x: vx0 + 0.08 * (vx1 - vx0), y: vy1 - 0.1 * (vy1 - vy0), size: 26, color: '#e0a21a' },
+            { type: 'text', x: vx0 + 0.2, y: vy0 + 0.4 * k, s: W.ground, small: true, anchor: 'start' },
+            wall ? { type: 'rrect', x0: x, y0: 0, x1: vx1, y1: vy1, r: 0, color: world === 'tower' ? '#8a8f98' : '#b5654a', alpha: 0.2, stroke: false }
+              : { type: 'polygon', pts: [[0, 0], [x, 0], [x, y]], color: '#b8864b', alpha: 0.3, stroke: false },
+            ...(wall ? [{ type: 'text', x: x + 0.3, y: flat ? 3.2 * k : ang < 40 ? y * 0.4 : tight ? y + 0.9 * k : y * 0.85, s: W.wall, small: true, anchor: 'start' }] : []),
+          ];
+          const rungs = [];
+          if (world === 'ladder') for (let t = 3.4; t < hyp - 0.8; t += 1.1) {
+            const px = t * Math.cos(rad(ang)), py = t * Math.sin(rad(ang));
+            const h = Math.min(0.28, 0.8 * (x - px) / Math.sin(rad(ang)), 0.8 * py / Math.cos(rad(ang)));
+            rungs.push({ type: 'polygon', pts: [[px + h * Math.sin(rad(ang)), py - h * Math.cos(rad(ang))], [px - h * Math.sin(rad(ang)), py + h * Math.cos(rad(ang))]], edge: '#9c6b3a', w: 2 });
+          }
+          // A flat triangle crowds the plain labels together, so the hypotenuse and angle labels move clear of the sides.
+          const items = plainDraw.items(s).map(it => {
+            if (flat && it.type === 'text' && it.term === 'hyp') return { ...it, x: x / 2, y: y + 2.6 * k, anchor: 'middle' };
+            if (flat && it.type === 'text' && it.term === 'ang') return { ...it, x: -1.5 * k, y: 0.8 * k };
+            if (tight && it.type === 'text' && it.term === 'opp' && it.anchor === 'start') return { ...it, y: y * 0.85 };
+            return it.type === 'polygon' && it.term === 'hyp' ? { ...it, ...(world === 'tower' ? { dash: '6 5' } : world === 'ladder' ? { w: 4 } : {}) } : it;
+          });
+          return [...scenery, ...items, ...rungs];
+        },
+      },
+    };
+    return sc;
+  };
   const triangle = tri();
 
   const sketch = '<svg viewBox="-6 -6 212 132" width="210" role="img" aria-label="A right triangle with a 90 degree corner at the bottom right, an angle at the bottom left, and the sides marked hypotenuse, opposite and adjacent" style="display:block;margin:8px 0;max-width:100%">'
@@ -81,7 +129,7 @@
           ],
           explain: 'The scene opens on this ramp, with the opposite side as ?. Once you solve it, the scene shows the side, and sin 35° is that side divided by 10.',
           hint: 'The side you know is the hypotenuse and the side you want is the opposite. Which of S, C, T joins opp and hyp?',
-          scene: tri({ ask: 'opp' }), at: { ang: 35, hyp: 10 }, reveal: true,
+          scene: tri({ ask: 'opp', world: 'ramp' }), at: { ang: 35, hyp: 10 }, reveal: tri({ world: 'ramp' }),
           answer: '5.7', wrong: '8.2', lazy: '10*sin(35)', check: rounded('10*sin(35)', 1) },
         { title: 'Find the adjacent side', kind: 'number', round: 1, question: '12*cos(40)', tex: '\\text{adj} = \\text{hyp} \\times \\cos\\theta \\;\\text{ with }\\; \\text{hyp} = 12,\\ \\theta = 40^\\circ',
           goal: 'Kit holds a 12 long ladder that leans so that it makes an angle of <code>40°</code> with the ground. How far along the ground is its foot from the wall? That is the adjacent side. Round to 1 decimal place.',
