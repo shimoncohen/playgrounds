@@ -232,7 +232,7 @@ RQ.CH.push({
         'Chapter 10 shows how to tell it. Until then the fix is to return an owned <code>String</code>: change <code>-> &str</code> to <code>-> String</code>, so the caller becomes the owner and nothing is borrowed.',
         '<code>a.to_string()</code> and <code>b.to_string()</code> build the owned <code>String</code> in each branch. Now the answer does not depend on either input, so it can outlive both.'
       ],
-      explain:'<code>E0106</code> also appears for a function with no reference parameter at all, like <code>fn make() -> &String</code>: the reference would have nothing to point at. In every case the way out is the same for now: return the value itself, as a <code>String</code>, instead of a reference to it. Ownership moves to the caller, as it did in chapter 4.',
+      explain:'<code>E0106</code> also appears for a function with no reference parameter at all, like <code>fn make() -> &String</code>: the reference would have nothing to point at. In every case the simple way out is the same: return the value itself, as a <code>String</code>, instead of a reference to it. Ownership moves to the caller, as it did in chapter 4. Chapter 10 shows how to return a reference that does borrow from an input.',
       hint:'Change the return type to <code>String</code> and write <code>a.to_string()</code> and <code>b.to_string()</code> in the two branches.',
       harness:LONGEST_MAIN,
       starter:LONGEST('&str','    if a.len() > b.len() {\n        a\n    } else {\n        b\n    }\n'),

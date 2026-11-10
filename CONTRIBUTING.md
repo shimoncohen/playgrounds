@@ -7,7 +7,7 @@ Thanks for wanting to make learning to code a little more fun. Pull requests are
 - **Add or improve missions.** A clearer goal, a better hint, a sneakier quick-fire question.
 - **Fix a bug.** Wrong check, typo, layout glitch on a phone, console error.
 - **Extend a quest.** New chapters, new commands in Shell Quest's practice shell, new field-guide entries.
-- **Start a new playground.** Rust? SQL? Git? Regex? Open an issue first so we can agree on scope.
+- **Start a new playground.** SQL? Git? Regex? Open an issue first so we can agree on scope.
 - **Playtest.** Play a quest, then tell us where you got stuck. That is gold.
 
 Look for issues labelled `good first issue` and `mission idea`. Not sure where to start? Open an issue and ask.

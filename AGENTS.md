@@ -14,10 +14,26 @@ npm run check          # every quest folder and math/ bundle for claude.ai artif
 npm run test:engine    # Node-only engine + content tests (fast, run often)
 npm run test:browser   # Playwright smoke + golden tests (about 3 minutes)
 npm test               # both
-for f in */app.js programming/*/app.js math/*.js math/scene/*.js math/input/*.js math/*/app.js math/*/content.js programming/ds-quest/*.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs programming/rust-quest/*.js programming/rust-quest/engine/*.js programming/rust-quest/content/*.js tests/rust/*.mjs tests/math/*.mjs programming/agent-quest/*.js programming/agent-quest/engine/*.js programming/agent-quest/content/*.js tests/agent/*.mjs tests/trophy/*.mjs; do node --check "$f" || break; done
+for f in */app.js programming/*/app.js math/*.js math/scene/*.js math/input/*.js math/*/app.js math/*/content.js programming/ds-quest/*.js programming/shell-quest/*.js programming/shell-quest/engine/*.js programming/shell-quest/content/*.js shared/*.js tests/*.mjs tests/shell/*.mjs tests/ds/*.mjs programming/net-quest/*.js programming/net-quest/engine/*.js programming/net-quest/content/*.js tests/net/*.mjs tests/python/*.mjs tests/script/*.mjs tests/cpp/*.mjs tests/harbor/*.mjs programming/rust-quest/*.js programming/rust-quest/engine/*.js programming/rust-quest/content/*.js tests/rust/*.mjs tests/math/*.mjs tests/fixtures/*.js programming/agent-quest/*.js programming/agent-quest/engine/*.js programming/agent-quest/content/*.js tests/agent/*.mjs tests/trophy/*.mjs; do node --check "$f" || break; done
 ```
 
 CI runs the tests for the parts a PR changes (`tools/ci-plan.mjs`) and all of them on `main`. A PR is not ready until they all pass locally.
+
+### Rust Quest: verify against a real rustc
+
+Any corpus, mission or engine-result change needs a fresh run of `tests/rust/verify-rustc.mjs`. It checks the corpus, every mission program and every field-guide example against rustc, and writes `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js` only on 0 mismatches. Pick one route; its check command fails when the tool is missing.
+
+```
+# local rustc (install from https://rustup.rs); edition 2024 must work
+rustc --version && node tests/rust/verify-rustc.mjs
+
+# docker (install from https://docs.docker.com/engine/install/); the digest-pinned image is the default
+sh tests/rust/docker-run.sh --version && RUSTC_RUNNER="sh tests/rust/docker-run.sh" RQ_TMP=$HOME/rq-verify-tmp RQ_JOBS=4 node tests/rust/verify-rustc.mjs
+```
+
+- `RQ_JOBS` is how many programs run at once (default 1).
+- `RQ_TMP` is where the temporary program directories go. Snap-packaged docker cannot see the host `/tmp`, so point it at a directory under `$HOME` (create it first) and delete its contents afterwards.
+- `RUST_IMAGE` overrides the pinned image and must be a `@sha256:` digest. The digest used is recorded in `verified.json`.
 
 ## Hard rules
 
@@ -52,7 +68,7 @@ In `.claude/skills/`: `add-mission`, `new-playground`, `pre-pr-check` (before a 
 | Change Data Structures Quest | `programming/ds-quest/content.js` (missions, `QF`, `GUIDE`), `programming/ds-quest/demos.js` (guide explainers), `programming/ds-quest/engine.js` (runner, DOM-free), `programming/ds-quest/app.js` (UI) + `tests/ds/` |
 | Change Agent Quest (chapters 1 to 23) | `programming/agent-quest/engine/` (simulator: files, prompt grammar, context, policy; DOM-free), `programming/agent-quest/content/` (`tiers.js`, `state.js`, `model.js`, `facts.js`, `scenarios.js`, `scenarios-personal.js`, `scenarios-tune.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `programming/agent-quest/ui.js` + `editor.js` + `meter.js` + `app.js` (UI) + `tests/agent/` (keep `tests/agent/harness.mjs` `FILES` in `programming/agent-quest/index.html` script order) |
 | Change Network Quest (chapters 1 to 5) | `programming/net-quest/engine/` (simulator, shell, commands; DOM-free), `programming/net-quest/content/` (`model.js`, `ch-*.js` chapters, `extras.js` for `RANKS`/`QF`/`GUIDE`; DOM-free), `programming/net-quest/ui.js` + `inspector.js` + `app.js` (UI) + `tests/net/` (keep `tests/net/harness.mjs` `FILES` in `programming/net-quest/index.html` script order) |
-| Change Rust Quest | `programming/rust-quest/engine/` (lexer, parser, checker, interpreter; DOM-free), `programming/rust-quest/content/` (`model.js`, `ch-*.js`, `extras.js`; `verified.js` is written only by `tests/rust/verify-rustc.mjs`), `programming/rust-quest/ui.js` + `editor.js` + `memview.js` (memory view and loan gutter) + `app.js` (UI) + `tests/rust/` (keep `tests/rust/harness.mjs` `FILES` in `programming/rust-quest/index.html` script order; any corpus, mission or engine-result change needs a fresh `verify-rustc.mjs` run) |
+| Change Rust Quest (chapters 1 to 13) | `programming/rust-quest/engine/` (lexer, parser, checker, interpreter; DOM-free), `programming/rust-quest/content/` (`model.js`, `state.js`, `ch-*.js`, `extras.js`; `verified.js` is written only by `tests/rust/verify-rustc.mjs`), `programming/rust-quest/story.js` + `ui.js` + `editor.js` + `memview.js` (memory view and loan gutter) + `app.js` (UI) + `tests/rust/` (keep `tests/rust/harness.mjs` `FILES` in `programming/rust-quest/index.html` script order; any corpus, mission or engine-result change needs a fresh `verify-rustc.mjs` run) |
 | Change the Math hub or its prerequisite graph | `math/graph.js` (DOM-free; chapter ids and order must match each track's `content.js`), `math/app.js` + `style.css` (hub), `tests/math/` (the landing Math card's `data-subject` and the catalog's math keys must match the graph tracks) |
 | Change a Math track's course | `math/<track>/content.js` (DOM-free: chapters, missions with `answer`/`wrong`/`lazy`, quick-fire templates, guide; chapter ids and order match `graph.js`), `math/track.js` + `track.css` (the shared track page) + `tests/math/content.test.mjs` |
 | Add a Math track | `math/<track>/` (`index.html`, `app.js`, `content.js`, copied from `geometry/` with its own `PROGRESS` key `math-<track>-v1`), the track and its chapters in `math/graph.js`, the landing card text in `index.html`, its entry in `shared/catalog.js` and its loader in `tests/trophy/catalog.test.mjs` (`tests/math/graph.test.mjs` checks the landing Math card's `data-subject` and the catalog's math keys against the graph tracks), `TRACKS` in `tests/math/content.test.mjs`, `PAGES` and the hub tests in `tests/smoke.mjs`, the README repo map |

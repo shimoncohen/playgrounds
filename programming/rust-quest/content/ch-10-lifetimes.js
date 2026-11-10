@@ -45,7 +45,7 @@ RQ.CH.push({
         `Putting <code>'a</code> on <code>a</code>, on <code>b</code> and on the result says: the answer is one of these two, so it may be used only while both are still there. The name is a label for the compiler's check. It does not make any text live longer or shorter.`,
         `The body does not change. The hidden <code>main</code> calls <code>longest</code> with other texts than the ones in the card, so the answer has to keep picking the longer one.`
       ],
-      explain:`The same label on two inputs and the result is the usual way to write "the answer comes from either one". If you label only one input and the body can return the other, Rust rejects it with <code>E0621</code>, which a later mission shows. The name <code>'a</code> is only a habit: <code>'x</code> works too, as long as it is declared and used the same way each time.`,
+      explain:`The same label on two inputs and the result is the usual way to write "the answer comes from either one". If you label only one input and the body can return the other, Rust rejects it with <code>E0621</code>, which a mission further on in this chapter shows. The name <code>'a</code> is only a habit: <code>'x</code> works too, as long as it is declared and used the same way each time.`,
       hint:`Write <code>fn longest&lt;'a&gt;(a: &'a str, b: &'a str) -> &'a str</code> and leave the body alone.`,
       harness:LONGEST_MAIN,
       starter:LONGEST('(a: &str, b: &str) -> &str',...PICK_IF),

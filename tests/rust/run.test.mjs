@@ -201,6 +201,12 @@ describe('RQ.run: unsupported is not an error', () => {
   it('no hint promises a later chapter or says the feature is coming', () => {
     for (const [f, h] of [...Object.entries(RQ.diag.UNSUPPORTED), ['default', RQ.diag.hint('anything else')]]) assert.doesNotMatch(h, /later chapter|for now|modeled yet|not yet|\byet\b/i, f);
   });
+  it('no learner text in the course promises a later mission or chapter', () => {
+    const dir = path.join(ROOT, 'programming/rust-quest/content');
+    for (const f of fs.readdirSync(dir).filter((n) => /^(ch-.*|extras)\.js$/.test(n))) {
+      assert.doesNotMatch(fs.readFileSync(path.join(dir, f), 'utf8'), /\bfor now\b|later (chapter|mission)/i, f);
+    }
+  });
   it('every feature name written in the engine source has its own hint', () => {
     const dir = path.join(ROOT, 'programming/rust-quest/engine');
     const seen = new Set();
