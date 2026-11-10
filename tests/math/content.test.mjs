@@ -42,6 +42,8 @@ for (const track of TRACKS) {
       for (const it of sc.story.draw.items(st)) {
         assert.ok(['axes', 'grid', 'fn', 'polygon', 'text', 'vector', 'point', 'icon', 'rrect', 'circle'].includes(it.type), `${sc.id}: unknown item ${it.type}`);
         const nums = it.type === 'rrect' ? [it.x0, it.y0, it.x1, it.y1, it.r] : it.type === 'circle' ? [it.x, it.y, it.r] : [];
+        if (it.rot !== undefined) assert.ok(['rrect', 'icon'].includes(it.type) && Number.isFinite(it.rot), `${sc.id}: rot is a number on an rrect or icon`);
+        if (it.type === 'icon') assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y) && (it.size === undefined || it.size > 0), `${sc.id}: icon needs a position and a positive size`);
         for (const v of nums) assert.ok(Number.isFinite(v), `${sc.id}: ${it.type} needs finite numbers`);
         if (it.type === 'rrect') assert.ok(it.x1 > it.x0 && it.y1 > it.y0, `${sc.id}: rrect needs a positive size`);
       }
@@ -375,4 +377,17 @@ test('trigonometry: every 2D scene has a story picture', () => {
   const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.draw.kind === '2d');
   assert.ok(scenes.length >= 5);
   for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+});
+
+test('geometry: a story picture adds a fixed number of items before the first draggable point', () => {
+  const MQ = loadMath([...BASE, 'geometry/content.js']);
+  const scenes = MQ.content.chapters.flatMap(ch => [ch.scene, ...ch.missions.flatMap(m => [m.scene, m.reveal && m.reveal !== true ? m.reveal : null])]).filter(sc => sc && sc.story);
+  const first = items => items.findIndex(it => it.type === 'point' && it.drag);
+  for (const sc of scenes) {
+    const m = MQ.scene.model(sc), extra = () => first(sc.story.draw.items(m.state())) - first(sc.draw.items(m.state())), base = extra();
+    for (const [k, p] of Object.entries(sc.params)) for (const v of [p.min, p.max]) {
+      m.set(k, v);
+      assert.equal(extra(), base, `${sc.id}: a changing item count before a draggable point drops its focus (${k}=${v})`);
+    }
+  }
 });
