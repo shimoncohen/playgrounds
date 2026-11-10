@@ -178,6 +178,20 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
   it('a condition no longer known after a block boundary leaves both branches live', () => {
     lint('    let mut c = false;\n    c = false;\n    println!("a");\n    if c {\n        let x: u8 = 255 + 1;\n    }', 'arithmetic_overflow', 7);
   });
+  it('&&, || and a real match switch end the block; a comparison, a closure, a wildcard match and a loop that always breaks do not', () => {
+    const X = (mid) => `    let mut x: u8 = 255;\n    x = x;\n    ${mid}\n    let y = x + 1;\n    println!("{}", y);`;
+    for (const mid of ['let c = 1 > 2 && true;', 'let c = true || false;', 'match 1 { 1 => {} _ => {} }', 'let f = || 1; f();', 'loop { 1 + 1; break; }']) compiles(X(mid));
+    for (const mid of ['let c = 1 > 2;', 'let c = !true;', 'let f = || 1;', 'match 1 { _ => {} }', 'let a = match 1 { n => n };', 'loop { break; }', 'loop { { break; } }']) lint(X(mid), 'arithmetic_overflow', 6);
+    lint('    match 1 {\n        _ => {}\n        _ => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n    }\n    let y: u8 = 255 + 1;\n    println!("{}", y);', 'arithmetic_overflow', 10);
+  });
+  it('a let without an initializer that is assigned once is folded like a plain let', () => {
+    lint('    let a: u8;\n    a = 255;\n    let b = a + 1;\n    println!("{}", b);', 'arithmetic_overflow', 5);
+    lint('    let d: i32;\n    d = 0;\n    println!("a");\n    println!("{}", 5 / d);', 'unconditional_panic', 6);
+    compiles('    let a: u8;\n    a = 255;\n    let r = &a;\n    let b = a + 1;\n    println!("{} {}", b, r);');
+  });
+  it('-0 as u8 is unsupported like -1 as u8', () => {
+    folding('    let x = -0 as u8;\n    println!("{}", x);');
+  });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
   });

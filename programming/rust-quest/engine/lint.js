@@ -50,9 +50,10 @@ RQ.lint=(ast,info)=>{
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
   // of its last store; it keeps none for a local whose address is taken anywhere in the fn
-  const valueOf=(b,s)=>s.val&&!borrowed.has(b)&&(b.assigns===0||s.fresh)?s.val:null;
+  const valueOf=(b,s)=>s.val&&!borrowed.has(b)&&(b.assigns===(b.deferred?1:0)||s.fresh)?s.val:null;
   const forget=bs=>{for(const b of bs)if(st.has(b))st.get(b).val=null;};
   // a break inside a nested loop leaves that loop, not this one
+  const isBreak=n=>{n=n.t==='ExprStmt'?n.expr:n;return n.t==='Break'&&!n.label||n.t==='Block'&&!n.label&&(n.stmts.some(isBreak)||!!n.tail&&isBreak(n.tail));};
   const hasBreak=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Break')f=true;if(x.t==='Loop'||x.t==='While'||x.t==='For')return false;});return f;};
   const part=(a,i)=>a&&a.k==='agg'?a.els[i]||null:null;
   function arith(op,a,b,e){
@@ -84,7 +85,11 @@ RQ.lint=(ast,info)=>{
     for(const s of b.stmts){
       if(div)return null;
       if(s.t==='Let'){
-        if(!s.init)continue; // a deferred let has no value to fold
+        if(!s.init){
+          const bd=s.pat.t==='IdentPat'&&bindOf(s.pat);
+          if(bd)st.set(bd,{val:null,fresh:true});
+          continue;
+        }
         const v=ev(s.init);
         if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:true});}
       }else if(s.t==='ExprStmt')ev(s.expr);
@@ -140,8 +145,10 @@ RQ.lint=(ast,info)=>{
         const op=e.op;
         if(op==='&&'||op==='||'){
           const a=ev(e.lhs);
+          barrier();
           if(a&&a.k==='bool'&&a.v===(op==='||'))return a;
           const b=ev(e.rhs);
+          barrier();
           return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v):null;
         }
         const a=ev(e.lhs),b=ev(e.rhs);
@@ -206,7 +213,7 @@ RQ.lint=(ast,info)=>{
         st=new Map();div=false;
         ev(e.body);
         st=keep;div=was;
-        forget(assignedIn(e));barrier();
+        forget(assignedIn(e));
         return null;
       }
       case 'Tuple':case 'Array':return {k:'agg',els:e.elems.map(ev)};
@@ -241,6 +248,12 @@ RQ.lint=(ast,info)=>{
           destructure(e.arms[0].pat,v,barriers===before);
           return ev(e.arms[0].body);
         }
+        const a0=e.arms[0];
+        // an irrefutable first arm needs no switch, so it is straight-line code and the arms after it are unreachable, never linted
+        if(a0&&!a0.guard&&(a0.pat.t==='Wild'||a0.pat.t==='IdentPat'&&bindOf(a0.pat)&&!a0.pat.sub&&!a0.pat.byRef)){
+          ev(e.scrut);
+          return ev(a0.body);
+        }
         ev(e.scrut);barrier();
         const base=snap();
         let all=e.arms.length>0;
@@ -257,6 +270,12 @@ RQ.lint=(ast,info)=>{
         div=all;return null;
       }
       case 'Loop':
+        // a break that is a direct statement of the body leaves no back edge, so rustc sees straight-line code
+        if(e.body.stmts.some(isBreak)||e.body.tail&&isBreak(e.body.tail)){
+          const was=div;
+          ev(e.body);
+          div=was;return null;
+        }
         loopBody(e,null);
         div=!hasBreak(e.body);return null;
       case 'While':{

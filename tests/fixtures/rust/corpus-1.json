@@ -8709,5 +8709,76 @@
     "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
     "expect": "ok", "out": "a\n", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
     "why": "a local assigned twice is not known after a call", "pr": "unit"
+  },
+  {
+    "id": "fold-cmp-live",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-and-boundary",
+    "why": "a comparison is not a block boundary, so x is still known after it", "pr": "P4"
+  },
+  {
+    "id": "fold-and-boundary",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2 && true;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "&& is a block boundary: x is no longer known after it, so the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-or-boundary",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2 || true;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "|| is a block boundary as well", "pr": "unit"
+  },
+  {
+    "id": "fold-closure-live",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let f = || 1;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-closure-call",
+    "why": "creating a closure is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-closure-call",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let f = || 1; f();\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "calling it is", "pr": "unit"
+  },
+  {
+    "id": "fold-match-wild",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match 1 { _ => {} }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-match-switch",
+    "why": "a match whose first arm matches everything needs no switch, so it is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-match-switch",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match 1 { 1 => {} _ => {} }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a match with a real switch is a block boundary", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-break",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-loop-arith",
+    "why": "a loop that always breaks has no back edge, so it is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-arith",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { 1 + 1; break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a checked operation inside it is a boundary", "pr": "unit"
+  },
+  {
+    "id": "fold-deferred",
+    "src": "fn main() {\n    let a: u8;\n    a = 255;\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-deferred-ok",
+    "why": "a let without an initializer that is assigned once is folded like a plain let", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-ok",
+    "src": "fn main() {\n    let a: u8;\n    a = 254;\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
   }
 ]
