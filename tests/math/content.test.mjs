@@ -54,6 +54,13 @@ for (const track of TRACKS) {
     for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
   });
 
+  const ALGEBRA_PLAIN = { parabola: 'an upward-opening curve that can sit anywhere has no world object yet (#186)' };
+  if (track === 'algebra') test('algebra: every 2D scene has a story picture', () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.draw.kind === '2d');
+    for (const sc of scenes) assert.ok(sc.story || ALGEBRA_PLAIN[sc.id], `${sc.id} has no story picture`);
+    for (const id of Object.keys(ALGEBRA_PLAIN)) assert.ok(scenes.some(sc => sc.id === id && !sc.story), `${id} has a story picture now: remove it from ALGEBRA_PLAIN`);
+  });
+
   test(`${track}: a story picture keeps the plain picture's x-range, vectors and points where they are`, () => {
     const corners = sc => Object.keys(sc.params).reduce((acc, n) => acc.flatMap(p => [...new Set([sc.params[n].min, sc.params[n].value, sc.params[n].max])].map(v => ({ ...p, [n]: v }))), [{}]);
     const key = it => JSON.stringify(it.type === 'vector' ? [it.type, it.from, it.to, it.term] : [it.type, it.x, it.y, it.term]);
