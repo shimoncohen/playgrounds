@@ -942,9 +942,9 @@ RQ.check=ast=>{
     const src=ex(e.expr),to=tyOf(e.ty),s=res(src),d=res(to);
     if(d.k==='any'||s.k==='any'||s.k==='never')return to;
     const lit=bareLit(e.expr);
+    // `-1 as u8`, `-0 as u8` and `- -1 as u8` are E0600, which Rust Quest does not model
+    if(d.k==='int'&&d.ty[0]==='u'){let n=peel(e.expr),neg=false;while(n.t==='Unary'&&n.op==='-'){neg=true;n=peel(n.expr);}if(neg&&n.t==='Lit'&&n.kind==='int'&&!n.suffix)return unsup('const folding',e.line);}
     if(lit&&d.k==='int'){
-      // `-1 as u8` is E0600, which Rust Quest does not model
-      if(peel(e.expr).t==='Unary'&&d.ty[0]==='u')return unsup('const folding',e.line);
       unify(src,to);return to;
     }
     if(lit&&d.k==='char'){if(fits(lit.v,'u8')){unify(src,T.int('u8'));return to;}return unsup('cast',e.line);}

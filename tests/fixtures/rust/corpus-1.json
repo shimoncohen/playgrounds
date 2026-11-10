@@ -8780,5 +8780,50 @@
     "src": "fn main() {\n    let a: u8;\n    a = 254;\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n",
     "expect": "ok", "out": "255\n", "err": "", "exit": 0,
     "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-value",
+    "src": "fn main() {\n    let v: u8 = loop { break 255; };\n    let w = v + 1;\n    println!(\"{}\", w);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3},
+    "pair": "fold-loop-value-ok",
+    "why": "a value a loop breaks with is known after it", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-value-ok",
+    "src": "fn main() {\n    let v: u8 = loop { break 254; };\n    let w = v + 1;\n    println!(\"{}\", w);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-diverge",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { return; break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a loop that returns before its break never reaches the code after it, so nothing there is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-match-bind",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match x { n => { println!(\"{}\", n + 1); } }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-match-bind-ok",
+    "why": "an irrefutable match binding carries the value of the scrutinee", "pr": "P4"
+  },
+  {
+    "id": "fold-match-bind-ok",
+    "src": "fn main() {\n    let mut x: u8 = 254;\n    x = x;\n    match x { n => { println!(\"{}\", n + 1); } }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-branch",
+    "src": "fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 255;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 8},
+    "pair": "fold-deferred-branch-ok",
+    "why": "the one store of a deferred let reaches the read even when it sits in a branch and the other branch returns", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-branch-ok",
+    "src": "fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 254;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
   }
 ]

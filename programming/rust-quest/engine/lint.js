@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),dead=0,skip=0,barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),dead=0,skip=0,barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -50,10 +50,18 @@ RQ.lint=(ast,info)=>{
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
   // of its last store; it keeps none for a local whose address is taken anywhere in the fn
-  const valueOf=(b,s)=>s.val&&!borrowed.has(b)&&(b.assigns===(b.deferred?1:0)||s.fresh)?s.val:null;
+  const valueOf=(b,s)=>s.val&&!borrowed.has(b)&&(b.assigns===0||s.fresh)?s.val:null;
   const forget=bs=>{for(const b of bs)if(st.has(b))st.get(b).val=null;};
   // a break inside a nested loop leaves that loop, not this one
-  const isBreak=n=>{n=n.t==='ExprStmt'?n.expr:n;return n.t==='Break'&&!n.label||n.t==='Block'&&!n.label&&(n.stmts.some(isBreak)||!!n.tail&&isBreak(n.tail));};
+  const plainBreak=n=>{
+    if(!n)return false;
+    if(n.t==='ExprStmt')return plainBreak(n.expr);
+    if(n.t==='Paren')return plainBreak(n.expr);
+    if(n.t==='Break')return !n.label;
+    if(n.t==='Block')return !n.label&&(n.stmts.some(plainBreak)||plainBreak(n.tail));
+    if(n.t==='Match'&&n.arms[0]&&patKind(n.arms[0].pat)!=='ref')return n.arms.some(a=>plainBreak(a.body));
+    return false;
+  };
   const hasBreak=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Break')f=true;if(x.t==='Loop'||x.t==='While'||x.t==='For')return false;});return f;};
   const part=(a,i)=>a&&a.k==='agg'?a.els[i]||null:null;
   function arith(op,a,b,e){
@@ -75,26 +83,64 @@ RQ.lint=(ast,info)=>{
     return r===undefined?null:boolv(r);
   }
 
+  // 'irr': no switch is built; 'ref': a real switch; 'maybe': cannot tell cheaply
+  function patKind(p){
+    const all=ps=>{const ks=ps.map(x=>x.t==='Rest'?'maybe':patKind(x));return ks.includes('ref')?'ref':ks.every(k=>k==='irr')?'irr':'maybe';};
+    switch(p.t){
+      case 'Wild':return 'irr';
+      case 'IdentPat':return !bindOf(p)?'ref':p.byRef?'maybe':p.sub?(patKind(p.sub)==='ref'?'ref':'maybe'):'irr';
+      case 'TuplePat':return all(p.pats);
+      case 'Or':{const ks=p.alts.map(patKind);return ks.every(k=>k==='ref')?'ref':'maybe';}
+      case 'RefPat':return patKind(p.pat)==='ref'?'ref':'maybe';
+      case 'StructPat':case 'TupleStructPat':{
+        const segs=p.path.segs,last=segs[segs.length-1].name;
+        const item=ast.items.find(i=>(i.t==='Struct'&&segs.length===1&&i.name===last)||(i.t==='Enum'&&segs.length===2&&i.name===segs[0].name));
+        // a struct is one shape; an enum variant is a switch unless the enum has a single variant
+        if(!item||item.t==='Enum'&&item.variants.length>1)return 'ref';
+        const k=p.t==='StructPat'?all(p.fields.map(f=>f.pat)):all(p.pats);
+        let binds=false;
+        RQ.walk(p,x=>{if(x.t==='IdentPat'&&bindOf(x))binds=true;});
+        return k==='irr'&&binds?'maybe':k;
+      }
+      default:return 'ref';
+    }
+  }
+
   // the arm of a desugared destructuring let holds the rest of the block, so it is straight-line code
   function destructure(p,v,fresh){
     if(p.t==='IdentPat'){const bd=!p.sub&&!p.byRef&&bindOf(p);if(bd)st.set(bd,{val:v,fresh});}
     else if(p.t==='TuplePat'&&v&&v.k==='agg'&&v.els.length===p.pats.length&&!p.pats.some(x=>x.t==='Rest'))p.pats.forEach((x,i)=>destructure(x,part(v,i),fresh));
   }
 
+  function stmt(s){
+    if(s.t==='Let'){
+      if(!s.init){
+        const bd=s.pat.t==='IdentPat'&&bindOf(s.pat);
+        if(bd)st.set(bd,{val:null,fresh:true});
+        return;
+      }
+      const v=ev(s.init);
+      if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:true});}
+    }else if(s.t==='ExprStmt')ev(s.expr);
+  }
   function block(b){
     for(const s of b.stmts){
       if(div)return null;
-      if(s.t==='Let'){
-        if(!s.init){
-          const bd=s.pat.t==='IdentPat'&&bindOf(s.pat);
-          if(bd)st.set(bd,{val:null,fresh:true});
-          continue;
-        }
-        const v=ev(s.init);
-        if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:true});}
-      }else if(s.t==='ExprStmt')ev(s.expr);
+      stmt(s);
     }
     return div||!b.tail?null:ev(b.tail);
+  }
+  // a loop whose body has an unlabeled break as a direct statement has no back edge: rustc sees straight-line code up to the
+  // break, and nothing after the loop is reachable when the body diverges first
+  function straightLoop(b){
+    const items=[...b.stmts,...(b.tail?[b.tail]:[])];
+    for(const s of items){
+      if(div)return null;
+      const x=s.t==='ExprStmt'?s.expr:s;
+      if(x.t==='Break'){return x.expr?ev(x.expr):null;}
+      if(s===b.tail)ev(s);else stmt(s);
+    }
+    return null;
   }
   // the live branch runs as written; a branch the condition rules out is judged only as far as rustc is known to ignore it
   function branch(b,live){
@@ -124,6 +170,7 @@ RQ.lint=(ast,info)=>{
       case 'Path':{
         const b=bindOf(e);
         if(b){
+          if(b.deferred&&b.assigns===1){const v=defVal.get(b);return v&&!borrowed.has(b)?v:null;}
           const s=st.get(b);
           if(!s||!s.val)return null;
           return valueOf(b,s);
@@ -187,6 +234,8 @@ RQ.lint=(ast,info)=>{
         if(e.lhs.t==='Deref'){ev(e.rhs);barrier();return null;}
         const b=bindOf(e);
         let r=ev(e.rhs);
+        // the one store of a deferred let reaches every later read, wherever in the control flow it sits
+        if(b&&b.deferred&&b.assigns===1){defVal.set(b,r);return null;}
         if(e.op!=='='){
           const s=b&&st.get(b),cur=s&&valueOf(b,s);
           r=arith(e.op.slice(0,-1),cur,r,e);barrier();
@@ -248,12 +297,14 @@ RQ.lint=(ast,info)=>{
           destructure(e.arms[0].pat,v,barriers===before);
           return ev(e.arms[0].body);
         }
-        const a0=e.arms[0];
+        const a0=e.arms[0],pk=a0&&!a0.guard?patKind(a0.pat):'ref';
         // an irrefutable first arm needs no switch, so it is straight-line code and the arms after it are unreachable, never linted
-        if(a0&&!a0.guard&&(a0.pat.t==='Wild'||a0.pat.t==='IdentPat'&&bindOf(a0.pat)&&!a0.pat.sub&&!a0.pat.byRef)){
-          ev(e.scrut);
+        if(pk==='irr'){
+          const before=barriers,v=ev(e.scrut);
+          destructure(a0.pat,v,barriers===before);
           return ev(a0.body);
         }
+        if(pk==='maybe')unsup('const folding',e.line);
         ev(e.scrut);barrier();
         const base=snap();
         let all=e.arms.length>0;
@@ -271,11 +322,9 @@ RQ.lint=(ast,info)=>{
       }
       case 'Loop':
         // a break that is a direct statement of the body leaves no back edge, so rustc sees straight-line code
-        if(e.body.stmts.some(isBreak)||e.body.tail&&isBreak(e.body.tail)){
-          const was=div;
-          ev(e.body);
-          div=was;return null;
-        }
+        if(!e.label&&[...e.body.stmts,...(e.body.tail?[e.body.tail]:[])].some(x=>x.t==='ExprStmt'?x.expr.t==='Break'&&!x.expr.label:x.t==='Break'&&!x.label))return straightLoop(e.body);
+        // a break reachable through no switch, or any break out of a labeled loop, is not modeled
+        if(e.label&&hasBreak(e.body)||plainBreak(e.body))unsup('const folding',e.line);
         loopBody(e,null);
         div=!hasBreak(e.body);return null;
       case 'While':{
@@ -307,7 +356,7 @@ RQ.lint=(ast,info)=>{
   const fns=RQ.fnItems(ast).map(x=>x.f);
   for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
-    st=new Map();dead=skip=0;barriers=0;div=false;borrowed=new Set();
+    st=new Map();defVal=new Map();dead=skip=0;barriers=0;div=false;borrowed=new Set();
     RQ.walk(it.body,n=>{
       let root=null;
       if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr

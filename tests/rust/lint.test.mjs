@@ -181,7 +181,11 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
   it('&&, || and a real match switch end the block; a comparison, a closure, a wildcard match and a loop that always breaks do not', () => {
     const X = (mid) => `    let mut x: u8 = 255;\n    x = x;\n    ${mid}\n    let y = x + 1;\n    println!("{}", y);`;
     for (const mid of ['let c = 1 > 2 && true;', 'let c = true || false;', 'match 1 { 1 => {} _ => {} }', 'let f = || 1; f();', 'loop { 1 + 1; break; }']) compiles(X(mid));
-    for (const mid of ['let c = 1 > 2;', 'let c = !true;', 'let f = || 1;', 'match 1 { _ => {} }', 'let a = match 1 { n => n };', 'loop { break; }', 'loop { { break; } }']) lint(X(mid), 'arithmetic_overflow', 6);
+    for (const mid of ['let c = 1 > 2;', 'let c = !true;', 'let f = || 1;', 'match 1 { _ => {} }', 'let a = match 1 { n => n };', 'loop { break; }']) lint(X(mid), 'arithmetic_overflow', 6);
+    for (const mid of ['loop { return; break; }', 'loop { { return; } break; }', 'loop { match 1 { _ => return } break; }']) compiles(X(mid));
+    lint('    let v: u8 = loop { break 255; };\n    let w = v + 1;\n    println!("{}", w);', 'arithmetic_overflow', 4);
+    lint(X('match x { n => { println!("{}", n + 1); } }'), 'arithmetic_overflow', 5);
+    lint(X('match (1, 2) { (a, b) => {} }'), 'arithmetic_overflow', 6);
     lint('    match 1 {\n        _ => {}\n        _ => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n    }\n    let y: u8 = 255 + 1;\n    println!("{}", y);', 'arithmetic_overflow', 10);
   });
   it('a let without an initializer that is assigned once is folded like a plain let', () => {
@@ -189,8 +193,16 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     lint('    let d: i32;\n    d = 0;\n    println!("a");\n    println!("{}", 5 / d);', 'unconditional_panic', 6);
     compiles('    let a: u8;\n    a = 255;\n    let r = &a;\n    let b = a + 1;\n    println!("{} {}", b, r);');
   });
-  it('-0 as u8 is unsupported like -1 as u8', () => {
-    folding('    let x = -0 as u8;\n    println!("{}", x);');
+  it('-0 as u8 and - -1 as u8 are unsupported like -1 as u8', () => {
+    for (const e of ['-0 as u8', '- -1 as u8']) folding(`    let x = ${e};\n    println!("{}", x);`);
+  });
+  it('a break or a pattern whose switch cannot be told cheaply is unsupported, not guessed', () => {
+    const X = (mid) => `    let mut x: u8 = 255;\n    x = x;\n    ${mid}\n    let y = x + 1;\n    println!("{}", y);`;
+    for (const mid of ['match 1 { n @ _ => {} }', 'match 1 { _ | 1 => {} }', 'loop { match 1 { _ => break } }', 'loop { { break; } }']) folding(X(mid));
+  });
+  it('the one store of a deferred let is known after a branch that holds it', () => {
+    lint('    f(true);', 'arithmetic_overflow', 8, 'fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 255;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!("{}", b);\n}');
+    compiles('    f(true);', 'fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 1;\n    } else {\n        a = 255;\n    }\n    let b = a + 1;\n    println!("{}", b);\n}');
   });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
