@@ -42,6 +42,21 @@ for (const track of TRACKS) {
     }
   });
 
+  test(`${track}: a story picture keeps the plain picture's x-range, vectors and points where they are`, () => {
+    const corners = sc => Object.keys(sc.params).reduce((acc, n) => acc.flatMap(p => [...new Set([sc.params[n].min, sc.params[n].value, sc.params[n].max])].map(v => ({ ...p, [n]: v }))), [{}]);
+    const key = it => JSON.stringify(it.type === 'vector' ? [it.type, it.from, it.to, it.term] : [it.type, it.x, it.y, it.term]);
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.story);
+    for (const sc of scenes) {
+      assert.deepEqual(plain(sc.story.draw.view.slice(0, 2)), plain(sc.draw.view.slice(0, 2)), `${sc.id}: x-range differs`);
+      for (const params of corners(sc)) {
+        const m = MQ.scene.model(sc);
+        for (const [k, v] of Object.entries(params)) m.set(k, v);
+        const st = m.state(), inStory = new Set(sc.story.draw.items(st).map(key));
+        for (const it of sc.draw.items(st)) if (it.type === 'vector' || it.type === 'point') assert.ok(inStory.has(key(it)), `${sc.id} ${JSON.stringify(params)}: story lacks ${key(it)}`);
+      }
+    }
+  });
+
   C.chapters.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
     const id = `${track} ${ci}.${mi} ${m.title}`;
     test(`${id}: answer passes, wrong and lazy fail`, () => {
