@@ -92,7 +92,7 @@ describe('round 2 probes: reachability and aggregates', () => {
   });
   it('t: tuple fields fold', () => {
     lint('    let t = (255u8, 1u8);\n    let y = t.0 + t.1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
-    folding('    let t = ((255u8, 1u8), 2u8);\n    let y = t.0.0 + t.0.1;\n    println!("{}", y);');
+    compiles('    let t = ((255u8, 1u8), 2u8);\n    let y = t.0.0 + t.0.1;\n    println!("{}", y);');
     assert.equal(ok('    let t = (254u8, 1u8);\n    let y = t.0 + t.1;\n    println!("{}", y);').out(), '255\n');
   });
   it('u: array elements fold', () => {
@@ -212,14 +212,20 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     folding('    let mut x: u8 = 255;\n    x = x;\n    loop { continue; break; }\n    let y = x + 1;\n    println!("{}", y);');
     lint(V('loop { println!("a"); break 255; }'), 'arithmetic_overflow', 4);
   });
-  it('rustc folds one level of tuple or array: a value inside a nested one blocks a verdict', () => {
+  it('rustc folds one level of tuple or array: what sits inside a nested one is unknown, so nothing is linted on it alone', () => {
     for (const body of [
       '    match (255u8, (1u8, 2u8)) {\n        (a, (b, _)) => {\n            println!("{}", a + b);\n        }\n    }',
       '    let ((a, b), c) = ((255u8, 1u8), 2u8);\n    println!("{}", a + b);',
       '    let x = ((255u8, 1u8), 2u8);\n    match x {\n        (p, q) => {\n            println!("{}", p.0 + 1);\n        }\n    }',
-      '    let a = [[255u8, 1u8], [2u8, 3u8]];\n    let y = a[0][0] + 1;\n    println!("{}", y);'
-    ]) folding(body);
+      '    let g = [[255u8, 1], [2, 3]];\n    let y = g[0][0] + 1;\n    println!("{}", y);',
+      '    let t = (1, (255u8, 2));\n    let y = t.1.0 + 1;\n    println!("{}", y);',
+      '    let g = [[1, 2], [3, 4]];\n    if g[0][0] > 0 {\n        println!("{}", g[1][1] + 1);\n    }',
+      '    let t = (1, (2, 3));\n    if t.1.0 == 2 {\n        println!("yes");\n    }'
+    ]) compiles(body);
+    assert.equal(ok('    let g = [[1, 2], [3, 4]];\n    if g[0][0] > 0 {\n        println!("{}", g[1][1] + 1);\n    }').out(), '5\n');
     lint('    let (a, b) = (255u8, (1u8, 2u8));\n    println!("{}", a + 1);', 'arithmetic_overflow', 4);
+    lint('    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 255 + 1;\n        println!("{}", x);\n    }', 'arithmetic_overflow', 5);
+    lint('    let t = ((255u8, 1u8), 2u8);\n    let d = 0;\n    println!("{}", t.0.0 / d);', 'unconditional_panic', 5);
   });
   it('a binding in an arm of a switching match is known to rustc, so a trap in the arm is not judged', () => {
     folding('    match (255u8, 1u8) {\n        (a, 1) => {\n            println!("{}", a + 1);\n        }\n        _ => {}\n    }');

@@ -8825,5 +8825,36 @@
     "src": "fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 254;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
     "expect": "ok", "out": "255\n", "err": "", "exit": 0,
     "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-nested-grid",
+    "src": "fn main() {\n    let g = [[1, 2], [3, 4]];\n    if g[0][0] > 0 {\n        println!(\"{}\", g[1][1] + 1);\n    }\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a condition on a value inside a nested array is unknown, so both branches stay live", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-cond",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 2 {\n        println!(\"yes\");\n    }\n}\n",
+    "expect": "ok", "out": "yes\n", "err": "", "exit": 0,
+    "why": "the same for a nested tuple", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-sum",
+    "src": "fn main() {\n    let g = [[255u8, 1], [2, 3]];\n    let y = g[0][0] + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "rustc folds one level of array, so an overflow through two levels is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-trap",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-nested-trap-ok",
+    "why": "a literal overflow is linted even in a branch whose condition is unknown", "pr": "P4"
+  },
+  {
+    "id": "fold-nested-trap-ok",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 254 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
   }
 ]
