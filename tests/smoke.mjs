@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 import { CHAPTERS } from './trophy/chapters.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent'];
+const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;
@@ -390,6 +390,552 @@ for (const track of ['arithmetic', 'algebra', 'geometry', 'trigonometry']) {
     await ctx.close();
   });
 }
+
+const RUST_KEY = 'rust-quest-v1';
+const RUST_HELLO = 'fn main() {\n    println!("Hello, Rust!");\n}\n';
+
+test('rust-quest writes a pristine state on a clean load', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const s = JSON.parse(await read(page, RUST_KEY));
+  assert.equal(s.xp, 0);
+  assert.deepEqual(s.done, {});
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: finishing mission 0.0 changes the XP text exactly once, even after running again', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  await page.fill('#code', RUST_HELLO);
+  await page.click('#bRun');
+  await page.waitForFunction(() => document.getElementById('xpText').textContent.trim() === '10 XP');
+  assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+  await page.click('#bRun');
+  await page.waitForTimeout(200);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.equal(JSON.parse(await read(page, RUST_KEY)).xp, 10);
+  assert.match(await page.textContent('#result'), /Hello, Rust!/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a bad saved shape loads with no console errors', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, {}, ctx => ctx.addInitScript(k => { if (!localStorage.getItem(k)) localStorage.setItem(k, '{"done":5,"xp":"x"}'); }, RUST_KEY));
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.equal(JSON.parse(await read(page, RUST_KEY)).xp, 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest field guide: example code keeps each line whole and scrolls sideways instead of wrapping', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width, height: 900 } });
+    await page.click('#t-guide');
+    await page.waitForSelector('#guide .excmd pre');
+    const wrapped = await page.evaluate(() => [...document.querySelectorAll('#guide .excmd pre')].filter(e => {
+      const cs = getComputedStyle(e), lines = e.textContent.replace(/\n$/, '').split('\n').length;
+      return e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) > (lines + 0.5) * parseFloat(cs.lineHeight);
+    }).map(e => e.textContent.split('\n')[1] || e.textContent));
+    assert.deepEqual(wrapped, [], `wrapped examples at ${width}px`);
+    assert.equal(await overflow(page), false, `${width}px`);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test('rust-quest: typed code survives a reload and reset restores the starter', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const starter = await page.inputValue('#code');
+  assert.match(starter, /fn main/);
+  await page.fill('#code', 'fn main() {\n    println!("typed");\n}\n');
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.waitForSelector('#mission');
+  assert.match(await page.inputValue('#code'), /typed/);
+  await page.click('#bReset');
+  assert.equal(await page.inputValue('#code'), starter);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the Playground link never carries learner code', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  const hrefs = await page.$$eval('a[href*="play.rust-lang.org"]', as => as.map(a => a.getAttribute('href')));
+  assert.ok(hrefs.length >= 2);
+  for (const h of hrefs) assert.equal(h, 'https://play.rust-lang.org/');
+  for (const h of await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')))) assert.ok(!/unsafe|fn%20main|fn main/.test(h), h);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the extra keys row inserts symbols at the caret', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 800 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', '');
+  await page.click('#keys button:has-text("<>")');
+  assert.equal(await page.inputValue('#code'), '<>');
+  assert.equal(await page.evaluate(() => document.getElementById('code').selectionStart), 1);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  for (const b of await page.$$('#keys button')) {
+    const box = await b.boundingBox();
+    assert.ok(box.width >= 44 && box.height >= 44, `a key is ${box.width}x${box.height}`);
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the memory view steps through mission 4.1 and shows the error point of its starter', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="3"]');
+  const m = await page.evaluate(() => ({ answer: RQ.CH[3].missions[0].answer, starter: RQ.CH[3].missions[1].starter }));
+  assert.equal(await page.isVisible('#memPanel'), false);
+  await page.fill('#code', m.answer);
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  assert.equal(steps, 4);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 2);
+  assert.match(await page.textContent('#memory .mv-heap'), /#1String\s*ahoy, Rustowner: s/);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-own', { state: 'attached' });
+  assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-own', p => p.length), 1);
+  const [stack, heap] = await page.$$eval('#memory .mv-stack, #memory .mv-heap', els => els.map(e => e.getBoundingClientRect().top));
+  assert.ok(heap > stack, 'stack and heap stack vertically on a phone');
+  await page.click('#memory button:has-text("Next")');
+  assert.match(await page.textContent('#memory .mv-step'), /Step 4 of 4/);
+  await page.fill('#code', 'fn main() {\n    let s = String::new();\n    println!("{}", s);\n}\n');
+  await page.click('#bRun');
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 1);
+  assert.match(await page.textContent('#memory .mv-heap'), /empty, no heap memory yet/);
+  await page.fill('#code', m.starter);
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#memory'), /E0382/);
+  assert.match(await page.textContent('#memory'), /the error is here/);
+  assert.equal(await page.$('#memory input[type=range]'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a slice is drawn as a dashed arrow into the heap of the String it borrows, with a loan bar beside the editor', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 1000, height: 800 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="4"]');
+  await page.click('#mission .dot[data-mi="4"]');
+  const answer = await page.evaluate(() => RQ.CH[4].missions[4].answer);
+  await page.fill('#code', answer);
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 3);
+  const slots = await page.$$eval('#memory .mv-ref', els => els.map(e => e.textContent));
+  assert.deepEqual(slots, ['[0..5] "hello"', '[6..10] "cove"']);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("s"))'), /borrowed x2/);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.equal(await page.$$eval('#memory .mv-arrows path.mv-a-shared', p => p.length), 2);
+  assert.equal(await page.$$eval('#gutter .gt-bar.shared', b => b.length), 2);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.fill('#code', await page.evaluate(() => RQ.CH[4].missions[8].starter));
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0515/);
+  assert.equal(await page.$('#memory input[type=range]'), null);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the memory view shows an enum variant with its payload, a field that moved out, and a borrow of one field', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'enum E {\n    A(String),\n    B,\n}\nstruct P {\n    a: String,\n    n: i32,\n}\nfn main() {\n    let e = E::A(String::from("x"));\n    let p = P { a: String::from("y"), n: 1 };\n    let r = &p.n;\n    let t = p.a;\n    println!("{} {}", r, t);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, steps - 2);
+  const text = n => page.textContent(`#memory .mv-var:has(.mv-name:text-is("${n}"))`);
+  assert.match(await text('e'), /A\s*A\.0\s*pointer to #\d/);
+  assert.match(await text('p'), /a\s*moved\s*n\s*1/);
+  assert.match(await text('r'), /& to p\.n/);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapters 6 and 7 play through: a struct shows its fields, an if let shows its Some, a missing arm is E0004', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  const last = (n) => page.$eval('#memory input[type=range]', (e, v) => { e.value = e.max - v; e.dispatchEvent(new Event('input')); }, n);
+  await page.click('[data-ch="5"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("pet"))'), /Critter\s*name\s*pointer to #1\s*age\s*5/);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-ch="6"]');
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0004[\s\S]*Light::Green/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("o"))'), /Option<u32>\s*Some\s*Some\.0\s*3/);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the memory view shows a Vec on the heap with its elements and owner, and says a moved field is a field', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'struct P {\n    a: String,\n    n: i32,\n}\nfn main() {\n    let p = P { a: String::from("y"), n: 1 };\n    let mut v = Vec::new();\n    v.push(String::from("x"));\n    let t = p.a;\n    println!("{} {}", v.len(), t);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  const events = [];
+  for (let i = 0; i < steps; i++) {
+    await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, i);
+    events.push(await page.textContent('#memory .mv-events'));
+  }
+  assert.ok(events.some(t => t.includes('A field of p moved (p.a), so it cannot be used any more.')), events.join('|'));
+  assert.ok(!events.some(t => t.includes('The variable p.a')));
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, steps - 2);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("v"))'), /Vec<String>\s*pointer to #\d/);
+  const boxes = await page.$$eval('#memory .mv-box', els => els.map(e => e.textContent));
+  assert.ok(boxes.some(t => /Vec\[pointer to #\d+\]owner: v/.test(t)), boxes.join('|'));
+  assert.ok(boxes.some(t => /Stringxowner: v\[0\]/.test(t)), boxes.join('|'));
+  assert.equal(await page.$eval('#memory', e => e.scrollWidth <= e.clientWidth + 1), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a HashMap heap box shows no quotes, an owner that reads as a key, and entries in key order', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'use std::collections::HashMap;\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(2, String::from("b"));\n    m.insert(1, String::from("a"));\n    println!("{}", m.len());\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, steps - 2);
+  const boxes = await page.$$eval('#memory .mv-box', els => els.map(e => e.textContent));
+  assert.ok(boxes.some(t => /^#\d+HashMap\{1: pointer to #\d+, 2: pointer to #\d+\}owner: m$/.test(t)), boxes.join('|'));
+  assert.ok(boxes.some(t => /Stringaowner: m\[value of key 1\]/.test(t)), boxes.join('|'));
+  assert.equal(await page.$('#memory .mv-box:has(.mv-kind:text-is("HashMap")) q'), null);
+  assert.equal(await page.$eval('#memory', e => e.scrollWidth <= e.clientWidth + 1), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 8 plays through: a loop shows its borrow of the Vec, a push in the loop is E0502, and a printed HashMap is refused for its order', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  const last = (n) => page.$eval('#memory input[type=range]', (e, v) => { e.value = e.max - v; e.dispatchEvent(new Event('input')); }, n);
+  await page.click('[data-ch="7"]');
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0502[\s\S]*cannot borrow bucket as mutable/);
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  const steps = await page.$eval('#memory input[type=range]', e => +e.max) + 1;
+  let seen = false;
+  for (let i = 0; i < steps && !seen; i++) {
+    await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, i);
+    seen = await page.$('#memory .mv-var:has(.mv-name:text-is("shell"))') !== null;
+  }
+  assert.ok(seen, 'the loop variable shows in the memory view');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback');
+  assert.match(await page.textContent('#feedback'), /depends on `?HashMap`? order/);
+  assert.doesNotMatch(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  await last(1);
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.fill('#code', 'use std::collections::HashMap;\nfn main() {\n    let mut m = HashMap::new();\n    m.insert(1, 2);\n    m.insert(3, 4);\n    println!("{:?}", m);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .note');
+  assert.match(await page.textContent('#result'), /depends on the order of a `?HashMap`?/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 9 plays through: a used-up Result is E0382, ? in a plain fn is E0277, and main returning an Err shows the error output and exit code 1', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="8"]');
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0382[\s\S]*borrow of moved value: r/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0277[\s\S]*operator can only be used in a function that returns Result or Option/);
+  await page.click('#mission .dot[data-mi="8"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .stderr');
+  assert.match(await page.textContent('#result'), /Your program ended with an error[\s\S]*Pip and Gus each get 4[\s\S]*Error: Odd\(7\)[\s\S]*Exit code 1/);
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 10 plays through: a struct that outlives its text is E0597, a struct holding a reference draws an arrow to the text, and a missing lifetime is E0726', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="9"]');
+  await page.click('#mission .dot[data-mi="7"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0597[\s\S]*words does not live long enough/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0726[\s\S]*implicit elided lifetime not allowed here/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 3);
+  await page.waitForSelector('#memory .mv-arrows path.mv-a-shared', { state: 'attached' });
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("note"))'), /text/);
+  assert.match(await page.textContent('#memory .mv-var:has(.mv-name:text-is("words"))'), /borrowed/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 11 plays through: a missing trait method is E0599, a type without Display is E0277, and a hand-written Display and a Drop run in the memory view', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="10"]');
+  await page.click('#mission .dot[data-mi="0"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0599[\s\S]*no method named .?sound.? found for .?struct.? .?Crab/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0277[\s\S]*Shell.? doesn't implement/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /shell:4[\s\S]*shell:12/);
+  await page.$eval('#memory input[type=range]', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); }, 4);
+  assert.match(await page.textContent('#memory'), /Shell::fmt/);
+  assert.match(await page.textContent('#memory'), /Formatter/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /closing inner[\s\S]*after the block[\s\S]*closing outer/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 12 plays through: a closure that outlives its function is E0373, a collect with no type is E0282, and a lazy pipeline prints in the order Rust runs it', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="11"]');
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0502[\s\S]*cannot borrow .?log.? as mutable/);
+  await page.click('#mission .dot[data-mi="5"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0373[\s\S]*closure may outlive the current function/);
+  await page.click('#mission .dot[data-mi="6"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0282[\s\S]*type annotations needed/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /before[\s\S]*doubling 2[\s\S]*doubling 5[\s\S]*doubling 9/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: chapter 13 plays through: an unopened Result is E0308, a missing lifetime is E0106, and the last mission adds up a day', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.click('[data-ch="12"]');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0308[\s\S]*mismatched types/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('#mission .dot[data-mi="4"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0106[\s\S]*missing lifetime specifier/);
+  await page.click('#mission .dot[data-mi="7"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#result');
+  assert.doesNotMatch(await page.textContent('#feedback'), /Mission complete/);
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#memory .mv-ctl input[type=range]');
+  assert.match(await page.textContent('#feedback'), /Mission complete/);
+  assert.match(await page.textContent('#result'), /Ok\(24\)[\s\S]*Err\(Unknown\("gem"\)\)[\s\S]*Ok\(0\)/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal scroll at 390px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the field guide lists the error glossary in a section of its own, after the chapters', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.click('#t-guide');
+  await page.waitForSelector('#guide .gsec');
+  const heads = await page.$$eval('#guide .gsec h3', hs => hs.map(h => h.textContent.trim()));
+  assert.equal(heads.filter(h => h.startsWith('Chapter')).length, 12, 'chapter 13 has no section of its own');
+  assert.deepEqual(heads.slice(-2), ['Error glossary', 'Your progress']);
+  assert.equal(await page.$$eval('#guide .gsec:nth-last-child(2) .card', cs => cs.length), 9);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a failing run clears the stale "Mission complete" card', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', RUST_HELLO);
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback .msg.win');
+  await page.fill('#code', 'fn main() {\n    let x = 1;\n    x = 2;\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result'), /E0384/);
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#feedback')).trim(), '');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: missions 1.1 to 1.6 give XP once each, wrong tries give a hint and no XP, the last one earns the badge', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  const ms = await page.evaluate(() => RQ.CH[0].missions.map(m => ({ answer: m.answer, wrong: m.wrong[0].src })));
+  assert.equal(ms.length, 6);
+  const xp = async () => (await page.textContent('#xpText')).trim();
+  for (let i = 0; i < ms.length; i++) {
+    await page.fill('#code', ms[i].wrong);
+    await page.click('#bRun');
+    await page.waitForSelector('#feedback .msg.tip, #result .diag');
+    assert.equal(await xp(), `${i * 10} XP`);
+    assert.equal(await page.$('#feedback .msg.win'), null);
+    await page.fill('#code', ms[i].answer);
+    await page.click('#bRun');
+    await page.waitForSelector('#feedback .msg.win');
+    assert.equal(await xp(), `${(i + 1) * 10} XP`);
+    assert.match(await page.textContent('#feedback'), /Mission complete! \+10 XP/);
+    const badge = /Badge earned: Moss's Note/.test(await page.textContent('#feedback'));
+    assert.equal(badge, i === ms.length - 1);
+    await page.click('#bRun');
+    await page.waitForTimeout(100);
+    assert.equal(await xp(), `${(i + 1) * 10} XP`);
+    if (i < ms.length - 1) await page.click('#feedback [data-act="next"]');
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: the unsupported card names the feature and the line; the internal-error card links no learner code', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    unsafe { }\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .card2');
+  assert.match(await page.textContent('#result .card2 h4'), /`?unsafe`?.*line 2|unsafe.*\(line 2\)/);
+  assert.equal(await page.locator('#result a[href*="feature-request"]').count(), 1);
+  await page.evaluate(() => { RQ.interp = () => { throw new Error('boom'); }; });
+  await page.fill('#code', 'fn main() {\n    println!("SECRET-LEARNER-CODE");\n}\n');
+  await page.click('#bRun');
+  await page.waitForFunction(() => /bug, not your code/.test(document.getElementById('result').textContent));
+  assert.match(await page.textContent('#result'), /nothing was counted/);
+  const hrefs = await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')));
+  assert.equal(hrefs.length, 1);
+  assert.match(hrefs[0], /feature-request/);
+  assert.ok(!/SECRET|println/i.test(hrefs[0]));
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a panic shows its output, the header and exit code 101, gives feedback, and the panic mission still completes', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn add(a: u8, b: u8) -> u8 {\n    a + b\n}\n\nfn main() {\n    println!("before");\n    println!("{}", add(250, 10));\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .stderr');
+  const result = await page.textContent('#result');
+  assert.match(result, /before/);
+  assert.match(result, /panicked at src\/main\.rs/);
+  assert.match(result, /Exit code 101/);
+  assert.match(await page.textContent('#feedback'), /Not quite yet[\s\S]*stopped with a panic: attempt to add with overflow/);
+  for (const h of await page.$$eval('#result a', as => as.map(a => a.getAttribute('href')))) assert.ok(!/add|fn%20|fn /.test(h), h);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  await page.click('.chap[data-ch="1"]');
+  await page.click('.dot[data-mi="7"]');
+  await page.click('[data-act="fill"]');
+  await page.click('#bRun');
+  await page.waitForSelector('#feedback .msg.win');
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  await page.click('#bRun');
+  await page.waitForTimeout(100);
+  assert.equal((await page.textContent('#xpText')).trim(), '10 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('rust-quest: a lint card shows the lint id, the line and a tip, and does not complete the mission', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/rust-quest/`);
+  await page.waitForSelector('#mission');
+  await page.fill('#code', 'fn main() {\n    let x: u8 = 255 + 1;\n    println!("{}", x);\n}\n');
+  await page.click('#bRun');
+  await page.waitForSelector('#result .diag');
+  assert.match(await page.textContent('#result .diag .id'), /arithmetic_overflow · line 2/);
+  assert.ok((await page.textContent('#result .diag .note')).trim().length > 10);
+  assert.equal(await page.$('#feedback .msg.win'), null);
+  assert.equal((await page.textContent('#xpText')).trim(), '0 XP');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
 
 test('math-algebra suggests Order of operations until it is done, and the link opens that chapter', async () => {
   const { ctx, page, errors } = await open(`${base}/math/algebra/`);
@@ -2266,6 +2812,37 @@ test('Story setting hides the trail strip, remembers the choice across reloads a
   assert.ok(await other.locator('.trail').isHidden());
   await pick(other, 'story', 'on');
   assert.ok(await other.locator('.trail').isVisible());
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest field guide: the code each explainer ran keeps its lines whole on a phone', async () => {
+  // The web fonts that open() blocks are wider, and learners see them, so only they show the wrap.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const page = await ctx.newPage(), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(`${base}/programming/ds-quest/`);
+  await page.click('.tabs button[data-tab="guide"]');
+  await page.waitForSelector('#demo-tree .dbtn');
+  // The mono face loads only once code is on screen, so wait for it before measuring.
+  const mono = await page.evaluate(() => document.fonts.load('12.5px "JetBrains Mono"').then(f => f.length > 0));
+  assert.ok(mono, 'the web fonts did not load, so this layout check cannot run');
+  const wrapped = id => page.evaluate(id => {
+    const e = document.querySelector(`#demo-${id} .democode`), cs = getComputedStyle(e), lines = e.textContent.replace(/\n$/, '').split('\n').length;
+    return e.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) > (lines + 0.5) * parseFloat(cs.lineHeight) ? e.textContent : '';
+  }, id);
+  for (const id of ['array', 'stack', 'queue', 'list', 'map', 'set', 'tree']) {
+    assert.equal(await wrapped(id), '', `${id} before any operation runs`);
+    const n = await page.locator(`#demo-${id} .dbtn`).count();
+    for (let i = 0; i < n; i++) {
+      const btn = page.locator(`#demo-${id} .dbtn`).nth(i);
+      if (await btn.isDisabled()) continue;
+      await btn.click();
+      await until(async () => !(await page.$(`#demo-${id} .dbtn:disabled`)));
+      assert.equal(await wrapped(id), '', `${id}, button ${i + 1}`);
+    }
+  }
+  assert.equal(await overflow(page), false);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
