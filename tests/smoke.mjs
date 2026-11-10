@@ -45,6 +45,10 @@ async function open(url, opts = {}, prep) {
   await page.goto(url);
   return { ctx, page, errors };
 }
+async function pick(page, name, value) {
+  if (await page.locator('#st-panel').isHidden()) await page.click('.st-trigger');
+  await page.check(`#st-panel input[name="st-${name}"][value="${value}"]`);
+}
 // Poll an async condition (waitForFunction doesn't reliably await async predicates).
 async function until(fn, ms = 8000) {
   const end = Date.now() + ms;
@@ -612,13 +616,13 @@ test('math-arithmetic: the cold-cellar story picture follows the Story setting i
   await page.fill('#scene input[type=number][aria-label="a value"]', '1');
   await page.dispatchEvent('#scene input[type=number][aria-label="a value"]', 'input');
   assert.match(await live(), /reads 1°/);
-  await page.click('.story-toggle');
+  await pick(page, 'story', 'off');
   assert.match(await live(), /^Start at 0, move 1, then move −5/);
   assert.equal(await label(), 'Two arrows along the number line');
   assert.equal(await icons(), 0);
   assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1', 'the slider keeps its value');
   assert.equal(await page.locator('#feedback .msg').count(), 0, 'swapping fires no check');
-  await page.click('.story-toggle');
+  await pick(page, 'story', 'on');
   assert.match(await live(), /reads 1°/);
   assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1');
   assert.deepEqual(errors, []);
@@ -2113,25 +2117,66 @@ test('shell-quest full course: every mission of chapters 1 to 19 completes throu
   await ctx.close();
 });
 
-test('theme button cycles auto, light, dark, remembers the choice and sets data-theme', async () => {
+test('Settings panel switches theme between Auto, Light and Dark, remembers it and sets data-theme', async () => {
   for (const url of [base + '/', `${base}/programming/shell-quest/`]) {
     const { ctx, page, errors } = await open(url, { colorScheme: 'light' });
     const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
     const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     assert.equal(await attr(), null, url);
+    assert.ok(await page.isChecked('#st-panel input[name="st-theme"][value="auto"]'), url);
     const light = await bg();
-    await page.click('.theme-toggle');
+    await pick(page, 'theme', 'light');
     assert.equal(await attr(), 'light', url);
-    await page.click('.theme-toggle');
+    await pick(page, 'theme', 'dark');
     assert.equal(await attr(), 'dark', url);
     assert.notEqual(await bg(), light, 'dark should change the page background');
     await page.reload();
     assert.equal(await attr(), 'dark', 'choice survives a reload');
-    assert.match(await page.textContent('.theme-toggle'), /Dark/);
-    await page.click('.theme-toggle');
+    assert.ok(await page.isChecked('#st-panel input[name="st-theme"][value="dark"]'));
+    await pick(page, 'theme', 'auto');
     assert.equal(await attr(), null, 'back to auto');
     assert.deepEqual(errors, []);
     await ctx.close();
+  }
+});
+
+test('Settings panel opens from one header button, closes on Escape or an outside click, and fits a phone', async () => {
+  for (const url of [base + '/', ...PAGES.map(u => `${base}/${u}`)]) {
+    const { ctx, page, errors } = await open(url, { viewport: { width: 390, height: 800 } });
+    assert.equal(await page.locator('.st-trigger').count(), 1, url);
+    assert.equal(await page.locator('.theme-toggle, .story-toggle').count(), 0, `${url}: the old buttons are gone`);
+    await page.click('.st-trigger');
+    assert.equal(await page.getAttribute('.st-trigger', 'aria-expanded'), 'true', url);
+    const box = await page.locator('#st-panel').boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= 390, `${url}: the panel stays on screen (${Math.round(box.x)}..${Math.round(box.x + box.width)})`);
+    await page.keyboard.press('Escape');
+    assert.ok(await page.locator('#st-panel').isHidden(), `${url}: Escape closes it`);
+    assert.ok(await page.evaluate(() => document.activeElement.classList.contains('st-trigger')), `${url}: focus returns to the button`);
+    await page.click('.st-trigger');
+    await page.mouse.click(5, 795);
+    assert.ok(await page.locator('#st-panel').isHidden(), `${url}: an outside click closes it`);
+    assert.deepEqual(errors, [], url);
+    await ctx.close();
+  }
+});
+
+test('every playground header stays on one row from 1280px to 1440px with the web fonts', async () => {
+  for (const url of PAGES) {
+    for (const width of [1280, 1366, 1440]) {
+      // This test needs the web fonts that open() blocks, because learners lay out in them.
+      const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await ctx.newPage();
+      await page.goto(`${base}/${url}`);
+      await page.evaluate(() => document.fonts.ready);
+      const fonts = await page.evaluate(() => [...document.fonts].some(f => f.status === 'loaded'));
+      assert.ok(fonts, `${url}: the web fonts did not load, so this layout check cannot run`);
+      const spread = await page.evaluate(() => {
+        const mids = [...document.querySelector('header.top').children].map(e => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; });
+        return Math.max(...mids) - Math.min(...mids);
+      });
+      assert.ok(spread < 16, `${url}: the header wraps at ${width}px (item centres ${Math.round(spread)}px apart)`);
+      await ctx.close();
+    }
   }
 });
 
@@ -2158,26 +2203,25 @@ test('the trail strip shows the chapter story on a later mission of every playgr
   }
 });
 
-test('Story button hides the trail strip, remembers the choice across reloads and playgrounds', async () => {
+test('Story setting hides the trail strip, remembers the choice across reloads and playgrounds', async () => {
   const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`);
   const attr = () => page.evaluate(() => document.documentElement.getAttribute('data-story'));
   assert.equal(await attr(), 'on');
-  assert.equal(await page.textContent('.story-toggle'), 'Story: On');
+  assert.ok(await page.isChecked('#st-panel input[name="st-story"][value="on"]'));
   await page.locator('.dots .dot').nth(1).click();
   assert.ok(await page.locator('.trail').isVisible());
-  await page.click('.story-toggle');
+  await pick(page, 'story', 'off');
   assert.equal(await attr(), 'off');
-  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
   assert.ok(await page.locator('.trail').isHidden());
   await page.reload();
   assert.equal(await attr(), 'off', 'choice survives a reload');
-  assert.equal(await page.textContent('.story-toggle'), 'Story: Off');
+  assert.ok(await page.isChecked('#st-panel input[name="st-story"][value="off"]'));
   const other = await ctx.newPage();
   await other.goto(`${base}/math/arithmetic/`);
   assert.equal(await other.evaluate(() => document.documentElement.getAttribute('data-story')), 'off', 'one setting for every playground');
   await other.locator('.dots .dot').nth(1).click();
   assert.ok(await other.locator('.trail').isHidden());
-  await other.click('.story-toggle');
+  await pick(other, 'story', 'on');
   assert.ok(await other.locator('.trail').isVisible());
   assert.deepEqual(errors, []);
   await ctx.close();

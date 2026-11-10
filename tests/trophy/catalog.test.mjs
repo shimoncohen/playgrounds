@@ -68,11 +68,13 @@ for (const q of QUESTS) {
   });
 }
 
-test('story: every playground page loads the trail files and renders the strip from a script it loads', () => {
+test('story: every playground page loads the trail and settings files and renders the strip from a script it loads', () => {
   for (const q of QUESTS) {
     const html = read(`${q.href}index.html`);
     assert.match(html, /<link rel="stylesheet" href="(\.\.\/)+shared\/trail\.css">/, `${q.href}: load shared/trail.css`);
     assert.match(html, /<script src="(\.\.\/)+shared\/trail\.js"><\/script>/, `${q.href}: load shared/trail.js`);
+    assert.match(html, /<link rel="stylesheet" href="(\.\.\/)+shared\/settings\.css">/, `${q.href}: load shared/settings.css`);
+    assert.match(html, /<script src="(\.\.\/)+shared\/settings\.js"><\/script>/, `${q.href}: load shared/settings.js`);
     const scripts = [...html.matchAll(/<script src="([^":]+)"><\/script>/g)].map(m => path.join(q.href, m[1]));
     assert.ok(scripts.some(f => read(f).includes('Trail.html(')), `${q.href}: render the strip with Trail.html(ch.story)`);
   }
