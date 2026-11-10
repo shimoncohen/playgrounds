@@ -1,0 +1,217 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { loadRust, ROOT } from './harness.mjs';
+
+const RQ = loadRust();
+const DIR = path.join(ROOT, 'programming', 'rust-quest');
+
+// Shipped mission titles, in order. Content is append only: saves are keyed '<chapter>.<mission>', so a new mission goes
+// at the end of its chapter and a new chapter after the last. Add to this list; never edit or reorder it.
+const SHIPPED = [['Say hello', 'Fill the hole', 'Name a value with let', 'Why can\'t I change it?', 'Lose a life', 'Same name, new variable'],
+  ['Say what kind of number', 'Numbers with a decimal point', 'Change a type with as', 'Keep values together in a tuple', 'Line values up in an array', 'A value that never changes', 'A number too big for its type', 'When a program panics'],
+  ['Write your own function', 'The semicolon that ate the value', 'Choose with if and else', 'An if that gives back a value', 'Repeat until you break out', 'Count down with while', 'Walk through a range with for', 'A typo in a name'],
+  ['Put text on the heap', 'One owner at a time', 'Numbers just copy', 'Copy a String on purpose', 'Take it in, give it back', 'Free a String early'],
+  ['Lend instead of give', 'Borrow it to change it', 'Many readers at once', 'Readers first, then the writer', 'Take a slice', 'A function that hands back a slice', 'A slice keeps its String borrowed', 'Which input does it borrow from?', 'A reference to something that is gone'],
+  ['Name the parts with a struct', 'Fields change only on a mut variable', 'Print a whole struct', 'A function that belongs to a type', 'A method that reads its struct', 'A method that changes its struct', 'A method that takes self'],
+  ['Name the choices with an enum', 'A match must cover every variant', 'Variants that carry data', 'Option: a value that might be missing', 'Ranges and a last arm', 'A number match needs a last arm', 'A guard adds a test', 'Match a pair', 'if let: when only one case matters', 'while let: keep going until it runs out', 'let else: leave early', 'Take a pair apart with let'],
+  ['A bucket that grows', 'A borrowed element blocks a push', 'Ask with get', 'Walk the bucket with for', 'for takes the bucket away', 'Change every shell in place', 'No pushing while you loop', 'Count with a HashMap', 'A HashMap keeps no order'],
+  ['A step that can fail', 'Open a Result with match', 'Trust it with expect', 'Pass the error up with ?', 'A Result is used up by ?', '? needs a Result to return', 'Name your errors with an enum', 'A missing value becomes an error', 'Let main report the error'],
+  ['Name the lifetime', 'The answer needs both inputs', 'Only label what the answer uses', 'A parameter without the label', 'A reference that lasts the whole run', 'A struct that holds a reference', 'Methods on a struct with a lifetime', 'A struct cannot outlive its text', 'A method result keeps the text borrowed'],
+  ['Give a type a trait', 'One function for many types', 'A default method to share', 'The bound opens the body', 'Say it with impl Trait', 'Teach a type to print with {}', 'Run code when a value goes', 'Turn one error into another', 'A struct that holds any type'],
+  ['A closure in a variable', 'A closure borrows what it reads', 'A closure that changes what it captured', 'Take a closure as a parameter', 'Fn, FnMut or FnOnce', 'Hand a closure back', 'Iterators are lazy', 'Filter and add up', 'Closures in std methods'],
+  ['Value a find', 'Lend the ledger, do not hand it over', 'Tally the finds by kind', 'Send the error up with ?', 'The heaviest find lives on', 'One total for every kind of thing', 'A rule as a closure', 'Add up a whole day']];
+const want = (m) => m.expect || 'ok';
+
+describe('chapter and mission ids are append only', () => {
+  it('every shipped mission still sits at its key', () => {
+    SHIPPED.forEach((titles, ci) => titles.forEach((t, mi) => assert.equal(RQ.CH[ci]?.missions[mi]?.title, t, `${ci}.${mi}`)));
+  });
+  it('chapters have the shape the page expects', () => {
+    RQ.CH.forEach((ch) => {
+      for (const k of ['name', 'badge', 'intro', 'toolbox']) assert.ok(ch[k], k);
+      assert.ok(ch.learned.length > 0 && ch.missions.length > 0);
+    });
+  });
+});
+
+RQ.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
+  const key = `${ci}.${mi}`;
+  describe(`mission ${key} ${m.title}`, () => {
+    it('has its card text: how has 3 to 5 steps and the first holds <code>', () => {
+      for (const k of ['goal', 'explain', 'hint']) assert.ok(m[k], k);
+      assert.ok(m.how.length >= 3 && m.how.length <= 5, `${m.how.length} how steps`);
+      assert.match(m.how[0], /<code>/);
+      assert.ok(['write', 'fix'].includes(m.kind));
+    });
+    it('expect is absent or panic', () => assert.ok(m.expect === undefined || m.expect === 'panic'));
+    it('the answer passes its own check', () => assert.equal(RQ.runMission(m, m.answer), true));
+    it('at least one alternative valid answer passes, and none is unsupported or internal', () => {
+      assert.ok(m.alts.length >= 1);
+      for (const a of [m.answer, ...m.alts]) {
+        const { c, result } = RQ.evalMission(m, a);
+        assert.equal(c.status, want(m), a);
+        assert.equal(result, true, a);
+      }
+    });
+    it('every wrong and lazy answer fails, and fails for its wrongWhy', () => {
+      assert.ok(m.wrong.length >= 1 && m.lazy.length >= 1);
+      for (const w of [...m.wrong, ...m.lazy]) {
+        const { c, result } = RQ.evalMission(m, w.src);
+        assert.notEqual(result, true, w.src);
+        assert.equal(typeof result, 'string');
+        if (w.wrongWhy === 'check') assert.ok(['ok', want(m)].includes(c.status), `${w.src} should compile and fail the check`);
+        else assert.equal(c.hasError(w.wrongWhy), true, `${w.src} should fail with ${w.wrongWhy}`);
+      }
+    });
+    it('the starter does not pass; a fix starter fails with starterErr', () => {
+      assert.ok(m.starter);
+      assert.notEqual(RQ.runMission(m, m.starter), true);
+      const starter = RQ.run(RQ.missionPrograms(m).find((p) => p.role === 'starter').src);
+      if (m.kind === 'fix') {
+        assert.ok(m.starterErr);
+        assert.equal(starter.hasError(m.starterErr), true);
+      } else assert.ok(['ok', want(m)].includes(starter.status));
+    });
+    it('every program is modeled: none returns unsupported or internal', () => {
+      for (const p of RQ.missionPrograms(m)) assert.ok(['ok', 'error', ...(m.expect ? [m.expect] : [])].includes(RQ.run(p.src).status), p.id);
+    });
+    it('the answer has the expected status, and on a mission that expects no panic nothing panics', () => {
+      assert.equal(RQ.evalMission(m, m.answer).c.status, want(m));
+      if (!m.expect) for (const p of RQ.missionPrograms(m)) assert.notEqual(RQ.run(p.src).status, 'panic', p.id);
+    });
+  });
+}));
+
+describe('the mission runner', () => {
+  const m = RQ.CH[0].missions[0];
+  it('an empty editor, unsupported code and engine bugs never complete a mission', () => {
+    assert.equal(typeof RQ.runMission(m, ''), 'string');
+    assert.match(RQ.runMission(m, 'trait T: Clone {}\nfn main() {}'), /does not model `trait`/);
+    assert.match(RQ.runMission(m, 'fn main() {'), /would not accept/);
+  });
+  it('a hidden harness is appended to the learner code', () => {
+    const fake = { harness: 'fn main() { println!("{}", helper()); }', answer: 'fn helper() -> i32 { 3 }', check: (c) => (c.out() === '3\n' ? true : 'no') };
+    assert.equal(RQ.runMission(fake, fake.answer), true);
+    assert.equal(RQ.runMission(fake, 'fn helper() -> i32 { 4 }'), 'no');
+  });
+  it('a panic on a mission that does not expect one gives the panic text, not the check', () => {
+    const fake = { answer: '', check: () => true };
+    const src = 'fn add(a: u8, b: u8) -> u8 { a + b }\nfn main() { println!("{}", add(250, 10)); }';
+    assert.equal(RQ.runMission(fake, src), 'The program stopped with a panic: attempt to add with overflow (line 1).');
+    assert.equal(RQ.runMission({ ...fake, expect: 'panic' }, src), true);
+  });
+  it('missionPrograms lists the answer, starter, alts, wrong and lazy programs with unique ids', () => {
+    const ps = RQ.missionPrograms();
+    assert.equal(new Set(ps.map((p) => p.id)).size, ps.length);
+    assert.deepEqual([...new Set(ps.map((p) => p.role))].sort(), ['alt', 'answer', 'lazy', 'starter', 'wrong']);
+    assert.equal(RQ.missionPrograms(m).length, 1 + 1 + m.alts.length + m.wrong.length + m.lazy.length);
+  });
+});
+
+describe('extras', () => {
+  it('ranks start at 0, rise, and have distinct titles', () => {
+    assert.equal(RQ.RANKS[0][0], 0);
+    RQ.RANKS.forEach((r, i) => { if (i) assert.ok(r[0] > RQ.RANKS[i - 1][0]); });
+    assert.equal(new Set(RQ.RANKS.map((r) => r[1])).size, RQ.RANKS.length);
+  });
+  it('quick-fire has at least 3 questions per chapter so far, each with 3 wrong answers', () => {
+    RQ.CH.forEach((_, ci) => assert.ok(RQ.QF.filter((q) => q.ch === ci).length >= 3, `chapter ${ci}`));
+    for (const q of RQ.QF) { assert.ok(RQ.CH[q.ch]); assert.equal(q.w.length, 3); assert.ok(!q.w.includes(q.a)); assert.ok(q.c && q.why); }
+  });
+  it('the field guide has at least one entry per chapter', () => {
+    RQ.CH.forEach((_, ci) => assert.ok(RQ.GUIDE.filter((g) => g.ch === ci).length >= 1, `chapter ${ci}`));
+    for (const g of RQ.GUIDE) { assert.ok(RQ.CH[g.ch] && g.c && g.what); for (const [code] of g.ex) assert.ok(code.includes('fn main')); }
+  });
+  it('every guide example has the status it declares: ok, panic, or the error id it is there to show', () => {
+    for (const g of RQ.GUIDE) for (const [code, , declared] of g.ex) {
+      const c = RQ.run(code);
+      if (!declared) assert.equal(c.status, 'ok', code);
+      else if (declared === 'panic') assert.equal(c.status, 'panic', code);
+      else {
+        assert.equal(c.status, 'error', code);
+        assert.equal(c.errors.filter((e) => e.code || e.lint).map((e) => e.code || e.lint).join(), declared, code);
+      }
+    }
+  });
+  it('every quest chapter has at least 6 quick-fire questions', () => {
+    RQ.CH.forEach((_, ci) => assert.ok(RQ.QF.filter((q) => q.ch === ci).length >= 6, `chapter ${ci}`));
+  });
+  it('a quick-fire question only calls methods that its chapter, or an earlier one, has taught', () => {
+    for (const q of RQ.QF) {
+      const taught = RQ.CH.slice(0, q.ch + 1).flatMap((c) => c.missions).map((m) => [m.goal, ...m.how, m.explain, m.hint, m.answer].join(' ')).join(' ');
+      for (const [, name] of q.c.matchAll(/\.([a-z_]+)\(/g)) assert.ok(taught.includes(`.${name}(`) || taught.includes(`<code>${name}</code>`), `${q.c}: ${name}`);
+    }
+  });
+  it('the top rank needs exactly the XP of finishing every mission', () => {
+    const total = RQ.CH.reduce((n, c) => n + c.missions.length, 0) * RQ.XP;
+    assert.equal(RQ.RANKS.at(-1)[0], total);
+  });
+  it('the guide explains every new error and lint id and panics', () => {
+    const text = RQ.GUIDE.map((g) => g.c + g.what).join(' ');
+    for (const w of ['E0308', 'E0425', 'E0382', 'E0502', 'E0596', 'E0106', 'E0515', 'arithmetic_overflow', 'overflowing_literals', 'unconditional_panic', 'panic']) assert.ok(text.includes(w), w);
+  });
+});
+
+describe('the guide glossary', () => {
+  const ids = Object.keys(RQ.diag.ERRORS);
+  const idsIn = (t) => t.match(/\bE\d{4}\b|\b[a-z]+(?:_[a-z]+)+\b/g) || [];
+  const entries = RQ.GUIDE.filter((g) => g.ch === RQ.CH.length - 1 && /^E\d{4}/.test(g.c));
+  it('the glossary entries are flagged, so the guide shows them in their own section', () => {
+    assert.deepEqual(RQ.GUIDE.filter((g) => g.gl).map((g) => g.c), entries.map((g) => g.c));
+  });
+  it('every error id and lint name the engine can emit is named in the title of a guide entry', () => {
+    for (const id of ids) assert.ok(RQ.GUIDE.some((g) => idsIn(g.c).includes(id)), `${id} has no field guide entry`);
+  });
+  it('every error id the engine source names is a row of the diagnostics table', () => {
+    const dir = path.join(DIR, 'engine');
+    for (const f of fs.readdirSync(dir)) for (const [, id] of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/['"](E\d{4})['"]/g)) assert.ok(ids.includes(id), `${f} names ${id}`);
+  });
+  it('every error id the corpus expects is a row of the diagnostics table', () => {
+    const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8'));
+    for (const e of corpus) if (e.expect !== 'ok') assert.ok(ids.includes(e.expect.code || e.expect.lint), e.id);
+  });
+  it('a glossary title lists only real ids, and each of its examples fails with one of them', () => {
+    assert.ok(entries.length >= 8);
+    for (const g of entries) {
+      const listed = idsIn(g.c);
+      for (const id of listed) assert.ok(ids.includes(id), `${g.c}: ${id}`);
+      for (const [code] of g.ex) {
+        const r = RQ.run(code);
+        assert.equal(r.status, 'error', code);
+        assert.ok(listed.some((id) => r.hasError(id)), `${g.c}: ${code}`);
+      }
+      assert.deepEqual(listed.filter((id) => !g.ex.some(([code]) => RQ.run(code).hasError(id))), [], `${g.c}: an id has no example`);
+    }
+  });
+  it('a glossary example is a corpus program, so a real rustc has seen it', () => {
+    const srcs = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8')).map((e) => e.src));
+    for (const g of entries) for (const [code] of g.ex) assert.ok(srcs.has(code), `${g.c}: ${code}`);
+  });
+});
+
+describe('inlined files', () => {
+  it('contain no </script or </style, so tools/build.py can inline them', () => {
+    const files = [];
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : /\.(js|css)$/.test(e.name) && files.push(path.join(d, e.name))));
+    walk(DIR);
+    assert.ok(files.length >= 8);
+    for (const f of files) assert.doesNotMatch(fs.readFileSync(f, 'utf8'), /<\/(script|style)/i, f);
+  });
+});
+
+describe('the rerun check helper', () => {
+  const src = 'fn main() {\n    let v = vec![1, 2, 3];\n    println!("{}", v.len());\n}\n';
+  it('runs the program again with the swapped text', () => {
+    assert.equal(RQ.run(src).rerun(['vec![1, 2, 3]', 'vec![1, 2, 3, 4]']).out(), '4\n');
+  });
+  it('is null when the text to swap is not in the program', () => {
+    assert.equal(RQ.run(src).rerun(['vec![9]', 'vec![]']), null);
+  });
+  it('catches a fix mission that prints a typed-in answer', () => {
+    const m = RQ.CH[7].missions[4];
+    const decoy = 'fn main() {\n    let bucket = vec![4, 8, 15];\n    let mut total = 27;\n    for _shell in &bucket {\n        total += 0;\n    }\n    println!("{} shells, total {}", bucket.len(), total);\n}\n';
+    assert.match(RQ.evalMission(m, decoy).result, /only works for this bucket/);
+  });
+});
