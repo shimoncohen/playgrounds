@@ -119,7 +119,7 @@ function renderMission() {
       : `<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch + 2}: ${esc(CH[S.ch + 1].name)}</button></div>`}${dots}`;
   } else {
     const m = ch.missions[S.mi];
-    h = `<div class="eyebrow">Chapter ${S.ch + 1} · Mission ${S.mi + 1} of ${n}${S.done[mkey()] ? ' · done ✓' : ''}</div>
+    h = `${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch + 1} · Mission ${S.mi + 1} of ${n}${S.done[mkey()] ? ' · done ✓' : ''}</div>
     ${prereq()}
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>

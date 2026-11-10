@@ -2129,7 +2129,7 @@ function renderMission(){const card=$('mission');
 `));saveCode()};return}
   const ch=CH[S.ch],m=curM(),k=mkey(S.ch,S.mi),done=!!S.done[k];
   const allDone=chDone(S.ch)===ch.missions.length;
-  let html=`<div class="eyebrow">Chapter ${S.ch+1} · ${esc(ch.name)} · Mission ${S.mi+1} of ${ch.missions.length}</div><h2>${esc(m.title)}</h2>`;
+  let html=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · ${esc(ch.name)} · Mission ${S.mi+1} of ${ch.missions.length}</div><h2>${esc(m.title)}</h2>`;
   if(S.mi===0)html+=`<p class="intro">${ch.intro}</p>`;
   html+=`<div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>`;
   html+=anatHTML(m.anat);html+=HowSteps.html(m.how);

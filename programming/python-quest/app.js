@@ -1113,7 +1113,7 @@ function renderMission(){
     ${last?`<p class="note">Next: play Quick-fire until reading code feels natural, then install Python on your computer. The field guide shows how.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button><button class="btn ghost" data-act="free">Free play</button></div>`}${dots}`}
   else{const m=ch.missions[S.mi];
-    h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
+    h=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
     ${S.mi===0?`<p class="intro">${HowSteps.tick(ch.intro,esc)}</p>`:''}
     <h2>${esc(m.title)}</h2>
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
