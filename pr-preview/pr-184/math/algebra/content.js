@@ -21,7 +21,7 @@
   const R = (label, value) => ({ min: 1, max: 5, step: 1, value, label });
   const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
-  const WOOD = '#9a6a3a', SAND = '#c9b98f', IRON = '#6f7b84', WATER = '#5b8fb9', ROPE = '#b08d57';
+  const WOOD = '#9a6a3a', SAND = '#c9b98f', IRON = '#6f7b84';
   const rr = (x0, y0, x1, y1, r, o) => ({ type: 'rrect', x0, y0, x1, y1, r, ...o });
   const disc = (x, y, r, o) => ({ type: 'circle', x, y, r, ...o });
   const label = (x, y, s, anchor) => ({ type: 'text', x, y, s, small: true, anchor });
@@ -313,27 +313,6 @@
       ],
     },
   };
-  // The label sits below the deepest the curve can dip (cMin − 9 at b = ±6), so it never meets the curve.
-  const labelY = cMin - 10.2, yLow = Math.floor(labelY - 0.9), boxH = 400 * (view[3] - yLow) / (view[3] - view[2]), py = (view[3] - yLow) / boxH;
-  plain.story = dressed(plain, 'The rope bridge over the mill stream',
-    s => `The rope bridge over the mill stream, ${plain.live(s).replace('the x-axis', 'the stream (the x-axis)')}`,
-    (items, { params: { b, c } }) => {
-      const g = x => x * x + b * x + c, rope = [], planks = [], len = 14 * py;
-      for (let x = view[0]; x < view[1] - 1e-9; x += 0.05) {
-        const lo = Math.min(g(x), g(x + 0.05)), hi = Math.max(g(x), g(x + 0.05));
-        if (hi < view[3] + 1 && lo > yLow - 1) rope.push({ type: 'polygon', pts: [[x, g(x)], [x + 0.05, g(x + 0.05)]], color: ROPE, edge: ROPE, w: 7 });
-      }
-      for (let x = view[0] + 1; x < view[1] - 0.9; x += 0.5) {
-        const y = g(x);
-        if (Math.abs(x) > 0.6 && y < view[3] - len && !(y - len < 6 * py && y > -16 * py)) planks.push(rr(x - 0.06, y - len, x + 0.06, y, 1, { color: WOOD, edge: WOOD, alpha: 0.9, w: 1 }));
-      }
-      const edge = (x0, x1) => [rr(x0, yLow, x1, 0, 0, { color: SAND, alpha: 0.35, stroke: false }), rr(x0 + 0.1, 0, x0 + 0.1 + (x1 - x0) * 0.5, 26 * py, 2, { color: WOOD, edge: WOOD, alpha: 0.9, w: 1.5 })];
-      return [
-        { type: 'polygon', pts: sq(view[0], yLow, view[1], 0), alpha: 0.18, stroke: false, color: WATER },
-        ...edge(view[0], view[0] + 0.6), ...edge(view[1] - 0.6, view[1]), ...rope, ...planks, ...items, label(0.4, labelY, 'the mill stream', 'start'),
-      ];
-    },
-    { view: [view[0], view[1], yLow, view[3]], box: [400, Math.round(boxH)] });
   return plain; };
 
   MQ.content = {
