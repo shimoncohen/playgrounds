@@ -16,7 +16,7 @@ const CLICKS=IMPL('Crab','format!("{} clicks", self.name)'),SQUAWKS=IMPL('Gull',
 const PAIR_MAIN=(call)=>J('',MAIN('let c = Crab { name: String::from("Pip") };','let g = Gull { name: String::from("Gus") };',call+'(&c);',call+'(&g);'));
 const ANNOUNCE=head=>FN(head,'println!("{}", x.sound());');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
+const OTHER=RQ.other('text');
 const BOUND=(g,name)=>!!g&&g.tparams.some(t=>t.bounds.includes(name));
 const MEET=J('',L('fn meet<T: Cry>(x: &T) {','    println!("{}", x.intro());','}'),MAIN('let c = Crab { name: String::from("Pip") };','let g = Gull { name: String::from("Gus") };','meet(&c);','meet(&g);'));
 const INTRO=L('    fn intro(&self) -> String {','        format!("{} says {}", self.name(), self.sound())','    }');
@@ -100,7 +100,7 @@ RQ.CH.push({
       lazy:[
         {src:J(CRY,CRAB,GULL,CLICKS,SQUAWKS,FN('fn announce<T: Cry>(x: &T)','let s = x.sound();')),wrongWhy:'check'}
       ],
-      defines:['generic-decl'],previews:[],
+      defines:['generic-decl','type-args'],previews:[],
       check:c=>{
         if(c.out()!=='Pip clicks\nGus squawks\n')return 'The program has to print `Pip clicks` and then `Gus squawks`.';
         if(!BOUND(c.genericOf('announce'),'Cry'))return 'Declare a type name after `announce`, like `<T: Cry>`, and write it as the parameter type, `&T`.';
@@ -224,7 +224,7 @@ RQ.CH.push({
       lazy:[
         {src:J(L('use std::fmt;'),SHELL,FMT('write!(f, "{}", self.size)')),wrongWhy:'check'}
       ],
-      defines:[],previews:[],
+      defines:['derive'],previews:[],
       check:c=>{
         if(c.out()!=='shell:4\nshell:12\n')return 'The program has to print `shell:4` and then `shell:12`.';
         if(!c.implOf('Display','Shell'))return 'Teach `Shell` to print with `<code>impl</code> fmt::Display for Shell`.';

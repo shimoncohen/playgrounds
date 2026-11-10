@@ -1,5 +1,7 @@
 # Rust Quest Phase 1 Implementation Plan
 
+Status: built; see "As built" at the end of the [design spec](../specs/2026-11-01-rust-quest-design.md). `content/tiers.js` below was never built: ranks live in `content/extras.js`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship `programming/rust-quest/`: an in-repo Rust checker and interpreter that runs the learner's real source, a memory view, and 13 chapters on one linear path, delivered as 16 strictly ordered PRs (P0 to P15). This plan details P0 to P5 (up to checkpoint 1); P6 to P15 are summary rows and are re-planned after checkpoint 1 and again after checkpoint 2.

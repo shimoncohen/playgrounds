@@ -31,8 +31,9 @@ RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static
   'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
-  'error conversion','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
-const PRINT={println:false,print:false,eprintln:true,eprint:true}; // value: goes to stderr
+  'error conversion','string concatenation','polymorphic recursion','bounds','where','into','generic reference','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
+const dict=o=>Object.assign(Object.create(null),o); // tables keyed by learner text must not inherit Object.prototype names
+const PRINT=dict({println:false,print:false,eprintln:true,eprint:true}); // value: goes to stderr
 const ITEM={Struct:'struct',Enum:'enum',Impl:'impl',Trait:'trait',Static:'static',TypeAlias:'type alias',Use:'use',Mod:'mod'};
 const EXPR={Match:'match',Closure:'closure',MethodCall:'method call',Range:'range expression',Ref:'reference',Deref:'dereference',Try:'try operator',
   StructLit:'struct literal',LetCond:'let condition',Await:'async',QPath:'qualified path'};
@@ -40,7 +41,7 @@ const TYPE_NODE={Slice:'slice',FnPtr:'fn pointer',ImplTrait:'impl Trait',QPath:'
 const COMPARE=new Set(['==','!=','<','>','<=','>=']);
 const ARITH=new Set(['+','-','*','/','%']);
 const MAX_ARRAY=10000;
-const COLL={Vec:1,HashMap:2};
+const COLL=dict({Vec:1,HashMap:2});
 const STD_TRAITS=['Debug','Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Hash'];
 
 RQ.check=ast=>{
@@ -62,7 +63,7 @@ RQ.check=ast=>{
     if(itemNames.has(it.name)){errors.push(RQ.diag.make('E0428',it.line,it.col,{name:it.name}));return false;}
     itemNames.add(it.name);return true;
   };
-  const peel=e=>e.t==='Paren'?peel(e.expr):e;
+  const peel=RQ.peel;
   const mism=(want,got,n,what)=>errors.push(RQ.diag.make('E0308',n.line,n.col,{expected:show(want),found:show(got),what:what||(peel(n).t==='Try'?'try':undefined)}));
   const expect=(got,want,n)=>{if(unify(got,want))return true;mism(want,got,n);return false;};
   // where a value goes into a typed place (let annotation, argument, return): &String becomes &str, and no other reference
@@ -344,7 +345,7 @@ RQ.check=ast=>{
   // Debug and Display need a `use`, so without one they are E0405 like any unknown name; the other prelude traits are not modeled as bounds
   const PRELUDE_TRAITS=new Set(['Clone','Copy','PartialEq','Eq','PartialOrd','Ord','Default']);
   const OTHER_PRELUDE=new Set(['Send','Sync','Sized','Drop','Fn','FnMut','FnOnce','AsRef','AsMut','Into','From','Iterator','Extend','IntoIterator','DoubleEndedIterator','ExactSizeIterator','ToOwned','ToString','TryFrom','TryInto','FromIterator']);
-  const IMPLIED={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['Eq','PartialOrd','PartialEq']};
+  const IMPLIED=dict({Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['Eq','PartialOrd','PartialEq']});
   // '' is a fn, const or static, which rustc also reports as E0404; undefined is a name that does not exist (E0405)
   function nonTrait(name,ps){
     if(ps&&ps.has(name))return 'type parameter';
@@ -424,6 +425,7 @@ RQ.check=ast=>{
     const inst=new Map(f.tps.map(p=>[p,fresh(line)]));
     const params=f.params.map(q=>subst(q.ty,inst)),ret=subst(f.ret,inst);
     const meet=()=>{
+      if(f===curFn)for(const p of f.tps){const t=res(inst.get(p));if(t.k!=='param'&&f.tps.some(q=>mentionsParam(t,q)))unsup('polymorphic recursion',line);}
       f.tps.forEach(p=>{
         const k=f.params.findIndex(q=>mentionsParam(q.ty,p)),at=k>=0&&argNodes[k]||callee;
         for(const tr of p.declared)obligs.push({ty:inst.get(p),tr,line:at.line,col:at.col});
@@ -638,7 +640,7 @@ RQ.check=ast=>{
   }
 
   const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
-  const USE_NAMES={'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter'};
+  const USE_NAMES=dict({'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter'});
   const mapUse=ast.items.filter(useMap).length===1;
   for(const it of ast.items){
     if(it.t==='Struct')structDecl(it);
@@ -678,7 +680,7 @@ RQ.check=ast=>{
     return heldBy(t).some(x=>holds(x,seenS));
   };
   // an enum derives Default from its one `#[default]` unit variant, so its fields are not asked for Default
-  const NEEDS={Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['PartialOrd','Eq']};
+  const NEEDS=dict({Copy:['Clone'],Eq:['PartialEq'],PartialOrd:['PartialEq'],Ord:['PartialOrd','Eq']});
   const badDerive=(rec,all)=>{
     const en=rec.node.t==='Enum';
     return rec.der.some(tr=>(tr!=='Default'||!en)&&all.some(f=>!has(f.ty,tr))||(NEEDS[tr]||[]).some(r=>!rec.der.includes(r)))
@@ -754,6 +756,7 @@ RQ.check=ast=>{
       const fl=t.k==='struct'||t.k==='enum'&&!t.builtin?froms.get(t.name):null,hit=fl&&fl.find(x=>unify(x.from,s0));
       if(hit)I(e).um={key:hit.key,self:'val',adj:'val',kind:'temp',ref:false,text:'value',from:-1,more:[]};
       else if(unify(s0,t))I(e).um={key:'Into::id',self:'val',adj:'val',kind:'temp',ref:false,text:'value',from:-1,more:[]};
+      else if(t.k==='String'&&s0.k==='str'||t.k==='int'&&s0.k==='int'&&widens(s0.ty,t.ty))I(e).um={key:t.k==='String'?'Into::String':'Into::int',to:t.ty,self:'val',adj:'val',kind:'temp',ref:false,text:'value',from:-1,more:[]};
       else if(fl||t.k==='struct'||t.k==='enum'&&!t.builtin)errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',type:show(t),trait:'From<'+show(s0,true)+'>'}));
       else unsup('into',e.line);
     }
@@ -1008,6 +1011,12 @@ RQ.check=ast=>{
     if(parts.length&&bt&&bt.k==='ref')via=via||bt;
     return {root:e,name:e.segs[0].name,parts,via,text:[e.segs[0].name,...parts].join('.')};
   }
+  // the lossless integer From impls; usize and isize have only a few, so they are left out
+  const widens=(from,to)=>{
+    if(from.endsWith('size')||to.endsWith('size'))return false;
+    const fb=+from.slice(1),tb=+to.slice(1);
+    return from[0]===to[0]?fb<tb:from[0]==='u'&&fb<tb;
+  };
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
   const ITERS=['iter','iter_mut','into_iter','keys','values','values_mut'],STORES=['push','insert','entry.or_insert','entry.or_default'];
   const MAP_KEYED=['insert','get','get_mut','contains_key','remove','entry.or_insert','entry.or_default'];
@@ -1481,7 +1490,7 @@ RQ.check=ast=>{
     const ct=T.closure(e.id,ps,ret);
     if(exp)ct.exp=exp.kind;
     const keep={r:curRet,l:loops,c:curCl,w:want};
-    const cl={id:e.id};
+    const cl={id:e.id,tries:[]};
     scopes.push(new Map());
     curCl=cl;curRet=ret;loops=[];want=null;
     e.params.forEach((p,i)=>bindVar(p.pat.name,p.pat.mut,'param',ps[i],p.pat));
@@ -1490,8 +1499,28 @@ RQ.check=ast=>{
     if(res(bt).k==='any'&&res(ret).k==='tvar')res(ret).pendDone=true;
     scopes.pop();
     curRet=keep.r;loops=keep.l;curCl=keep.c;want=keep.w;
+    for(const x of cl.tries)tryCheck(x.e,x.t,res(x.ret));
     if(e.move&&holdsRef(ret))return unsup('closure returning a reference',e.line);
     return ct;
+  }
+  const tryKind=x=>x.k==='enum'&&x.builtin?x.name:null;
+  // `?` in a closure with no declared return type is judged once the body has fixed that type
+  function tryCheck(e,t,rt){
+    const tk=tryKind(t);
+    if(!tk||hasRef(rt))return unsup('try operator',e.line);
+    const ok=t.args[0];
+    if(rt.k==='any'||rt.k==='never')return ok;
+    const rk=tryKind(rt);
+    if(!rk||rk!==tk){errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:rk?'try-kind':'try-ret',from:tk,ret:show(rt)}));return ok;}
+    if(tk==='Option')return ok;
+    const [,from]=t.args,[,to]=rt.args;
+    if(isOpen(from,false)||isOpen(to,false))return unsup('inferred type',e.line);
+    if(unify(from,to))return ok;
+    const fl=froms.get(res(to).name),hit=res(to).k!=='enum'||!res(to).builtin?fl&&fl.find(x=>unify(x.from,from)):null;
+    if(hit){I(e).conv=hit.key;return ok;}
+    if(noFrom(res(from),res(to)))errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:'try-convert',to:show(to),from:show(from)}));
+    else unsup('error conversion',e.line);
+    return ok;
   }
   // arguments checked against the closure signatures a std method expects; sig(i,types so far) gives the signature of argument i or null
   function argsWith(e,sig){
@@ -1765,6 +1794,17 @@ RQ.check=ast=>{
         const op=e.op;
         if(op==='&&'||op==='||')return unify(a,T.bool)&&unify(b,T.bool)?T.bool:unsup('type checking',e.line);
         if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
+        const SCALAR=['int','ivar','float','fvar','bool','char'];
+        if(op==='+'&&(res(a).k==='str'||res(a).k==='ref'&&res(res(a).to).k==='String')&&(SCALAR.includes(res(b).k)||res(b).k==='str'||res(b).k==='ref'&&res(res(b).to).k==='String')){
+          errors.push(RQ.diag.make('E0369',e.oline,e.ocol,{op,type:show(a),right:show(b)}));
+          return T.any;
+        }
+        if(op==='+'&&res(a).k==='String'){
+          const rb=res(b);
+          if(SCALAR.includes(rb.k)){mism(T.str,b,e.rhs);return T.string;}
+          // String + &str and String + &String (deref coercion) move the left String and give it back; other right sides are not judged
+          return rb.k==='str'||rb.k==='ref'&&res(rb.to).k==='String'?T.string:unsup('string concatenation',e.line);
+        }
         // a comparison needs the same number of references on both sides: rustc reports E0277 for == and != and E0308 for the order operators
         if(COMPARE.has(op)){
           const depth=t=>{let n=0;t=res(t);while(t.k==='ref'){n++;t=res(t.to);}return [n,t];};
@@ -1845,6 +1885,7 @@ RQ.check=ast=>{
         if(e.op!=='='){
           const op=e.op.slice(0,-1);
           if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
+          if(op==='+'&&res(ty).k==='String')return unsup('string concatenation',e.line);
           const rt=res(r),rn=rt.k==='ref'&&!rt.mut&&numeric(res(rt.to))?rt.to:r;
           if(!operands(ty,rn,{rhs:e.rhs,line:e.line}))return T.unit;
           const bit=op==='&'||op==='|'||op==='^',c=cls(ty);
@@ -1998,7 +2039,7 @@ RQ.check=ast=>{
           return tgt;
         }
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param')return adtMethod(e,r,adt,args,null);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&!r.mut&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
@@ -2025,7 +2066,7 @@ RQ.check=ast=>{
           const d=res(ex(e.args[0]));
           if(d.k==='any')return T.any;
           if(!(d.k==='ref'&&d.mut&&res(d.to).k==='fmtr'))return unsup(e.name+'!',e.line);
-          format({...e,name:'println',args:e.args.slice(1)});
+          format({...e,name:e.name==='write'?'print':'println',args:e.args.slice(1)});
           return fmtResult();
         }
         if(e.name==='vec'&&!e.named.length)return vecMacro(e);
@@ -2036,21 +2077,8 @@ RQ.check=ast=>{
       case 'Try':{
         const t=res(ex(e.expr)),rt=res(curRet);
         if(t.k==='any'||t.k==='never')return T.any;
-        const kind=x=>x.k==='enum'&&x.builtin?x.name:null,tk=kind(t);
-        if(!tk||hasRef(rt))return unsup('try operator',e.line);
-        const ok=t.args[0];
-        if(rt.k==='any'||rt.k==='never')return ok;
-        const rk=kind(rt);
-        if(!rk||rk!==tk){errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:rk?'try-kind':'try-ret',from:tk,ret:show(rt)}));return ok;}
-        if(tk==='Option')return ok;
-        const [,from]=t.args,[,to]=rt.args;
-        if(isOpen(from,false))return unsup('inferred type',e.line);
-        if(unify(from,to))return ok;
-        const fl=froms.get(res(to).name),hit=res(to).k!=='enum'||!res(to).builtin?fl&&fl.find(x=>unify(x.from,from)):null;
-        if(hit){I(e).conv=hit.key;return ok;}
-        if(noFrom(res(from),res(to)))errors.push(RQ.diag.make('E0277',e.qline,e.qcol,{what:'try-convert',to:show(to),from:show(from)}));
-        else unsup('error conversion',e.line);
-        return ok;
+        if(rt.k==='tvar'&&curCl&&tryKind(t)){curCl.tries.push({e,t,ret:curRet});return t.args[0];}
+        return tryCheck(e,t,rt);
       }
       case 'Return':{
         if(!e.expr){if(!unify(T.unit,curRet))unsup('type checking',e.line);return T.never;}
@@ -2184,8 +2212,10 @@ RQ.check=ast=>{
     }
   }
 
+  let curFn=null;
   function fnBody(f){
     if(!f.node.body)return;
+    curFn=f;
     scopes=[new Map()];curRet=f.ret;loops=[];tparams=f.tmap||null;opqCl=0;
     if(f.reg)I(f.node).reg=f.reg;
     if(f.node.name==='main'&&f.node.ret){

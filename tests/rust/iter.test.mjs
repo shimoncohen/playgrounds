@@ -61,7 +61,12 @@ describe('the two-seed rule for HashMap order', () => {
     const c = RQ.run(P(USE, '#[derive(Debug)]', 'struct W {', '    m: HashMap<i32, i32>,', '}', main(...MAP3, 'let w = W { m };', 'println!("{:?}", w);')));
     assert.equal(c.orderDependent, true);
   });
-  it('std.hashOrder rotates the order by one for seed 1, and the flag is per session', () => {
+  it('skipping one entry of a map in a loop is still order dependent', () => {
+    const c = RQ.run(P(USE, 'fn main() {', '    let mut m = HashMap::new();', '    m.insert(10, 2);', '    m.insert(20, 1);', '    m.insert(30, 3);', '    m.insert(40, 4);', '    for (k, v) in &m {', '        if *v != 2 {', '            println!("{} {}", k, v);', '        }', '    }', '}'));
+    assert.equal(c.status, 'ok');
+    assert.equal(c.orderDependent, true);
+  });
+  it('std.hashOrder rotates the order for seed 1 and reverses it for seed 2, and the flag is per session', () => {
     const m = { k: 'map', v: [1, 2, 3, 4].map((i) => ({ key: { k: 'int', v: BigInt(i), ty: 'i32' }, val: { k: 'int', v: BigInt(i), ty: 'i32' } })) };
     const s0 = RQ.std.hashSession(0);
     assert.equal(s0.iterated, false);
@@ -71,6 +76,8 @@ describe('the two-seed rule for HashMap order', () => {
     const b = RQ.std.hashOrder(m).map((e) => e.key.v);
     assert.deepEqual(b.map(String), [...a.slice(1), a[0]].map(String));
     for (const [i, x] of a.entries()) assert.notEqual(String(b[i]), String(x), `position ${i} keeps its key`);
+    RQ.std.hashSession(2);
+    assert.deepEqual(RQ.std.hashOrder(m).map((e) => String(e.key.v)), [...a].reverse().map(String));
     assert.equal(RQ.std.debug(m).includes('1: 1'), true);
     RQ.std.hashSession(0);
   });

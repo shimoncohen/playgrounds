@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { loadRust, ROOT } from './harness.mjs';
 
@@ -18,7 +19,15 @@ function distance(a, b) {
   return prev[b.length];
 }
 
+// Entries with pr "unit" are programs the unit tests assert on, added so the rustc verify checks them; they need no paired accept.
+// The corpus is append-only: the first SHIPPED entries keep their ids and order. Raise SHIPPED and the hash only when entries are appended and shipped.
+const SHIPPED = 1404, SHIPPED_IDS_SHA256 = '9077c77fa46a936628ca34734274891a945ec5c3808158a39935397fb200dcbd';
 describe('corpus v0: shape', () => {
+  it('only grows: the shipped ids are still the first entries, in order', () => {
+    assert.ok(corpus.length >= SHIPPED, `the corpus shrank to ${corpus.length}`);
+    assert.equal(crypto.createHash('sha256').update(corpus.slice(0, SHIPPED).map((e) => e.id).join('\n')).digest('hex'), SHIPPED_IDS_SHA256);
+  });
+
   it('ids are unique and every entry has its authored fields', () => {
     assert.equal(byId.size, corpus.length);
     for (const e of corpus) {
@@ -35,7 +44,7 @@ describe('corpus v0: shape', () => {
   });
 
   it('every reject has a paired accept that differs by a minimal edit', () => {
-    const rejects = corpus.filter((e) => e.expect !== 'ok');
+    const rejects = corpus.filter((e) => e.expect !== 'ok' && e.pr !== 'unit');
     assert.ok(rejects.length >= 3);
     for (const e of rejects) {
       const acc = byId.get(e.pair);
@@ -52,7 +61,7 @@ describe('corpus v0: shape', () => {
   it('P5: each borrow-check code has 3 or more rejects, each with a paired accept', () => {
     assert.ok(corpus.some((e) => e.pr === 'P5'));
     for (const code of ['E0381', 'E0382', 'E0499', 'E0502', 'E0505', 'E0506', 'E0596', 'E0597']) {
-      const rs = corpus.filter((e) => e.expect !== 'ok' && e.expect.code === code);
+      const rs = corpus.filter((e) => e.expect !== 'ok' && e.pr !== 'unit' && e.expect.code === code);
       assert.ok(rs.length >= 3, `${code} has ${rs.length} rejects`);
       for (const e of rs) assert.equal(byId.get(e.pair)?.expect, 'ok', `${e.id} has no paired accept`);
     }

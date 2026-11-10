@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadRust } from './harness.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { loadRust, ROOT } from './harness.mjs';
 
 const RQ = loadRust();
 const main = (body, items = '') => `${items}\nfn main() {\n${body}\n}\n`;
@@ -146,6 +148,14 @@ describe('RQ.run: syntax and format errors have no code', () => {
     assert.equal(c.errors[0].code, undefined);
     assert.equal(c.compiles(), false);
   });
+  it('impl with no trait, and write! with no format string, are errors without a code', () => {
+    for (const src of ['fn f(x: impl) {}\nfn main() {}\n', 'use std::fmt;\nstruct S;\nimpl fmt::Display for S { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f) } }\nfn main() { println!("{}", S); }\n']) {
+      const c = RQ.run(src);
+      assert.equal(c.status, 'error', src);
+      assert.equal(c.errors[0].code || c.errors[0].lint, undefined);
+    }
+    assert.equal(RQ.run('use std::fmt;\nstruct S;\nimpl fmt::Display for S { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { writeln!(f) } }\nfn main() { println!("{}", S); }\n').status, 'ok');
+  });
   it('a missing main and a wrong format string are errors', () => {
     assert.equal(RQ.run('fn other() {}').status, 'error');
     assert.equal(RQ.run(main('    println!("{} {}", 1);')).status, 'error');
@@ -190,6 +200,22 @@ describe('RQ.run: unsupported is not an error', () => {
   });
   it('no hint promises a later chapter or says the feature is coming', () => {
     for (const [f, h] of [...Object.entries(RQ.diag.UNSUPPORTED), ['default', RQ.diag.hint('anything else')]]) assert.doesNotMatch(h, /later chapter|for now|modeled yet|not yet|\byet\b/i, f);
+  });
+  it('no learner text in the course promises a later mission or chapter', () => {
+    const dir = path.join(ROOT, 'programming/rust-quest/content');
+    for (const f of fs.readdirSync(dir).filter((n) => /^(ch-.*|extras)\.js$/.test(n))) {
+      assert.doesNotMatch(fs.readFileSync(path.join(dir, f), 'utf8'), /\bfor now\b|later (chapter|mission)/i, f);
+    }
+  });
+  it('every feature name written in the engine source has its own hint', () => {
+    const dir = path.join(ROOT, 'programming/rust-quest/engine');
+    const seen = new Set();
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      for (const m of src.matchAll(/\b(?:unsup|un|Unsup)\(\s*'([^']+)'|feature:\s*'([^']+)'/g)) seen.add(m[1] || m[2]);
+    }
+    assert.ok(seen.size > 60, `only ${seen.size} feature names found`);
+    for (const f of seen) assert.ok(Object.hasOwn(RQ.diag.UNSUPPORTED, f), `no hint for "${f}"`);
   });
   it('every feature the engine can report has a hint in the diag catalog', () => {
     for (const f of [...RQ.PARSE_FEATURES, ...RQ.CHECK_FEATURES, ...RQ.BORROW_FEATURES]) assert.ok(RQ.diag.UNSUPPORTED[f] && RQ.diag.UNSUPPORTED[f].length > 10, f);

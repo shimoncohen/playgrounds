@@ -2,6 +2,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+const OTHER=RQ.other('values');
 const L=(...lines)=>lines.join('\n')+'\n';
 const PET=L('struct Critter {','    name: String,','    age: u32,','}');
 const DPET=L('#[derive(Debug)]','struct Critter {','    name: String,','    age: u32,','}');
@@ -108,9 +109,9 @@ RQ.CH.push({
       answer:NEW(['        Critter { name: String::from(name), age: age }']),
       alts:[NEW(['        Critter { name: name.to_string(), age: age }']),NEW(['        Critter { name: String::from(name), age }']),NEW(['        Self { name: String::from(name), age }']),NEW(['        let pet = Critter { name: String::from(name), age: age };','        pet'])],
       wrong:[{src:NEW(['        Critter { name: String::from(name), age: 0 }']),wrongWhy:'check'},{src:NEW(['        Critter { name: String::from("Pip"), age }']),wrongWhy:'check'}],
-      lazy:[{src:NEW(['        Critter { name: String::new(), age: 3 }']),wrongWhy:'check'},{src:NEW(['        Critter { name: String::from(name), age: 3 }']),wrongWhy:'check'}],
+      lazy:[{src:NEW(['        Critter { name: String::new(), age: 3 }']),wrongWhy:'check'},{src:NEW(['        Critter { name: String::from(name), age: 3 }']),wrongWhy:'check'},{src:'struct Critter {\n    name: String,\n    age: u32,\n}\nimpl Critter {\n    fn new(name: &str, age: u32) -> Critter {\n        if age == 3 {\n            Critter { name: String::from("Pip"), age: 3 }\n        } else {\n            Critter { name: String::from("Moss"), age: 11 }\n        }\n    }\n}\n',wrongWhy:'check'}],
       defines:['impl','path-call'],previews:[],
-      check:c=>c.out()!=='Pip is 3\nMoss is 11\n'?'`Critter::new` has to give back a `Critter` with the name and the age it was given. The program should print `Pip is 3` and then `Moss is 11`.':c.count('assoc')<1?'Put the function `new` inside an `impl Critter { ... }` block, so `Critter::new(...)` finds it.':true
+      check:c=>c.out()!=='Pip is 3\nMoss is 11\n'?'`Critter::new` has to give back a `Critter` with the name and the age it was given. The program should print `Pip is 3` and then `Moss is 11`.':c.count('assoc')<1?'Put the function `new` inside an `impl Critter { ... }` block, so `Critter::new(...)` finds it.':OTHER(c,'Kelp is 7\nDune is 2\n','`Critter::new` has to build a `Critter` from whatever name and age it is given, not only the ones `main` asks about.',['Critter::new("Pip", 3)','Critter::new("Kelp", 7)'],['Critter::new("Moss", 11)','Critter::new("Dune", 2)'])
     },
     {
       title:'A method that reads its struct',kind:'write',
@@ -128,9 +129,9 @@ RQ.CH.push({
       answer:L('impl Pool {','    fn area(&self) -> u32 {','        self.w * self.h','    }','}'),
       alts:[L('impl Pool {','    fn area(&self) -> u32 {','        self.h * self.w','    }','}'),L('impl Pool {','    fn area(&self) -> u32 {','        return self.w * self.h;','    }','}')],
       wrong:[{src:L('impl Pool {','    fn area(&self) -> u32 {','        self.w + self.h','    }','}'),wrongWhy:'check'},{src:L('impl Pool {','    fn area(&self) -> u32 {','        self.w * self.w','    }','}'),wrongWhy:'check'},{src:L('impl Pool {','    fn area(self) -> u32 {','        self.w * self.h','    }','}'),wrongWhy:'check'}],
-      lazy:[{src:L('impl Pool {','    fn area(&self) -> u32 {','        12','    }','}'),wrongWhy:'check'},{src:L('impl Pool {','    fn area(&self) -> u32 {','        3 * 4','    }','}'),wrongWhy:'check'}],
+      lazy:[{src:L('impl Pool {','    fn area(&self) -> u32 {','        12','    }','}'),wrongWhy:'check'},{src:L('impl Pool {','    fn area(&self) -> u32 {','        3 * 4','    }','}'),wrongWhy:'check'},{src:'impl Pool {\n    fn area(&self) -> u32 {\n        if self.w == 3 { 12 } else { 20 }\n    }\n}\n',wrongWhy:'check'}],
       defines:['method-call'],previews:[],
-      check:c=>c.out()!=='12 20\n'?'`area` has to give back the width times the height of the pool it was called on, so the program prints `12 20`.':c.count('method')<1?'Write `area` inside an `impl Pool` block, with `&self` as its first parameter.':c.selfOf('area')!=='&'?'Take `&self`, so `area` only borrows the pool and the caller keeps it.':true
+      check:c=>c.out()!=='12 20\n'?'`area` has to give back the width times the height of the pool it was called on, so the program prints `12 20`.':c.count('method')<1?'Write `area` inside an `impl Pool` block, with `&self` as its first parameter.':c.selfOf('area')!=='&'?'Take `&self`, so `area` only borrows the pool and the caller keeps it.':OTHER(c,'30 9\n','`area` has to multiply the width and the height of whichever pool it is called on, not only the ones `main` builds.',['Pool { w: 3, h: 4 }','Pool { w: 5, h: 6 }'],['Pool { w: 10, h: 2 }','Pool { w: 1, h: 9 }'])
     },
     {
       title:'A method that changes its struct',kind:'fix',
@@ -149,9 +150,9 @@ RQ.CH.push({
       answer:BUMP(['    fn bump(&mut self) {','        self.n += 1;','    }']),
       alts:[BUMP(['    fn bump(&mut self) {','        self.n = self.n + 1;','    }'])],
       wrong:[{src:BUMP(['    fn bump(&mut self) {','        self.n += 2;','    }']),wrongWhy:'check'},{src:BUMP(['    fn bump(&mut self) {','        self.n = self.n * 2;','    }']),wrongWhy:'check'}],
-      lazy:[{src:BUMP(['    fn bump(&mut self) {','        self.n = 2;','    }']),wrongWhy:'check'},{src:BUMP(['    fn bump(&mut self) {','    }']),wrongWhy:'check'}],
+      lazy:[{src:BUMP(['    fn bump(&mut self) {','        self.n = 2;','    }']),wrongWhy:'check'},{src:BUMP(['    fn bump(&mut self) {','    }']),wrongWhy:'check'},{src:'struct Counter {\n    n: u32,\n}\nimpl Counter {\n    fn bump(&mut self) {\n        if self.n < 5 {\n            self.n += 1;\n        } else {\n            self.n = 11;\n        }\n    }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='2 11\n'?'Each `bump` has to add one to the counter it was called on, so the harness prints `2 11`.':c.selfOf('bump')!=='&mut'?'Take `&mut self`, so `bump` borrows the counter and may change it.':true
+      check:c=>c.out()!=='2 11\n'?'Each `bump` has to add one to the counter it was called on, so the harness prints `2 11`.':c.selfOf('bump')!=='&mut'?'Take `&mut self`, so `bump` borrows the counter and may change it.':OTHER(c,'7 21\n','`bump` has to add one to whichever counter it is called on, not only the ones `main` builds.',['Counter { n: 0 }','Counter { n: 5 }'],['Counter { n: 10 }','Counter { n: 20 }'])
     },
     {
       title:'A method that takes self',kind:'fix',
@@ -169,9 +170,9 @@ RQ.CH.push({
       answer:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, age);'),
       alts:[L(PET.trim(),'','impl Critter {','    fn new(name: &str, age: u32) -> Critter {','        Critter { name: String::from(name), age }','    }','','    fn into_name(&self) -> String {','        self.name.clone()','    }','}',MAIN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, pet.age);').trim())],
       wrong:[{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, pet.age);'),wrongWhy:'E0382'},{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", age, name);'),wrongWhy:'check'}],
-      lazy:[{src:OWN('println!("Pip was 3");'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, 3);'),wrongWhy:'check'}],
+      lazy:[{src:OWN('println!("Pip was 3");'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let name = pet.into_name();','println!("{} was {}", name, 3);'),wrongWhy:'check'},{src:OWN('let pet = Critter::new("Pip", 3);','let age = pet.age;','let name = pet.into_name();','println!("{} was {}", name, if age == 3 { 3 } else { 0 });'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='Pip was 3\n'?'The program has to print `Pip was 3`: the name first, and then the age.':c.usesMethod('into_name')<1?'Keep using `into_name` to get the name.':c.count('field')<2?'Read the age out of the `pet` itself, instead of typing it again.':true
+      check:c=>c.out()!=='Pip was 3\n'?'The program has to print `Pip was 3`: the name first, and then the age.':c.usesMethod('into_name')<1?'Keep using `into_name` to get the name.':c.count('field')<2?'Read the age out of the `pet` itself, instead of typing it again.':OTHER(c,'Bo was 7\n','The program has to print the name and the age of whichever `Critter` it builds, not only Pip.',['"Pip", 3','"Bo", 7'])
     }
   ]
 });

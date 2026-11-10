@@ -50,7 +50,7 @@ Type `help` in the shell for every command by tier. The practice shell is a docu
 These make good, low-stakes onboarding material: new hires learn by doing, at their own pace, with nothing to install.
 
 - **Share a link.** Every playground has a stable URL. Send `https://shimoncohen.github.io/playgrounds/programming/shell-quest/` and a new colleague is typing commands in seconds.
-- **Pick a path.** Backend newcomers: Shell Quest, then Harbor Quest. Frontend newcomers: Script Quest. Data folks: Python Quest. Systems folks: C++ Quest.
+- **Pick a path.** Backend newcomers: Shell Quest, then Harbor Quest. Frontend newcomers: Script Quest. Data folks: Python Quest. Systems folks: C++ Quest or Rust Quest.
 - **Set a rank as the goal.** "Reach *Pipe Fitter* in your first week" is a friendly, measurable milestone. Progress exports to a small JSON file, so people can show where they are.
 - **Pair on it.** The missions read well out loud. Take turns driving.
 - **Challenge a friend.** Quick-fire rounds are made for "beat my score".
@@ -150,7 +150,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 The Artifact service wraps pages in its own skeleton, so it needs a single body-only file:
 
 ```
-python3 tools/build.py            # all eight -> dist/<name>-quest.html
+python3 tools/build.py            # every playground -> dist/<name>-quest.html
 python3 tools/build.py shell      # just one
 python3 tools/build.py --check    # verify the folders bundle cleanly
 ```

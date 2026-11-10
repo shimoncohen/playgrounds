@@ -25,7 +25,7 @@ const OUTER=(...inner)=>J(NOTE,MAIN('let note: Note;','{','    let words = Strin
 const START_IMPL=J(NOTE,FN("impl<'a> Note<'a>",'fn start(&self) -> &str {','    &self.text[..4]','}'));
 const START_MAIN=(...steps)=>MAIN('let mut words = String::from("meet at low tide");','let note = Note { text: &words };','let start = note.start();',...steps);
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
+const OTHER=RQ.other('text');
 const SAME_LT=s=>!!s&&s.params.length>=2&&!!s.params[0]&&s.params.every(p=>p===s.params[0])&&s.ret===s.params[0];
 
 RQ.CH.push({
@@ -45,7 +45,7 @@ RQ.CH.push({
         `Putting <code>'a</code> on <code>a</code>, on <code>b</code> and on the result says: the answer is one of these two, so it may be used only while both are still there. The name is a label for the compiler's check. It does not make any text live longer or shorter.`,
         `The body does not change. The hidden <code>main</code> calls <code>longest</code> with other texts than the ones in the card, so the answer has to keep picking the longer one.`
       ],
-      explain:`The same label on two inputs and the result is the usual way to write "the answer comes from either one". If you label only one input and the body can return the other, Rust rejects it with <code>E0621</code>, which a later mission shows. The name <code>'a</code> is only a habit: <code>'x</code> works too, as long as it is declared and used the same way each time.`,
+      explain:`The same label on two inputs and the result is the usual way to write "the answer comes from either one". If you label only one input and the body can return the other, Rust rejects it with <code>E0621</code>, which a mission further on in this chapter shows. The name <code>'a</code> is only a habit: <code>'x</code> works too, as long as it is declared and used the same way each time.`,
       hint:`Write <code>fn longest&lt;'a&gt;(a: &'a str, b: &'a str) -> &'a str</code> and leave the body alone.`,
       harness:LONGEST_MAIN,
       starter:LONGEST('(a: &str, b: &str) -> &str',...PICK_IF),

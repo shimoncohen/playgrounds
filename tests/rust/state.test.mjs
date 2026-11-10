@@ -6,8 +6,8 @@ const RQ = loadRust();
 const { state } = RQ;
 const CH = RQ.CH;
 
-// Copied from shared/progress.js:44: a state with xp 0 and nothing done is "no progress".
-const pristine = (d) => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0));
+// Mirrors the `pristine` rule in shared/progress.js: a state with xp 0, nothing done and no notes is "no progress".
+const pristine = (d) => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && (!d.notes || Object.values(d.notes).every((v) => !v)));
 const L = (o) => state.load(typeof o === 'string' ? o : JSON.stringify(o), CH);
 
 describe('saved state', () => {

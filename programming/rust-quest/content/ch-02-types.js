@@ -164,14 +164,14 @@ RQ.CH.push({
       answer:ADD+'fn main() {\n    println!("{}", add(250, 10));\n}\n',
       alts:[ADD+'fn main() {\n    let n = add(250, 10);\n    println!("{}", n);\n}\n',ADD+'fn main() {\n    println!("{}", add(255, 1));\n}\n'],
       wrong:[{src:ADD+'fn main() {\n    println!("{}", 250u8 + 10);\n}\n',wrongWhy:'arithmetic_overflow'},{src:ADD+'fn main() {\n    println!("{}", add(100, 100));\n}\n',wrongWhy:'check'}],
-      lazy:[{src:ADD+'fn main() {\n    println!("{}", add(1, 2));\n}\n',wrongWhy:'check'},{src:ADD+'fn main() {\n    println!("101");\n}\n',wrongWhy:'check'}],
+      lazy:[{src:ADD+'fn main() {\n    println!("{}", add(1, 2));\n}\n',wrongWhy:'check'},{src:ADD+'fn main() {\n    println!("101");\n}\n',wrongWhy:'check'},{src:'fn add(a: u8, b: u8) -> u8 {\n    panic!("attempt to add with overflow");\n}\n\nfn main() {\n    println!("{}", add(1, 2));\n}\n',wrongWhy:'check'}],
       defines:[],
       previews:[
         {tag:'fn-decl',wording:'The <code>fn add</code> part declares a function of your own: Chapter 3 shows how to write one.',home:3},
         {tag:'fn-params',wording:'The list <code>(a: u8, b: u8)</code> names the values it receives (Chapter 3 covers parameters)',home:3},
         {tag:'fn-ret',wording:'<code>-> u8</code> says what type it gives back (Chapter 3 covers return types)',home:3}
       ],
-      check:c=>c.calls('add')<1?'Call `add` from `main`, and print what it gives back.':c.status!=='panic'?'It ran to the end, because the sum fits in a `u8`. Pick numbers that add up to more than `255`.':c.exit===101&&c.panic.msg==='attempt to add with overflow'?true:'The program panicked, but not from the addition. Add two numbers that are too big for a `u8`.'
+      check:c=>c.calls('add')<1?'Call `add` from `main`, and print what it gives back.':c.usesMacro('panic')>0?'Do not call `panic!` yourself. Let the addition in `add` overflow, so Rust panics for you.':c.status!=='panic'?'It ran to the end, because the sum fits in a `u8`. Pick numbers that add up to more than `255`.':c.exit===101&&c.panic.msg==='attempt to add with overflow'?true:'The program panicked, but not from the addition. Add two numbers that are too big for a `u8`.'
     }
   ]
 });

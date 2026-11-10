@@ -1,4 +1,5 @@
-// Every verdict here was checked against rustc (pinned image, edition 2024): the id and line of an error, the output of a program that compiles.
+// Every program here that finishes or fails with one coded error is also in the corpus, so the rustc verify checks its id, line and output.
+// A row marked unsupported is Rust Quest declining to judge; it has no rustc verdict to check.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRust } from './harness.mjs';

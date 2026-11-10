@@ -70,3 +70,33 @@ describe('lexer', () => {
     assert.ok(Date.now() - t0 < 3000);
   });
 });
+
+describe('lexer: rustc edge cases', () => {
+  const run = (src) => RQ.run(src);
+  it('a literal over u128::MAX is "integer literal is too large", with no lint id', () => {
+    const c = run('fn main() { let x = 340282366920938463463374607431768211456; }');
+    assert.equal(c.status, 'error');
+    assert.equal(c.errors[0].code || c.errors[0].lint, undefined);
+    assert.match(c.errors[0].msg, /too large/);
+  });
+  it('a literal that only overflows its type is still overflowing_literals', () => {
+    assert.equal(run('fn main() { let x = 300000000000000000000000000000000000000; }').errors[0].lint, 'overflowing_literals');
+  });
+  it('a #! line 1 is a shebang, and #![ is an attribute', () => {
+    assert.equal(run('#!/usr/bin/env run\nfn main() { println!("hi"); }').stdout, 'hi\n');
+    assert.equal(run('#![allow(unused)]\nfn main() { println!("hi"); }').stdout, 'hi\n');
+    assert.equal(run('#!x\nfn main() {\n    let x: i32 = "a";\n}').errors[0].line, 3);
+  });
+});
+
+describe('a generic function that calls itself with a bigger type', () => {
+  it('is unsupported, not a limit, because rustc rejects it', () => {
+    const c = RQ.run('fn f<T>(x: T) { f((x,)) }\nfn main() { f(1); }');
+    assert.equal(c.status, 'unsupported');
+    assert.equal(c.unsupported.feature, 'polymorphic recursion');
+  });
+  it('same-type and concrete-type self calls are unchanged', () => {
+    assert.equal(RQ.run('fn f<T>(x: T, n: u32) { if n > 0 { f(x, n - 1); } else { println!("end"); } }\nfn main() { f(1, 2); }').stdout, 'end\n');
+    assert.equal(RQ.run('fn f<T>(x: T, n: u32) { if n > 0 { f(1i32, n - 1); } }\nfn main() { f("a", 3); println!("ok"); }').stdout, 'ok\n');
+  });
+});

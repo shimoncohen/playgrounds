@@ -10,6 +10,9 @@
 const RQ=globalThis.RQ=globalThis.RQ||{};
 RQ.CH=RQ.CH||[];
 
+// Reruns the learner's program with the given harness text swapped, to catch an answer that only fits the harness's own calls.
+RQ.other=noun=>(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other '+noun+'.':r.out()!==want?why:true;};
+
 const ORDER_TIP='Your output depends on `HashMap` order. Real Rust changes that order every run, so sort the keys first.';
 const program=(m,input)=>m.harness?input+'\n'+m.harness:input;
 

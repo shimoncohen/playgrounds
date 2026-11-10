@@ -5,7 +5,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
-const peel=e=>e.t==='Paren'?peel(e.expr):e;
+const peel=RQ.peel;
 const ARITH={'+':1,'-':1,'*':1};
 
 RQ.lint=(ast,info)=>{

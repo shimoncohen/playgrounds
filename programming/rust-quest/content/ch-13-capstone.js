@@ -7,7 +7,7 @@ const J=(...parts)=>parts.join('\n');
 const MAIN=(...body)=>L('fn main() {',...body.map(l=>'    '+l),'}');
 const FN=(head,...body)=>L(head+' {',...body.map(l=>'    '+l),'}');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
+const OTHER=RQ.other('text');
 const EACH=(c,why,...cases)=>{for(const [want,...swaps] of cases){const r=OTHER(c,want,why,...swaps);if(r!==true)return r;}return true;};
 const BOUND=(g,name)=>!!g&&(g.tparams.some(t=>t.bounds.includes(name))||g.impl.some(b=>!!b&&b.includes(name)));
 const FN_BOUND=g=>!!g&&(g.tparams.some(t=>t.bounds.includes('Fn'))||g.impl.some(b=>!!b&&b.includes('Fn')));
