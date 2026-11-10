@@ -599,6 +599,50 @@ test('math-arithmetic: each mission opens its picture on its own numbers', async
   await ctx.close();
 });
 
+test('math-arithmetic: the cold-cellar story picture follows the Story setting in place and keeps the sliders', async () => {
+  const { ctx, page, errors } = await open(`${base}/math/arithmetic/`);
+  await page.evaluate(() => localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: 1, mi: 0, done: {}, badges: {} })));
+  await page.reload();
+  await page.waitForSelector('#scene .mq-live');
+  const live = () => page.textContent('#scene .mq-live'), label = () => page.getAttribute('#scene svg', 'aria-label');
+  const icons = () => page.locator('#scene svg .icon').count();
+  assert.match(await live(), /^At dusk the cellar thermometer reads −3°\. Overnight it changes by −5°/);
+  assert.equal(await label(), 'The cold cellar thermometer');
+  assert.equal(await icons(), 1, 'the dawn mark');
+  await page.fill('#scene input[type=number][aria-label="a value"]', '1');
+  await page.dispatchEvent('#scene input[type=number][aria-label="a value"]', 'input');
+  assert.match(await live(), /reads 1°/);
+  await page.click('.story-toggle');
+  assert.match(await live(), /^Start at 0, move 1, then move −5/);
+  assert.equal(await label(), 'Two arrows along the number line');
+  assert.equal(await icons(), 0);
+  assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1', 'the slider keeps its value');
+  assert.equal(await page.locator('#feedback .msg').count(), 0, 'swapping fires no check');
+  await page.click('.story-toggle');
+  assert.match(await live(), /reads 1°/);
+  assert.equal(await page.inputValue('#scene input[type=number][aria-label="a value"]'), '1');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('math-arithmetic: a scene mission on a story picture still completes, with Story On and Off', async () => {
+  for (const mode of ['on', 'off']) {
+    const { ctx, page, errors } = await open(`${base}/math/arithmetic/`, {}, c => c.addInitScript(m => {
+      localStorage.setItem('playgrounds-story', m);
+      if (!localStorage.getItem('math-arithmetic-v1')) localStorage.setItem('math-arithmetic-v1', JSON.stringify({ xp: 0, ch: 1, mi: 4, done: {}, badges: {} }));
+    }, mode));
+    await page.waitForSelector('#scene .mq-live');
+    assert.equal(await page.locator('#scene svg .icon').count() > 0, mode === 'on');
+    for (const [n, v] of [['a', '-3'], ['b', '-4']]) {
+      await page.fill(`#scene input[type=number][aria-label="${n} value"]`, v);
+      await page.dispatchEvent(`#scene input[type=number][aria-label="${n} value"]`, 'input');
+    }
+    await page.waitForSelector('#feedback .msg.win');
+    assert.deepEqual(errors, [], mode);
+    await ctx.close();
+  }
+});
+
 test('math-geometry: scene points move with the arrow keys and a pointer, and the live area and angles follow', async () => {
   const { ctx, page, errors } = await open(`${base}/math/geometry/`);
   const live = () => page.textContent('#scene .mq-live');
