@@ -39,6 +39,12 @@ for (const track of TRACKS) {
       assert.equal(typeof sc.story.draw.items, 'function', `${sc.id}: story draw has no items function`);
       const st = MQ.scene.model(sc).state();
       for (const it of sc.story.draw.items(st)) if (it.type === 'icon') assert.ok(MQ.svg2d.icons[it.name], `${sc.id}: unknown icon ${it.name}`);
+      for (const it of sc.story.draw.items(st)) {
+        assert.ok(['axes', 'grid', 'fn', 'polygon', 'text', 'vector', 'point', 'icon', 'rrect', 'circle'].includes(it.type), `${sc.id}: unknown item ${it.type}`);
+        const nums = it.type === 'rrect' ? [it.x0, it.y0, it.x1, it.y1, it.r] : it.type === 'circle' ? [it.x, it.y, it.r] : [];
+        for (const v of nums) assert.ok(Number.isFinite(v), `${sc.id}: ${it.type} needs finite numbers`);
+        if (it.type === 'rrect') assert.ok(it.x1 > it.x0 && it.y1 > it.y0, `${sc.id}: rrect needs a positive size`);
+      }
       for (const it of sc.story.draw.items(st)) if (it.alpha !== undefined) assert.ok(it.alpha > 0 && it.alpha <= 1, `${sc.id}: alpha ${it.alpha}`);
     }
   });
