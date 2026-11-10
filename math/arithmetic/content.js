@@ -72,6 +72,37 @@
         ];
       },
     },
+    story: {
+      title: 'The cold cellar thermometer',
+      live: s => { const { a, b } = s.params; return `At dusk the cellar thermometer reads ${signed(a)}°. Overnight it changes by ${signed(b)}°. What does Wick read at dawn?`; },
+      draw: {
+        kind: '2d', view: [-11, 11, -1.9, 1.2], box: [400, 217],
+        items: s => {
+          const { a, b } = s.params, t = a + b;
+          // Labels are ~0.42 units a character: keep the night label above its arrow, off the 0° edge and inside the picture.
+          const nightS = 'night ' + signed(b) + '°', w = nightS.length * 0.42;
+          let nightX = a + b / 2;
+          if (nightX - w / 2 < 0 && nightX + w / 2 > 0) nightX = (nightX < 0 ? -1 : 1) * (w / 2 + 0.2);
+          nightX = Math.min(11 - w / 2 - 0.2, Math.max(-11 + w / 2 + 0.2, nightX));
+          const mark = v => ({ type: 'text', x: v, y: -0.5, s: v ? signed(v) + '°' : '0°: water freezes', small: true });
+          return [
+            { type: 'polygon', pts: [[-11, -1.9], [0, -1.9], [0, 1.2], [-11, 1.2]], alpha: 0.12, stroke: false },
+            { type: 'polygon', pts: [[-10.5, -0.15], [10.5, -0.15], [10.5, 0.15], [-10.5, 0.15]] },
+            { type: 'polygon', pts: [[-10.5, -0.15], [t, -0.15], [t, 0.15], [-10.5, 0.15]], term: 'sum' },
+            ...[-10, 0, 10].map(mark),
+            { type: 'vector', from: [0, 0.35], to: [a, 0.35], term: 'a' },
+            { type: 'text', x: a > 0 ? -0.3 : 0.3, y: 0.35, s: 'dusk ' + signed(a) + '°', small: true, anchor: a > 0 ? 'end' : 'start', term: 'a' },
+            { type: 'vector', from: [a, 0.75], to: [t, 0.75], term: 'b' },
+            { type: 'text', x: nightX, y: 0.97, s: nightS, small: true, term: 'b' },
+            { type: 'point', x: t, y: 0, term: 'sum' },
+            { type: 'icon', name: t < 0 ? 'snowflake' : 'sun', x: t, y: -0.95, term: 'sum' },
+            { type: 'text', x: Math.min(10.2, Math.max(-10.2, t)), y: -1.27, s: 'dawn', small: true, term: 'sum' },
+            { type: 'text', x: -10.8, y: -1.7, s: 'colder ← the cellar', small: true, anchor: 'start' },
+            { type: 'text', x: 10.8, y: -1.7, s: 'warmer → the street', small: true, anchor: 'end' },
+          ];
+        },
+      },
+    },
   };
 
   const D = (label, value) => ({ min: 2, max: 6, step: 1, value, label });

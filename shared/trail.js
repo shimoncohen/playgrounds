@@ -25,6 +25,7 @@
       mode = mode === 'on' ? 'off' : 'on';
       try { localStorage.setItem(KEY, mode); } catch (e) { /* choice just won't persist */ }
       root.setAttribute('data-story', mode);
+      document.dispatchEvent(new CustomEvent('playgrounds:story', { detail: mode }));
       show();
     });
     show();
