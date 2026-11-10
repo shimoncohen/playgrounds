@@ -2,7 +2,15 @@
 
 Date: 2026-11-01. Status: built; what shipped is in [As built](#as-built) at the end. The sections between are the approved design and were not rewritten. Issue: #47.
 
-> **Rust facts are UNVERIFIED until the first verify run (P2).** Error codes, lint names and folding behaviour, the panic header format, thread-id presence, exit codes, `f64` formatting and edition 2024 behaviour are authored from memory. `tests/rust/verify-rustc.mjs` settles them against a real `rustc`. Nothing in this spec is a claim about `rustc` until then.
+> **Rust facts are settled by the verify run, except the gaps listed here.** `tests/rust/verify-rustc.mjs` compiles and runs every corpus, mission and field-guide program on a real `rustc` (1.99.1, edition 2024, in the digest-pinned container image recorded in `tests/fixtures/rust/verified.json`) and reports 0 mismatches. What that corpus settles:
+>
+> - **Error codes.** 48 distinct `E` codes.
+> - **Lints.** The ids `arithmetic_overflow`, `unconditional_panic` and `overflowing_literals`, and the folding the lint pass models: literals, `let` and `let mut` locals, tuples and arrays, `const` items, literal casts, branches on a known condition, and what a borrow, a call or a block boundary does to a known value.
+> - **Panics.** The header and message text, and exit code 101 (and 1 for `main` returning `Err`).
+> - **`f64` formatting.** `Display` and `Debug`, including NaN, the infinities and negative zero.
+> - **Edition 2024.** Every program compiles with `--edition 2024`.
+>
+> Not settled: the thread id (rustc 1.99.1 prints `thread 'main' (<id>) panicked`; the verify drops the id before comparing, so its value is never checked); edition-2024-only behaviour (let chains, `if let` scoping, tail-expression temporaries), which no program probes on purpose; folding in `match` arms and E0600 for a negative literal cast to an unsigned type, which the lint pass reports as unsupported; and anything else no corpus program exercises.
 
 ## Goal
 
@@ -301,7 +309,7 @@ How the analysis of issue #47 is settled:
 - Fidelity can drift in corners the corpus misses. Mitigations: minimal pairs, combination programs, the stamp. A checker bug on supported constructs stays a residual risk.
 - **What the oracle cannot see.** `rustc` can compare compile results, stdout, stderr and exit codes, and drop order through `impl Drop` programs that print. It cannot observe the memory view's snapshot content, `alloc`/`free` events, or loan-region display. `c.allocs` counts, which the lazy checks rely on, are checked only by unit tests with hand-counted programs.
 - The stamp is an honor-system record. CI cannot run `rustc`. A forged `verified.json` passes the hash tests. The PR description must carry the verify output line (version, counts, 0 mismatches).
-- **Rust facts are UNVERIFIED until the first verify run** (E-codes, lint names and folding behaviour, panic format, thread-id presence, edition 2024 behaviour, `f64` formatting). If the owner's `rustc` is older than edition 2024, D4 needs an owner decision.
+- Rust facts are settled only where the corpus covers them (see the banner at the top for what is and is not). The verify ran on `rustc` 1.99.1 with edition 2024, so D4 needs no owner decision.
 - Lint modeling (see Diagnostics) is the most fragile fidelity area.
 - Checkpoint 2 cuts closures, adapters, user traits and user generics: if ch11-12 are downgraded, R1's "traits and simple generics" and "iterators and closures" are authored only (see Alternatives).
 - P2 carries the verify script and its tests, so it is bigger than the Agent chain's P2.
@@ -497,7 +505,9 @@ stateDiagram-v2
 
 Status: built. Thirteen chapters ship, delivered as a chain of PRs into `feat/47-rust-quest` that lands on `main` through #96. The sections above are the approved design and are kept as written; this section records where the build differs.
 
-**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1404 corpus programs, 931 mission programs and 103 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
+**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1444 corpus programs, 943 mission programs and 103 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
+
+**Lint folding.** `engine/lint.js` follows rustc's per-local rule, probed on the pinned image: a local assigned once is known for the whole function, one assigned more than once only until the next block boundary, and one whose address is taken anywhere (`&`, a closure capture, a `println!` argument, an autoref method receiver) never. `const` items are known operands, a literal cast gives the literal the target type, and a branch a known condition rules out is never linted. Still `unsupported`: a trap inside a `match` arm, and a negative literal cast to an unsigned type (rustc reports E0600, which Rust Quest does not model).
 
 **Checkpoint 2.** The owner decided that chapters 11 (traits and generics) and 12 (closures and iterators) are real code, run by the engine, not authored lessons.
 
