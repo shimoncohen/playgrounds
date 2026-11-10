@@ -174,49 +174,60 @@
   const br = v => (v < 0 ? `(${signed(v)})` : String(v));
   const sq = (x0, y0, w, h, term) => rect(x0, y0, x0 + w, y0 + h, term);
 
-  const chain = (id, tex, stages) => ({
-    id, title: 'The line, one step at a time',
-    params: {},
-    terms: ['now'],
-    t: { min: 0, max: stages.length - 1, step: 0.01, value: 0, speed: 0.5, label: 'step' },
-    formula: tex,
-    live: s => { const k = Math.floor(s.t); return `Line ${k + 1} of ${stages.length}: ${stages[k][0]}`; },
-    draw: {
-      kind: '2d', view: [0, 10, 0, stages.length * 1.2], box: [420, 52 * stages.length],
-      items: s => {
-        const k = Math.floor(s.t), out = [];
-        for (let i = 0; i <= k; i++) {
-          const y = (stages.length - i - 0.5) * 1.2;
-          if (i === k) out.push(rect(0.05, y - 0.55, 9.95, y + 0.55, 'now'));
-          out.push({ type: 'text', x: 0.3, y: y + 0.22, s: stages[i][0], anchor: 'start' }, { type: 'text', x: 0.3, y: y - 0.3, s: stages[i][1], small: true, anchor: 'start' });
-        }
-        return out;
+  const wash = (x0, y0, x1, y1) => ({ ...rect(x0, y0, x1, y1), alpha: 0.12, stroke: false });
+  const icon = (name, x, y, size = 20) => ({ type: 'icon', name, x, y, size });
+  const say = (items, f) => items.map(it => (it.type === 'text' ? { ...it, s: f(it.s) } : it));
+  // A story picture reuses the plain items (so every arrow, point and mission-named mark stays put) and adds the world around them.
+  const dressed = (plain, title, live, build, look) => ({ title, live, draw: { ...plain.draw, ...look, items: s => build(plain.draw.items(s), s) } });
+
+  const chain = (id, tex, stages, world) => {
+    const plain = {
+      id, title: 'The line, one step at a time',
+      params: {},
+      terms: ['now'],
+      t: { min: 0, max: stages.length - 1, step: 0.01, value: 0, speed: 0.5, label: 'step' },
+      formula: tex,
+      live: s => { const k = Math.floor(s.t); return `Line ${k + 1} of ${stages.length}: ${stages[k][0]}`; },
+      draw: {
+        kind: '2d', view: [0, 10, 0, stages.length * 1.2], box: [420, 52 * stages.length],
+        items: s => {
+          const k = Math.floor(s.t), out = [];
+          for (let i = 0; i <= k; i++) {
+            const y = (stages.length - i - 0.5) * 1.2;
+            if (i === k) out.push(rect(0.05, y - 0.55, 9.95, y + 0.55, 'now'));
+            out.push({ type: 'text', x: 0.3, y: y + 0.22, s: stages[i][0], anchor: 'start' }, { type: 'text', x: 0.3, y: y - 0.3, s: stages[i][1], small: true, anchor: 'start' });
+          }
+          return out;
+        },
       },
-    },
-  });
+    };
+    plain.story = dressed(plain, world.title, s => `${world.line} ${Math.floor(s.t) + 1} of ${stages.length}: ${stages[Math.floor(s.t)][0]}`,
+      items => [wash(0, 0, 10, stages.length * 1.2), icon(world.icon, 9.6, (stages.length - 0.5) * 1.2 + 0.2), ...items]);
+    return plain;
+  };
   const orderChain = chain('order-chain', '1 \\times 2 - 3 \\times 2 + 10 \\div (2 - 1)', [
     ['1 × 2 − 3 × 2 + 10 ÷ (2 − 1)', 'the line to work out'],
     ['1 × 2 − 3 × 2 + 10 ÷ 1', 'bracket first: 2 − 1 is 1'],
     ['2 − 6 + 10', '× and ÷ next: 1 × 2, 3 × 2, 10 ÷ 1'],
     ['−4 + 10', '+ and − from the left: 2 − 6 is −4'],
-  ]);
+  ], { title: 'Pim\'s chalk board, one line at a time', line: 'Chalk line', icon: 'board' });
   const plusChain = chain('plus-minus-chain', '10 - 4 + 2 \\times 3', [
     ['10 − 4 + 2 × 3', 'the line to work out'],
     ['10 − 4 + 6', '× first: 2 × 3 is 6'],
     ['6 + 6', '+ and − from the left: 10 − 4 is 6'],
-  ]);
+  ], { title: 'Pim\'s chalk board, one line at a time', line: 'Chalk line', icon: 'board' });
   const negChain = chain('negative-chain', '8 - (3 - 10) + (-2) \\times 3', [
     ['8 − (3 − 10) + (−2) × 3', 'the line to work out'],
     ['8 − (−7) + (−2) × 3', 'bracket first: 3 − 10 is −7'],
     ['8 − (−7) + (−6)', '× next: (−2) × 3 is −6'],
     ['15 + (−6)', 'taking away −7 is adding 7'],
-  ]);
+  ], { title: 'The cellar tally, one line at a time', line: 'Tally line', icon: 'coin' });
   const fracChain = chain('fraction-chain', '\\frac{1}{2} + \\frac{3}{4} \\times \\frac{2}{3} - \\frac{1}{3}', [
     ['1/2 + 3/4 × 2/3 − 1/3', 'the line to work out'],
     ['1/2 + 6/12 − 1/3', '× first: tops 3 × 2, bottoms 4 × 3'],
     ['1/2 + 1/2 − 1/3', '6/12 simplifies to 1/2'],
     ['1 − 1/3', '1/2 + 1/2 is 1'],
-  ]);
+  ], { title: 'The baker\'s slate, one line at a time', line: 'Slate line', icon: 'loaf' });
 
   const divTimes = {
     id: 'divide-then-times', title: 'Cut into parts, then take copies',
@@ -380,26 +391,89 @@
     },
   };
 
-  const percent = grow => ({
-    id: grow ? 'percent-increase' : 'percent-of', title: grow ? 'A bar that grows by a percentage' : 'A percentage of a bar',
-    params: { base: { min: 10, max: 200, step: 10, value: grow ? 40 : 80, label: 'base: the amount' }, pct: { min: 5, max: grow ? 50 : 100, step: 5, value: grow ? 25 : 15, label: 'pct: percent' } },
-    terms: ['part'],
-    formula: grow ? '\\term{base}{\\text{base}} + \\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}}' : '\\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}} = \\term{part}{\\text{the shaded part}}',
-    live: s => { const { base, pct } = s.params; return grow ? `${base} grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `${pct}% of ${base} is the shaded part of the bar.`; },
-    draw: {
-      kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 150],
-      items: s => {
-        const { base, pct } = s.params, W = grow ? 10 / 1.5 : 10, w = W * pct / 100;
-        return grow
-          ? [sq(0, 1.4, W, 1.2, 'base'), sq(W, 1.4, w, 1.2, 'part'),
-            { type: 'text', x: W / 2, y: 0.7, s: String(base), small: true, term: 'base' }, { type: 'text', x: W + w / 2, y: 0.7, s: `+${pct}%`, small: true, term: 'part' },
-            { type: 'text', x: 0, y: 3.4, s: `${base} grown by ${pct}%`, small: true, anchor: 'start' }]
-          : [sq(0, 1.4, W, 1.2, 'base'), sq(0, 1.4, w, 1.2, 'part'),
-            { type: 'text', x: w / 2, y: 0.7, s: `${pct}%`, small: true, term: 'part' }, { type: 'text', x: 10, y: 0.7, s: String(base), small: true, anchor: 'end' },
-            { type: 'text', x: 0, y: 3.4, s: `${pct}% of ${base}`, small: true, anchor: 'start' }];
+  const percent = grow => {
+    const plain = {
+      id: grow ? 'percent-increase' : 'percent-of', title: grow ? 'A bar that grows by a percentage' : 'A percentage of a bar',
+      params: { base: { min: 10, max: 200, step: 10, value: grow ? 40 : 80, label: 'base: the amount' }, pct: { min: 5, max: grow ? 50 : 100, step: 5, value: grow ? 25 : 15, label: 'pct: percent' } },
+      terms: ['part'],
+      formula: grow ? '\\term{base}{\\text{base}} + \\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}}' : '\\term{pct}{\\text{pct}}\\% \\text{ of } \\term{base}{\\text{base}} = \\term{part}{\\text{the shaded part}}',
+      live: s => { const { base, pct } = s.params; return grow ? `${base} grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `${pct}% of ${base} is the shaded part of the bar.`; },
+      draw: {
+        kind: '2d', view: [-0.3, 10.3, 0, 4], box: [400, 150],
+        items: s => {
+          const { base, pct } = s.params, W = grow ? 10 / 1.5 : 10, w = W * pct / 100;
+          return grow
+            ? [sq(0, 1.4, W, 1.2, 'base'), sq(W, 1.4, w, 1.2, 'part'),
+              { type: 'text', x: W / 2, y: 0.7, s: String(base), small: true, term: 'base' }, { type: 'text', x: W + w / 2, y: 0.7, s: `+${pct}%`, small: true, term: 'part' },
+              { type: 'text', x: 0, y: 3.4, s: `${base} grown by ${pct}%`, small: true, anchor: 'start' }]
+            : [sq(0, 1.4, W, 1.2, 'base'), sq(0, 1.4, w, 1.2, 'part'),
+              { type: 'text', x: w / 2, y: 0.7, s: `${pct}%`, small: true, term: 'part' }, { type: 'text', x: 10, y: 0.7, s: String(base), small: true, anchor: 'end' },
+              { type: 'text', x: 0, y: 3.4, s: `${pct}% of ${base}`, small: true, anchor: 'start' }];
+        },
       },
+    };
+    plain.story = dressed(plain, grow ? 'The jacket price bar, grown' : 'The jacket price bar',
+      s => { const { base, pct } = s.params; return grow ? `The jacket costs ${base} coins, grown by ${pct}%: the new piece is ${pct}% of ${base}, added on the end.` : `The jacket costs ${base} coins: ${pct}% of ${base} is the shaded part of the price bar.`; },
+      (items, s) => { const { base, pct } = s.params; return [icon('tag', 9.6, 3.4), ...items.map(it => (it.y === 3.4 ? { ...it, s: grow ? `the jacket's ${base} coins, grown by ${pct}%` : `${pct}% of the jacket's ${base} coins` } : it))]; });
+    return plain;
+  };
+
+  order.story = dressed(order, 'The price board: two chalk rows',
+    s => { const [r1, r2] = rows(s.params, s.t); return `Pim chalks two rows on the price board. Step ${Math.min(2, Math.floor(s.t))}:  ${line(r1)}   and   ${line(r2)}`; },
+    items => [wash(0, 0, 10, 4.5), icon('board', 9.6, 4.05), ...say(items, t => ({ 'No brackets': 'Row 1: no brackets', 'With brackets': 'Row 2: with brackets' })[t] ?? t)]);
+
+  bars.story = dressed(bars, 'Pim\'s pie and the baker\'s loaf, cut in pieces',
+    s => { const { a, b, n } = s.params; return `The baker's loaf and Pim's pie, ${n} piece${n === 1 ? '' : 's'} each: the loaf, ${fits(a, n)}; the pie, ${fits(b, n)}`; },
+    items => [...items,
+      icon('loaf', 9.6, 3.8), icon('pie', 9.6, 1.8),
+      { type: 'text', x: 1.3, y: 3.8, s: 'the baker\'s loaf', small: true, anchor: 'start' }, { type: 'text', x: 1.3, y: 1.8, s: 'Pim\'s pie', small: true, anchor: 'start' }]);
+
+  tiles.story = dressed(tiles, 'The tile-sellers\' yard',
+    s => { const { n } = s.params; return `Wick lays ${n} row${n === 1 ? '' : 's'} of ${n} tile${n === 1 ? '' : 's'} in the yard: ${n} × ${n} = ${n}² = ${n * n} tiles`; },
+    items => [wash(-0.6, -1.9, 10.6, -1), icon('tile', 0.3, -1.45), { type: 'text', x: 10.4, y: -1.45, s: 'the tile-sellers\' yard', small: true, anchor: 'end' }, ...items],
+    { view: [-0.6, 10.6, -1.9, 10.3], box: [300, 327] });
+
+  ratioBar.story = dressed(ratioBar, 'Stickers shared between Wick and Dot',
+    s => { const { a, b } = s.params, t = a + b; return `Wick and Dot share stickers ${a} : ${b}. Wick gets ${a} of ${t} parts, ${pct(a, t)}%. Dot gets ${b} of ${t}, ${pct(b, t)}%.`; },
+    items => [...items, icon('star', 0.3, 2.85, 16),
+      { type: 'text', x: 0.7, y: 2.85, s: 'Wick\'s stickers', small: true, anchor: 'start', term: 'a' }, { type: 'text', x: 10, y: 2.85, s: 'Dot\'s stickers', small: true, anchor: 'end', term: 'b' }],
+    { view: [-0.3, 10.3, 0, 3.4], box: [400, 136] });
+
+  divTimes.story = dressed(divTimes, 'Wick\'s coin piles',
+    s => { const { a, b, c } = s.params; return `${a} coins cut into ${b} equal pile${b === 1 ? '' : 's'}, then ${c} of those piles. Compare the two bars.`; },
+    items => [icon('coin', 9.7, 5.5), icon('coin', 9.7, 2.7), ...say(items, t => t.replace(' cut into', ' coins cut into').replace(/parts?/, m => (m === 'parts' ? 'piles' : 'pile')))]);
+
+  product.story = dressed(product, 'Pim\'s coin board',
+    s => {
+      const { a, b } = s.params;
+      return a && b ? `${br(a)} × ${br(b)} coins: ${Math.abs(a)} across, ${Math.abs(b)} up. A filled rectangle is coins in the purse, a dashed one is coins taken away.` : `${br(a)} × ${br(b)} coins: a zero makes the rectangle flat.`;
     },
-  });
+    items => [wash(0, 0, 6, 6), wash(-6, -6, 0, 0), ...items]);
+
+  debt.story = dressed(debt, 'Coins owed between the stalls',
+    s => { const { d, k } = s.params; return `${d} coin${d === 1 ? '' : 's'} owed, dealt out one at a time to ${k} stall${k === 1 ? '' : 's'}. Dashed squares are owed coins.${d % k ? ' They do not share out evenly.' : ''}`; },
+    items => [wash(0, 0, 10, 1), icon('coin', 9.5, 6.5), ...say(items, t => t.replace('friend', 'stall'))]);
+
+  areaModel.story = dressed(areaModel, 'The baker\'s tray cut both ways',
+    s => { const { b, d } = s.params, a = Math.min(s.params.a, b), c = Math.min(s.params.c, d); return `${a}/${b} × ${c}/${d} of the baker's tray: ${a} of ${b} columns and ${c} of ${d} rows. Count the cells shaded both ways, and all the cells. (A top above its bottom stops at the whole tray.)`; },
+    items => [...items, icon('loaf', 9.6, 10.2), { type: 'text', x: 1.2, y: 10.2, s: 'the baker\'s tray', small: true, anchor: 'start' }],
+    { view: [-0.5, 10.5, -1.2, 10.9], box: [320, 350] });
+
+  groups.story = dressed(groups, 'Pim\'s pie in groups of pieces',
+    s => `Pim's pie: ${groups.live(s)}`,
+    items => [icon('pie', 9.6, 3.4), ...say(items, t => t.replace(/ pieces$/, ' pieces of Pim\'s pie'))]);
+
+  cube.story = dressed(cube, 'The tile-sellers\' stack',
+    s => { const { n, e } = s.params; return `${n}${sup(e)}: ${e} cop${e === 1 ? 'y' : 'ies'} of ${n} multiplied. Count the tiles in the tile-sellers' stack.`; },
+    items => [wash(-0.5, -1.3, 8.5, 0), icon('tile', 8, 7.7), ...items]);
+
+  squares.story = dressed(squares, 'Two tile stacks in the yard',
+    s => `Two tile stacks. ${squares.live(s)}`,
+    items => [wash(0, 0.2, 10, 1.2), { type: 'text', x: 5, y: 0.7, s: 'the tile-sellers\' yard', small: true }, icon('tile', 9.6, 6.4), ...items]);
+
+  sameBase.story = dressed(sameBase, 'Tiles stamped with one base',
+    s => { const { b, p, q } = s.params; return `${b}${sup(p)} × ${b}${sup(q)}: ${p} copies of ${b} and ${q} copies of ${b}, one tile each. Count the tiles in the bottom row.`; },
+    items => [icon('tile', 9.6, 6.6), ...items]);
 
   MQ.content = {
     track: 'arithmetic',

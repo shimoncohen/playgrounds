@@ -43,6 +43,11 @@ for (const track of TRACKS) {
     }
   });
 
+  if (track === 'arithmetic') test('arithmetic: every 2D scene has a story picture', () => {
+    const scenes = C.chapters.flatMap(ch => [ch.scene, ...ch.missions.map(m => m.scene)]).filter(sc => sc && sc.draw.kind === '2d');
+    for (const sc of scenes) assert.ok(sc.story, `${sc.id} has no story picture`);
+  });
+
   test(`${track}: a story picture keeps the plain picture's x-range, vectors and points where they are`, () => {
     const corners = sc => Object.keys(sc.params).reduce((acc, n) => acc.flatMap(p => [...new Set([sc.params[n].min, sc.params[n].value, sc.params[n].max])].map(v => ({ ...p, [n]: v }))), [{}]);
     const key = it => JSON.stringify(it.type === 'vector' ? [it.type, it.from, it.to, it.term] : [it.type, it.x, it.y, it.term]);
