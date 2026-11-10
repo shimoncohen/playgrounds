@@ -8856,5 +8856,100 @@
     "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 254 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-match-known",
+    "src": "fn main() {\n    let n = 2u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!(\"{}\", x);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-match-known-ok",
+    "why": "a match on a known value follows only the arm that matches, here the live one", "pr": "P4"
+  },
+  {
+    "id": "fold-match-known-ok",
+    "src": "fn main() {\n    let n = 3u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!(\"{}\", x);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the arm with the overflow is not the one that matches, so it is never linted", "pr": "P4"
+  },
+  {
+    "id": "fold-match-return-live",
+    "src": "fn main() {\n    let n = 3u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-match-return",
+    "why": "the taken arm does not return, so the code after the match is live", "pr": "P4"
+  },
+  {
+    "id": "fold-match-return",
+    "src": "fn main() {\n    let n = 0u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the taken arm returns, so the code after the match is unreachable", "pr": "unit"
+  },
+  {
+    "id": "fold-struct-field",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let y = s.a + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-struct-field-ok",
+    "why": "a field of a struct built from literals is known", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-field-ok",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 254 };\n    let y = s.a + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-pat",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let S { a } = S { a: 255 };\n    println!(\"{}\", a + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-struct-pat-ok",
+    "why": "a struct pattern binds the known fields", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-pat-ok",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let S { a } = S { a: 254 };\n    println!(\"{}\", a + 1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-return",
+    "src": "fn f() -> u8 {\n    let mut n = 255u8;\n    loop {\n        n += 1;\n        return n;\n    }\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-loop-return-ok",
+    "why": "a loop that returns on its first pass has no back edge, so n is known in it", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-return-ok",
+    "src": "fn f() -> u8 {\n    let mut n = 254u8;\n    loop {\n        n += 1;\n        return n;\n    }\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-array-repeat",
+    "src": "fn main() {\n    let a = [255u8; 3];\n    let z = a[0] + 1;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "rustc does not fold an array built with [v; n]", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-tuple-struct",
+    "src": "struct W(u8);\n\nfn main() {\n    let w = W(5);\n    match w {\n        W(n) => println!(\"{}\", n),\n    }\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a tuple struct pattern is an ordinary match", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-guard-loop",
+    "src": "fn main() {\n    let mut i = 0;\n    loop {\n        i += 1;\n        match i {\n            n if n > 3 => break,\n            _ => {}\n        }\n    }\n    println!(\"{}\", i);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "a guarded arm is a switch, so the break is an ordinary one", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-continue",
+    "src": "fn main() {\n    let mut n = 0u8;\n    loop {\n        n += 1;\n        if n > 2 {\n            continue;\n        }\n        break;\n    }\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a loop with a continue before its break runs as written", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-match-sub",
+    "src": "fn main() {\n    let n = 0u8;\n    let r = match n {\n        0 => 0,\n        k => k - 1,\n    };\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the arm k - 1 never matches n = 0, so it is not linted", "pr": "unit"
   }
 ]

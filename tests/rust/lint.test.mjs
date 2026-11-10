@@ -97,7 +97,8 @@ describe('round 2 probes: reachability and aggregates', () => {
   });
   it('u: array elements fold', () => {
     lint('    let a = [255u8];\n    let y = a[0] + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
-    lint('    let a = [255u8; 3];\n    let y = a[2] + 1;\n    println!("{}", y);', 'arithmetic_overflow', 4);
+    compiles('    let a = [255u8; 3];\n    let y = a[2] + 1;\n    println!("{}", y);');
+    compiles('    let a = [255u8; 3];\n    let z = a[0];\n    let w = z + 1;\n    println!("{}", w);');
     assert.equal(ok('    let a = [254u8];\n    let y = a[0] + 1;\n    println!("{}", y);').out(), '255\n');
   });
   it('an aggregate built from a parameter or read at an unknown index is not folded', () => {
@@ -207,10 +208,12 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
   it('a loop value or store is known only when no break or continue comes before the direct break', () => {
     const I = 'fn idb(b: bool) -> bool {\n    b\n}\n\nfn idu(x: u8) -> u8 {\n    x\n}';
     const V = (loop) => `    let v: u8 = ${loop};\n    println!("{}", v + 1);`;
-    for (const loop of ['loop { if idb(false) { break 1; } break 255; }', 'loop { if idb(true) { break 1; } break 255; }', 'loop { match idu(1) { 1 => { break 3; } _ => {} } break 255; }', 'loop { let k = idu(0); if k == 1 { break k; } break 255; }']) folding(V(loop), I);
-    folding('    let mut x: u8 = 255;\n    x = x;\n    loop {\n        if idb(true) {\n            x = 0;\n            break;\n        }\n        x = 255;\n        break;\n    }\n    let y = x + 1;\n    println!("{}", y);', I);
+    for (const loop of ['loop { if idb(false) { break 1; } break 255; }', 'loop { if idb(true) { break 1; } break 255; }', 'loop { match idu(1) { 1 => { break 3; } _ => {} } break 255; }', 'loop { let k = idu(0); if k == 1 { break k; } break 255; }']) compiles(V(loop), I);
+    compiles('    let mut x: u8 = 255;\n    x = x;\n    loop {\n        if idb(true) {\n            x = 0;\n            break;\n        }\n        x = 255;\n        break;\n    }\n    let y = x + 1;\n    println!("{}", y);', I);
     folding('    let mut x: u8 = 255;\n    x = x;\n    loop { continue; break; }\n    let y = x + 1;\n    println!("{}", y);');
     lint(V('loop { println!("a"); break 255; }'), 'arithmetic_overflow', 4);
+    lint('    f();', 'arithmetic_overflow', 4, 'fn f() -> u8 {\n    let mut n = 255u8;\n    loop {\n        n += 1;\n        return n;\n    }\n}');
+    folding('    let mut i = 0u8;\n    let x = loop {\n        i += 1;\n        if i > 3 {\n            break 255u8;\n        }\n    };\n    println!("{}", x + 1);');
   });
   it('rustc folds one level of tuple or array: what sits inside a nested one is unknown, so nothing is linted on it alone', () => {
     for (const body of [
@@ -231,8 +234,46 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     folding('    match (255u8, 1u8) {\n        (a, 1) => {\n            println!("{}", a + 1);\n        }\n        _ => {}\n    }');
     folding('    match 1u8 {\n        n @ 0..=255 => {\n            println!("{}", n + 255);\n        }\n        _ => {}\n    }');
   });
+  it('a match on a known scrutinee follows only the arm that matches', () => {
+    for (const body of [
+      '    let n = 5u8;\n    match n {\n        1 => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n        _ => {}\n    }',
+      '    let n = 0u8;\n    match n {\n        0 => {}\n        _ => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n    }',
+      '    let n = 3u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n        _ => {}\n    }',
+      '    let n = 0u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);'
+    ]) compiles(body);
+    for (const [body, line] of [
+      ['    let n = 2u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n        _ => {}\n    }', 6],
+      ['    let n = 7i32;\n    match n {\n        1..=5 => {}\n        _ => {\n            let x: u8 = 255 + 1;\n            println!("{}", x);\n        }\n    }', 7],
+      ['    let n = 3u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);', 8]
+    ]) lint(body, 'arithmetic_overflow', line);
+  });
+  it('struct values fold one level: a field, a struct pattern and a tuple struct', () => {
+    lint('    let s = S { a: 255 };\n    let y = s.a + 1;\n    println!("{}", y);', 'arithmetic_overflow', 7, 'struct S {\n    a: u8,\n}\n');
+    lint('    let S { a } = S { a: 255 };\n    println!("{}", a + 1);', 'arithmetic_overflow', 7, 'struct S {\n    a: u8,\n}\n');
+    lint('    let w = W(255);\n    let y = w.0 + 1;\n    println!("{}", y);', 'arithmetic_overflow', 5, 'struct W(u8);\n');
+  });
+  it('ordinary programs that rustc and main accept stay ok, whatever shape the match or loop has', () => {
+    const P = 'struct Pt {\n    x: i32,\n    y: i32,\n}\n\n';
+    for (const [src, out] of [
+      ['struct W(u8);\n\nfn main() {\n    let w = W(5);\n    match w {\n        W(n) => println!("{}", n),\n    }\n}\n', '5\n'],
+      [P + 'fn main() {\n    let p = Pt { x: 1, y: 2 };\n    match p {\n        Pt { x, y } => println!("{} {}", x, y),\n    }\n}\n', '1 2\n'],
+      [P + 'fn main() {\n    let p = Pt { x: 1, y: 2 };\n    match &p {\n        Pt { x, .. } => println!("{}", x),\n    }\n}\n', '1\n'],
+      [P + 'impl Pt {\n    fn sum(&self) -> i32 {\n        match self {\n            Pt { x, y } => x + y,\n        }\n    }\n}\n\nfn main() {\n    let p = Pt { x: 1, y: 2 };\n    println!("{}", p.sum());\n}\n', '3\n'],
+      ['fn main() {\n    let t = (1, 2);\n    match t {\n        (x, ..) => println!("{}", x),\n    }\n}\n', '1\n'],
+      ['enum E {\n    A(i32),\n}\n\nfn main() {\n    let e = E::A(3);\n    match e {\n        E::A(n) => println!("{}", n),\n    }\n}\n', '3\n'],
+      ['fn main() {\n    let mut i = 0;\n    loop {\n        i += 1;\n        match i {\n            n if n > 3 => break,\n            _ => {}\n        }\n    }\n    println!("{}", i);\n}\n', '4\n'],
+      ['fn main() {\n    let mut i = 0;\n    loop {\n        i += 1;\n        match i {\n            x if x > 3 => {\n                println!("{}", x);\n                break;\n            }\n            x => println!("{}", x),\n        }\n    }\n}\n', '1\n2\n3\n4\n'],
+      ['fn main() {\n    let mut n = 0u8;\n    loop {\n        n += 1;\n        if n > 2 {\n            continue;\n        }\n        break;\n    }\n    println!("{}", n);\n}\n', '1\n'],
+      ['fn main() {\n    let n = 0u8;\n    let r = match n {\n        0 => 0,\n        k => k - 1,\n    };\n    println!("{}", r);\n}\n', '0\n'],
+      ['fn main() {\n    let g = [[1, 2], [3, 4]];\n    if g[0][0] > 0 {\n        println!("{}", g[1][1] + 1);\n    }\n}\n', '5\n']
+    ]) {
+      const c = RQ.run(src);
+      assert.equal(c.status, 'ok', src + JSON.stringify(c.unsupported) + JSON.stringify(c.errors));
+      assert.equal(c.stdout, out, src);
+    }
+  });
   it('a trap in a match arm is still unsupported const folding', () => {
-    folding('    let n = 3;\n    match n {\n        4 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
+    folding('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
   });
   it('a const item is a known operand', () => {
     lint('    let y = N + 1;\n    println!("{}", y);', 'arithmetic_overflow', 3, 'const N: u8 = 255;');
