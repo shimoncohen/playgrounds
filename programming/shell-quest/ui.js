@@ -45,7 +45,7 @@ function renderMission(){const ch=CH[S.ch],n=ch.missions.length;
   else{const m=ch.missions[S.mi];const sc=(m.kind==='script'||m.kind==='challenge')&&m.file;
     const mk=S.ch+'.'+S.mi,st=m.steps,sd=st?SQ.stepsDone(mk):[],cur=st?st[SQ.stepNext(m,mk)]:m; /* a multi-step mission: hint, chips and how follow the first open step */
     const hint=cur.hint||m.hint||(sc?`Use nano ${esc(m.file)} to write it, then try it with bash ${esc(m.file)}.`:`Type exactly this, then press Enter: <code>${esc(cur.answer)}</code>`);
-    h=`<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${st?` · ${sd.length} of ${st.length} steps done`:''}${S.done[mk]?' · done before':''}</div>
+    h=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${st?` · ${sd.length} of ${st.length} steps done`:''}${S.done[mk]?' · done before':''}</div>
     ${S.mi===0?`<p class="intro">${esc(ch.intro)}</p>`:''}
     <h2>${esc(m.title)}${m.kind==='challenge'?' <span class="mtag">Challenge</span>':''}</h2>
     ${sc?`<div class="where">Your file: <code>${esc(m.file)}</code></div>`:''}
