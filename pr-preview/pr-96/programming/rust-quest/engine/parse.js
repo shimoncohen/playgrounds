@@ -12,6 +12,7 @@ const ASSIGN=new Set(['=','+=','-=','*=','/=','%=','^=','&=','|=','<<=','>>=']);
 const CLOSE={'(':')','[':']','{':'}'};
 const BLOCKLIKE=new Set(['if','match','while','loop','for','unsafe']);
 
+RQ.peel=e=>e.t==='Paren'?RQ.peel(e.expr):e;
 RQ.walk=(n,f,parent)=>{
   if(Array.isArray(n)){for(const x of n)RQ.walk(x,f,parent);return;}
   if(!n||typeof n!=='object')return;
@@ -52,9 +53,9 @@ RQ.parse=tokens=>{
     if(depth)fail('this file contains an unclosed delimiter, expected `'+close+'`');
   };
 
-  function attrs(){
+  function attrs(innerOnly){
     const out=[];
-    while(isP('#')){p++;eatP('!');expP('[');let depth=1;const txt=[];
+    while(isP('#')&&(!innerOnly||isP('!',pk()))){p++;eatP('!');expP('[');let depth=1;const txt=[];
       while(T().k!=='eof'){if(isP('['))depth++;else if(isP(']')){depth--;if(!depth)break;}txt.push(T().v);p++;}
       expP(']');out.push(txt.join(' '));}
     return out;
@@ -153,7 +154,7 @@ RQ.parse=tokens=>{
       expP(']');return mk('Slice',x,{ty:el});
     }
     if(isP('!')){p++;feat('never type',x.line);return mk('Never',x);}
-    if(isK('impl')){p++;return mk('ImplTrait',x,{bounds:bounds()});}
+    if(isK('impl')){p++;const bs=bounds();if(!bs.length)fail('at least one trait must be specified',x);return mk('ImplTrait',x,{bounds:bs});}
     if(isK('dyn')){p++;feat('dyn',x.line);return mk('DynTrait',x,{bounds:bounds()});}
     if(isK('for')){p++;expP('<');while(!isCloseAngle())p++;closeAngle();feat('higher-ranked bound',x.line);return ty();}
     if(isK('fn')||isK('unsafe')||isK('extern')){
@@ -496,7 +497,7 @@ RQ.parse=tokens=>{
       if(isP('<')){const t=ty();pa=t.t==='QPath'?t:fail('expected expression');}
       else pa=path(true);
       if(isP('!')&&!isP('=',pk())&&pa.t==='Path'){p++;return macroCall(pa,x);}
-      if(!ns&&isP('{')&&pa.t==='Path'&&/^[A-Z]/.test(pa.segs[pa.segs.length-1].name))return structLit(pa,x);
+      if(!ns&&isP('{')&&pa.t==='Path')return structLit(pa,x);
       return pa;
     }
     return fail('expected expression, found '+desc(x));
@@ -637,7 +638,7 @@ RQ.parse=tokens=>{
   }
   if(stack.length){const o=stack[stack.length-1];return {ast:null,errors:[{line:o.line,col:o.col,msg:'this file contains an unclosed delimiter'}],unsupported:un};}
   try{
-    while(isP('#')&&isP('!',pk()))attrs();
+    attrs(true);
     const items=[];
     while(T().k!=='eof')items.push(item());
     return {ast:mk('Crate',toks[0],{items}),errors:[],unsupported:un};

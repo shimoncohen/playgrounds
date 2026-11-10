@@ -2,6 +2,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+const OTHER=RQ.other('numbers');
 const prog=body=>'fn main() {\n'+body+'}\n';
 const STUB=note=>prog('    // '+note+'\n');
 const DOUBLE_MAIN='fn main() {\n    println!("{}", double(21));\n    println!("{}", double(4));\n}\n';
@@ -33,9 +34,9 @@ RQ.CH.push({
       answer:'fn double(n: i32) -> i32 {\n    n * 2\n}\n',
       alts:['fn double(n: i32) -> i32 {\n    return n * 2;\n}\n','fn double(n: i32) -> i32 {\n    n + n\n}\n'],
       wrong:[{src:'fn double(n: i32) -> i32 {\n    n * 3\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    n + 20\n}\n',wrongWhy:'check'}],
-      lazy:[{src:'fn double(n: i32) -> i32 {\n    42\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    n\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    21 * 2\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn double(n: i32) -> i32 {\n    42\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    n\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    21 * 2\n}\n',wrongWhy:'check'},{src:'fn double(n: i32) -> i32 {\n    n * 2 + (n - 21) * (n - 4)\n}\n',wrongWhy:'check'}],
       defines:['fn-decl','fn-params','fn-ret'],previews:[],
-      check:c=>c.out()!=='42\n8\n'?'`double(21)` has to give back `42` and `double(4)` has to give back `8`, so the program prints `42` and then `8`.':c.count('var-use')<1?'Do the maths with the parameter `n`: use it in the body instead of typing numbers.':true
+      check:c=>c.out()!=='42\n8\n'?'`double(21)` has to give back `42` and `double(4)` has to give back `8`, so the program prints `42` and then `8`.':c.count('var-use')<1?'Do the maths with the parameter `n`: use it in the body instead of typing numbers.':OTHER(c,'10\n-6\n','`double` has to double whatever number it is given, not only the ones `main` asks about.',['double(21)','double(5)'],['double(4)','double(-3)'])
     },
     {
       title:'The semicolon that ate the value',kind:'fix',
@@ -53,9 +54,9 @@ RQ.CH.push({
       answer:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',
       alts:['fn add_one(n: i32) -> i32 {\n    return n + 1;\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n'],
       wrong:[{src:'fn add_one(n: i32) -> i32 {\n    n + 2\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> u8 {\n    n + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'E0308'}],
-      lazy:[{src:'fn add_one(n: i32) -> i32 {\n    42\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("42");\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    41 + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn add_one(n: i32) -> i32 {\n    42\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    n + 1\n}\n\nfn main() {\n    println!("42");\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    41 + 1\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'},{src:'fn add_one(n: i32) -> i32 {\n    42 + n - n\n}\n\nfn main() {\n    println!("{}", add_one(41));\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.calls('add_one')<1?'Keep calling `add_one` from `main`.':c.count('op')<1||c.count('var-use')<1?'Keep the maths inside `add_one`: it should work out `n + 1` from its parameter.':true
+      check:c=>c.out()!=='42\n'?'The program has to print `42` on one line.':c.calls('add_one')<1?'Keep calling `add_one` from `main`.':c.count('op')<1||c.count('var-use')<1?'Keep the maths inside `add_one`: it should work out `n + 1` from its parameter.':OTHER(c,'11\n','`add_one` has to add one to any number, not only to `41`.',['add_one(41)','add_one(10)'])
     },
     {
       title:'Choose with if and else',kind:'write',
@@ -73,9 +74,9 @@ RQ.CH.push({
       answer:'fn describe(temp: i32) {\n    if temp > 20 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',
       alts:['fn describe(temp: i32) {\n    if temp <= 20 {\n        println!("cold");\n    } else {\n        println!("warm");\n    }\n}\n','fn describe(temp: i32) {\n    if temp >= 21 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n'],
       wrong:[{src:'fn describe(temp: i32) {\n    if temp >= 20 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if temp > 30 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if temp < 20 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if temp {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'E0308'}],
-      lazy:[{src:'fn describe(temp: i32) {\n    if temp == 25 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    println!("warm");\n    println!("cold");\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if true {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn describe(temp: i32) {\n    if temp == 25 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    println!("warm");\n    println!("cold");\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if true {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'},{src:'fn describe(temp: i32) {\n    if temp == 25 || temp == 21 {\n        println!("warm");\n    } else {\n        println!("cold");\n    }\n}\n',wrongWhy:'check'}],
       defines:['if'],previews:[],
-      check:c=>c.out()!=='warm\nwarm\ncold\ncold\n'?'The program has to print `warm` for `25` and `21`, and `cold` for `20` and `5`, each on its own line. Remember that `20` is not above `20`.':c.count('if')<1?'Choose with `if` and `else`, based on `temp`.':true
+      check:c=>c.out()!=='warm\nwarm\ncold\ncold\n'?'The program has to print `warm` for `25` and `21`, and `cold` for `20` and `5`, each on its own line. Remember that `20` is not above `20`.':c.count('if')<1?'Choose with `if` and `else`, based on `temp`.':OTHER(c,'warm\nwarm\ncold\ncold\n','`describe` has to answer for any temperature, not only the ones `main` asks about: warm above `20`, cold otherwise.',['describe(25)','describe(30)'],['describe(21)','describe(22)'],['describe(20)','describe(19)'],['describe(5)','describe(-5)'])
     },
     {
       title:'An if that gives back a value',kind:'write',
@@ -93,9 +94,9 @@ RQ.CH.push({
       answer:'fn bonus(level: i32) -> i32 {\n    if level > 5 { 10 } else { 0 }\n}\n',
       alts:['fn bonus(level: i32) -> i32 {\n    let b = if level >= 6 { 10 } else { 0 };\n    b\n}\n','fn bonus(level: i32) -> i32 {\n    if level > 5 {\n        return 10;\n    }\n    0\n}\n'],
       wrong:[{src:'fn bonus(level: i32) -> i32 {\n    if level > 8 { 10 } else { 0 }\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level > 3 { 10 } else { 0 }\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level > 6 { 10 } else { 0 }\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level == 7 { 10 } else { 0 }\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level > 5 { 0 } else { 10 }\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level > 5 { 10 } else { "none" }\n}\n',wrongWhy:'E0308'}],
-      lazy:[{src:'fn bonus(level: i32) -> i32 {\n    10\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    0\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn bonus(level: i32) -> i32 {\n    10\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    0\n}\n',wrongWhy:'check'},{src:'fn bonus(level: i32) -> i32 {\n    if level == 7 || level == 6 { 10 } else { 0 }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='10\n10\n0\n0\n'?'The program has to print `10` for `bonus(7)` and `bonus(6)`, and `0` for `bonus(5)` and `bonus(2)`, each on its own line. Remember that `5` is not above `5`.':c.count('if')<1?'Choose the number with `if` and `else`, based on `level`.':true
+      check:c=>c.out()!=='10\n10\n0\n0\n'?'The program has to print `10` for `bonus(7)` and `bonus(6)`, and `0` for `bonus(5)` and `bonus(2)`, each on its own line. Remember that `5` is not above `5`.':c.count('if')<1?'Choose the number with `if` and `else`, based on `level`.':OTHER(c,'10\n10\n0\n0\n','`bonus` has to answer for any level, not only the ones `main` asks about: `10` above `5`, otherwise `0`.',['bonus(7)','bonus(9)'],['bonus(6)','bonus(8)'],['bonus(5)','bonus(4)'],['bonus(2)','bonus(0)'])
     },
     {
       title:'Repeat until you break out',kind:'write',
@@ -113,9 +114,9 @@ RQ.CH.push({
       answer:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n * n > limit {\n            break n;\n        }\n        n = n + 1;\n    }\n}\n',
       alts:['fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    let found = loop {\n        if n * n > limit {\n            break n;\n        }\n        n = n + 1;\n    };\n    found\n}\n','fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n * n > limit {\n            return n;\n        }\n        n += 1;\n    }\n}\n'],
       wrong:[{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n * n >= limit {\n            break n;\n        }\n        n = n + 1;\n    }\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n * n > limit + 20 {\n            break n;\n        }\n        n = n + 1;\n    }\n}\n',wrongWhy:'check'}],
-      lazy:[{src:'fn first_square_over(limit: i32) -> i32 {\n    8\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n == 8 {\n            break n;\n        }\n        n = n + 1;\n    }\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    while n * n <= limit {\n        n = n + 1;\n    }\n    n\n}\n',wrongWhy:'check'}],
+      lazy:[{src:'fn first_square_over(limit: i32) -> i32 {\n    8\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    loop {\n        if n == 8 {\n            break n;\n        }\n        n = n + 1;\n    }\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 1;\n    while n * n <= limit {\n        n = n + 1;\n    }\n    n\n}\n',wrongWhy:'check'},{src:'fn first_square_over(limit: i32) -> i32 {\n    let mut n = 0;\n    loop {\n        n = 8;\n        if limit > 50 {\n            n = 11;\n        }\n        break n;\n    }\n}\n',wrongWhy:'check'}],
       defines:['loop'],previews:[],
-      check:c=>c.out()!=='8\n11\n'?'The program has to print `8` for `first_square_over(50)` and `11` for `first_square_over(100)`, each on its own line.':c.count('loop')<1?'This mission is about `loop`: repeat the test with a `loop` and leave it with `break`.':c.count('break')+c.count('return')<1?'Leave the loop with `break` once the square is over `limit`.':c.count('assign')<1?'Move on to the next number each round: give `n` its new value with `=`.':true
+      check:c=>c.out()!=='8\n11\n'?'The program has to print `8` for `first_square_over(50)` and `11` for `first_square_over(100)`, each on its own line.':c.count('loop')<1?'This mission is about `loop`: repeat the test with a `loop` and leave it with `break`.':c.count('break')+c.count('return')<1?'Leave the loop with `break` once the square is over `limit`.':c.count('assign')<1?'Move on to the next number each round: give `n` its new value with `=`.':OTHER(c,'6\n15\n','`first_square_over` has to work for any limit, not only the ones `main` asks about.',['first_square_over(50)','first_square_over(30)'],['first_square_over(100)','first_square_over(200)'])
     },
     {
       title:'Count down with while',kind:'write',

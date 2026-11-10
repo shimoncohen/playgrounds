@@ -2,6 +2,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+const OTHER=RQ.other('text');
 const prog=body=>'fn main() {\n'+body+'}\n';
 const STUB=note=>prog('    // '+note+'\n');
 const SHOUT_MAIN='fn main() {\n    let a = String::from("hey");\n    let a = shout(a);\n    shout(a);\n    let b = String::from("yo");\n    shout(b);\n}\n';
@@ -126,10 +127,11 @@ RQ.CH.push({
         {src:SHOUT('    println!("{}!", s);\n    Clone::clone(&s)\n'),wrongWhy:'check'},
         {src:SHOUT('    s\n'),wrongWhy:'check'},
         {src:SHOUT('    println!("hey!");\n    s\n'),wrongWhy:'check'},
-        {src:SHOUT('    println!("{}!", s);\n    String::from("hey")\n'),wrongWhy:'check'}
+        {src:SHOUT('    println!("{}!", s);\n    String::from("hey")\n'),wrongWhy:'check'},
+        {src:SHOUT('    if s.len() == 3 {\n        println!("hey!");\n    } else {\n        println!("yo!");\n    }\n    s\n'),wrongWhy:'check'}
       ],
       defines:[],
-      check:c=>c.out()!=='hey!\nhey!\nyo!\n'?'`shout` has to print each word with a `!`, and `main` has to be able to shout `hey` twice and then `yo`: the output is `hey!`, `hey!`, `yo!`.':c.allocs('String')!==2?'The only `String`s should be the two that `main` builds. Hand the same `String` back; do not copy it.':true
+      check:c=>c.out()!=='hey!\nhey!\nyo!\n'?'`shout` has to print each word with a `!`, and `main` has to be able to shout `hey` twice and then `yo`: the output is `hey!`, `hey!`, `yo!`.':c.allocs('String')!==2?'The only `String`s should be the two that `main` builds. Hand the same `String` back; do not copy it.':OTHER(c,'hello!\nhello!\nhi!\n','`shout` has to print any word with a `!` and hand it back, not only `hey` and `yo`.',['String::from("hey")','String::from("hello")'],['String::from("yo")','String::from("hi")'])
     },
     {
       title:'Free a String early',kind:'write',

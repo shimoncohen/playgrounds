@@ -70,8 +70,10 @@ RQ.lex=src=>{
     }
     if(i<n&&idStart(cs[i])){while(i<n&&idPart(cs[i]))suffix+=adv();}
     if(suffix==='f32'||suffix==='f64')kind='float';
+    if(kind==='int'&&BigInt(v)>=1n<<128n){err('integer literal is too large',l,c);return;}
     tok(kind,v,l,c,suffix?{suffix}:null);
   }
+  if(cs[0]==='#'&&cs[1]==='!'&&cs[2]!=='[')while(i<n&&cs[i]!=='\n')adv();
   while(i<n){
     const c0=cs[i],l=line,c=col;
     if(/\s/.test(c0)){adv();continue;}

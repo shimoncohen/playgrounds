@@ -25,7 +25,7 @@ const RQ=globalThis.RQ=globalThis.RQ||{};
 RQ.BORROW_FEATURES=['borrow of a field','temporary borrow','partial move','move out of reference','two-phase borrow','constant condition','program too large','closure capture of a field','closure capture of a mutable reference'];
 const MAX_INSTRS=5000,MAX_LOCALS=300;
 const PRINT=new Set(['println','print','eprintln','eprint']);
-const peel=e=>e.t==='Paren'?peel(e.expr):e;
+const peel=RQ.peel;
 const NIL={k:'const'};
 const BIG={};
 

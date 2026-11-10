@@ -86,8 +86,7 @@ function quoted(s,q,room){
   }
   return o+q;
 }
-// The one entry point for a HashMap traversal (for, iter, keys, values, into_iter, extend, {:?}, drop): it sets the flag the two-seed rule reads.
-// Seed 1 rotates seed 0 by one place, so every position changes for two or more entries and one entry cannot differ.
+// Seed 1 rotates seed 0's order and seed 2 reverses it: rotation alone misses a program that skips the first entry, reversal alone keeps an odd count's middle in place.
 const session={seed:0,iterated:false};
 const hashSession=seed=>{session.seed=seed;session.iterated=false;return session;};
 const fnv=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0;return h;};
@@ -96,7 +95,7 @@ function hashOrder(m){
   const h=m.v.map((en,i)=>{let t;try{t=debug(en.key);}catch(x){t=String(i);}return {en,h:fnv(t),i};});
   h.sort((a,b)=>a.h-b.h||a.i-b.i);
   const o=h.map(x=>x.en);
-  return session.seed&&o.length?[...o.slice(1),o[0]]:o;
+  return session.seed===1&&o.length?[...o.slice(1),o[0]]:session.seed===2?o.reverse():o;
 }
 const unref=v=>{while(v.k==='ref'){const t=v.cell.val;v=v.range?{k:'array',v:t.v.slice(v.range[0],v.range[1])}:t;}return v;};
 function display(v,user){

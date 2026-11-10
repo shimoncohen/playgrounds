@@ -21,7 +21,7 @@ const COUNTS=['let mut counts: HashMap<String, u32> = HashMap::new();','counts.i
 const WITH_HM=(...body)=>L(HM,'')+MAIN(...body);
 const ORDER_OUT='crab 2\nmoon 5\nstar 1\n';
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other numbers.':r.out()!==want?why:true;};
+const OTHER=RQ.other('numbers');
 
 RQ.CH.push({
   name:'Vec and HashMap',
@@ -49,7 +49,7 @@ RQ.CH.push({
       wrong:[{src:BUCKET('let mut shells = Vec::new();','for i in 0..n {','    shells.push(i);','}','shells'),wrongWhy:'check'},{src:BUCKET('let mut shells = Vec::new();','for i in 1..n {','    shells.push(i);','}','shells'),wrongWhy:'check'}],
       lazy:[{src:BUCKET('vec![1, 2, 3]'),wrongWhy:'check'},{src:BUCKET('let mut shells = Vec::new();','shells.push(n);','shells'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!==BUCKET_OUT?'`bucket(3)` has to be `[1, 2, 3]`, `bucket(0)` has to be empty and `bucket(5)` has to hold `1` to `5`, so the program prints `'+BUCKET_OUT.split('\n').slice(0,3).join('`, `')+'`.':c.methodIn('bucket','push')<1?'Put the numbers in with `push`, inside `bucket`.':c.forOver('bucket','n')+c.countIn('while','bucket')<1?'Use a loop in `bucket` that runs up to `n`.':true
+      check:c=>c.out()!==BUCKET_OUT?'`bucket(3)` has to be `[1, 2, 3]`, `bucket(0)` has to be empty and `bucket(5)` has to hold `1` to `5`, so the program prints `'+BUCKET_OUT.split('\n').slice(0,3).join('`, `')+'`.':c.methodIn('bucket','push')<1?'Put the numbers in with `push`, inside `bucket`.':c.forOver('bucket','n')+c.countIn('while','bucket')<1?'Use a loop in `bucket` that runs up to `n`.':OTHER(c,'[1, 2] 2\n[] 0\n[1, 2, 3, 4] 4\n','`bucket` has to hold `1` up to any `n`, not only the sizes `main` asks about.',['bucket(3)','bucket(2)'],['bucket(5)','bucket(4)'])
     },
     {
       title:'A borrowed element blocks a push',kind:'fix',
@@ -87,9 +87,9 @@ RQ.CH.push({
       answer:AT('match bucket.get(i) {','    Some(x) => *x,','    None => 0,','}'),
       alts:[AT('if let Some(x) = bucket.get(i) {','    *x','} else {','    0','}'),AT('bucket.get(i).copied().unwrap_or(0)')],
       wrong:[{src:AT('match bucket.get(i) {','    Some(x) => *x + 1,','    None => 0,','}'),wrongWhy:'check'},{src:AT('match bucket.get(i) {','    Some(x) => *x,','    None => 1,','}'),wrongWhy:'check'}],
-      lazy:[{src:AT('0'),wrongWhy:'check'},{src:AT('if i < bucket.len() {','    bucket[i]','} else {','    0','}'),wrongWhy:'check'}],
+      lazy:[{src:AT('0'),wrongWhy:'check'},{src:AT('if i < bucket.len() {','    bucket[i]','} else {','    0','}'),wrongWhy:'check'},{src:'fn shell_at(bucket: &Vec<u32>, i: usize) -> u32 {\n    match bucket.get(i) {\n        Some(x) => if i == 1 { 8 } else if i == 2 { 15 } else { *x },\n        None => 0,\n    }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='8\n15\n0\n0\n'?'`shell_at(&bucket, 1)` has to be `8`, place `2` has to be `15`, and places that do not exist, like `7` or any place of an empty bucket, have to give `0`. So the program prints `8`, `15`, `0` and `0`.':c.methodIn('shell_at','get')<1?'Ask for the shell with `get` inside `shell_at`.':true
+      check:c=>c.out()!=='8\n15\n0\n0\n'?'`shell_at(&bucket, 1)` has to be `8`, place `2` has to be `15`, and places that do not exist, like `7` or any place of an empty bucket, have to give `0`. So the program prints `8`, `15`, `0` and `0`.':c.methodIn('shell_at','get')<1?'Ask for the shell with `get` inside `shell_at`.':OTHER(c,'3\n6\n0\n0\n','`shell_at` has to work for any bucket and place, not only the ones `main` asks about.',['let bucket = vec![4, 8, 15];','let bucket = vec![3, 6, 9];'],['shell_at(&bucket, 1)','shell_at(&bucket, 0)'],['shell_at(&bucket, 2)','shell_at(&bucket, 1)'])
     },
     {
       title:'Walk the bucket with for',kind:'write',
@@ -107,9 +107,9 @@ RQ.CH.push({
       answer:TOTAL('let mut sum = 0;','for shell in bucket {','    sum += *shell;','}','sum'),
       alts:[TOTAL('let mut sum = 0;','for i in 0..bucket.len() {','    sum += bucket[i];','}','sum'),TOTAL('let mut sum = 0;','for shell in bucket.iter() {','    sum = sum + *shell;','}','sum')],
       wrong:[{src:TOTAL('let mut sum = 0;','for shell in bucket {','    sum += 1;','}','sum'),wrongWhy:'check'},{src:TOTAL('let mut sum = 0;','for shell in bucket {','    sum = *shell;','}','sum'),wrongWhy:'check'}],
-      lazy:[{src:TOTAL('27'),wrongWhy:'check'},{src:TOTAL('let mut sum = 0;','for shell in bucket {','    sum += 9;','}','sum'),wrongWhy:'check'}],
+      lazy:[{src:TOTAL('27'),wrongWhy:'check'},{src:TOTAL('let mut sum = 0;','for shell in bucket {','    sum += 9;','}','sum'),wrongWhy:'check'},{src:'fn total(bucket: &Vec<u32>) -> u32 {\n    let mut sum = 0;\n    for shell in bucket {\n        sum += *shell;\n    }\n    if bucket.len() == 3 { 27 } else if bucket.len() == 4 { 1123 } else { sum }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='27\n0\n1123\n6\n'?'`total` of `[4, 8, 15]` has to be `27`, of an empty bucket `0`, of `[100, 20, 3, 1000]` `1123` and of `[2, 2, 2]` `6`, so the program prints `27`, `0`, `1123` and `6`.':c.forOver('total','bucket')<1?'Walk the bucket with a `for` loop inside `total`.':true
+      check:c=>c.out()!=='27\n0\n1123\n6\n'?'`total` of `[4, 8, 15]` has to be `27`, of an empty bucket `0`, of `[100, 20, 3, 1000]` `1123` and of `[2, 2, 2]` `6`, so the program prints `27`, `0`, `1123` and `6`.':c.forOver('total','bucket')<1?'Walk the bucket with a `for` loop inside `total`.':OTHER(c,'3\n0\n1124\n6\n','`total` has to add up any bucket, not only the ones `main` asks about.',['vec![4, 8, 15]','vec![1, 2]'],['vec![100, 20, 3, 1000]','vec![100, 20, 3, 1000, 1]'])
     },
     {
       title:'for takes the bucket away',kind:'fix',
@@ -147,9 +147,9 @@ RQ.CH.push({
       answer:DOUBLE('for shell in bucket {','    *shell *= 2;','}'),
       alts:[DOUBLE('for shell in bucket.iter_mut() {','    *shell = *shell * 2;','}'),DOUBLE('for i in 0..bucket.len() {','    bucket[i] *= 2;','}')],
       wrong:[{src:DOUBLE('for shell in bucket {','    *shell += 2;','}'),wrongWhy:'check'},{src:DOUBLE('for shell in bucket {','    *shell *= 3;','}'),wrongWhy:'check'}],
-      lazy:[{src:DOUBLE('bucket.clear();','bucket.push(8);','bucket.push(16);','bucket.push(30);'),wrongWhy:'check'},{src:DOUBLE('let _ = bucket;'),wrongWhy:'check'}],
+      lazy:[{src:DOUBLE('bucket.clear();','bucket.push(8);','bucket.push(16);','bucket.push(30);'),wrongWhy:'check'},{src:DOUBLE('let _ = bucket;'),wrongWhy:'check'},{src:'fn double_all(bucket: &mut Vec<u32>) {\n    for _shell in bucket.iter() {\n    }\n    if bucket.len() == 3 {\n        bucket.clear();\n        bucket.push(8);\n        bucket.push(16);\n        bucket.push(30);\n    } else {\n        bucket.clear();\n        bucket.push(10);\n    }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='[8, 16, 30]\n[10]\n'?'`double_all` has to double every shell in place: `[4, 8, 15]` becomes `[8, 16, 30]` and `[5]` becomes `[10]`.':c.forOver('double_all','bucket')<1?'Walk the bucket with a `for` loop inside `double_all`.':true
+      check:c=>c.out()!=='[8, 16, 30]\n[10]\n'?'`double_all` has to double every shell in place: `[4, 8, 15]` becomes `[8, 16, 30]` and `[5]` becomes `[10]`.':c.forOver('double_all','bucket')<1?'Walk the bucket with a `for` loop inside `double_all`.':OTHER(c,'[2, 4, 6]\n[14, 14]\n','`double_all` has to double every shell of whichever bucket it is given, not only the ones `main` builds.',['vec![4, 8, 15]','vec![1, 2, 3]'],['vec![5]','vec![7, 7]'])
     },
     {
       title:'No pushing while you loop',kind:'fix',
@@ -189,7 +189,7 @@ RQ.CH.push({
       wrong:[{src:TALLY('let mut counts = HashMap::new();','for name in finds {','    *counts.entry(name.clone()).or_insert(0) += 2;','}','counts'),wrongWhy:'check'},{src:TALLY('let mut counts = HashMap::new();','for name in finds {','    counts.insert(name.clone(), 1);','}','counts'),wrongWhy:'check'}],
       lazy:[{src:TALLY('let mut counts = HashMap::new();','counts.insert(String::from("crab"), 2);','counts.insert(String::from("star"), 1);','counts'),wrongWhy:'check'},{src:TALLY('let counts = HashMap::new();','counts'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!==TALLY_OUT?'`tally` has to count each name: the first list gives `crab` a count of `2`, `star` a count of `1` and a map of `2` names, an empty list gives an empty map, and four `moon`s give `Some(4)`. So the program prints `Some(2) Some(1) 2`, `0` and `Some(4)`.':c.forOver('tally','finds')<1?'Walk the list with a `for` loop inside `tally`.':true
+      check:c=>c.out()!==TALLY_OUT?'`tally` has to count each name: the first list gives `crab` a count of `2`, `star` a count of `1` and a map of `2` names, an empty list gives an empty map, and four `moon`s give `Some(4)`. So the program prints `Some(2) Some(1) 2`, `0` and `Some(4)`.':c.forOver('tally','finds')<1?'Walk the list with a `for` loop inside `tally`.':OTHER(c,'Some(1) Some(3) 2\n0\nSome(4)\n','`tally` has to count any list of names, not only the ones `main` asks about.',['vec![String::from("crab"), String::from("star"), String::from("crab")]','vec![String::from("star"), String::from("star"), String::from("star"), String::from("crab")]'])
     },
     {
       title:'A HashMap keeps no order',kind:'write',

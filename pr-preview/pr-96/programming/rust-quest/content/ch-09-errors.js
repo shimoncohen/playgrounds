@@ -31,7 +31,7 @@ const M7_MAIN=L('')+MAIN('let bucket = vec![4, 8, 15];','println!("{:?}", shell_
 const M7_OUT='Ok(8)\nOk(15)\nErr("no shell at 7")\n';
 const ODD=L('#[derive(Debug)]','enum ShareError {','    Odd(u32),','}','','fn split(shells: u32) -> Result<u32, ShareError> {','    if shells % 2 == 1 {','        Err(ShareError::Odd(shells))','    } else {','        Ok(shells / 2)','    }','}','');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other numbers.':r.out()!==want?why:true;};
+const OTHER=RQ.other('numbers');
 
 RQ.CH.push({
   name:'Errors with Result',
@@ -109,7 +109,7 @@ RQ.CH.push({
         'Here <code>total</code> itself returns a <code>Result</code> with the same error type as <code>split</code>, <code>String</code>, so the <code>Err</code> goes up as it is. The last line wraps the sum in <code>Ok(x + y)</code>, since the function must return a <code>Result</code> on the happy path too.',
         'The hidden part of the program prints each answer with <code>{:?}</code>. When both piles fail, the first one wins, because <code>total</code> stops at the first <code>?</code> that meets an <code>Err</code>.'
       ],
-      explain:'<code>?</code> is a <code>match</code> that returns early on <code>Err</code>, written as one character. It converts the error with <code>From</code>; with the same type nothing changes, and this quest only uses that case. When the function leaves early, the variables it made are dropped as usual. Converting one error type into another is a later chapter.',
+      explain:'<code>?</code> is a <code>match</code> that returns early on <code>Err</code>, written as one character. It converts the error with <code>From</code>; with the same type nothing changes, which is the case in this chapter. When the function leaves early, the variables it made are dropped as usual. Chapter 11 converts one error type into another with <code>impl From</code>.',
       hint:'Write <code>let x = split(a)?;</code>, then <code>let y = split(b)?;</code>, and finish with <code>Ok(x + y)</code>.',
       harness:M3_MAIN,
       starter:TOTAL('Ok(a + b)'),
@@ -171,7 +171,7 @@ RQ.CH.push({
         'Check the cases in an order that makes each one certain. <code>0</code> is even, so test it before the even branch, or it would be called <code>Ok(0)</code>. Then <code>shells % 2 == 1</code> is the odd case, and everything left is <code>Ok(shells / 2)</code>.',
         'The hidden part of the program prints <code>split(8)</code>, <code>split(7)</code> and <code>split(0)</code> with <code>{:?}</code>, and then tries other counts.'
       ],
-      explain:'A text error is quick to write but hard to act on: the caller can only print it. An <code>enum</code> error can be matched, so the caller can retry on <code>Odd</code> and give up on <code>Empty</code>. Printing it with <code>{:?}</code> is enough for now. Writing a nicer <code>{}</code> text for it needs a later chapter.',
+      explain:'A text error is quick to write but hard to act on: the caller can only print it. An <code>enum</code> error can be matched, so the caller can retry on <code>Odd</code> and give up on <code>Empty</code>. Printing it with <code>{:?}</code> is enough here. A nicer <code>{}</code> text comes from implementing <code>Display</code>, which chapter 11 shows.',
       hint:'Test <code>shells == 0</code> first and return <code>Err(ShareError::Empty)</code>, then <code>shells % 2 == 1</code> and return <code>Err(ShareError::Odd(shells))</code>, and end with <code>Ok(shells / 2)</code>.',
       harness:M6_MAIN,
       starter:SPLIT_E('Ok(shells / 2)'),

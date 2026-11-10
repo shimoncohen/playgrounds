@@ -7,7 +7,7 @@ const J=(...parts)=>parts.join('\n');
 const MAIN=(...body)=>L('fn main() {',...body.map(l=>'    '+l),'}');
 const FN=(head,...body)=>L(head+' {',...body.map(l=>'    '+l),'}');
 // runs the learner's program on other input and wants what real code gives, so a typed-in answer fails; null means the input text was changed
-const OTHER=(c,want,why,...swaps)=>{const r=c.rerun(...swaps);return r===null?'Keep `'+swaps[0][0]+'` as it is, so Rust Quest can try your code on other text.':r.out()!==want?why:true;};
+const OTHER=RQ.other('text');
 // a closure has no node of its own in the check context, so a closure that is called by name and no `fn` besides main stand for it
 const CLOSURE_ONLY=(c,name)=>c.calls(name)<1||c.count('fn')>1?'Make `'+name+'` a closure with `let '+name+' = |...| ...;` and call it, with no `fn` besides `main`.'
   :c.printedCalls(name)<2?'Print what `'+name+'` gives back, in each of the two `println!` lines, so the numbers come from the closure.':null;

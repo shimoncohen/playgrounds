@@ -2,6 +2,7 @@
 (()=>{
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
+const OTHER=RQ.other('numbers');
 const L=(...lines)=>lines.join('\n')+'\n';
 const LIGHT=L('enum Light {','    Red,','    Yellow,','    Green,','}');
 const LIGHT_MAIN=L('','fn main() {','    println!("{}", wait(Light::Red));','    println!("{}", wait(Light::Yellow));','    println!("{}", wait(Light::Green));','}');
@@ -94,9 +95,9 @@ RQ.CH.push({
       answer:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(side) => side * side,','Shape::Rect { w, h } => w * h,').trim()),
       alts:[L(SHAPE.trim(),'',AREA('Shape::Square(s) => s * s,','Shape::Rect { w: width, h: height } => width * height,','Shape::Dot => 0,').trim()),L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(side) => side * side,','Shape::Rect { w, .. } if w == 0 => 0,','Shape::Rect { w, h } => w * h,').trim())],
       wrong:[{src:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(side) => side + side,','Shape::Rect { w, h } => w * h,').trim()),wrongWhy:'check'},{src:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(side) => side * side,','Shape::Rect { w, h } => w + h,').trim()),wrongWhy:'check'}],
-      lazy:[{src:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(_) => 9,','Shape::Rect { .. } => 10,').trim()),wrongWhy:'check'},{src:L(SHAPE.trim(),'',AREA('_ => 0,').trim()),wrongWhy:'check'}],
+      lazy:[{src:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(_) => 9,','Shape::Rect { .. } => 10,').trim()),wrongWhy:'check'},{src:L(SHAPE.trim(),'',AREA('_ => 0,').trim()),wrongWhy:'check'},{src:L(SHAPE.trim(),'',AREA('Shape::Dot => 0,','Shape::Square(side) => if side == 3 { 9 } else { 16 },','Shape::Rect { w, h } => if w == 2 { 10 } else { 42 },').trim()),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='9\n10\n0\n16\n42\n'?'`area` has to give the side times the side for a square, the width times the height for a rectangle, and `0` for a dot, so the program prints `9`, `10`, `0`, `16` and `42`.':c.count('arm')<3?'Give each of the three variants its own arm.':c.count('catch-all')>0?'Give every variant its own arm with its own pattern, instead of one arm that catches several.':true
+      check:c=>c.out()!=='9\n10\n0\n16\n42\n'?'`area` has to give the side times the side for a square, the width times the height for a rectangle, and `0` for a dot, so the program prints `9`, `10`, `0`, `16` and `42`.':c.count('arm')<3?'Give each of the three variants its own arm.':c.count('catch-all')>0?'Give every variant its own arm with its own pattern, instead of one arm that catches several.':OTHER(c,'25\n12\n0\n1\n16\n','`area` has to work for any square and any rectangle, not only the ones `main` asks about.',['Shape::Square(3)','Shape::Square(5)'],['Shape::Rect { w: 2, h: 5 }','Shape::Rect { w: 4, h: 3 }'],['Shape::Square(4)','Shape::Square(1)'],['Shape::Rect { w: 6, h: 7 }','Shape::Rect { w: 2, h: 8 }'])
     },
     {
       title:'Option: a value that might be missing',kind:'write',
@@ -114,10 +115,10 @@ RQ.CH.push({
       answer:EVEN('if a % 2 == 0 {','    Some(a)','} else if b % 2 == 0 {','    Some(b)','} else {','    None','}'),
       alts:[EVEN('if a % 2 == 0 {','    return Some(a);','}','if b % 2 == 0 {','    return Some(b);','}','None'),EVEN('match (a % 2, b % 2) {','    (0, _) => Some(a),','    (_, 0) => Some(b),','    _ => None,','}')],
       wrong:[{src:EVEN('if b % 2 == 0 {','    Some(b)','} else if a % 2 == 0 {','    Some(a)','} else {','    None','}'),wrongWhy:'check'},{src:EVEN('if a % 2 == 0 {','    Some(a)','} else {','    Some(b)','}'),wrongWhy:'check'}],
-      lazy:[{src:EVEN('Some(8)'),wrongWhy:'check'},{src:EVEN('None'),wrongWhy:'check'}],
+      lazy:[{src:EVEN('Some(8)'),wrongWhy:'check'},{src:EVEN('None'),wrongWhy:'check'},{src:'fn first_even(a: i32, b: i32) -> Option<i32> {\n    if a == 3 {\n        Some(8)\n    } else if a == 4 {\n        Some(4)\n    } else {\n        None\n    }\n}\n',wrongWhy:'check'}],
       defines:[],
       previews:[{tag:'type-args',wording:'The <code>&lt;i32&gt;</code> says what\'s inside. <code>Option&lt;T&gt;</code> means <code>T</code> stands for any type. Chapter 11 shows how to write your own.',home:11}],
-      check:c=>c.out()!=='found 8\nnone\nfound 4\n'?'`first_even(3, 8)` has to be `Some(8)`, `first_even(5, 7)` has to be `None` and `first_even(4, 6)` has to be `Some(4)`, so the program prints `found 8`, `none` and `found 4`.':true
+      check:c=>c.out()!=='found 8\nnone\nfound 4\n'?'`first_even(3, 8)` has to be `Some(8)`, `first_even(5, 7)` has to be `None` and `first_even(4, 6)` has to be `Some(4)`, so the program prints `found 8`, `none` and `found 4`.':OTHER(c,'found 2\nfound 6\nnone\n','`first_even` has to work for any two numbers, not only the pairs `main` asks about.',['first_even(3, 8)','first_even(2, 8)'],['first_even(5, 7)','first_even(5, 6)'],['first_even(4, 6)','first_even(3, 7)'])
     },
     {
       title:'Ranges and a last arm',kind:'write',
@@ -135,9 +136,9 @@ RQ.CH.push({
       answer:GRADE('90..=100 => \'A\',','80..=89 => \'B\',','70..=79 => \'C\',','_ => \'F\','),
       alts:[GRADE('80..=89 => \'B\',','90..=100 => \'A\',','70..=79 => \'C\',','_ => \'F\','),GRADE('90..=100 => \'A\',','80..90 => \'B\',','70..=79 => \'C\',','_ => \'F\',')],
       wrong:[{src:GRADE('90..100 => \'A\',','80..=89 => \'B\',','70..=79 => \'C\',','_ => \'F\','),wrongWhy:'check'},{src:GRADE('90..=100 => \'A\',','81..=89 => \'B\',','70..=79 => \'C\',','_ => \'F\','),wrongWhy:'check'}],
-      lazy:[{src:L('fn grade(score: u32) -> char {','    if score >= 90 {','        \'A\'','    } else if score >= 80 {','        \'B\'','    } else if score >= 70 {','        \'C\'','    } else {','        \'F\'','    }','}'),wrongWhy:'check'},{src:GRADE('_ => \'A\','),wrongWhy:'check'}],
+      lazy:[{src:L('fn grade(score: u32) -> char {','    if score >= 90 {','        \'A\'','    } else if score >= 80 {','        \'B\'','    } else if score >= 70 {','        \'C\'','    } else {','        \'F\'','    }','}'),wrongWhy:'check'},{src:GRADE('_ => \'A\','),wrongWhy:'check'},{src:'fn grade(score: u32) -> char {\n    match score {\n        100 => \'A\',\n        95 => \'A\',\n        89 | 80 => \'B\',\n        79 => \'C\',\n        _ => \'F\',\n    }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='A\nA\nB\nB\nC\nF\n'?'`grade` has to give `A` for 90 to 100, `B` for 80 to 89, `C` for 70 to 79 and `F` for the rest, so the program prints `A`, `A`, `B`, `B`, `C` and `F`.':c.count('match')<1?'Choose the letter with a `match` on the score, using a range in each band.':c.count('arm')<4?'Give each band its own arm, and a last arm for the rest.':true
+      check:c=>c.out()!=='A\nA\nB\nB\nC\nF\n'?'`grade` has to give `A` for 90 to 100, `B` for 80 to 89, `C` for 70 to 79 and `F` for the rest, so the program prints `A`, `A`, `B`, `B`, `C` and `F`.':c.count('match')<1?'Choose the letter with a `match` on the score, using a range in each band.':c.count('arm')<4?'Give each band its own arm, and a last arm for the rest.':OTHER(c,'A\nA\nB\nC\nC\nF\n','`grade` has to grade any score, not only the ones `main` asks about: `A` for 90 to 100, `B` for 80 to 89, `C` for 70 to 79 and `F` for the rest.',['grade(100)','grade(90)'],['grade(95)','grade(99)'],['grade(89)','grade(85)'],['grade(80)','grade(70)'],['grade(79)','grade(75)'],['grade(12)','grade(0)'])
     },
     {
       title:'A number match needs a last arm',kind:'fix',
@@ -156,9 +157,9 @@ RQ.CH.push({
       answer:SIZE('0 => 0,','1..=9 => 1,','10..=99 => 2,','_ => 3,'),
       alts:[SIZE('0 => 0,','1..=9 => 1,','10..=99 => 2,','100..=255 => 3,'),SIZE('0 => 0,','1..=9 => 1,','10..=99 => 2,','100.. => 3,')],
       wrong:[{src:SIZE('0 => 0,','1..=9 => 1,','10..=99 => 2,','_ => 2,'),wrongWhy:'check'},{src:SIZE('0 => 0,','1..=9 => 1,','10..=99 => 2,','100..=199 => 3,'),wrongWhy:'E0004'}],
-      lazy:[{src:SIZE('_ => 3,'),wrongWhy:'check'},{src:L('fn size(n: u8) -> u8 {','    3','}'),wrongWhy:'check'}],
+      lazy:[{src:SIZE('_ => 3,'),wrongWhy:'check'},{src:L('fn size(n: u8) -> u8 {','    3','}'),wrongWhy:'check'},{src:SIZE('0 => 0,','5 => 1,','50 => 2,','_ => 3,'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='0\n1\n2\n3\n'?'`size` has to give `0`, `1`, `2` and `3` for 0, 5, 50 and 200, so the program prints those four numbers.':c.count('match')<1?'Keep the `match` in `size`.':c.count('arm')<4?'Keep an arm for each band, and add the one for 100 and more.':true
+      check:c=>c.out()!=='0\n1\n2\n3\n'?'`size` has to give `0`, `1`, `2` and `3` for 0, 5, 50 and 200, so the program prints those four numbers.':c.count('match')<1?'Keep the `match` in `size`.':c.count('arm')<4?'Keep an arm for each band, and add the one for 100 and more.':OTHER(c,'0\n1\n2\n3\n','`size` has to sort every `u8`, not only 0, 5, 50 and 200: 100 and more is size `3`.',['size(5)','size(9)'],['size(50)','size(99)'],['size(200)','size(100)'])
     },
     {
       title:'A guard adds a test',kind:'write',
@@ -176,9 +177,9 @@ RQ.CH.push({
       answer:KIND('0 => 0,','n if n < 0 => 1,','n if n % 2 == 0 => 2,','_ => 3,'),
       alts:[KIND('0 => 0,','x if x < 0 => 1,','x if x % 2 == 0 => 2,','x if x % 2 == 1 => 3,','_ => 3,'),KIND('n if n < 0 => 1,','0 => 0,','n if n % 2 == 0 => 2,','_ => 3,')],
       wrong:[{src:KIND('0 => 0,','n if n < 0 => 1,','n if n % 2 == 0 => 3,','_ => 2,'),wrongWhy:'check'},{src:KIND('n if n % 2 == 0 => 2,','n if n < 0 => 1,','0 => 0,','_ => 3,'),wrongWhy:'check'}],
-      lazy:[{src:L('fn kind(n: i32) -> u32 {','    if n == 0 {','        0','    } else if n < 0 {','        1','    } else if n % 2 == 0 {','        2','    } else {','        3','    }','}'),wrongWhy:'check'},{src:KIND('0 => 0,','_ => 3,'),wrongWhy:'check'}],
+      lazy:[{src:L('fn kind(n: i32) -> u32 {','    if n == 0 {','        0','    } else if n < 0 {','        1','    } else if n % 2 == 0 {','        2','    } else {','        3','    }','}'),wrongWhy:'check'},{src:KIND('0 => 0,','_ => 3,'),wrongWhy:'check'},{src:'fn kind(n: i32) -> u32 {\n    match n {\n        0 => 0,\n        -4 => 1,\n        8 => 2,\n        n if n == 7 => 3,\n        _ => 3,\n    }\n}\n',wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!=='0\n1\n2\n3\n'?'`kind` has to give `0` for 0, `1` for -4, `2` for 8 and `3` for 7, so the program prints `0`, `1`, `2` and `3`.':c.count('match')<1?'Choose the number with a `match` on `n`.':c.count('guard')<1?'Use at least one `if` guard on an arm to ask a question that a pattern cannot.':true
+      check:c=>c.out()!=='0\n1\n2\n3\n'?'`kind` has to give `0` for 0, `1` for -4, `2` for 8 and `3` for 7, so the program prints `0`, `1`, `2` and `3`.':c.count('match')<1?'Choose the number with a `match` on `n`.':c.count('guard')<1?'Use at least one `if` guard on an arm to ask a question that a pattern cannot.':OTHER(c,'0\n1\n2\n3\n','`kind` has to work for any number, not only the ones `main` asks about.',['kind(-4)','kind(-5)'],['kind(8)','kind(10)'],['kind(7)','kind(9)'])
     },
     {
       title:'Match a pair',kind:'write',
@@ -196,9 +197,9 @@ RQ.CH.push({
       answer:SHOW('(0, 0) => println!("FizzBuzz"),','(0, _) => println!("Fizz"),','(_, 0) => println!("Buzz"),','_ => println!("{}", n),'),
       alts:[SHOW('(0, 0) => println!("FizzBuzz"),','(0, _) => println!("Fizz"),','(_, 0) => println!("Buzz"),','(_, _) => println!("{}", n),'),SHOW('(0, 0) => {','    println!("FizzBuzz");','}','(0, _) => {','    println!("Fizz");','}','(_, 0) => {','    println!("Buzz");','}','_ => {','    println!("{}", n);','}')],
       wrong:[{src:SHOW('(0, _) => println!("Fizz"),','(_, 0) => println!("Buzz"),','(0, 0) => println!("FizzBuzz"),','_ => println!("{}", n),'),wrongWhy:'check'},{src:SHOW('(0, 0) => println!("FizzBuzz"),','(0, _) => println!("Buzz"),','(_, 0) => println!("Fizz"),','_ => println!("{}", n),'),wrongWhy:'check'}],
-      lazy:[{src:L('fn show(n: u32) {','    if n % 15 == 0 {','        println!("FizzBuzz");','    } else if n % 3 == 0 {','        println!("Fizz");','    } else if n % 5 == 0 {','        println!("Buzz");','    } else {','        println!("{}", n);','    }','}'),wrongWhy:'check'},{src:SHOW('_ => println!("{}", n),'),wrongWhy:'check'}],
+      lazy:[{src:L('fn show(n: u32) {','    if n % 15 == 0 {','        println!("FizzBuzz");','    } else if n % 3 == 0 {','        println!("Fizz");','    } else if n % 5 == 0 {','        println!("Buzz");','    } else {','        println!("{}", n);','    }','}'),wrongWhy:'check'},{src:SHOW('_ => println!("{}", n),'),wrongWhy:'check'},{src:L('fn show(n: u32) {','    match n {','        3 | 6 | 9 | 12 => println!("Fizz"),','        5 | 10 => println!("Buzz"),','        15 => println!("FizzBuzz"),','        _ => println!("{}", n),','    }','}'),wrongWhy:'check'}],
       defines:[],previews:[],
-      check:c=>c.out()!==FIZZ_OUT?'The numbers 1 to 15 should print as `1`, `2`, `Fizz`, `4`, `Buzz`, and so on, with `FizzBuzz` for 15.':c.count('match')<1?'Choose what to print with a `match` on the pair `(n % 3, n % 5)`.':c.count('arm')<4?'Give each of the four cases its own arm.':true
+      check:c=>c.out()!==FIZZ_OUT?'The numbers 1 to 15 should print as `1`, `2`, `Fizz`, `4`, `Buzz`, and so on, with `FizzBuzz` for 15.':c.count('match')<1?'Choose what to print with a `match` on the pair `(n % 3, n % 5)`.':c.count('arm')<4?'Give each of the four cases its own arm.':OTHER(c,'Buzz\n11\nFizz\n13\n14\nFizzBuzz\n16\n17\nFizz\n19\nBuzz\n','`show` has to work for any number, not only 1 to 15.',['1..=15','10..=20'])
     },
     {
       title:'if let: when only one case matters',kind:'write',
@@ -216,9 +217,9 @@ RQ.CH.push({
       answer:OPT('if let Some(n) = o {','    println!("got {}", n);','}'),
       alts:[OPT('if let Some(n) = o {','    println!("got {}", n);','} else {','}'),OPT('if let Some(value) = o {','    println!("got {}", value);','}')],
       wrong:[{src:OPT('if let Some(n) = o {','    println!("{}", n);','}'),wrongWhy:'check'},{src:OPT('if let Some(n) = o {','    println!("got {}", n);','} else {','    println!("got nothing");','}'),wrongWhy:'check'}],
-      lazy:[{src:OPT('match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'},{src:OPT('println!("got 7");'),wrongWhy:'check'},{src:OPT('if let Some(_) = Some(1u32) {','}','match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'}],
+      lazy:[{src:OPT('match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'},{src:OPT('println!("got 7");'),wrongWhy:'check'},{src:OPT('if let Some(_) = Some(1u32) {','}','match o {','    Some(n) => println!("got {}", n),','    None => {}','}'),wrongWhy:'check'},{src:'fn show(o: Option<u32>) {\n    if let Some(n) = o {\n        if n == 7 || n == 3 {\n            println!("got {}", n);\n        }\n    }\n}\n',wrongWhy:'check'}],
       defines:['if-let'],previews:[],
-      check:c=>c.out()!=='got 7\ngot 3\n'?'`show` has to print `got` and the number when it holds one, and nothing when it is empty, so the program prints `got 7` and then `got 3`.':c.matchOn('iflet','show','o')<1?'Use `if let` on `o` inside `show` to look inside the `Option`.':true
+      check:c=>c.out()!=='got 7\ngot 3\n'?'`show` has to print `got` and the number when it holds one, and nothing when it is empty, so the program prints `got 7` and then `got 3`.':c.matchOn('iflet','show','o')<1?'Use `if let` on `o` inside `show` to look inside the `Option`.':OTHER(c,'got 8\ngot 1\n','`show` has to print whatever number the `Option` holds, not only the ones `main` asks about.',['show(Some(7))','show(Some(8))'],['show(Some(3))','show(Some(1))'])
     },
     {
       title:'while let: keep going until it runs out',kind:'write',
@@ -236,9 +237,9 @@ RQ.CH.push({
       answer:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    println!("{}", n);','    n = next;','}'),
       alts:[MAIN('let mut n = 3;','while let Some(m) = step(n) {','    println!("{}", n);','    n = m;','}')],
       wrong:[{src:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    n = next;','    println!("{}", n);','}'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while let Some(next) = step(n) {','    println!("{}", n);','    n = next;','}','println!("{}", n);'),wrongWhy:'check'}],
-      lazy:[{src:MAIN('println!("3");','println!("2");','println!("1");'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'},{src:MAIN('while let Some(_) = step(0) {','}','let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'}],
+      lazy:[{src:MAIN('println!("3");','println!("2");','println!("1");'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'},{src:MAIN('while let Some(_) = step(0) {','}','let mut n = 3;','while n > 0 {','    println!("{}", n);','    n -= 1;','}'),wrongWhy:'check'},{src:MAIN('let mut n = 3;','let mut shown = 4;','while let Some(next) = step(n) {','    shown -= 1;','    println!("{}", shown);','    n = next;','}'),wrongWhy:'check'}],
       defines:['while-let'],previews:[],
-      check:c=>c.out()!=='3\n2\n1\n'?'The program has to print `3`, `2` and `1`, one per line, and stop when `step` says `None`.':c.matchOn('whilelet','main','step',true)<1?'Use `while let` on what `step` gives back, and print `n` inside its block, to keep going for as long as `step` gives a value.':true
+      check:c=>c.out()!=='3\n2\n1\n'?'The program has to print `3`, `2` and `1`, one per line, and stop when `step` says `None`.':c.matchOn('whilelet','main','step',true)<1?'Use `while let` on what `step` gives back, and print `n` inside its block, to keep going for as long as `step` gives a value.':OTHER(c,'5\n4\n3\n2\n1\n','The loop has to run for as long as `step` gives a value, whatever `n` starts at.',['n = 3;','n = 5;'])
     },
     {
       title:'let else: leave early',kind:'write',
@@ -256,9 +257,9 @@ RQ.CH.push({
       answer:PLUS('let Some(v) = o else {','    return 0;','};','v + 1'),
       alts:[PLUS('let Some(number) = o else {','    return 0;','};','return number + 1;')],
       wrong:[{src:PLUS('let Some(v) = o else {','    return 0;','};','v'),wrongWhy:'check'},{src:PLUS('let Some(v) = o else {','    return 1;','};','v + 1'),wrongWhy:'check'}],
-      lazy:[{src:PLUS('match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'},{src:PLUS('if let Some(v) = o {','    return v + 1;','}','0'),wrongWhy:'check'},{src:PLUS('let Some(_) = Some(1) else {','    return 0;','};','match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'}],
+      lazy:[{src:PLUS('match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'},{src:PLUS('if let Some(v) = o {','    return v + 1;','}','0'),wrongWhy:'check'},{src:PLUS('let Some(_) = Some(1) else {','    return 0;','};','match o {','    Some(v) => v + 1,','    None => 0,','}'),wrongWhy:'check'},{src:'fn plus_one(o: Option<i32>) -> i32 {\n    let Some(v) = o else {\n        return 0;\n    };\n    if v == 4 { 5 } else { 10 }\n}\n',wrongWhy:'check'}],
       defines:['let-else'],previews:[],
-      check:c=>c.out()!=='5\n0\n10\n'?'`plus_one` has to give `5` for `Some(4)`, `0` for `None` and `10` for `Some(9)`, so the program prints `5`, `0` and `10`.':c.matchOn('letelse','plus_one','o')<1?'Use `let ... else` on `o` inside `plus_one` to leave early when there is no number.':true
+      check:c=>c.out()!=='5\n0\n10\n'?'`plus_one` has to give `5` for `Some(4)`, `0` for `None` and `10` for `Some(9)`, so the program prints `5`, `0` and `10`.':c.matchOn('letelse','plus_one','o')<1?'Use `let ... else` on `o` inside `plus_one` to leave early when there is no number.':OTHER(c,'2\n0\n-1\n','`plus_one` has to work for any number, not only the ones `main` asks about.',['plus_one(Some(4))','plus_one(Some(1))'],['plus_one(Some(9))','plus_one(Some(-2))'])
     },
     {
       title:'Take a pair apart with let',kind:'write',
@@ -276,9 +277,9 @@ RQ.CH.push({
       answer:SWAP('let (a, b) = p;','(b, a)'),
       alts:[SWAP('let (x, y) = p;','(y, x)'),SWAP('let (a, b) = p;','return (b, a);')],
       wrong:[{src:SWAP('let (a, b) = p;','(a, a)'),wrongWhy:'check'},{src:SWAP('let (a, b) = p;','(a, b)'),wrongWhy:'check'}],
-      lazy:[{src:SWAP('(p.1, p.0)'),wrongWhy:'check'},{src:SWAP('(2, 1)'),wrongWhy:'check'},{src:SWAP('let (_x, _y) = (0, 0);','(p.1, p.0)'),wrongWhy:'check'}],
+      lazy:[{src:SWAP('(p.1, p.0)'),wrongWhy:'check'},{src:SWAP('(2, 1)'),wrongWhy:'check'},{src:SWAP('let (_x, _y) = (0, 0);','(p.1, p.0)'),wrongWhy:'check'},{src:'fn swap(p: (i32, i32)) -> (i32, i32) {\n    let (a, b) = p;\n    if a == 1 { (2, 1) } else { (9, 3) }\n}\n',wrongWhy:'check'}],
       defines:['destructure'],previews:[],
-      check:c=>c.out()!=='2 1\n9 3\n'?'`swap` has to give the pair the other way round, so the program prints `2 1` and then `9 3`.':c.matchOn('let','swap','p')<1?'Take the pair apart with a pattern, `let (a, b) = p;`, instead of reading `p.0` and `p.1`.':true
+      check:c=>c.out()!=='2 1\n9 3\n'?'`swap` has to give the pair the other way round, so the program prints `2 1` and then `9 3`.':c.matchOn('let','swap','p')<1?'Take the pair apart with a pattern, `let (a, b) = p;`, instead of reading `p.0` and `p.1`.':OTHER(c,'6 5\n0 7\n','`swap` has to swap any pair, not only the ones `main` asks about.',['swap((1, 2))','swap((5, 6))'],['swap((3, 9))','swap((7, 0))'])
     }
   ]
 });
