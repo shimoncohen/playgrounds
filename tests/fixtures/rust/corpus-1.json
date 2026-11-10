@@ -8951,5 +8951,41 @@
     "src": "fn main() {\n    let n = 0u8;\n    let r = match n {\n        0 => 0,\n        k => k - 1,\n    };\n    println!(\"{}\", r);\n}\n",
     "expect": "ok", "out": "0\n", "err": "", "exit": 0,
     "why": "the arm k - 1 never matches n = 0, so it is not linted", "pr": "unit"
+  },
+  {
+    "id": "fold-field-store-branch",
+    "src": "struct S {\n    a: u8,\n}\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut s = S { a: 255 };\n    if idb() {\n        s.a = 0;\n    }\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field store inside a branch means the field is not known after it", "pr": "unit"
+  },
+  {
+    "id": "fold-tuple-store-branch",
+    "src": "fn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut t = (255u8, 1u8);\n    if idb() {\n        t.0 = 0;\n    }\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a tuple field", "pr": "unit"
+  },
+  {
+    "id": "fold-tuple-struct-store-branch",
+    "src": "struct W(u8);\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut w = W(255);\n    if idb() {\n        w.0 = 0;\n    }\n    println!(\"{}\", w.0 + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a tuple struct field", "pr": "unit"
+  },
+  {
+    "id": "fold-field-store-match",
+    "src": "struct S {\n    a: u8,\n}\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut s = S { a: 255 };\n    match idb() {\n        true => {\n            s.a = 0;\n        }\n        false => {}\n    }\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a store in a match arm", "pr": "unit"
+  },
+  {
+    "id": "fold-skipped-literal-arm",
+    "src": "fn main() {\n    let n = 5u8;\n    match n {\n        1 => println!(\"{}\", 255u8 + 1),\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an arm skipped behind a literal pattern is not linted, a borrowed constant expression included", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-branch-literal",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a dead branch is not linted", "pr": "unit"
   }
 ]

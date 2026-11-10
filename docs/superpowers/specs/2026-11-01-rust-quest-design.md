@@ -505,7 +505,7 @@ stateDiagram-v2
 
 Status: built. Thirteen chapters ship, delivered as a chain of PRs into `feat/47-rust-quest` that lands on `main` through #96. The sections above are the approved design and are kept as written; this section records where the build differs.
 
-**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1482 corpus programs, 943 mission programs and 103 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
+**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1488 corpus programs, 943 mission programs and 103 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
 
 **Lint folding.** `engine/lint.js` follows rustc's per-local rule, probed on the pinned image: a local assigned once is known for the whole function, one assigned more than once only until the next block boundary, and one whose address is taken anywhere (`&`, a closure capture, a `println!` argument, an autoref method receiver) never. `const` items are known operands, a literal cast gives the literal the target type, and a branch a known condition rules out is never linted. Still `unsupported`: a trap inside a `match` arm, and a negative literal cast to an unsigned type (rustc reports E0600, which Rust Quest does not model).
 

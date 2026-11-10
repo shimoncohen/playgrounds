@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),defVal=new Map(),dead=0,skip=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),dead=0,skip=0,skipB=0,bor=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -39,10 +39,14 @@ RQ.lint=(ast,info)=>{
   const snap=()=>new Map([...st].map(([k,s])=>[k,{...s}]));
   // rustc follows only the taken edge of a branch on a known condition, so a trap in the other one is never linted;
   // a trap in a match arm whose scrutinee this pass cannot decide, or on a value whose known-ness is in doubt, is unsupported
+  const isLit=x=>{x=peel(x);if(x.t==='Unary'&&x.op==='-')x=peel(x.expr);return x.t==='Lit'&&x.kind==='int';};
+  const litOnly=n=>n.t==='Binary'?isLit(n.lhs)&&isLit(n.rhs):n.t==='Unary'&&isLit(n.expr);
   function trap(id,n,o,d){
     if(constLine)unsup('const initializer',constLine);
-    else if(skip)return;
-    else if(dead||dub||d)unsup('const folding',n.line);
+    else if(skip){
+      // rustc lints a borrowed constant expression (`&(255u8 + 1)`, a format argument) even in code it never runs
+      if(skipB&&bor&&litOnly(n))unsup('const folding',n.line);
+    }else if(dead||dub||d)unsup('const folding',n.line);
     else flag(id,n,o);
   }
   const int=(v,ty,d)=>({k:'int',v,ty,d});
@@ -51,7 +55,7 @@ RQ.lint=(ast,info)=>{
   // rustc folds one level of aggregate: what sits inside a nested one is unknown to it
   const nest=els=>els.map(v=>v&&v.k==='agg'?null:v);
   const boolv=(v,d)=>({k:'bool',v,d});
-  const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x);if(b)s.add(b);}});return s;};
+  const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x)||rootBind(x.lhs);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
   // of its last store; it keeps none for a local whose address is taken anywhere in the fn
   const valueOf=(b,s)=>!s.val||borrowed.has(b)?null:s.doubt?doubt(s.val):b.assigns===0||s.fresh?s.val:null;
@@ -121,7 +125,6 @@ RQ.lint=(ast,info)=>{
   }
 
   const litVal=n=>n.t==='Unary'?-litVal(n.expr):n.t==='Lit'&&n.kind==='bool'?n.v:n.t==='Lit'&&n.kind==='int'?BigInt(n.v):null;
-  // the index of the arm a known int or bool scrutinee takes, or -1 when a guard, another pattern or an unknown value is in the way
   function pickArm(e,sv){
     if(!sv||sv.d||sv.k!=='int'&&sv.k!=='bool')return -1;
     const hit=p=>{
@@ -146,8 +149,13 @@ RQ.lint=(ast,info)=>{
         if(bd)st.set(bd,{val:null,fresh:true});
         return;
       }
-      const v=ev(s.init);
-      if(s.pat.t==='IdentPat'){const bd=bindOf(s.pat);if(bd)st.set(bd,{val:v,fresh:true});}
+      let v=ev(s.init);
+      if(s.pat.t==='IdentPat'){
+        const bd=bindOf(s.pat);
+        // a copy of a whole aggregate, or a struct stored more than once, is not folded the way a field read is
+        if(v&&v.k==='agg'&&(peel(s.init).t==='Path'||v.by&&bd&&bd.assigns>0))v=doubt(v);
+        if(bd)st.set(bd,{val:v,fresh:true});
+      }
     }else if(s.t==='ExprStmt')ev(s.expr);
   }
   function block(b){
@@ -172,9 +180,9 @@ RQ.lint=(ast,info)=>{
   // the live branch runs as written; a trap in a branch the condition rules out is never linted
   function branch(b,live){
     const was=div;
-    if(!live)skip++;
+    if(!live){skip++;skipB++;}
     block(b);
-    if(!live)skip--;
+    if(!live){skip--;skipB--;}
     const d=div;div=was;return d;
   }
   let lastFrame=null;
@@ -241,7 +249,7 @@ RQ.lint=(ast,info)=>{
         return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.d):null;
       }
       case 'Ref':{
-        ev(e.expr);
+        bor++;ev(e.expr);bor--;
         // a &mut hands out a way to change the value that rustc's folding may or may not see
         if(e.mut){const b=rootBind(e.expr);if(b)forget([b]);barrier();}
         return null;
@@ -271,14 +279,18 @@ RQ.lint=(ast,info)=>{
           const s=b&&st.get(b),cur=s&&valueOf(b,s);
           r=arith(e.op.slice(0,-1),cur,r,e);barrier();
         }
+        if(r&&r.k==='agg'&&(peel(e.rhs).t==='Path'||r.by))r=doubt(r);
         if(b&&st.has(b)){const s=st.get(b);s.val=r;s.fresh=true;s.doubt=false;}
         return null;
       }
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
+        const fmt=e.t==='Macro'&&FORMATS.has(e.name);
+        if(fmt)bor++;
         const vals=args.map(ev),c=e.t==='Call'&&(info.get(e)||{}).ctor;
-        // a tuple struct constructor is an aggregate, not a call
+        if(fmt)bor--;
         if(c&&c.variant==null)return {k:'agg',els:nest(vals)};
+        if(c){doubtAll();return null;}
         barrier();
         if(e.name==='panic')div=true;
         return null;
@@ -328,9 +340,9 @@ RQ.lint=(ast,info)=>{
         let de=false;
         if(e.els&&e.els.t==='If'){
           const was=div;
-          if(known&&c.v)skip++;
+          if(known&&c.v){skip++;skipB++;}
           ev(e.els);
-          if(known&&c.v)skip--;
+          if(known&&c.v){skip--;skipB--;}
           de=div;div=was;
         }else if(e.els)de=branch(e.els,!known||!c.v);
         dub-=db;
@@ -361,9 +373,10 @@ RQ.lint=(ast,info)=>{
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
           const was=div,mode=pick<0?'dead':i===pick?'live':'skip';
           destructure(a.pat,sv,false,true);
-          if(mode==='dead')dead++;else if(mode==='skip')skip++;
+          const rb=mode==='skip'&&e.arms.some(x=>x.pat.t==='RangePat');
+          if(mode==='dead')dead++;else if(mode==='skip'){skip++;if(rb)skipB++;}
           if(a.body.t==='Block')block(a.body);else ev(a.body);
-          if(mode==='dead')dead--;else if(mode==='skip')skip--;
+          if(mode==='dead')dead--;else if(mode==='skip'){skip--;if(rb)skipB--;}
           armDiv.push(div);all=all&&div;div=was;
         });
         st=base;forget(assignedIn(e));barrier();
@@ -377,7 +390,6 @@ RQ.lint=(ast,info)=>{
         loopBody(e,null);
         const fr=lastFrame;
         div=!hasBreak(e.body);
-        // a break that merges paths, or one rustc may see differently, leaves what was known in doubt
         if(early||e.label&&hasBreak(e.body)||plainBreak(e.body))doubtAll();
         return fr.n===1&&fr.vals.length===1&&!fr.bad&&!e.label?doubt(fr.vals[0]):null;
       }

@@ -272,6 +272,27 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
       assert.equal(c.stdout, out, src);
     }
   });
+  it('a store through a field, an aggregate copy, a re-stored struct and a variant constructor leave a value in doubt, not wrong', () => {
+    const S = 'struct S {\n    a: u8,\n}\n\nfn idb() -> bool {\n    true\n}';
+    const SC = '#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}';
+    for (const body of [
+      '    let mut s = S { a: 255 };\n    if idb() {\n        s.a = 0;\n    }\n    println!("{}", s.a + 1);',
+      '    let mut s = S { a: 255 };\n    match idb() {\n        true => {\n            s.a = 0;\n        }\n        false => {}\n    }\n    println!("{}", s.a + 1);',
+      '    let mut t = (255u8, 1u8);\n    if idb() {\n        t.0 = 0;\n    }\n    println!("{}", t.0 + 1);'
+    ]) assert.equal(ok(body, S).out(), '1\n', body);
+    folding('    let mut s = S { a: 0 };\n    s = S { a: 255 };\n    println!("{}", s.a + 1);', S);
+    folding('    let s = S { a: 255 };\n    let t = s;\n    println!("{}", t.a + 1);', SC);
+    folding('    let t = (255u8, 1u8);\n    let u = t;\n    println!("{}", u.0 + 1);');
+    folding('    let mut x: u8 = 254;\n    x = 255;\n    let o = Some(1);\n    let y = x + 1;\n    println!("{:?} {}", o, y);');
+    lint('    let s = S { a: 255 };\n    let y = s.a;\n    println!("{}", y + 1);', 'arithmetic_overflow', 8, SC);
+    lint('    let mut t = (0u8, 1u8);\n    t = (255, 1);\n    println!("{}", t.0 + 1);', 'arithmetic_overflow', 5);
+  });
+  it('a borrowed constant expression in code rustc never runs is linted by rustc, so it is unsupported here', () => {
+    folding('    let n = 5u8;\n    match n {\n        0..=9 => {}\n        _ => println!("{}", 255u8 + 1),\n    }');
+    folding('    let n = 2;\n    if n == 1 {\n        println!("{}", 255u8 + 1);\n    }');
+    compiles('    let n = 5u8;\n    match n {\n        1 => println!("{}", 255u8 + 1),\n        _ => {}\n    }');
+    compiles('    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!("{}", x);\n    }');
+  });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
   });
