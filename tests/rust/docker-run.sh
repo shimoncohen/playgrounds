@@ -1,7 +1,7 @@
 #!/bin/sh
 # Runs build-run.sh inside a throwaway container, so compile and run share one sandbox.
 #   [RUST_IMAGE=rust@sha256:<digest>] docker-run.sh <dir> <edition> <run-timeout-s> <nonce>
-#   docker-run.sh --version
+#   docker-run.sh --version     prints the image it uses, then the rustc version
 # It runs as the invoking user: with CAP_DAC_OVERRIDE dropped, root could not read the owner-only (0700) temp dir.
 # no-new-privileges is left off on purpose: snap-packaged docker refuses it.
 # A timeout, an error or a signal removes the container by name, so none outlives its run.
@@ -14,6 +14,7 @@ here=$(cd "$(dirname "$0")" && pwd) || exit 2
 
 if [ "${1:-}" = "--version" ]; then
   nonce=version$$
+  echo "image: $RUST_IMAGE"
   run_timeout=120
   set -- "$RUST_IMAGE" sh /build-run.sh --version
 else

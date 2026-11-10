@@ -1,12 +1,8 @@
-// Checks the corpus, every mission program and every field-guide example against a real rustc, three ways for programs that compile (the authored
-// fields, rustc, RQ.run) and two ways for the rest. On 0 mismatches it writes tests/fixtures/rust/verified.json and
-// programming/rust-quest/content/verified.js; on any mismatch it exits nonzero and writes nothing. It never edits the corpus.
-//
-//   node tests/rust/verify-rustc.mjs                              uses a local rustc (>= 1.85, edition 2024)
-//   RUSTC_RUNNER="sh tests/rust/docker-run.sh" RUST_IMAGE=rust:slim@sha256:... node tests/rust/verify-rustc.mjs
-//
-// RUSTC_RUNNER is split on whitespace and run without a shell; its arguments are those of build-run.sh.
-// RQ_TMP is where the temporary program directories go (default: the OS temp dir). RQ_JOBS is how many programs run at once (default 1).
+// Checks the corpus, every mission program and every field-guide example against a real rustc. Writes verified.json and
+// content/verified.js only on 0 mismatches; never edits the corpus.
+//   node tests/rust/verify-rustc.mjs                                       local rustc (>= 1.85, edition 2024)
+//   RUSTC_RUNNER="sh tests/rust/docker-run.sh" node tests/rust/verify-rustc.mjs
+// RUSTC_RUNNER is split on whitespace and run without a shell. RQ_TMP: temp dir (default the OS one). RQ_JOBS: parallel programs (default 1).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -89,9 +85,11 @@ const RQ = loadRust();
 const corpus = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/rust/corpus-1.json'), 'utf8'));
 const progs = programs(RQ, corpus);
 
-const ver = (await run(['--version'])).stdout.match(/rustc (\d+)\.(\d+)\.(\d+)/);
+const verOut = (await run(['--version'])).stdout;
+const ver = verOut.match(/rustc (\d+)\.(\d+)\.(\d+)/);
 if (!ver) { console.error('could not read the rustc version from the runner'); process.exit(2); }
 const version = ver.slice(1).join('.');
+const image = verOut.match(/^image: (\S+)/m)?.[1];
 if (+ver[1] < 1 || (+ver[1] === 1 && +ver[2] < 85)) {
   console.error(`rustc ${version} is older than 1.85, which edition ${EDITION} needs. Stop and ask the owner.`);
   process.exit(3);
@@ -123,7 +121,7 @@ if (mismatches.length) {
   process.exit(1);
 }
 
-const rec = { rustc: version, edition: EDITION, ...(process.env.RUST_IMAGE ? { image: process.env.RUST_IMAGE } : {}), date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
+const rec = { rustc: version, edition: EDITION, ...(image ? { image } : {}), date: new Date().toISOString().slice(0, 10), ...record(RQ, corpus) };
 fs.writeFileSync(path.join(ROOT, 'tests/fixtures/rust/verified.json'), JSON.stringify(rec, null, 2) + '\n');
 fs.writeFileSync(path.join(ROOT, 'programming/rust-quest/content/verified.js'), verifiedJs(rec));
 console.log(`rustc ${version} edition ${EDITION}: ${rec.counts.corpus} corpus + ${rec.counts.missions} mission programs + ${rec.counts.guide} guide examples, 0 mismatches`);

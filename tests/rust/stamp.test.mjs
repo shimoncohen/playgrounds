@@ -80,7 +80,12 @@ describe('sortGroups, the any-order comparison for HashMap output', () => {
   it('keeps tuples whole, handles nesting and quoted commas', () => {
     assert.equal(sortGroups('{(3, 4), (1, 2)}'), sortGroups('{(1, 2), (3, 4)}'));
     assert.notEqual(sortGroups('{(1, 4), (3, 2)}'), sortGroups('{(1, 2), (3, 4)}'));
-    assert.equal(sortGroups('x [{"k": [2, 1]}, {"a, b": 0}]'), sortGroups('x [{"a, b": 0}, {"k": [1, 2]}]'));
+    assert.equal(sortGroups('x [{"b": 0, "a": 1}]'), sortGroups('x [{"a": 1, "b": 0}]'));
+    assert.equal(sortGroups('{"k": {2, 1}}'), sortGroups('{"k": {1, 2}}'));
+  });
+  it('keeps a Vec in order, so a wrong-order Vec does not pass', () => {
+    assert.notEqual(sortGroups('[2, 1]'), sortGroups('[1, 2]'));
+    assert.notEqual(sortGroups('x [{"k": [2, 1]}, {"a": 0}]'), sortGroups('x [{"a": 0}, {"k": [2, 1]}]'));
   });
   it('leaves order outside brackets alone', () => assert.notEqual(sortGroups('a, b'), sortGroups('b, a')));
 });

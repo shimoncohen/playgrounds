@@ -8459,5 +8459,77 @@
     "src": "fn main() {\n    let f = |r: Option<i32>| -> Option<i32> { let n = r?; Some(n + 1) };\n    println!(\"{:?} {:?}\", f(Some(1)), f(None));\n}\n",
     "expect": "ok", "out": "Some(2) None\n", "err": "", "exit": 0,
     "why": "result unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "convert-001",
+    "src": "fn main() {\n    let a = String::from(\"a\");\n    let s = String::from(\"hi\");\n    let c = a + \"b\" + &s;\n    println!(\"{} {}\", c, s);\n}\n",
+    "expect": "ok", "out": "abhi hi\n", "err": "", "exit": 0,
+    "why": "convert unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "convert-002",
+    "src": "fn main() {\n    let a = String::from(\"a\");\n    let c = a + \"b\";\n    println!(\"{} {}\", c, a);\n}\n",
+    "expect": {"code": "E0382", "line": 4},
+    "why": "convert unit test: rustc reports one coded error", "pr": "unit"
+  },
+  {
+    "id": "convert-003",
+    "src": "fn main() {\n    let c = String::from(\"a\") + \"b\" + \"c\";\n    println!(\"{}\", c);\n}\n",
+    "expect": "ok", "out": "abc\n", "err": "", "exit": 0,
+    "why": "convert unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "convert-004",
+    "src": "fn main() {\n    let n = 5i32;\n    let r = &n;\n    println!(\"{} {} {}\", 5.to_string(), n.to_string(), r.to_string());\n    println!(\"{} {} {} {}\", 'x'.to_string(), true.to_string(), 2.5.to_string(), 3.0.to_string());\n    println!(\"{}\", 300u32.to_string() + \"!\");\n}\n",
+    "expect": "ok", "out": "5 5 5\nx true 2.5 3\n300!\n", "err": "", "exit": 0,
+    "why": "convert unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "convert-005",
+    "src": "fn main() {\n    let x: i32 = 5.to_string();\n}\n",
+    "expect": {"code": "E0308", "line": 2},
+    "why": "convert unit test: rustc reports one coded error", "pr": "unit"
+  },
+  {
+    "id": "convert-006",
+    "src": "fn main() {\n    let s: String = \"hi\".into();\n    let x: i64 = 5i32.into();\n    let y: u16 = 7u8.into();\n    let z: i64 = 5u32.into();\n    println!(\"{} {} {} {}\", s, x, y, z);\n}\n",
+    "expect": "ok", "out": "hi 5 7 5\n", "err": "", "exit": 0,
+    "why": "convert unit test: compiles and runs", "pr": "unit"
+  },
+  {
+    "id": "attr-001",
+    "src": "#![allow(unused)]\n#[derive(Debug)]\nstruct Foo { x: i32 }\nfn main() {\n    println!(\"{:?}\", Foo { x: 1 });\n}\n",
+    "expect": "ok", "out": "Foo { x: 1 }\n", "err": "", "exit": 0,
+    "why": "an inner attribute followed by an outer derive: the derive still applies", "pr": "unit"
+  },
+  {
+    "id": "attr-002",
+    "src": "#![allow(unused)]\nstruct Foo { x: i32 }\nfn main() {\n    println!(\"{:?}\", Foo { x: 1 });\n}\n",
+    "expect": {"code": "E0277", "line": 4},
+    "why": "an inner attribute and no derive: rustc reports E0277", "pr": "unit"
+  },
+  {
+    "id": "strplus-001",
+    "src": "fn main() {\n    let c = \"a\" + \"b\";\n}\n",
+    "expect": {"code": "E0369", "line": 2},
+    "why": "adding two &str is E0369", "pr": "unit"
+  },
+  {
+    "id": "strplus-002",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let c = &s + \"b\";\n}\n",
+    "expect": {"code": "E0369", "line": 3},
+    "why": "adding to a &String is E0369", "pr": "unit"
+  },
+  {
+    "id": "strplus-003",
+    "src": "fn main() {\n    let s = String::from(\"a\");\n    let c = s + 5;\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "why": "String + a number is E0308", "pr": "unit"
+  },
+  {
+    "id": "strplus-004",
+    "src": "fn main() {\n    let c = \"a\" + 5;\n}\n",
+    "expect": {"code": "E0369", "line": 2},
+    "why": "a number added to a &str is E0369", "pr": "unit"
   }
 ]

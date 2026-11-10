@@ -1,4 +1,4 @@
-// The programs that finish are also in the corpus, so the rustc verify checks their output. An unsupported verdict has no rustc answer to check.
+// The programs that finish or fail with one coded error are also in the corpus, so the rustc verify checks them. An unsupported verdict has no rustc answer to check.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRust } from './harness.mjs';
@@ -49,5 +49,17 @@ describe('.into()', () => {
 describe('every unsupported feature the checker names has a specific hint', () => {
   it('bounds, where, into and generic reference', () => {
     for (const f of ['bounds', 'where', 'into', 'generic reference']) assert.notEqual(RQ.diag.hint(f), RQ.diag.hint('anything else'), f);
+  });
+});
+
+describe('adding to a &str, or a number to a String', () => {
+  const codes = (src) => { const c = RQ.run(src); assert.equal(c.status, 'error', src); return c.errors.map((e) => `${e.code}@${e.line}`).join(); };
+  it('&str + &str and &String + &str are E0369 at the operator', () => {
+    assert.equal(codes(main('let c = "a" + "b";')), 'E0369@2');
+    assert.equal(codes(main('let s = String::from("a");', 'let c = &s + "b";')), 'E0369@3');
+    assert.match(RQ.run(main('let c = "a" + 5;')).errors[0].msg, /cannot add `\{integer\}` to `&str`/);
+  });
+  it('String + a number is E0308', () => {
+    assert.equal(codes(main('let s = String::from("a");', 'let c = s + 5;')), 'E0308@3');
   });
 });

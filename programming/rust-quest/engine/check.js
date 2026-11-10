@@ -1794,8 +1794,14 @@ RQ.check=ast=>{
         const op=e.op;
         if(op==='&&'||op==='||')return unify(a,T.bool)&&unify(b,T.bool)?T.bool:unsup('type checking',e.line);
         if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
+        const SCALAR=['int','ivar','float','fvar','bool','char'];
+        if(op==='+'&&(res(a).k==='str'||res(a).k==='ref'&&res(res(a).to).k==='String')&&(SCALAR.includes(res(b).k)||res(b).k==='str'||res(b).k==='ref'&&res(res(b).to).k==='String')){
+          errors.push(RQ.diag.make('E0369',e.oline,e.ocol,{op,type:show(a),right:show(b)}));
+          return T.any;
+        }
         if(op==='+'&&res(a).k==='String'){
           const rb=res(b);
+          if(SCALAR.includes(rb.k)){mism(T.str,b,e.rhs);return T.string;}
           // String + &str and String + &String (deref coercion) move the left String and give it back; other right sides are not judged
           return rb.k==='str'||rb.k==='ref'&&res(rb.to).k==='String'?T.string:unsup('string concatenation',e.line);
         }

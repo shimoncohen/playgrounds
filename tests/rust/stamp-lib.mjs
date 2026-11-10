@@ -38,8 +38,8 @@ export function record(RQ, corpus) {
 
 export const verifiedJs = (rec) => `/* Written only by tests/rust/verify-rustc.mjs. Do not edit. */\nglobalThis.RQ=globalThis.RQ||{};RQ.verified=${JSON.stringify(rec)};\n`;
 
-// Sorts the elements of every {...} and [...] group in a line, innermost first, so a HashMap or HashSet debug line compares in any
-// order. Quoted text is skipped and tuples keep their order.
+// Sorts the elements of every {...} group in a line, innermost first, so a HashMap or HashSet debug line compares in any order.
+// [...] keeps its order: sorting it would let a Vec in the wrong order pass. Quoted text is skipped and tuples keep their order.
 export function sortGroups(line) {
   let i = 0;
   const parse = (close) => {
@@ -54,9 +54,10 @@ export function sortGroups(line) {
         cur += line[i++] ?? '';
       } else if (ch === '(') {
         cur += '(' + parse(')').join(', ') + ')';
-      } else if (ch === '{' || ch === '[') {
-        const inner = parse(ch === '{' ? '}' : ']');
-        cur += ch + inner.sort().join(', ') + (ch === '{' ? '}' : ']');
+      } else if (ch === '[') {
+        cur += '[' + parse(']').join(', ') + ']';
+      } else if (ch === '{') {
+        cur += '{' + parse('}').sort().join(', ') + '}';
       } else if (ch === ',' && line[i] === ' ') { items.push(cur); cur = ''; i++; }
       else cur += ch;
     }

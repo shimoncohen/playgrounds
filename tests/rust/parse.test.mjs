@@ -159,6 +159,14 @@ describe('parser: out-of-subset constructs parse, then report unsupported', () =
   });
 });
 
+describe('parser: inner attributes', () => {
+  it('a #![...] line does not swallow the outer attribute after it', () => {
+    const r = RQ.run('#![allow(unused)]\n#[derive(Debug)]\nstruct Foo { x: i32 }\nfn main() {\n    println!("{:?}", Foo { x: 1 });\n}\n');
+    assert.equal(r.status, 'ok');
+    assert.equal(r.stdout, 'Foo { x: 1 }\n');
+  });
+});
+
 describe('parser: size', () => {
   it('parses a 5,000-line source quickly', () => {
     const src = 'fn f(a: i32) -> i32 {\n    let b = a + 1;\n    b * 2\n}\n\n'.repeat(1000);

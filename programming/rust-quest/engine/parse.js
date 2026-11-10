@@ -53,9 +53,9 @@ RQ.parse=tokens=>{
     if(depth)fail('this file contains an unclosed delimiter, expected `'+close+'`');
   };
 
-  function attrs(){
+  function attrs(innerOnly){
     const out=[];
-    while(isP('#')){p++;eatP('!');expP('[');let depth=1;const txt=[];
+    while(isP('#')&&(!innerOnly||isP('!',pk()))){p++;eatP('!');expP('[');let depth=1;const txt=[];
       while(T().k!=='eof'){if(isP('['))depth++;else if(isP(']')){depth--;if(!depth)break;}txt.push(T().v);p++;}
       expP(']');out.push(txt.join(' '));}
     return out;
@@ -638,7 +638,7 @@ RQ.parse=tokens=>{
   }
   if(stack.length){const o=stack[stack.length-1];return {ast:null,errors:[{line:o.line,col:o.col,msg:'this file contains an unclosed delimiter'}],unsupported:un};}
   try{
-    while(isP('#')&&isP('!',pk()))attrs();
+    attrs(true);
     const items=[];
     while(T().k!=='eof')items.push(item());
     return {ast:mk('Crate',toks[0],{items}),errors:[],unsupported:un};

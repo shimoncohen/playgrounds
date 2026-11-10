@@ -1,5 +1,5 @@
 // Learner-chosen names that are also Object.prototype members must behave like any other name.
-// rustc accepts every program here (with a non_camel_case_types or non_snake_case warning for some).
+// Each name gets the verdict an ordinary name gets. Not every program compiles in rustc (`use`, unknown types and methods are errors), so this file asserts no rustc output.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRust } from './harness.mjs';
