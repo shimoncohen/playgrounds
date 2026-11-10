@@ -139,7 +139,7 @@ test('summary sums XP over the real catalog and works out level, subjects and qu
   }), sandbox.Catalog));
   assert.equal(s.xp, 160);
   assert.equal(s.level.n, 3);
-  assert.equal(s.quests.length, 12);
+  assert.equal(s.quests.length, 13);
   assert.deepEqual(s.subjects.map(x => [x.id, x.started, x.complete, x.chaptersDone]), [['programming', 1, 0, 1], ['math', 1, 1, 1]]);
   assert.deepEqual(s.achievements.filter(a => a.earned).map(a => a.id), ['first-steps', 'finisher', 'polymath']);
 });
