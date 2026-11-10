@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Math</title>
+<link rel="stylesheet" href="../shared/settings.css">
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../shared/nav.css">
+
+<div class="wrap">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true">∑</span>Math</div>
+</header>
+
+<main>
+<p class="lede">Pick a track, or follow the map. A chapter can suggest what to learn first, but nothing is locked.</p>
+
+<section aria-labelledby="h-tracks">
+  <h2 id="h-tracks">Tracks</h2>
+  <div class="tracks" id="tracks"></div>
+</section>
+
+<section aria-labelledby="h-next">
+  <h2 id="h-next">Next up</h2>
+  <ul class="next" id="next"></ul>
+</section>
+
+<section aria-labelledby="h-map">
+  <h2 id="h-map">Map</h2>
+  <div id="overview"></div>
+  <div id="trackView" aria-live="polite"></div>
+  <div id="mapList"></div>
+</section>
+</main>
+</div>
+<script src="../shared/settings.js"></script>
+<script src="graph.js"></script>
+<script src="app.js"></script>
+<script src="../shared/nav.js"></script>
+</body>
+</html>
