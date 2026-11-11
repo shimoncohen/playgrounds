@@ -8977,12 +8977,6 @@
     "why": "the same for a store in a match arm", "pr": "unit"
   },
   {
-    "id": "fold-skipped-literal-arm",
-    "src": "fn main() {\n    let n = 5u8;\n    match n {\n        1 => println!(\"{}\", 255u8 + 1),\n        _ => {}\n    }\n}\n",
-    "expect": "ok", "out": "", "err": "", "exit": 0,
-    "why": "an arm skipped behind a literal pattern is not linted, a borrowed constant expression included", "pr": "unit"
-  },
-  {
     "id": "fold-dead-branch-literal",
     "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,

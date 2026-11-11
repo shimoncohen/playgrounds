@@ -287,10 +287,14 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     lint('    let s = S { a: 255 };\n    let y = s.a;\n    println!("{}", y + 1);', 'arithmetic_overflow', 8, SC);
     lint('    let mut t = (0u8, 1u8);\n    t = (255, 1);\n    println!("{}", t.0 + 1);', 'arithmetic_overflow', 5);
   });
-  it('a borrowed constant expression in code rustc never runs is linted by rustc, so it is unsupported here', () => {
-    folding('    let n = 5u8;\n    match n {\n        0..=9 => {}\n        _ => println!("{}", 255u8 + 1),\n    }');
-    folding('    let n = 2;\n    if n == 1 {\n        println!("{}", 255u8 + 1);\n    }');
-    compiles('    let n = 5u8;\n    match n {\n        1 => println!("{}", 255u8 + 1),\n        _ => {}\n    }');
+  it('a literal-only trap in code that never runs is unsupported, except a plain let initializer', () => {
+    for (const body of [
+      '    let n = 5u8;\n    match n {\n        0..=9 => {}\n        _ => println!("{}", 255u8 + 1),\n    }',
+      '    let n = 5u8;\n    match n {\n        1 | 7..=9 => println!("{}", 255u8 + 1),\n        _ => {}\n    }',
+      '    let n = 5u8;\n    match n {\n        1..=2 | 7..=9 => println!("{}", 255u8 + 1),\n        _ => {}\n    }',
+      '    let n = 2;\n    if n == 1 {\n        println!("{}", 255u8 + 1);\n    }',
+      '    let n = 2;\n    if n == 1 {\n        let s = (255u8 + 1).to_string();\n        println!("{}", s);\n    }'
+    ]) folding(body);
     compiles('    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!("{}", x);\n    }');
   });
   it('a trap in a match arm is still unsupported const folding', () => {

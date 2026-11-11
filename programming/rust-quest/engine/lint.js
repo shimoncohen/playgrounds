@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),defVal=new Map(),dead=0,skip=0,skipB=0,bor=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),dead=0,skip=0,letInit=null,dub=0,frames=[],barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -44,8 +44,8 @@ RQ.lint=(ast,info)=>{
   function trap(id,n,o,d){
     if(constLine)unsup('const initializer',constLine);
     else if(skip){
-      // rustc lints a borrowed constant expression (`&(255u8 + 1)`, a format argument) even in code it never runs
-      if(skipB&&bor&&litOnly(n))unsup('const folding',n.line);
+      // rustc lints a constant expression that is borrowed or promoted even in code it never runs, but not a plain let initializer
+      if(litOnly(n)&&n!==letInit)unsup('const folding',n.line);
     }else if(dead||dub||d)unsup('const folding',n.line);
     else flag(id,n,o);
   }
@@ -149,7 +149,10 @@ RQ.lint=(ast,info)=>{
         if(bd)st.set(bd,{val:null,fresh:true});
         return;
       }
+      const keep=letInit;
+      letInit=peel(s.init);
       let v=ev(s.init);
+      letInit=keep;
       if(s.pat.t==='IdentPat'){
         const bd=bindOf(s.pat);
         // a copy of a whole aggregate, or a struct stored more than once, is not folded the way a field read is
@@ -180,9 +183,9 @@ RQ.lint=(ast,info)=>{
   // the live branch runs as written; a trap in a branch the condition rules out is never linted
   function branch(b,live){
     const was=div;
-    if(!live){skip++;skipB++;}
+    if(!live)skip++;
     block(b);
-    if(!live){skip--;skipB--;}
+    if(!live)skip--;
     const d=div;div=was;return d;
   }
   let lastFrame=null;
@@ -249,7 +252,7 @@ RQ.lint=(ast,info)=>{
         return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.d):null;
       }
       case 'Ref':{
-        bor++;ev(e.expr);bor--;
+        ev(e.expr);
         // a &mut hands out a way to change the value that rustc's folding may or may not see
         if(e.mut){const b=rootBind(e.expr);if(b)forget([b]);barrier();}
         return null;
@@ -285,10 +288,7 @@ RQ.lint=(ast,info)=>{
       }
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
-        const fmt=e.t==='Macro'&&FORMATS.has(e.name);
-        if(fmt)bor++;
         const vals=args.map(ev),c=e.t==='Call'&&(info.get(e)||{}).ctor;
-        if(fmt)bor--;
         if(c&&c.variant==null)return {k:'agg',els:nest(vals)};
         if(c){doubtAll();return null;}
         barrier();
@@ -340,9 +340,9 @@ RQ.lint=(ast,info)=>{
         let de=false;
         if(e.els&&e.els.t==='If'){
           const was=div;
-          if(known&&c.v){skip++;skipB++;}
+          if(known&&c.v)skip++;
           ev(e.els);
-          if(known&&c.v){skip--;skipB--;}
+          if(known&&c.v)skip--;
           de=div;div=was;
         }else if(e.els)de=branch(e.els,!known||!c.v);
         dub-=db;
@@ -373,10 +373,9 @@ RQ.lint=(ast,info)=>{
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
           const was=div,mode=pick<0?'dead':i===pick?'live':'skip';
           destructure(a.pat,sv,false,true);
-          const rb=mode==='skip'&&e.arms.some(x=>x.pat.t==='RangePat');
-          if(mode==='dead')dead++;else if(mode==='skip'){skip++;if(rb)skipB++;}
+          if(mode==='dead')dead++;else if(mode==='skip')skip++;
           if(a.body.t==='Block')block(a.body);else ev(a.body);
-          if(mode==='dead')dead--;else if(mode==='skip'){skip--;if(rb)skipB--;}
+          if(mode==='dead')dead--;else if(mode==='skip')skip--;
           armDiv.push(div);all=all&&div;div=was;
         });
         st=base;forget(assignedIn(e));barrier();
