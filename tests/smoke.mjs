@@ -241,6 +241,22 @@ test('math hub loads cleanly', async () => {
 });
 
 const PAGES = [...NAMES.map(n => `programming/${n}-quest/`), 'math/arithmetic/', 'math/algebra/', 'math/geometry/', 'math/trigonometry/'];
+
+// An empty save is overwritten by a linked backup without asking, so no page may count its own load as progress.
+test('every playground stores an empty (pristine) save on a fresh load', async () => {
+  const { pristineFor } = await import('./pristine.mjs');
+  for (const pg of PAGES) {
+    const { ctx, page, errors } = await open(`${base}/${pg}`);
+    await page.waitForSelector('#mission');
+    await page.waitForTimeout(600);
+    const cfg = await page.evaluate(() => window.PROGRESS);
+    const raw = await read(page, cfg.key);
+    // Some pages store nothing until the learner acts; nothing stored is empty too.
+    if (raw !== null) assert.equal(pristineFor(cfg)(JSON.parse(raw)), true, `${pg} counts its fresh load as progress: ${raw.slice(0, 300)}`);
+    assert.deepEqual(errors, [], pg);
+    await ctx.close();
+  }
+});
 // A Math track saves under math-<track>-v1, so its progress file is named math-<track>, not after its folder.
 const appOf = pg => pg.startsWith('math/') ? 'math-' + pg.split('/')[1] : pg.split('/')[1];
 for (const pg of PAGES) {
