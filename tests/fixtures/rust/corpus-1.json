@@ -9307,5 +9307,30 @@
     "src": "fn run(n: usize) {\n    let mut x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n        x = 255;\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
     "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:21:\nattempt to add with overflow\n", "exit": 101,
     "why": "nor is one the loop assigns", "pr": "unit"
+  },
+  {
+    "id": "fold-after-return-live",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 { }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-after-return",
+    "why": "after an if with an empty then, the code is reached from both sides and still sees what was known", "pr": "P4"
+  },
+  {
+    "id": "fold-after-return",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 { return; }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "after an if on an unknown condition whose then returns, the code is reached only through the value edge and sees nothing known before", "pr": "unit"
+  },
+  {
+    "id": "fold-after-return-else",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 {\n        return;\n    } else {\n        println!(\"b\");\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "\nthread 'main' panicked at src/main.rs:8:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the same when the else is the side that stays", "pr": "unit"
+  },
+  {
+    "id": "fold-after-else-return",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 {\n        println!(\"a\");\n    } else {\n        return;\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 8},
+    "why": "when the else returns, the code after is reached through the then edge and keeps what was known", "pr": "unit"
   }
 ]

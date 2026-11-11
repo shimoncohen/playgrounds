@@ -216,6 +216,14 @@ RQ.lint=(ast,info)=>{
     }
     return null;
   }
+  // code after an if whose diverging side leaves only a value-target edge into it starts with nothing known; inside a loop the
+  // effect of break and return is not pinned, so what was known only blocks a verdict
+  function blankAfter(pre){
+    if(keeps.length){doubtAll();return;}
+    for(const s of st.values()){s.val=null;s.doubt=false;}
+    for(const b of pre)defVal.delete(b);
+  }
+  const hasReturn=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Return')f=true;});return f;};
   function branch(b,live,pr){
     const was=div;
     if(!live){skip++;if(pr)prune++;}
@@ -376,7 +384,7 @@ RQ.lint=(ast,info)=>{
       }
       case 'Continue':div=true;softK=0;return null;
       case 'If':{
-        const c=ev(e.cond),known=c&&c.k==='bool'&&!c.d,nn=known?0:nots(e.cond),db=(c&&c.d)||nn>1?1:0;
+        const c=ev(e.cond),known=c&&c.k==='bool'&&!c.d,nn=known?0:nots(e.cond),db=(c&&c.d)||nn>1?1:0,preDef=[...defVal.keys()];
         barrier();
         const base=snap();
         dub+=db;
@@ -396,6 +404,14 @@ RQ.lint=(ast,info)=>{
         // rustc follows only the taken edge of an if on a known condition, so a diverging taken branch ends the block
         div=known?(c.v?dt:!!e.els&&de):!!e.els&&dt&&de;
         softK=div&&known?(c.lit?2:1):0;
+        if(!known&&nn<2&&(dt||(e.els&&de))){
+          const live=[];
+          if(!dt)live.push(nn===0?'full':'blank');
+          if(!(e.els&&de))live.push(nn===0?'blank':'full');
+          // only a return is probed; a panic leaves the code after it with what was known
+          if((dt&&!hasReturn(e.then))||(e.els&&de&&!hasReturn(e.els)))doubtAll();
+          else if(live.length===1&&live[0]==='blank')blankAfter(preDef);
+        }
         return null;
       }
       case 'Match':{
@@ -412,7 +428,7 @@ RQ.lint=(ast,info)=>{
           return ev(a0.body);
         }
         const sv=ev(e.scrut);barrier();
-        const base=snap();
+        const base=snap(),preDef=[...defVal.keys()];
         const pick=pickArm(e,sv),armDiv=[],states=!sv?armStates(e):null;
         let hasRange=false;
         for(const a of e.arms)RQ.walk(a.pat,x=>{if(x.t==='RangePat')hasRange=true;});
@@ -430,6 +446,10 @@ RQ.lint=(ast,info)=>{
         });
         st=base;forget(assignedIn(e));barrier();
         if(pk==='maybe')doubtAll();
+        if(states&&armDiv.some(d=>d)){
+          const live=armDiv.map((d,i)=>d?null:states[i]).filter(Boolean);
+          if(live.length&&live.every(x=>x==='blank'))blankAfter(preDef);
+        }
         div=pick>=0?armDiv[pick]:all;
         softK=div&&pick>=0?(hasRange?3:2):0;
         return null;
@@ -442,7 +462,7 @@ RQ.lint=(ast,info)=>{
         const fr=lastFrame;
         div=!hasBreak(e.body);
         if(div)softK=0;
-        if(early||e.label&&hasBreak(e.body)||plainBreak(e.body))doubtAll();
+        if(early||e.label&&hasBreak(e.body)||plainBreak(e.body)||hasReturn(e.body))doubtAll();
         return fr.n===1&&fr.vals.length===1&&!fr.bad&&!e.label?doubt(fr.vals[0]):null;
       }
       case 'While':{
@@ -450,12 +470,15 @@ RQ.lint=(ast,info)=>{
         // rustc treats a while on a known-true condition with no break like loop {}: nothing after it is reachable
         div=!!c&&c.k==='bool'&&c.v===true&&!c.d&&!hasBreak(e.body);
         if(div)softK=0;
+        if(hasReturn(e.body))doubtAll();
         return null;
       }
       case 'For':{
         const r=peel(e.iter);
         if(r.t==='Range'){if(r.from)ev(r.from);if(r.to)ev(r.to);}else ev(e.iter);
-        loopBody(e,null);return null;
+        loopBody(e,null);
+        if(hasReturn(e.body))doubtAll();
+        return null;
       }
       default:return null;
     }
