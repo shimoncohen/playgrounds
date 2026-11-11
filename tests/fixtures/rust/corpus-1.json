@@ -10720,5 +10720,111 @@
     "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", a[0]);\n}\n",
     "expect": "ok", "out": "1\n2\n1\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: the loop name is gone after the loop", "pr": "P5"
+  },
+  {
+    "id": "arr-move-closure-copy",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || {\n        a[0] += 10;\n        a[0]\n    };\n    println!(\"{}\", f());\n    a[1] = 7;\n    println!(\"{} {:?}\", f(), a);\n}\n",
+    "expect": "ok", "out": "11\n21 [1, 7]\n", "err": "", "exit": 0,
+    "why": "a move closure copies a Copy array into itself, so the caller's array and the closure's are apart", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-read",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = move || a[0];\n    a[0] = 9;\n    println!(\"{} {:?}\", f(), a);\n}\n",
+    "expect": "ok", "out": "1 [9, 2]\n", "err": "", "exit": 0,
+    "why": "a move closure that only reads still holds its own copy of the array", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: [i32; 2],\n}\n\nfn main() {\n    let mut s = S { a: [1, 2] };\n    let f = move || s.a[0];\n    s.a[0] = 9;\n    println!(\"{} {:?}\", f(), s.a);\n}\n",
+    "expect": "ok", "out": "1 [9, 2]\n", "err": "", "exit": 0,
+    "why": "a move closure copies a Copy struct that holds an array, whole", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-tuple",
+    "src": "fn main() {\n    let mut t = ([1, 2], 3);\n    let f = move || t.0[0];\n    t.0[0] = 9;\n    println!(\"{} {:?}\", f(), t);\n}\n",
+    "expect": "ok", "out": "1 ([9, 2], 3)\n", "err": "", "exit": 0,
+    "why": "a move closure copies a tuple that holds an array, whole", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-rows",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    let mut f = move || {\n        a[1][0] = 0;\n        a[1][0]\n    };\n    println!(\"{}\", f());\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "0\n[[1, 2], [3, 4]]\n", "err": "", "exit": 0,
+    "why": "a move closure writes its own copy of a nested array", "pr": "unit"
+  },
+  {
+    "id": "arr-closure-ref-write",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = || a[0];\n    a[0] = 9;\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-closure-ref-write-ok",
+    "why": "E0506: a closure that reads the array borrows it, so writing the array while the closure is used later is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-ref-write-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = move || a[0];\n    a[0] = 9;\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a closure that reads the array borrows it, so writing the array while the closure is used later is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-write",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = || a[0] += 1;\n    a[1] = 7;\n    f();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-closure-mut-write-ok",
+    "why": "E0506: a closure that writes the array borrows it mutably, so writing the array before the closure is called is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-write-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || a[0] += 1;\n    a[1] = 7;\n    f();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 7]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a closure that writes the array borrows it mutably, so writing the array before the closure is called is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-read",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = || a[0] += 1;\n    println!(\"{:?}\", a);\n    f();\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "arr-closure-mut-read-ok",
+    "why": "E0502: printing the array while a closure that writes it is called later", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-read-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || a[0] += 1;\n    println!(\"{:?}\", a);\n    f();\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: printing the array while a closure that writes it is called later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-uninit-not-mut",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a[0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone: writing an element of a binding that was never set and is not mut", "pr": "unit"
+  },
+  {
+    "id": "arr-set-uninit-not-mut-row",
+    "src": "fn main() {\n    let a: [[i32; 2]; 2];\n    a[0][0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a nested element of a binding that was never set", "pr": "unit"
+  },
+  {
+    "id": "arr-set-uninit-compound",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a[0] += 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a compound write on a binding that was never set", "pr": "unit"
+  },
+  {
+    "id": "vec-set-uninit-not-mut",
+    "src": "fn main() {\n    let v: Vec<i32>;\n    v[0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a Vec element written before the Vec was set", "pr": "unit"
+  },
+  {
+    "id": "arr-set-assigned-not-mut",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a = [0; 3];\n    a[0] = 1;\n}\n",
+    "expect": {"code": "E0594", "line": 4},
+    "pair": "arr-set-assigned-not-mut-ok",
+    "why": "E0594: the array was set once, but it is still not mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-assigned-not-mut-ok",
+    "src": "fn main() {\n    let mut a: [i32; 3];\n    a = [0; 3];\n    a[0] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the array was set once, but it is still not mut", "pr": "P5"
   }
 ]

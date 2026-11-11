@@ -812,7 +812,7 @@ RQ.interp=(ast,opts)=>{
       const v=read(outer,e.line);
       if(hasDrop(v))throw new Unsup('closure that owns a value with Drop',e.line);
       if(c.mode==='move'){outer.moved=true;note({t:'move',name:c.name,line:e.line});}
-      const cell={val:v,name:c.name,ty:outer.ty,line:outer.line};
+      const cell={val:c.mode==='copy'?copyVal(v):v,name:c.name,ty:outer.ty,line:outer.line};
       scope.set(c.name,cell);owned.push(cell);
     }
     return {k:'closure',node:e,scope,owned,kind:cl.kind};

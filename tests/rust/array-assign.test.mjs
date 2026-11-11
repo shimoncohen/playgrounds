@@ -47,6 +47,18 @@ describe('writing an array element', () => {
     assert.deepEqual([c.panic.line, c.panic.col], [5, 5]);
   });
 
+  it('a write to a binding that was never set is E0381 alone, whether or not it is mut', () => {
+    assert.deepEqual(msgs(main('let a: [i32; 3];\na[0] = 1;')), ['E0381@3 used binding `a` isn\'t initialized']);
+    assert.deepEqual(msgs(main('let mut a: [i32; 3];\na[0] = 1;')), ['E0381@3 used binding `a` isn\'t initialized']);
+    assert.deepEqual(msgs(main('let v: Vec<i32>;\nv[0] = 1;')), ['E0381@3 used binding `v` isn\'t initialized']);
+    assert.deepEqual(msgs(main('let a: [i32; 3];\na = [0; 3];\na[0] = 1;')), ['E0594@4 cannot assign to `a[_]`, as `a` is not declared as mutable']);
+  });
+
+  it('a move closure owns a copy of a Copy array, a struct or a tuple that holds one', () => {
+    const c = RQ.run(main('let mut a = [1, 2];\nlet mut f = move || {\na[0] += 10;\na[0]\n};\nprintln!("{}", f());\na[1] = 7;\nprintln!("{} {:?}", f(), a);'));
+    assert.equal(c.stdout, '11\n21 [1, 7]\n');
+  });
+
   it('two arrays never share their elements: a copy, a by-value argument and a repeated row are all apart', () => {
     const c = RQ.run(main('let a = [[1, 2], [3, 4]];\nlet mut b = a;\nb[0][1] = 9;\nlet mut r = [[0; 2]; 2];\nr[1][0] = 5;\nprintln!("{:?} {:?} {:?}", a, b, r);'));
     assert.equal(c.stdout, '[[1, 2], [3, 4]] [[1, 9], [3, 4]] [[0, 0], [5, 0]]\n');
