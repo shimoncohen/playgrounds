@@ -203,8 +203,10 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     assert.equal(RQ.diag.ERRORS.E0600.msg({ type: 'u8' }), 'cannot apply unary operator `-` to type `u8`');
     for (const body of ['    let x = -1 as i8;', '    let y: i32 = 5;\n    let z = -y;', '    let a: usize = 3;\n    let b = -(a as i32);', '    let x = -1;', '    let x = -2.5f64;']) compiles(body + '\n    println!("{}", 1);');
   });
-  it('a literal negated where its type is only fixed later is unsupported, because rustc says E0277 or E0600 by where the type came from', () => {
-    for (const body of ['    let x = -1;\n    let y: u8 = x;', '    let n = 5u8;\n    println!("{}", n + -1);', '    takes(-1);']) assert.equal(RQ.run(main(body + '\n    println!("{}", 1);', 'fn takes(n: u8) {\n    println!("{}", n);\n}')).status, 'unsupported', body);
+  it('a literal negated where its type is only fixed later is E0277, where a parameter, field or annotation expects it E0600', () => {
+    const code = (body) => { const c = RQ.run(main(body + '\n    println!("{}", 1);', 'fn takes(n: u8) {\n    println!("{}", n);\n}')); assert.equal(c.status, 'error', body); return c.errors.map((e) => e.code).join(); };
+    for (const body of ['    let x = -1;\n    let y: u8 = x;', '    let n = 5u8;\n    println!("{}", n + -1);']) assert.equal(code(body), 'E0277', body);
+    assert.equal(code('    takes(-1);'), 'E0600');
   });
   it('a break or a pattern whose switch cannot be told cheaply is unsupported, not guessed', () => {
     const X = (mid) => `    let mut x: u8 = 255;\n    x = x;\n    ${mid}\n    let y = x + 1;\n    println!("{}", y);`;
@@ -241,7 +243,7 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
   });
   it('a binding in an arm of a switching match is known to rustc, so a trap in the arm is not judged', () => {
     folding('    match (255u8, 1u8) {\n        (a, 1) => {\n            println!("{}", a + 1);\n        }\n        _ => {}\n    }');
-    folding('    match 1u8 {\n        n @ 0..=255 => {\n            println!("{}", n + 255);\n        }\n        _ => {}\n    }');
+    lint('    match 1u8 {\n        n @ 0..=255 => {\n            println!("{}", n + 255);\n        }\n        _ => {}\n    }', 'arithmetic_overflow', 5);
   });
   it('a match on a known scrutinee follows only the arm that matches', () => {
     for (const body of [
@@ -371,8 +373,8 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     assert.equal(state("fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            return;\n        }\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n"), 'unsupported', 'k11');
     assert.equal(state("fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        println!(\"{}\", i);\n        if i > 100 {\n            break;\n        }\n        let z = x + 1;\n        println!(\"{}\", z);\n    }\n}\n\nfn main() {\n    run(1);\n}\n"), 'unsupported', 'k12');
   });
-  it('a trap in a match arm is still unsupported const folding', () => {
-    folding('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
+  it('a trap in an arm the known scrutinee rules out is not linted, behind a guard too', () => {
+    compiles('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
   });
   it('a const item is a known operand', () => {
     lint('    let y = N + 1;\n    println!("{}", y);', 'arithmetic_overflow', 3, 'const N: u8 = 255;');

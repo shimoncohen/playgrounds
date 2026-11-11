@@ -17,6 +17,7 @@ RQ.lint=(ast,info)=>{
   const flag=(id,n,o)=>once(id+'@'+n.line+':'+n.col,()=>errors.push(RQ.diag.make(id,n.line,n.col,o)));
   const rtyOf=e=>(info.get(e)||{}).rty;
   const bindOf=e=>(info.get(e)||{}).bind;
+  const isRef=e=>{const t=(info.get(e)||{}).ty;return !!t&&RQ.types.res(t).k==='ref';};
   // the local a place hangs off: x for x, x.0 and x[i]
   const rootBind=n=>{n=peel(n);while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'?bindOf(n):null;};
   let borrowed=new Set(); // per fn: the locals that are the root of a & or &mut operand, or of an autoref method receiver
@@ -128,6 +129,121 @@ RQ.lint=(ast,info)=>{
   }
 
   const litVal=n=>n.t==='Unary'?-litVal(n.expr):n.t==='Lit'&&n.kind==='bool'?n.v:n.t==='Lit'&&n.kind==='int'?BigInt(n.v):null;
+  // an arm's alternatives as {k:'any'} | {k:'lit',v} | {k:'range',lo,hi,incl}; null for any other shape
+  function normPat(p){
+    const lit=x=>{const v=litVal(x);return typeof v==='bigint'?v:null;};
+    switch(p.t){
+      case 'Wild':return [{k:'any'}];
+      case 'IdentPat':return p.byRef||!bindOf(p)?null:p.sub?normPat(p.sub):[{k:'any'}];
+      case 'LitPat':{const v=lit(p.lit);return v===null?null:[{k:'lit',v}];}
+      case 'RangePat':{
+        if(!p.lo||!p.hi)return null;
+        const lo=lit(p.lo),hi=lit(p.hi);
+        if(lo===null||hi===null)return null;
+        return p.inclusive&&lo===hi?[{k:'lit',v:lo}]:[{k:'range',lo,hi,incl:p.inclusive}];
+      }
+      case 'Or':{
+        const out=[];
+        for(const x of p.alts){const r=x.t==='Or'||x.t==='IdentPat'&&x.sub?null:normPat(x);if(!r)return null;out.push(...r);}
+        return out;
+      }
+      default:return null;
+    }
+  }
+  // a guard that is one comparison of locals and literals, or a flag, so that evaluating it early changes nothing
+  const simpleGuard=g=>{
+    g=peel(g);
+    if(g.t==='Unary'&&g.op==='!'&&nots(g)===1)g=peel(g.expr);
+    if(g.t==='Path')return true;
+    if(g.t!=='Binary'||!['==','!=','<','>','<=','>='].includes(g.op))return false;
+    const operand=x=>{x=peel(x);if(x.t==='Unary'&&x.op==='-')x=peel(x.expr);return x.t==='Path'||x.t==='Lit'&&x.kind==='int';};
+    return operand(g.lhs)&&operand(g.rhs);
+  };
+  // rustc lowers a match on an integer by testing the first candidate (an or-pattern is one candidate per alternative): literals
+  // that follow share one switch, as do the ranges that hold none of its values; the rest are tested after it fails. A candidate
+  // no test reaches is never lowered, so its guard and bindings do not exist. Null for a shape that is not modeled.
+  function lowerMatch(e){
+    const arms=e.arms,C=[];
+    for(let i=0;i<arms.length;i++){
+      const x=normPat(arms[i].pat),g=arms[i].guard;
+      if(!x||g&&!simpleGuard(g))return null;
+      for(const a of x)C.push({i,a,g});
+    }
+    const INF=10n**30n,N=[],add=o=>N.push(o)-1,bodies=[],guarded=new Set();
+    const span=a=>a.k==='lit'?[a.v,a.v]:a.k==='range'?[a.lo,a.incl?a.hi:a.hi-1n]:[-INF,INF];
+    const body=i=>bodies[i]??(bodies[i]=add({t:'arm',i}));
+    // the candidates that match once the test passes, up to the first without a guard
+    const matched=(cs,f)=>{
+      const k=cs.findIndex(x=>!x.g);
+      return (k<0?cs:cs.slice(0,k+1)).reduceRight((next,x)=>x.g?(guarded.add(x.i),add({t:'bool',g:x.g,f:next,o:body(x.i)})):body(x.i),f);
+    };
+    function tests(L,fail){
+      if(!L.length)return fail;
+      const c=L[0];
+      if(c.a.k==='any')return c.g?matched([c],tests(L.slice(1),fail)):body(c.i);
+      if(c.a.k==='range'){
+        const [lo,hi]=span(c.a),miss=[];
+        let stop=L.length;
+        const same=[c];
+        for(let j=1;j<L.length;j++){
+          const [a,b]=span(L[j].a);
+          if(L[j].a.k==='range'&&a===lo&&b===hi)same.push(L[j]);
+          else if(L[j].a.k==='any'||a<=hi&&b>=lo){stop=j;break;}
+          else miss.push(L[j]);
+        }
+        const rem=tests(L.slice(stop),fail);
+        return add({t:'cmp',lo,hi,f:miss.length?tests(miss,rem):rem,o:matched(same,rem)});
+      }
+      const vals=[],by=new Map(),other=[];
+      let stop=L.length;
+      for(let j=0;j<L.length;j++){
+        const x=L[j],[a,b]=span(x.a);
+        if(x.a.k==='lit'&&!other.some(y=>{const [c,d]=span(y.a);return a>=c&&a<=d;})){if(!by.has(a)){by.set(a,[]);vals.push(a);}by.get(a).push(x);}
+        else if(x.a.k==='range'&&!vals.some(v=>v>=a&&v<=b))other.push(x);
+        else{stop=j;break;}
+      }
+      const rem=tests(L.slice(stop),fail);
+      return add({t:'sw',vals:vals.map(v=>[v,matched(by.get(v),rem)]),o:other.length?tests(other,rem):rem});
+    }
+    const start=tests(C,-1);
+    return {N,start,guarded};
+  }
+  const hasBinding=p=>{let f=false;RQ.walk(p,x=>{if(x.t==='IdentPat'&&bindOf(x))f=true;});return f;};
+  // a guard sees its arm's bindings through a reference to the scrutinee, which makes it unknown to rustc: a local for the whole fn,
+  // any other value but a literal for the match
+  const guardBinds=m=>{
+    const low=lowerMatch(m);
+    return m.arms.some((a,i)=>a.guard&&(!low||low.guarded.has(i))&&hasBinding(a.pat));
+  };
+  // The lint walks the blocks depth first: a switch on a known value leaves by one edge, on an unknown one by all, and only the
+  // chain of otherwise edges from the match keeps what was known, every other block it reaches starts with nothing known.
+  // Returns each arm as 'full', 'blank' or 'skip' (not reached), or null for a shape that is not modeled.
+  function matchPlan(e,sv){
+    const low=lowerMatch(e);
+    if(!low||sv&&(sv.d||sv.k!=='int'))return null;
+    const {N,start}=low,seen=new Set(),out=new Array(e.arms.length).fill('skip'),stack=[[start,'full']];
+    while(stack.length){
+      const [id,state]=stack.pop();
+      if(id<0||seen.has(id))continue;
+      seen.add(id);
+      const x=N[id],known=sv&&state==='full';
+      let succ;
+      if(x.t==='arm'){out[x.i]=state;continue;}
+      if(x.t==='sw'){
+        const hit=known&&x.vals.find(([v])=>v===sv.v);
+        succ=known?[hit?hit[1]:x.o]:[...x.vals.map(([,t])=>t),x.o];
+      }else if(x.t==='cmp')succ=known?[sv.v>=x.lo&&sv.v<=x.hi?x.o:x.f]:[x.f,x.o];
+      else{
+        const c=state==='full'?ev(x.g):blank(()=>ev(x.g));
+        if(c&&(c.k!=='bool'||c.d||c.lit))return null;
+        // `!c` as a guard switches on `c` with the two edges the other way round
+        succ=c?[c.v?x.o:x.f]:nots(x.g)?[x.o,x.f]:[x.f,x.o];
+      }
+      succ=succ.filter(t=>t>=0);
+      succ.forEach((t,j)=>stack.push([t,j===succ.length-1?state:'blank']));
+    }
+    return out;
+  }
   function pickArm(e,sv){
     if(!sv||sv.d||sv.k!=='int'&&sv.k!=='bool')return -1;
     const hit=p=>{
@@ -207,7 +323,10 @@ RQ.lint=(ast,info)=>{
     const a=e.arms,n=a.length;
     if(n<2||a.some(x=>x.guard))return null;
     const last=a[n-1].pat,catchAll=last.t==='Wild'||last.t==='IdentPat'&&!last.sub&&!last.byRef&&!!bindOf(last);
-    if(catchAll&&a.slice(0,n-1).every(x=>isLitPat(x.pat,'int')))return a.map((x,i)=>i<n-1?'blank':'full');
+    if(catchAll&&a.slice(0,n-1).every(x=>isLitPat(x.pat,'int'))){
+      const vs=a.slice(0,n-1).flatMap(x=>(x.pat.t==='Or'?x.pat.alts:[x.pat]).map(y=>litVal(y.lit)));
+      if(new Set(vs).size===vs.length)return a.map((x,i)=>i<n-1?'blank':'full');
+    }
     const rng=p=>p.t==='RangePat'&&p.lo&&p.hi&&typeof litVal(p.lo)==='bigint'&&typeof litVal(p.hi)==='bigint';
     if(n===2&&catchAll&&rng(a[0].pat))return ['full','blank'];
     if(n===2&&isLitPat(a[0].pat,'bool')&&isLitPat(a[1].pat,'bool')){
@@ -287,7 +406,12 @@ RQ.lint=(ast,info)=>{
           return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v,dbt(a,b)):null;
         }
         const a=ev(e.lhs),b=ev(e.rhs);
-        if(ARITH[op]||op==='/'||op==='%'){const r=arith(op,a,b,e);barrier();return r;}
+        if(ARITH[op]||op==='/'||op==='%'){
+          // an operand that is a reference makes the operation a call of std's impl, which rustc neither folds nor lints
+          const r=isRef(e.lhs)||isRef(e.rhs)?null:arith(op,a,b,e);
+          barrier();
+          return r;
+        }
         if(op==='&'||op==='|'||op==='^'){
           return a&&b&&a.k==='int'&&b.k==='int'?int(op==='&'?a.v&b.v:op==='|'?a.v|b.v:a.v^b.v,a.ty,dbt(a,b)):null;
         }
@@ -427,16 +551,17 @@ RQ.lint=(ast,info)=>{
           destructure(a0.pat,v,barriers===before);
           return ev(a0.body);
         }
-        const sv=ev(e.scrut);barrier();
+        const sv0=ev(e.scrut),sv=guardBinds(e)&&!isLit(e.scrut)?null:sv0;barrier();
         const base=snap(),preDef=[...defVal.keys()];
-        const pick=pickArm(e,sv),armDiv=[],states=!sv?armStates(e):null;
+        const model=!frames.length&&(e.arms.some(a=>a.guard||a.pat.t==='IdentPat'&&a.pat.sub)||!sv&&!armStates(e))?matchPlan(e,sv):null;
+        const pick=model?-1:pickArm(e,sv),armDiv=[],states=model||(!sv?armStates(e):null);
         let hasRange=false;
         for(const a of e.arms)RQ.walk(a.pat,x=>{if(x.t==='RangePat')hasRange=true;});
         let all=e.arms.length>0;
         // with a known scrutinee rustc follows only the arm that matches; otherwise a trap in any arm is unsupported
         e.arms.forEach((a,i)=>{
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
-          const was=div,mode=states?'unknown':pick<0?'dead':i===pick?'live':'skip',pr=!hasRange;
+          const was=div,mode=model&&model[i]==='skip'?'skip':states?'unknown':pick<0?'dead':i===pick?'live':'skip',pr=!hasRange&&!model;
           destructure(a.pat,sv,false,true);
           if(mode==='dead')dead++;else if(mode==='skip'){skip++;if(pr)prune++;else unsure++;}
           const run=()=>{if(a.body.t==='Block')block(a.body);else ev(a.body);};
@@ -447,10 +572,10 @@ RQ.lint=(ast,info)=>{
         st=base;forget(assignedIn(e));barrier();
         if(pk==='maybe')doubtAll();
         if(states&&armDiv.some(d=>d)){
-          const live=armDiv.map((d,i)=>d?null:states[i]).filter(Boolean);
+          const live=armDiv.map((d,i)=>d||states[i]==='skip'?null:states[i]).filter(Boolean);
           if(live.length&&live.every(x=>x==='blank'))blankAfter(preDef);
         }
-        div=pick>=0?armDiv[pick]:all;
+        div=pick>=0?armDiv[pick]:model?armDiv.every((d,i)=>d||model[i]==='skip'):all;
         softK=div&&pick>=0?(hasRange?3:2):0;
         return null;
       }
@@ -507,6 +632,7 @@ RQ.lint=(ast,info)=>{
         if(r&&r.adj!=='val'||u&&!u.ref&&(u.adj==='&'||u.adj==='&mut'))root=rootBind(n.recv);
       }
       if(root)borrowed.add(root);
+      if(n.t==='Match'&&n.kind!=='let'&&guardBinds(n)){const x=peel(n.scrut),b=x.t==='Path'&&bindOf(x);if(b)borrowed.add(b);}
       if(n.t==='Macro'&&n.args&&FORMATS.has(n.name)){
         // format_args! takes `&arg` for every argument, and for every `{name}` it captures
         const at=n.name==='write'||n.name==='writeln'?1:0;
