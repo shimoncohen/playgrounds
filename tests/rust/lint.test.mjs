@@ -289,9 +289,15 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
       '    let mut s = S { a: 255 };\n    match idb() {\n        true => {\n            s.a = 0;\n        }\n        false => {}\n    }\n    println!("{}", s.a + 1);',
       '    let mut t = (255u8, 1u8);\n    if idb() {\n        t.0 = 0;\n    }\n    println!("{}", t.0 + 1);'
     ]) assert.equal(ok(body, S).out(), '1\n', body);
-    folding('    let mut s = S { a: 0 };\n    s = S { a: 255 };\n    println!("{}", s.a + 1);', S);
-    folding('    let s = S { a: 255 };\n    let t = s;\n    println!("{}", t.a + 1);', SC);
-    folding('    let t = (255u8, 1u8);\n    let u = t;\n    println!("{}", u.0 + 1);');
+    compiles('    let mut s = S { a: 0 };\n    s = S { a: 255 };\n    println!("{}", s.a + 1);', S);
+    compiles('    let s = S { a: 255 };\n    let t = s;\n    println!("{}", t.a + 1);', SC);
+    compiles('    let t = (255u8, 1u8);\n    let u = t;\n    println!("{}", u.0 + 1);');
+    compiles('    let a = [255u8, 1];\n    let b = a;\n    println!("{}", b[0] + 1);');
+    compiles('    let mut a = [0u8, 1];\n    a = [255, 1];\n    println!("{}", a[0] + 1);');
+    lint('    let s = S { a: 255 };\n    let t = s;\n    println!("{} {}", t.a, s.a + 1);', 'arithmetic_overflow', 8, SC);
+    lint('    let mut s = S { a: 255 };\n    let y = s.a + 1;\n    s = S { a: 0 };\n    println!("{} {}", y, s.a + 1);', 'arithmetic_overflow', 10, S);
+    lint('    let t = (255u8, 1u8);\n    let (a, b) = t;\n    println!("{}", a + b);', 'arithmetic_overflow', 5);
+    lint('    let mut t = (0u8, 0u8, 0u8);\n    t = (255, 1, 2);\n    println!("{}", t.0 + 1);', 'arithmetic_overflow', 5);
     folding('    let mut x: u8 = 254;\n    x = 255;\n    let o = Some(1);\n    let y = x + 1;\n    println!("{:?} {}", o, y);');
     lint('    let s = S { a: 255 };\n    let y = s.a;\n    println!("{}", y + 1);', 'arithmetic_overflow', 8, SC);
     lint('    let mut t = (0u8, 1u8);\n    t = (255, 1);\n    println!("{}", t.0 + 1);', 'arithmetic_overflow', 5);

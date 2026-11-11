@@ -155,8 +155,8 @@ RQ.lint=(ast,info)=>{
       letInit=keep;
       if(s.pat.t==='IdentPat'){
         const bd=bindOf(s.pat);
-        // a copy of a whole aggregate, or a struct stored more than once, is not folded the way a field read is
-        if(v&&v.k==='agg'&&(peel(s.init).t==='Path'||v.by&&bd&&bd.assigns>0))v=doubt(v);
+        // rustc keeps nothing of an aggregate copied whole from a local, nor of an array that is stored more than once
+        if(v&&v.k==='agg'&&(peel(s.init).t==='Path'||v.arr&&bd&&bd.assigns>0))v=null;
         if(bd)st.set(bd,{val:v,fresh:true});
       }
     }else if(s.t==='ExprStmt')ev(s.expr);
@@ -308,7 +308,8 @@ RQ.lint=(ast,info)=>{
           const s=b&&st.get(b),cur=s&&valueOf(b,s);
           r=arith(e.op.slice(0,-1),cur,r,e);barrier();
         }
-        if(r&&r.k==='agg'&&(peel(e.rhs).t==='Path'||r.by))r=doubt(r);
+        // a struct or array stored again is not folded, and neither is an aggregate copied whole from a local
+        if(r&&r.k==='agg'&&(peel(e.rhs).t==='Path'||r.by||r.arr))r=null;
         if(b&&st.has(b)){const s=st.get(b);s.val=r;s.fresh=true;s.doubt=false;}
         return null;
       }
@@ -336,7 +337,7 @@ RQ.lint=(ast,info)=>{
         forget(assignedIn(e));
         return null;
       }
-      case 'Tuple':case 'Array':return {k:'agg',els:nest(e.elems.map(ev))};
+      case 'Tuple':case 'Array':return {k:'agg',arr:e.t==='Array',els:nest(e.elems.map(ev))};
       case 'StructLit':{
         const by={};
         for(const f of e.fields){const v=ev(f.expr);by[f.name]=v&&v.k==='agg'?null:v;}

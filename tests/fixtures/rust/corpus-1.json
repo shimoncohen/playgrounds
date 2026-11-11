@@ -9126,5 +9126,74 @@
     "src": "fn main() {\n    let a = [String::from(\"a\"), String::from(\"b\")];\n    for s in a {\n        let t = s;\n        println!(\"{}\", t);\n    }\n}\n",
     "expect": "ok", "out": "a\nb\n", "err": "", "exit": 0,
     "why": "each String moves out of the array into the loop variable", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-source",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let t = s;\n    println!(\"{} {}\", t.a, s.a + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 9},
+    "pair": "fold-copy-source-ok",
+    "why": "the source of a whole copy stays known", "pr": "P4"
+  },
+  {
+    "id": "fold-copy-source-ok",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 254 };\n    let t = s;\n    println!(\"{} {}\", t.a, s.a + 1);\n}\n",
+    "expect": "ok", "out": "254 255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-copy-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let t = s;\n    println!(\"{}\", t.a + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:9:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a struct copied whole into a new binding is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-tuple",
+    "src": "fn main() {\n    let t = (255u8, 1u8);\n    let u = t;\n    println!(\"{}\", u.0 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "neither is a tuple", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-array",
+    "src": "fn main() {\n    let a = [255u8, 1];\n    let b = a;\n    println!(\"{}\", b[0] + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "neither is an array", "pr": "unit"
+  },
+  {
+    "id": "fold-store-struct",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let mut s = S { a: 0 };\n    s = S { a: 255 };\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a struct stored again is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-store-array",
+    "src": "fn main() {\n    let mut a = [0u8, 1];\n    a = [255, 1];\n    println!(\"{}\", a[0] + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an array stored again is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-store-tuple",
+    "src": "fn main() {\n    let mut t = (0u8, 0u8, 0u8);\n    t = (255, 1, 2);\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-store-tuple-ok",
+    "why": "a tuple stored again is folded", "pr": "P4"
+  },
+  {
+    "id": "fold-store-tuple-ok",
+    "src": "fn main() {\n    let mut t = (0u8, 0u8, 0u8);\n    t = (254, 1, 2);\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-destructure-tuple",
+    "src": "fn main() {\n    let t = (255u8, 1u8);\n    let (a, b) = t;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-destructure-tuple-ok",
+    "why": "destructuring a tuple copies its parts, which are known", "pr": "P4"
+  },
+  {
+    "id": "fold-destructure-tuple-ok",
+    "src": "fn main() {\n    let t = (254u8, 1u8);\n    let (a, b) = t;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
   }
 ]
