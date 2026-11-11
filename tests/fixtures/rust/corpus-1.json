@@ -8531,5 +8531,806 @@
     "src": "fn main() {\n    let c = \"a\" + 5;\n}\n",
     "expect": {"code": "E0369", "line": 2},
     "why": "a number added to a &str is E0369", "pr": "unit"
+  },
+  {
+    "id": "fold-const-add",
+    "src": "const N: u8 = 255;\n\nfn main() {\n    let y = N + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-const-add-ok",
+    "why": "a const item is a known operand of the lint", "pr": "P4"
+  },
+  {
+    "id": "fold-const-add-ok",
+    "src": "const N: u8 = 254;\n\nfn main() {\n    let y = N + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-const-div0",
+    "src": "const Z: i32 = 0;\n\nfn main() {\n    println!(\"{}\", 5 / Z);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "fold-const-div0-ok",
+    "why": "a const divisor of zero is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "fold-const-div0-ok",
+    "src": "const Z: i32 = 1;\n\nfn main() {\n    println!(\"{}\", 5 / Z);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "the same shape with a divisor that is not zero", "pr": "P4"
+  },
+  {
+    "id": "fold-const-index",
+    "src": "const I: usize = 7;\n\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", a[I]);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "fold-const-index-ok",
+    "why": "a const index past the end of an array is unconditional_panic", "pr": "P4"
+  },
+  {
+    "id": "fold-const-index-ok",
+    "src": "const I: usize = 2;\n\nfn main() {\n    let a = [1, 2, 3];\n    println!(\"{}\", a[I]);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "the same shape inside the array", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-lit",
+    "src": "fn main() {\n    let x = 256 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "overflowing_literals", "line": 2},
+    "pair": "fold-cast-lit-ok",
+    "why": "a literal cast takes the target type, so 256 as u8 is overflowing_literals", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-lit-ok",
+    "src": "fn main() {\n    let x = 255 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same cast that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-neg",
+    "src": "fn main() {\n    let x = -129 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "overflowing_literals", "line": 2},
+    "pair": "fold-cast-neg-ok",
+    "why": "a negative literal cast to a signed type is judged as one literal", "pr": "P4"
+  },
+  {
+    "id": "fold-cast-neg-ok",
+    "src": "fn main() {\n    let x = -128 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-128\n", "err": "", "exit": 0,
+    "why": "the same cast that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-assign-add",
+    "src": "fn main() {\n    let mut x: u8 = 250;\n    x += 3;\n    let y = x + 3;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-assign-add-ok",
+    "why": "a value stored by += is known in the block that follows", "pr": "P4"
+  },
+  {
+    "id": "fold-assign-add-ok",
+    "src": "fn main() {\n    let mut x: u8 = 250;\n    x += 3;\n    let y = x + 2;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-live-true",
+    "src": "fn main() {\n    if true {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3},
+    "pair": "fold-dead-false",
+    "why": "the branch a known-true condition takes is linted", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-false",
+    "src": "fn main() {\n    if false {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the branch a known-false condition rules out is never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-else-live",
+    "src": "fn main() {\n    let n = 3;\n    if n > 5 {\n        println!(\"a\");\n    } else {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 6},
+    "pair": "fold-else-dead",
+    "why": "an else branch on a known-false condition is live and linted", "pr": "P4"
+  },
+  {
+    "id": "fold-else-dead",
+    "src": "fn main() {\n    let n = 3;\n    if n > 1 {\n        println!(\"a\");\n    } else {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "an else branch on a known-true condition is dead and never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-mut-single",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-mut-single-ok",
+    "why": "a let mut assigned once is folded across a call", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-single-ok",
+    "src": "fn main() {\n    let mut x: u8 = 254;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "a\n255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-div0",
+    "src": "fn main() {\n    let mut d = 0;\n    println!(\"a\");\n    println!(\"{}\", 5 / d);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "fold-mut-div0-ok",
+    "why": "a let mut divisor assigned once is folded across a call", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-div0-ok",
+    "src": "fn main() {\n    let mut d = 1;\n    println!(\"a\");\n    println!(\"{}\", 5 / d);\n}\n",
+    "expect": "ok", "out": "a\n5\n", "err": "", "exit": 0,
+    "why": "the same shape with a divisor that is not zero", "pr": "P4"
+  },
+  {
+    "id": "fold-mut-cond-dead",
+    "src": "fn main() {\n    let mut c = false;\n    if c {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a let mut condition assigned once is folded, so the branch it rules out is never linted", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-println",
+    "src": "fn main() {\n    let x: u8 = 255;\n    println!(\"{}\", x);\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "println! borrows x, so rustc does not fold it and the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-inline",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let y = x + 1;\n    println!(\"{x} {y}\");\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an inline {x} borrows x as well", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-ref",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let r = &x;\n    let y = x + 1;\n    println!(\"{} {}\", y, r);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a & of x anywhere in the fn stops rustc folding x", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-later",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let y = x + 1;\n    let r = &x;\n    println!(\"{} {}\", y, r);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a & of x after the operation stops the folding too", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-closure",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let f = || x;\n    let y = x + 1;\n    println!(\"{} {}\", y, f());\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a closure that names x holds it by reference", "pr": "unit"
+  },
+  {
+    "id": "fold-borrow-method",
+    "src": "fn main() {\n    let x: u8 = 255;\n    let s = x.to_string();\n    let y = x + 1;\n    println!(\"{} {}\", y, s);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "to_string takes &self, an autoref of x", "pr": "unit"
+  },
+  {
+    "id": "fold-multi-call",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    println!(\"a\");\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a local assigned twice is not known after a call", "pr": "unit"
+  },
+  {
+    "id": "fold-cmp-live",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-and-boundary",
+    "why": "a comparison is not a block boundary, so x is still known after it", "pr": "P4"
+  },
+  {
+    "id": "fold-and-boundary",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2 && true;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "&& is a block boundary: x is no longer known after it, so the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-or-boundary",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let c = 1 > 2 || true;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "|| is a block boundary as well", "pr": "unit"
+  },
+  {
+    "id": "fold-closure-live",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let f = || 1;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-closure-call",
+    "why": "creating a closure is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-closure-call",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    let f = || 1; f();\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "calling it is", "pr": "unit"
+  },
+  {
+    "id": "fold-match-wild",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match 1 { _ => {} }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-match-switch",
+    "why": "a match whose first arm matches everything needs no switch, so it is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-match-switch",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match 1 { 1 => {} _ => {} }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a match with a real switch is a block boundary", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-break",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-loop-arith",
+    "why": "a loop that always breaks has no back edge, so it is not a block boundary", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-arith",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { 1 + 1; break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a checked operation inside it is a boundary", "pr": "unit"
+  },
+  {
+    "id": "fold-deferred",
+    "src": "fn main() {\n    let a: u8;\n    a = 255;\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-deferred-ok",
+    "why": "a let without an initializer that is assigned once is folded like a plain let", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-ok",
+    "src": "fn main() {\n    let a: u8;\n    a = 254;\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-value",
+    "src": "fn main() {\n    let v: u8 = loop { break 255; };\n    let w = v + 1;\n    println!(\"{}\", w);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3},
+    "pair": "fold-loop-value-ok",
+    "why": "a value a loop breaks with is known after it", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-value-ok",
+    "src": "fn main() {\n    let v: u8 = loop { break 254; };\n    let w = v + 1;\n    println!(\"{}\", w);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-diverge",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    loop { return; break; }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a loop that returns before its break never reaches the code after it, so nothing there is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-match-bind",
+    "src": "fn main() {\n    let mut x: u8 = 255;\n    x = x;\n    match x { n => { println!(\"{}\", n + 1); } }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-match-bind-ok",
+    "why": "an irrefutable match binding carries the value of the scrutinee", "pr": "P4"
+  },
+  {
+    "id": "fold-match-bind-ok",
+    "src": "fn main() {\n    let mut x: u8 = 254;\n    x = x;\n    match x { n => { println!(\"{}\", n + 1); } }\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-branch",
+    "src": "fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 255;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 8},
+    "pair": "fold-deferred-branch-ok",
+    "why": "the one store of a deferred let reaches the read even when it sits in a branch and the other branch returns", "pr": "P4"
+  },
+  {
+    "id": "fold-deferred-branch-ok",
+    "src": "fn f(c: bool) {\n    let a: u8;\n    if c {\n        a = 254;\n    } else {\n        return;\n    }\n    let b = a + 1;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-nested-grid",
+    "src": "fn main() {\n    let g = [[1, 2], [3, 4]];\n    if g[0][0] > 0 {\n        println!(\"{}\", g[1][1] + 1);\n    }\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a condition on a value inside a nested array is unknown, so both branches stay live", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-cond",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 2 {\n        println!(\"yes\");\n    }\n}\n",
+    "expect": "ok", "out": "yes\n", "err": "", "exit": 0,
+    "why": "the same for a nested tuple", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-sum",
+    "src": "fn main() {\n    let g = [[255u8, 1], [2, 3]];\n    let y = g[0][0] + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "rustc folds one level of array, so an overflow through two levels is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "fold-nested-trap",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-nested-trap-ok",
+    "why": "a literal overflow is linted even in a branch whose condition is unknown", "pr": "P4"
+  },
+  {
+    "id": "fold-nested-trap-ok",
+    "src": "fn main() {\n    let t = (1, (2, 3));\n    if t.1.0 == 5 {\n        let x: u8 = 254 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-match-known",
+    "src": "fn main() {\n    let n = 2u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!(\"{}\", x);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-match-known-ok",
+    "why": "a match on a known value follows only the arm that matches, here the live one", "pr": "P4"
+  },
+  {
+    "id": "fold-match-known-ok",
+    "src": "fn main() {\n    let n = 3u8;\n    match n {\n        1 | 2 => {\n            let x: u8 = 255 + 1;\n            println!(\"{}\", x);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the arm with the overflow is not the one that matches, so it is never linted", "pr": "P4"
+  },
+  {
+    "id": "fold-match-return-live",
+    "src": "fn main() {\n    let n = 3u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-match-return",
+    "why": "the taken arm does not return, so the code after the match is live", "pr": "P4"
+  },
+  {
+    "id": "fold-match-return",
+    "src": "fn main() {\n    let n = 0u8;\n    match n {\n        0 => return,\n        _ => {}\n    }\n    let x: u8 = 255 + 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the taken arm returns, so the code after the match is unreachable", "pr": "unit"
+  },
+  {
+    "id": "fold-struct-field",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let y = s.a + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-struct-field-ok",
+    "why": "a field of a struct built from literals is known", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-field-ok",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 254 };\n    let y = s.a + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-pat",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let S { a } = S { a: 255 };\n    println!(\"{}\", a + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-struct-pat-ok",
+    "why": "a struct pattern binds the known fields", "pr": "P4"
+  },
+  {
+    "id": "fold-struct-pat-ok",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let S { a } = S { a: 254 };\n    println!(\"{}\", a + 1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-return",
+    "src": "fn f() -> u8 {\n    let mut n = 255u8;\n    loop {\n        n += 1;\n        return n;\n    }\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-loop-return-ok",
+    "why": "a loop that returns on its first pass has no back edge, so n is known in it", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-return-ok",
+    "src": "fn f() -> u8 {\n    let mut n = 254u8;\n    loop {\n        n += 1;\n        return n;\n    }\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-array-repeat",
+    "src": "fn main() {\n    let a = [255u8; 3];\n    let z = a[0] + 1;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "rustc does not fold an array built with [v; n]", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-tuple-struct",
+    "src": "struct W(u8);\n\nfn main() {\n    let w = W(5);\n    match w {\n        W(n) => println!(\"{}\", n),\n    }\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a tuple struct pattern is an ordinary match", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-guard-loop",
+    "src": "fn main() {\n    let mut i = 0;\n    loop {\n        i += 1;\n        match i {\n            n if n > 3 => break,\n            _ => {}\n        }\n    }\n    println!(\"{}\", i);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "a guarded arm is a switch, so the break is an ordinary one", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-continue",
+    "src": "fn main() {\n    let mut n = 0u8;\n    loop {\n        n += 1;\n        if n > 2 {\n            continue;\n        }\n        break;\n    }\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a loop with a continue before its break runs as written", "pr": "unit"
+  },
+  {
+    "id": "fold-ordinary-match-sub",
+    "src": "fn main() {\n    let n = 0u8;\n    let r = match n {\n        0 => 0,\n        k => k - 1,\n    };\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the arm k - 1 never matches n = 0, so it is not linted", "pr": "unit"
+  },
+  {
+    "id": "fold-field-store-branch",
+    "src": "struct S {\n    a: u8,\n}\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut s = S { a: 255 };\n    if idb() {\n        s.a = 0;\n    }\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field store inside a branch means the field is not known after it", "pr": "unit"
+  },
+  {
+    "id": "fold-tuple-store-branch",
+    "src": "fn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut t = (255u8, 1u8);\n    if idb() {\n        t.0 = 0;\n    }\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a tuple field", "pr": "unit"
+  },
+  {
+    "id": "fold-tuple-struct-store-branch",
+    "src": "struct W(u8);\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut w = W(255);\n    if idb() {\n        w.0 = 0;\n    }\n    println!(\"{}\", w.0 + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a tuple struct field", "pr": "unit"
+  },
+  {
+    "id": "fold-field-store-match",
+    "src": "struct S {\n    a: u8,\n}\n\nfn idb() -> bool {\n    true\n}\n\nfn main() {\n    let mut s = S { a: 255 };\n    match idb() {\n        true => {\n            s.a = 0;\n        }\n        false => {}\n    }\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "the same for a store in a match arm", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-branch-literal",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a dead branch is not linted", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-arm-bind",
+    "src": "fn f(n: u8) {\n    let x = 255u8;\n    match n {\n        k => {\n            let y = x + 1;\n            println!(\"{}\", y);\n        }\n        _ => {}\n    }\n}\n\nfn main() {\n    f(0);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-unknown-arm-lit",
+    "why": "a catch-all first arm needs no switch, so the value known before the match is known inside it", "pr": "P4"
+  },
+  {
+    "id": "fold-unknown-arm-lit",
+    "src": "fn f(n: u8) {\n    let x = 255u8;\n    match n {\n        1 => {\n            let y = x + 1;\n            println!(\"{}\", y);\n        }\n        _ => {}\n    }\n}\n\nfn main() {\n    f(0);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an arm reached through a literal pattern of a switch on an unknown value does not see what was known before the switch", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-if",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if c {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(false);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-unknown-if-not",
+    "why": "the then branch of an if on an unknown condition sees what was known before it", "pr": "P4"
+  },
+  {
+    "id": "fold-unknown-if-not",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if !c {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(false);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:17:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the same branch behind `!c` is reached through a value target and does not", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-else",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if c {\n        println!(\"a\");\n    } else {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the else branch of an if on an unknown condition does not see what was known before the if", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-or",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    let b = c || x + 1 > 3;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "the right side of || is reached through a value target as well", "pr": "unit"
+  },
+  {
+    "id": "neg-unsigned-let",
+    "src": "fn main() {\n    let x: u8 = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-let-ok",
+    "why": "negating a literal that an annotated let makes unsigned is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-let-ok",
+    "src": "fn main() {\n    let x: i8 = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-cast",
+    "src": "fn main() {\n    let x = -1 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-cast-ok",
+    "why": "a cast gives the negated literal its target type, so -1 as u8 is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-cast-ok",
+    "src": "fn main() {\n    let x = -1 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same cast to a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-var",
+    "src": "fn main() {\n    let y: u32 = 5;\n    let z = -y;\n    println!(\"{}\", z);\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-unsigned-var-ok",
+    "why": "negating an unsigned variable is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-var-ok",
+    "src": "fn main() {\n    let y: i32 = 5;\n    let z = -y;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "-5\n", "err": "", "exit": 0,
+    "why": "the same with a signed variable", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-zero",
+    "src": "fn main() {\n    let x = -0 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-zero-ok",
+    "why": "even -0 is a negation, so it is E0600 for an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-zero-ok",
+    "src": "fn main() {\n    let x = -0 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-paren",
+    "src": "fn main() {\n    let x = -(1) as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-paren-ok",
+    "why": "parentheses around the literal change nothing", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-paren-ok",
+    "src": "fn main() {\n    let x = -(1) as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "for-array-nested",
+    "src": "fn main() {\n    let g = [[1u8, 2], [3, 4]];\n    let mut s = 0;\n    for r in g {\n        for c in r {\n            s += c;\n        }\n    }\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "a for over an array by value, and over the arrays inside it", "pr": "unit"
+  },
+  {
+    "id": "for-array-copy",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in a {\n        println!(\"{}\", x);\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "an array of Copy values is copied by the loop, so it is still usable after it", "pr": "unit"
+  },
+  {
+    "id": "for-array-moved",
+    "src": "fn main() {\n    let a = [String::from(\"a\"), String::from(\"b\")];\n    for s in a {\n        println!(\"{}\", s);\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0382", "line": 6},
+    "why": "an array of Strings is moved by the loop, so using it after is E0382", "pr": "unit"
+  },
+  {
+    "id": "for-array-literal",
+    "src": "fn main() {\n    for x in [1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "a for over an array literal", "pr": "unit"
+  },
+  {
+    "id": "for-array-break",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    let mut total = 0;\n    for x in a {\n        if x == 1 {\n            break;\n        }\n        total += x;\n    }\n    println!(\"{}\", total);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "break leaves the loop early", "pr": "unit"
+  },
+  {
+    "id": "for-array-pairs",
+    "src": "fn main() {\n    let a = [(1, 2), (3, 4)];\n    for p in a {\n        println!(\"{}\", p.0 + p.1);\n    }\n}\n",
+    "expect": "ok", "out": "3\n7\n", "err": "", "exit": 0,
+    "why": "the items of an array of pairs are pairs", "pr": "unit"
+  },
+  {
+    "id": "for-array-strings",
+    "src": "fn main() {\n    let a = [String::from(\"a\"), String::from(\"b\")];\n    for s in a {\n        let t = s;\n        println!(\"{}\", t);\n    }\n}\n",
+    "expect": "ok", "out": "a\nb\n", "err": "", "exit": 0,
+    "why": "each String moves out of the array into the loop variable", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-source",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let t = s;\n    println!(\"{} {}\", t.a, s.a + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 9},
+    "pair": "fold-copy-source-ok",
+    "why": "the source of a whole copy stays known", "pr": "P4"
+  },
+  {
+    "id": "fold-copy-source-ok",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 254 };\n    let t = s;\n    println!(\"{} {}\", t.a, s.a + 1);\n}\n",
+    "expect": "ok", "out": "254 255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-copy-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: 255 };\n    let t = s;\n    println!(\"{}\", t.a + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:9:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a struct copied whole into a new binding is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-tuple",
+    "src": "fn main() {\n    let t = (255u8, 1u8);\n    let u = t;\n    println!(\"{}\", u.0 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "neither is a tuple", "pr": "unit"
+  },
+  {
+    "id": "fold-copy-array",
+    "src": "fn main() {\n    let a = [255u8, 1];\n    let b = a;\n    println!(\"{}\", b[0] + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "neither is an array", "pr": "unit"
+  },
+  {
+    "id": "fold-store-struct",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let mut s = S { a: 0 };\n    s = S { a: 255 };\n    println!(\"{}\", s.a + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a struct stored again is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-store-array",
+    "src": "fn main() {\n    let mut a = [0u8, 1];\n    a = [255, 1];\n    println!(\"{}\", a[0] + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an array stored again is not folded", "pr": "unit"
+  },
+  {
+    "id": "fold-store-tuple",
+    "src": "fn main() {\n    let mut t = (0u8, 0u8, 0u8);\n    t = (255, 1, 2);\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-store-tuple-ok",
+    "why": "a tuple stored again is folded", "pr": "P4"
+  },
+  {
+    "id": "fold-store-tuple-ok",
+    "src": "fn main() {\n    let mut t = (0u8, 0u8, 0u8);\n    t = (254, 1, 2);\n    println!(\"{}\", t.0 + 1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-destructure-tuple",
+    "src": "fn main() {\n    let t = (255u8, 1u8);\n    let (a, b) = t;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-destructure-tuple-ok",
+    "why": "destructuring a tuple copies its parts, which are known", "pr": "P4"
+  },
+  {
+    "id": "fold-destructure-tuple-ok",
+    "src": "fn main() {\n    let t = (254u8, 1u8);\n    let (a, b) = t;\n    println!(\"{}\", a + b);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-borrowed",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-dead-borrowed-ok",
+    "why": "a borrowed constant expression is promoted, so rustc lints its overflow even in a branch it never runs", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-borrowed-ok",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 254u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-plain-let",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a plain let initializer is not promoted, so a dead branch hides it", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-div-zero",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 5 / 0);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a division by a literal zero is not promoted either", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-by-value",
+    "src": "fn f(n: u8) {\n    println!(\"{}\", n);\n}\n\nfn main() {\n    let n = 2;\n    if n == 1 {\n        f(255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a constant expression passed by value is not promoted", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-false",
+    "src": "fn main() {\n    if false {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the dead side of a literal false is never built, so nothing in it is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-else",
+    "src": "fn main() {\n    if true {\n    } else {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "neither is the else of a literal true", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-local",
+    "src": "fn main() {\n    let c = false;\n    if c {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a local holding a literal bool prunes its dead branch the same way", "pr": "unit"
+  },
+  {
+    "id": "fold-soft-return",
+    "src": "fn main() {\n    let n = 1;\n    if n == 1 {\n        return;\n    }\n    println!(\"{}\", 255u8 + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 6},
+    "pair": "fold-soft-return-ok",
+    "why": "code after an if on a known value that returns still exists, so a promoted overflow in it is linted", "pr": "P4"
+  },
+  {
+    "id": "fold-soft-return-ok",
+    "src": "fn main() {\n    let n = 1;\n    if n == 1 {\n        return;\n    }\n    println!(\"{}\", 254u8 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-hard-return",
+    "src": "fn main() {\n    return;\n    println!(\"{}\", 255u8 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "code after an unconditional return is not built, so nothing in it is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-skipped-literal-arm",
+    "src": "fn main() {\n    let n = 5u8;\n    match n {\n        1 => {\n            println!(\"{}\", 255u8 + 1);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an arm skipped behind a literal pattern is pruned", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-else-kept",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-loop-else-kept-ok",
+    "why": "in a loop, a local known before the loop is still known in the else of an if on an unknown condition", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-else-kept-ok",
+    "src": "fn run(n: usize) {\n    let x = 254u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-match-kept",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        match i {\n            0 => println!(\"a\"),\n            1 => {\n                let z = x + 1;\n            println!(\"{}\", z);\n            }\n            _ => {}\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-loop-match-kept-ok",
+    "why": "and in a match arm behind a literal pattern", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-match-kept-ok",
+    "src": "fn run(n: usize) {\n    let x = 254u8;\n    for i in 0..n {\n        match i {\n            0 => println!(\"a\"),\n            1 => {\n                let z = x + 1;\n            println!(\"{}\", z);\n            }\n            _ => {}\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-else-fresh",
+    "src": "fn run(n: usize) {\n    for i in 0..n {\n        let x = 255u8;\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:21:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a local declared inside the loop body before the if is not known in the else", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-else-assigned",
+    "src": "fn run(n: usize) {\n    let mut x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n        x = 255;\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:21:\nattempt to add with overflow\n", "exit": 101,
+    "why": "nor is one the loop assigns", "pr": "unit"
+  },
+  {
+    "id": "fold-after-return-live",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 { }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-after-return",
+    "why": "after an if with an empty then, the code is reached from both sides and still sees what was known", "pr": "P4"
+  },
+  {
+    "id": "fold-after-return",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 { return; }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "after an if on an unknown condition whose then returns, the code is reached only through the value edge and sees nothing known before", "pr": "unit"
+  },
+  {
+    "id": "fold-after-return-else",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 {\n        return;\n    } else {\n        println!(\"b\");\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "\nthread 'main' panicked at src/main.rs:8:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the same when the else is the side that stays", "pr": "unit"
+  },
+  {
+    "id": "fold-after-else-return",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 {\n        println!(\"a\");\n    } else {\n        return;\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 8},
+    "why": "when the else returns, the code after is reached through the then edge and keeps what was known", "pr": "unit"
   }
 ]

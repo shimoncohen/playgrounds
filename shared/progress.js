@@ -40,8 +40,11 @@
   };
 
   // Every playground starts from a state with xp 0 and nothing done, and writes it on load,
-  // so "empty" has to mean "no progress", not "no key".
-  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && (!d.notes || Object.values(d.notes).every(v => !v)));
+  // so "empty" has to mean "no progress", not "no key". Learner-typed text (notes, code per mission,
+  // typed answers, the free-code and sandbox buffers) is progress even at xp 0.
+  const TEXT_MAPS = ['notes', 'codes', 'code', 'answers'];
+  const hasText = d => TEXT_MAPS.some(f => d[f] && typeof d[f] === 'object' && Object.values(d[f]).some(v => v)) || !!d.sandbox || !!(d.free && d.free.code);
+  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && !hasText(d));
   const hasProgress = () => {
     const raw = rawGet.call(ls, KEY);
     if (raw === null) return false;

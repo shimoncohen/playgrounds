@@ -270,15 +270,15 @@ describe('lint with references', () => {
     assert.deepEqual(lintOf('    let r = &(255u8 + 1);'), [['arithmetic_overflow@3'], []]);
     assert.deepEqual(lintOf('    let mut x: u8 = 255;\n    x = 255;\n    let y = x + 1;'), [['arithmetic_overflow@5'], []]);
     assert.deepEqual(lintOf('', 'fn t(s: &String) {\n    let mut x: u8 = 255;\n    x = 255;\n    let y = x + 1;\n}'), [['arithmetic_overflow@4'], []]);
-    assert.deepEqual(lintOf('', 'fn t(s: &String) {\n    let mut x: u8 = 255;\n    x = 255;\n    let n = s.len();\n    let y = x + 1;\n}'), [[], ['const folding@5']]);
+    assert.deepEqual(lintOf('', 'fn t(s: &String) {\n    let mut x: u8 = 255;\n    x = 255;\n    let n = s.len();\n    let y = x + 1;\n}'), [[], []]);
   });
   it('&mut x forgets the value of x', () => {
     assert.deepEqual(lintOf('    let mut x: u8 = 255;\n    let r = &mut x;\n    *r = 0;\n    let y = x + 1;'), [[], []]);
   });
-  it('a local borrowed anywhere in the fn is const folding, not a verdict', () => {
-    assert.deepEqual(lintOf('    let x: u8 = 255;\n    let r = &x;\n    let y = x + 1;'), [[], ['const folding@5']]);
+  it('a local borrowed anywhere in the fn is not folded', () => {
+    assert.deepEqual(lintOf('    let x: u8 = 255;\n    let r = &x;\n    let y = x + 1;'), [[], []]);
     assert.deepEqual(lintOf('    let x: u8 = 255;\n    let y = x + 1;'), [['arithmetic_overflow@4'], []]);
-    assert.deepEqual(lintOf('    let x: u8 = 255;\n    let y = x + 1;\n    let r = &x;'), [[], ['const folding@4']]);
+    assert.deepEqual(lintOf('    let x: u8 = 255;\n    let y = x + 1;\n    let r = &x;'), [[], []]);
   });
   it('an assignment through a Deref stores nothing and folds nothing', () => {
     assert.deepEqual(lintOf('    let mut x: i32 = 1;\n    let r = &mut x;\n    *r = 255u8 as i32;\n    let y = *r + 2147483647;'), [[], []]);
