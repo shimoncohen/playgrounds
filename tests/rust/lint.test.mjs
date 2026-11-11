@@ -297,6 +297,30 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     ]) folding(body);
     compiles('    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!("{}", x);\n    }');
   });
+  it('a branch reached through a value target of a switch on an unknown value does not see what was known before it', () => {
+    const F = (body) => `fn f(c: bool, n: u8) {\n${body}\n}`;
+    const T = '        let y = x + 1;\n        println!("{}", y);\n';
+    const call = '    f(true, 0);';
+    const lintF = (body, line) => lint(call, 'arithmetic_overflow', line, F(body));
+    const okF = (body) => compiles(call, F(body));
+    lintF('    let x = 255u8;\n    if c {\n' + T + '    }', 4);
+    okF('    let x = 255u8;\n    if c {\n        println!("a");\n    } else {\n' + T + '    }');
+    okF('    let x = 255u8;\n    if !c {\n' + T + '    }');
+    lintF('    let x = 255u8;\n    if !c {\n        println!("b");\n    } else {\n' + T + '    }', 6);
+    okF('    let x = 255u8;\n    let b = c || x + 1 > 3;\n    println!("{}", b);');
+    lintF('    let x = 255u8;\n    let b = c && x + 1 > 3;\n    println!("{}", b);', 3);
+    lintF('    if c {\n        println!("a");\n    } else {\n        let y: u8 = 255 + 1;\n        println!("{}", y);\n    }', 5);
+    lintF('    let x = 255u8;\n    if c {\n        println!("a");\n    }\n    let y = x + 1;\n    println!("{}", y);', 6);
+    const arms = (pats) => `    let x = 255u8;\n    match n {\n${pats}    }`;
+    const A = (pat, trap) => `        ${pat} => {\n${trap ? T.replace(/^ {8}/gm, '            ') : ''}        }\n`;
+    okF(arms(A('1', true) + A('_', false)));
+    okF(arms(A('1 | 2', true) + A('_', false)));
+    lintF(arms(A('1', false) + A('_', true)), 7);
+    lintF(arms(A('1', false) + A('2', false) + A('k', true)), 9);
+    lintF(arms(A('k', true) + A('_', false)), 5);
+    lintF(arms(A('0..=9', true) + A('_', false)), 5);
+    okF(arms(A('0..=9', false) + A('_', true)));
+  });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
   });

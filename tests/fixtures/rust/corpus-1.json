@@ -8981,5 +8981,43 @@
     "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "a dead branch is not linted", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-arm-bind",
+    "src": "fn f(n: u8) {\n    let x = 255u8;\n    match n {\n        k => {\n            let y = x + 1;\n            println!(\"{}\", y);\n        }\n        _ => {}\n    }\n}\n\nfn main() {\n    f(0);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 5},
+    "pair": "fold-unknown-arm-lit",
+    "why": "a catch-all first arm needs no switch, so the value known before the match is known inside it", "pr": "P4"
+  },
+  {
+    "id": "fold-unknown-arm-lit",
+    "src": "fn f(n: u8) {\n    let x = 255u8;\n    match n {\n        1 => {\n            let y = x + 1;\n            println!(\"{}\", y);\n        }\n        _ => {}\n    }\n}\n\nfn main() {\n    f(0);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an arm reached through a literal pattern of a switch on an unknown value does not see what was known before the switch", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-if",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if c {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(false);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-unknown-if-not",
+    "why": "the then branch of an if on an unknown condition sees what was known before it", "pr": "P4"
+  },
+  {
+    "id": "fold-unknown-if-not",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if !c {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(false);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:17:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the same branch behind `!c` is reached through a value target and does not", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-else",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    if c {\n        println!(\"a\");\n    } else {\n        let y = x + 1;\n        println!(\"{}\", y);\n    }\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the else branch of an if on an unknown condition does not see what was known before the if", "pr": "unit"
+  },
+  {
+    "id": "fold-unknown-or",
+    "src": "fn f(c: bool) {\n    let x = 255u8;\n    let b = c || x + 1 > 3;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "the right side of || is reached through a value target as well", "pr": "unit"
   }
 ]

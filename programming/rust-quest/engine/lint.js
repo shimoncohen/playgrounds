@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),defVal=new Map(),dead=0,skip=0,letInit=null,dub=0,frames=[],barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),outerDef=null,dead=0,skip=0,letInit=null,dub=0,frames=[],barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -181,6 +181,31 @@ RQ.lint=(ast,info)=>{
     return null;
   }
   // the live branch runs as written; a trap in a branch the condition rules out is never linted
+  // rustc skips the const-prop state a switch had when it enters a block through one of the switch's value targets (the else of
+  // an if, a literal arm): what was known before the switch is unknown there, what the block assigns itself is known
+  function blank(f){
+    const keep=st,keepOuter=outerDef;
+    st=new Map([...st].map(([k,s])=>[k,{...s,val:null,doubt:false}]));
+    outerDef=new Set([...(outerDef||[]),...defVal.keys()]);
+    const r=f();
+    st=keep;outerDef=keepOuter;return r;
+  }
+  const nots=c=>{let n=0,x=peel(c);while(x.t==='Unary'&&x.op==='!'){n++;x=peel(x.expr);}return n;};
+  const isLitPat=(p,kind)=>p.t==='LitPat'&&(kind==='bool'?peel(p.lit).kind==='bool':typeof litVal(p.lit)==='bigint')||p.t==='Or'&&p.alts.every(x=>x.t==='LitPat'&&typeof litVal(x.lit)==='bigint');
+  // which arms of a match on a value rustc does not know enter through a value target ('blank') or the otherwise edge ('full')
+  function armStates(e){
+    const a=e.arms,n=a.length;
+    if(n<2||a.some(x=>x.guard))return null;
+    const last=a[n-1].pat,catchAll=last.t==='Wild'||last.t==='IdentPat'&&!last.sub&&!last.byRef&&!!bindOf(last);
+    if(catchAll&&a.slice(0,n-1).every(x=>isLitPat(x.pat,'int')))return a.map((x,i)=>i<n-1?'blank':'full');
+    const rng=p=>p.t==='RangePat'&&p.lo&&p.hi&&typeof litVal(p.lo)==='bigint'&&typeof litVal(p.hi)==='bigint';
+    if(n===2&&catchAll&&rng(a[0].pat))return ['full','blank'];
+    if(n===2&&isLitPat(a[0].pat,'bool')&&isLitPat(a[1].pat,'bool')){
+      const v0=peel(a[0].pat.lit).v,v1=peel(a[1].pat.lit).v;
+      if(v0!==v1)return v0?['full','blank']:['blank','full'];
+    }
+    return null;
+  }
   function branch(b,live){
     const was=div;
     if(!live)skip++;
@@ -195,7 +220,8 @@ RQ.lint=(ast,info)=>{
     barrier();
     const fr={n:0,vals:[],bad:false},d=c&&c.d?1:0;
     frames.push(fr);dub+=d;
-    branch(n.body,!(c&&c.k==='bool'&&c.v===false&&!c.d));
+    if(cond&&!(c&&c.k==='bool')&&nots(cond)===1)blank(()=>branch(n.body,true));
+    else branch(n.body,!(c&&c.k==='bool'&&c.v===false&&!c.d));
     dub-=d;frames.pop();lastFrame=fr;
     forget(assignedIn(n));barrier();
     return c;
@@ -212,7 +238,7 @@ RQ.lint=(ast,info)=>{
       case 'Path':{
         const b=bindOf(e);
         if(b){
-          if(b.deferred&&b.assigns===1){const v=defVal.get(b);return v&&!borrowed.has(b)?v:null;}
+          if(b.deferred&&b.assigns===1){const v=defVal.get(b);return v&&!borrowed.has(b)&&!(outerDef&&outerDef.has(b))?v:null;}
           const s=st.get(b);
           if(!s||!s.val)return null;
           return valueOf(b,s);
@@ -236,7 +262,7 @@ RQ.lint=(ast,info)=>{
           const a=ev(e.lhs);
           barrier();
           if(a&&a.k==='bool'&&a.v===(op==='||'))return a;
-          const b=ev(e.rhs);
+          const b=op==='||'&&!(a&&a.k==='bool')?blank(()=>ev(e.rhs)):ev(e.rhs);
           barrier();
           return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v,dbt(a,b)):null;
         }
@@ -277,7 +303,7 @@ RQ.lint=(ast,info)=>{
         const b=bindOf(e);
         let r=ev(e.rhs);
         // the one store of a deferred let reaches every later read, wherever in the control flow it sits
-        if(b&&b.deferred&&b.assigns===1){defVal.set(b,r);return null;}
+        if(b&&b.deferred&&b.assigns===1){defVal.set(b,r);if(outerDef)outerDef.delete(b);return null;}
         if(e.op!=='='){
           const s=b&&st.get(b),cur=s&&valueOf(b,s);
           r=arith(e.op.slice(0,-1),cur,r,e);barrier();
@@ -331,20 +357,21 @@ RQ.lint=(ast,info)=>{
       }
       case 'Continue':div=true;return null;
       case 'If':{
-        const c=ev(e.cond),known=c&&c.k==='bool'&&!c.d,db=c&&c.d?1:0;
+        const c=ev(e.cond),known=c&&c.k==='bool'&&!c.d,nn=known?0:nots(e.cond),db=(c&&c.d)||nn>1?1:0;
         barrier();
         const base=snap();
         dub+=db;
-        const dt=branch(e.then,!known||c.v);
+        const thenBlank=!known&&nn===1,elseBlank=!known&&nn===0;
+        const dt=thenBlank?blank(()=>branch(e.then,true)):branch(e.then,!known||c.v);
         st=base;
         let de=false;
         if(e.els&&e.els.t==='If'){
           const was=div;
           if(known&&c.v)skip++;
-          ev(e.els);
+          if(elseBlank)blank(()=>ev(e.els));else ev(e.els);
           if(known&&c.v)skip--;
           de=div;div=was;
-        }else if(e.els)de=branch(e.els,!known||!c.v);
+        }else if(e.els)de=elseBlank?blank(()=>branch(e.els,true)):branch(e.els,!known||!c.v);
         dub-=db;
         forget(assignedIn(e));barrier();
         // rustc follows only the taken edge of an if on a known condition, so a diverging taken branch ends the block
@@ -366,15 +393,16 @@ RQ.lint=(ast,info)=>{
         }
         const sv=ev(e.scrut);barrier();
         const base=snap();
-        const pick=pickArm(e,sv),armDiv=[];
+        const pick=pickArm(e,sv),armDiv=[],states=!sv?armStates(e):null;
         let all=e.arms.length>0;
         // with a known scrutinee rustc follows only the arm that matches; otherwise a trap in any arm is unsupported
         e.arms.forEach((a,i)=>{
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
-          const was=div,mode=pick<0?'dead':i===pick?'live':'skip';
+          const was=div,mode=states?'unknown':pick<0?'dead':i===pick?'live':'skip';
           destructure(a.pat,sv,false,true);
           if(mode==='dead')dead++;else if(mode==='skip')skip++;
-          if(a.body.t==='Block')block(a.body);else ev(a.body);
+          const run=()=>{if(a.body.t==='Block')block(a.body);else ev(a.body);};
+          if(mode==='unknown'&&states[i]==='blank')blank(run);else run();
           if(mode==='dead')dead--;else if(mode==='skip')skip--;
           armDiv.push(div);all=all&&div;div=was;
         });
