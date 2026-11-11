@@ -1233,11 +1233,15 @@ RQ.check=ast=>{
     if(mode==='move'&&!isCopy(t)){
       const last=path[path.length-1];
       if(st.viaRef){
-        if(path.length!==1||!last.variant){unsup('move out of reference',p.line);return WILD;}
+        const dp=peel(st.scrut).pat;
+        if(!dp&&(path.length!==1||!last.variant)){unsup('move out of reference',p.line);return WILD;}
         if(!st.cov.err){
           st.cov.err=true;
-          const x=peel(st.scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
-          errors.push(RQ.diag.make('E0507',st.scrut.line,st.scrut.col,{name:ch?ch.text:'value',variant:last.variant,mut:!!via&&via.mut}));
+          if(dp)errors.push(RQ.diag.make('E0507',p.line,p.col,{pat:true,mut:dp.mut}));
+          else{
+            const x=peel(st.scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
+            errors.push(RQ.diag.make('E0507',st.scrut.line,st.scrut.col,{name:ch?ch.text:'value',variant:last.variant,mut:!!via&&via.mut}));
+          }
         }
       }else st.cov.moves=true;
     }
@@ -1259,10 +1263,11 @@ RQ.check=ast=>{
   function walkPat(p,t,mode,path,st){
     t=res(t);
     const bad=()=>{unsup('pattern',p.line);return WILD;};
-    if(t.k==='any'||t.k==='never'){
+    const anyNames=()=>{
       RQ.walk(p,x=>{if(x.t==='IdentPat'&&!st.names.has(x.name)&&x.name!=='None'){st.names.add(x.name);bindVar(x.name,x.mut,'let',T.any,x);I(x).bpath=path;I(x).bmode='move';}});
       return WILD;
-    }
+    };
+    if(t.k==='any'||t.k==='never')return anyNames();
     switch(p.t){
       case 'Wild':return WILD;
       case 'IdentPat':{
@@ -1308,7 +1313,7 @@ RQ.check=ast=>{
         const q=peelPat(p,t,mode,path);
         if(!q)return WILD;
         const els=q.t.k==='tuple'?q.t.els:q.t.k==='unit'?[]:null;
-        if(!els){mism(q.t,T.tuple(p.pats.map(()=>T.tvar())),p);return WILD;}
+        if(!els){mism(q.t,T.tuple(p.pats.map(()=>T.tvar())),p);return anyNames();}
         const args=subPats(p,p.pats,els.map((ty,i)=>({name:String(i),ty})),q.mode,path,st,null);
         return args?wrapRef({c:'single',args},q.wraps):WILD;
       }
@@ -2090,6 +2095,11 @@ RQ.check=ast=>{
       case 'Deref':{
         const t=ex(e.expr),r=res(t),x=peel(e.expr);
         if(x.t==='Path'&&info.get(x).bind)I(e).bind=info.get(x).bind;
+        if(e.pat){
+          // an `&` or `&mut` pattern is matched against the reference itself, so a value of another type is E0308
+          if(r.k==='any'||r.k==='never')return T.any;
+          if(r.k!=='ref'||r.mut!==e.pat.mut){errors.push(RQ.diag.make('E0308',e.line,e.col,{expected:show(t),found:e.pat.mut?'&mut _':'&_'}));return T.any;}
+        }
         if(r.k==='ref')return r.to;
         return r.k==='any'||r.k==='never'?T.any:unsup('dereference',e.line);
       }

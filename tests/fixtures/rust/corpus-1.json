@@ -10429,5 +10429,296 @@
     "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n    set(&mut a);\n    let r = &a;\n    println!(\"{:?}\", r);\n}\n",
     "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
     "why": "the array is usable again after a &mut [T] argument ends", "pr": "unit"
+  },
+  {
+    "id": "forref-sum-max",
+    "src": "fn main() {\n    let a = [3, 9, 2, 7];\n    let mut sum = 0;\n    let mut best = a[0];\n    for &x in &a {\n        sum += x;\n        if x > best {\n            best = x;\n        }\n    }\n    println!(\"{} {} {:?}\", sum, best, a);\n}\n",
+    "expect": "ok", "out": "21 9 [3, 9, 2, 7]\n", "err": "", "exit": 0,
+    "why": "for &x in &a copies each element out of the reference, and the array is usable after the loop", "pr": "unit"
+  },
+  {
+    "id": "forref-iter-vec",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let mut s = 0;\n    for &x in v.iter() {\n        s += x;\n    }\n    for &x in &v {\n        s += x * 10;\n    }\n    println!(\"{} {:?}\", s, v);\n}\n",
+    "expect": "ok", "out": "66 [1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "for &x in v.iter() and for &x in &v copy each element of a Vec", "pr": "unit"
+  },
+  {
+    "id": "forref-array-iter",
+    "src": "fn main() {\n    let a = [1.5, 2.5];\n    for &x in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1.5\n2.5\n", "err": "", "exit": 0,
+    "why": "for &x in a.iter() on an array", "pr": "unit"
+  },
+  {
+    "id": "forref-pairs",
+    "src": "fn main() {\n    let pairs = [(1, 2), (3, 4)];\n    for &(a, b) in &pairs {\n        println!(\"{} {}\", a, b);\n    }\n    let v = vec![(5, 6)];\n    for &(a, b) in v.iter() {\n        println!(\"{}\", a * b);\n    }\n}\n",
+    "expect": "ok", "out": "1 2\n3 4\n30\n", "err": "", "exit": 0,
+    "why": "for &(a, b) in &pairs destructures the tuple behind the reference", "pr": "unit"
+  },
+  {
+    "id": "forref-nested-tuple",
+    "src": "fn main() {\n    let a = [(1, (2, 3))];\n    for &(x, (y, z)) in &a {\n        println!(\"{}\", x + y + z);\n    }\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "an & pattern holds a nested tuple pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-enumerate",
+    "src": "fn main() {\n    let a = [10, 20, 30];\n    let mut at = 0;\n    for (i, &x) in a.iter().enumerate() {\n        if x == 20 {\n            at = i;\n        }\n    }\n    println!(\"{}\", at);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "for (i, &x) in a.iter().enumerate() copies the element and keeps the index", "pr": "unit"
+  },
+  {
+    "id": "forref-zip",
+    "src": "fn main() {\n    let a = [1, 2];\n    let b = [3, 4];\n    for (&x, &y) in a.iter().zip(b.iter()) {\n        println!(\"{}\", x * y);\n    }\n}\n",
+    "expect": "ok", "out": "3\n8\n", "err": "", "exit": 0,
+    "why": "two & patterns in a tuple pattern over zip", "pr": "unit"
+  },
+  {
+    "id": "forref-mut",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for &mut x in &mut a {\n        println!(\"{}\", x);\n    }\n    a[0] = 9;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n[9, 2, 3]\n", "err": "", "exit": 0,
+    "why": "for &mut x in &mut a copies each element, and the array is usable after the loop", "pr": "unit"
+  },
+  {
+    "id": "forref-params",
+    "src": "fn total(v: &[i32]) -> i32 {\n    let mut t = 0;\n    for &x in v {\n        t += x;\n    }\n    t\n}\n\nfn count(v: &Vec<i32>) -> usize {\n    let mut n = 0;\n    for &x in v {\n        if x > 1 {\n            n += 1;\n        }\n    }\n    n\n}\n\nfn first(a: &[i32; 2]) -> i32 {\n    let mut f = 0;\n    for &x in a.iter() {\n        f = x;\n        break;\n    }\n    f\n}\n\nfn main() {\n    let v = vec![1, 2, 3];\n    let a = [7, 8];\n    println!(\"{} {} {}\", total(&v), count(&v), first(&a));\n}\n",
+    "expect": "ok", "out": "6 2 7\n", "err": "", "exit": 0,
+    "why": "a & pattern over a &[T], a &Vec<T> and a &[T; N] parameter", "pr": "unit"
+  },
+  {
+    "id": "forref-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct P {\n    x: i32,\n    y: i32,\n}\n\nfn main() {\n    let a = [P { x: 1, y: 2 }, P { x: 3, y: 4 }];\n    for &P { x, y } in &a {\n        println!(\"{} {}\", x, y);\n    }\n    println!(\"{}\", a[1].x);\n}\n",
+    "expect": "ok", "out": "1 2\n3 4\n3\n", "err": "", "exit": 0,
+    "why": "an & pattern over a Copy struct binds its fields by copy", "pr": "unit"
+  },
+  {
+    "id": "forref-rows",
+    "src": "fn main() {\n    let m = [[1, 2], [3, 4]];\n    for row in &m {\n        for &c in row {\n            print!(\"{} \", c);\n        }\n        println!();\n    }\n}\n",
+    "expect": "ok", "out": "1 2 \n3 4 \n", "err": "", "exit": 0,
+    "why": "an inner loop over a row reference with a & pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-shadow-flow",
+    "src": "fn main() {\n    let x = 100;\n    let a = [1, 2, 3, 4];\n    for &x in &a {\n        if x == 2 {\n            continue;\n        }\n        if x == 4 {\n            break;\n        }\n        for &x in &a {\n            print!(\"{}\", x);\n        }\n        println!(\" {}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1234 1\n1234 3\n100\n", "err": "", "exit": 0,
+    "why": "the loop variable shadows an outer one, and break and continue work inside", "pr": "unit"
+  },
+  {
+    "id": "forref-overflow-run",
+    "src": "fn main() {\n    let a = [1u8, 255];\n    for &x in &a {\n        println!(\"{}\", x + 1);\n    }\n}\n",
+    "expect": "ok", "out": "2\n", "err": "\nthread 'main' panicked at src/main.rs:4:24:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an element copied out of a reference is not known to rustc, so the overflow panics at run time", "pr": "unit"
+  },
+  {
+    "id": "forref-text",
+    "src": "fn main() {\n    let a = [\"x\", \"y\"];\n    for &s in &a {\n        println!(\"{}\", s);\n    }\n    let b = [true, false];\n    for &f in &b {\n        println!(\"{}\", !f);\n    }\n}\n",
+    "expect": "ok", "out": "x\ny\nfalse\ntrue\n", "err": "", "exit": 0,
+    "why": "a & pattern over &str and bool elements", "pr": "unit"
+  },
+  {
+    "id": "forref-string",
+    "src": "fn main() {\n    let a = [String::from(\"a\")];\n    for &s in &a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-ok",
+    "why": "E0507: a & pattern cannot move a String out of the shared reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-ok",
+    "src": "fn main() {\n    let a = [String::from(\"a\")];\n    for s in &a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern cannot move a String out of the shared reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-vec",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\")];\n    for &s in v.iter() {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-vec-ok",
+    "why": "E0507: a & pattern over v.iter() on a Vec of Strings", "pr": "P5"
+  },
+  {
+    "id": "forref-string-vec-ok",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\")];\n    for s in v.iter() {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern over v.iter() on a Vec of Strings", "pr": "P5"
+  },
+  {
+    "id": "forref-string-tuple",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for &(n, s) in &v {\n        println!(\"{} {}\", n, s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-tuple-ok",
+    "why": "E0507: a tuple pattern behind & that binds a String by value", "pr": "P5"
+  },
+  {
+    "id": "forref-string-tuple-ok",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for (n, s) in &v {\n        println!(\"{} {}\", n, s);\n    }\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a tuple pattern behind & that binds a String by value", "pr": "P5"
+  },
+  {
+    "id": "forref-string-ignored",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for &(n, _) in &v {\n        println!(\"{}\", n);\n    }\n    println!(\"{}\", v[0].1);\n}\n",
+    "expect": "ok", "out": "1\na\n", "err": "", "exit": 0,
+    "why": "a tuple pattern behind & that ignores the String moves nothing", "pr": "unit"
+  },
+  {
+    "id": "forref-string-mut",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\")];\n    for &mut s in &mut a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-mut-ok",
+    "why": "E0507: a &mut pattern cannot move a String out of the mutable reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-mut-ok",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\")];\n    for s in &mut a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut pattern cannot move a String out of the mutable reference", "pr": "P5"
+  },
+  {
+    "id": "forref-struct-move",
+    "src": "struct P {\n    x: i32,\n    s: String,\n}\n\nfn main() {\n    let a = [P { x: 1, s: String::from(\"a\") }];\n    for &P { x, s } in &a {\n        println!(\"{} {}\", x, s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 8},
+    "pair": "forref-struct-move-ok",
+    "why": "E0507: a struct pattern behind & that binds a String field by value", "pr": "P5"
+  },
+  {
+    "id": "forref-struct-move-ok",
+    "src": "struct P {\n    x: i32,\n    s: String,\n}\n\nfn main() {\n    let a = [P { x: 1, s: String::from(\"a\") }];\n    for P { x, s } in &a {\n        println!(\"{} {}\", x, s);\n    }\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a struct pattern behind & that binds a String field by value", "pr": "P5"
+  },
+  {
+    "id": "forref-option-string",
+    "src": "fn main() {\n    let a = [Some(String::from(\"a\")), None];\n    for &x in &a {\n        println!(\"{:?}\", x);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-option-string-ok",
+    "why": "E0507: an Option<String> element is not Copy", "pr": "P5"
+  },
+  {
+    "id": "forref-option-string-ok",
+    "src": "fn main() {\n    let a = [Some(String::from(\"a\")), None];\n    for x in &a {\n        println!(\"{:?}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "Some(\"a\")\nNone\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an Option<String> element is not Copy", "pr": "P5"
+  },
+  {
+    "id": "forref-by-value",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for &x in a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-by-value-ok",
+    "why": "E0308: the items of an array iterated by value are not references", "pr": "P5"
+  },
+  {
+    "id": "forref-by-value-ok",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the items of an array iterated by value are not references", "pr": "P5"
+  },
+  {
+    "id": "forref-map",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in a.iter().map(|x| x + 1) {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-map-ok",
+    "why": "E0308: map makes owned items, so there is no reference to match", "pr": "P5"
+  },
+  {
+    "id": "forref-map-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for x in a.iter().map(|x| x + 1) {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: map makes owned items, so there is no reference to match", "pr": "P5"
+  },
+  {
+    "id": "forref-mut-on-shared",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &mut x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-mut-on-shared-ok",
+    "why": "E0308: a &mut pattern against the & items of a shared loop", "pr": "P5"
+  },
+  {
+    "id": "forref-mut-on-shared-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut pattern against the & items of a shared loop", "pr": "P5"
+  },
+  {
+    "id": "forref-shared-on-mut",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    for &x in &mut a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-shared-on-mut-ok",
+    "why": "E0308: a & pattern against the &mut items of a mutable loop", "pr": "P5"
+  },
+  {
+    "id": "forref-shared-on-mut-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    for &mut x in &mut a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern against the &mut items of a mutable loop", "pr": "P5"
+  },
+  {
+    "id": "forref-tuple-on-int",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &(x, y) in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-tuple-on-int-ok",
+    "why": "E0308: a tuple pattern behind & against a number", "pr": "P5"
+  },
+  {
+    "id": "forref-tuple-on-int-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a tuple pattern behind & against a number", "pr": "P5"
+  },
+  {
+    "id": "forref-two-refs",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &&x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-two-refs-ok",
+    "why": "E0308: a second & against an element that is a number", "pr": "P5"
+  },
+  {
+    "id": "forref-two-refs-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a second & against an element that is a number", "pr": "P5"
+  },
+  {
+    "id": "forref-assign",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        x += 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0384", "line": 4},
+    "pair": "forref-assign-ok",
+    "why": "E0384: the name bound behind & is not mut", "pr": "P5"
+  },
+  {
+    "id": "forref-assign-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &(mut x) in &a {\n        x += 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the name bound behind & is not mut", "pr": "P5"
+  },
+  {
+    "id": "forref-lent-push",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w = vec![];\n    for &x in &v {\n        v.push(x);\n    }\n    w.push(1);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "forref-lent-push-ok",
+    "why": "E0502: the loop lends the Vec, so the body cannot push to it", "pr": "P5"
+  },
+  {
+    "id": "forref-lent-push-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w = vec![];\n    for &x in &v {\n        w.push(x);\n    }\n    v.push(1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the loop lends the Vec, so the body cannot push to it", "pr": "P5"
+  },
+  {
+    "id": "forref-refutable",
+    "src": "fn main() {\n    let a = [Some(1), None];\n    for &Some(x) in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0005", "line": 3},
+    "why": "E0005: an & pattern with a refutable inner pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-out-of-scope",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0425", "line": 6},
+    "pair": "forref-out-of-scope-ok",
+    "why": "E0425: the loop name is gone after the loop", "pr": "P5"
+  },
+  {
+    "id": "forref-out-of-scope-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", a[0]);\n}\n",
+    "expect": "ok", "out": "1\n2\n1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the loop name is gone after the loop", "pr": "P5"
   }
 ]
