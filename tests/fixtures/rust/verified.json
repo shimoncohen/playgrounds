@@ -2,12 +2,12 @@
   "rustc": "1.99.1",
   "edition": "2024",
   "image": "rust@sha256:b8e062b1c3a80183df83d9ba187cadd2b5ab84bc78d453dbfeb2fccd5f982247",
-  "date": "2026-11-10",
-  "inputsHash": "82d29eea27700eae5be9edc9e8834fc6c2aef7477358769724a33ad6ce74ded6",
-  "resultsHash": "61745d5d5b367c57248bc60149da7dfa65838b64ffda52f938ee05064251680d",
+  "date": "2026-11-11",
+  "inputsHash": "3545e365c878b16843f43dacc39434f1873e16a413e56b57ce38cd670dfd7045",
+  "resultsHash": "85a399b4efea275b839a063a1cbd65365ca7155b428e18f856c549c57414c3ea",
   "counts": {
-    "corpus": 1416,
+    "corpus": 1543,
     "missions": 943,
-    "guide": 103
+    "guide": 106
   }
 }

@@ -1,13 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRust } from './harness.mjs';
+import { pristine } from '../pristine.mjs';
 
 const RQ = loadRust();
 const { state } = RQ;
 const CH = RQ.CH;
 
-// Mirrors the `pristine` rule in shared/progress.js: a state with xp 0, nothing done and no notes is "no progress".
-const pristine = (d) => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && (!d.notes || Object.values(d.notes).every((v) => !v)));
 const L = (o) => state.load(typeof o === 'string' ? o : JSON.stringify(o), CH);
 
 describe('saved state', () => {
