@@ -107,6 +107,7 @@ RQ.check=ast=>{
     return t.k==='coll'?1:t.k==='array'?t.n*weight(t.el):t.k==='tuple'?sum(t.els):t.k==='struct'?sum(fieldsOf(t)):t.k==='enum'?sum(t.builtin?t.args:variantsOf(t).flatMap(v=>v.fields)):1;
   };
   // rustc gives a bare literal under a cast the cast's type, so the checker has to see it too
+  const isIntLit=x=>{x=peel(x);return x.t==='Lit'&&x.kind==='int';};
   const bareLit=e=>{
     e=peel(e);let neg=false;
     if(e.t==='Unary'&&e.op==='-'){neg=true;e=peel(e.expr);}
@@ -695,7 +696,7 @@ RQ.check=ast=>{
   }
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
-  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[],keyChecks=[],patLits=[],exChecks=[];
+  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],negs=[],okNeg=new Set(),lits=[],fmts=[],tvs=[],keyChecks=[],patLits=[],exChecks=[];
   // a fn declared `-> &'static str` may only give back string literals: any other leaf could borrow from a parameter, which rustc
   // rejects, and the quest does not model lifetimes. Block tails and if branches are looked through; return/break/continue have their own check.
   function staticLeaves(e){
@@ -776,6 +777,11 @@ RQ.check=ast=>{
       else if(!meets(r,o.tr))errors.push(o.method?RQ.diag.make('E0599',o.line,o.col,{what:'bounds',name:o.method,type:o.shown(),kind:o.kind==='enum'?'enum':'struct'}):RQ.diag.make('E0277',o.line,o.col,{what:'bound',trait:o.tr,type:show(r)}));
     }
     obligs=[];
+    // rustc reports E0600 for a literal that an annotated let or a cast types as unsigned, and E0277 when its type comes from elsewhere
+    for(const [e,t] of negs){
+      const r=res(t);
+      if(r.k==='int'&&!RQ.types.isSigned(r.ty)){if(okNeg.has(e))errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));else unsup('type checking',e.line);}
+    }
     for(const [e,t] of lits){const r=res(t);I(e).rty=r.k==='int'?r.ty:r.k==='float'?'f64':'i32';}
     for(const f of fmts){
       const r=res(f.t);
@@ -798,7 +804,7 @@ RQ.check=ast=>{
         errors.push(RQ.diag.make(x.e.kind==='let'?'E0005':'E0004',at.line,at.col,{missing:miss}));
       }
     }
-    vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
+    vars=[];negs=[];okNeg=new Set();lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
 
   function slice(e,x){
@@ -846,6 +852,15 @@ RQ.check=ast=>{
       if(rt.k==='iter'){I(e).iterFor=true;return rt.item;}
       if(rt.k==='coll')ty=rt;
       else if(rt.k==='ref'&&res(rt.to).k==='coll'){ty=res(rt.to);mode=rt.mut?'mut':'ref';viaRef=true;}
+      else if(rt.k==='array'){
+        // an array in a for is `into_iter()` on it: by value since edition 2021, copying when the elements are Copy
+        const call=Object.assign({t:'MethodCall',id:it.id+0.5,recv:it,name:'into_iter',targs:null,args:[],line:it.line,col:it.col,nline:it.line,ncol:it.col});
+        e.iter=call;reuse=it;
+        const t=res(ex(call));
+        reuse=null;
+        if(t.k==='iter'){I(e).iterFor=true;return t.item;}
+        return unsup('for iterable',it.line);
+      }
       else return unsup('for iterable',it.line);
     }
     const [k,v]=ty.args,m=mode==='val'?x=>x:mode==='mut'?x=>mkRef(true,x):x=>mkRef(false,x);
@@ -875,6 +890,7 @@ RQ.check=ast=>{
         }
         const ann=s.ty?tyOf(s.ty):null;
         letInit=peel(s.init);letPat=named?pt:null;
+        if(ann&&letInit.t==='Unary'&&letInit.op==='-'&&isIntLit(letInit.expr))okNeg.add(letInit);
         let t=exW(s.init,ann);
         letInit=null;letPat=null;
         if(named&&lookup(pt.name)){
@@ -939,11 +955,16 @@ RQ.check=ast=>{
   const cls=t=>{t=res(t);return t.k==='int'||t.k==='ivar'||t.k==='float'||t.k==='fvar'?'num':t.k;};
 
   function cast(e){
+    for(let n=peel(e.expr);n.t==='Unary'&&n.op==='-';n=peel(n.expr))okNeg.add(n);
     const src=ex(e.expr),to=tyOf(e.ty),s=res(src),d=res(to);
     if(d.k==='any'||s.k==='any'||s.k==='never')return to;
     const lit=bareLit(e.expr);
+    if(d.k==='int'&&d.ty[0]==='u'){
+      let n=peel(e.expr),neg=false;
+      while(n.t==='Unary'&&n.op==='-'){neg=true;n=peel(n.expr);}
+      if(neg&&n.t==='Lit'&&n.kind==='int'&&!n.suffix){unify(src,to);return to;}
+    }
     if(lit&&d.k==='int'){
-      if(!fits(lit.v,d.ty))return unsup('const folding',e.line);
       unify(src,to);return to;
     }
     if(lit&&d.k==='char'){if(fits(lit.v,'u8')){unify(src,T.int('u8'));return to;}return unsup('cast',e.line);}
@@ -1786,6 +1807,8 @@ RQ.check=ast=>{
       }
       case 'Unary':{
         const t=ex(e.expr),r=res(t);
+        if(e.op==='-'&&r.k==='int'&&!RQ.types.isSigned(r.ty)){errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));return t;}
+        if(e.op==='-'&&r.k==='ivar')negs.push([e,t]);
         if(e.op==='-')return r.k==='int'&&RQ.types.isSigned(r.ty)||r.k==='ivar'||r.k==='float'||r.k==='fvar'||r.k==='any'?t:unsup('type checking',e.line);
         return unify(t,T.bool)?t:unsup('type checking',e.line);
       }
