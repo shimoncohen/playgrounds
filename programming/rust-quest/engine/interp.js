@@ -486,6 +486,14 @@ RQ.interp=(ast,opts)=>{
   function declare(scope,name,cell){scope.set(name,cell);scope.own.push(cell);}
   const newScope=()=>{const m=new Map();m.own=[];return m;};
   const tyName=n=>{const o=info.get(n);return o&&o.ty?show(o.ty):'';};
+  // array elements are written in place, so a Copy aggregate read from a place must not share parts with its source
+  function copyVal(v){
+    switch(v.k){
+      case 'array':case 'tuple':return {...v,v:v.v.map(copyVal)};
+      case 'struct':case 'enum':return {...v,fields:v.fields.map(f=>({name:f.name,val:copyVal(f.val)}))};
+      default:return v;
+    }
+  }
   // a by-value use of a local moves a non-Copy value out of it (a reference is reborrowed, never moved)
   function mv(e,env){
     const x=peel(e);
@@ -495,6 +503,7 @@ RQ.interp=(ast,opts)=>{
         const v=read(c,x.line);
         if(t&&!isCopy(t)&&res(t).k!=='ref'){c.moved=true;note({t:'move',name:c.name,line:x.line});}
         else if(v.k==='closure'&&v.owned.length)return copyClosure(v,x.line);
+        else if(t&&isCopy(t))return copyVal(v);
         return v;
       }
     }
@@ -507,7 +516,9 @@ RQ.interp=(ast,opts)=>{
         return v;
       }
     }
-    return ev(e,env);
+    const v=ev(e,env);
+    if(x.t==='Field'||x.t==='Index'||x.t==='Deref'){const t=typeOf(x);if(t&&isCopy(t))return copyVal(v);}
+    return v;
   }
   // operands that end up owned together: if a later one panics, the earlier ones drop while it unwinds
   function mvAll(es,env){
@@ -1509,7 +1520,7 @@ RQ.interp=(ast,opts)=>{
         return ctorVal(c,names.map(n=>by.get(n)));
       }
       case 'Match':return matchEx(e,env);
-      case 'ArrayRepeat':{const v=ev(e.elem,env);return {k:'array',v:Array(Number(e.len.v)).fill(v)};}
+      case 'ArrayRepeat':{const v=ev(e.elem,env);return {k:'array',v:Array.from({length:Number(e.len.v)},()=>copyVal(v))};}
       case 'Index':{
         const a=view(ev(e.expr,env)),i=ev(e.index,env);
         if(i.v>=BigInt(a.len))throw panic('index out of bounds: the len is '+a.len+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
