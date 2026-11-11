@@ -251,6 +251,7 @@ test('every playground stores an empty (pristine) save on a fresh load', async (
     await page.waitForTimeout(600);
     const cfg = await page.evaluate(() => window.PROGRESS);
     const raw = await read(page, cfg.key);
+    // Some pages store nothing until the learner acts; nothing stored is empty too.
     if (raw !== null) assert.equal(pristineFor(cfg)(JSON.parse(raw)), true, `${pg} counts its fresh load as progress: ${raw.slice(0, 300)}`);
     assert.deepEqual(errors, [], pg);
     await ctx.close();

@@ -40,12 +40,9 @@
     return rawSet.call(this, k, v);
   };
 
-  // A save is "empty" when the learner has done nothing: xp 0, nothing done, no typed text and no work
-  // field changed from its default. An empty save is overwritten by the linked backup file and skips the
-  // "overwrite your progress?" prompt on import, so a field the rule misses is lost without asking.
-  // Every playground starts from a state with xp 0 and writes it on load, so a fresh load must stay empty.
-  // A quest that stops saving xp, or adds a field the learner types or changes, must update this rule:
-  // text maps go in TEXT_MAPS, other fields go in its page's window.PROGRESS.defaults as {field: default}.
+  // An empty save is overwritten by the linked backup and skips the import prompt, so learner work this rule
+  // misses is lost without asking; a fresh load must still count as empty. New typed text maps go in
+  // TEXT_MAPS, other learner-changed fields in the page's window.PROGRESS.defaults as {field: start value}.
   const TEXT_MAPS = ['notes', 'codes', 'code', 'answers', 'tray', 'work'];
   const filled = v => Array.isArray(v) ? v.some(filled) : !!v;
   const hasText = d => TEXT_MAPS.some(f => d[f] && typeof d[f] === 'object' && Object.values(d[f]).some(filled)) || !!d.sandbox || !!(d.free && d.free.code);
