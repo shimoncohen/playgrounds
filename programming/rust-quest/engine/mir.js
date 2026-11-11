@@ -255,7 +255,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       if(i.rv)rv(i.rv);
       else if(i.op==='store'){o(i.ref);o(i.x);}
       else if(i.op==='branch'||i.op==='return')o(i.x);
-      if(i.op==='assign')note(i.l,'write',i);
+      if(i.op==='assign'||i.op==='write')note(i.l,'write',i);
     }
     return use;
   }
@@ -486,6 +486,29 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false,slice:true},e,dest,tyOf(e));
   }
 
+  // an array element is a place inside the array, so a write borrows nothing: it conflicts with a loan on the array or on a field above it
+  function arrayWrite(e,lhs,compound,v){
+    const idx=[];
+    let b=lhs;
+    for(;b.t==='Index';b=peel(b.expr))idx.unshift(b.index);
+    const c=classify(b);
+    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('assignment target',e);return;}
+    const ops=idx.map(x=>ex(x)),t=tyOf(lhs),name='[_]'.repeat(idx.length);
+    if(c.k==='via'||L[c.l].ty.k==='ref'){
+      const r=opnd(c.l,L[c.l].ty.k==='ref'&&L[c.l].ty.mut,false);
+      if(ops.some(x=>x.k!=='const'))emit('eval',e,{rv:{k:'op',args:ops}});
+      if(compound)v=put({k:'op',args:[put({k:'deref',x:r},e,undefined,t),v]},e,undefined,t);
+      emit('store',e,{ref:r,x:v});
+      return;
+    }
+    let root=c.l;
+    while(L[root].parent!==undefined)root=L[root].parent;
+    if(c.k==='path'&&uninit.has(root)){un('deferred initialization',e);return;}
+    const args=[...(compound?[opnd(c.l)]:[]),...ops,v].filter(x=>x.k!=='const');
+    if(args.length)emit('eval',e,{rv:{k:'op',args}});
+    emit('write',e,{l:c.l,name});
+  }
+
   function assign(e){
     const lhs=peel(e.lhs),compound=e.op!=='=';
     let v=ex(e.rhs);
@@ -504,6 +527,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       if(ro)emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x)),v]}});
       return;
     }
+    if(lhs.t==='Index'){arrayWrite(e,lhs,compound,v);return;}
     if(lhs.t==='Field'){
       const c=classify(lhs);
       if(c.k==='path'){

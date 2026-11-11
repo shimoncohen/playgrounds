@@ -127,7 +127,7 @@ RQ.interp=(ast,opts)=>{
   function indexCell(e,env){
     const b=peel(e.expr);
     let vec,c=null;
-    if(b.t==='Index'&&isVecIdx(b)){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
+    if(b.t==='Index'){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
     else{
       vec=unref(ev(b,env));
       if(b.t==='Path')c=find(env,b.segs[0].name);
@@ -135,7 +135,7 @@ RQ.interp=(ast,opts)=>{
       while(c&&c.val&&c.val.k==='ref')c=c.val.cell;
     }
     const i=ev(e.index,env);
-    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,{line:e.bline,col:e.bcol});
+    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
     const k=Number(i.v);
     return elemCell(vec,k,c);
   }

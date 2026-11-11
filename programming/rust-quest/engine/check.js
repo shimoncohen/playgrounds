@@ -87,8 +87,8 @@ RQ.check=ast=>{
     const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
     if(g.k==='str'&&w.k==='ref'&&!w.mut&&res(w.to).k==='String'){mism(want,got,n);return false;}
-    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
-    if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='coll'&&res(g.to).name==='Vec'&&res(w.to).k==='slice'&&unify(res(g.to).args[0],res(w.to).el))return true;
+    if(g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
+    if(g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&res(g.to).k==='coll'&&res(g.to).name==='Vec'&&res(w.to).k==='slice'&&unify(res(g.to).args[0],res(w.to).el))return true;
     // &&T auto-derefs to &T, as when a `filter` closure passes its argument on
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&!w.mut&&res(g.to).k==='ref'&&!res(g.to).mut)return coerce(res(g.to),want,n);
     // rustc checks `vec![..]` against the annotation element by element and points at the element, which is not modeled
@@ -251,7 +251,7 @@ RQ.check=ast=>{
       if(n.lt==='static'){if(!(top&&isStr&&!n.mut))return unsup('explicit lifetime',n.line);}
       else if(n.lt&&(n.mut||!lifetimeOk(n,n.lt)))return unsup('explicit lifetime',n.line);
       if(isStr)return n.mut?unsup('reference',n.line):T.str;
-      if(to.t==='Slice'){const el=tyOf(to.ty);return n.mut?unsup('reference',n.line):mkRef(false,T.slice(el));}
+      if(to.t==='Slice')return mkRef(n.mut,T.slice(tyOf(to.ty)));
       return mkRef(n.mut,tyOf(to));
     }
     if(n.t==='Tuple')return n.tys.length?T.tuple(n.tys.map(x=>tyOf(x))):T.unit;
@@ -1054,6 +1054,7 @@ RQ.check=ast=>{
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(name==='to_string'&&meets(base,'Display')&&base.k!=='coll')return {...rec('&',[],T.string,-1),key:'Display::to_string'};
+    if(name==='swap'&&(base.k==='array'||base.k==='slice'))return {...rec('&mut',[T.int('usize'),T.int('usize')],T.unit,-1),key:'Vec::swap'};
     if(base.k==='coll'){
       const [k,v]=base.args,vec=base.name==='Vec',usz=T.int('usize');
       if(name==='len'||name==='is_empty')return rec('&',[],name==='len'?T.int('usize'):T.bool,-1);
@@ -1931,11 +1932,20 @@ RQ.check=ast=>{
           if(rt.k!=='ref')return T.any;
         }else if(peel(e.lhs).t==='Index'){
           ty=ex(e.lhs);
-          // a Vec element is written through IndexMut, so the Vec must be owned or held by `&mut`
-          let b=peel(e.lhs);
-          while(b.t==='Index'&&I(b).vecIdx)b=peel(b.expr);
-          const bt=b.t==='Index'?null:info.get(b)&&info.get(b).ty&&res(info.get(b).ty);
-          if(!I(peel(e.lhs)).vecIdx||b.t==='Index'||!(b.t==='Path'||b.t==='Field')||bt&&bt.k==='ref'&&!bt.mut||b.t==='Field'&&(!chainOf(b)||chainOf(b).via&&!chainOf(b).via.mut))return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
+          let b=peel(e.lhs),vec=false,arr=false,depth=0;
+          for(;b.t==='Index';b=peel(b.expr)){if(I(b).vecIdx)vec=true;else arr=true;depth++;}
+          const ch=b.t==='Path'||b.t==='Field'?chainOf(b):null,bd=ch&&lookup(ch.name);
+          if(vec&&arr||!ch||!bd)return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
+          const bt=res(info.get(b)&&info.get(b).ty||T.any),viaRef=ch.via||bt.k==='ref'&&!ch.parts.length;
+          const shared=ch.via?!ch.via.mut:viaRef&&!bt.mut,locked=arr&&!viaRef&&!bd.mut;
+          // inside a closure the message names a captured variable, which is not modeled
+          if(bd.cl!==curCl&&(shared||locked))return unsup('assignment target',e.line);
+          // E0594 and E0596 are borrowck errors, like E0384: the borrow pass still runs beside them
+          if(arr){
+            const name=ch.text+'[_]'.repeat(depth);
+            if(shared)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,ref:true}));
+            else if(locked)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,root:ch.name}));
+          }else if(shared)errors.push(RQ.diag.make('E0596',e.line,e.col,{name:bt.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
         }else if(peel(e.lhs).t==='Field'){
           ty=ex(e.lhs);
           const ch=chainOf(e.lhs);
@@ -2110,9 +2120,9 @@ RQ.check=ast=>{
           return tgt;
         }
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='swap'&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
-        const seq=r.k==='array'?r:r.k==='ref'&&!r.mut&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
+        const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
           if(args.length)return unsup('wrong argument count',e.line);
           I(e).recv={method:'len',kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
@@ -2173,15 +2183,15 @@ RQ.check=ast=>{
         const b=res(ex(e.expr)),i=ex(e.index);
         if(b.k==='any'||b.k==='never')return T.any;
         // through a `&[T]`; a `&[T; N]` keeps its length for the lint, so it is not indexed through the reference
-        if(b.k==='ref'&&!b.mut&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
+        if(b.k==='ref'&&res(b.to).k==='slice')return unify(i,T.int('usize'))?res(b.to).el:unsup('type checking',e.line);
         const cb=b.k==='ref'?res(b.to):b;
         if(cb.k==='coll'){
           if(cb.name!=='Vec')return unsup('map index',e.line);
           if(!unify(i,T.int('usize')))return unsup('collection method',e.line);
           I(e).vecIdx=true;return cb.args[0];
         }
-        if(b.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
-        I(e).alen=b.n;return b.el;
+        if(cb.k!=='array'||!unify(i,T.int('usize')))return unsup('type checking',e.line);
+        I(e).alen=cb.n;return cb.el;
       }
       case 'Field':{
         let b=res(ex(e.expr));
