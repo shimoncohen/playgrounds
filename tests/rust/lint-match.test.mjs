@@ -446,4 +446,13 @@ describe('match arms with guards, ranges and or-patterns, where a trap meets the
     const inLoop = 'fn f(n: u8) {\n    for _i in 0..2 {\n        match n {\n            1 if n > 0 => { let y: u8 = 255 + 1; println!("{}", y); }\n            _ => {}\n        }\n    }\n}\nfn main() { f(1); }\n';
     assert.equal(verdict(inLoop), 'unsupported const folding');
   });
+  it('a guard that is not one comparison leaves the scrutinee unproven: a trap that depends on it is unsupported, never accepted', () => {
+    const body = (x, arms) => `fn main() {\n    let x: u8 = ${x};\n    let b = x > 5;\n    let y = match x {\n${arms}\n    };\n    println!("{}", y);\n}\n`;
+    for (const arms of [
+      '        9..=255 if x > 7 && x < 210 => x * 2,\n        n => 0,\n        n @ 7..=9 if x > 255 => n + 1,\n        _ => 0,',
+      '        9..=255 if x > 7 && x < 210 => x * 2,\n        _ => 0,\n        n @ 7..=9 if x > 255 => n + 1,',
+      '        100..=255 => x * 2,\n        n @ 100..=200 if x > 3 && x < 110 => n + 1,\n        _ => 0,',
+      '        0..=255 => x * 2,\n        7 if x > 7 && x < 17 => x * 2,\n        n if b => n,\n        _ => 0,',
+    ]) assert.equal(verdict(body(200, arms)), 'unsupported const folding', arms);
+  });
 });

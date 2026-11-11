@@ -777,7 +777,7 @@ RQ.check=ast=>{
       else if(!meets(r,o.tr))errors.push(o.method?RQ.diag.make('E0599',o.line,o.col,{what:'bounds',name:o.method,type:o.shown(),kind:o.kind==='enum'?'enum':'struct'}):RQ.diag.make('E0277',o.line,o.col,{what:'bound',trait:o.tr,type:show(r)}));
     }
     obligs=[];
-    // rustc reports E0600 for a literal whose position expects an unsigned type, and E0277 (once for each literal's type) when the type comes from a later use
+    // E0600 where the position expects an unsigned type, E0277 (once per literal type) where a later use fixes it
     const bound=new Set();
     for(const [e,t,r0] of negs){
       const r=res(t);
@@ -824,7 +824,7 @@ RQ.check=ast=>{
     return unsup('type checking',e.line);
   }
 
-  // `for` calls `into_iter()` on its operand: by value for an array (since edition 2021, copying Copy items), by reference for a held `&[T]`; the `&mut` it is handed is moved, not reborrowed
+  // `for` calls `into_iter()` on its operand: a `&mut` it is handed is moved, not reborrowed
   function intoIterFor(e,it){
     const call={t:'MethodCall',id:it.id+0.5,recv:it,name:'into_iter',targs:null,args:[],line:it.line,col:it.col,nline:it.line,ncol:it.col};
     e.iter=call;reuse=it;I(call).forMove=true;
@@ -1463,8 +1463,7 @@ RQ.check=ast=>{
     return to.k==='String'&&['int','float','bool','unit'].includes(from.k);
   };
   const takeWant=()=>{const w=want;want=null;return w&&!['any','never'].includes(res(w).k)?w:null;};
-  // rustc types a literal from what its position expects before it negates it, so `-1` where an unsigned type is expected is E0600,
-  // and where nothing is expected yet (its type is settled by a later use) E0277
+  // rustc types a literal from what its position expects before negating it: E0600 there, E0277 when nothing is expected yet
   function negOk(e,w){
     if(!w)return;
     const x=peel(e),t=res(w);
@@ -1483,7 +1482,7 @@ RQ.check=ast=>{
       else if(v==='Err')negOk(x.args[0],t.args[1]);
     }
   }
-  // the positions that expect nothing of a `-` operand, however they sit in a larger expression: it is typed first and the `Neg` bound is checked at the end
+  // positions that expect nothing of a `-` operand: its `Neg` bound is checked at the end
   function negFree(e){
     const x=peel(e);
     if(x.t==='Unary'&&x.op==='-')for(let n=x;n.t==='Unary'&&n.op==='-';n=peel(n.expr))freeNeg.add(n);

@@ -20,6 +20,7 @@ RQ.lint=(ast,info)=>{
   const isRef=e=>{const t=(info.get(e)||{}).ty;return !!t&&RQ.types.res(t).k==='ref';};
   // the local a place hangs off: x for x, x.0 and x[i]
   const rootBind=n=>{n=peel(n);while(n.t==='Field'||n.t==='Index')n=peel(n.expr);return n.t==='Path'?bindOf(n):null;};
+  let shaky=new Set();
   let borrowed=new Set(); // per fn: the locals that are the root of a & or &mut operand, or of an autoref method receiver
 
   // overflowing_literals is a type-based lint, so it covers every literal, reachable or not
@@ -62,7 +63,7 @@ RQ.lint=(ast,info)=>{
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x)||rootBind(x.lhs);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
   // of its last store; it keeps none for a local whose address is taken anywhere in the fn
-  const valueOf=(b,s)=>!s.val||borrowed.has(b)?null:s.doubt?doubt(s.val):b.assigns===0||s.fresh?s.val:null;
+  const valueOf=(b,s)=>!s.val||borrowed.has(b)?null:s.doubt||shaky.has(b)?doubt(s.val):b.assigns===0||s.fresh?s.val:null;
   // after a shape whose effect on rustc's folding is not decided, what was known stays known but only blocks a verdict
   const doubtAll=()=>{for(const s of st.values())if(s.val)s.doubt=true;for(const [b,v] of defVal)defVal.set(b,doubt(v));};
   const forget=bs=>{for(const b of bs)if(st.has(b))st.get(b).val=null;};
@@ -129,7 +130,7 @@ RQ.lint=(ast,info)=>{
   }
 
   const litVal=n=>n.t==='Unary'?-litVal(n.expr):n.t==='Lit'&&n.kind==='bool'?n.v:n.t==='Lit'&&n.kind==='int'?BigInt(n.v):null;
-  // an arm's alternatives as {k:'any'} | {k:'lit',v} | {k:'range',lo,hi,incl}; null for any other shape
+  // alternatives as {k:'any'}, {k:'lit',v} or {k:'range',lo,hi,incl}; null for any other shape
   function normPat(p){
     const lit=x=>{const v=litVal(x);return typeof v==='bigint'?v:null;};
     switch(p.t){
@@ -150,7 +151,7 @@ RQ.lint=(ast,info)=>{
       default:return null;
     }
   }
-  // a guard that is one comparison of locals and literals, or a flag, so that evaluating it early changes nothing
+  // only a comparison or flag: evaluating it early must not change anything
   const simpleGuard=g=>{
     g=peel(g);
     if(g.t==='Unary'&&g.op==='!'&&nots(g)===1)g=peel(g.expr);
@@ -159,9 +160,7 @@ RQ.lint=(ast,info)=>{
     const operand=x=>{x=peel(x);if(x.t==='Unary'&&x.op==='-')x=peel(x.expr);return x.t==='Path'||x.t==='Lit'&&x.kind==='int';};
     return operand(g.lhs)&&operand(g.rhs);
   };
-  // rustc lowers a match on an integer by testing the first candidate (an or-pattern is one candidate per alternative): literals
-  // that follow share one switch, as do the ranges that hold none of its values; the rest are tested after it fails. A candidate
-  // no test reaches is never lowered, so its guard and bindings do not exist. Null for a shape that is not modeled.
+  // rustc tests the first candidate (an or-pattern is one per alternative); a candidate no test reaches is never lowered. Null: not modeled.
   function lowerMatch(e){
     const arms=e.arms,C=[];
     for(let i=0;i<arms.length;i++){
@@ -172,7 +171,6 @@ RQ.lint=(ast,info)=>{
     const INF=10n**30n,N=[],add=o=>N.push(o)-1,bodies=[],guarded=new Set();
     const span=a=>a.k==='lit'?[a.v,a.v]:a.k==='range'?[a.lo,a.incl?a.hi:a.hi-1n]:[-INF,INF];
     const body=i=>bodies[i]??(bodies[i]=add({t:'arm',i}));
-    // the candidates that match once the test passes, up to the first without a guard
     const matched=(cs,f)=>{
       const k=cs.findIndex(x=>!x.g);
       return (k<0?cs:cs.slice(0,k+1)).reduceRight((next,x)=>x.g?(guarded.add(x.i),add({t:'bool',g:x.g,f:next,o:body(x.i)})):body(x.i),f);
@@ -209,15 +207,14 @@ RQ.lint=(ast,info)=>{
     return {N,start,guarded};
   }
   const hasBinding=p=>{let f=false;RQ.walk(p,x=>{if(x.t==='IdentPat'&&bindOf(x))f=true;});return f;};
-  // a guard sees its arm's bindings through a reference to the scrutinee, which makes it unknown to rustc: a local for the whole fn,
-  // any other value but a literal for the match
+  // a guarded arm's bindings borrow the scrutinee, so rustc loses it: a local for the whole fn, any other value but a literal for the match
   const guardBinds=m=>{
     const low=lowerMatch(m);
-    return m.arms.some((a,i)=>a.guard&&(!low||low.guarded.has(i))&&hasBinding(a.pat));
+    return !!low&&m.arms.some((a,i)=>a.guard&&low.guarded.has(i)&&hasBinding(a.pat));
   };
-  // The lint walks the blocks depth first: a switch on a known value leaves by one edge, on an unknown one by all, and only the
-  // chain of otherwise edges from the match keeps what was known, every other block it reaches starts with nothing known.
-  // Returns each arm as 'full', 'blank' or 'skip' (not reached), or null for a shape that is not modeled.
+  // without a lowering it is not known which guarded arms rustc builds, so the scrutinee only blocks a verdict
+  const guardMaybe=m=>!lowerMatch(m)&&m.arms.some(a=>a.guard&&hasBinding(a.pat));
+  // the lint walks depth first: only the otherwise-edge chain from the match keeps what was known. Arms are 'full', 'blank' or 'skip'; null: not modeled.
   function matchPlan(e,sv){
     const low=lowerMatch(e);
     if(!low||sv&&(sv.d||sv.k!=='int'))return null;
@@ -407,7 +404,7 @@ RQ.lint=(ast,info)=>{
         }
         const a=ev(e.lhs),b=ev(e.rhs);
         if(ARITH[op]||op==='/'||op==='%'){
-          // an operand that is a reference makes the operation a call of std's impl, which rustc neither folds nor lints
+          // a reference operand makes it a call of std's impl, which rustc neither folds nor lints
           const r=isRef(e.lhs)||isRef(e.rhs)?null:arith(op,a,b,e);
           barrier();
           return r;
@@ -551,7 +548,7 @@ RQ.lint=(ast,info)=>{
           destructure(a0.pat,v,barriers===before);
           return ev(a0.body);
         }
-        const sv0=ev(e.scrut),sv=guardBinds(e)&&!isLit(e.scrut)?null:sv0;barrier();
+        const sv0=ev(e.scrut),sv=guardBinds(e)&&!isLit(e.scrut)?null:guardMaybe(e)&&sv0?doubt(sv0):sv0;barrier();
         const base=snap(),preDef=[...defVal.keys()];
         const model=!frames.length&&(e.arms.some(a=>a.guard||a.pat.t==='IdentPat'&&a.pat.sub)||!sv&&!armStates(e))?matchPlan(e,sv):null;
         const pick=model?-1:pickArm(e,sv),armDiv=[],states=model||(!sv?armStates(e):null);
@@ -623,7 +620,7 @@ RQ.lint=(ast,info)=>{
   const fns=RQ.fnItems(ast).map(x=>x.f);
   for(const it of fns){
     if(it.t!=='Fn'||!it.body)continue;
-    st=new Map();defVal=new Map();dead=skip=0;barriers=0;div=false;borrowed=new Set();
+    st=new Map();defVal=new Map();dead=skip=0;barriers=0;div=false;borrowed=new Set();shaky=new Set();
     RQ.walk(it.body,n=>{
       let root=null;
       if(n.t==='Ref'&&n.expr)root=rootBind(n.expr); // a type's Ref has no expr
@@ -632,7 +629,7 @@ RQ.lint=(ast,info)=>{
         if(r&&r.adj!=='val'||u&&!u.ref&&(u.adj==='&'||u.adj==='&mut'))root=rootBind(n.recv);
       }
       if(root)borrowed.add(root);
-      if(n.t==='Match'&&n.kind!=='let'&&guardBinds(n)){const x=peel(n.scrut),b=x.t==='Path'&&bindOf(x);if(b)borrowed.add(b);}
+      if(n.t==='Match'&&n.kind!=='let'&&(guardBinds(n)||guardMaybe(n))){const x=peel(n.scrut),b=x.t==='Path'&&bindOf(x);if(b)(guardBinds(n)?borrowed:shaky).add(b);}
       if(n.t==='Macro'&&n.args&&FORMATS.has(n.name)){
         // format_args! takes `&arg` for every argument, and for every `{name}` it captures
         const at=n.name==='write'||n.name==='writeln'?1:0;

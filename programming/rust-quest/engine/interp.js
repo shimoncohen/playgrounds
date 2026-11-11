@@ -486,8 +486,7 @@ RQ.interp=(ast,opts)=>{
   function declare(scope,name,cell){scope.set(name,cell);scope.own.push(cell);}
   const newScope=()=>{const m=new Map();m.own=[];return m;};
   const tyName=n=>{const o=info.get(n);return o&&o.ty?show(o.ty):'';};
-  // a by-value use of a local moves a non-Copy value out of it (a reference is reborrowed, never moved)
-  // array elements are written in place, so a Copy aggregate read from a place must not share its parts with the source
+  // array elements are written in place, so a Copy aggregate read from a place must not share parts with its source
   function copyVal(v){
     switch(v.k){
       case 'array':case 'tuple':return {...v,v:v.v.map(copyVal)};
@@ -495,6 +494,7 @@ RQ.interp=(ast,opts)=>{
       default:return v;
     }
   }
+  // a by-value use of a local moves a non-Copy value out of it (a reference is reborrowed, never moved)
   function mv(e,env){
     const x=peel(e);
     if(x.t==='Path'){
