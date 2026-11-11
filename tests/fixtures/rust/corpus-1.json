@@ -9084,5 +9084,47 @@
     "src": "fn main() {\n    let x = -(1) as i8;\n    println!(\"{}\", x);\n}\n",
     "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
     "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "for-array-nested",
+    "src": "fn main() {\n    let g = [[1u8, 2], [3, 4]];\n    let mut s = 0;\n    for r in g {\n        for c in r {\n            s += c;\n        }\n    }\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "a for over an array by value, and over the arrays inside it", "pr": "unit"
+  },
+  {
+    "id": "for-array-copy",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in a {\n        println!(\"{}\", x);\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "an array of Copy values is copied by the loop, so it is still usable after it", "pr": "unit"
+  },
+  {
+    "id": "for-array-moved",
+    "src": "fn main() {\n    let a = [String::from(\"a\"), String::from(\"b\")];\n    for s in a {\n        println!(\"{}\", s);\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0382", "line": 6},
+    "why": "an array of Strings is moved by the loop, so using it after is E0382", "pr": "unit"
+  },
+  {
+    "id": "for-array-literal",
+    "src": "fn main() {\n    for x in [1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "a for over an array literal", "pr": "unit"
+  },
+  {
+    "id": "for-array-break",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    let mut total = 0;\n    for x in a {\n        if x == 1 {\n            break;\n        }\n        total += x;\n    }\n    println!(\"{}\", total);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "break leaves the loop early", "pr": "unit"
+  },
+  {
+    "id": "for-array-pairs",
+    "src": "fn main() {\n    let a = [(1, 2), (3, 4)];\n    for p in a {\n        println!(\"{}\", p.0 + p.1);\n    }\n}\n",
+    "expect": "ok", "out": "3\n7\n", "err": "", "exit": 0,
+    "why": "the items of an array of pairs are pairs", "pr": "unit"
+  },
+  {
+    "id": "for-array-strings",
+    "src": "fn main() {\n    let a = [String::from(\"a\"), String::from(\"b\")];\n    for s in a {\n        let t = s;\n        println!(\"{}\", t);\n    }\n}\n",
+    "expect": "ok", "out": "a\nb\n", "err": "", "exit": 0,
+    "why": "each String moves out of the array into the loop variable", "pr": "unit"
   }
 ]

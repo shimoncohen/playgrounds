@@ -851,6 +851,15 @@ RQ.check=ast=>{
       if(rt.k==='iter'){I(e).iterFor=true;return rt.item;}
       if(rt.k==='coll')ty=rt;
       else if(rt.k==='ref'&&res(rt.to).k==='coll'){ty=res(rt.to);mode=rt.mut?'mut':'ref';viaRef=true;}
+      else if(rt.k==='array'){
+        // an array in a for is `into_iter()` on it: by value since edition 2021, copying when the elements are Copy
+        const call=Object.assign({t:'MethodCall',id:it.id+0.5,recv:it,name:'into_iter',targs:null,args:[],line:it.line,col:it.col,nline:it.line,ncol:it.col});
+        e.iter=call;reuse=it;
+        const t=res(ex(call));
+        reuse=null;
+        if(t.k==='iter'){I(e).iterFor=true;return t.item;}
+        return unsup('for iterable',it.line);
+      }
       else return unsup('for iterable',it.line);
     }
     const [k,v]=ty.args,m=mode==='val'?x=>x:mode==='mut'?x=>mkRef(true,x):x=>mkRef(false,x);
