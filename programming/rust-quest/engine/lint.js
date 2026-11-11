@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),defVal=new Map(),outerDef=null,dead=0,skip=0,prune=0,unsure=0,bor=0,softK=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),outerDef=null,keeps=[],dead=0,skip=0,prune=0,unsure=0,bor=0,softK=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -193,8 +193,10 @@ RQ.lint=(ast,info)=>{
   // an if, a literal arm): what was known before the switch is unknown there, what the block assigns itself is known
   function blank(f){
     const keep=st,keepOuter=outerDef;
-    st=new Map([...st].map(([k,s])=>[k,{...s,val:null,doubt:false}]));
-    outerDef=new Set([...(outerDef||[]),...defVal.keys()]);
+    // inside a loop a local known before the loop and not assigned in it stays known
+    const kept=b=>keeps.some(k=>k.has(b));
+    st=new Map([...st].map(([k,s])=>[k,kept(k)?{...s}:{...s,val:null,doubt:false}]));
+    outerDef=new Set([...(outerDef||[]),...[...defVal.keys()].filter(b=>!kept(b))]);
     const r=f();
     st=keep;outerDef=keepOuter;return r;
   }
@@ -227,10 +229,12 @@ RQ.lint=(ast,info)=>{
     const c=cond?ev(cond):null;
     barrier();
     const fr={n:0,vals:[],bad:false},d=c&&c.d?1:0;
+    const noBack=[...n.body.stmts,...(n.body.tail?[n.body.tail]:[])].some(isExit);
+    keeps.push(noBack?new Set():new Set([...st].filter(([,s])=>s.val).map(([k])=>k)));
     frames.push(fr);dub+=d;
     if(cond&&!(c&&c.k==='bool')&&nots(cond)===1)blank(()=>branch(n.body,true,false));
     else branch(n.body,!(c&&c.k==='bool'&&c.v===false&&!c.d),c&&c.lit);
-    dub-=d;frames.pop();lastFrame=fr;
+    dub-=d;frames.pop();keeps.pop();lastFrame=fr;
     forget(assignedIn(n));barrier();
     return c;
   }

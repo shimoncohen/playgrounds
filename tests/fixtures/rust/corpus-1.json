@@ -9269,5 +9269,43 @@
     "src": "fn main() {\n    let n = 5u8;\n    match n {\n        1 => {\n            println!(\"{}\", 255u8 + 1);\n        }\n        _ => {}\n    }\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "an arm skipped behind a literal pattern is pruned", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-else-kept",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-loop-else-kept-ok",
+    "why": "in a loop, a local known before the loop is still known in the else of an if on an unknown condition", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-else-kept-ok",
+    "src": "fn run(n: usize) {\n    let x = 254u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-match-kept",
+    "src": "fn run(n: usize) {\n    let x = 255u8;\n    for i in 0..n {\n        match i {\n            0 => println!(\"a\"),\n            1 => {\n                let z = x + 1;\n            println!(\"{}\", z);\n            }\n            _ => {}\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 7},
+    "pair": "fold-loop-match-kept-ok",
+    "why": "and in a match arm behind a literal pattern", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-match-kept-ok",
+    "src": "fn run(n: usize) {\n    let x = 254u8;\n    for i in 0..n {\n        match i {\n            0 => println!(\"a\"),\n            1 => {\n                let z = x + 1;\n            println!(\"{}\", z);\n            }\n            _ => {}\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-loop-else-fresh",
+    "src": "fn run(n: usize) {\n    for i in 0..n {\n        let x = 255u8;\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:21:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a local declared inside the loop body before the if is not known in the else", "pr": "unit"
+  },
+  {
+    "id": "fold-loop-else-assigned",
+    "src": "fn run(n: usize) {\n    let mut x = 255u8;\n    for i in 0..n {\n        if i > 100 {\n            println!(\"a\");\n        } else {\n            let z = x + 1;\n            println!(\"{}\", z);\n        }\n        x = 255;\n    }\n}\n\nfn main() {\n    run(1);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:21:\nattempt to add with overflow\n", "exit": 101,
+    "why": "nor is one the loop assigns", "pr": "unit"
   }
 ]
