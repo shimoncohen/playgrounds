@@ -9195,5 +9195,79 @@
     "src": "fn main() {\n    let t = (254u8, 1u8);\n    let (a, b) = t;\n    println!(\"{}\", a + b);\n}\n",
     "expect": "ok", "out": "255\n", "err": "", "exit": 0,
     "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-borrowed",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 4},
+    "pair": "fold-dead-borrowed-ok",
+    "why": "a borrowed constant expression is promoted, so rustc lints its overflow even in a branch it never runs", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-borrowed-ok",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 254u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-dead-plain-let",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a plain let initializer is not promoted, so a dead branch hides it", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-div-zero",
+    "src": "fn main() {\n    let n = 2;\n    if n == 1 {\n        println!(\"{}\", 5 / 0);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a division by a literal zero is not promoted either", "pr": "unit"
+  },
+  {
+    "id": "fold-dead-by-value",
+    "src": "fn f(n: u8) {\n    println!(\"{}\", n);\n}\n\nfn main() {\n    let n = 2;\n    if n == 1 {\n        f(255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a constant expression passed by value is not promoted", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-false",
+    "src": "fn main() {\n    if false {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the dead side of a literal false is never built, so nothing in it is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-else",
+    "src": "fn main() {\n    if true {\n    } else {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "neither is the else of a literal true", "pr": "unit"
+  },
+  {
+    "id": "fold-pruned-local",
+    "src": "fn main() {\n    let c = false;\n    if c {\n        println!(\"{}\", 255u8 + 1);\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "a local holding a literal bool prunes its dead branch the same way", "pr": "unit"
+  },
+  {
+    "id": "fold-soft-return",
+    "src": "fn main() {\n    let n = 1;\n    if n == 1 {\n        return;\n    }\n    println!(\"{}\", 255u8 + 1);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 6},
+    "pair": "fold-soft-return-ok",
+    "why": "code after an if on a known value that returns still exists, so a promoted overflow in it is linted", "pr": "P4"
+  },
+  {
+    "id": "fold-soft-return-ok",
+    "src": "fn main() {\n    let n = 1;\n    if n == 1 {\n        return;\n    }\n    println!(\"{}\", 254u8 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "the same shape that fits", "pr": "P4"
+  },
+  {
+    "id": "fold-hard-return",
+    "src": "fn main() {\n    return;\n    println!(\"{}\", 255u8 + 1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "code after an unconditional return is not built, so nothing in it is linted", "pr": "unit"
+  },
+  {
+    "id": "fold-skipped-literal-arm",
+    "src": "fn main() {\n    let n = 5u8;\n    match n {\n        1 => {\n            println!(\"{}\", 255u8 + 1);\n        }\n        _ => {}\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "an arm skipped behind a literal pattern is pruned", "pr": "unit"
   }
 ]

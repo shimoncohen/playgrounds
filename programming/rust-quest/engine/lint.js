@@ -31,7 +31,7 @@ RQ.lint=(ast,info)=>{
     if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
   });
 
-  let st=new Map(),defVal=new Map(),outerDef=null,dead=0,skip=0,letInit=null,dub=0,frames=[],barriers=0,div=false,constLine=0;
+  let st=new Map(),defVal=new Map(),outerDef=null,dead=0,skip=0,prune=0,unsure=0,bor=0,softK=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
   const consts=new Map(),constVals=new Map();
   for(const it of ast.items)if(it.t==='Const')consts.set(it.name,it);
 
@@ -44,8 +44,11 @@ RQ.lint=(ast,info)=>{
   function trap(id,n,o,d){
     if(constLine)unsup('const initializer',constLine);
     else if(skip){
-      // rustc lints a constant expression that is borrowed or promoted even in code it never runs, but not a plain let initializer
-      if(litOnly(n)&&n!==letInit)unsup('const folding',n.line);
+      // rustc promotes a borrowed constant expression and lints its overflow wherever it sits in the code it built; it prunes the
+      // dead side of a literal condition and of a literal pattern, and evaluates nothing else there
+      if(prune||!bor||id!=='arithmetic_overflow')return;
+      if(litOnly(n)){if(unsure)unsup('const folding',n.line);else flag(id,n,o);}
+      else{let c=false;RQ.walk(n,x=>{if(x.t==='Path'&&!bindOf(x)&&consts.has(x.segs[0].name))c=true;});if(c)unsup('const folding',n.line);}
     }else if(dead||dub||d)unsup('const folding',n.line);
     else flag(id,n,o);
   }
@@ -54,7 +57,7 @@ RQ.lint=(ast,info)=>{
   const doubt=v=>v&&{...v,d:true};
   // rustc folds one level of aggregate: what sits inside a nested one is unknown to it
   const nest=els=>els.map(v=>v&&v.k==='agg'?null:v);
-  const boolv=(v,d)=>({k:'bool',v,d});
+  const boolv=(v,d,lit)=>({k:'bool',v,d,lit});
   const assignedIn=n=>{const s=new Set();RQ.walk(n,x=>{if(x.t==='Assign'){const b=bindOf(x)||rootBind(x.lhs);if(b)s.add(b);}});return s;};
   // rustc keeps the value of a local assigned once for the whole fn, and of one assigned more than once only inside the block
   // of its last store; it keeps none for a local whose address is taken anywhere in the fn
@@ -149,10 +152,7 @@ RQ.lint=(ast,info)=>{
         if(bd)st.set(bd,{val:null,fresh:true});
         return;
       }
-      const keep=letInit;
-      letInit=peel(s.init);
       let v=ev(s.init);
-      letInit=keep;
       if(s.pat.t==='IdentPat'){
         const bd=bindOf(s.pat);
         // rustc keeps nothing of an aggregate copied whole from a local, nor of an array that is stored more than once
@@ -161,12 +161,20 @@ RQ.lint=(ast,info)=>{
       }
     }else if(s.t==='ExprStmt')ev(s.expr);
   }
+  // code after an if or match on a known value still exists for rustc, which lints its borrowed constant expressions: it is
+  // evaluated with the trap rules of a skipped region
   function block(b){
+    let k=0;
+    const enter=()=>{k=softK;softK=0;div=false;skip++;if(k===2)prune++;else if(k===3)unsure++;};
+    const leave=()=>{if(k){skip--;if(k===2)prune--;else if(k===3)unsure--;div=true;}};
     for(const s of b.stmts){
-      if(div)return null;
+      if(div){if(!softK||k){leave();return null;}enter();}
       stmt(s);
     }
-    return div||!b.tail?null:ev(b.tail);
+    if(div&&softK&&!k)enter();
+    const r=div||!b.tail?null:ev(b.tail);
+    leave();
+    return r;
   }
   // a loop whose body ends in a direct break or return, with no break or continue before it, has no back edge: rustc sees
   // straight-line code up to there, and nothing after the loop is reachable when the body diverges first
@@ -206,11 +214,11 @@ RQ.lint=(ast,info)=>{
     }
     return null;
   }
-  function branch(b,live){
+  function branch(b,live,pr){
     const was=div;
-    if(!live)skip++;
+    if(!live){skip++;if(pr)prune++;}
     block(b);
-    if(!live)skip--;
+    if(!live){skip--;if(pr)prune--;}
     const d=div;div=was;return d;
   }
   let lastFrame=null;
@@ -220,8 +228,8 @@ RQ.lint=(ast,info)=>{
     barrier();
     const fr={n:0,vals:[],bad:false},d=c&&c.d?1:0;
     frames.push(fr);dub+=d;
-    if(cond&&!(c&&c.k==='bool')&&nots(cond)===1)blank(()=>branch(n.body,true));
-    else branch(n.body,!(c&&c.k==='bool'&&c.v===false&&!c.d));
+    if(cond&&!(c&&c.k==='bool')&&nots(cond)===1)blank(()=>branch(n.body,true,false));
+    else branch(n.body,!(c&&c.k==='bool'&&c.v===false&&!c.d),c&&c.lit);
     dub-=d;frames.pop();lastFrame=fr;
     forget(assignedIn(n));barrier();
     return c;
@@ -230,7 +238,7 @@ RQ.lint=(ast,info)=>{
   function ev(e){
     switch(e.t){
       case 'Lit':{
-        if(e.kind==='bool')return boolv(e.v);
+        if(e.kind==='bool')return boolv(e.v,false,true);
         if(e.kind!=='int'||badLit.has(e))return null;
         return int(BigInt(e.v),rtyOf(e));
       }
@@ -251,7 +259,7 @@ RQ.lint=(ast,info)=>{
         const x=peel(e.expr);
         if(e.op==='-'&&x.t==='Lit'&&x.kind==='int')return badLit.has(x)?null:int(-BigInt(x.v),rtyOf(x));
         const a=ev(e.expr);
-        if(e.op==='!')return a&&a.k==='bool'?boolv(!a.v,a.d):null;
+        if(e.op==='!')return a&&a.k==='bool'?boolv(!a.v,a.d,a.lit):null;
         if(a&&a.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]){trap('arithmetic_overflow',e,{},a.d);barrier();return null;}
         barrier();
         return a&&a.k==='int'?int(-a.v,a.ty,a.d):null;
@@ -278,14 +286,17 @@ RQ.lint=(ast,info)=>{
         return a&&a.k==='int'&&INT[t]?int(wrap(a.v,t),t,a.d):null;
       }
       case 'Ref':{
-        ev(e.expr);
+        bor++;ev(e.expr);bor--;
         // a &mut hands out a way to change the value that rustc's folding may or may not see
         if(e.mut){const b=rootBind(e.expr);if(b)forget([b]);barrier();}
         return null;
       }
       case 'Deref':ev(e.expr);return null;
       case 'MethodCall':{
+        const i=info.get(e)||{},u=i.um,ar=i.recv&&i.recv.adj!=='val'||u&&!u.ref&&(u.adj==='&'||u.adj==='&mut');
+        if(ar)bor++;
         ev(e.recv);
+        if(ar)bor--;
         for(const a of e.args)ev(a);
         barrier();return null;
       }
@@ -315,11 +326,14 @@ RQ.lint=(ast,info)=>{
       }
       case 'Call':case 'Macro':{
         const args=e.t==='Call'?e.args:[...(e.args||[]),...e.named.map(x=>x.expr)];
+        const fmt=e.t==='Macro'&&FORMATS.has(e.name);
+        if(fmt)bor++;
         const vals=args.map(ev),c=e.t==='Call'&&(info.get(e)||{}).ctor;
+        if(fmt)bor--;
         if(c&&c.variant==null)return {k:'agg',els:nest(vals)};
         if(c){doubtAll();return null;}
         barrier();
-        if(e.name==='panic')div=true;
+        if(e.name==='panic'){div=true;softK=0;}
         return null;
       }
       case 'Index':{
@@ -354,29 +368,30 @@ RQ.lint=(ast,info)=>{
           if(e.label||skip||dead)for(const f of frames)f.bad=true;
           fr.n++;if(e.expr)fr.vals.push(v);
         }
-        div=true;return null;
+        div=true;softK=0;return null;
       }
-      case 'Continue':div=true;return null;
+      case 'Continue':div=true;softK=0;return null;
       case 'If':{
         const c=ev(e.cond),known=c&&c.k==='bool'&&!c.d,nn=known?0:nots(e.cond),db=(c&&c.d)||nn>1?1:0;
         barrier();
         const base=snap();
         dub+=db;
         const thenBlank=!known&&nn===1,elseBlank=!known&&nn===0;
-        const dt=thenBlank?blank(()=>branch(e.then,true)):branch(e.then,!known||c.v);
+        const dt=thenBlank?blank(()=>branch(e.then,true)):branch(e.then,!known||c.v,known&&c.lit);
         st=base;
         let de=false;
         if(e.els&&e.els.t==='If'){
           const was=div;
-          if(known&&c.v)skip++;
+          if(known&&c.v){skip++;if(c.lit)prune++;}
           if(elseBlank)blank(()=>ev(e.els));else ev(e.els);
-          if(known&&c.v)skip--;
+          if(known&&c.v){skip--;if(c.lit)prune--;}
           de=div;div=was;
-        }else if(e.els)de=elseBlank?blank(()=>branch(e.els,true)):branch(e.els,!known||!c.v);
+        }else if(e.els)de=elseBlank?blank(()=>branch(e.els,true)):branch(e.els,!known||!c.v,known&&c.lit);
         dub-=db;
         forget(assignedIn(e));barrier();
         // rustc follows only the taken edge of an if on a known condition, so a diverging taken branch ends the block
         div=known?(c.v?dt:!!e.els&&de):!!e.els&&dt&&de;
+        softK=div&&known?(c.lit?2:1):0;
         return null;
       }
       case 'Match':{
@@ -395,21 +410,25 @@ RQ.lint=(ast,info)=>{
         const sv=ev(e.scrut);barrier();
         const base=snap();
         const pick=pickArm(e,sv),armDiv=[],states=!sv?armStates(e):null;
+        let hasRange=false;
+        for(const a of e.arms)RQ.walk(a.pat,x=>{if(x.t==='RangePat')hasRange=true;});
         let all=e.arms.length>0;
         // with a known scrutinee rustc follows only the arm that matches; otherwise a trap in any arm is unsupported
         e.arms.forEach((a,i)=>{
           st=new Map([...base].map(([k,v])=>[k,{...v}]));
-          const was=div,mode=states?'unknown':pick<0?'dead':i===pick?'live':'skip';
+          const was=div,mode=states?'unknown':pick<0?'dead':i===pick?'live':'skip',pr=!hasRange;
           destructure(a.pat,sv,false,true);
-          if(mode==='dead')dead++;else if(mode==='skip')skip++;
+          if(mode==='dead')dead++;else if(mode==='skip'){skip++;if(pr)prune++;else unsure++;}
           const run=()=>{if(a.body.t==='Block')block(a.body);else ev(a.body);};
           if(mode==='unknown'&&states[i]==='blank')blank(run);else run();
-          if(mode==='dead')dead--;else if(mode==='skip')skip--;
+          if(mode==='dead')dead--;else if(mode==='skip'){skip--;if(pr)prune--;else unsure--;}
           armDiv.push(div);all=all&&div;div=was;
         });
         st=base;forget(assignedIn(e));barrier();
         if(pk==='maybe')doubtAll();
-        div=pick>=0?armDiv[pick]:all;return null;
+        div=pick>=0?armDiv[pick]:all;
+        softK=div&&pick>=0?(hasRange?3:2):0;
+        return null;
       }
       case 'Loop':{
         const items=[...e.body.stmts,...(e.body.tail?[e.body.tail]:[])],di=items.findIndex(isExit);
@@ -418,6 +437,7 @@ RQ.lint=(ast,info)=>{
         loopBody(e,null);
         const fr=lastFrame;
         div=!hasBreak(e.body);
+        if(div)softK=0;
         if(early||e.label&&hasBreak(e.body)||plainBreak(e.body))doubtAll();
         return fr.n===1&&fr.vals.length===1&&!fr.bad&&!e.label?doubt(fr.vals[0]):null;
       }
@@ -425,6 +445,7 @@ RQ.lint=(ast,info)=>{
         const c=loopBody(e,e.cond);
         // rustc treats a while on a known-true condition with no break like loop {}: nothing after it is reachable
         div=!!c&&c.k==='bool'&&c.v===true&&!c.d&&!hasBreak(e.body);
+        if(div)softK=0;
         return null;
       }
       case 'For':{

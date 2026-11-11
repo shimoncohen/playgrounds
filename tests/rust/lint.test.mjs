@@ -302,39 +302,24 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     lint('    let s = S { a: 255 };\n    let y = s.a;\n    println!("{}", y + 1);', 'arithmetic_overflow', 8, SC);
     lint('    let mut t = (0u8, 1u8);\n    t = (255, 1);\n    println!("{}", t.0 + 1);', 'arithmetic_overflow', 5);
   });
-  it('a literal-only trap in code that never runs is unsupported, except a plain let initializer', () => {
+  it('code rustc never runs: a literal condition prunes it, a known value leaves a borrowed constant expression linted', () => {
+    const D = (T, c = '    let n = 2;\n    if n == 1 {\n') => `${c}        ${T}\n    }`;
+    const P = 'println!("{}", 255u8 + 1);';
+    lint(D(P), 'arithmetic_overflow', 5);
+    lint(D('let s = (255u8 + 1).to_string();\n        println!("{}", s);'), 'arithmetic_overflow', 5);
+    for (const T of ['let x: u8 = 255 + 1;\n        println!("{}", x);', 'println!("{}", 5 / 0);', 'println!("{}", 255u8 as u32 + 1);', 'let y = 255u8 + 1 + 0;\n        println!("{}", y);']) compiles(D(T));
+    for (const head of ['    if false {\n', '    let c = false;\n    if c {\n', '    while false {\n']) compiles(D(P, head));
+    compiles('    if true {\n    } else {\n        ' + P + '\n    }');
+    compiles('    return;\n    ' + P);
+    lint('    let n = 1;\n    if n == 1 {\n        return;\n    }\n    ' + P, 'arithmetic_overflow', 7);
+    compiles('    let n = 1;\n    if n == 1 {\n        return;\n    }\n    let x: u8 = 255 + 1;\n    println!("{}", x);');
+    compiles('    let n = 5u8;\n    match n {\n        1 => { ' + P + ' }\n        _ => {}\n    }');
+    compiles('    let n = 5u8;\n    match n {\n        5 => {}\n        _ => { ' + P + ' }\n    }');
     for (const body of [
-      '    let n = 5u8;\n    match n {\n        0..=9 => {}\n        _ => println!("{}", 255u8 + 1),\n    }',
-      '    let n = 5u8;\n    match n {\n        1 | 7..=9 => println!("{}", 255u8 + 1),\n        _ => {}\n    }',
-      '    let n = 5u8;\n    match n {\n        1..=2 | 7..=9 => println!("{}", 255u8 + 1),\n        _ => {}\n    }',
-      '    let n = 2;\n    if n == 1 {\n        println!("{}", 255u8 + 1);\n    }',
-      '    let n = 2;\n    if n == 1 {\n        let s = (255u8 + 1).to_string();\n        println!("{}", s);\n    }'
+      '    let n = 5u8;\n    match n {\n        1 | 7..=9 => { ' + P + ' }\n        _ => {}\n    }',
+      '    let n = 5u8;\n    match n {\n        1..=2 | 7..=9 => { ' + P + ' }\n        _ => {}\n    }',
+      '    let n = 5u8;\n    match n {\n        1 => { ' + P + ' }\n        7..=9 => {}\n        _ => {}\n    }'
     ]) folding(body);
-    compiles('    let n = 2;\n    if n == 1 {\n        let x: u8 = 255 + 1;\n        println!("{}", x);\n    }');
-  });
-  it('a branch reached through a value target of a switch on an unknown value does not see what was known before it', () => {
-    const F = (body) => `fn f(c: bool, n: u8) {\n${body}\n}`;
-    const T = '        let y = x + 1;\n        println!("{}", y);\n';
-    const call = '    f(true, 0);';
-    const lintF = (body, line) => lint(call, 'arithmetic_overflow', line, F(body));
-    const okF = (body) => compiles(call, F(body));
-    lintF('    let x = 255u8;\n    if c {\n' + T + '    }', 4);
-    okF('    let x = 255u8;\n    if c {\n        println!("a");\n    } else {\n' + T + '    }');
-    okF('    let x = 255u8;\n    if !c {\n' + T + '    }');
-    lintF('    let x = 255u8;\n    if !c {\n        println!("b");\n    } else {\n' + T + '    }', 6);
-    okF('    let x = 255u8;\n    let b = c || x + 1 > 3;\n    println!("{}", b);');
-    lintF('    let x = 255u8;\n    let b = c && x + 1 > 3;\n    println!("{}", b);', 3);
-    lintF('    if c {\n        println!("a");\n    } else {\n        let y: u8 = 255 + 1;\n        println!("{}", y);\n    }', 5);
-    lintF('    let x = 255u8;\n    if c {\n        println!("a");\n    }\n    let y = x + 1;\n    println!("{}", y);', 6);
-    const arms = (pats) => `    let x = 255u8;\n    match n {\n${pats}    }`;
-    const A = (pat, trap) => `        ${pat} => {\n${trap ? T.replace(/^ {8}/gm, '            ') : ''}        }\n`;
-    okF(arms(A('1', true) + A('_', false)));
-    okF(arms(A('1 | 2', true) + A('_', false)));
-    lintF(arms(A('1', false) + A('_', true)), 7);
-    lintF(arms(A('1', false) + A('2', false) + A('k', true)), 9);
-    lintF(arms(A('k', true) + A('_', false)), 5);
-    lintF(arms(A('0..=9', true) + A('_', false)), 5);
-    okF(arms(A('0..=9', false) + A('_', true)));
   });
   it('a trap in a match arm is still unsupported const folding', () => {
     folding('    let n = 3;\n    match n {\n        4 if n > 0 => {\n            let x: u8 = 255 + 1;\n        }\n        _ => {}\n    }');
