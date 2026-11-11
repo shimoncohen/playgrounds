@@ -9019,5 +9019,70 @@
     "src": "fn f(c: bool) {\n    let x = 255u8;\n    let b = c || x + 1 > 3;\n    println!(\"{}\", b);\n}\n\nfn main() {\n    f(true);\n}\n",
     "expect": "ok", "out": "true\n", "err": "", "exit": 0,
     "why": "the right side of || is reached through a value target as well", "pr": "unit"
+  },
+  {
+    "id": "neg-unsigned-let",
+    "src": "fn main() {\n    let x: u8 = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-let-ok",
+    "why": "negating a literal that an annotated let makes unsigned is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-let-ok",
+    "src": "fn main() {\n    let x: i8 = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-cast",
+    "src": "fn main() {\n    let x = -1 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-cast-ok",
+    "why": "a cast gives the negated literal its target type, so -1 as u8 is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-cast-ok",
+    "src": "fn main() {\n    let x = -1 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same cast to a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-var",
+    "src": "fn main() {\n    let y: u32 = 5;\n    let z = -y;\n    println!(\"{}\", z);\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-unsigned-var-ok",
+    "why": "negating an unsigned variable is E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-var-ok",
+    "src": "fn main() {\n    let y: i32 = 5;\n    let z = -y;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "-5\n", "err": "", "exit": 0,
+    "why": "the same with a signed variable", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-zero",
+    "src": "fn main() {\n    let x = -0 as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-zero-ok",
+    "why": "even -0 is a negation, so it is E0600 for an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-zero-ok",
+    "src": "fn main() {\n    let x = -0 as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-paren",
+    "src": "fn main() {\n    let x = -(1) as u8;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-unsigned-paren-ok",
+    "why": "parentheses around the literal change nothing", "pr": "P4"
+  },
+  {
+    "id": "neg-unsigned-paren-ok",
+    "src": "fn main() {\n    let x = -(1) as i8;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "the same with a signed type", "pr": "P4"
   }
 ]

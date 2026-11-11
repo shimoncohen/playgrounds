@@ -695,7 +695,7 @@ RQ.check=ast=>{
   }
   if(!fns.has('main')&&!un.length)syn(1,1,'`main` function not found in the file');
 
-  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],lits=[],fmts=[],tvs=[],keyChecks=[],patLits=[],exChecks=[];
+  let scopes=[],curRet=T.unit,curStatic=false,loops=[],vars=[],negs=[],okNeg=new Set(),lits=[],fmts=[],tvs=[],keyChecks=[],patLits=[],exChecks=[];
   // a fn declared `-> &'static str` may only give back string literals: any other leaf could borrow from a parameter, which rustc
   // rejects, and the quest does not model lifetimes. Block tails and if branches are looked through; return/break/continue have their own check.
   function staticLeaves(e){
@@ -776,6 +776,11 @@ RQ.check=ast=>{
       else if(!meets(r,o.tr))errors.push(o.method?RQ.diag.make('E0599',o.line,o.col,{what:'bounds',name:o.method,type:o.shown(),kind:o.kind==='enum'?'enum':'struct'}):RQ.diag.make('E0277',o.line,o.col,{what:'bound',trait:o.tr,type:show(r)}));
     }
     obligs=[];
+    // rustc reports E0600 when the literal's type is known where it is negated (an annotated let, a cast) and E0277 when it is fixed later
+    for(const [e,t] of negs){
+      const r=res(t);
+      if(r.k==='int'&&!RQ.types.isSigned(r.ty)){if(okNeg.has(e))errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));else unsup('type checking',e.line);}
+    }
     for(const [e,t] of lits){const r=res(t);I(e).rty=r.k==='int'?r.ty:r.k==='float'?'f64':'i32';}
     for(const f of fmts){
       const r=res(f.t);
@@ -798,7 +803,7 @@ RQ.check=ast=>{
         errors.push(RQ.diag.make(x.e.kind==='let'?'E0005':'E0004',at.line,at.col,{missing:miss}));
       }
     }
-    vars=[];lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
+    vars=[];negs=[];okNeg=new Set();lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
 
   function slice(e,x){
@@ -875,6 +880,7 @@ RQ.check=ast=>{
         }
         const ann=s.ty?tyOf(s.ty):null;
         letInit=peel(s.init);letPat=named?pt:null;
+        if(ann)okNeg.add(letInit);
         let t=exW(s.init,ann);
         letInit=null;letPat=null;
         if(named&&lookup(pt.name)){
@@ -939,11 +945,15 @@ RQ.check=ast=>{
   const cls=t=>{t=res(t);return t.k==='int'||t.k==='ivar'||t.k==='float'||t.k==='fvar'?'num':t.k;};
 
   function cast(e){
+    for(let n=peel(e.expr);n.t==='Unary'&&n.op==='-';n=peel(n.expr))okNeg.add(n);
     const src=ex(e.expr),to=tyOf(e.ty),s=res(src),d=res(to);
     if(d.k==='any'||s.k==='any'||s.k==='never')return to;
     const lit=bareLit(e.expr);
-    // `-1 as u8`, `-0 as u8` and `- -1 as u8` are E0600, which Rust Quest does not model
-    if(d.k==='int'&&d.ty[0]==='u'){let n=peel(e.expr),neg=false;while(n.t==='Unary'&&n.op==='-'){neg=true;n=peel(n.expr);}if(neg&&n.t==='Lit'&&n.kind==='int'&&!n.suffix)return unsup('const folding',e.line);}
+    if(d.k==='int'&&d.ty[0]==='u'){
+      let n=peel(e.expr),neg=false;
+      while(n.t==='Unary'&&n.op==='-'){neg=true;n=peel(n.expr);}
+      if(neg&&n.t==='Lit'&&n.kind==='int'&&!n.suffix){unify(src,to);return to;}
+    }
     if(lit&&d.k==='int'){
       unify(src,to);return to;
     }
@@ -1787,6 +1797,8 @@ RQ.check=ast=>{
       }
       case 'Unary':{
         const t=ex(e.expr),r=res(t);
+        if(e.op==='-'&&r.k==='int'&&!RQ.types.isSigned(r.ty)){errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));return t;}
+        if(e.op==='-'&&r.k==='ivar')negs.push([e,t]);
         if(e.op==='-')return r.k==='int'&&RQ.types.isSigned(r.ty)||r.k==='ivar'||r.k==='float'||r.k==='fvar'||r.k==='any'?t:unsup('type checking',e.line);
         return unify(t,T.bool)?t:unsup('type checking',e.line);
       }

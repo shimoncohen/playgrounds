@@ -194,8 +194,17 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     lint('    let d: i32;\n    d = 0;\n    println!("a");\n    println!("{}", 5 / d);', 'unconditional_panic', 6);
     compiles('    let a: u8;\n    a = 255;\n    let r = &a;\n    let b = a + 1;\n    println!("{} {}", b, r);');
   });
-  it('-0 as u8 and - -1 as u8 are unsupported like -1 as u8', () => {
-    for (const e of ['-0 as u8', '- -1 as u8']) folding(`    let x = ${e};\n    println!("{}", x);`);
+  it('E0600: negating an unsigned type, one error per minus', () => {
+    const errs = (body) => { const c = RQ.run(`fn main() {\n${body}\n}\n`); assert.equal(c.status, 'error', body); return [...c.errors].map((e) => `${e.code}@${e.line}`); };
+    for (const body of ['    let x = -1 as u8;', '    let x = -0 as u8;', '    let x = -(1) as u8;', '    let x = (-1) as u8;', '    let x = -1 as u32;', '    let x = -1 as usize;', '    let x: u8 = -1;', '    let y: u32 = 5;\n    let z = -y;', '    let n = 7usize;\n    println!("{}", -n);', '    let x = -1u8;']) {
+      assert.deepEqual(errs(body + '\n    println!("{}", 1);').map((x) => x.split('@')[0]), ['E0600'], body);
+    }
+    assert.deepEqual(errs('    let x = - -1 as u8;\n    println!("{}", x);'), ['E0600@2', 'E0600@2']);
+    assert.equal(RQ.diag.ERRORS.E0600.msg({ type: 'u8' }), 'cannot apply unary operator `-` to type `u8`');
+    for (const body of ['    let x = -1 as i8;', '    let y: i32 = 5;\n    let z = -y;', '    let a: usize = 3;\n    let b = -(a as i32);', '    let x = -1;', '    let x = -2.5f64;']) compiles(body + '\n    println!("{}", 1);');
+  });
+  it('a literal negated where its type is only fixed later is unsupported, because rustc says E0277 or E0600 by where the type came from', () => {
+    for (const body of ['    let x = -1;\n    let y: u8 = x;', '    let n = 5u8;\n    println!("{}", n + -1);', '    takes(-1);']) assert.equal(RQ.run(main(body + '\n    println!("{}", 1);', 'fn takes(n: u8) {\n    println!("{}", n);\n}')).status, 'unsupported', body);
   });
   it('a break or a pattern whose switch cannot be told cheaply is unsupported, not guessed', () => {
     const X = (mid) => `    let mut x: u8 = 255;\n    x = x;\n    ${mid}\n    let y = x + 1;\n    println!("{}", y);`;
@@ -334,9 +343,8 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     lint('    let a = [1, 2, 3];\n    println!("{}", a[I]);', 'unconditional_panic', 4, 'const I: usize = 7;');
     assert.equal(ok('    let y = N + 1;\n    println!("{}", y);', 'const N: u8 = 2;').out(), '3\n');
   });
-  it('a literal that does not fit its cast target is overflowing_literals; a negative one cast to an unsigned type stays unsupported', () => {
+  it('a literal that does not fit its cast target is overflowing_literals; a negative one cast to an unsigned type is E0600', () => {
     for (const src of ['256 as u8', '300 as u8', '-129 as i8', '128 as i8', '65536 as u16', '3000000000 as i32', '(256) as u8', '256 as u8 as u32']) lint(`    let x = ${src};\n    println!("{}", x);`, 'overflowing_literals', 3);
-    for (const src of ['-1 as u8', '-1 as u32', '(-1) as u8']) folding(`    let x = ${src};\n    println!("{}", x);`);
     for (const [src, out] of [['255 as u8', '255'], ['-128 as i8', '-128'], ['256 as u16', '256'], ['300u16 as u8', '44']]) assert.equal(ok(`    let x = ${src};\n    println!("{}", x);`).out(), out + '\n');
     assert.equal(ok('    let n = 256;\n    println!("{}", n as u8);').out(), '0\n');
   });
