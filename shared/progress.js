@@ -10,7 +10,8 @@
  *     browser doesn't evict the data when disk is low.
  * It never reads or changes the game logic: it watches localStorage writes to the key.
  *
- * Set before loading this script:  window.PROGRESS = {key:'shell-quest-v1', name:'Shell Quest'}
+ * Set before loading this script:  window.PROGRESS = {key:'shell-quest-v1', name:'Shell Quest', defaults:{hist:[]}}
+ * (defaults is optional: fields besides typed text that count as progress once they differ from the value given)
  */
 (() => {
   'use strict';
@@ -39,12 +40,17 @@
     return rawSet.call(this, k, v);
   };
 
-  // Every playground starts from a state with xp 0 and nothing done, and writes it on load,
-  // so "empty" has to mean "no progress", not "no key". Learner-typed text (notes, code per mission,
-  // typed answers, the free-code and sandbox buffers) is progress even at xp 0.
-  const TEXT_MAPS = ['notes', 'codes', 'code', 'answers'];
-  const hasText = d => TEXT_MAPS.some(f => d[f] && typeof d[f] === 'object' && Object.values(d[f]).some(v => v)) || !!d.sandbox || !!(d.free && d.free.code);
-  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && !hasText(d));
+  // A save is "empty" when the learner has done nothing: xp 0, nothing done, no typed text and no work
+  // field changed from its default. An empty save is overwritten by the linked backup file and skips the
+  // "overwrite your progress?" prompt on import, so a field the rule misses is lost without asking.
+  // Every playground starts from a state with xp 0 and writes it on load, so a fresh load must stay empty.
+  // A quest that stops saving xp, or adds a field the learner types or changes, must update this rule:
+  // text maps go in TEXT_MAPS, other fields go in its page's window.PROGRESS.defaults as {field: default}.
+  const TEXT_MAPS = ['notes', 'codes', 'code', 'answers', 'tray', 'work'];
+  const filled = v => Array.isArray(v) ? v.some(filled) : !!v;
+  const hasText = d => TEXT_MAPS.some(f => d[f] && typeof d[f] === 'object' && Object.values(d[f]).some(filled)) || !!d.sandbox || !!(d.free && d.free.code);
+  const hasWork = d => Object.entries(cfg.defaults || {}).some(([f, base]) => d[f] !== undefined && JSON.stringify(d[f]) !== JSON.stringify(base));
+  const pristine = d => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0) && !hasText(d) && !hasWork(d));
   const hasProgress = () => {
     const raw = rawGet.call(ls, KEY);
     if (raw === null) return false;

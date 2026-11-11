@@ -852,6 +852,7 @@ const qfOpen=done=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch
 const KEY='script-quest-v1';
 const RUNS={'greet.js':'node greet.js Pepper','package.json':'npm start','math.js':null};
 CH.forEach(ch=>ch.missions.forEach(m=>{if(m.editFile&&!('run' in m))m.run=m.editFile in RUNS?RUNS[m.editFile]:'node '+m.editFile}));
+/* keep in step with defaults.files in this page's window.PROGRESS: shared/progress.js uses it to tell an untouched project from an edited one */
 const INITIAL_FILES={'hello.js':'console.log("Welcome backstage!")\n','notes.txt':'Sweep the ring\nFeed Mumbles\nHang the posters\n'};
 let S={xp:0,done:{},chap:0,cur:{},best:0,files:null,pkgs:[]};
 try{const raw=localStorage.getItem(KEY);if(raw)S=Object.assign(S,JSON.parse(raw))}catch(e){}
