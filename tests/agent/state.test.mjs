@@ -3,6 +3,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAgent, J } from './harness.mjs';
+import { pristine } from '../pristine.mjs';
 
 const AQ = loadAgent();
 const { state } = AQ;
@@ -12,8 +13,6 @@ const chapters = [
   { name: 'B', badge: 'b', tier: 'core', missions: [{}, {}] },
 ];
 const load = (raw) => state.load(raw, chapters);
-// Copied from shared/progress.js:44: the predicate that decides whether a saved state counts as progress.
-const pristine = (d) => !d || typeof d !== 'object' || (d.xp === 0 && (!d.done || Object.keys(d.done).length === 0));
 
 describe('saved state', () => {
   it('a fresh serialized state is pristine for shared/progress.js', () => {

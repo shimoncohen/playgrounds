@@ -152,7 +152,7 @@ describe('for over collections', () => {
     assert.equal(ids(RQ.run(main('let v = vec![Some(1), None];', 'for Some(x) in v {', '    println!("{}", x);', '}'))), 'E0005@3');
   });
   it('what stays unsupported has a hint: arrays and slices, iterators held in a variable, adapters and closures', () => {
-    assert.equal(feature(main('let a = [1, 2];', 'for x in a {}')), 'for iterable@3');
+    assert.equal(feature(main('let a = [1, 2];', 'for x in &a {}')), 'for iterable@3');
     assert.equal(feature(main('let v = vec![1];', 'let it = v.iter().peekable();')), 'iterator@3');
     assert.equal(feature(main('let v = vec![1];', 'for x in v.iter().zip_all() {}')), 'iterator@3');
     assert.equal(feature(main('let v = vec![1];', 'for x in &v[..1] {}')), 'for iterable@3');
@@ -310,5 +310,19 @@ describe('the expected type of a coercion site reaches the arms of a match or if
   });
   it('without an expectation the arms are still compared with each other', () => {
     assert.equal(ids(RQ.run(main('let c = true;', 'let x = if c { 1 } else { "x" };'))), 'E0308@3');
+  });
+});
+
+describe('a for over an array by value', () => {
+  it('runs the items, nested rows included, and leaves a Copy array usable', () => {
+    assert.equal(out(main('let g = [[1u8, 2], [3, 4]];', 'let mut s = 0;', 'for r in g {', '    for c in r {', '        s += c;', '    }', '}', 'println!("{}", s);')), '10\n');
+    assert.equal(out(main('let a = [1, 2, 3];', 'for x in a {', '    println!("{}", x);', '}', 'println!("{:?}", a);')), '1\n2\n3\n[1, 2, 3]\n');
+    assert.equal(out(main('for x in [1, 2, 3] {', '    println!("{}", x);', '}')), '1\n2\n3\n');
+    assert.equal(out(main('let a = [3, 1, 2];', 'let mut t = 0;', 'for x in a {', '    if x == 1 {', '        break;', '    }', '    t += x;', '}', 'println!("{}", t);')), '3\n');
+    assert.equal(out(main('let a = [(1, 2), (3, 4)];', 'for p in a {', '    println!("{}", p.0 + p.1);', '}')), '3\n7\n');
+  });
+  it('moves an array of Strings: each item is owned, and the array is gone after the loop', () => {
+    assert.equal(out(main('let a = [String::from("a"), String::from("b")];', 'for s in a {', '    let t = s;', '    println!("{}", t);', '}')), 'a\nb\n');
+    assert.equal(ids(RQ.run(main('let a = [String::from("a"), String::from("b")];', 'for s in a {', '    println!("{}", s);', '}', 'println!("{:?}", a);'))), 'E0382@6');
   });
 });

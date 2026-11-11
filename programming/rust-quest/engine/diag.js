@@ -114,6 +114,11 @@ const ERRORS={
     tipFor:o=>o.param?'A type parameter only has what its bounds give it. Add `'+o.type+': '+(o.op==='=='||o.op==='!='?'PartialEq':ARITH_WORD[o.op]?'std::ops::Add':'PartialOrd')+'` to the bounds, or compare something the bounds already allow.':'',
     tip:'`==` needs the type to say what equal means. Add `#[derive(PartialEq)]` above the type, or compare the fields one by one.'
   },
+  E0600:{
+    title:'an unsigned number cannot be negated',
+    msg:o=>'cannot apply unary operator `-` to type `'+o.type+'`',
+    tip:'A `u8`, `u32` or `usize` has no sign, so `-` has nothing to flip. Use a signed type like `i32` (or `i8` for a small number) if the value can go below zero.'
+  },
   E0594:{
     title:'a field is assigned, but it cannot change',
     msg:o=>o.closure?'cannot assign to `'+o.name+'`, as it is a captured variable in a `'+o.closure+'` closure':o.plain?'cannot assign to `'+o.name+'`, as it is not declared as mutable':o.ref?'cannot assign to `'+o.name+'`, which is behind a `&` reference':'cannot assign to `'+o.name+'`, as `'+o.root+'` is not declared as mutable',
