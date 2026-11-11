@@ -363,7 +363,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       }else{
         const l=p.t==='Path'?lid(p):-1;
         // a `&mut` variable whose method hands back a borrow of it: the loan is on `*v`, a reborrow of the variable
-        if(u.from===0&&l>=0&&L[l].ty.k==='ref'&&L[l].ty.mut){
+        if(info.get(e).forMove)ro=moveOp(e.recv);
+        else if(u.from===0&&l>=0&&L[l].ty.k==='ref'&&L[l].ty.mut){
           const mut=u.self==='&mut';
           ro=put({k:'ref',l,mut,implicit:true,deref:true},e,undefined,T.ref(mut,L[l].ty,0));
         }else ro=argOp(e.recv,u.adj==='reb'||u.self==='&');
