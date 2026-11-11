@@ -55,6 +55,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   let cur,count=0,retL;
   const tyOf=e=>{const o=info.get(e);return res(o&&o.ty||T.any);};
   const carries=t=>RQ.types.hasRef(t)||t.k==='str';
+  const tempOk=new Set();
   const isUnit=t=>t.k==='unit'||t.k==='never';
   const isBool=e=>{e=peel(e);return e.t==='Lit'&&e.kind==='bool';};
   const local=(name,ty,o)=>{
@@ -726,6 +727,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           loan=cs.some(q=>related(q,b));
         }
         ro=loan?put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',t,0)):opnd(c.l,t.k==='ref'&&t.mut,fi.mode!=='mut');
+      }else if(c.k==='other'&&e.copyOut&&fi.mode==='ref'&&!['Path','Field','Index','Deref'].includes(src.t)){
+        // `for &x in &[..]`: the temporary lives as long as the loop, and the names copy out of it, so no loan outlives it
+        const v=ex(src),t=v.k==='const'?put({k:'use',x:v},src,undefined,tyOf(src)):v;
+        ro=put({k:'ref',l:t.l,mut:false,implicit:true},e,undefined,T.ref(false,tyOf(src),0));
       }else{un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return NIL;}
     }
     const it=temp(fi.mode==='val'?tyOf(src):T.ref(fi.mode==='mut',tyOf(src),0));
@@ -809,6 +814,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         const fn=c.segs.map(s=>s.name).join('::');
         if((info.get(e)||{}).ctor)return put({k:'agg',args:seq(e.args,ex)},e,dest,tyOf(e));
         rebTwice(e.args,e);
+        // a temporary lent to a call lives to the end of the statement; with a result that holds no reference it cannot be kept past that
+        if(!carries(tyOf(e)))for(const a of e.args)if(peel(a).t==='Ref')tempOk.add(peel(a));
         const sig=(info.get(e)||{}).sig;
         return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1,more:sig&&sig.more||[]},e,dest,tyOf(e));
       }
@@ -843,6 +850,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           // a shared borrow of a field behind a shared reference lives as long as the reference does
           if(c.k==='via'&&!e.mut&&L[c.l].ty.k==='ref'&&!L[c.l].ty.mut)return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
           if(c.k==='via'){un('reborrow',e);return fin(NIL,e,dest);}
+        }
+        if(tempOk.has(e)&&!['Path','Field','Index','Deref'].includes(x.t)){
+          const v=ex(x),t=v.k==='const'?put({k:'use',x:v},x,undefined,tyOf(x)):v;
+          return put({k:'ref',l:t.l,mut:e.mut},e,dest,tyOf(e));
         }
         un(x.t==='Field'||x.t==='Index'?'borrow of a field':x.t==='Deref'?'reborrow':'temporary borrow',e);
         return fin(NIL,e,dest);

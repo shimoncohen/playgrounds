@@ -408,7 +408,7 @@ RQ.parse=tokens=>{
         const only=q=>q.t==='RefPat'?only(q.pat):q.t==='TuplePat'?q.pats.every(only):!hasRef(q);
         body=blockOf(refs(pt)&&only(pt)?(pt.t==='RefPat'?lower(pt.pat,derefOf({...pt,nm:'#for'}),body):lower(pt,sc,body)):letOn(pt,sc,body));
       }
-      return mk('For',x,{pat:pn,iter:it,body,label:null});
+      return mk('For',x,{pat:pn,iter:it,body,label:null,copyOut:pt.t==='RefPat'});
     }
     if(isK('unsafe')){p++;feat('unsafe',x.line);const b=block();b.unsafe=true;return b;}
     return block();

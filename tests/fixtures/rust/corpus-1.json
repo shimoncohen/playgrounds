@@ -10826,5 +10826,71 @@
     "src": "fn main() {\n    let mut a: [i32; 3];\n    a = [0; 3];\n    a[0] = 1;\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: the array was set once, but it is still not mut", "pr": "P5"
+  },
+  {
+    "id": "temp-arg-vec",
+    "src": "fn largest(list: &[i32]) -> i32 {\n    let mut largest = list[0];\n    for &item in list {\n        if item > largest {\n            largest = item;\n        }\n    }\n    largest\n}\n\nfn main() {\n    let number_list = vec![34, 50, 25, 100, 65];\n    let result = largest(&number_list);\n    println!(\"The largest number is {result}\");\n    println!(\"{}\", largest(&vec![1, 5, 2]));\n    println!(\"{}\", largest(&[7, 9]));\n}\n",
+    "expect": "ok", "out": "The largest number is 100\n5\n9\n", "err": "", "exit": 0,
+    "why": "a Vec built in the argument is lent to the call and dropped at the end of the statement", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-drop",
+    "src": "struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn f(a: &N) -> i32 {\n    a.0\n}\n\nfn main() {\n    let x = f(&N(1));\n    println!(\"after {}\", x);\n    let y = f(&N(2)) + f(&N(3));\n    println!(\"after {}\", y);\n}\n",
+    "expect": "ok", "out": "drop 1\nafter 1\ndrop 3\ndrop 2\nafter 5\n", "err": "", "exit": 0,
+    "why": "a temporary lent to a call drops at the end of its statement, the later ones first", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-string",
+    "src": "fn len(s: &String) -> usize {\n    s.len()\n}\n\nfn main() {\n    let n = len(&String::from(\"ab\")) + len(&\"xyz\".to_string());\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a String built in the argument is lent as a &String", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-mut",
+    "src": "fn push(v: &mut Vec<i32>) {\n    v.push(1);\n}\n\nfn main() {\n    push(&mut vec![]);\n    println!(\"ok\");\n}\n",
+    "expect": "ok", "out": "ok\n", "err": "", "exit": 0,
+    "why": "a &mut of a temporary is lent to the call", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-oob",
+    "src": "fn get(a: &[i32; 3]) -> i32 {\n    a[5]\n}\n\nfn main() {\n    println!(\"{}\", get(&[1, 2, 3]));\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 2},
+    "why": "an index past the end of a lent temporary array is a panic in the callee", "pr": "unit"
+  },
+  {
+    "id": "temp-for-array",
+    "src": "fn main() {\n    for &x in &[1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "for &x in &[..] loops over a temporary array and copies each element out", "pr": "unit"
+  },
+  {
+    "id": "temp-for-vec",
+    "src": "fn main() {\n    for &x in &vec![1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "for &x in &vec![..] loops over a temporary Vec", "pr": "unit"
+  },
+  {
+    "id": "temp-for-pairs",
+    "src": "fn main() {\n    for &(a, b) in &[(1, 2), (3, 4)] {\n        println!(\"{}\", a + b);\n    }\n}\n",
+    "expect": "ok", "out": "3\n7\n", "err": "", "exit": 0,
+    "why": "for &(a, b) in &[..] destructures each tuple of a temporary array", "pr": "unit"
+  },
+  {
+    "id": "temp-for-nested",
+    "src": "fn main() {\n    for &x in &[1, 2] {\n        for &y in &[10, 20] {\n            println!(\"{}\", x + y);\n        }\n    }\n}\n",
+    "expect": "ok", "out": "11\n21\n12\n22\n", "err": "", "exit": 0,
+    "why": "an inner loop over a temporary array inside an outer one", "pr": "unit"
+  },
+  {
+    "id": "temp-for-drop",
+    "src": "struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn main() {\n    for &N(x) in &[N(1), N(2)] {\n        println!(\"{}\", x);\n    }\n    for &N(x) in &vec![N(7), N(8)] {\n        println!(\"{}\", x);\n        break;\n    }\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "1\n2\ndrop 1\ndrop 2\n7\ndrop 7\ndrop 8\nend\n", "err": "", "exit": 0,
+    "why": "the temporary of a for loop drops when the loop ends, even after a break", "pr": "unit"
+  },
+  {
+    "id": "temp-for-string",
+    "src": "fn main() {\n    for &x in &[String::from(\"a\")] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 2},
+    "why": "E0507: a & pattern cannot move a String out of a temporary array", "pr": "unit"
   }
 ]

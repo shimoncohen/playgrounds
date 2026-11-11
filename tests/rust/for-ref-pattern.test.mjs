@@ -42,6 +42,22 @@ describe('an & pattern in a for loop', () => {
   });
 });
 
+describe('a temporary lent to a call or a for loop', () => {
+  it('drops at the end of its statement, the later one first, and after a break', () => {
+    const drop = 'struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!("drop {}", self.0);\n    }\n}\n\nfn f(a: &N) -> i32 {\n    a.0\n}\n\n';
+    assert.equal(RQ.run(`${drop}${main('let y = f(&N(2)) + f(&N(3));\nprintln!("after {}", y);')}`).stdout, 'drop 3\ndrop 2\nafter 5\n');
+    assert.equal(RQ.run(`${drop}${main('for &N(x) in &vec![N(7), N(8)] {\nprintln!("{}", x);\nbreak;\n}\nprintln!("end");')}`).stdout, '7\ndrop 7\ndrop 8\nend\n');
+  });
+
+  it('a result that may keep the borrow, or a loop name that stays a reference, is still unsupported', () => {
+    for (const src of ['fn first(a: &[i32]) -> &[i32] {\n    a\n}\n\n' + main('let r = first(&vec![1, 2]);\nprintln!("{:?}", r);'), main('for x in &[1, 2, 3] {\nprintln!("{}", x);\n}')]) {
+      const c = RQ.run(src);
+      assert.equal(c.status, 'unsupported');
+      assert.equal(c.unsupported.feature, 'temporary borrow');
+    }
+  });
+});
+
 describe('what a pattern behind & still leaves unsupported', () => {
   for (const [what, body] of [
     ['a slice pattern', 'let a = [[1, 2]];\nfor &[x, y] in &a {\nprintln!("{} {}", x, y);\n}'],

@@ -608,7 +608,11 @@ RQ.interp=(ast,opts)=>{
       if(rv.k==='ref'){pc=rv.cell;loan=rv.loan;}
     }else if(src.t==='Index'&&isVecIdx(src)){pc=indexCell(src,env);coll=pc.val;}
     else if(src.t==='Field'){const pl=placeOf(src,env);pc=pl&&fieldCell(pl.cell,pl.path);coll=unref(pc?read(pc,e.line):ev(src,env));}
-    else{pc=src.t==='Path'&&find(env,src.segs[0].name);coll=unref(pc?read(pc,e.line):ev(src,env));}
+    else{
+      pc=src.t==='Path'&&find(env,src.segs[0].name);
+      if(pc)coll=unref(read(pc,e.line));
+      else{const tv=ev(src,env);coll=unref(tv);if(src.t!=='Path'&&owns(tv))temps.push({v:tv,line:e.line});}
+    }
     while(pc&&pc.val&&pc.val.k==='ref')pc=pc.val.cell;
     const mut=fi.mode==='mut';
     const list=map?RQ.std.hashOrder(coll):coll.v.slice();
@@ -1479,7 +1483,9 @@ RQ.interp=(ast,opts)=>{
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
-        return {k:'ref',cell:{val:ev(x,env)},mut:e.mut,loan:e.id};
+        const tv=ev(x,env);
+        if(owns(tv))temps.push({v:tv,line:e.line});
+        return {k:'ref',cell:{val:tv},mut:e.mut,loan:e.id};
       }
       case 'Deref':{
         const v=ev(e.expr,env);
