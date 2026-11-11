@@ -107,6 +107,7 @@ RQ.check=ast=>{
     return t.k==='coll'?1:t.k==='array'?t.n*weight(t.el):t.k==='tuple'?sum(t.els):t.k==='struct'?sum(fieldsOf(t)):t.k==='enum'?sum(t.builtin?t.args:variantsOf(t).flatMap(v=>v.fields)):1;
   };
   // rustc gives a bare literal under a cast the cast's type, so the checker has to see it too
+  const isIntLit=x=>{x=peel(x);return x.t==='Lit'&&x.kind==='int';};
   const bareLit=e=>{
     e=peel(e);let neg=false;
     if(e.t==='Unary'&&e.op==='-'){neg=true;e=peel(e.expr);}
@@ -776,7 +777,7 @@ RQ.check=ast=>{
       else if(!meets(r,o.tr))errors.push(o.method?RQ.diag.make('E0599',o.line,o.col,{what:'bounds',name:o.method,type:o.shown(),kind:o.kind==='enum'?'enum':'struct'}):RQ.diag.make('E0277',o.line,o.col,{what:'bound',trait:o.tr,type:show(r)}));
     }
     obligs=[];
-    // rustc reports E0600 when the literal's type is known where it is negated (an annotated let, a cast) and E0277 when it is fixed later
+    // rustc reports E0600 for a literal that an annotated let or a cast types as unsigned, and E0277 when its type comes from elsewhere
     for(const [e,t] of negs){
       const r=res(t);
       if(r.k==='int'&&!RQ.types.isSigned(r.ty)){if(okNeg.has(e))errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));else unsup('type checking',e.line);}
@@ -889,7 +890,7 @@ RQ.check=ast=>{
         }
         const ann=s.ty?tyOf(s.ty):null;
         letInit=peel(s.init);letPat=named?pt:null;
-        if(ann)okNeg.add(letInit);
+        if(ann&&letInit.t==='Unary'&&letInit.op==='-'&&isIntLit(letInit.expr))okNeg.add(letInit);
         let t=exW(s.init,ann);
         letInit=null;letPat=null;
         if(named&&lookup(pt.name)){
