@@ -2,7 +2,22 @@
 
 Date: 2026-11-01. Status: built; what shipped is in [As built](#as-built) at the end. The sections between are the approved design and were not rewritten. Issue: #47.
 
-> **Rust facts are UNVERIFIED until the first verify run (P2).** Error codes, lint names and folding behaviour, the panic header format, thread-id presence, exit codes, `f64` formatting and edition 2024 behaviour are authored from memory. `tests/rust/verify-rustc.mjs` settles them against a real `rustc`. Nothing in this spec is a claim about `rustc` until then.
+> **Rust facts are settled by the verify run, except the gaps listed here.** `tests/rust/verify-rustc.mjs` compiles and runs every corpus, mission and field-guide program on a real `rustc` (1.99.1, edition 2024, in the digest-pinned container image recorded in `tests/fixtures/rust/verified.json`) and reports 0 mismatches. What that corpus settles:
+>
+> - **Error codes.** 49 distinct `E` codes, `E0600` (negating an unsigned number) among them.
+> - **Lints.** The ids `arithmetic_overflow`, `unconditional_panic` and `overflowing_literals`, and the folding the lint pass models, all probed on the pinned image:
+>   - values: literals, `let` and `let mut` locals, `const` items, literal casts, tuples and arrays one level deep (a value inside a nested one is unknown), structs by field. A local assigned once is known for the whole function, one assigned more than once only until the next block boundary, and a borrowed one never. An aggregate copied whole from a local is unknown at its destination, and so is a struct or array stored again.
+>   - block boundaries: a call, a checked operation, `&&`, `||`, a `match` with a real switch, and an `if` or a loop that can repeat end the block. A comparison, a closure, a `match` whose first arm matches everything and a loop with a direct `break` do not.
+>   - a switch on a value rustc does not know: the else of an `if`, the right side of `||` and an arm behind a literal pattern start with nothing known from before the switch; the otherwise edge keeps it.
+>   - a switch on a known value follows only the taken edge. The dead side of a literal condition, and of a literal pattern, is not built and nothing in it is linted. The dead side of another known condition, the code after an `if` or `match` whose taken side returns, and an arm behind a range pattern are built: only a borrowed constant expression is linted there.
+>   - `for` over an array by value (copies Copy items, moves the rest).
+>
+>   Where the pass cannot tell, what it knew stays known but only blocks a verdict: a trap that depends on it is reported as unsupported (a `break` reached through an irrefutable `match` or a nested block, a labeled loop with a `break`, a loop with a break or continue before its direct break, a pattern that may or may not need a switch such as `n @ _`, a `match` with guards or a range pattern next to a borrowed literal overflow in a skipped arm, a match on a char, tuple or `Option` value).
+> - **Panics.** The header and message text, and exit code 101 (and 1 for `main` returning `Err`).
+> - **`f64` formatting.** `Display` and `Debug`, including NaN, the infinities and negative zero.
+> - **Edition 2024.** Every program compiles with `--edition 2024`.
+>
+> Not settled: the thread id (rustc 1.99.1 prints `thread 'main' (<id>) panicked`; the verify drops the id before comparing, so its value is never checked); edition-2024-only behaviour (let chains, `if let` scoping, tail-expression temporaries), which no program probes on purpose; the shapes listed above as unsupported, which stay unsupported rather than guessed; and anything else no corpus program exercises.
 
 ## Goal
 
@@ -29,7 +44,7 @@ Owner decisions, closed. Later PRs follow them.
 | D11 | **Corpus:** authored programs modeled on Rust Book scenarios, with `rustc` as ground truth. |
 | D12 | **Course shape:** one linear path, no Tiers in v1. |
 | D13 | **`HashMap` order:** deterministic scramble plus the two-seed rule (see Check context). |
-| D14 | **Bundle size:** measure at P2 and P5 and set a budget in this spec (see Bundle size). |
+| D14 | **Bundle size:** the budget is 1,200,000 bytes for `dist/rust-quest.html`, set from the P2 and P5 measurements and the shipped size (see Bundle size). |
 | D15 | **`unsupported` in a mission:** hint, copy and Playground option, feature-request footer, no completion. No skip, no self-verified "mark done". |
 | D16 | **Ranks ladder top title:** named in P2 (#65), not in this spec, because the name is written together with the chapter content there. |
 
@@ -301,14 +316,23 @@ How the analysis of issue #47 is settled:
 - Fidelity can drift in corners the corpus misses. Mitigations: minimal pairs, combination programs, the stamp. A checker bug on supported constructs stays a residual risk.
 - **What the oracle cannot see.** `rustc` can compare compile results, stdout, stderr and exit codes, and drop order through `impl Drop` programs that print. It cannot observe the memory view's snapshot content, `alloc`/`free` events, or loan-region display. `c.allocs` counts, which the lazy checks rely on, are checked only by unit tests with hand-counted programs.
 - The stamp is an honor-system record. CI cannot run `rustc`. A forged `verified.json` passes the hash tests. The PR description must carry the verify output line (version, counts, 0 mismatches).
-- **Rust facts are UNVERIFIED until the first verify run** (E-codes, lint names and folding behaviour, panic format, thread-id presence, edition 2024 behaviour, `f64` formatting). If the owner's `rustc` is older than edition 2024, D4 needs an owner decision.
+- Rust facts are settled only where the corpus covers them (see the banner at the top for what is and is not). The verify ran on `rustc` 1.99.1 with edition 2024, so D4 needs no owner decision.
 - Lint modeling (see Diagnostics) is the most fragile fidelity area.
 - Checkpoint 2 cuts closures, adapters, user traits and user generics: if ch11-12 are downgraded, R1's "traits and simple generics" and "iterators and closures" are authored only (see Alternatives).
 - P2 carries the verify script and its tests, so it is bigger than the Agent chain's P2.
 - The P2 tests do not run in CI until P3 wires them. P2's PR description must show a local `npm run test:engine` run.
 
 ### Bundle size
-The C++ quest file is 212 KB. This engine may be 2 to 3 times that. The budget (D14) is set from two measurements: P2 records the size of the first bundle and P5 records it again after the move and borrow engine lands. The budget goes into this spec by a docs PR once both numbers exist. Until then no limit is enforced.
+The C++ quest file is 212 KB. This engine was expected to be 2 to 3 times that.
+
+The budget (D14) is **1,200,000 bytes** for `dist/rust-quest.html`. It comes from these measurements:
+
+- P2, the first bundle (lexer, parser, chapter 1): 154,298 bytes.
+- P4: 232,480 bytes.
+- P5, after the move and borrow engine: 278,826 bytes.
+- Chapters 1 to 13 as shipped, with the lint folding work: 996,815 bytes.
+
+The early measurements grew by about 45 to 80 KB per phase, and the shipped course is about 3.6 times the P5 size, because the chapter content and the later engine parts make up most of the file. The budget is the shipped size plus about 20%. That leaves room for a few more chapters or engine features. Going past it needs a size cut or a spec change that sets a new budget. The budget is written here and checked in review; `npm run check` prints the size but does not fail on it.
 
 ## Test plan and fidelity proof
 
@@ -497,7 +521,9 @@ stateDiagram-v2
 
 Status: built. Thirteen chapters ship, delivered as a chain of PRs into `feat/47-rust-quest` that lands on `main` through #96. The sections above are the approved design and are kept as written; this section records where the build differs.
 
-**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1404 corpus programs, 931 mission programs and 103 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
+**Verification.** The last rustc verify ran on rustc 1.99.1, edition 2024, in the pinned container image, and reported 1533 corpus programs, 943 mission programs and 106 field-guide examples with 0 mismatches. `tests/rust/verify-rustc.mjs` writes both `tests/fixtures/rust/verified.json` and `programming/rust-quest/content/verified.js`, and records the image digest when `RUST_IMAGE` is set.
+
+**Lint folding.** `engine/lint.js` follows rustc's per-local rule and its block and switch rules, as the banner at the top lists, and each rule is covered by corpus pairs. `E0600` is a coded error of the checker; a `-` whose literal gets its type only later (through a variable or an operand) is unsupported, because rustc then reports `E0277` instead. `for x in &array` is still unsupported.
 
 **Checkpoint 2.** The owner decided that chapters 11 (traits and generics) and 12 (closures and iterators) are real code, run by the engine, not authored lessons.
 
@@ -509,4 +535,4 @@ Status: built. Thirteen chapters ship, delivered as a chain of PRs into `feat/47
 
 **Not built.** The `predict` and `choose` mission kinds were not used, and quick-fire is authored per chapter, not generated by running snippets.
 
-**Size.** The `dist/rust-quest.html` bundle is about 970 KB. The size budget is tracked in #116.
+**Size.** The `dist/rust-quest.html` bundle is 996,815 bytes, under the 1,200,000-byte budget set in Bundle size.

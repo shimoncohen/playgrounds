@@ -232,8 +232,7 @@ describe('new engine paths: ranges and operators', () => {
 
 describe('review fixes: what rustc decides after a closure', () => {
   it('a non-move closure makes the variables it names address-taken for the lints; a move of a Copy value still lints', () => {
-    assert.equal(feature(main('let x: u8 = 255;', 'let f = || x;', 'let y = x + 1;', 'println!("{} {}", y, f());')), 'const folding@4');
-    assert.equal(feature(main('let d = 0;', 'let f = || d;', 'println!("{}", 5 / d);')), 'const folding@4');
+    for (const src of [main('let x: u8 = 255;', 'let f = || x;', 'let y = x + 1;', 'println!("{} {}", y, f());'), main('let d = 0;', 'let f = || d;', 'println!("{}", 5 / d);')]) assert.equal(RQ.run(src).status, 'panic', src);
     assert.equal(rejects(main('let x: u8 = 255;', 'let f = move || x;', 'let y = x + 1;', 'println!("{} {}", y, f());')), 'arithmetic_overflow@4');
     assert.equal(rejects(main('let f = || { let a: u8 = 255; a + 1 };', 'println!("{}", f());')), 'arithmetic_overflow@2');
   });

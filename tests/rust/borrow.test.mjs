@@ -435,8 +435,7 @@ describe('the unsupported list, end to end through RQ.run', () => {
   ]));
   it('borrow triggers and the lint', () => sweepAll([
     [SIMPLE('let mut x = 5;', 'let r = &mut x;', 'let y = x;', '*r = 1;', 'println!("{}", y);'), 'use while borrowed', 4],
-    [SIMPLE('let x = 5;', 'let r = &x;', 'let t = (r, 1);', 'println!("{}", t.1);'), 'reference in aggregate', 4],
-    [SIMPLE('let x: u8 = 255;', 'let r = &x;', 'let y = x + 1;'), 'const folding', 4]
+    [SIMPLE('let x = 5;', 'let r = &x;', 'let t = (r, 1);', 'println!("{}", t.1);'), 'reference in aggregate', 4]
   ]));
   it('as_str on a temporary is never ok', () => {
     const c = RQ.run(SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'));
