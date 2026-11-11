@@ -9332,5 +9332,512 @@
     "src": "fn run(n: usize) {\n    let x = 255u8;\n    if n > 100 {\n        println!(\"a\");\n    } else {\n        return;\n    }\n    let z = x + 1;\n    println!(\"{}\", z);\n}\n\nfn main() {\n    run(1);\n}\n",
     "expect": {"lint": "arithmetic_overflow", "line": 8},
     "why": "when the else returns, the code after is reached through the then edge and keeps what was known", "pr": "unit"
+  },
+  {
+    "id": "for-arr-sum",
+    "src": "fn main() {\n    let scores = [90, 85, 72];\n    let mut total = 0;\n    for s in &scores {\n        total += s;\n    }\n    println!(\"{} {}\", total, scores.len());\n}\n",
+    "expect": "ok", "out": "247 3\n", "err": "", "exit": 0,
+    "why": "for over &array lends the array and gives a reference to each element, and the array is usable after the loop", "pr": "unit"
+  },
+  {
+    "id": "for-arr-mut-double",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        *x *= 2;\n    }\n    for x in &a {\n        println!(\"{}\", x);\n    }\n    let b = a;\n    println!(\"{:?}\", b);\n}\n",
+    "expect": "ok", "out": "2\n4\n6\n[2, 4, 6]\n", "err": "", "exit": 0,
+    "why": "for over &mut array gives a &mut to each element; a Copy array is usable after the loops", "pr": "unit"
+  },
+  {
+    "id": "for-arr-nested",
+    "src": "fn main() {\n    let mut grid = [[0; 3]; 2];\n    for row in &mut grid {\n        for cell in row {\n            *cell += 1;\n        }\n    }\n    for row in &grid {\n        for cell in row {\n            print!(\"{}\", cell);\n        }\n        println!();\n    }\n}\n",
+    "expect": "ok", "out": "111\n111\n", "err": "", "exit": 0,
+    "why": "[row; n] makes n independent rows, and a row reference from the outer loop is the iterable of the inner one", "pr": "unit"
+  },
+  {
+    "id": "for-arr-copy-apart",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let mut b = a;\n    for x in &mut b {\n        *x *= 10;\n    }\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [10, 20, 30]\n", "err": "", "exit": 0,
+    "why": "a Copy array assigned to another variable is a copy, so changing one leaves the other", "pr": "unit"
+  },
+  {
+    "id": "for-arr-param",
+    "src": "fn bump(a: &mut [i32; 3]) {\n    for x in a {\n        *x += 1;\n    }\n}\n\nfn show(a: &[i32; 3]) {\n    for x in a {\n        print!(\"{} \", x);\n    }\n    println!();\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    bump(&mut a);\n    bump(&mut a);\n    show(&a);\n    show(&a);\n}\n",
+    "expect": "ok", "out": "3 4 5 \n3 4 5 \n", "err": "", "exit": 0,
+    "why": "a parameter of type &mut [T; N] or &[T; N] is the iterable itself", "pr": "unit"
+  },
+  {
+    "id": "for-arr-slice-param",
+    "src": "fn total(xs: &[i32]) -> i32 {\n    let mut t = 0;\n    for x in xs {\n        t += x;\n    }\n    t\n}\n\nfn main() {\n    let a = [1, 2, 3];\n    let v = vec![4, 5];\n    println!(\"{} {}\", total(&a), total(&v));\n    println!(\"{}\", total(&a));\n}\n",
+    "expect": "ok", "out": "6 9\n6\n", "err": "", "exit": 0,
+    "why": "a &[T] parameter takes an array or a Vec by reference and loops over its elements", "pr": "unit"
+  },
+  {
+    "id": "for-arr-field",
+    "src": "struct Bag {\n    items: [i32; 3],\n}\n\nimpl Bag {\n    fn bump(&mut self) {\n        for i in &mut self.items {\n            *i += 1;\n        }\n    }\n\n    fn total(&self) -> i32 {\n        let mut t = 0;\n        for i in &self.items {\n            t += i;\n        }\n        t\n    }\n}\n\nfn main() {\n    let mut b = Bag { items: [1, 2, 3] };\n    b.bump();\n    println!(\"{}\", b.total());\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "an array field is lent by &self.items or &mut self.items", "pr": "unit"
+  },
+  {
+    "id": "for-arr-mut-read",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        println!(\"{:?}\", a);\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "for-arr-mut-read-ok",
+    "why": "E0502: the loop holds a &mut loan of the array, so reading the array inside the body is a second, shared loan", "pr": "P5"
+  },
+  {
+    "id": "for-arr-mut-read-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        println!(\"{:?}\", a);\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n1\n[1, 2, 3]\n2\n[1, 2, 3]\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the loop holds a &mut loan of the array, so reading the array inside the body is a second, shared loan", "pr": "P5"
+  },
+  {
+    "id": "for-arr-mut-twice",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        for y in &mut a {\n            println!(\"{} {}\", x, y);\n        }\n    }\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "pair": "for-arr-mut-twice-ok",
+    "why": "E0499: two loops that both lend the array mutably at once", "pr": "P5"
+  },
+  {
+    "id": "for-arr-mut-twice-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        for y in &a {\n            println!(\"{} {}\", x, y);\n        }\n    }\n}\n",
+    "expect": "ok", "out": "1 1\n1 2\n1 3\n2 1\n2 2\n2 3\n3 1\n3 2\n3 3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: two loops that both lend the array mutably at once", "pr": "P5"
+  },
+  {
+    "id": "for-arr-assign",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        a = [0, 0, 0];\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "for-arr-assign-ok",
+    "why": "E0506: assigning the array while the loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "for-arr-assign-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        let _ = [0, 0, 0];\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: assigning the array while the loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "for-arr-not-mut",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in &mut a {\n        *x += 1;\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "for-arr-not-mut-ok",
+    "why": "E0596: a &mut loan of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "for-arr-not-mut-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        *x += 1;\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[2, 3, 4]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut loan of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "for-arr-held-twice",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &mut a;\n    for x in r {\n        *x += 1;\n    }\n    for x in r {\n        *x += 1;\n    }\n}\n",
+    "expect": {"code": "E0382", "line": 7},
+    "why": "for over a &mut variable moves it: the second loop uses a moved value", "pr": "unit"
+  },
+  {
+    "id": "for-arr-param-twice",
+    "src": "fn bump(a: &mut [i32; 3]) {\n    for x in a {\n        *x += 1;\n    }\n    for x in a {\n        *x += 1;\n    }\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    bump(&mut a);\n}\n",
+    "expect": {"code": "E0382", "line": 5},
+    "why": "a &mut [T; N] parameter looped over twice is moved by the first loop", "pr": "unit"
+  },
+  {
+    "id": "for-arr-mut-as-ref",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in &a {\n        let y: &mut i32 = x;\n        println!(\"{}\", y);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 4},
+    "pair": "for-arr-mut-as-ref-ok",
+    "why": "E0308: each element reference of for over &array is shared, not &mut", "pr": "P5"
+  },
+  {
+    "id": "for-arr-mut-as-ref-ok",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in &a {\n        let y: &i32 = x;\n        println!(\"{}\", y);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: each element reference of for over &array is shared, not &mut", "pr": "P5"
+  },
+  {
+    "id": "match-guard-binding-full",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        x if x > 3 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "match-guard-binding-full-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-guard-binding-full-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        x if x > 3 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-lit-guard-blank",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        3 if k == 1 => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"{}\", 1 / k);\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 8},
+    "pair": "match-lit-guard-blank-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-lit-guard-blank-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        3 if k == 1 => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"{}\", 1 / k);\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-or-range-first",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        1 | 7..=9 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "match-or-range-first-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-or-range-first-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        1 | 7..=9 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-second-range-blank",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        0 | 1 => {\n            println!(\"x\");\n        }\n        2..=5 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 8},
+    "pair": "match-second-range-blank-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-second-range-blank-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        0 | 1 => {\n            println!(\"x\");\n        }\n        2..=5 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-exhaustive-ranges",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        0..=9 => {\n            println!(\"{}\", 1 / k);\n        }\n        10..=255 => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "match-exhaustive-ranges-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-exhaustive-ranges-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        0..=9 => {\n            println!(\"{}\", 1 / k);\n        }\n        10..=255 => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-guard-true-known",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        _ if k == 0 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 5},
+    "pair": "match-guard-true-known-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-guard-true-known-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        _ if k == 0 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-not-guard",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        0 if !(n > 1) => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"{}\", 1 / k);\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 8},
+    "pair": "match-not-guard-ok",
+    "why": "unconditional_panic: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-not-guard-ok",
+    "src": "fn f(n: u8) {\n    let k = 1;\n    match n {\n        0 if !(n > 1) => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"{}\", 1 / k);\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the arm is walked with what rustc knew, so 1 / k with k = 0 is linted", "pr": "P4"
+  },
+  {
+    "id": "match-guard-blank-arm",
+    "src": "fn f(n: u8) {\n    let k = 0;\n    match n {\n        x if x > 3 => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"{}\", 1 / k);\n        }\n    }\n}\n\nfn main() {\n    f(5);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "the arm after a guard that fails is walked with nothing known, so 1 / k is not linted; it panics at run time only if reached (n = 3 here would, 5 does not)", "pr": "unit"
+  },
+  {
+    "id": "match-guard-false-pruned",
+    "src": "fn main() {\n    let k = 0;\n    let n: u8 = 3;\n    match n {\n        _ if k == 1 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "a guard on a known false condition is followed only to its false edge, so the arm it guards is never walked", "pr": "unit"
+  },
+  {
+    "id": "match-dup-literal",
+    "src": "fn f(n: u8) {\n    match n {\n        10 => {\n            println!(\"x\");\n        }\n        10 => {\n            let y: u8 = 255 + 1;\n            println!(\"{}\", y);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n\nfn main() {\n    f(3);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "a second arm for the same literal is never reached, so rustc does not walk it", "pr": "unit"
+  },
+  {
+    "id": "match-lit-binding-known",
+    "src": "fn main() {\n    let k = 0;\n    match 0u8 {\n        0 => {\n            println!(\"x\");\n        }\n        x if x > 3 => {\n            println!(\"{}\", 1 / k);\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n}\n",
+    "expect": "ok", "out": "x\n", "err": "", "exit": 0,
+    "why": "a literal scrutinee stays known to rustc even when an arm binds it for a guard", "pr": "unit"
+  },
+  {
+    "id": "match-guard-binding-unknown",
+    "src": "fn main() {\n    let k = 0;\n    let n: u8 = 1;\n    match n {\n        0 => {\n            println!(\"x\");\n        }\n        _ if k == 1 => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n    let z = n + 255;\n    println!(\"{}\", z);\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 15},
+    "pair": "match-guard-binding-unknown-ok",
+    "why": "arithmetic_overflow: a guard with no binding leaves n known after the match, so n + 255 is linted; a binding in the guard borrows n and makes it unknown (the accept panics at run time)", "pr": "P4"
+  },
+  {
+    "id": "match-guard-binding-unknown-ok",
+    "src": "fn main() {\n    let k = 0;\n    let n: u8 = 1;\n    match n {\n        0 => {\n            println!(\"x\");\n        }\n        x if k == 1 => {\n            println!(\"x\");\n        }\n        _ => {\n            println!(\"x\");\n        }\n    }\n    let z = n + 255;\n    println!(\"{}\", z);\n}\n",
+    "expect": "ok", "out": "x\n", "err": "\nthread 'main' panicked at src/main.rs:15:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "compiles once the cause is gone: a guard with no binding leaves n known after the match, so n + 255 is linted; a binding in the guard borrows n and makes it unknown (the accept panics at run time)", "pr": "P4"
+  },
+  {
+    "id": "neg-field",
+    "src": "struct S {\n    a: u8,\n}\n\nfn main() {\n    let s = S { a: -1 };\n    println!(\"{}\", s.a);\n}\n",
+    "expect": {"code": "E0600", "line": 6},
+    "pair": "neg-field-ok",
+    "why": "E0600: a struct field that expects an unsigned type gives the literal that type before it is negated", "pr": "P4"
+  },
+  {
+    "id": "neg-field-ok",
+    "src": "struct S {\n    a: i8,\n}\n\nfn main() {\n    let s = S { a: -1 };\n    println!(\"{}\", s.a);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a struct field that expects an unsigned type gives the literal that type before it is negated", "pr": "P4"
+  },
+  {
+    "id": "neg-arg",
+    "src": "fn f(x: u8) -> u8 {\n    x\n}\n\nfn main() {\n    println!(\"{}\", f(-1));\n}\n",
+    "expect": {"code": "E0600", "line": 6},
+    "pair": "neg-arg-ok",
+    "why": "E0600: an argument for an unsigned parameter", "pr": "P4"
+  },
+  {
+    "id": "neg-arg-ok",
+    "src": "fn f(x: i8) -> i8 {\n    x\n}\n\nfn main() {\n    println!(\"{}\", f(-1));\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an argument for an unsigned parameter", "pr": "P4"
+  },
+  {
+    "id": "neg-tail",
+    "src": "fn f() -> u8 {\n    -1\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-tail-ok",
+    "why": "E0600: the tail of a function that returns an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-tail-ok",
+    "src": "fn f() -> i8 {\n    -1\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the tail of a function that returns an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-return",
+    "src": "fn f() -> u32 {\n    return -1;\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-return-ok",
+    "why": "E0600: a return of an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-return-ok",
+    "src": "fn f() -> i32 {\n    return -1;\n}\n\nfn main() {\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a return of an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-vec",
+    "src": "fn main() {\n    let v: Vec<u8> = vec![1, -1];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-vec-ok",
+    "why": "E0600: a vec! element of an unsigned Vec", "pr": "P4"
+  },
+  {
+    "id": "neg-vec-ok",
+    "src": "fn main() {\n    let v: Vec<i8> = vec![1, -1];\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, -1]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a vec! element of an unsigned Vec", "pr": "P4"
+  },
+  {
+    "id": "neg-some",
+    "src": "fn main() {\n    let o: Option<u8> = Some(-1);\n    println!(\"{:?}\", o);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-some-ok",
+    "why": "E0600: the payload of Some for an unsigned Option", "pr": "P4"
+  },
+  {
+    "id": "neg-some-ok",
+    "src": "fn main() {\n    let o: Option<i8> = Some(-1);\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "Some(-1)\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the payload of Some for an unsigned Option", "pr": "P4"
+  },
+  {
+    "id": "neg-tuple",
+    "src": "fn main() {\n    let t: (u8, i8) = (-1, -1);\n    println!(\"{:?}\", t);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-tuple-ok",
+    "why": "E0600: only the element whose type is unsigned", "pr": "P4"
+  },
+  {
+    "id": "neg-tuple-ok",
+    "src": "fn main() {\n    let t: (i8, i8) = (-1, -1);\n    println!(\"{:?}\", t);\n}\n",
+    "expect": "ok", "out": "(-1, -1)\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: only the element whose type is unsigned", "pr": "P4"
+  },
+  {
+    "id": "neg-if",
+    "src": "fn main() {\n    let c = true;\n    let x: u8 = if c { -3 } else { 2 };\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-if-ok",
+    "why": "E0600: a branch of an if that is typed by an unsigned annotation", "pr": "P4"
+  },
+  {
+    "id": "neg-if-ok",
+    "src": "fn main() {\n    let c = true;\n    let x: i8 = if c { -3 } else { 2 };\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a branch of an if that is typed by an unsigned annotation", "pr": "P4"
+  },
+  {
+    "id": "neg-block",
+    "src": "fn main() {\n    let x: u8 = {\n        let y = 1;\n        -3\n    };\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 4},
+    "pair": "neg-block-ok",
+    "why": "E0600: the tail of a block", "pr": "P4"
+  },
+  {
+    "id": "neg-block-ok",
+    "src": "fn main() {\n    let x: i8 = {\n        let y = 1;\n        -3\n    };\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the tail of a block", "pr": "P4"
+  },
+  {
+    "id": "neg-match",
+    "src": "fn main() {\n    let x: u8 = match 1 {\n        1 => -1,\n        _ => 2,\n    };\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-match-ok",
+    "why": "E0600: an arm of a match", "pr": "P4"
+  },
+  {
+    "id": "neg-match-ok",
+    "src": "fn main() {\n    let x: i8 = match 1 {\n        1 => -1,\n        _ => 2,\n    };\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an arm of a match", "pr": "P4"
+  },
+  {
+    "id": "neg-array",
+    "src": "fn main() {\n    let a: [u8; 2] = [-1, 2];\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0600", "line": 2},
+    "pair": "neg-array-ok",
+    "why": "E0600: an element of an unsigned array", "pr": "P4"
+  },
+  {
+    "id": "neg-array-ok",
+    "src": "fn main() {\n    let a: [i8; 2] = [-1, 2];\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[-1, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an element of an unsigned array", "pr": "P4"
+  },
+  {
+    "id": "neg-assign",
+    "src": "fn main() {\n    let mut x: u8 = 0;\n    x = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-assign-ok",
+    "why": "E0600: assigning to an unsigned variable", "pr": "P4"
+  },
+  {
+    "id": "neg-assign-ok",
+    "src": "fn main() {\n    let mut x: i8 = 0;\n    x = -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: assigning to an unsigned variable", "pr": "P4"
+  },
+  {
+    "id": "neg-compare",
+    "src": "fn main() {\n    let x: u8 = 5;\n    if x == -1 {\n        println!(\"a\");\n    }\n}\n",
+    "expect": {"code": "E0600", "line": 3},
+    "pair": "neg-compare-ok",
+    "why": "E0600: comparing an unsigned value with a negative literal", "pr": "P4"
+  },
+  {
+    "id": "neg-compare-ok",
+    "src": "fn main() {\n    let x: i8 = 5;\n    if x == -1 {\n        println!(\"a\");\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: comparing an unsigned value with a negative literal", "pr": "P4"
+  },
+  {
+    "id": "neg-const",
+    "src": "const C: u8 = -1;\n\nfn main() {\n    println!(\"{}\", C);\n}\n",
+    "expect": {"code": "E0600", "line": 1},
+    "pair": "neg-const-ok",
+    "why": "E0600: a const of an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-const-ok",
+    "src": "const C: i8 = -1;\n\nfn main() {\n    println!(\"{}\", C);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a const of an unsigned type", "pr": "P4"
+  },
+  {
+    "id": "neg-tuple-struct",
+    "src": "struct S(u8);\n\nfn main() {\n    let s = S(-1);\n    println!(\"{}\", s.0);\n}\n",
+    "expect": {"code": "E0600", "line": 4},
+    "pair": "neg-tuple-struct-ok",
+    "why": "E0600: the field of a tuple struct", "pr": "P4"
+  },
+  {
+    "id": "neg-tuple-struct-ok",
+    "src": "struct S(i8);\n\nfn main() {\n    let s = S(-1);\n    println!(\"{}\", s.0);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the field of a tuple struct", "pr": "P4"
+  },
+  {
+    "id": "neg-later",
+    "src": "fn main() {\n    let x = -1;\n    let y: u8 = x;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"code": "E0277", "line": 2},
+    "pair": "neg-later-ok",
+    "why": "E0277: the literal has no type yet when it is negated, and a later use makes it unsigned, which is a missing Neg bound, not E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-later-ok",
+    "src": "fn main() {\n    let x = -1;\n    let y: i8 = x;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the literal has no type yet when it is negated, and a later use makes it unsigned, which is a missing Neg bound, not E0600", "pr": "P4"
+  },
+  {
+    "id": "neg-operand",
+    "src": "fn main() {\n    let x = 5u8;\n    let y = x - -1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "neg-operand-ok",
+    "why": "E0277: an operand of + - * / % is typed before the operation, so its literal has no type to be negated with", "pr": "P4"
+  },
+  {
+    "id": "neg-operand-ok",
+    "src": "fn main() {\n    let x = 5i8;\n    let y = x - -1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an operand of + - * / % is typed before the operation, so its literal has no type to be negated with", "pr": "P4"
+  },
+  {
+    "id": "neg-compound",
+    "src": "fn main() {\n    let mut x: u8 = 3;\n    x -= -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "neg-compound-ok",
+    "why": "E0277: the right side of -= is typed before the operation", "pr": "P4"
+  },
+  {
+    "id": "neg-compound-ok",
+    "src": "fn main() {\n    let mut x: i8 = 3;\n    x -= -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the right side of -= is typed before the operation", "pr": "P4"
+  },
+  {
+    "id": "neg-free-tuple",
+    "src": "fn main() {\n    let t = (-1, 2);\n    let u: (u8, i32) = t;\n    println!(\"{:?}\", u);\n}\n",
+    "expect": {"code": "E0277", "line": 2},
+    "pair": "neg-free-tuple-ok",
+    "why": "E0277: a tuple built before its type is fixed", "pr": "P4"
+  },
+  {
+    "id": "neg-free-tuple-ok",
+    "src": "fn main() {\n    let t = (-1, 2);\n    let u: (i8, i32) = t;\n    println!(\"{:?}\", u);\n}\n",
+    "expect": "ok", "out": "(-1, 2)\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a tuple built before its type is fixed", "pr": "P4"
+  },
+  {
+    "id": "neg-free-if",
+    "src": "fn main() {\n    let c = true;\n    let x = if c { -1 } else { 2 };\n    let y: u8 = x;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "neg-free-if-ok",
+    "why": "E0277: an if whose type is fixed after it", "pr": "P4"
+  },
+  {
+    "id": "neg-free-if-ok",
+    "src": "fn main() {\n    let c = true;\n    let x = if c { -1 } else { 2 };\n    let y: i8 = x;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an if whose type is fixed after it", "pr": "P4"
   }
 ]
