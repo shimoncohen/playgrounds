@@ -24,7 +24,7 @@ describe('RQ.borrow: the API', () => {
   });
   it('compile returns loans', () => assert.deepEqual(RQ.compile(SIMPLE('let s = String::new();')).loans, []));
   it('the mir unsupported list comes through', () => {
-    const c = RQ.compile(SIMPLE('let s = String::new();', 'let r = &String::new();'));
+    const c = RQ.compile(SIMPLE('let s = String::new();', 'let t = (&String::new(), 1);'));
     assert.deepEqual(RQ.borrow(c.ast, c.info).unsupported.map((u) => `${u.feature}@${u.line}`), ['temporary borrow@3']);
   });
 });
@@ -133,7 +133,7 @@ describe('when the pass runs', () => {
     assert.equal(diags(SIMPLE('let x: i32 = "a";', 'let s = String::new();', 'drop(s);', 'drop(s);')), 'E0308@2');
   });
   it('an unsupported construct wins over a verdict', () => {
-    const c = RQ.run(SIMPLE('let s = String::new();', 'drop(s);', 'drop(s);', 'let r = &String::new();'));
+    const c = RQ.run(SIMPLE('let s = String::new();', 'drop(s);', 'drop(s);', 'let t = (&String::new(), 1);'));
     assert.equal(c.status, 'unsupported');
     assert.equal(c.unsupported.feature, 'temporary borrow');
   });
@@ -425,8 +425,8 @@ describe('the unsupported list, end to end through RQ.run', () => {
     [SIMPLE('let mut x = 1;', 'let r = &mut x;', 'let r2 = r;'), 'reborrow', 4],
     [SIMPLE('let x = 1;', 'let r = &x;', 'let r2 = &*r;'), 'reborrow', 4],
     [SIMPLE('let a = [1, 2];', 'let r = &a[0];'), 'borrow of a field', 3],
-    [SIMPLE('let r = &String::new();'), 'temporary borrow', 2],
-    [SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'), 'temporary borrow', 2],
+    [SIMPLE('let t = (&String::new(), 1);'), 'temporary borrow', 2],
+    [SIMPLE('let o = Some(&String::from("a"));'), 'temporary borrow', 2],
     [SIMPLE('let a = [String::new()];', 'let s = a[0];'), 'partial move', 3],
     [SIMPLE('let s = String::new();', 'let r = &s;', 'let t = *r;'), 'move out of reference', 4],
     [SIMPLE('let mut s = String::from("a");', 's.push_str(&s);'), 'two-phase borrow', 3],
@@ -437,10 +437,10 @@ describe('the unsupported list, end to end through RQ.run', () => {
     [SIMPLE('let mut x = 5;', 'let r = &mut x;', 'let y = x;', '*r = 1;', 'println!("{}", y);'), 'use while borrowed', 4],
     [SIMPLE('let x = 5;', 'let r = &x;', 'let t = (r, 1);', 'println!("{}", t.1);'), 'reference in aggregate', 4]
   ]));
-  it('as_str on a temporary is never ok', () => {
+  it('as_str on a temporary that is used after its statement is E0716, never ok', () => {
     const c = RQ.run(SIMPLE('let r = String::from("a").as_str();', 'println!("{}", r);'));
-    assert.notEqual(c.status, 'ok');
-    assert.equal(c.status, 'unsupported');
+    assert.equal(c.status, 'error');
+    assert.deepEqual(Array.from(c.errors, (e) => `${e.code}@${e.line} ${e.msg}`), ['E0716@2 temporary value dropped while borrowed']);
   });
 });
 

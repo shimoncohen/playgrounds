@@ -141,9 +141,9 @@ function mutability(F,errors,un){
         const root=R[r.l];
         if(roots.has(root)&&roots.get(root)!==i.line+':'+i.col)un('repeated error',i);
         roots.set(root,i.line+':'+i.col);
-        err(i,L[r.l].name,false,L[r.l].path?L[R[r.l]].name:null);
+        err(i,L[r.l].name+(r.sfx||''),false,L[r.l].path||r.sfx?L[R[r.l]].name:null);
       }
-      else if(r.k==='method'&&r.recv.k!=='const'&&RQ.std.methods.get(r.name).self==='&mut'){
+      else if(r.k==='method'&&r.recv.k!=='const'&&(RQ.std.methods.get(r.name)||{}).self==='&mut'){
         const t=L[r.recv.l].ty;
         if(t.k==='ref'&&!t.mut)err(i,r.text||'*'+(L[r.recv.l].name||L[r.recv.l].src||'value'),true,null);
       }
@@ -255,7 +255,7 @@ function loanPass(F,errors,un,loans,stats){
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value')+(i.op==='write'?i.name:''),mut:kind==='mut'||kind==='reb'}));
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value')+(i.op==='write'?i.name:i.rv&&i.rv.sfx||''),mut:kind==='mut'||kind==='reb'}));
   };
   for(const b of B){
     if(!inn[b.id])continue;
@@ -304,8 +304,8 @@ function loanPass(F,errors,un,loans,stats){
       if(i.op==='dead'){
         const hit=lm&(onS[i.l]|onM[i.l]);
         if(hit)lo.forEach((x,k)=>{
-          const key='E0597@'+x.i.line+':'+x.i.col;
-          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0597',x.i.line,x.i.col,{name:L[i.l].name}));}
+          const code=L[i.l].tmp?'E0716':'E0597',key=code+'@'+x.i.line+':'+x.i.col;
+          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make(code,x.i.line,x.i.col,{name:L[i.l].name}));}
         });
       }
       if(i.op==='assign'){
