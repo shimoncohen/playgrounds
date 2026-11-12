@@ -68,7 +68,7 @@ describe('writing an array element', () => {
 describe('what a write to an element still leaves unsupported', () => {
   const OPEN = [
     ['a compound write while a loop lends the array mutably (E0503)', main('let mut a = [0; 3];\nfor x in &mut a {\na[1] += *x;\n}'), 'use while borrowed'],
-    ['a slice of a slice parameter', `fn f(a: &mut [i32]) {\n    a[0] = 1;\n}\n\n${main('let mut a = [1, 2, 3];\nf(&mut a[..]);')}`, 'reference'],
+    ['a slice of a &mut parameter kept in a variable', `fn f(a: &mut [i32]) {\n    let b = &mut a[1..];\n    b[0] = 7;\n}\n\n${main('let mut a = [1, 2, 3];\nf(&mut a);')}`, 'reborrow'],
   ];
   for (const [what, src, feature] of OPEN) {
     it(what, () => {

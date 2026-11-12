@@ -811,16 +811,27 @@ RQ.check=ast=>{
     vars=[];negs=[];okNeg=new Set();freeNeg=new Set();lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
 
+  // `v[a..b].m()` borrows the slice itself, as `(&v[a..b]).m()` does
+  function lendRange(e){
+    const rx=peel(e.recv);
+    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||e.name==='swap',expr:rx};
+  }
   function slice(e,x){
     const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);
-    if(e.mut)return unsup('reference',e.line);
     if(b.k==='any'||b.k==='never')return T.any;
     if(!ts.every(t=>unify(t,T.int('usize'))))return unsup('type checking',e.line);
-    if(b.k==='ref'&&b.mut)return unsup('reborrow',e.line);
     const base=b.k==='ref'?res(b.to):b;
     if(base.k==='coll'&&base.name!=='Vec')return unsup('collection method',e.line);
-    if(base.k==='String'||b.k==='str'){I(e).slice='str';return T.str;}
-    if(base.k==='array'||base.k==='slice'||base.k==='coll'){I(e).slice='arr';return mkRef(false,T.slice(base.k==='coll'?base.args[0]:base.el));}
+    if(base.k==='String'||b.k==='str'){
+      if(e.mut)return unsup('reference',e.line);
+      I(e).slice='str';return T.str;
+    }
+    if(base.k==='array'||base.k==='slice'||base.k==='coll'){
+      // IndexMut borrows the base mutably, so behind a `&` it is E0596, as for a Vec element
+      const bx=peel(x.expr),ch=e.mut&&(bx.t==='Path'||bx.t==='Field')?chainOf(bx):null;
+      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+      I(e).slice='arr';return mkRef(!!e.mut,T.slice(base.k==='coll'?base.args[0]:base.el));
+    }
     return unsup('type checking',e.line);
   }
 
@@ -838,6 +849,7 @@ RQ.check=ast=>{
   function forItems(e,it){
     let src=it,mode='val',part='kv',ty,viaRef=false;
     if(it.t==='MethodCall'&&ITERS.includes(it.name)&&!it.args.length){
+      lendRange(it);
       const rt=res(ex(it.recv)),base=rt.k==='ref'?res(rt.to):rt;
       if(base.k!=='coll'){
         reuse=it.recv;
@@ -855,7 +867,11 @@ RQ.check=ast=>{
       if(viaRef&&!rt.mut&&mode==='mut')return unsup('for iterable',it.line);
     }else if(it.t==='Ref'){
       const x=peel(it.expr);
-      if(x.t==='Index'&&peel(x.index).t==='Range'){ex(e.iter);return unsup('for iterable',it.line);}
+      if(x.t==='Index'&&peel(x.index).t==='Range'){
+        const st=res(ex(it));
+        if(st.k==='any'||st.k==='never')return T.any;
+        return st.k==='ref'&&res(st.to).k==='slice'?intoIterFor(e,it):unsup('for iterable',it.line);
+      }
       const rt=res(ex(it));
       if(rt.k!=='ref')return T.any;
       ty=res(rt.to);src=it.expr;mode=it.mut?'mut':'ref';
@@ -2110,6 +2126,7 @@ RQ.check=ast=>{
       case 'MethodCall':{
         const hint=['collect','sum','product'].includes(e.name)?takeWant():null;
         if(peel(e.recv).t==='Range')rangeOk=true;
+        if(e.recv!==reuse)lendRange(e);
         const rt=e.recv===reuse?(reuse=null,info.get(e.recv).ty):ex(e.recv),r=res(rt);
         if(r.k==='tvar'&&(r.cparam||r.pendTgt)){
           e.args.forEach(ex);
@@ -2137,10 +2154,10 @@ RQ.check=ast=>{
         if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='swap'&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
-        if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
+        if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
           if(args.length)return unsup('wrong argument count',e.line);
-          I(e).recv={method:'len',kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
-          return T.int('usize');
+          I(e).recv={method:e.name,kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
+          return e.name==='len'?T.int('usize'):T.bool;
         }
         const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):''):'';
         const sig=RQ.std.methods.get(e.name);

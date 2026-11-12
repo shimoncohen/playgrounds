@@ -55,7 +55,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   let cur,count=0,retL;
   const tyOf=e=>{const o=info.get(e);return res(o&&o.ty||T.any);};
   const carries=t=>RQ.types.hasRef(t)||t.k==='str';
-  const tempOk=new Set();
+  const tempOk=new Set(),rebArg=new Map();
   const isUnit=t=>t.k==='unit'||t.k==='never';
   const isBool=e=>{e=peel(e);return e.t==='Lit'&&e.kind==='bool';};
   const local=(name,ty,o)=>{
@@ -358,6 +358,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   const stdArgs=u=>{let i=0;return x=>stdArg(x,u,i++);};
   const SLICE_MUT=new Set(['Vec::swap','Vec::get_mut']);
   function umethod(e,dest){
+    lendArgs(e);
     const u=info.get(e).um,p=peel(e.recv);
     let ro,rest,inner;
     if(u.ref){
@@ -430,13 +431,14 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
 
   function method(e,dest){
     if(info.get(e).um)return umethod(e,dest);
+    lendArgs(e);
     const r=info.get(e).recv;
     if(!r){un('method call',e);return fin(NIL,e,dest);}
     let ro,args;
     if(r.adj==='val'){
       rebTwice([e.recv,...e.args],e);
       // std method args are all `&str`, so only `&mut self` methods reborrow mutably
-      [ro,...args]=seq([e.recv,...e.args],x=>argOp(x,x!==e.recv||RQ.std.methods.get(e.name).self==='&'));
+      [ro,...args]=seq([e.recv,...e.args],x=>argOp(x,x!==e.recv||e.name==='is_empty'||RQ.std.methods.get(e.name).self==='&'));
     }else{
       const mut=r.adj==='&mut',p=peel(e.recv);
       let target=-1;
@@ -475,19 +477,55 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     return put({k:'method',name:e.name,recv:ro,args},e,dest,tyOf(e));
   }
 
+  // a slice of a `&mut` parameter lent straight to a call is a reborrow that ends with the call, if the result keeps no reference
+  const lendArgs=e=>{if(!carries(tyOf(e)))for(const a of e.args)if(peel(a).t==='Ref')rebArg.set(peel(a),e);};
   // a base that is already a reference passes its loans on instead of making one
   function slice(e,x,dest){
-    const rg=peel(x.index),b=peel(x.expr),c=classify(b);
-    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
-    const bounds=[rg.from,rg.to].filter(Boolean).map(y=>ex(y));
-    if(bounds.length)emit('eval',e,{rv:{k:'op',args:bounds}});
-    const l=c.l,t=L[l].ty;
-    // a field behind a reference lives as long as the reference does
-    if(c.k==='via'){
-      if(t.mut){un('reborrow',e);return fin(NIL,e,dest);}
-      return put({k:'use',x:opnd(l)},e,dest,tyOf(e));
+    const rg=peel(x.index),b=peel(x.expr),c=classify(b),bounds=[rg.from,rg.to].filter(Boolean),mut=!!e.mut;
+    const evalBounds=()=>{if(bounds.length)emit('eval',e,{rv:{k:'op',args:bounds.map(y=>ex(y))}});};
+    // a row of a Vec of Vecs, `&v[i][a..b]`: the Vec is lent for the slice, as for `&v[i]`
+    if(c.k==='idx'&&hasVecIdx(b)){
+      const r=vecRoot(b),rc=r.c;
+      if(rc.k!=='local'&&rc.k!=='path'&&rc.k!=='via'){un('temporary borrow',e);return fin(NIL,e,dest);}
+      const rt=L[rc.l].ty;
+      if(rc.k==='via'||rt.k==='ref'){
+        if(mut||rt.mut){un('reborrow',e);return fin(NIL,e,dest);}
+        emit('eval',e,{rv:{k:'op',args:r.idx.map(y=>ex(y))}});
+        evalBounds();
+        return put({k:'use',x:opnd(rc.l)},e,dest,tyOf(e));
+      }
+      if(mut){
+        const ro=vecRef(rc,true,e,true,r);
+        if(!ro)return fin(NIL,e,dest);
+        emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(y=>ex(y))]}});
+        evalBounds();
+        return put({k:'use',x:ro},e,dest,tyOf(e));
+      }
+      emit('eval',e,{rv:{k:'op',args:r.idx.map(y=>ex(y))}});
+      evalBounds();
+      return put({k:'ref',l:rc.l,mut:false,slice:true},e,dest,tyOf(e));
     }
-    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut:false,slice:true},e,dest,tyOf(e));
+    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
+    const l=c.l,t=L[l].ty;
+    if(t.k==='ref'&&t.mut){
+      // the other mentions of the reference in the call may read what the reborrow holds: not judged
+      const call=rebArg.get(e);
+      let n=0;
+      if(call)RQ.walk([call.recv,...call.args].filter(Boolean),y=>{if(y.t==='Path'&&lid(y)===l)n++;});
+      if(!call||n>1){un('reborrow',e);return fin(NIL,e,dest);}
+      evalBounds();
+      return put({k:'use',x:opnd(l,true,!mut)},e,dest,tyOf(e));
+    }
+    // IndexMut borrows the base before the bounds run, so a bound that reads it conflicts
+    if(!(t.k==='ref'||t.k==='str'||c.k==='via')&&mut){
+      const r=put({k:'ref',l,mut,slice:true},e,dest,tyOf(e));
+      evalBounds();
+      return r;
+    }
+    evalBounds();
+    // a field behind a reference lives as long as the reference does
+    if(c.k==='via')return put({k:'use',x:opnd(l)},e,dest,tyOf(e));
+    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut,slice:true},e,dest,tyOf(e));
   }
 
   // an array element is a place inside the array, so a write borrows nothing: it conflicts with a loan on the array or on a field above it
@@ -820,6 +858,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         rebTwice(e.args,e);
         // a temporary lent to a call lives to the end of the statement; with a result that holds no reference it cannot be kept past that
         if(!carries(tyOf(e)))for(const a of e.args)if(peel(a).t==='Ref')tempOk.add(peel(a));
+        lendArgs(e);
         const sig=(info.get(e)||{}).sig;
         return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1,more:sig&&sig.more||[]},e,dest,tyOf(e));
       }

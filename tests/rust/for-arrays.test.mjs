@@ -228,9 +228,8 @@ describe('for over an array: `&a`, `&mut a`, a held `&[T; N]`, `&mut [T; N]` or 
     assert.equal(verdict('fn main() {\n    let a = [[1, 2], [3, 4]];\n    let mut b = a;\n    for row in &mut b {\n        for c in row {\n            *c = 0;\n        }\n    }\n    println!("{:?} {:?}", a, b);\n}\n'), '[[1, 2], [3, 4]] [[0, 0], [0, 0]]\n');
     assert.equal(verdict('fn main() {\n    let a = [1, 2];\n    let b = [a; 2];\n    let mut c = a;\n    for x in c.iter_mut() {\n        *x = 9;\n    }\n    println!("{:?} {:?} {:?}", a, b, c);\n}\n'), '[1, 2] [[1, 2], [1, 2]] [9, 9]\n');
   });
-  it('what is not modeled keeps its hint: a part of an array, a use of the array while it is lent', () => {
+  it('what is not modeled keeps its hint: a use of the array while it is lent', () => {
     for (const [body, feature] of [
-      ['let a = [1, 2, 3];\n    for x in &a[1..] {\n        println!("{}", x);\n    }', 'for iterable'],
       ['let mut a = [1, 2, 3];\n    for x in &mut a {\n        let n = a.len();\n        *x = n as i32;\n    }', 'use while borrowed'],
     ]) {
       const c = RQ.run(`fn main() {\n    ${body}\n}\n`);

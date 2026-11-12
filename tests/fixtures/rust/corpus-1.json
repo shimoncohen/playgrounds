@@ -11344,5 +11344,467 @@
     "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 1 }];\n    let w = v.len();\n    v[0].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
     "expect": "ok", "out": "1\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: writing a field of an element after the Vec moved", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-full",
+    "src": "fn zero(a: &mut [i32]) {\n    for x in a.iter_mut() {\n        *x = 0;\n    }\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    zero(&mut v[..]);\n    println!(\"{:?}\", v);\n    let mut a = [4, 5, 6];\n    zero(&mut a[..]);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[0, 0, 0]\n[0, 0, 0]\n", "err": "", "exit": 0,
+    "why": "&mut v[..] and &mut a[..] lend a whole Vec or array as a &mut slice", "pr": "unit"
+  },
+  {
+    "id": "slice-mut-range",
+    "src": "fn zero(a: &mut [i32]) {\n    for x in a.iter_mut() {\n        *x = 0;\n    }\n}\n\nfn main() {\n    let mut a = [1, 2, 3, 4];\n    zero(&mut a[1..3]);\n    println!(\"{:?}\", a);\n    let i = 3;\n    zero(&mut a[i..]);\n    println!(\"{:?}\", a);\n    let mut v = vec![1, 2, 3, 4];\n    zero(&mut v[..=1]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 0, 0, 4]\n[1, 0, 0, 0]\n[0, 0, 3, 4]\n", "err": "", "exit": 0,
+    "why": "&mut a[1..3], &mut a[i..] and &mut v[..=1] lend part of an array or Vec", "pr": "unit"
+  },
+  {
+    "id": "slice-mut-set",
+    "src": "fn set(a: &mut [i32], i: usize) {\n    a[i] = 9;\n    a[i] += 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3, 4];\n    set(&mut a[1..], 0);\n    set(&mut a[..2], 1);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 10, 3, 4]\n", "err": "", "exit": 0,
+    "why": "a write through a &mut slice that starts inside the array lands at the right element", "pr": "unit"
+  },
+  {
+    "id": "slice-sort",
+    "src": "fn sort(a: &mut [i32]) {\n    let n = a.len();\n    for i in 0..n {\n        for j in 0..n - 1 - i {\n            if a[j] > a[j + 1] {\n                a.swap(j, j + 1);\n            }\n        }\n    }\n}\n\nfn main() {\n    let mut v = vec![5, 3, 4, 1];\n    sort(&mut v[..]);\n    println!(\"{:?}\", v);\n    let mut w = vec![9, 8, 7, 6];\n    sort(&mut w[1..3]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 3, 4, 5]\n[9, 7, 8, 6]\n", "err": "", "exit": 0,
+    "why": "a bubble sort over &mut v[..] and over a part of a Vec", "pr": "unit"
+  },
+  {
+    "id": "slice-quicksort",
+    "src": "fn qs(a: &mut [i32]) {\n    if a.len() <= 1 {\n        return;\n    }\n    let p = a[a.len() - 1];\n    let mut i = 0;\n    for j in 0..a.len() - 1 {\n        if a[j] < p {\n            a.swap(i, j);\n            i += 1;\n        }\n    }\n    let n = a.len() - 1;\n    a.swap(i, n);\n    qs(&mut a[..i]);\n    qs(&mut a[i + 1..]);\n}\n\nfn main() {\n    let mut v = vec![5, 2, 9, 1, 7, 3];\n    qs(&mut v);\n    println!(\"{:?}\", v);\n    let mut b = [4, 3, 2, 1];\n    qs(&mut b[1..]);\n    println!(\"{:?}\", b);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3, 5, 7, 9]\n[4, 1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "a recursive quicksort that lends the halves with &mut a[..i] and &mut a[i + 1..]", "pr": "unit"
+  },
+  {
+    "id": "slice-mergesort",
+    "src": "fn merge_sort(a: &mut [i32]) {\n    let n = a.len();\n    if n <= 1 {\n        return;\n    }\n    let mid = n / 2;\n    merge_sort(&mut a[..mid]);\n    merge_sort(&mut a[mid..]);\n    let mut out = Vec::new();\n    let (mut i, mut j) = (0, mid);\n    while i < mid && j < n {\n        if a[i] <= a[j] {\n            out.push(a[i]);\n            i += 1;\n        } else {\n            out.push(a[j]);\n            j += 1;\n        }\n    }\n    while i < mid {\n        out.push(a[i]);\n        i += 1;\n    }\n    while j < n {\n        out.push(a[j]);\n        j += 1;\n    }\n    for k in 0..n {\n        a[k] = out[k];\n    }\n}\n\nfn main() {\n    let mut v = vec![5, 2, 9, 1, 7, 3];\n    merge_sort(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3, 5, 7, 9]\n", "err": "", "exit": 0,
+    "why": "a recursive merge sort that lends the halves of a &mut slice", "pr": "unit"
+  },
+  {
+    "id": "slice-sum-rec",
+    "src": "fn sum(a: &[i32]) -> i32 {\n    if a.is_empty() {\n        0\n    } else {\n        a[0] + sum(&a[1..])\n    }\n}\n\nfn main() {\n    println!(\"{}\", sum(&[1, 2, 3, 4]));\n    let v = vec![5, 6];\n    println!(\"{}\", sum(&v));\n    println!(\"{}\", sum(&v[1..]));\n}\n",
+    "expect": "ok", "out": "10\n11\n6\n", "err": "", "exit": 0,
+    "why": "a recursive sum over &a[1..] with an is_empty base case", "pr": "unit"
+  },
+  {
+    "id": "slice-let-mut",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let s = &mut v[1..3];\n    s[0] = 9;\n    s[1] += 1;\n    println!(\"{:?}\", s);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[9, 4]\n[1, 9, 4, 4]\n", "err": "", "exit": 0,
+    "why": "a &mut slice kept in a variable is written, and the Vec shows it afterwards", "pr": "unit"
+  },
+  {
+    "id": "slice-let-mut-iter",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let s = &mut v[1..];\n    for x in s.iter_mut() {\n        *x *= 2;\n    }\n    for x in s {\n        *x += 1;\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 5, 7, 9]\n", "err": "", "exit": 0,
+    "why": "a &mut slice is walked with iter_mut and with for", "pr": "unit"
+  },
+  {
+    "id": "slice-for-ref",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4];\n    for x in &v[1..3] {\n        println!(\"{}\", x);\n    }\n    for x in v[2..].iter() {\n        println!(\"{}\", x);\n    }\n    let a = [1, 2, 3];\n    for x in &a[1..] {\n        println!(\"{}\", x);\n    }\n    for &x in &a[..2] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "2\n3\n3\n4\n2\n3\n1\n2\n", "err": "", "exit": 0,
+    "why": "for loops over &v[1..3], v[2..].iter(), &a[1..] and &a[..2] with & patterns", "pr": "unit"
+  },
+  {
+    "id": "slice-for-mut",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    for x in &mut v[1..3] {\n        *x *= 10;\n    }\n    for x in v[..2].iter_mut() {\n        *x += 1;\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[2, 21, 30, 4]\n", "err": "", "exit": 0,
+    "why": "for loops over &mut v[1..3] and v[..2].iter_mut()", "pr": "unit"
+  },
+  {
+    "id": "slice-swap",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4, 5];\n    let s = &mut v[1..4];\n    s.swap(0, 2);\n    println!(\"{:?}\", v);\n    v[..2].swap(0, 1);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 4, 3, 2, 5]\n[4, 1, 3, 2, 5]\n", "err": "", "exit": 0,
+    "why": "swap on a &mut slice swaps inside the range", "pr": "unit"
+  },
+  {
+    "id": "slice-swap-oob",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4, 5];\n    let s = &mut v[1..3];\n    s.swap(0, 2);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:7:\nindex out of bounds: the len is 2 but the index is 2\n", "exit": 101,
+    "why": "swap past the end of a &mut slice panics with the slice length", "pr": "unit"
+  },
+  {
+    "id": "slice-index-in-range",
+    "src": "fn bump(a: &mut [i32], i: usize) {\n    a[i] += 1;\n}\n\nfn main() {\n    let mut v = [1, 2, 3, 4, 5];\n    bump(&mut v[1..4], 2);\n    println!(\"{:?}\", v);\n    bump(&mut v[1..4], 3);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3, 5, 5]\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 3 but the index is 3\n", "exit": 101,
+    "why": "an index is counted from the start of the slice, and past its end it panics", "pr": "unit"
+  },
+  {
+    "id": "slice-index-oob-in-range",
+    "src": "fn zero(a: &mut [i32]) {\n    a[3] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3, 4, 5];\n    zero(&mut v[1..3]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 2 but the index is 3\n", "exit": 101,
+    "why": "an index past the end of a short slice panics with the slice length, not the array length", "pr": "unit"
+  },
+  {
+    "id": "slice-methods",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4];\n    let n: i32 = v[1..3].iter().sum();\n    println!(\"{} {}\", n, v[1..].len());\n    let m = v[1..].iter().map(|x| x * 2).collect::<Vec<i32>>();\n    println!(\"{:?} {}\", m, v[4..].is_empty());\n}\n",
+    "expect": "ok", "out": "5 3\n[4, 6, 8] true\n", "err": "", "exit": 0,
+    "why": "iter, len and is_empty on v[a..b] borrow the slice", "pr": "unit"
+  },
+  {
+    "id": "slice-self",
+    "src": "struct B {\n    cells: Vec<i32>,\n}\n\nimpl B {\n    fn clear_from(&mut self, from: usize) {\n        zero(&mut self.cells[from..]);\n        self.cells[0] = 1;\n    }\n\n    fn tail(&self) -> i32 {\n        sum(&self.cells[1..])\n    }\n}\n\nfn zero(a: &mut [i32]) {\n    for x in a.iter_mut() {\n        *x = 0;\n    }\n}\n\nfn sum(a: &[i32]) -> i32 {\n    a.iter().sum()\n}\n\nfn main() {\n    let mut b = B { cells: vec![1, 2, 3] };\n    b.clear_from(1);\n    println!(\"{:?} {}\", b.cells, b.tail());\n}\n",
+    "expect": "ok", "out": "[1, 0, 0] 0\n", "err": "", "exit": 0,
+    "why": "a slice of a field behind &mut self or &self", "pr": "unit"
+  },
+  {
+    "id": "slice-reborrow-pass",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn f(a: &mut [i32]) -> usize {\n    zero(&mut a[1..]);\n    zero(&mut a[..2]);\n    a[0] = 5;\n    a.len()\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    println!(\"{}\", f(&mut v));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "4\n[5, 0, 3, 4]\n", "err": "", "exit": 0,
+    "why": "a &mut parameter lends slices of itself to calls one after another, then is used again", "pr": "unit"
+  },
+  {
+    "id": "slice-oob-end-run",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    let n = 5;\n    zero(&mut v[..n]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:16:\nrange end index 5 out of range for slice of length 3\n", "exit": 101,
+    "why": "a range end past the end of a Vec panics at run time", "pr": "unit"
+  },
+  {
+    "id": "slice-oob-start-run",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3];\n    let s = 4;\n    zero(&mut v[s..]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:16:\nrange start index 4 out of range for slice of length 3\n", "exit": 101,
+    "why": "a range start past the end of an array panics at run time", "pr": "unit"
+  },
+  {
+    "id": "slice-order-run",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3];\n    let (s, e) = (2, 1);\n    zero(&mut v[s..e]);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:16:\nslice index starts at 2 but ends at 1\n", "exit": 101,
+    "why": "a range that starts after it ends panics at run time", "pr": "unit"
+  },
+  {
+    "id": "slice-oob-end-const",
+    "src": "fn sum(a: &[i32]) -> i32 {\n    a.iter().sum()\n}\n\nfn main() {\n    let v = [1, 2, 3];\n    println!(\"{}\", sum(&v[..4]));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:7:26:\nrange end index 4 out of range for slice of length 3\n", "exit": 101,
+    "why": "a constant range end past an array is not linted: it panics at run time", "pr": "unit"
+  },
+  {
+    "id": "slice-oob-incl",
+    "src": "fn sum(a: &[i32]) -> i32 {\n    a.iter().sum()\n}\n\nfn main() {\n    let v = vec![1, 2, 3];\n    println!(\"{}\", sum(&v[..=2]));\n    println!(\"{}\", sum(&v[..=3]));\n}\n",
+    "expect": "ok", "out": "6\n", "err": "\nthread 'main' panicked at src/main.rs:8:26:\nrange end index 3 out of range for slice of length 3\n", "exit": 101,
+    "why": "an inclusive range end past a Vec panics and names the end as written", "pr": "unit"
+  },
+  {
+    "id": "slice-immut-vec",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let v = vec![1, 2, 3];\n    zero(&mut v[..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "slice-immut-vec-ok",
+    "why": "E0596: &mut v[..] of a Vec that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-immut-vec-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    zero(&mut v[..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[0, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut v[..] of a Vec that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-immut-arr",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let v = [1, 2, 3];\n    zero(&mut v[1..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "slice-immut-arr-ok",
+    "why": "E0596: &mut a[1..] of an array that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-immut-arr-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3];\n    zero(&mut v[1..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 0, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut a[1..] of an array that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-shared-param",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn outer(a: &[i32]) {\n    zero(&mut a[1..]);\n}\n\nfn main() {\n    outer(&[1, 2, 3]);\n}\n",
+    "expect": {"code": "E0596", "line": 6},
+    "pair": "slice-shared-param-ok",
+    "why": "E0596: &mut a[1..] of a &[i32] parameter", "pr": "P5"
+  },
+  {
+    "id": "slice-shared-param-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn outer(a: &mut [i32]) {\n    zero(&mut a[1..]);\n}\n\nfn main() {\n    outer(&mut [1, 2, 3]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut a[1..] of a &[i32] parameter", "pr": "P5"
+  },
+  {
+    "id": "slice-shared-vec-param",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn outer(a: &Vec<i32>) {\n    zero(&mut a[1..]);\n}\n\nfn main() {\n    outer(&vec![1, 2, 3]);\n}\n",
+    "expect": {"code": "E0596", "line": 6},
+    "pair": "slice-shared-vec-param-ok",
+    "why": "E0596: &mut a[1..] of a &Vec parameter", "pr": "P5"
+  },
+  {
+    "id": "slice-shared-vec-param-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn outer(a: &mut Vec<i32>) {\n    zero(&mut a[1..]);\n}\n\nfn main() {\n    outer(&mut vec![1, 2, 3]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut a[1..] of a &Vec parameter", "pr": "P5"
+  },
+  {
+    "id": "slice-self-shared",
+    "src": "struct B {\n    cells: Vec<i32>,\n}\n\nimpl B {\n    fn clear_tail(&self) {\n        zero(&mut self.cells[1..]);\n    }\n}\n\nfn zero(a: &mut [i32]) {\n    for x in a.iter_mut() {\n        *x = 0;\n    }\n}\n\nfn main() {\n    let b = B { cells: vec![1, 2, 3] };\n    b.clear_tail();\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "slice-self-shared-ok",
+    "why": "E0596: &mut self.cells[1..] through &self", "pr": "P5"
+  },
+  {
+    "id": "slice-self-shared-ok",
+    "src": "struct B {\n    cells: Vec<i32>,\n}\n\nimpl B {\n    fn clear_tail(&mut self) {\n        zero(&mut self.cells[1..]);\n    }\n}\n\nfn zero(a: &mut [i32]) {\n    for x in a.iter_mut() {\n        *x = 0;\n    }\n}\n\nfn main() {\n    let mut b = B { cells: vec![1, 2, 3] };\n    b.clear_tail();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut self.cells[1..] through &self", "pr": "P5"
+  },
+  {
+    "id": "slice-wrong-ref",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3];\n    zero(&v[1..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0308", "line": 7},
+    "pair": "slice-wrong-ref-ok",
+    "why": "E0308: &v[1..] passed where a &mut slice is wanted", "pr": "P5"
+  },
+  {
+    "id": "slice-wrong-ref-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = [1, 2, 3];\n    zero(&mut v[1..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 0, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &v[1..] passed where a &mut slice is wanted", "pr": "P5"
+  },
+  {
+    "id": "slice-lent-then-mut",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    let r = &v;\n    zero(&mut v[..]);\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "slice-lent-then-mut-ok",
+    "why": "E0502: &mut v[..] while a shared borrow of the Vec is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-lent-then-mut-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    let r = &v;\n    zero(&mut v[..]);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[0, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut v[..] while a shared borrow of the Vec is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-then-read",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let s = &mut v[1..3];\n    println!(\"{}\", v[0]);\n    s[0] = 1;\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "slice-mut-then-read-ok",
+    "why": "E0502: reading the Vec while a &mut slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-then-read-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let s = &mut v[1..3];\n    println!(\"{}\", s[0]);\n    s[0] = 1;\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: reading the Vec while a &mut slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-two-mut",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &mut v[2..];\n    a[0] = 1;\n    b[0] = 2;\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0499", "line": 5},
+    "pair": "slice-two-mut-ok",
+    "why": "E0499: two &mut slices of one Vec: rustc does not split by range", "pr": "P5"
+  },
+  {
+    "id": "slice-two-mut-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &mut w[2..];\n    a[0] = 1;\n    b[0] = 2;\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 2, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: two &mut slices of one Vec: rustc does not split by range", "pr": "P5"
+  },
+  {
+    "id": "slice-two-mut-arr",
+    "src": "fn main() {\n    let mut v = [1, 2, 3, 4];\n    let mut w = [5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &mut v[2..];\n    a[0] = 1;\n    b[0] = 2;\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0499", "line": 5},
+    "pair": "slice-two-mut-arr-ok",
+    "why": "E0499: two &mut slices of one array: rustc does not split by range", "pr": "P5"
+  },
+  {
+    "id": "slice-two-mut-arr-ok",
+    "src": "fn main() {\n    let mut v = [1, 2, 3, 4];\n    let mut w = [5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &mut w[2..];\n    a[0] = 1;\n    b[0] = 2;\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 2, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: two &mut slices of one array: rustc does not split by range", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-and-shared",
+    "src": "fn main() {\n    let mut v = [1, 2, 3, 4];\n    let w = [5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &v[2..];\n    a[0] = b[0];\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "slice-mut-and-shared-ok",
+    "why": "E0502: a &mut slice and a & slice of one array", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-and-shared-ok",
+    "src": "fn main() {\n    let mut v = [1, 2, 3, 4];\n    let w = [5, 6, 7, 8];\n    let a = &mut v[..2];\n    let b = &w[2..];\n    a[0] = b[0];\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut slice and a & slice of one array", "pr": "P5"
+  },
+  {
+    "id": "slice-call-overlap",
+    "src": "fn cp(d: &mut [i32], s: &[i32]) {\n    d[0] = s[0];\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let w = vec![5, 6, 7, 8];\n    cp(&mut v[..2], &v[2..]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "slice-call-overlap-ok",
+    "why": "E0502: &mut v[..2] and &v[2..] as two arguments of one call", "pr": "P5"
+  },
+  {
+    "id": "slice-call-overlap-ok",
+    "src": "fn cp(d: &mut [i32], s: &[i32]) {\n    d[0] = s[0];\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let w = vec![5, 6, 7, 8];\n    cp(&mut v[..2], &w[2..]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut v[..2] and &v[2..] as two arguments of one call", "pr": "P5"
+  },
+  {
+    "id": "slice-call-twice-mut",
+    "src": "fn cp(d: &mut [i32], s: &mut [i32]) {\n    d[0] = s[0];\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    cp(&mut v[..2], &mut v[2..]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0499", "line": 8},
+    "pair": "slice-call-twice-mut-ok",
+    "why": "E0499: &mut v[..2] and &mut v[2..] as two arguments of one call", "pr": "P5"
+  },
+  {
+    "id": "slice-call-twice-mut-ok",
+    "src": "fn cp(d: &mut [i32], s: &mut [i32]) {\n    d[0] = s[0];\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    cp(&mut v[..2], &mut w[2..]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut v[..2] and &mut v[2..] as two arguments of one call", "pr": "P5"
+  },
+  {
+    "id": "slice-for-conflict",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    for x in &v[1..3] {\n        v.push(*x);\n    }\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "slice-for-conflict-ok",
+    "why": "E0502: pushing to a Vec while a for loop walks a slice of it", "pr": "P5"
+  },
+  {
+    "id": "slice-for-conflict-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    for x in &v[1..3] {\n        w.push(*x);\n    }\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[5, 6, 7, 8, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: pushing to a Vec while a for loop walks a slice of it", "pr": "P5"
+  },
+  {
+    "id": "slice-for-mut-conflict",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    for x in &mut v[1..3] {\n        v[0] = *x;\n    }\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0499", "line": 5},
+    "pair": "slice-for-mut-conflict-ok",
+    "why": "E0499: writing the Vec while a for loop walks a &mut slice of it", "pr": "P5"
+  },
+  {
+    "id": "slice-for-mut-conflict-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    for x in &mut v[1..3] {\n        w[0] = *x;\n    }\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[3, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the Vec while a for loop walks a &mut slice of it", "pr": "P5"
+  },
+  {
+    "id": "slice-arr-write-while-mut",
+    "src": "fn main() {\n    let mut a = [1, 2, 3, 4];\n    let mut b = [5, 6, 7, 8];\n    let s = &mut a[1..];\n    a[0] = 5;\n    s[0] = 1;\n    println!(\"{:?}\", b);\n}\n",
+    "expect": {"code": "E0506", "line": 5},
+    "pair": "slice-arr-write-while-mut-ok",
+    "why": "E0506: writing an array element while a &mut slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-arr-write-while-mut-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3, 4];\n    let mut b = [5, 6, 7, 8];\n    let s = &mut a[1..];\n    b[0] = 5;\n    s[0] = 1;\n    println!(\"{:?}\", b);\n}\n",
+    "expect": "ok", "out": "[5, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an array element while a &mut slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-arr-write-while-shared",
+    "src": "fn main() {\n    let mut a = [1, 2, 3, 4];\n    let mut b = [5, 6, 7, 8];\n    let s = &a[1..];\n    a[0] = 5;\n    println!(\"{:?} {:?}\", s, b);\n}\n",
+    "expect": {"code": "E0506", "line": 5},
+    "pair": "slice-arr-write-while-shared-ok",
+    "why": "E0506: writing an array element while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-arr-write-while-shared-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3, 4];\n    let mut b = [5, 6, 7, 8];\n    let s = &a[1..];\n    b[0] = 5;\n    println!(\"{:?} {:?}\", s, b);\n}\n",
+    "expect": "ok", "out": "[2, 3, 4] [5, 6, 7, 8]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an array element while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-vec-move",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4];\n    let s = &v[1..];\n    let w = v;\n    println!(\"{:?} {:?}\", s, w);\n}\n",
+    "expect": {"code": "E0505", "line": 4},
+    "pair": "slice-vec-move-ok",
+    "why": "E0505: moving a Vec while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-vec-move-ok",
+    "src": "fn main() {\n    let v = vec![1, 2, 3, 4];\n    let s = &v[1..];\n    let w = v.clone();\n    println!(\"{:?} {:?}\", s, w);\n}\n",
+    "expect": "ok", "out": "[2, 3, 4] [1, 2, 3, 4]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: moving a Vec while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-vec-clear",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    let a = &v[..2];\n    v.clear();\n    println!(\"{:?} {:?}\", a, w);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "slice-vec-clear-ok",
+    "why": "E0502: clearing a Vec while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-vec-clear-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut w = vec![5, 6, 7, 8];\n    let a = &v[..2];\n    w.clear();\n    println!(\"{:?} {:?}\", a, w);\n}\n",
+    "expect": "ok", "out": "[1, 2] []\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: clearing a Vec while a slice of it is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-closure-mut-immut",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let v = vec![1, 2, 3, 4];\n    let mut f = || zero(&mut v[1..]);\n    f();\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "slice-closure-mut-immut-ok",
+    "why": "E0596: a closure that lends &mut v[1..] of a Vec that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-closure-mut-immut-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let mut f = || zero(&mut v[1..]);\n    f();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a closure that lends &mut v[1..] of a Vec that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-bound-reads-base",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let w = vec![1, 2, 3, 4];\n    zero(&mut v[..v.len() / 2]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "slice-bound-reads-base-ok",
+    "why": "E0502: a range bound that reads the Vec being lent as &mut", "pr": "P5"
+  },
+  {
+    "id": "slice-bound-reads-base-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3, 4];\n    let w = vec![1, 2, 3, 4];\n    zero(&mut v[..w.len() / 2]);\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3, 4]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a range bound that reads the Vec being lent as &mut", "pr": "P5"
+  },
+  {
+    "id": "slice-row",
+    "src": "fn sum(a: &[i32]) -> i32 {\n    a.iter().sum()\n}\n\nfn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    println!(\"{} {}\", sum(&g[0][1..]), sum(&g[1][..2]));\n    zero(&mut g[1][1..]);\n    let s = &mut g[0][..2];\n    s[1] = 9;\n    for x in &mut g[0][1..] {\n        *x += 1;\n    }\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "5 9\n[[1, 10, 4], [4, 0, 6]]\n", "err": "", "exit": 0,
+    "why": "&g[0][1..], &mut g[1][1..] and for over &mut g[0][1..] slice a row of a Vec of Vecs", "pr": "unit"
+  },
+  {
+    "id": "slice-row-oob-run",
+    "src": "fn sum(a: &[i32]) -> i32 {\n    a.iter().sum()\n}\n\nfn main() {\n    let g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    let n = 4;\n    println!(\"{}\", sum(&g[0][..n]));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:29:\nrange end index 4 out of range for slice of length 3\n", "exit": 101,
+    "why": "a range end past a row of a Vec of Vecs panics at run time", "pr": "unit"
+  },
+  {
+    "id": "slice-row-conflict",
+    "src": "fn main() {\n    let mut g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    let mut h = vec![vec![1]];\n    let s = &g[0][1..];\n    g[1][0] = 5;\n    println!(\"{:?} {:?}\", s, h);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "slice-row-conflict-ok",
+    "why": "E0502: writing another row while a slice of one row is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-row-conflict-ok",
+    "src": "fn main() {\n    let mut g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    let mut h = vec![vec![1]];\n    let s = &g[0][1..];\n    h[0][0] = 5;\n    println!(\"{:?} {:?}\", s, h);\n}\n",
+    "expect": "ok", "out": "[2, 3] [[5]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing another row while a slice of one row is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-row-mut-conflict",
+    "src": "fn main() {\n    let mut g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    let mut h = vec![vec![1]];\n    let s = &mut g[0][1..];\n    g[1][0] = 5;\n    s[0] = 1;\n    println!(\"{:?}\", h);\n}\n",
+    "expect": {"code": "E0499", "line": 5},
+    "pair": "slice-row-mut-conflict-ok",
+    "why": "E0499: writing another row while a &mut slice of one row is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-row-mut-conflict-ok",
+    "src": "fn main() {\n    let mut g = vec![vec![1, 2, 3], vec![4, 5, 6]];\n    let mut h = vec![vec![1]];\n    let s = &mut g[0][1..];\n    h[0][0] = 5;\n    s[0] = 1;\n    println!(\"{:?}\", h);\n}\n",
+    "expect": "ok", "out": "[[5]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing another row while a &mut slice of one row is still used", "pr": "P5"
+  },
+  {
+    "id": "slice-row-immut",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let g = vec![vec![1, 2, 3]];\n    zero(&mut g[0][1..]);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "slice-row-immut-ok",
+    "why": "E0596: &mut g[0][1..] of a Vec of Vecs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "slice-row-immut-ok",
+    "src": "fn zero(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn main() {\n    let mut g = vec![vec![1, 2, 3]];\n    zero(&mut g[0][1..]);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 0, 3]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: &mut g[0][1..] of a Vec of Vecs that is not mut", "pr": "P5"
   }
 ]

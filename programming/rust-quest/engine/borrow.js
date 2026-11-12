@@ -143,7 +143,7 @@ function mutability(F,errors,un){
         roots.set(root,i.line+':'+i.col);
         err(i,L[r.l].name+(r.sfx||''),false,L[r.l].path||r.sfx?L[R[r.l]].name:null);
       }
-      else if(r.k==='method'&&r.recv.k!=='const'&&RQ.std.methods.get(r.name).self==='&mut'){
+      else if(r.k==='method'&&r.recv.k!=='const'&&(RQ.std.methods.get(r.name)||{}).self==='&mut'){
         const t=L[r.recv.l].ty;
         if(t.k==='ref'&&!t.mut)err(i,r.text||'*'+(L[r.recv.l].name||L[r.recv.l].src||'value'),true,null);
       }
