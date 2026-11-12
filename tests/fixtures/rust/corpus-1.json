@@ -12225,5 +12225,202 @@
     "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn num(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let a = id(&(1 < 2));\n    let b = id(&(true == false));\n    let c = id(&('a' < 'b'));\n    let d = id(&!true);\n    let e = num(&(2 * 3 - 1));\n    let f = num(&(6 & 3));\n    let g = num(&-5);\n    println!(\"{} {} {} {} {} {} {}\", a, b, c, d, e, f, g);\n    let mut l = &false;\n    for x in &[1 < 2, 2 > 3] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
     "expect": "ok", "out": "true false true false 5 2 -5\nfalse\n", "err": "", "exit": 0,
     "why": "a borrow of a constant comparison, arithmetic, bit operation or negation on numbers, bools and chars is promoted to a static", "pr": "unit"
+  },
+  {
+    "id": "seq-sort-arr-imm",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "seq-sort-arr-imm-ok",
+    "why": "E0596: sort changes the array in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-arr-imm-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: sort changes the array in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-reverse-arr-imm",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    a.reverse();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "seq-reverse-arr-imm-ok",
+    "why": "E0596: reverse changes the array in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-reverse-arr-imm-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    a.reverse();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[2, 1, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: reverse changes the array in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-unstable-vec-imm",
+    "src": "fn main() {\n    let v = vec![3, 1, 2];\n    v.sort_unstable();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "seq-sort-unstable-vec-imm-ok",
+    "why": "E0596: sort_unstable changes the Vec in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-unstable-vec-imm-ok",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_unstable();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: sort_unstable changes the Vec in place, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-range-imm",
+    "src": "fn main() {\n    let v = [5, 4, 3];\n    v[1..].sort();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "seq-sort-range-imm-ok",
+    "why": "E0596: sorting a range of an array changes the array, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-range-imm-ok",
+    "src": "fn main() {\n    let mut v = [5, 4, 3];\n    v[1..].sort();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[5, 3, 4]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: sorting a range of an array changes the array, so the name has to be `mut`", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-slice-shared",
+    "src": "fn sort_all(x: &[i32]) {\n    x.sort();\n}\n\nfn main() {\n    let mut v = [3, 1, 2];\n    sort_all(&v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 2},
+    "pair": "seq-sort-slice-shared-ok",
+    "why": "E0596: a `&` slice parameter cannot be sorted in place", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-slice-shared-ok",
+    "src": "fn sort_all(x: &mut [i32]) {\n    x.sort();\n}\n\nfn main() {\n    let mut v = [3, 1, 2];\n    sort_all(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a `&` slice parameter cannot be sorted in place", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-arr-f64",
+    "src": "fn main() {\n    let mut a = [3.0, 1.0, 2.0];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "seq-sort-arr-f64-ok",
+    "why": "E0277: a decimal number has no Ord because of NaN, so an array of them cannot be sorted", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-arr-f64-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a decimal number has no Ord because of NaN, so an array of them cannot be sorted", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-slice-f64",
+    "src": "fn sort_all(x: &mut [f64]) {\n    x.sort();\n}\n\nfn main() {\n    let mut v = [2.0, 1.0];\n    sort_all(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 2},
+    "pair": "seq-sort-slice-f64-ok",
+    "why": "E0277: a slice of f64 cannot be sorted, f64 has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-slice-f64-ok",
+    "src": "fn sort_all(x: &mut [i32]) {\n    x.sort();\n}\n\nfn main() {\n    let mut v = [2, 1];\n    sort_all(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a slice of f64 cannot be sorted, f64 has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-unstable-f64",
+    "src": "fn main() {\n    let mut v = vec![2.5, 1.5];\n    v.sort_unstable();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "seq-sort-unstable-f64-ok",
+    "why": "E0277: sort_unstable needs Ord, which f64 does not have", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-unstable-f64-ok",
+    "src": "fn main() {\n    let mut v = vec![2, 1];\n    v.sort_unstable();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: sort_unstable needs Ord, which f64 does not have", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-loan",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let r = &a;\n    a.sort();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "seq-sort-loan-ok",
+    "why": "E0502: sort needs the array mutably while a shared borrow is still used", "pr": "P5"
+  },
+  {
+    "id": "seq-sort-loan-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let r = &a;\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: sort needs the array mutably while a shared borrow is still used", "pr": "P5"
+  },
+  {
+    "id": "seq-first-loan",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let f = a.first();\n    a.sort();\n    println!(\"{:?}\", f);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "seq-first-loan-ok",
+    "why": "E0502: first lends the array, so sorting it while the result is used is a second borrow", "pr": "P5"
+  },
+  {
+    "id": "seq-first-loan-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let f = a.first();\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: first lends the array, so sorting it while the result is used is a second borrow", "pr": "P5"
+  },
+  {
+    "id": "seq-contains-value",
+    "src": "fn main() {\n    let a = [3, 1];\n    println!(\"{}\", a.contains(1));\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "seq-contains-value-ok",
+    "why": "E0308: contains takes a reference to the value", "pr": "P4"
+  },
+  {
+    "id": "seq-contains-value-ok",
+    "src": "fn main() {\n    let a = [3, 1];\n    println!(\"{}\", a.contains(&1));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: contains takes a reference to the value", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-arr",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    a.sort();\n    println!(\"{:?}\", a);\n    a.reverse();\n    println!(\"{:?}\", a);\n    a.sort_unstable();\n    println!(\"{:?} {}\", a, a.len());\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n[3, 2, 1]\n[1, 2, 3] 3\n", "err": "", "exit": 0,
+    "why": "sort, reverse and sort_unstable change an array in place", "pr": "unit"
+  },
+  {
+    "id": "seq-sort-vec-unstable",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_unstable();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "sort_unstable on a Vec", "pr": "unit"
+  },
+  {
+    "id": "seq-slice-param",
+    "src": "fn median(v: &mut [i32]) -> i32 {\n    v.sort();\n    v[v.len() / 2]\n}\n\nfn main() {\n    let mut a = [4, 8, 1];\n    let mut b = vec![9, 7, 8, 1, 2];\n    println!(\"{} {}\", median(&mut a), median(&mut b));\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "4 7\n[1, 4, 8] [1, 2, 7, 8, 9]\n", "err": "", "exit": 0,
+    "why": "a &mut [T] parameter takes an array or a Vec and sorts it", "pr": "unit"
+  },
+  {
+    "id": "seq-range-window",
+    "src": "fn main() {\n    let mut v = vec![5, 4, 3, 2, 1];\n    v[1..].sort();\n    println!(\"{:?}\", v);\n    v[..3].reverse();\n    println!(\"{:?}\", v);\n    let mut a = [5, 4, 3, 2, 1];\n    a[1..4].sort_unstable();\n    println!(\"{:?}\", a);\n    let s = &mut a[..2];\n    s.reverse();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[5, 1, 2, 3, 4]\n[2, 1, 5, 3, 4]\n[5, 2, 3, 4, 1]\n[2, 5, 3, 4, 1]\n", "err": "", "exit": 0,
+    "why": "a range sorts or reverses only its window of the array behind it", "pr": "unit"
+  },
+  {
+    "id": "seq-contains-first-last",
+    "src": "fn main() {\n    let a = [5, 4, 3, 2, 1];\n    println!(\"{} {} {}\", a.contains(&4), a.contains(&9), a[..2].contains(&3));\n    println!(\"{:?} {:?}\", a.first(), a.last());\n    println!(\"{:?} {:?}\", a[1..3].first(), a[1..3].last());\n    let v = vec![5, 4, 3];\n    println!(\"{:?} {:?}\", v[1..1].first(), v[3..].last());\n    let e: [i32; 0] = [];\n    println!(\"{:?}\", e.first());\n}\n",
+    "expect": "ok", "out": "true false false\nSome(5) Some(1)\nSome(4) Some(3)\nNone None\nNone\n", "err": "", "exit": 0,
+    "why": "contains, first and last read an array or a slice, and an empty one has no first or last", "pr": "unit"
+  },
+  {
+    "id": "seq-first-match",
+    "src": "fn head(x: &[i32]) -> i32 {\n    match x.first() {\n        Some(v) => *v,\n        None => -1,\n    }\n}\n\nfn main() {\n    println!(\"{} {}\", head(&[7, 8]), head(&[]));\n}\n",
+    "expect": "ok", "out": "7 -1\n", "err": "", "exit": 0,
+    "why": "first on a slice parameter gives an Option of a reference", "pr": "unit"
+  },
+  {
+    "id": "seq-sort-text-struct",
+    "src": "#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]\nstruct P {\n    x: i32,\n    y: i32,\n}\n\nfn main() {\n    let mut s = [String::from(\"b\"), String::from(\"a\")];\n    s.sort();\n    let mut t = [(2, 'a'), (1, 'b')];\n    t.sort();\n    let mut p = [P { x: 2, y: 1 }, P { x: 1, y: 5 }, P { x: 1, y: 3 }];\n    p.sort();\n    println!(\"{:?} {:?} {:?}\", s, t, p);\n}\n",
+    "expect": "ok", "out": "[\"a\", \"b\"] [(1, 'b'), (2, 'a')] [P { x: 1, y: 3 }, P { x: 1, y: 5 }, P { x: 2, y: 1 }]\n", "err": "", "exit": 0,
+    "why": "strings, tuples and structs that derive Ord sort by that order", "pr": "unit"
+  },
+  {
+    "id": "seq-range-panic",
+    "src": "fn main() {\n    let mut v = [5, 4, 3];\n    let n = 9;\n    v[..n].sort();\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:6:\nrange end index 9 out of range for slice of length 3\n", "exit": 101,
+    "why": "a range past the end of the array panics at the range", "pr": "unit"
+  },
+  {
+    "id": "seq-sort-self-field",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nimpl S {\n    fn go(&mut self) -> i32 {\n        self.a.sort();\n        self.a[2]\n    }\n}\n\nfn main() {\n    let mut s = S { a: [3, 9, 4] };\n    println!(\"{}\", s.go());\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "sort on an array field through &mut self", "pr": "unit"
   }
 ]

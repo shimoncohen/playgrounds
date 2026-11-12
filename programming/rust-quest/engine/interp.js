@@ -1103,6 +1103,7 @@ RQ.interp=(ast,opts)=>{
       const eref=(k,mut)=>({k:'ref',cell:elemCell(c,k,cell),mut,loan:e.id});
       const vref=(en,mut)=>({k:'ref',cell:entryCell(c,en,cell,'value'),mut,loan:e.id});
       const at=n=>Number(unref(n).v);
+      const win=()=>{const w=collOf(rv),off=w.rg?w.rg[0]:0;return {arr:w.coll.v,off,len:w.rg?w.rg[1]-off:w.coll.v.length};};
       const insertEntry=(k,v)=>{
         const old=mapFind(c,k);
         if(!old){c.v.push({key:k,val:v});return null;}
@@ -1150,12 +1151,14 @@ RQ.interp=(ast,opts)=>{
           return UNIT;
         }
         case 'swap':{
-          const a=at(args[0]),b=at(args[1]),w=collOf(rv),off=w.rg?w.rg[0]:0,len=w.rg?w.rg[1]-off:w.coll.v.length;
+          const a=at(args[0]),b=at(args[1]),{arr,off,len}=win();
           for(const k of [a,b])if(k>=len)throw panic('index out of bounds: the len is '+len+' but the index is '+k,at0);
-          const arr=w.coll.v;
           [arr[off+a],arr[off+b]]=[arr[off+b],arr[off+a]];return UNIT;
         }
-        case 'reverse':c.v.reverse();return UNIT;
+        case 'reverse':{
+          const {arr,off,len}=win();
+          arr.splice(off,len,...arr.slice(off,off+len).reverse());return UNIT;
+        }
         case 'sort_by_key':{
           const f=args[0];
           if(f.kind!=='Fn')throw new Unsup('sort_by_key with side effects',e.line);
@@ -1180,8 +1183,14 @@ RQ.interp=(ast,opts)=>{
           dropClosure(f,e.line);
           return UNIT;
         }
-        case 'sort':c.v.sort((x,y)=>cmpv(x,y));return UNIT;
-        case 'contains':return bool(c.v.some(x=>eqv(x,args[0])));
+        case 'sort':case 'sort_unstable':{
+          const {arr,off,len}=win();
+          arr.splice(off,len,...arr.slice(off,off+len).sort(cmpv));return UNIT;
+        }
+        case 'contains':{
+          const {arr,off,len}=win();
+          return bool(arr.slice(off,off+len).some(x=>eqv(x,args[0])));
+        }
         case 'contains_key':return bool(!!mapFind(c,args[0]));
         case 'get':case 'get_mut':{
           const mut=key.endsWith('get_mut');
@@ -1189,8 +1198,10 @@ RQ.interp=(ast,opts)=>{
           const en=mapFind(c,args[0]);
           return en?some(vref(en,mut)):none();
         }
-        case 'first':return c.v.length?some(eref(0,false)):none();
-        case 'last':return c.v.length?some(eref(c.v.length-1,false)):none();
+        case 'first':case 'last':{
+          const {off,len}=win();
+          return len?some({k:'ref',cell:elemCell(collOf(rv).coll,off+(key.endsWith('first')?0:len-1),cell),mut:false,loan:e.id}):none();
+        }
         case 'extend':{
           const a=unref(args[0]);
           if(c.k==='vec')for(const x of a.v)c.v.push(x);
