@@ -82,12 +82,20 @@ RQ.lint=(ast,info)=>{
   };
   const hasBreak=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Break')f=true;if(x.t==='Loop'||x.t==='While'||x.t==='For')return false;});return f;};
   const part=(a,i)=>{const v=a&&a.k==='agg'?(typeof i==='string'?a.by&&a.by[i]:a.els[i])||null:null;return v&&a.d?doubt(v):v;};
+  const leftTy=e=>{const t=e.t==='Assign'&&e.lhs.t==='Path'?(bindOf(e)||{}).ty:(info.get(e.lhs)||{}).ty,r=t&&RQ.types.res(t);return r?r.k==='int'?r.ty:r.k==='ivar'?'i32':null:null;};
   function arith(op,a,b,e){
     if(op==='/'||op==='%'){
       if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'},dbt(a,b));
       else if(a&&b&&a.k==='int'&&b.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]&&b.v===-1n)unsup('integer overflow',e.line);
       else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty,dbt(a,b));
       return null;
+    }
+    if(op==='<<'||op==='>>'){
+      // rustc checks the amount against the width of the left side's type even when the left side is not known
+      const lt=a&&a.k==='int'?a.ty:leftTy(e);
+      if(!b||b.k!=='int'||!lt)return null;
+      if(b.v<0n||b.v>=BigInt(lt.endsWith('size')?64:lt.slice(1))){trap('arithmetic_overflow',e,{},dbt(a,b));return null;}
+      return a&&a.k==='int'?int(op==='<<'?wrap(a.v<<b.v,lt):a.v>>b.v,lt,dbt(a,b)):null;
     }
     if(!a||!b||a.k!=='int'||b.k!=='int')return null;
     const r=op==='+'?a.v+b.v:op==='-'?a.v-b.v:a.v*b.v;
@@ -403,7 +411,7 @@ RQ.lint=(ast,info)=>{
           return a&&b&&a.k==='bool'&&b.k==='bool'?boolv(op==='&&'?a.v&&b.v:a.v||b.v,dbt(a,b)):null;
         }
         const a=ev(e.lhs),b=ev(e.rhs);
-        if(ARITH[op]||op==='/'||op==='%'){
+        if(ARITH[op]||op==='/'||op==='%'||op==='<<'||op==='>>'){
           // a reference operand makes it a call of std's impl, which rustc neither folds nor lints
           const r=isRef(e.lhs)||isRef(e.rhs)?null:arith(op,a,b,e);
           barrier();
@@ -442,12 +450,17 @@ RQ.lint=(ast,info)=>{
           while(x.t==='Field')x=peel(x.expr);
           if(x.t==='Index')ev(x);
           if(e.op==='/='||e.op==='%=')arith(e.op[0],null,r,e);
+          else if(e.op==='<<='||e.op==='>>=')arith(e.op.slice(0,-1),null,r,e);
           const rb=rootBind(e.lhs);
           if(rb)forget([rb]);
           barrier();return null;
         }
         // *r = v: lints in v still fire, but nothing is stored and nothing folded (the Deref's .bind is the reference, not the target)
-        if(e.lhs.t==='Deref'){ev(e.rhs);barrier();return null;}
+        if(e.lhs.t==='Deref'){
+          const r=ev(e.rhs);
+          if(['/=','%=','<<=','>>='].includes(e.op))arith(e.op.slice(0,-1),null,r,e);
+          barrier();return null;
+        }
         const b=bindOf(e);
         let r=ev(e.rhs);
         // the one store of a deferred let reaches every later read, wherever in the control flow it sits
