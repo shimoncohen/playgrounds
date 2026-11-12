@@ -89,8 +89,9 @@ RQ.interp=(ast,opts)=>{
     return r?{arr,off:r[0],len:r[1]-r[0]}:{arr,off:0,len:arr.length};
   };
   function slice(e,x,env){
-    const rg=peel(x.index),px=peel(x.expr),pl=px.t==='Field'&&placeOf(px,env),own=px.t==='Path'?find(env,px.segs[0].name):pl&&fieldCell(pl.cell,pl.path);
-    const bv=ev(px,env),at=n=>Number(unref(ev(n,env)).v);
+    const rg=peel(x.index),px=peel(x.expr),pl=px.t==='Field'&&placeOf(px,env),ic=px.t==='Index'?indexCell(px,env):null;
+    const own=px.t==='Path'?find(env,px.segs[0].name):ic||pl&&fieldCell(pl.cell,pl.path);
+    const bv=ic?ic.val:ev(px,env),at=n=>Number(unref(ev(n,env)).v);
     const lo=rg.from?at(rg.from):0;
     let hi=rg.to?at(rg.to)+(rg.inclusive?1:0):null;
     const text=info.get(e).slice==='str';
@@ -112,7 +113,7 @@ RQ.interp=(ast,opts)=>{
     if(hi>len)throw panic('range end index '+shown+' out of range for slice of length '+len,at0);
     if(lo>hi)throw panic('slice index starts at '+lo+' but ends at '+hi,at0);
     const v=view(bv);
-    return {k:'ref',cell:bv.k==='ref'?bv.cell:own,mut:false,loan:bv.k==='ref'?bv.loan:e.id,range:[v.off+lo,v.off+hi]};
+    return {k:'ref',cell:bv.k==='ref'?bv.cell:own,mut:!!e.mut,loan:bv.k==='ref'?bv.loan:e.id,range:[v.off+lo,v.off+hi]};
   }
   function cellOf(e,env){
     e=peel(e);
@@ -127,17 +128,29 @@ RQ.interp=(ast,opts)=>{
   function indexCell(e,env){
     const b=peel(e.expr);
     let vec,c=null;
+    let rg=null;
     if(b.t==='Index'){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
     else{
-      vec=unref(ev(b,env));
+      // unref copies the window of a range reference, and a write must reach the array behind it
+      let r=ev(b,env);
+      while(r.k==='ref'&&!r.range)r=r.cell.val;
+      if(r.k==='ref'){rg=r.range;vec=r.cell.val;}else vec=r;
       if(b.t==='Path')c=find(env,b.segs[0].name);
       else if(b.t==='Field'){const pl=placeOf(b,env);c=pl&&fieldCell(pl.cell,pl.path);}
       while(c&&c.val&&c.val.k==='ref')c=c.val.cell;
     }
     const i=ev(e.index,env);
-    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
+    const len=rg?rg[1]-rg[0]:vec.v.length;
+    if(i.v>=BigInt(len))throw panic('index out of bounds: the len is '+len+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
     const k=Number(i.v);
-    return elemCell(vec,k,c);
+    return elemCell(vec,rg?rg[0]+k:k,c);
+  }
+  const hasIdx=p=>{for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(p.t==='Index')return true;return false;};
+  function idxPlace(e,env){
+    e=peel(e);
+    if(e.t==='Index')return {cell:indexCell(e,env),path:[]};
+    const b=idxPlace(e.expr,env);
+    return {cell:b.cell,path:[...b.path,e.name]};
   }
   function elemCell(vec,k,pc){
     const root=pc&&(pc.proxy?pc.parent:pc),label=(pc&&pc.proxy?pc.label:'')+'['+k+']';
@@ -402,7 +415,7 @@ RQ.interp=(ast,opts)=>{
     if(cur.k==='ref')return {cell:cur.cell,path:[e.name],loan:cur.loan};
     return {cell:b.cell,path:[...b.path,e.name],loan:b.loan};
   }
-  const rootName=c=>{while(c.proxy)c=c.parent;return c.name;};
+  const rootName=c=>{while(c&&c.proxy)c=c.parent;return c?c.name:null;};
   const pathName=(c,path)=>{const r=rootName(c);return r?[r,...(c.proxy?[c.label]:[]),...path].join('.'):null;};
   function eqv(a,b){
     tick();
@@ -561,7 +574,10 @@ RQ.interp=(ast,opts)=>{
     if(s.t==='Let'){
       const pt=s.pat;
       if(pt.t==='IdentPat'){
-        const cell={val:s.init?mv(s.init,env):null,name:pt.name,ty:tyName(pt),line:pt.line};
+        const val=s.init?mv(s.init,env):null,ext=s.init&&peel(s.init),at=ext&&ext.t==='Ref'?temps.findLastIndex(t=>t.ref===ext):-1;
+        // `let r = &temp;` keeps the temporary until the end of the block, and drops it after `r`
+        if(at>=0){const t=temps.splice(at,1)[0];t.cell.line=t.line;scope.own.push(t.cell);}
+        const cell={val,name:pt.name,ty:tyName(pt),line:pt.line};
         declare(scope,pt.name,cell);
       }else if(s.init){
         const v=ev(s.init,env);
@@ -1134,9 +1150,10 @@ RQ.interp=(ast,opts)=>{
           return UNIT;
         }
         case 'swap':{
-          const a=at(args[0]),b=at(args[1]);
-          for(const k of [a,b])if(k>=c.v.length)throw panic('index out of bounds: the len is '+c.v.length+' but the index is '+k,at0);
-          [c.v[a],c.v[b]]=[c.v[b],c.v[a]];return UNIT;
+          const a=at(args[0]),b=at(args[1]),w=collOf(rv),off=w.rg?w.rg[0]:0,len=w.rg?w.rg[1]-off:w.coll.v.length;
+          for(const k of [a,b])if(k>=len)throw panic('index out of bounds: the len is '+len+' but the index is '+k,at0);
+          const arr=w.coll.v;
+          [arr[off+a],arr[off+b]]=[arr[off+b],arr[off+a]];return UNIT;
         }
         case 'reverse':c.v.reverse();return UNIT;
         case 'sort_by_key':{
@@ -1427,10 +1444,13 @@ RQ.interp=(ast,opts)=>{
           ic.val=r;
           return UNIT;
         }else if(peel(e.lhs).t==='Field'){
-          const pl=placeOf(e.lhs,env);
+          // below an index the right side runs first, as for `a[i] = v`
+          const first=hasIdx(e.lhs);
+          let r=first?(e.op==='='?mv(e.rhs,env):ev(e.rhs,env)):null,pl;
+          try{pl=first?idxPlace(e.lhs,env):placeOf(e.lhs,env);}catch(x){if(first&&x instanceof Panic&&e.op==='=')dropValue(r,null,e.line);throw x;}
           if(!pl)throw new Unsup('assignment target',e.line);
           const old=getAt(read(pl.cell,e.line),pl.path);
-          let r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
+          if(!first)r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
           if(e.op!=='=')r=binop(e.op.slice(0,-1),old,r,e);
           else if(old.k!=='moved')dropValue(old,pathName(pl.cell,pl.path),e.line,true);
           pl.cell.val=setAt(pl.cell.val,pl.path,r);
@@ -1483,9 +1503,9 @@ RQ.interp=(ast,opts)=>{
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
-        const tv=ev(x,env);
-        if(owns(tv))temps.push({v:tv,line:e.line});
-        return {k:'ref',cell:{val:tv},mut:e.mut,loan:e.id};
+        const tv=ev(x,env),cell={val:tv};
+        if(owns(tv))temps.push({cell,line:e.line,ref:e});
+        return {k:'ref',cell,mut:e.mut,loan:e.id};
       }
       case 'Deref':{
         const v=ev(e.expr,env);
@@ -1494,7 +1514,7 @@ RQ.interp=(ast,opts)=>{
       }
       case 'MethodCall':{
         if((info.get(e)||{}).um)return userMethod(e,env);
-        if(!RQ.std.methods.has(e.name))throw new Unsup('method call',e.line);
+        if(!RQ.std.methods.has(e.name)&&e.name!=='is_empty')throw new Unsup('method call',e.line);
         if(e.name==='push_str'){
           const r=peel(e.recv);
           if(r.t==='Index'&&!isVecIdx(r))throw new Unsup('borrow of a field',e.line);
@@ -1502,7 +1522,7 @@ RQ.interp=(ast,opts)=>{
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
         const rv=ev(e.recv,env);
-        if(e.name==='len'&&(rv.k==='array'||rv.k==='ref'&&(rv.cell.val.k==='array'||rv.cell.val.k==='vec')))return int(BigInt(view(rv).len),'usize');
+        if((e.name==='len'||e.name==='is_empty')&&(rv.k==='array'||rv.k==='ref'&&(rv.cell.val.k==='array'||rv.cell.val.k==='vec')))return e.name==='len'?int(BigInt(view(rv).len),'usize'):bool(!view(rv).len);
         const s=unref(rv).v;
         if(rv.k==='String'&&!isPlace(e.recv))temps.push({v:rv,line:e.line});
         if(e.name==='len')return int(BigInt(utf8Len(s)),'usize');
