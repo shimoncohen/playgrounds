@@ -370,8 +370,12 @@ describe('caps', () => {
     progs(9990).forEach((p) => assert.ok(p.length <= 20000, p.length));
     for (let i = 0; i < 6; i++) {
       time(progs(500)[i]); // warm up
-      const small = Math.min(...[1, 2, 3].map(() => time(progs(999)[i])));
-      const big = Math.min(...[1, 2, 3].map(() => time(progs(9990)[i])));
+      // Interleaved so a burst of machine load slows both sizes, not only the big one.
+      let small = Infinity, big = Infinity;
+      for (let k = 0; k < 7; k++) {
+        small = Math.min(small, time(progs(999)[i]));
+        big = Math.min(big, time(progs(9990)[i]));
+      }
       assert.ok(big < 250, `program ${i}: ${big} ms`);
       assert.ok(big < 40 * Math.max(small, 0.5), `program ${i}: ${small} ms for 1k, ${big} ms for 10x`);
     }
