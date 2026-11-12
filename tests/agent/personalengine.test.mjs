@@ -368,9 +368,9 @@ describe('E11: tool functions with an effect', () => {
     assert.equal(d.status, 'failed');
     assert.ok(d.steps.some((s) => s.type === 'skip' && s.by === 'permission rule'));
   });
-  it('pitfall: the same scenario without the leading read ends blocked (policy turns an all-skipped script into blocked)', () => {
+  it('pitfall: the same scenario without the leading read ends failed, since its check ran and failed', () => {
     const o = ask('calendar: list', agenda({ script: [{ verb: 'call', target: 'calendar.create' }] })).outcome;
-    assert.equal(o.status, 'blocked');
+    assert.equal(o.status, 'failed');
   });
   it('control: without toolFns the lazy setup ends done, so toolFns is what decides', () => {
     const o = ask('calendar: list', agenda({ toolFns: undefined })).outcome;

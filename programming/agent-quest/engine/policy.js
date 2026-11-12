@@ -127,7 +127,7 @@ function run(scenario,setup,prompt,opts={}){
       status=r&&r.ok?'done':'failed';
     }
   }else if(hookLast.size)status=[...hookLast.values()].every(Boolean)?'done':'failed';
-  if(script.length&&!ran)status='blocked';
+  if(script.length&&!ran&&status==='unverified')status='blocked';
   return outcome(status);
 }
 

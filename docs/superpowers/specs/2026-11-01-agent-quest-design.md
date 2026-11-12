@@ -247,7 +247,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 - `unattended` (optional): nobody is there to approve. `Plan` stalls and a non-`read` action needs an `allow` line (see "Unattended runs").
 - `connected` (optional): a `call` needs a setup MCP server that provides the tool (see "Tool connection").
 - `scheduled` (optional): a schedule line must start the run (see "Schedules").
-- `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed` only if at least one script action ran; if every script action was skipped, the run is `blocked`, so a scenario that relies on a failing read-back starts its script with a `read`.
+- `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed`, whether or not a script action ran.
 
 ### Policy
 
@@ -264,7 +264,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
    - after an executed edit, the matching after-edit hooks run and push `hook` steps (see "After hooks").
 6. Run the verification if there is one: the typed `Done when`, else the command's, else the default check.
 7. If verification fails, apply the scenario's correction step and re-verify, up to a step cap.
-8. If there is no verification, stop as `unverified`, except that a run with after-edit hooks and no `Done when` is `done` when every hook's last run passed.
+8. If there is no verification, stop as `unverified`, except that a run with after-edit hooks and no `Done when` is `done` when every hook's last run passed. A run that ends `unverified` with a non-empty script in which every action was skipped is `blocked`; a run whose check ran keeps its `done` or `failed`.
 
 ### Outcome
 
