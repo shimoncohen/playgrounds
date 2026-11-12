@@ -202,9 +202,9 @@ Two shorthands of this simulator are not what real tools do. A `*` in an `edit`,
 
 #### Tool connection
 
-- A scenario with `connected: true` skips a `call` with reason `not connected` unless a setup MCP server provides the tool: the target equals the server name or `server.tool`. A permission rule still shows first, and a missing file the call needs is reported before the connection. `Done when: call X` follows the same path and then ends `unverified`.
+- `.claude/mcp.txt` is the only source of MCP tools, in every scenario. A `call` or `send` is skipped with reason `not connected` unless a setup server provides the tool: the target equals the server name or `server.tool`. The same list decides what a typed `Constraints` rule, a typed `Done when: call X` and `Use` may name; a tool that is not listed is an error there. A mission's own fixed prompt may still name an unlisted tool: it resolves, and the run skips it as not connected. `scenario.tools` lists only tools no server provides (none ship). A permission rule still shows first, and a missing file the call needs is reported before the connection. `Done when: call X` follows the same path and then ends `unverified`.
 - Skip reasons show as words in the Run panel and in the narration: `not seen yet` (the agent has not read what it needs yet), `not connected` (the tool is not connected), `no one to ask` (nobody is there to approve it). A skip by a hook or a permission rule reads "a hook does not allow it" or "a permission rule does not allow it".
-- Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match.
+- Not simulated: no server startup, auth, schema or real tool discovery; the list in `mcp.txt` is a match.
 
 ### Prompt model
 
@@ -234,7 +234,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 
 ### Scenario
 
-`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended`, `connected`, `scheduled` and `toolFns`:
+`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended`, `scheduled` and `toolFns`:
 
 - `script`: the ordered actions the policy would take (reads, edits, tool calls, verifications), including the trap action.
 - `hidden`: the scenario's hidden forbidden set, a list of `{verb, target}` pairs, for example an edit under `migrations/` or a call to `mail.send`. It exists independent of what the learner wrote and alone decides which executed actions log a violation.
@@ -245,7 +245,6 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 - `explore` (optional): the files an agent with no `Files` line reads before it acts.
 - `focus` (optional): the part of `explore` that matters. With it, `Use` helpers take the search and the agent reads only `focus` (see "Helpers").
 - `unattended` (optional): nobody is there to approve. `Plan` stalls and a non-`read` action needs an `allow` line (see "Unattended runs").
-- `connected` (optional): a `call` needs a setup MCP server that provides the tool (see "Tool connection").
 - `scheduled` (optional): a schedule line must start the run (see "Schedules").
 - `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed`, whether or not a script action ran.
 
@@ -306,7 +305,7 @@ Every mission carries `answer`, `wrong` and `lazy`. The solvability test require
 - Lazy: `Constraints: be careful and don't break anything`. It does not parse, so the run is refused with an inline error and the mission fails.
 - Lazy 2: `do not edit nonexistent/`. The target does not resolve, so the line is rejected and the run is refused.
 
-**Personal MCP missions (chapter 19).** Three config missions on `connected` scenarios, graded on connect, deny and read-back. Times and titles are not graded, because a tool call logs only `{verb,target}`.
+**Personal MCP missions (chapter 19).** Three config missions whose scenarios ship `.claude/mcp.txt`, graded on connect, deny and read-back. Times and titles are not graded, because a tool call logs only `{verb,target}`.
 
 - 19.1 `notesApp` connects the notes tools the job calls.
 - 19.2 `inboxApp` reads the mail and never sends it, either by leaving `send` unconnected or with `deny call mail.send`.
@@ -348,7 +347,7 @@ Chapter numbers are 1-based; the array index is the number minus 1.
 | R2 subagents, parallel work, worktrees | Ch 10 (helpers, see "Helpers"). Not simulated: parallel speed-up and worktree isolation are text, quick-fire and the 10.3 explanation only; there is no clock and there are no concurrent agents |
 | R2 hooks for lint, format, guards | Ch 11 (see "After hooks"). Not simulated: hooks are config lines mapped to scripted commands; no exit codes or hook output are used beyond pass or fail |
 | R2 custom slash commands, repo skills | Ch 12 (see "Commands"). Not simulated: no command arguments; commands are merged text, not skills the agent decides to load; repo skills are text only |
-| R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match |
+| R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; the `mcp.txt` list is a match |
 | R2 CI and headless | Ch 14 (see "Unattended runs"). Not simulated: no runner, secrets, exit codes or clock (a schedule line is read and played once; see "Schedules"); `unattended` only blocks `Plan` and non-`read` actions without an `allow` line |
 | R2 writing a project `CLAUDE.md` | Ch 15 (see "Default check"). Not simulated: only the root `CLAUDE.md` supplies the check; global memory, `AGENTS.md`, imports and `/init` stay text |
 | R3 writing and research | Ch 17 |

@@ -271,8 +271,7 @@ describe('chapter 21 (index 20): Audit what is loaded messages', () => {
   it('21.3 a server kept whole is told the size, and the lists are long enough that none can stay whole', () => {
     assert.match(msg(20, 2, MC(LINES[0] + '\nmail: read\n')), new RegExp(`held about \\d+ tokens at once\\. The goal is ${AQ.TUNE.mcp} or fewer`));
     assert.ok(LINES[0].split(',').length >= 10 && LINES[1].split(',').length >= 10);
-    const names = AQ.config.parseSetup(AQ.vfs.create(AQ.scenarios.tuneMcp.vfs)).mcp.flatMap((m) => m.tools.map((t) => `${m.name}.${t}`));
-    assert.deepEqual([...names].sort(), [...AQ.scenarios.tuneMcp.tools].sort());
+    assert.equal(AQ.scenarios.tuneMcp.tools.length, 0);
   });
 });
 

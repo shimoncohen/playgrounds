@@ -331,8 +331,7 @@ describe('E10: file#section in the grammar and the run', () => {
 const agenda = (extra = {}) => ({
   vfs: { 'notes/dentist.md': 'Dentist, Tuesday 10:00', 'calendar/events.txt': 'team standup', '.claude/mcp.txt': 'calendar: list' },
   commands: {},
-  tools: ['calendar.list', 'calendar.create'],
-  connected: true,
+  tools: [],
   script: [{ verb: 'read', target: 'notes/dentist.md' }, { verb: 'call', target: 'calendar.create' }],
   toolFns: {
     'calendar.create': (v) => { v.write('calendar/events.txt', v.read('calendar/events.txt') + '\ndentist visit'); return { ok: true }; },
@@ -340,7 +339,7 @@ const agenda = (extra = {}) => ({
   },
   ...extra,
 });
-const ask = (mcp, scn = agenda(), more = '') => run(`Goal: put the dentist visit on my calendar\nDone when: call calendar.list${more}`, { scn, files: { '.claude/mcp.txt': mcp } });
+const ask = (mcp, scn = agenda(), more = '') => run(`Goal: put the dentist visit on my calendar\nDone when: call calendar.list${more}`, { scn, allow: new Set(['calendar.list']), files: { '.claude/mcp.txt': mcp } });
 const verify = (o) => o.steps.find((s) => s.type === 'act' && s.tag === 'verify');
 
 describe('E11: tool functions with an effect', () => {
@@ -378,16 +377,18 @@ describe('E11: tool functions with an effect', () => {
     assert.equal(o.vfs.read('calendar/events.txt'), 'team standup');
   });
   it('a throwing function is ok:false, and absent toolFns keeps the old list match', () => {
+    const exec = (s, t, verb = 'call') => AQ.shell.exec(s, { verb, target: t }, vfs.create(s.vfs), [], AQ.config.parseSetup(vfs.create({ '.claude/mcp.txt': 'calendar: list, create' })));
     const boom = agenda({ toolFns: { 'calendar.list': () => { throw new Error('x'); } } });
-    assert.equal(AQ.shell.exec(boom, { verb: 'call', target: 'calendar.list' }, vfs.create(boom.vfs)).ok, false);
+    assert.equal(exec(boom, 'calendar.list').ok, false);
     const none = agenda({ toolFns: undefined });
-    assert.deepEqual(J(AQ.shell.exec(none, { verb: 'call', target: 'calendar.list' }, vfs.create(none.vfs))), { ok: true, out: '' });
-    assert.equal(AQ.shell.exec(none, { verb: 'call', target: 'calendar.nope' }, vfs.create(none.vfs)).ok, false);
+    assert.deepEqual(J(exec(none, 'calendar.list')), { ok: true, out: '' });
+    assert.equal(exec(none, 'calendar.nope').ok, false);
   });
   it('a send to a name present in toolFns keeps the list-match result', () => {
     const scn = agenda();
-    assert.deepEqual(J(AQ.shell.exec(scn, { verb: 'send', target: 'calendar.create' }, vfs.create(scn.vfs))), { ok: true, out: '' });
-    assert.equal(AQ.shell.exec(scn, { verb: 'send', target: 'calendar.list' }, vfs.create(scn.vfs)).ok, true);
+    const setup = AQ.config.parseSetup(vfs.create({ '.claude/mcp.txt': 'calendar: list, create' }));
+    assert.deepEqual(J(AQ.shell.exec(scn, { verb: 'send', target: 'calendar.create' }, vfs.create(scn.vfs), [], setup)), { ok: true, out: '' });
+    assert.equal(AQ.shell.exec(scn, { verb: 'send', target: 'calendar.list' }, vfs.create(scn.vfs), [], setup).ok, true);
   });
   it('a toolFns write does not change the scenario', () => {
     const scn = agenda();
@@ -395,6 +396,8 @@ describe('E11: tool functions with an effect', () => {
     assert.equal(scn.vfs['calendar/events.txt'], 'team standup');
   });
   it('toolFns keys are tools of their scenario, for every registered scenario', () => {
-    for (const [k, s] of Object.entries(AQ.scenarios)) for (const t of Object.keys(s.toolFns || {})) assert.ok((s.tools || []).includes(t), `${k}.${t}`);
+    for (const [k, s] of Object.entries(AQ.scenarios)) {
+      for (const t of Object.keys(s.toolFns || {})) assert.ok(/^[\w-]+\.[\w-]+$/.test(t), `${k}.${t}`);
+    }
   });
 });

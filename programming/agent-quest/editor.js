@@ -96,7 +96,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
       rulesEl=el('p','rules');fileEl.append(rulesEl);
       const root=p==='CLAUDE.md';
       const upd=()=>{
-        const r=AQ.config.memoryRules({memory:ta.value},sc,root),n=r.ignored.length;
+        const r=AQ.config.memoryRules({...AQ.prepare(mission,getInput()).setup,memory:ta.value},sc,root),n=r.ignored.length;
         /* only the root file can supply a default check, so a folder file shows neither phrase */
         const sep=root?(r.check?', 1 acts as the default check, ':', no default check, '):'. ';
         rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules'+sep+plural(n,'other line')+' only cost'+(n===1?'s':'')+' tokens.';

@@ -1,0 +1,56 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { AQ, scenario, run } from './fixture.mjs';
+
+const scn = { ...scenario, tools: [], hidden: [], script: [{ verb: 'call', target: 'tracker.close' }] };
+const MCP = (text) => ({ '.claude/mcp.txt': text });
+const errs = (o) => o.prompt.errors.map((e) => e.msg).join('\n');
+
+describe('.claude/mcp.txt is the only source of MCP tools', () => {
+  it('a tool removed from the list cannot be called, and a send is skipped like a call', () => {
+    for (const verb of ['call', 'send']) {
+      const o = run('Goal: x', { scn: { ...scn, script: [{ verb, target: 'tracker.close' }] }, files: MCP('tracker: open') }).outcome;
+      assert.ok(o.steps.some((s) => s.type === 'skip' && s.by === 'not connected'), verb);
+      assert.equal(o.calls.length, 0, verb);
+    }
+  });
+  it('a tool removed from the list is refused in a rule, in Done when and in Use', () => {
+    const files = MCP('tracker: open');
+    for (const line of ['Constraints: do not call tracker.close', 'Done when: call tracker.close', 'Use: tracker.close']) assert.notEqual(run(line, { scn, files }).prompt.errors.length, 0, line);
+  });
+  it('a tool added to the list resolves in Constraints, Done when and Use', () => {
+    const files = MCP('tracker: open, close');
+    for (const line of ['Constraints: do not call tracker.close', 'Constraints: do not send tracker', 'Done when: call tracker.close', 'Use: tracker.close']) assert.equal(errs(run(line, { scn, files })), '', line);
+  });
+  it('a standing rule in CLAUDE.md follows the same list', () => {
+    const rule = (mcp) => run('Goal: x', { scn, files: { 'CLAUDE.md': 'do not call tracker.close', ...MCP(mcp) } }).outcome;
+    assert.ok(rule('tracker: close').steps.some((s) => s.type === 'skip' && s.by === 'CLAUDE.md'));
+    assert.ok(!rule('tracker: open').steps.some((s) => s.by === 'CLAUDE.md'));
+  });
+  it('a tool the mission prompt itself names resolves unlisted, and the run skips it as not connected', () => {
+    const o = run('Done when: call tracker.close', { scn, allow: new Set(['tracker.close']) });
+    assert.equal(errs(o), '');
+    assert.ok(o.outcome.steps.some((x) => x.type === 'skip' && x.tag === 'verify' && x.by === 'not connected'));
+  });
+  it('a scenario tool that no server provides still resolves', () => {
+    const own = { ...scn, tools: ['web.search'], script: [{ verb: 'call', target: 'web.search' }] };
+    const o = run('Done when: call web.search', { scn: own });
+    assert.equal(errs(o), '');
+    assert.ok(o.outcome.calls.every((c) => c.target === 'web.search') && o.outcome.calls.length > 0);
+  });
+});
+
+describe('shipped scenarios take their tools from mcp.txt', () => {
+  it('no scenario lists a tool, and every call or send in a script is listed in its own mcp.txt unless the mission teaches leaving it out', () => {
+    for (const [k, s] of Object.entries(AQ.scenarios)) {
+      assert.equal((s.tools || []).length, 0, k);
+      assert.equal(s.connected, undefined, k);
+    }
+    for (const k of ['calendar', 'vendor', 'audit', 'remind', 'quiet', 'clipping']) {
+      const sc = AQ.scenarios[k];
+      if (!sc) continue;
+      const listed = AQ.config.parseSetup(AQ.vfs.create(sc.vfs)).mcp.flatMap((m) => m.tools.map((t) => `${m.name}.${t}`));
+      for (const a of sc.script.filter((x) => x.verb === 'call' || x.verb === 'send')) assert.ok(listed.includes(a.target), `${k}: ${a.target}`);
+    }
+  });
+});

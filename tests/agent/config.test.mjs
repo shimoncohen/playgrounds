@@ -190,9 +190,10 @@ describe('after-edit hooks and allow lines in the setup', () => {
 describe('connected tools', () => {
   const setup = config.parseSetup(vfs.create({ '.claude/mcp.txt': 'tracker: open, comment' }));
   it('hasTool is true for a server name or one of its tools only', () => {
-    for (const t of ['tracker', 'tracker.open', 'tracker.comment']) assert.equal(config.hasTool(setup, t), true, t);
-    for (const t of ['tracker.close', 'track', 'trackers.open', 'open', '']) assert.equal(config.hasTool(setup, t), false, t);
-    assert.equal(config.hasTool(config.parseSetup(vfs.create({})), 'tracker'), false);
+    for (const t of ['tracker', 'tracker.open', 'tracker.comment']) assert.equal(config.hasTool(setup, {}, t), true, t);
+    for (const t of ['tracker.close', 'track', 'trackers.open', 'open', '']) assert.equal(config.hasTool(setup, {}, t), false, t);
+    assert.equal(config.hasTool(config.parseSetup(vfs.create({})), {}, 'tracker'), false)
+    assert.equal(config.hasTool(config.parseSetup(vfs.create({})), { tools: ['web.search'] }, 'web.search'), true);;
   });
 });
 

@@ -5,7 +5,7 @@
 const AQ=globalThis.AQ=globalThis.AQ||{};
 
 /* action: {verb, target, write?}; write is the new text, or a function of the file system and the Examples styles returning it */
-function exec(scenario,action,vfs,styles=[]){
+function exec(scenario,action,vfs,styles=[],setup){
   try{
     const t=action.target;
     if(action.verb==='read'){
@@ -28,7 +28,7 @@ function exec(scenario,action,vfs,styles=[]){
       const r=scenario.toolFns[t](vfs);
       return {ok:!!r.ok,out:String(r.out??'')};
     }
-    return {ok:(scenario.tools||[]).some(x=>x===t||x.startsWith(t+'.')),out:''};
+    return {ok:AQ.config.hasTool(setup,scenario,t),out:''};
   }catch(e){return {ok:false,out:'the action failed'};}
 }
 

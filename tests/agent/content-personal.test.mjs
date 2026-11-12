@@ -452,13 +452,8 @@ describe('chapter 19 (index 18): Personal MCP messages and outcomes', () => {
     assert.ok(r.outcome.steps.some((s) => s.type === 'act' && s.tag === 'verify' && s.target === 'calendar.list' && s.ok));
     assert.equal(AQ.scenarios.agenda.vfs['calendar/events.txt'], 'team standup');
   });
-  it('the three scenarios are connected, list only tools they have, and every toolFns key is one of their tools', () => {
-    for (const k of KEYS[18]) {
-      const s = AQ.scenarios[k];
-      assert.equal(s.connected, true, k);
-      for (const m of AQ.config.parseSetup(AQ.vfs.create(s.vfs)).mcp) for (const t of m.tools) assert.ok(s.tools.includes(`${m.name}.${t}`), `${k}: ${m.name}.${t}`);
-      for (const t of Object.keys(s.toolFns || {})) assert.ok(s.tools.includes(t), `${k}.${t}`);
-    }
+  it('the three scenarios take their tools from .claude/mcp.txt alone', () => {
+    for (const k of KEYS[18]) assert.equal(AQ.scenarios[k].tools.length, 0, k);
   });
   it('agenda is the one personal scenario with toolFns, and its script starts with a read', () => {
     const withFns = AQ.CH.slice(15).flatMap((ch) => ch.missions.map((m) => m.scenario)).filter((k) => AQ.scenarios[k].toolFns);

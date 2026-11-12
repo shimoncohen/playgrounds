@@ -39,9 +39,9 @@ function build(setup,prompt,history=[],readFiles=[],opts={}){
   return {segments:all,dropped,total,peak:demand,limit:WINDOW};
 }
 
-function rules(ctx,scenario){
+function rules(ctx,scenario,setup){
   const out=[];
-  for(const s of ctx.segments)if(s.kind==='history')for(const l of s.text.split('\n')){const r=AQ.config.parseConstraint(l,scenario);if(r.ok)out.push(r.c);}
+  for(const s of ctx.segments)if(s.kind==='history')for(const l of s.text.split('\n')){const r=AQ.config.parseConstraint(l,scenario,setup);if(r.ok)out.push(r.c);}
   return out;
 }
 

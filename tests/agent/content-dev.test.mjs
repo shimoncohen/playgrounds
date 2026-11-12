@@ -493,11 +493,10 @@ describe('12.3 Your line wins', () => {
 });
 
 describe('13.1 Connect the docs server', () => {
-  it('chapter 13 scenarios are all connected, and each list names only tools the scenario has', () => {
+  it('chapter 13 scenarios take their tools from .claude/mcp.txt alone', () => {
     for (const i of [0, 1, 2]) {
       const s = AQ.scenarios[M(12, i).scenario];
-      assert.equal(s.connected, true, M(12, i).scenario);
-      for (const m of AQ.config.parseSetup(AQ.vfs.create(s.vfs)).mcp) for (const t of m.tools) assert.ok(s.tools.includes(`${m.name}.${t}`), `${m.name}.${t}`);
+      assert.equal(s.tools.length, 0, M(12, i).scenario);
     }
   });
   it('an unconnected docs tool is skipped as not connected, and a docs server with another tool does not help', () => {

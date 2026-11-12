@@ -28,7 +28,9 @@ function prepare(m,input){
   for(const p of Object.keys(inp.files))if(editable(p)&&typeof inp.files[p]==='string'&&(!AQ.isFolderMemory(p)||AQ.vfs.own(sc.vfs,p)))vfs.write(p,inp.files[p]);
   const setup=AQ.config.parseSetup(vfs);
   /* config and budget missions send their own prompt: the learner's work is the setup files */
-  const prompt=AQ.config.parsePrompt([m.prompt,m.kind==='prompt'?inp.prompt:''].filter(Boolean).join('\n'),sc,setup);
+  /* a tool the mission's own prompt names resolves even when mcp.txt lacks it: the run then skips it as not connected */
+  const fixed=new Set([...String(m.prompt||'').matchAll(/\b(?:call|send)\s+([\w.-]+)/gi)].map(x=>x[1]));
+  const prompt=AQ.config.parsePrompt([m.prompt,m.kind==='prompt'?inp.prompt:''].filter(Boolean).join('\n'),sc,setup,fixed);
   return {scenario:sc,vfs,setup,prompt};
 }
 

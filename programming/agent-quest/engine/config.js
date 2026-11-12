@@ -18,6 +18,7 @@ const err=error=>({ok:false,error});
 /* null when the target exists in the scenario for this verb, else the reason.
    opts.glob is for rules only: Files, Examples and Done when expand a scope to one file or folder, and a pattern there would read nothing. */
 function resolveTarget(verb,target,scenario,opts={}){
+  const setup=opts.setup;
   const sc=scenario||{};
   if(!target)return 'there is no target';
   if(target.includes('..'))return '".." paths are not allowed';
@@ -32,11 +33,11 @@ function resolveTarget(verb,target,scenario,opts={}){
     return valid(target)&&(own(sc.vfs||{},target)||files.some(f=>f.startsWith(dir(target))))?null:bad;
   }
   if(verb==='run')return own(sc.commands||{},target)?null:'"'+show(target)+'" is not a command this project has';
-  return (sc.tools||[]).some(t=>t===target||t.startsWith(target+'.'))?null:'"'+show(target)+'" is not a tool the agent has';
+  return hasTool(setup,sc,target)||(opts.allow&&opts.allow.has(target))?null:'"'+show(target)+'" is not a tool the agent has';
 }
 
 const RULE_HELP='Use "do not VERB TARGET", "only VERB TARGET", "ask before VERB TARGET" or "max N files"';
-function parseConstraint(line,scenario){
+function parseConstraint(line,scenario,setup,allow){
   const s=String(line??'').trim();
   if(!s)return err('the line is empty');
   if(s.length>MAXLINE)return err('the line is longer than '+MAXLINE+' characters');
@@ -46,16 +47,16 @@ function parseConstraint(line,scenario){
   if(!m)return err('"'+show(s)+'" is not a rule. '+RULE_HELP);
   const kind=m[1].toLowerCase(),verb=m[2].toLowerCase(),target=m[3].trim();
   if(!VERBS.includes(verb))return err('"'+show(m[2])+'" is not a verb. Pick one of '+VERBS.join(', '));
-  const bad=resolveTarget(verb,target,scenario,{glob:true});
+  const bad=resolveTarget(verb,target,scenario,{glob:true,setup,allow});
   return bad?err(bad):{ok:true,c:{kind,verb,target}};
 }
-function parseDoneWhen(line,scenario){
+function parseDoneWhen(line,scenario,setup,allow){
   const s=String(line??'').trim();
   if(!s)return err('the line is empty');
   if(s.length>MAXLINE)return err('the line is longer than '+MAXLINE+' characters');
   const m=/^(run|read|call)\s+(.+)$/i.exec(s);
   if(!m)return err('"'+show(s)+'" is not a check the agent can perform. Use "run COMMAND", "read PATH" or "call TOOL"');
-  const verb=m[1].toLowerCase(),target=m[2].trim(),bad=resolveTarget(verb,target,scenario);
+  const verb=m[1].toLowerCase(),target=m[2].trim(),bad=resolveTarget(verb,target,scenario,{setup,allow});
   return bad?err(bad):{ok:true,d:{verb,target}};
 }
 
@@ -82,7 +83,7 @@ function splitFields(text){
 
 /* A Use name that is a saved command is expanded into the prompt: its lines join the typed ones (lists concatenate, Plan is ORed,
    a typed Goal or Done when wins). A bad line, or a Use line, inside a command is an error, and an error refuses the whole run. */
-function parsePrompt(text,scenario,setup){
+function parsePrompt(text,scenario,setup,allow){
   const {fields,bad}=splitFields(text),errors=bad.map(b=>({line:b.line,msg:b.error}));
   const cmds=[];
   for(const name of new Set(fields.use)){
@@ -95,9 +96,9 @@ function parsePrompt(text,scenario,setup){
   }
   const src=[{tag:'',f:fields},...cmds],all=k=>src.flatMap(s=>s.f[k].map(v=>({tag:s.tag,v})));
   const constraints=[];let doneWhen=null;
-  for(const {tag,v} of all('constraints')){const r=parseConstraint(v,scenario);if(r.ok)constraints.push(r.c);else errors.push({line:tag+'Constraints: '+show(v),msg:r.error});}
+  for(const {tag,v} of all('constraints')){const r=parseConstraint(v,scenario,setup,allow);if(r.ok)constraints.push(r.c);else errors.push({line:tag+'Constraints: '+show(v),msg:r.error});}
   const dw=src.find(s=>s.f.donewhen!==null);
-  if(dw){const r=parseDoneWhen(dw.f.donewhen,scenario);if(r.ok)doneWhen=r.d;else errors.push({line:dw.tag+'Done when: '+show(dw.f.donewhen),msg:r.error});}
+  if(dw){const r=parseDoneWhen(dw.f.donewhen,scenario,setup,allow);if(r.ok)doneWhen=r.d;else errors.push({line:dw.tag+'Done when: '+show(dw.f.donewhen),msg:r.error});}
   const known=names(setup,scenario);
   const keep=(name,list,ok)=>list.filter(({tag,v})=>ok(v)?true:(errors.push({line:tag+name+': '+show(v),msg:'"'+show(v)+'" '+(name==='Use'?'is not in the setup':'is not a file or folder in this project')}),false)).map(x=>x.v);
   const pathOk=p=>!p.includes('..')&&resolveTarget('read',p,scenario)===null;
@@ -199,15 +200,19 @@ function memoryRules(setup,scenario,root=true){
   const rules=[],ignored=[];
   let check=null;
   for(const l of lines(setup.memory)){
-    const r=parseConstraint(l,scenario);
+    const r=parseConstraint(l,scenario,setup);
     if(r.ok){rules.push(r.c);continue;}
-    const m=root&&!check&&/^done when:\s*(.*)$/i.exec(l),d=m&&parseDoneWhen(m[1],scenario);
+    const m=root&&!check&&/^done when:\s*(.*)$/i.exec(l),d=m&&parseDoneWhen(m[1],scenario,setup);
     if(d&&d.ok)check=d.d;else ignored.push(l);
   }
   return {rules,ignored,check};
 }
 
-const hasTool=(setup,target)=>setup.mcp.some(m=>m.name===target||m.tools.some(t=>m.name+'.'+t===target));
+/* .claude/mcp.txt is the only source of MCP tools; scenario.tools holds only tools that no server provides */
+function hasTool(setup,scenario,target){
+  if(((scenario||{}).tools||[]).some(t=>t===target||t.startsWith(target+'.')))return true;
+  return !!setup&&!!setup.mcp&&setup.mcp.some(m=>m.name===target||m.tools.some(t=>m.name+'.'+t===target));
+}
 
 const folderMemory=(setup,readPaths)=>setup.memoryFolders.filter(f=>readPaths.some(p=>p.startsWith(f.dir)));
 
