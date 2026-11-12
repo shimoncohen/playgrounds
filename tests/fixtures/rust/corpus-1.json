@@ -9839,5 +9839,1058 @@
     "src": "fn main() {\n    let c = true;\n    let x = if c { -1 } else { 2 };\n    let y: i8 = x;\n    println!(\"{}\", y);\n}\n",
     "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: an if whose type is fixed after it", "pr": "P4"
+  },
+  {
+    "id": "arr-set-fill",
+    "src": "fn main() {\n    let mut a = [0; 5];\n    for i in 0..5 {\n        a[i] = i * 2;\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[0, 2, 4, 6, 8]\n", "err": "", "exit": 0,
+    "why": "an element of an array is written in place with a[i] = x", "pr": "unit"
+  },
+  {
+    "id": "arr-set-compound",
+    "src": "fn main() {\n    let mut a = [10, 20, 30, 40, 50];\n    a[0] += 1;\n    a[1] -= 1;\n    a[2] *= 2;\n    a[3] /= 3;\n    a[4] %= 7;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[11, 19, 60, 13, 1]\n", "err": "", "exit": 0,
+    "why": "every compound operator works on an array element and leaves the other elements alone", "pr": "unit"
+  },
+  {
+    "id": "arr-set-grid",
+    "src": "fn main() {\n    let mut grid = [[0; 4]; 3];\n    for r in 0..3 {\n        for c in 0..4 {\n            grid[r][c] = r * 4 + c;\n        }\n    }\n    grid[1][2] += 100;\n    println!(\"{:?}\", grid);\n}\n",
+    "expect": "ok", "out": "[[0, 1, 2, 3], [4, 5, 106, 7], [8, 9, 10, 11]]\n", "err": "", "exit": 0,
+    "why": "a[r][c] = x writes into the row, and the other rows are untouched", "pr": "unit"
+  },
+  {
+    "id": "arr-set-copy-apart",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    let mut b = a;\n    b[0] = 100;\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [100, 2, 3]\n", "err": "", "exit": 0,
+    "why": "an array copied to another variable is a copy, so writing one element leaves the original alone", "pr": "unit"
+  },
+  {
+    "id": "arr-set-pass-copy",
+    "src": "fn bump(mut a: [i32; 3]) -> [i32; 3] {\n    a[0] += 10;\n    a\n}\n\nfn main() {\n    let a = [1, 2, 3];\n    let b = bump(a);\n    println!(\"{:?} {:?}\", a, b);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [11, 2, 3]\n", "err": "", "exit": 0,
+    "why": "an array passed by value is a copy the callee may change", "pr": "unit"
+  },
+  {
+    "id": "arr-set-bubble",
+    "src": "fn main() {\n    let mut a = [5, 2, 9, 1, 7];\n    let n = a.len();\n    for i in 0..n {\n        for j in 0..n - 1 - i {\n            if a[j] > a[j + 1] {\n                let tmp = a[j];\n                a[j] = a[j + 1];\n                a[j + 1] = tmp;\n            }\n        }\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 5, 7, 9]\n", "err": "", "exit": 0,
+    "why": "swapping two elements through a temporary: read both, write both", "pr": "unit"
+  },
+  {
+    "id": "arr-set-counts",
+    "src": "fn main() {\n    let digits = [1, 2, 2, 3, 3, 3, 0];\n    let mut counts = [0; 10];\n    for d in digits {\n        counts[d] += 1;\n    }\n    for i in 0..4 {\n        println!(\"{} appears {} times\", i, counts[i]);\n    }\n}\n",
+    "expect": "ok", "out": "0 appears 1 times\n1 appears 1 times\n2 appears 2 times\n3 appears 3 times\n", "err": "", "exit": 0,
+    "why": "counts[d] += 1 tallies into an array indexed by a value", "pr": "unit"
+  },
+  {
+    "id": "arr-set-fib",
+    "src": "fn main() {\n    let mut f = [0u64; 20];\n    f[1] = 1;\n    for i in 2..20 {\n        f[i] = f[i - 1] + f[i - 2];\n    }\n    println!(\"{}\", f[19]);\n}\n",
+    "expect": "ok", "out": "4181\n", "err": "", "exit": 0,
+    "why": "an element is computed from the two before it", "pr": "unit"
+  },
+  {
+    "id": "arr-set-order",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let b = [1, 2, 0];\n    a[b[0]] = a[b[1]] + 10;\n    a[a[0] - 1] += 5;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[6, 13, 3]\n", "err": "", "exit": 0,
+    "why": "the index operand is evaluated after the value, and may itself index the array", "pr": "unit"
+  },
+  {
+    "id": "arr-set-field",
+    "src": "struct Board {\n    cells: [i32; 4],\n}\n\nimpl Board {\n    fn set(&mut self, i: usize, v: i32) {\n        self.cells[i] = v;\n    }\n\n    fn get(&self, i: usize) -> i32 {\n        self.cells[i]\n    }\n}\n\nfn main() {\n    let mut b = Board { cells: [0; 4] };\n    b.set(1, 5);\n    b.cells[2] = 7;\n    b.cells[0] += 1;\n    println!(\"{} {:?}\", b.get(1), b.cells);\n}\n",
+    "expect": "ok", "out": "5 [1, 5, 7, 0]\n", "err": "", "exit": 0,
+    "why": "an array field is written through self or through a struct variable", "pr": "unit"
+  },
+  {
+    "id": "arr-set-param-array",
+    "src": "fn sort(a: &mut [i32; 5]) {\n    for i in 0..5 {\n        for j in 0..4 - i {\n            if a[j] > a[j + 1] {\n                let t = a[j];\n                a[j] = a[j + 1];\n                a[j + 1] = t;\n            }\n        }\n    }\n}\n\nfn main() {\n    let mut a = [5, 2, 9, 1, 7];\n    sort(&mut a);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 5, 7, 9]\n", "err": "", "exit": 0,
+    "why": "a &mut [T; N] parameter writes the caller's array", "pr": "unit"
+  },
+  {
+    "id": "arr-set-param-slice",
+    "src": "fn double(a: &mut [i32]) {\n    for i in 0..a.len() {\n        a[i] *= 2;\n    }\n}\n\nfn first_to_last(a: &mut [i32]) {\n    let n = a.len();\n    a[n - 1] = a[0];\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    let mut v = vec![4, 5];\n    double(&mut a);\n    double(&mut v);\n    first_to_last(&mut a);\n    first_to_last(&mut v);\n    println!(\"{:?} {:?}\", a, v);\n}\n",
+    "expect": "ok", "out": "[2, 4, 2] [8, 8]\n", "err": "", "exit": 0,
+    "why": "a &mut [T] parameter takes an array or a Vec by &mut and writes it", "pr": "unit"
+  },
+  {
+    "id": "arr-set-reborrow",
+    "src": "fn zero_first(a: &mut [i32]) {\n    a[0] = 0;\n}\n\nfn clear(a: &mut [i32]) {\n    zero_first(a);\n    zero_first(a);\n    a[1] = 0;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    clear(&mut a);\n    let r = &mut a;\n    zero_first(r);\n    zero_first(r);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[0, 0, 3]\n", "err": "", "exit": 0,
+    "why": "a &mut [T] parameter passed on is reborrowed, so it stays usable", "pr": "unit"
+  },
+  {
+    "id": "arr-set-nested-param",
+    "src": "fn corner(g: &mut [[i32; 2]; 2]) {\n    g[1][1] = 9;\n    g[0][0] += 1;\n}\n\nfn main() {\n    let mut g = [[0; 2]; 2];\n    corner(&mut g);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 0], [0, 9]]\n", "err": "", "exit": 0,
+    "why": "a nested array parameter is written two levels down", "pr": "unit"
+  },
+  {
+    "id": "arr-set-swap",
+    "src": "struct Row {\n    cells: [i32; 3],\n}\n\nfn flip(a: &mut [i32]) {\n    a.swap(0, 2);\n}\n\nfn main() {\n    let mut a = [3, 1, 2];\n    a.swap(0, 1);\n    a.swap(1, 2);\n    let mut r = Row { cells: [7, 8, 9] };\n    r.cells.swap(0, 1);\n    flip(&mut a);\n    println!(\"{:?} {:?}\", a, r.cells);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1] [8, 7, 9]\n", "err": "", "exit": 0,
+    "why": "swap on an array, a field and a &mut [T] swaps two elements", "pr": "unit"
+  },
+  {
+    "id": "arr-set-string",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\"), String::from(\"b\")];\n    a[0] = String::from(\"z\");\n    let s = String::from(\"q\");\n    a[1] = s;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[\"z\", \"q\"]\n", "err": "", "exit": 0,
+    "why": "overwriting a String element drops the old one, and the other elements stay", "pr": "unit"
+  },
+  {
+    "id": "arr-set-drop",
+    "src": "struct Noisy(i32);\n\nimpl Drop for Noisy {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn main() {\n    let mut a = [Noisy(1), Noisy(2)];\n    a[0] = Noisy(3);\n    println!(\"set\");\n}\n",
+    "expect": "ok", "out": "drop 1\nset\ndrop 3\ndrop 2\n", "err": "", "exit": 0,
+    "why": "overwriting an element drops the old value at once, the rest drop with the array", "pr": "unit"
+  },
+  {
+    "id": "arr-set-closure",
+    "src": "fn main() {\n    let mut a = [0; 3];\n    let mut set = |i: usize| a[i] = 1;\n    set(0);\n    set(2);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 0, 1]\n", "err": "", "exit": 0,
+    "why": "a closure that writes an element captures the array by &mut", "pr": "unit"
+  },
+  {
+    "id": "arr-set-shared-then-write",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &a;\n    println!(\"{:?}\", r);\n    a[0] = 9;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n[9, 2, 3]\n", "err": "", "exit": 0,
+    "why": "a shared borrow that is no longer used does not block a write to the array", "pr": "unit"
+  },
+  {
+    "id": "arr-set-oob-run",
+    "src": "fn set(a: &mut [i32; 3], i: usize) {\n    a[i] = 9;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a, 1);\n    println!(\"{:?}\", a);\n    set(&mut a, 5);\n}\n",
+    "expect": "ok", "out": "[1, 9, 3]\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 3 but the index is 5\n", "exit": 101,
+    "why": "an index that is not known at compile time panics at run time with the length and the index", "pr": "unit"
+  },
+  {
+    "id": "arr-set-oob-slice",
+    "src": "fn set(a: &mut [i32], i: usize) {\n    a[i] = 9;\n}\n\nfn main() {\n    let mut v = vec![1, 2, 3];\n    set(&mut v, 3);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 3 but the index is 3\n", "exit": 101,
+    "why": "a write past the end of a &mut [T] panics at run time", "pr": "unit"
+  },
+  {
+    "id": "arr-set-oob-loop",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let mut i = 0;\n    while i < 4 {\n        a[i] = 0;\n        println!(\"{}\", i);\n        i += 1;\n    }\n}\n",
+    "expect": "ok", "out": "0\n1\n2\n", "err": "\nthread 'main' panicked at src/main.rs:5:9:\nindex out of bounds: the len is 3 but the index is 3\n", "exit": 101,
+    "why": "a loop that runs one step too far panics at the bad index and keeps the earlier writes", "pr": "unit"
+  },
+  {
+    "id": "arr-set-add-overflow-run",
+    "src": "fn main() {\n    let mut a = [250u8; 2];\n    for _ in 0..10 {\n        a[0] += 1;\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:9:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a[i] += 1 past the type's maximum panics at run time: rustc does not fold an array element", "pr": "unit"
+  },
+  {
+    "id": "arr-set-sub-overflow-run",
+    "src": "fn main() {\n    let mut a = [0u32; 3];\n    a[1] -= 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:5:\nattempt to subtract with overflow\n", "exit": 101,
+    "why": "an unsigned element decremented below zero panics at run time", "pr": "unit"
+  },
+  {
+    "id": "arr-set-stored-overflow-run",
+    "src": "fn main() {\n    let mut a = [0u8; 3];\n    a[0] = 200;\n    a[1] = a[0] + 100;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:12:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a value stored in an element is not known to rustc, so a sum that overflows it panics at run time", "pr": "unit"
+  },
+  {
+    "id": "arr-set-div-zero-run",
+    "src": "fn main() {\n    let mut a = [10, 20, 30];\n    let mut z = 1;\n    z -= 1;\n    a[1] /= a[2] - 30 + z;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:5:5:\nattempt to divide by zero\n", "exit": 101,
+    "why": "a divisor that is only known at run time panics at run time", "pr": "unit"
+  },
+  {
+    "id": "arr-lint-oob",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[3] = 4;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "arr-lint-oob-ok",
+    "why": "unconditional_panic: writing an array at a constant index past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[2] = 4;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 4]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an array at a constant index past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-local",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let i = 1 + 4;\n    a[i] = 1;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "arr-lint-oob-local-ok",
+    "why": "unconditional_panic: the index is a local rustc knows", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-local-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let i = 1 + 1;\n    a[i] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the index is a local rustc knows", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-compound",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[3] += 1;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "arr-lint-oob-compound-ok",
+    "why": "unconditional_panic: += on an element past the end", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-compound-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[2] += 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: += on an element past the end", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-row",
+    "src": "fn main() {\n    let mut g = [[1, 2, 3]; 2];\n    g[0][3] = 1;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "arr-lint-oob-row-ok",
+    "why": "unconditional_panic: the inner index of a nested array is past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-row-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2, 3]; 2];\n    g[0][2] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the inner index of a nested array is past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-outer",
+    "src": "fn main() {\n    let mut g = [[1, 2, 3]; 2];\n    let i = 2;\n    g[i][0] = 1;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "arr-lint-oob-outer-ok",
+    "why": "unconditional_panic: the outer index of a nested array is past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-outer-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2, 3]; 2];\n    let i = 1;\n    g[i][0] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the outer index of a nested array is past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-ref",
+    "src": "fn set(a: &mut [i32; 3]) {\n    a[5] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 2},
+    "pair": "arr-lint-oob-ref-ok",
+    "why": "unconditional_panic: the array is written through a &mut parameter, and its length is in the type", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-ref-ok",
+    "src": "fn set(a: &mut [i32; 3]) {\n    a[2] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the array is written through a &mut parameter", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-field",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nfn main() {\n    let mut s = S { a: [0; 3] };\n    s.a[4] = 1;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 7},
+    "pair": "arr-lint-oob-field-ok",
+    "why": "unconditional_panic: an array field written past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-field-ok",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nfn main() {\n    let mut s = S { a: [0; 3] };\n    s.a[2] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an array field written past its length", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-oob-dead",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    if false {\n        a[5] = 1;\n    }\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "a write in a branch rustc proves dead is never linted", "pr": "unit"
+  },
+  {
+    "id": "arr-lint-oob-len",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let n = a.len();\n    a[n] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:5:\nindex out of bounds: the len is 3 but the index is 3\n", "exit": 101,
+    "why": "a.len() is a call, so an index made from it is only checked at run time", "pr": "unit"
+  },
+  {
+    "id": "arr-lint-rhs",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[0] = a[3];\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "arr-lint-rhs-ok",
+    "why": "unconditional_panic: the value read from past the end, on the right of a write", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-rhs-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    a[0] = a[2];\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the value read from past the end, on the right of a write", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-lit-overflow",
+    "src": "fn main() {\n    let mut a = [1u8, 2, 3];\n    a[0] = 255 + 1;\n}\n",
+    "expect": {"lint": "arithmetic_overflow", "line": 3},
+    "pair": "arr-lint-lit-overflow-ok",
+    "why": "arithmetic_overflow: a sum of literals that does not fit the element type", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-lit-overflow-ok",
+    "src": "fn main() {\n    let mut a = [1u8, 2, 3];\n    a[0] = 254 + 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a sum of literals that does not fit the element type", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-div-zero",
+    "src": "fn main() {\n    let mut a = [5, 6];\n    a[0] /= 0;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "arr-lint-div-zero-ok",
+    "why": "unconditional_panic: /= by a literal zero on an element", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-div-zero-ok",
+    "src": "fn main() {\n    let mut a = [5, 6];\n    a[0] /= 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[5, 6]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: /= by a literal zero on an element", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-rem-zero-local",
+    "src": "fn main() {\n    let mut a = [5, 6];\n    let z = 0;\n    a[0] %= z;\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 4},
+    "pair": "arr-lint-rem-zero-local-ok",
+    "why": "unconditional_panic: %= by a local that is known to be zero", "pr": "P4"
+  },
+  {
+    "id": "arr-lint-rem-zero-local-ok",
+    "src": "fn main() {\n    let mut a = [5, 6];\n    let z = 1;\n    a[0] %= z;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: %= by a local that is known to be zero", "pr": "P4"
+  },
+  {
+    "id": "field-lint-div-zero",
+    "src": "struct S {\n    x: i32,\n}\n\nfn main() {\n    let mut s = S { x: 5 };\n    let z = 0;\n    s.x /= z;\n    println!(\"{}\", s.x);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 8},
+    "pair": "field-lint-div-zero-ok",
+    "why": "unconditional_panic: /= by a known zero on a struct field", "pr": "P4"
+  },
+  {
+    "id": "field-lint-div-zero-ok",
+    "src": "struct S {\n    x: i32,\n}\n\nfn main() {\n    let mut s = S { x: 5 };\n    let z = 1;\n    s.x /= z;\n    println!(\"{}\", s.x);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: /= by a known zero on a struct field", "pr": "P4"
+  },
+  {
+    "id": "arr-set-not-mut",
+    "src": "fn main() {\n    let a = [0; 3];\n    a[0] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0594", "line": 3},
+    "pair": "arr-set-not-mut-ok",
+    "why": "E0594: writing an element of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-not-mut-ok",
+    "src": "fn main() {\n    let mut a = [0; 3];\n    a[0] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 0, 0]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-not-mut-row",
+    "src": "fn main() {\n    let g = [[0; 2]; 2];\n    g[0][1] = 1;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": {"code": "E0594", "line": 3},
+    "pair": "arr-set-not-mut-row-ok",
+    "why": "E0594: writing a nested element of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-not-mut-row-ok",
+    "src": "fn main() {\n    let mut g = [[0; 2]; 2];\n    g[0][1] = 1;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[0, 1], [0, 0]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a nested element of an array that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-not-mut-param",
+    "src": "fn f(a: [i32; 3]) -> i32 {\n    a[0] = 1;\n    a[0]\n}\n\nfn main() {\n    println!(\"{}\", f([0; 3]));\n}\n",
+    "expect": {"code": "E0594", "line": 2},
+    "pair": "arr-set-not-mut-param-ok",
+    "why": "E0594: a by-value array parameter that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-not-mut-param-ok",
+    "src": "fn f(mut a: [i32; 3]) -> i32 {\n    a[0] = 1;\n    a[0]\n}\n\nfn main() {\n    println!(\"{}\", f([0; 3]));\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a by-value array parameter that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-ref",
+    "src": "fn set(a: &[i32; 3]) {\n    a[0] = 5;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&a);\n}\n",
+    "expect": {"code": "E0594", "line": 2},
+    "pair": "arr-set-shared-ref-ok",
+    "why": "E0594: writing an element through a & reference", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-ref-ok",
+    "src": "fn set(a: &mut [i32; 3]) {\n    a[0] = 5;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element through a & reference", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-slice",
+    "src": "fn set(a: &[i32]) {\n    a[0] = 5;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&a);\n}\n",
+    "expect": {"code": "E0594", "line": 2},
+    "pair": "arr-set-shared-slice-ok",
+    "why": "E0594: writing an element through a &[T] parameter", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-slice-ok",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 5;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element through a &[T] parameter", "pr": "P5"
+  },
+  {
+    "id": "arr-set-field-not-mut",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nfn main() {\n    let s = S { a: [0; 3] };\n    s.a[0] = 1;\n    println!(\"{:?}\", s.a);\n}\n",
+    "expect": {"code": "E0594", "line": 7},
+    "pair": "arr-set-field-not-mut-ok",
+    "why": "E0594: writing an element of an array field of a struct that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-field-not-mut-ok",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nfn main() {\n    let mut s = S { a: [0; 3] };\n    s.a[0] = 1;\n    println!(\"{:?}\", s.a);\n}\n",
+    "expect": "ok", "out": "[1, 0, 0]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array field of a struct that is not declared mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-self-shared",
+    "src": "struct Board {\n    cells: [i32; 4],\n}\n\nimpl Board {\n    fn set(&self, i: usize, v: i32) {\n        self.cells[i] = v;\n    }\n}\n\nfn main() {\n    let mut b = Board { cells: [0; 4] };\n    b.set(1, 5);\n}\n",
+    "expect": {"code": "E0594", "line": 7},
+    "pair": "arr-set-self-shared-ok",
+    "why": "E0594: writing an element of an array field through &self", "pr": "P5"
+  },
+  {
+    "id": "arr-set-self-shared-ok",
+    "src": "struct Board {\n    cells: [i32; 4],\n}\n\nimpl Board {\n    fn set(&mut self, i: usize, v: i32) {\n        self.cells[i] = v;\n    }\n}\n\nfn main() {\n    let mut b = Board { cells: [0; 4] };\n    b.set(1, 5);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array field through &self", "pr": "P5"
+  },
+  {
+    "id": "vec-set-shared-ref",
+    "src": "fn set(v: &Vec<i32>) {\n    v[0] = 1;\n}\n\nfn main() {\n    let mut v = vec![0; 3];\n    set(&v);\n}\n",
+    "expect": {"code": "E0596", "line": 2},
+    "pair": "vec-set-shared-ref-ok",
+    "why": "E0596: writing an element of a Vec behind a & reference borrows it mutably", "pr": "P5"
+  },
+  {
+    "id": "vec-set-shared-ref-ok",
+    "src": "fn set(v: &mut Vec<i32>) {\n    v[0] = 1;\n}\n\nfn main() {\n    let mut v = vec![0; 3];\n    set(&mut v);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a Vec behind a & reference borrows it mutably", "pr": "P5"
+  },
+  {
+    "id": "vec-set-field-shared-ref",
+    "src": "struct S {\n    v: Vec<i32>,\n}\n\nfn set(s: &S) {\n    s.v[0] = 1;\n}\n\nfn main() {\n    let mut s = S { v: vec![0; 3] };\n    set(&s);\n}\n",
+    "expect": {"code": "E0596", "line": 6},
+    "pair": "vec-set-field-shared-ref-ok",
+    "why": "E0596: writing an element of a Vec field through a & reference", "pr": "P5"
+  },
+  {
+    "id": "vec-set-field-shared-ref-ok",
+    "src": "struct S {\n    v: Vec<i32>,\n}\n\nfn set(s: &mut S) {\n    s.v[0] = 1;\n}\n\nfn main() {\n    let mut s = S { v: vec![0; 3] };\n    set(&mut s);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a Vec field through a & reference", "pr": "P5"
+  },
+  {
+    "id": "arr-set-slice-not-mut",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "arr-set-slice-not-mut-ok",
+    "why": "E0596: lending an array that is not declared mut as a &mut [T]", "pr": "P5"
+  },
+  {
+    "id": "arr-set-slice-not-mut-ok",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: lending an array that is not declared mut as a &mut [T]", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-looped",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        a[0] = *x;\n    }\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-set-while-looped-ok",
+    "why": "E0506: writing the array while the loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-looped-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in a {\n        a[0] = x;\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the array while the loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-iter",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in a.iter() {\n        a[1] = *x;\n    }\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-set-while-iter-ok",
+    "why": "E0506: writing the array while an iter() loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-iter-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in a {\n        a[1] = x;\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the array while an iter() loop still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-mut-loop",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        a[0] = 1;\n        *x += 1;\n    }\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-set-while-mut-loop-ok",
+    "why": "E0506: writing the array while a for over &mut still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-mut-loop-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for x in &mut a {\n        let t = 1;\n        *x += 1;\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the array while a for over &mut still lends it", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-ref",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &a;\n    a[0] = 9;\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-set-while-ref-ok",
+    "why": "E0506: writing the array while a & reference to it is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-ref-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &a;\n    a[0] = 9;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[9, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the array while a & reference to it is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-mut-ref",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &mut a;\n    a[0] = 9;\n    r[1] = 2;\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-set-while-mut-ref-ok",
+    "why": "E0506: writing the array while a &mut reference to it is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-while-mut-ref-ok",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    let r = &mut a;\n    r[1] = 2;\n    a[0] = 9;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing the array while a &mut reference to it is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-twice-lent",
+    "src": "fn copy_first(a: &mut [i32], b: &mut [i32]) {\n    a[0] = b[0];\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    let mut b = a;\n    copy_first(&mut a, &mut a);\n}\n",
+    "expect": {"code": "E0499", "line": 8},
+    "pair": "arr-set-twice-lent-ok",
+    "why": "E0499: the same array lent as two &mut [T] arguments at once", "pr": "P5"
+  },
+  {
+    "id": "arr-set-twice-lent-ok",
+    "src": "fn copy_first(a: &mut [i32], b: &mut [i32]) {\n    a[0] = b[0];\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    let mut b = a;\n    copy_first(&mut a, &mut b);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the same array lent as two &mut [T] arguments at once", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-then-lend",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    let r = &a;\n    set(&mut a);\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "arr-set-shared-then-lend-ok",
+    "why": "E0502: a &mut [T] argument while a shared reference to the array is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-shared-then-lend-ok",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    let r = &a;\n    set(&mut a);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut [T] argument while a shared reference to the array is used later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-lend-in-loop",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    for x in &a {\n        set(&mut a);\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "arr-set-lend-in-loop-ok",
+    "why": "E0502: a &mut [T] argument inside a loop that still lends the array", "pr": "P5"
+  },
+  {
+    "id": "arr-set-lend-in-loop-ok",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    for x in a {\n        set(&mut a);\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut [T] argument inside a loop that still lends the array", "pr": "P5"
+  },
+  {
+    "id": "arr-set-uninit",
+    "src": "fn main() {\n    let mut a: [i32; 3];\n    a[0] = 5;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "pair": "arr-set-uninit-ok",
+    "why": "E0381: writing an element of an array that was never given a value", "pr": "P5"
+  },
+  {
+    "id": "arr-set-uninit-ok",
+    "src": "fn main() {\n    let mut a: [i32; 3] = [0;3];\n    a[0] = 5;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array that was never given a value", "pr": "P5"
+  },
+  {
+    "id": "arr-set-moved",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\"), String::from(\"b\")];\n    let b = a;\n    a[0] = String::new();\n    println!(\"{:?}\", b);\n}\n",
+    "expect": {"code": "E0382", "line": 4},
+    "pair": "arr-set-moved-ok",
+    "why": "E0382: writing an element of an array of Strings after the array moved", "pr": "P5"
+  },
+  {
+    "id": "arr-set-moved-ok",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\"), String::from(\"b\")];\n    let b = &a;\n    a[0] = String::new();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[\"\", \"b\"]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array of Strings after the array moved", "pr": "P5"
+  },
+  {
+    "id": "arr-set-slice-run-ok",
+    "src": "fn set(a: &mut [i32]) {\n    a[0] = 1;\n}\n\nfn main() {\n    let mut a = [1, 2, 3];\n    set(&mut a);\n    set(&mut a);\n    let r = &a;\n    println!(\"{:?}\", r);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "the array is usable again after a &mut [T] argument ends", "pr": "unit"
+  },
+  {
+    "id": "forref-sum-max",
+    "src": "fn main() {\n    let a = [3, 9, 2, 7];\n    let mut sum = 0;\n    let mut best = a[0];\n    for &x in &a {\n        sum += x;\n        if x > best {\n            best = x;\n        }\n    }\n    println!(\"{} {} {:?}\", sum, best, a);\n}\n",
+    "expect": "ok", "out": "21 9 [3, 9, 2, 7]\n", "err": "", "exit": 0,
+    "why": "for &x in &a copies each element out of the reference, and the array is usable after the loop", "pr": "unit"
+  },
+  {
+    "id": "forref-iter-vec",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let mut s = 0;\n    for &x in v.iter() {\n        s += x;\n    }\n    for &x in &v {\n        s += x * 10;\n    }\n    println!(\"{} {:?}\", s, v);\n}\n",
+    "expect": "ok", "out": "66 [1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "for &x in v.iter() and for &x in &v copy each element of a Vec", "pr": "unit"
+  },
+  {
+    "id": "forref-array-iter",
+    "src": "fn main() {\n    let a = [1.5, 2.5];\n    for &x in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1.5\n2.5\n", "err": "", "exit": 0,
+    "why": "for &x in a.iter() on an array", "pr": "unit"
+  },
+  {
+    "id": "forref-pairs",
+    "src": "fn main() {\n    let pairs = [(1, 2), (3, 4)];\n    for &(a, b) in &pairs {\n        println!(\"{} {}\", a, b);\n    }\n    let v = vec![(5, 6)];\n    for &(a, b) in v.iter() {\n        println!(\"{}\", a * b);\n    }\n}\n",
+    "expect": "ok", "out": "1 2\n3 4\n30\n", "err": "", "exit": 0,
+    "why": "for &(a, b) in &pairs destructures the tuple behind the reference", "pr": "unit"
+  },
+  {
+    "id": "forref-nested-tuple",
+    "src": "fn main() {\n    let a = [(1, (2, 3))];\n    for &(x, (y, z)) in &a {\n        println!(\"{}\", x + y + z);\n    }\n}\n",
+    "expect": "ok", "out": "6\n", "err": "", "exit": 0,
+    "why": "an & pattern holds a nested tuple pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-enumerate",
+    "src": "fn main() {\n    let a = [10, 20, 30];\n    let mut at = 0;\n    for (i, &x) in a.iter().enumerate() {\n        if x == 20 {\n            at = i;\n        }\n    }\n    println!(\"{}\", at);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "for (i, &x) in a.iter().enumerate() copies the element and keeps the index", "pr": "unit"
+  },
+  {
+    "id": "forref-zip",
+    "src": "fn main() {\n    let a = [1, 2];\n    let b = [3, 4];\n    for (&x, &y) in a.iter().zip(b.iter()) {\n        println!(\"{}\", x * y);\n    }\n}\n",
+    "expect": "ok", "out": "3\n8\n", "err": "", "exit": 0,
+    "why": "two & patterns in a tuple pattern over zip", "pr": "unit"
+  },
+  {
+    "id": "forref-mut",
+    "src": "fn main() {\n    let mut a = [1, 2, 3];\n    for &mut x in &mut a {\n        println!(\"{}\", x);\n    }\n    a[0] = 9;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n[9, 2, 3]\n", "err": "", "exit": 0,
+    "why": "for &mut x in &mut a copies each element, and the array is usable after the loop", "pr": "unit"
+  },
+  {
+    "id": "forref-params",
+    "src": "fn total(v: &[i32]) -> i32 {\n    let mut t = 0;\n    for &x in v {\n        t += x;\n    }\n    t\n}\n\nfn count(v: &Vec<i32>) -> usize {\n    let mut n = 0;\n    for &x in v {\n        if x > 1 {\n            n += 1;\n        }\n    }\n    n\n}\n\nfn first(a: &[i32; 2]) -> i32 {\n    let mut f = 0;\n    for &x in a.iter() {\n        f = x;\n        break;\n    }\n    f\n}\n\nfn main() {\n    let v = vec![1, 2, 3];\n    let a = [7, 8];\n    println!(\"{} {} {}\", total(&v), count(&v), first(&a));\n}\n",
+    "expect": "ok", "out": "6 2 7\n", "err": "", "exit": 0,
+    "why": "a & pattern over a &[T], a &Vec<T> and a &[T; N] parameter", "pr": "unit"
+  },
+  {
+    "id": "forref-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct P {\n    x: i32,\n    y: i32,\n}\n\nfn main() {\n    let a = [P { x: 1, y: 2 }, P { x: 3, y: 4 }];\n    for &P { x, y } in &a {\n        println!(\"{} {}\", x, y);\n    }\n    println!(\"{}\", a[1].x);\n}\n",
+    "expect": "ok", "out": "1 2\n3 4\n3\n", "err": "", "exit": 0,
+    "why": "an & pattern over a Copy struct binds its fields by copy", "pr": "unit"
+  },
+  {
+    "id": "forref-rows",
+    "src": "fn main() {\n    let m = [[1, 2], [3, 4]];\n    for row in &m {\n        for &c in row {\n            print!(\"{} \", c);\n        }\n        println!();\n    }\n}\n",
+    "expect": "ok", "out": "1 2 \n3 4 \n", "err": "", "exit": 0,
+    "why": "an inner loop over a row reference with a & pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-shadow-flow",
+    "src": "fn main() {\n    let x = 100;\n    let a = [1, 2, 3, 4];\n    for &x in &a {\n        if x == 2 {\n            continue;\n        }\n        if x == 4 {\n            break;\n        }\n        for &x in &a {\n            print!(\"{}\", x);\n        }\n        println!(\" {}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1234 1\n1234 3\n100\n", "err": "", "exit": 0,
+    "why": "the loop variable shadows an outer one, and break and continue work inside", "pr": "unit"
+  },
+  {
+    "id": "forref-overflow-run",
+    "src": "fn main() {\n    let a = [1u8, 255];\n    for &x in &a {\n        println!(\"{}\", x + 1);\n    }\n}\n",
+    "expect": "ok", "out": "2\n", "err": "\nthread 'main' panicked at src/main.rs:4:24:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an element copied out of a reference is not known to rustc, so the overflow panics at run time", "pr": "unit"
+  },
+  {
+    "id": "forref-text",
+    "src": "fn main() {\n    let a = [\"x\", \"y\"];\n    for &s in &a {\n        println!(\"{}\", s);\n    }\n    let b = [true, false];\n    for &f in &b {\n        println!(\"{}\", !f);\n    }\n}\n",
+    "expect": "ok", "out": "x\ny\nfalse\ntrue\n", "err": "", "exit": 0,
+    "why": "a & pattern over &str and bool elements", "pr": "unit"
+  },
+  {
+    "id": "forref-string",
+    "src": "fn main() {\n    let a = [String::from(\"a\")];\n    for &s in &a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-ok",
+    "why": "E0507: a & pattern cannot move a String out of the shared reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-ok",
+    "src": "fn main() {\n    let a = [String::from(\"a\")];\n    for s in &a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern cannot move a String out of the shared reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-vec",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\")];\n    for &s in v.iter() {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-vec-ok",
+    "why": "E0507: a & pattern over v.iter() on a Vec of Strings", "pr": "P5"
+  },
+  {
+    "id": "forref-string-vec-ok",
+    "src": "fn main() {\n    let v = vec![String::from(\"a\")];\n    for s in v.iter() {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern over v.iter() on a Vec of Strings", "pr": "P5"
+  },
+  {
+    "id": "forref-string-tuple",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for &(n, s) in &v {\n        println!(\"{} {}\", n, s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-tuple-ok",
+    "why": "E0507: a tuple pattern behind & that binds a String by value", "pr": "P5"
+  },
+  {
+    "id": "forref-string-tuple-ok",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for (n, s) in &v {\n        println!(\"{} {}\", n, s);\n    }\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a tuple pattern behind & that binds a String by value", "pr": "P5"
+  },
+  {
+    "id": "forref-string-ignored",
+    "src": "fn main() {\n    let v = vec![(1, String::from(\"a\"))];\n    for &(n, _) in &v {\n        println!(\"{}\", n);\n    }\n    println!(\"{}\", v[0].1);\n}\n",
+    "expect": "ok", "out": "1\na\n", "err": "", "exit": 0,
+    "why": "a tuple pattern behind & that ignores the String moves nothing", "pr": "unit"
+  },
+  {
+    "id": "forref-string-mut",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\")];\n    for &mut s in &mut a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-string-mut-ok",
+    "why": "E0507: a &mut pattern cannot move a String out of the mutable reference", "pr": "P5"
+  },
+  {
+    "id": "forref-string-mut-ok",
+    "src": "fn main() {\n    let mut a = [String::from(\"a\")];\n    for s in &mut a {\n        println!(\"{}\", s);\n    }\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut pattern cannot move a String out of the mutable reference", "pr": "P5"
+  },
+  {
+    "id": "forref-struct-move",
+    "src": "struct P {\n    x: i32,\n    s: String,\n}\n\nfn main() {\n    let a = [P { x: 1, s: String::from(\"a\") }];\n    for &P { x, s } in &a {\n        println!(\"{} {}\", x, s);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 8},
+    "pair": "forref-struct-move-ok",
+    "why": "E0507: a struct pattern behind & that binds a String field by value", "pr": "P5"
+  },
+  {
+    "id": "forref-struct-move-ok",
+    "src": "struct P {\n    x: i32,\n    s: String,\n}\n\nfn main() {\n    let a = [P { x: 1, s: String::from(\"a\") }];\n    for P { x, s } in &a {\n        println!(\"{} {}\", x, s);\n    }\n}\n",
+    "expect": "ok", "out": "1 a\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a struct pattern behind & that binds a String field by value", "pr": "P5"
+  },
+  {
+    "id": "forref-option-string",
+    "src": "fn main() {\n    let a = [Some(String::from(\"a\")), None];\n    for &x in &a {\n        println!(\"{:?}\", x);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 3},
+    "pair": "forref-option-string-ok",
+    "why": "E0507: an Option<String> element is not Copy", "pr": "P5"
+  },
+  {
+    "id": "forref-option-string-ok",
+    "src": "fn main() {\n    let a = [Some(String::from(\"a\")), None];\n    for x in &a {\n        println!(\"{:?}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "Some(\"a\")\nNone\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: an Option<String> element is not Copy", "pr": "P5"
+  },
+  {
+    "id": "forref-by-value",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for &x in a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-by-value-ok",
+    "why": "E0308: the items of an array iterated by value are not references", "pr": "P5"
+  },
+  {
+    "id": "forref-by-value-ok",
+    "src": "fn main() {\n    let a = [1, 2, 3];\n    for x in a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the items of an array iterated by value are not references", "pr": "P5"
+  },
+  {
+    "id": "forref-map",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in a.iter().map(|x| x + 1) {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-map-ok",
+    "why": "E0308: map makes owned items, so there is no reference to match", "pr": "P5"
+  },
+  {
+    "id": "forref-map-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for x in a.iter().map(|x| x + 1) {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: map makes owned items, so there is no reference to match", "pr": "P5"
+  },
+  {
+    "id": "forref-mut-on-shared",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &mut x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-mut-on-shared-ok",
+    "why": "E0308: a &mut pattern against the & items of a shared loop", "pr": "P5"
+  },
+  {
+    "id": "forref-mut-on-shared-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a &mut pattern against the & items of a shared loop", "pr": "P5"
+  },
+  {
+    "id": "forref-shared-on-mut",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    for &x in &mut a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-shared-on-mut-ok",
+    "why": "E0308: a & pattern against the &mut items of a mutable loop", "pr": "P5"
+  },
+  {
+    "id": "forref-shared-on-mut-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    for &mut x in &mut a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a & pattern against the &mut items of a mutable loop", "pr": "P5"
+  },
+  {
+    "id": "forref-tuple-on-int",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &(x, y) in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-tuple-on-int-ok",
+    "why": "E0308: a tuple pattern behind & against a number", "pr": "P5"
+  },
+  {
+    "id": "forref-tuple-on-int-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in a.iter() {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a tuple pattern behind & against a number", "pr": "P5"
+  },
+  {
+    "id": "forref-two-refs",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &&x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0308", "line": 3},
+    "pair": "forref-two-refs-ok",
+    "why": "E0308: a second & against an element that is a number", "pr": "P5"
+  },
+  {
+    "id": "forref-two-refs-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a second & against an element that is a number", "pr": "P5"
+  },
+  {
+    "id": "forref-assign",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        x += 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0384", "line": 4},
+    "pair": "forref-assign-ok",
+    "why": "E0384: the name bound behind & is not mut", "pr": "P5"
+  },
+  {
+    "id": "forref-assign-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &(mut x) in &a {\n        x += 1;\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "2\n3\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the name bound behind & is not mut", "pr": "P5"
+  },
+  {
+    "id": "forref-lent-push",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w = vec![];\n    for &x in &v {\n        v.push(x);\n    }\n    w.push(1);\n}\n",
+    "expect": {"code": "E0502", "line": 5},
+    "pair": "forref-lent-push-ok",
+    "why": "E0502: the loop lends the Vec, so the body cannot push to it", "pr": "P5"
+  },
+  {
+    "id": "forref-lent-push-ok",
+    "src": "fn main() {\n    let mut v = vec![1, 2];\n    let mut w = vec![];\n    for &x in &v {\n        w.push(x);\n    }\n    v.push(1);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the loop lends the Vec, so the body cannot push to it", "pr": "P5"
+  },
+  {
+    "id": "forref-refutable",
+    "src": "fn main() {\n    let a = [Some(1), None];\n    for &Some(x) in &a {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0005", "line": 3},
+    "why": "E0005: an & pattern with a refutable inner pattern", "pr": "unit"
+  },
+  {
+    "id": "forref-out-of-scope",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0425", "line": 6},
+    "pair": "forref-out-of-scope-ok",
+    "why": "E0425: the loop name is gone after the loop", "pr": "P5"
+  },
+  {
+    "id": "forref-out-of-scope-ok",
+    "src": "fn main() {\n    let a = [1, 2];\n    for &x in &a {\n        println!(\"{}\", x);\n    }\n    println!(\"{}\", a[0]);\n}\n",
+    "expect": "ok", "out": "1\n2\n1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the loop name is gone after the loop", "pr": "P5"
+  },
+  {
+    "id": "arr-move-closure-copy",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || {\n        a[0] += 10;\n        a[0]\n    };\n    println!(\"{}\", f());\n    a[1] = 7;\n    println!(\"{} {:?}\", f(), a);\n}\n",
+    "expect": "ok", "out": "11\n21 [1, 7]\n", "err": "", "exit": 0,
+    "why": "a move closure copies a Copy array into itself, so the caller's array and the closure's are apart", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-read",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = move || a[0];\n    a[0] = 9;\n    println!(\"{} {:?}\", f(), a);\n}\n",
+    "expect": "ok", "out": "1 [9, 2]\n", "err": "", "exit": 0,
+    "why": "a move closure that only reads still holds its own copy of the array", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-struct",
+    "src": "#[derive(Clone, Copy)]\nstruct S {\n    a: [i32; 2],\n}\n\nfn main() {\n    let mut s = S { a: [1, 2] };\n    let f = move || s.a[0];\n    s.a[0] = 9;\n    println!(\"{} {:?}\", f(), s.a);\n}\n",
+    "expect": "ok", "out": "1 [9, 2]\n", "err": "", "exit": 0,
+    "why": "a move closure copies a Copy struct that holds an array, whole", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-tuple",
+    "src": "fn main() {\n    let mut t = ([1, 2], 3);\n    let f = move || t.0[0];\n    t.0[0] = 9;\n    println!(\"{} {:?}\", f(), t);\n}\n",
+    "expect": "ok", "out": "1 ([9, 2], 3)\n", "err": "", "exit": 0,
+    "why": "a move closure copies a tuple that holds an array, whole", "pr": "unit"
+  },
+  {
+    "id": "arr-move-closure-rows",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    let mut f = move || {\n        a[1][0] = 0;\n        a[1][0]\n    };\n    println!(\"{}\", f());\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "0\n[[1, 2], [3, 4]]\n", "err": "", "exit": 0,
+    "why": "a move closure writes its own copy of a nested array", "pr": "unit"
+  },
+  {
+    "id": "arr-closure-ref-write",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = || a[0];\n    a[0] = 9;\n    println!(\"{}\", f());\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-closure-ref-write-ok",
+    "why": "E0506: a closure that reads the array borrows it, so writing the array while the closure is used later is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-ref-write-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let f = move || a[0];\n    a[0] = 9;\n    println!(\"{}\", f());\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a closure that reads the array borrows it, so writing the array while the closure is used later is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-write",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = || a[0] += 1;\n    a[1] = 7;\n    f();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0506", "line": 4},
+    "pair": "arr-closure-mut-write-ok",
+    "why": "E0506: a closure that writes the array borrows it mutably, so writing the array before the closure is called is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-write-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || a[0] += 1;\n    a[1] = 7;\n    f();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[1, 7]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a closure that writes the array borrows it mutably, so writing the array before the closure is called is an error", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-read",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = || a[0] += 1;\n    println!(\"{:?}\", a);\n    f();\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "arr-closure-mut-read-ok",
+    "why": "E0502: printing the array while a closure that writes it is called later", "pr": "P5"
+  },
+  {
+    "id": "arr-closure-mut-read-ok",
+    "src": "fn main() {\n    let mut a = [1, 2];\n    let mut f = move || a[0] += 1;\n    println!(\"{:?}\", a);\n    f();\n}\n",
+    "expect": "ok", "out": "[1, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: printing the array while a closure that writes it is called later", "pr": "P5"
+  },
+  {
+    "id": "arr-set-uninit-not-mut",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a[0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone: writing an element of a binding that was never set and is not mut", "pr": "unit"
+  },
+  {
+    "id": "arr-set-uninit-not-mut-row",
+    "src": "fn main() {\n    let a: [[i32; 2]; 2];\n    a[0][0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a nested element of a binding that was never set", "pr": "unit"
+  },
+  {
+    "id": "arr-set-uninit-compound",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a[0] += 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a compound write on a binding that was never set", "pr": "unit"
+  },
+  {
+    "id": "vec-set-uninit-not-mut",
+    "src": "fn main() {\n    let v: Vec<i32>;\n    v[0] = 1;\n}\n",
+    "expect": {"code": "E0381", "line": 3},
+    "why": "E0381 alone for a Vec element written before the Vec was set", "pr": "unit"
+  },
+  {
+    "id": "arr-set-assigned-not-mut",
+    "src": "fn main() {\n    let a: [i32; 3];\n    a = [0; 3];\n    a[0] = 1;\n}\n",
+    "expect": {"code": "E0594", "line": 4},
+    "pair": "arr-set-assigned-not-mut-ok",
+    "why": "E0594: the array was set once, but it is still not mut", "pr": "P5"
+  },
+  {
+    "id": "arr-set-assigned-not-mut-ok",
+    "src": "fn main() {\n    let mut a: [i32; 3];\n    a = [0; 3];\n    a[0] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: the array was set once, but it is still not mut", "pr": "P5"
+  },
+  {
+    "id": "temp-arg-vec",
+    "src": "fn largest(list: &[i32]) -> i32 {\n    let mut largest = list[0];\n    for &item in list {\n        if item > largest {\n            largest = item;\n        }\n    }\n    largest\n}\n\nfn main() {\n    let number_list = vec![34, 50, 25, 100, 65];\n    let result = largest(&number_list);\n    println!(\"The largest number is {result}\");\n    println!(\"{}\", largest(&vec![1, 5, 2]));\n    println!(\"{}\", largest(&[7, 9]));\n}\n",
+    "expect": "ok", "out": "The largest number is 100\n5\n9\n", "err": "", "exit": 0,
+    "why": "a Vec built in the argument is lent to the call and dropped at the end of the statement", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-drop",
+    "src": "struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn f(a: &N) -> i32 {\n    a.0\n}\n\nfn main() {\n    let x = f(&N(1));\n    println!(\"after {}\", x);\n    let y = f(&N(2)) + f(&N(3));\n    println!(\"after {}\", y);\n}\n",
+    "expect": "ok", "out": "drop 1\nafter 1\ndrop 3\ndrop 2\nafter 5\n", "err": "", "exit": 0,
+    "why": "a temporary lent to a call drops at the end of its statement, the later ones first", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-string",
+    "src": "fn len(s: &String) -> usize {\n    s.len()\n}\n\nfn main() {\n    let n = len(&String::from(\"ab\")) + len(&\"xyz\".to_string());\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a String built in the argument is lent as a &String", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-mut",
+    "src": "fn push(v: &mut Vec<i32>) {\n    v.push(1);\n}\n\nfn main() {\n    push(&mut vec![]);\n    println!(\"ok\");\n}\n",
+    "expect": "ok", "out": "ok\n", "err": "", "exit": 0,
+    "why": "a &mut of a temporary is lent to the call", "pr": "unit"
+  },
+  {
+    "id": "temp-arg-oob",
+    "src": "fn get(a: &[i32; 3]) -> i32 {\n    a[5]\n}\n\nfn main() {\n    println!(\"{}\", get(&[1, 2, 3]));\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 2},
+    "why": "an index past the end of a lent temporary array is a panic in the callee", "pr": "unit"
+  },
+  {
+    "id": "temp-for-array",
+    "src": "fn main() {\n    for &x in &[1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "for &x in &[..] loops over a temporary array and copies each element out", "pr": "unit"
+  },
+  {
+    "id": "temp-for-vec",
+    "src": "fn main() {\n    for &x in &vec![1, 2, 3] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n3\n", "err": "", "exit": 0,
+    "why": "for &x in &vec![..] loops over a temporary Vec", "pr": "unit"
+  },
+  {
+    "id": "temp-for-pairs",
+    "src": "fn main() {\n    for &(a, b) in &[(1, 2), (3, 4)] {\n        println!(\"{}\", a + b);\n    }\n}\n",
+    "expect": "ok", "out": "3\n7\n", "err": "", "exit": 0,
+    "why": "for &(a, b) in &[..] destructures each tuple of a temporary array", "pr": "unit"
+  },
+  {
+    "id": "temp-for-nested",
+    "src": "fn main() {\n    for &x in &[1, 2] {\n        for &y in &[10, 20] {\n            println!(\"{}\", x + y);\n        }\n    }\n}\n",
+    "expect": "ok", "out": "11\n21\n12\n22\n", "err": "", "exit": 0,
+    "why": "an inner loop over a temporary array inside an outer one", "pr": "unit"
+  },
+  {
+    "id": "temp-for-drop",
+    "src": "struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nfn main() {\n    for &N(x) in &[N(1), N(2)] {\n        println!(\"{}\", x);\n    }\n    for &N(x) in &vec![N(7), N(8)] {\n        println!(\"{}\", x);\n        break;\n    }\n    println!(\"end\");\n}\n",
+    "expect": "ok", "out": "1\n2\ndrop 1\ndrop 2\n7\ndrop 7\ndrop 8\nend\n", "err": "", "exit": 0,
+    "why": "the temporary of a for loop drops when the loop ends, even after a break", "pr": "unit"
+  },
+  {
+    "id": "temp-for-string",
+    "src": "fn main() {\n    for &x in &[String::from(\"a\")] {\n        println!(\"{}\", x);\n    }\n}\n",
+    "expect": {"code": "E0507", "line": 2},
+    "why": "E0507: a & pattern cannot move a String out of a temporary array", "pr": "unit"
   }
 ]

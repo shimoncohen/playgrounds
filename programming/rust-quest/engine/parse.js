@@ -385,9 +385,30 @@ RQ.parse=tokens=>{
       if(!(pt.t==='Wild'||pt.t==='IdentPat'&&!pt.sub&&!pt.byRef)){
         pn=mk('IdentPat',pt,{name:'#for',mut:false,byRef:false,sub:null});
         const sc=mk('Path',pt,{segs:[{name:'#for',args:null,fn:null,line:pt.line}],global:false});
-        body=mk('Block',body,{stmts:[],tail:mk('Match',pt,{scrut:sc,arms:[mk('Arm',pt,{pat:pt,guard:null,body})],kind:'let',annot:null}),unsafe:false,label:null});
+        const blockOf=e=>mk('Block',e,{stmts:[],tail:e,unsafe:false,label:null});
+        const letOn=(pat,scrut,inner)=>mk('Match',pat,{scrut,arms:[mk('Arm',pat,{pat,guard:null,body:inner})],kind:'let',annot:null});
+        // an `&` is a name in the outer pattern and a let on its deref inside, so E0507 and the loan rules come from that let
+        const derefOf=r=>mk('Deref',r,{expr:mk('Path',r,{segs:[{name:r.nm,args:null,fn:null,line:r.line}],global:false}),pat:{mut:r.mut}});
+        let nref=0;
+        const lower=(pat,scrut,inner)=>{
+          const found=[];
+          const strip=q=>{
+            if(q.t==='RefPat'){const nm='#r'+nref++;found.push({q,nm});return mk('IdentPat',q,{name:nm,mut:false,byRef:false,sub:null});}
+            return q.t==='TuplePat'?{...q,pats:q.pats.map(strip)}:q;
+          };
+          const outer=strip(pat);
+          for(let i=found.length-1;i>=0;i--){
+            const {q,nm}=found[i];
+            inner=blockOf(lower(q.pat,derefOf({...q,nm}),inner));
+          }
+          return letOn(outer,scrut,inner);
+        };
+        const hasRef=q=>{let f=false;RQ.walk(q,x=>{if(x.t==='RefPat')f=true;});return f;};
+        const refs=q=>q.t==='RefPat'||q.t==='TuplePat'&&q.pats.some(refs);
+        const only=q=>q.t==='RefPat'?only(q.pat):q.t==='TuplePat'?q.pats.every(only):!hasRef(q);
+        body=blockOf(refs(pt)&&only(pt)?(pt.t==='RefPat'?lower(pt.pat,derefOf({...pt,nm:'#for'}),body):lower(pt,sc,body)):letOn(pt,sc,body));
       }
-      return mk('For',x,{pat:pn,iter:it,body,label:null});
+      return mk('For',x,{pat:pn,iter:it,body,label:null,copyOut:pt.t==='RefPat'});
     }
     if(isK('unsafe')){p++;feat('unsafe',x.line);const b=block();b.unsafe=true;return b;}
     return block();

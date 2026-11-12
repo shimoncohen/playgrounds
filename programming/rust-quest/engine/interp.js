@@ -127,7 +127,7 @@ RQ.interp=(ast,opts)=>{
   function indexCell(e,env){
     const b=peel(e.expr);
     let vec,c=null;
-    if(b.t==='Index'&&isVecIdx(b)){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
+    if(b.t==='Index'){const ic=indexCell(b,env);vec=unref(ic.val);c=ic;}
     else{
       vec=unref(ev(b,env));
       if(b.t==='Path')c=find(env,b.segs[0].name);
@@ -135,7 +135,7 @@ RQ.interp=(ast,opts)=>{
       while(c&&c.val&&c.val.k==='ref')c=c.val.cell;
     }
     const i=ev(e.index,env);
-    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,{line:e.bline,col:e.bcol});
+    if(i.v>=BigInt(vec.v.length))throw panic('index out of bounds: the len is '+vec.v.length+' but the index is '+i.v,isVecIdx(e)?{line:e.bline,col:e.bcol}:e);
     const k=Number(i.v);
     return elemCell(vec,k,c);
   }
@@ -608,7 +608,11 @@ RQ.interp=(ast,opts)=>{
       if(rv.k==='ref'){pc=rv.cell;loan=rv.loan;}
     }else if(src.t==='Index'&&isVecIdx(src)){pc=indexCell(src,env);coll=pc.val;}
     else if(src.t==='Field'){const pl=placeOf(src,env);pc=pl&&fieldCell(pl.cell,pl.path);coll=unref(pc?read(pc,e.line):ev(src,env));}
-    else{pc=src.t==='Path'&&find(env,src.segs[0].name);coll=unref(pc?read(pc,e.line):ev(src,env));}
+    else{
+      pc=src.t==='Path'&&find(env,src.segs[0].name);
+      if(pc)coll=unref(read(pc,e.line));
+      else{const tv=ev(src,env);coll=unref(tv);if(src.t!=='Path'&&owns(tv))temps.push({v:tv,line:e.line});}
+    }
     while(pc&&pc.val&&pc.val.k==='ref')pc=pc.val.cell;
     const mut=fi.mode==='mut';
     const list=map?RQ.std.hashOrder(coll):coll.v.slice();
@@ -812,7 +816,7 @@ RQ.interp=(ast,opts)=>{
       const v=read(outer,e.line);
       if(hasDrop(v))throw new Unsup('closure that owns a value with Drop',e.line);
       if(c.mode==='move'){outer.moved=true;note({t:'move',name:c.name,line:e.line});}
-      const cell={val:v,name:c.name,ty:outer.ty,line:outer.line};
+      const cell={val:c.mode==='copy'?copyVal(v):v,name:c.name,ty:outer.ty,line:outer.line};
       scope.set(c.name,cell);owned.push(cell);
     }
     return {k:'closure',node:e,scope,owned,kind:cl.kind};
@@ -1479,7 +1483,9 @@ RQ.interp=(ast,opts)=>{
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
-        return {k:'ref',cell:{val:ev(x,env)},mut:e.mut,loan:e.id};
+        const tv=ev(x,env);
+        if(owns(tv))temps.push({v:tv,line:e.line});
+        return {k:'ref',cell:{val:tv},mut:e.mut,loan:e.id};
       }
       case 'Deref':{
         const v=ev(e.expr,env);
