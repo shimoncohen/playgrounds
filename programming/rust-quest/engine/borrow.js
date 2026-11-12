@@ -304,8 +304,8 @@ function loanPass(F,errors,un,loans,stats){
       if(i.op==='dead'){
         const hit=lm&(onS[i.l]|onM[i.l]);
         if(hit)lo.forEach((x,k)=>{
-          const key='E0597@'+x.i.line+':'+x.i.col;
-          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0597',x.i.line,x.i.col,{name:L[i.l].name}));}
+          const code=L[i.l].tmp?'E0716':'E0597',key=code+'@'+x.i.line+':'+x.i.col;
+          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make(code,x.i.line,x.i.col,{name:L[i.l].name}));}
         });
       }
       if(i.op==='assign'){

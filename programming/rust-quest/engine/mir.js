@@ -55,7 +55,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   let cur,count=0,retL;
   const tyOf=e=>{const o=info.get(e);return res(o&&o.ty||T.any);};
   const carries=t=>RQ.types.hasRef(t)||t.k==='str';
-  const tempOk=new Set(),rebArg=new Map();
+  const rebArg=new Map(),extRef=new Set(),argRef=new Map(),asgRef=new Set(),stmtTemps=[];
   const isUnit=t=>t.k==='unit'||t.k==='never';
   const isBool=e=>{e=peel(e);return e.t==='Lit'&&e.kind==='bool';};
   const local=(name,ty,o)=>{
@@ -152,6 +152,45 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     if(t.k!=='const')L[t.l].src=L[x.l].name;
     return t;
   });
+  // a temporary dies at the end of its statement, so a loan that outlives it is E0716
+  const ownTemp=l=>{
+    const t=L[l];
+    if(t.name===null&&!t.tmp&&t.ty.k!=='ref'&&t.ty.k!=='str'){t.tmp=true;stmtTemps.push(l);}
+  };
+  // the receiver of a method that gives back a borrow of it: a constant is promoted and lives forever
+  const ownRecv=(e,l)=>{
+    const pr=promo(e.recv);
+    if(pr==='yes')return;
+    if(pr==='maybe'&&carries(tyOf(e))){un('temporary borrow',e);return;}
+    ownTemp(l);
+  };
+  // rustc promotes the borrow of a constant to a static, which never dies: yes, no, or maybe when it depends on rules not modeled
+  function promo(x){
+    x=peel(x);
+    switch(x.t){
+      case 'Lit':return 'yes';
+      case 'Unary':return x.op==='-'||x.op==='!'?promo(x.expr):'maybe';
+      case 'Tuple':case 'Array':return worst(x.elems.map(promo));
+      case 'ArrayRepeat':return peel(x.len).t==='Lit'?promo(x.elem):'maybe';
+      case 'Binary':return ['+','-','*','&','|','^','==','!=','<','>','<=','>=','&&','||'].includes(x.op)?worst([promo(x.lhs),promo(x.rhs)]):'maybe';
+      case 'StructLit':{
+        if(x.base)return 'maybe';
+        return dropTys.has(x.path.segs[x.path.segs.length-1].name)?'no':worst(x.fields.map(f=>promo(f.expr)));
+      }
+      case 'Call':{
+        const ct=(info.get(x)||{}).ctor;
+        if(!ct)return 'no';
+        return dropTys.has(ct.adt)?'no':worst(x.args.map(promo));
+      }
+      case 'Path':{
+        const ct=(info.get(x)||{}).ctor;
+        return ct?(dropTys.has(ct.adt)?'no':'yes'):lid(x)>=0?'no':'maybe';
+      }
+      case 'Macro':case 'MethodCall':return 'no';
+      default:return 'maybe';
+    }
+  }
+  const worst=rs=>rs.includes('no')?'no':rs.includes('maybe')?'maybe':'yes';
   // the same `&mut` local twice among the operands of one call (E0499 in rustc) has no loan here: not modelled
   const rebTwice=(es,nd)=>{
     for(const a of es){
@@ -393,6 +432,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           const t=put({k:'use',x},e.recv,undefined,tyOf(e.recv));
           target=t.k==='const'?-1:t.l;
         }
+        if(target>=0)ownRecv(e,target);
       }else if(c.k==='idx'&&hasVecIdx(e.recv)){
         const r=vecRoot(e.recv);
         ro=vecRef(r.c,mut,e,true,r);
@@ -464,8 +504,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           RQ.walk(e.args,a=>{if(a.t==='Path'&&info.get(a)&&info.get(a).bind===b)again=true;});
           if(again)un('two-phase borrow',e);
         }
-      }else if(e.name==='as_str'){un('temporary borrow',e);return fin(NIL,e,dest);}
-      else{const x=ex(e.recv);if(x.k!=='const')target=x.l;}
+      }else{
+        const x=ex(e.recv);
+        if(x.k!=='const'){target=x.l;ownRecv(e,target);}
+      }
       if(ro===undefined){
         if(target<0){un('temporary borrow',e);return fin(NIL,e,dest);}
         ro=put({k:'ref',l:target,mut,implicit:true},e,undefined,T.ref(mut,L[target].ty,0));
@@ -478,7 +520,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   }
 
   // a slice of a `&mut` parameter lent straight to a call is a reborrow that ends with the call, if the result keeps no reference
-  const lendArgs=e=>{if(!carries(tyOf(e)))for(const a of e.args)if(peel(a).t==='Ref')rebArg.set(peel(a),e);};
+  const lendArgs=e=>{for(const a of e.args)if(peel(a).t==='Ref'){argRef.set(peel(a),e);if(!carries(tyOf(e)))rebArg.set(peel(a),e);}};
   // a base that is already a reference passes its loans on instead of making one
   function slice(e,x,dest){
     const rg=peel(x.index),b=peel(x.expr),c=classify(b),bounds=[rg.from,rg.to].filter(Boolean),mut=!!e.mut;
@@ -554,6 +596,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
 
   function assign(e){
     const lhs=peel(e.lhs),compound=e.op!=='=';
+    if(!compound&&peel(e.rhs).t==='Ref')asgRef.add(peel(e.rhs));
     let v=ex(e.rhs);
     if(lhs.t==='Deref'){
       const r=argOp(lhs.expr);
@@ -744,7 +787,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   // every turn reads the iterator, so a loan of the collection lasts as long as the loop
   function forColl(e,fi){
     const src=peel(fi.src);
-    let ro;
+    let ro,loopTemp=-1;
     if(fi.mode==='val'||fi.viaRef){
       const p=src,l=p.t==='Path'?lid(p):-1;
       // a `&mut` variable that is lent, not moved, is reborrowed: the loan is on the variable, and no `mut` is needed to make it
@@ -769,10 +812,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           loan=cs.some(q=>related(q,b));
         }
         ro=loan?put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',t,0)):opnd(c.l,t.k==='ref'&&t.mut,fi.mode!=='mut');
-      }else if(c.k==='other'&&e.copyOut&&fi.mode==='ref'&&!['Path','Field','Index','Deref'].includes(src.t)){
-        // `for &x in &[..]`: the temporary lives as long as the loop, and the names copy out of it, so no loan outlives it
+      }else if(c.k==='other'&&!['Path','Field','Index','Deref'].includes(src.t)){
+        // the temporary lives as long as the loop; a constant is promoted to a static and lives forever
+        const pr=fi.mode==='mut'?'no':promo(src);
+        if(pr==='maybe'){un('temporary borrow',e);return NIL;}
         const v=ex(src),t=v.k==='const'?put({k:'use',x:v},src,undefined,tyOf(src)):v;
-        ro=put({k:'ref',l:t.l,mut:false,implicit:true},e,undefined,T.ref(false,tyOf(src),0));
+        ro=put({k:'ref',l:t.l,mut:fi.mode==='mut',implicit:true},e,undefined,T.ref(fi.mode==='mut',tyOf(src),0));
+        if(pr==='no'){L[t.l].tmp=true;loopTemp=t.l;}
       }else{un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return NIL;}
     }
     const it=temp(fi.mode==='val'?tyOf(src):T.ref(fi.mode==='mut',tyOf(src),0));
@@ -788,6 +834,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     kill(scopes.pop(),e);
     edge(cur,h);loops.pop();
     cur=x;
+    if(loopTemp>=0)emit('dead',e,{l:loopTemp});
     return NIL;
   }
 
@@ -805,6 +852,12 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   }
 
   function stmt(s){
+    const mark=stmtTemps.length;
+    stmt1(s);
+    for(let i=stmtTemps.length-1;i>=mark;i--)emit('dead',s,{l:stmtTemps[i]});
+    stmtTemps.length=mark;
+  }
+  function stmt1(s){
     if(s.t==='Let'){
       const pt=s.pat;
       if(pt.t==='Wild'){
@@ -813,7 +866,10 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         if(s.init&&!['Path','Field','Index','Deref'].includes(k))ex(s.init);
       }else if(pt.t!=='IdentPat'||!info.get(pt)||!info.get(pt).bind)un('pattern',s);
       else if(!s.init)declare(pt,s,true,info.get(pt).ty);
-      else ex(s.init,declare(pt,s,false,info.get(pt).ty));
+      else{
+        if(peel(s.init).t==='Ref')extRef.add(peel(s.init));
+        ex(s.init,declare(pt,s,false,info.get(pt).ty));
+      }
     }else if(s.t==='ExprStmt'){
       const x=ex(s.expr);
       if(['Path','Field','Index','Deref'].includes(peel(s.expr).t)&&x.k!=='const')emit('eval',s,{rv:{k:'use',x}});
@@ -857,7 +913,6 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         if((info.get(e)||{}).ctor)return put({k:'agg',args:seq(e.args,ex)},e,dest,tyOf(e));
         rebTwice(e.args,e);
         // a temporary lent to a call lives to the end of the statement; with a result that holds no reference it cannot be kept past that
-        if(!carries(tyOf(e)))for(const a of e.args)if(peel(a).t==='Ref')tempOk.add(peel(a));
         lendArgs(e);
         const sig=(info.get(e)||{}).sig;
         return put({k:'call',fn:sig&&sig.key||fn,args:seq(e.args,fn==='drop'&&!userDrop?moveOp:argOp),from:sig&&sig.from!==undefined?sig.from:-1,more:sig&&sig.more||[]},e,dest,tyOf(e));
@@ -894,8 +949,17 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           if(c.k==='via'&&!e.mut&&L[c.l].ty.k==='ref'&&!L[c.l].ty.mut)return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
           if(c.k==='via'){un('reborrow',e);return fin(NIL,e,dest);}
         }
-        if(tempOk.has(e)&&!['Path','Field','Index','Deref'].includes(x.t)){
+        if((argRef.has(e)||extRef.has(e)||asgRef.has(e))&&!['Path','Field','Index','Deref'].includes(x.t)){
+          let pr=e.mut?'no':promo(x);
+          // what is not promoted dies with the statement, and a call that gives back no reference cannot keep it past that
+          if(pr==='maybe'&&argRef.has(e)&&!carries(tyOf(argRef.get(e))))pr='no';
+          if(pr==='maybe'){un('temporary borrow',e);return fin(NIL,e,dest);}
           const v=ex(x),t=v.k==='const'?put({k:'use',x:v},x,undefined,tyOf(x)):v;
+          if(pr==='no'){
+            // `let r = &temp;` keeps the temporary as long as the block, any other borrow only until the end of the statement
+            if(extRef.has(e)){L[t.l].tmp=true;scopes[scopes.length-1].push(t.l);}
+            else ownTemp(t.l);
+          }
           return put({k:'ref',l:t.l,mut:e.mut},e,dest,tyOf(e));
         }
         un(x.t==='Field'||x.t==='Index'?'borrow of a field':x.t==='Deref'?'reborrow':'temporary borrow',e);

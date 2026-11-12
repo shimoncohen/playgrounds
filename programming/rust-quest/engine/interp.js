@@ -574,7 +574,10 @@ RQ.interp=(ast,opts)=>{
     if(s.t==='Let'){
       const pt=s.pat;
       if(pt.t==='IdentPat'){
-        const cell={val:s.init?mv(s.init,env):null,name:pt.name,ty:tyName(pt),line:pt.line};
+        const val=s.init?mv(s.init,env):null,ext=s.init&&peel(s.init),at=ext&&ext.t==='Ref'?temps.findLastIndex(t=>t.ref===ext):-1;
+        // `let r = &temp;` keeps the temporary until the end of the block, and drops it after `r`
+        if(at>=0){const t=temps.splice(at,1)[0];t.cell.line=t.line;scope.own.push(t.cell);}
+        const cell={val,name:pt.name,ty:tyName(pt),line:pt.line};
         declare(scope,pt.name,cell);
       }else if(s.init){
         const v=ev(s.init,env);
@@ -1500,9 +1503,9 @@ RQ.interp=(ast,opts)=>{
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
-        const tv=ev(x,env);
-        if(owns(tv))temps.push({v:tv,line:e.line});
-        return {k:'ref',cell:{val:tv},mut:e.mut,loan:e.id};
+        const tv=ev(x,env),cell={val:tv};
+        if(owns(tv))temps.push({cell,line:e.line,ref:e});
+        return {k:'ref',cell,mut:e.mut,loan:e.id};
       }
       case 'Deref':{
         const v=ev(e.expr,env);

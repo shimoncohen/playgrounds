@@ -210,6 +210,11 @@ const ERRORS={
     msg:o=>'`'+o.name+'` does not live long enough',
     tip:'A variable disappears at the end of the block that declares it, and a borrow of it cannot outlast that. Declare the variable in the outer block, or use the borrow before the block ends.'
   },
+  E0716:{
+    title:'a temporary value is dropped while it is still borrowed',
+    msg:()=>'temporary value dropped while borrowed',
+    tip:'A value that is not stored in a variable, like the result of `String::from("a")` or `make()`, is dropped at the end of its statement, so a borrow of it cannot be used after that. Put it in a `let` first, or write `let r = &value;`, which keeps it as long as `r` lives.'
+  },
   E0261:{
     title:'a lifetime name was never declared',
     msg:o=>'use of undeclared lifetime name `\''+o.name+'`',
@@ -344,7 +349,7 @@ const HINTS={
   'reference to reference':'A reference to a reference, like `&&str` or `&t` where `t` is already a `&str`, is not modeled. Pass `t` itself instead.',
   reborrow:'Reborrowing a `&mut`, like `&*r`, borrowing a field behind a `&mut`, like `&mut self.items`, or calling `as_str` on a `&mut String`, is not modeled. A slice of a `&mut` parameter, like `&mut a[1..]`, is modeled only as an argument of a call that gives back no reference, and not beside another use of `a` in the same call. Use the `&mut` variable directly instead.',
   'borrow of a field':'Borrowing an array element, like `&a[0]`, or a method call on one, is not modeled. Borrow the whole variable instead. A `Vec` element, like `&v[0]`, is modeled.',
-  'temporary borrow':'Borrowing a temporary value is modeled only as an argument of a call whose result keeps no borrow, like `largest(&vec![1, 2])`, and as the iterable of `for &x in &[1, 2, 3]`. Other uses, like `&5`, `&String::new()`, `let r = &[1, 2];` or `String::from("a").as_str()`, are not modeled. Put the value in a variable first, then borrow the variable.',
+  'temporary borrow':'A borrow of a temporary value is modeled as `let r = &String::new();`, as an argument of a call, on the right of `=`, as the iterable of a `for`, and as the receiver of a method. A borrow inside a tuple, an array, `Some(..)` or a block, like `let t = (&String::new(), 1);`, is not modeled. Put the value in a variable first, then borrow the variable.',
   'partial move':'Moving an element out of an array, a field out of a type with `impl Drop`, or a name out of a `match` on such a value is not modeled. Use `.clone()`, or a field that is a number. A match that moves a name the compiler may already see as moved is not modeled either.',
   'move out of reference':'Moving a value out from behind a reference, like `let t = *r;` on a `&String`, is not modeled. Use `r.clone()` to copy it instead.',
   'two-phase borrow':'A `&mut` method call whose argument borrows or changes the same variable, like `s.push_str(&s)` or `v.push(v.pop().unwrap())`, is not modeled. Reading it is: `v.push(v.len())` works. Copy the argument into a variable first.',
