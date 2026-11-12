@@ -25,7 +25,10 @@ RQ.compile=src=>{
     let be=b.errors.filter(e=>!inBad(e));
     // the one type error only mir.js can see (a closure's Copy bound) ends the compile before borrowck, as any type error does
     if(be.some(e=>e.code==='E0277')){be=be.filter(e=>e.code==='E0277');diags=diags.filter(e=>!BORROWCK.includes(e.code));}
-    diags=[...diags,...be].sort((a,b)=>a.line-b.line||a.col-b.col);
+    diags=[...diags,...be];
+    // writing through a binding that was never set is E0381 alone: rustc does not also report that the binding is not mut
+    const unset=new Set(diags.filter(e=>e.code==='E0381').map(e=>e.line+':'+e.col));
+    diags=diags.filter(e=>(e.code!=='E0594'&&e.code!=='E0596')||!unset.has(e.line+':'+e.col)).sort((a,b)=>a.line-b.line||a.col-b.col);
     unsupported.push(...b.unsupported.filter(u=>!inBad(u)));loans=b.loans;moves=b.moves;maxLive=b.maxLive;
   }
   // rustc lints only a program that type-checks, and the quest judges only a program it fully models
