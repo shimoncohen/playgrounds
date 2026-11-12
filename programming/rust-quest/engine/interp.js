@@ -179,6 +179,10 @@ RQ.interp=(ast,opts)=>{
         if(b.v===0n)throw panic('attempt to calculate the remainder with a divisor of zero',e);
         if(a.v===INT[ty][0]&&b.v===-1n&&ty[0]==='i')throw panic('attempt to calculate the remainder with overflow',e);
         return int(a.v%b.v,ty);
+      case '<<':case '>>':{
+        if(b.v<0n||b.v>=BigInt(ty.endsWith('size')?64:ty.slice(1)))throw panic('attempt to shift '+(op==='<<'?'left':'right')+' with overflow',e);
+        return int(op==='<<'?wrap(a.v<<b.v,ty):a.v>>b.v,ty);
+      }
       case '&':return int(a.v&b.v,ty);
       case '|':return int(a.v|b.v,ty);
       case '^':return int(a.v^b.v,ty);
@@ -197,6 +201,7 @@ RQ.interp=(ast,opts)=>{
         case '%':return {k:'float',v:a.v%b.v};
       }
     }
+    if(a.k==='bool'&&b.k==='bool'&&(op==='&'||op==='|'||op==='^'))return bool(op==='&'?a.v&&b.v:op==='|'?a.v||b.v:a.v!==b.v);
     if(a.k===b.k&&['int','float','bool','char','str'].includes(a.k)){
       const text=a.k==='char'||a.k==='str',d=text?cmpCodePoints(a.v,b.v):null;
       const x=text?d:a.v,y=text?0:b.v;
@@ -1427,6 +1432,7 @@ RQ.interp=(ast,opts)=>{
         if(e.op==='-'&&a.k==='int')return checked(-a.v,a.ty,'attempt to negate with overflow',e);
         if(e.op==='-'&&a.k==='float')return {k:'float',v:-a.v};
         if(e.op==='!'&&a.k==='bool')return bool(!a.v);
+        if(e.op==='!'&&a.k==='int')return int(wrap(~a.v,a.ty),a.ty);
         return bug('unary '+e.op);
       }
       case 'Binary':{

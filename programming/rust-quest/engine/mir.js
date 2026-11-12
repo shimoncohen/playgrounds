@@ -175,10 +175,16 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       // `&&`, `||` and a comparison or operator on a non-scalar (str, tuple, String) are calls or branches, which rustc never promotes
       case 'Binary':{
         if(x.op==='&&'||x.op==='||')return 'no';
-        const ok=['+','-','*','&','|','^','==','!=','<','>','<=','>='].includes(x.op);
+        if(x.op==='/'||x.op==='%'){
+          if(!scalar(x.lhs)||!scalar(x.rhs))return 'no';
+          const ops=worst([promo(x.lhs),promo(x.rhs)]);
+          return ['float','fvar'].includes(tyOf(x.lhs).k)?ops:worst([ops,divisorOk(x)]);
+        }
+        const ok=['+','-','*','&','|','^','<<','>>','==','!=','<','>','<=','>='].includes(x.op);
         if(!ok)return 'maybe';
         return scalar(x.lhs)&&scalar(x.rhs)?worst([promo(x.lhs),promo(x.rhs)]):'no';
       }
+      case 'Cast':return scalar(x.expr)&&scalar(x)?promo(x.expr):'maybe';
       case 'StructLit':{
         if(x.base)return 'maybe';
         return dropTys.has(x.path.segs[x.path.segs.length-1].name)?'no':worst(x.fields.map(f=>promo(f.expr)));
@@ -195,6 +201,25 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       case 'Macro':case 'MethodCall':return 'no';
       default:return 'maybe';
     }
+  }
+  // rustc promotes an integer `/` or `%` only when the divisor is itself a literal other than 0, and for a signed type with divisor -1 only when the dividend is a literal other than the minimum
+  function divisorOk(x){
+    const lit=n=>{
+      n=peel(n);
+      const neg=n.t==='Unary'&&n.op==='-';
+      if(neg)n=peel(n.expr);
+      return n.t==='Lit'&&n.kind==='int'?(neg?-BigInt(n.v):BigInt(n.v)):null;
+    };
+    const d=lit(x.rhs);
+    if(d===null){
+      const r=peel(x.rhs);
+      return r.t==='Binary'||r.t==='Cast'||r.t==='Unary'&&r.op==='!'?'no':'maybe';
+    }
+    if(d===0n)return 'no';
+    const ty=tyOf(x.lhs),name=ty.k==='int'?ty.ty:'i32';
+    if(d!==-1n||!RQ.types.isSigned(name))return 'yes';
+    const n=lit(x.lhs);
+    return n===null?'maybe':n===RQ.types.INT[name][0]?'no':'yes';
   }
   const scalar=n=>['int','ivar','float','fvar','bool','char'].includes(tyOf(n).k);
   const worst=rs=>rs.includes('no')?'no':rs.includes('maybe')?'maybe':'yes';

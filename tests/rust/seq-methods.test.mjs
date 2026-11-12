@@ -68,6 +68,17 @@ describe('what rustc rejects in them', () => {
   });
 });
 
+describe('the type rustc names when an element lacks Ord', () => {
+  it('is the part that lacks it: the float inside an array, a tuple or an Option', () => {
+    const bound = '`{float}: Ord`';
+    for (const e of ['[[3.0, 1.0]]', '[(3.0, 1)]', '[Some(1.5)]', 'vec![[3.0, 1.0]]', '[(1, (2.5, 3))]']) {
+      assert.deepEqual(msgs(main(`let mut a = ${e};\na.sort();`)), [`E0277@3:7 the trait bound ${bound} is not satisfied`], e);
+    }
+    assert.deepEqual(msgs('fn f(x: &mut [(i32, f64)]) {\n    x.sort();\n}\n\n' + main('f(&mut [(1, 2.0)]);')), ['E0277@2:7 the trait bound `f64: Ord` is not satisfied']);
+    assert.deepEqual(msgs(main('let a = [(3.0, 1)];\nlet m = a.iter().max();')), [`E0277@3:22 the trait bound ${bound} is not satisfied`]);
+  });
+});
+
 describe('what stays unsupported', () => {
   const feature = (src) => { const c = RQ.run(src); assert.equal(c.status, 'unsupported', src); return c.unsupported.feature; };
 
@@ -84,5 +95,16 @@ describe('what stays unsupported', () => {
 
   it('the hint for a method it does not know names the array and slice methods', () => {
     assert.match(RQ.diag.hint('collection method'), /array or a slice.*`sort_unstable`/);
+  });
+});
+
+describe('bool bit operations and ! on an integer', () => {
+  it('& | ^ on bools and ! on integers give the values rustc gives', () => {
+    assert.equal(out(main('let x = true;\nlet y = false;\nprintln!("{} {} {}", x & y, x | y, x ^ y);\nlet mut z = false;\nz |= true;\nz &= true;\nz ^= true;\nprintln!("{}", z);')), 'false true true\nfalse\n');
+    assert.equal(out(main('let a: i32 = 5;\nlet b: u8 = 0;\nlet c: i8 = -3;\nlet d: usize = 0;\nprintln!("{} {} {} {}", !a, !b, !c, !d);\nlet e: u16 = !7;\nprintln!("{} {}", e, !!5);')), '-6 255 2 18446744073709551615\n65528 5\n');
+  });
+
+  it('! on a decimal number or text stays unsupported', () => {
+    assert.equal(RQ.run(main('let x = 1.5;\nprintln!("{}", !x);')).status, 'unsupported');
   });
 });

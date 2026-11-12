@@ -4,7 +4,7 @@
 'use strict';
 const RQ=globalThis.RQ=globalThis.RQ||{};
 
-const BOUND=o=>o.trait==='Display'?'`'+o.type+'` doesn\'t implement `std::fmt::Display`':o.trait==='Debug'?'`'+o.type+'` doesn\'t implement `Debug`':o.trait==='PartialEq'||o.trait==='PartialOrd'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'the trait bound `'+o.type+': '+o.trait+'` is not satisfied';
+const BOUND=o=>o.trait==='Display'?'`'+o.type+'` doesn\'t implement `std::fmt::Display`':o.trait==='Debug'?'`'+o.type+'` doesn\'t implement `Debug`':o.trait==='PartialEq'||o.trait==='PartialOrd'?'can\'t compare `'+o.type+'` with `'+o.type+'`':'the trait bound `'+(o.type==='floating-point number'?'{float}':o.type)+': '+o.trait+'` is not satisfied';
 const ARITH_WORD={'+':['add','to'],'-':['subtract','from'],'*':['multiply','by'],'/':['divide','by'],'%':['calculate the remainder of','divided by']};
 const ERRORS={
   E0384:{
@@ -394,7 +394,6 @@ const HINTS={
   'main signature':'`main` takes no parameters and returns nothing, or `Result<(), E>` where `E` can be printed with `{:?}`. Write `fn main() { ... }` or `fn main() -> Result<(), String> { ... }`.',
   'path call':'Only `Name::function` for a function in your own `impl Name { ... }`, an `enum` variant, `Name::default()` for a type that derives `Default`, `String::new`, `String::from`, `Vec::new` and `HashMap::new` are modeled.',
   'function value':'Using a function as a value is not modeled. Call it with `name(...)`, or wrap it in a closure like `|x| name(x)`.',
-  'bit shift':'Shifts are not modeled. Multiply or divide instead.',
   'block label':'A labeled loop or block, like `\'outer: loop`, is not modeled. Use a variable that says when to stop, or `return` from a function.',
   call:'A call is modeled on one of your own functions, like `name(1, 2)`, and on a closure or an `Fn` parameter in a variable. Anything else is not modeled: write a function, or put the closure in a variable first.',
   'wrong argument count':'Rust stops a call with the wrong number of arguments, but Rust Quest does not report it. Pass exactly what the function declares.',

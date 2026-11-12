@@ -268,7 +268,11 @@ RQ.parse=tokens=>{
   function bin(min,ns){
     let l=unary(ns);
     for(;;){
-      if(isK('as')){const o=toks[p++];l=mk('Cast',o,{expr:l,ty:ty(),line:l.line,col:l.col});continue;}
+      if(isK('as')){
+        const o=toks[p++],from=p,t=ty();
+        if(isP('<<'))fail('`<<` is interpreted as a start of generic arguments for `'+toks.slice(from,p).map(k=>k.v).join('')+'`, not a shift');
+        l=mk('Cast',o,{expr:l,ty:t,line:l.line,col:l.col});continue;
+      }
       const x=T();
       const pr=x.k==='punct'?BIN[x.v]:undefined;
       if(pr===undefined||pr<min)return l;

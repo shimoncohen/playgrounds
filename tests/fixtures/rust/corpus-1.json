@@ -12422,5 +12422,609 @@
     "src": "struct S {\n    a: [i32; 3],\n}\n\nimpl S {\n    fn go(&mut self) -> i32 {\n        self.a.sort();\n        self.a[2]\n    }\n}\n\nfn main() {\n    let mut s = S { a: [3, 9, 4] };\n    println!(\"{}\", s.go());\n}\n",
     "expect": "ok", "out": "9\n", "err": "", "exit": 0,
     "why": "sort on an array field through &mut self", "pr": "unit"
+  },
+  {
+    "id": "seq-bool-ops",
+    "src": "fn main() {\n    let x = true;\n    let y = false;\n    println!(\"{} {} {}\", x & y, x | y, x ^ y);\n    let mut z = false;\n    z |= true;\n    z &= true;\n    z ^= false;\n    println!(\"{}\", z);\n    let a: i32 = 5;\n    let b: u8 = 0;\n    let c: i8 = -3;\n    let d: usize = 0;\n    println!(\"{} {} {} {}\", !a, !b, !c, !d);\n    let e: u16 = !7;\n    println!(\"{} {}\", e, !!5);\n}\n",
+    "expect": "ok", "out": "false true true\ntrue\n-6 255 2 18446744073709551615\n65528 5\n", "err": "", "exit": 0,
+    "why": "& | ^ on bools and ! on an integer", "pr": "unit"
+  },
+  {
+    "id": "temp-promo-div-zero-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 / 0));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-div-zero-id-ok",
+    "why": "E0716: a division by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-zero-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 / 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a division by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-zero-for",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[1 / 0] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 4},
+    "pair": "temp-promo-div-zero-for-ok",
+    "why": "E0716: a division by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-zero-for-ok",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[1 / 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a division by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-rem-zero-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 % 0));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-rem-zero-id-ok",
+    "why": "E0716: a remainder by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-rem-zero-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 % 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a remainder by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-rem-zero-for",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[1 % 0] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 4},
+    "pair": "temp-promo-rem-zero-for-ok",
+    "why": "E0716: a remainder by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-rem-zero-for-ok",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[1 % 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a remainder by the literal 0 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-min-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(-2147483648 / -1));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-div-min-id-ok",
+    "why": "E0716: dividing the smallest i32 by -1 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-min-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(-2147483648 / -2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: dividing the smallest i32 by -1 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-min-for",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[-2147483648 / -1] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 4},
+    "pair": "temp-promo-div-min-for-ok",
+    "why": "E0716: dividing the smallest i32 by -1 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-min-for-ok",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[-2147483648 / -2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: dividing the smallest i32 by -1 is not promoted, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-expr-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(4 / (3 - 1)));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-div-expr-id-ok",
+    "why": "E0716: a divisor that is itself an operation is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-expr-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(4 / 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a divisor that is itself an operation is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-expr-for",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[4 / (3 - 1)] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 4},
+    "pair": "temp-promo-div-expr-for-ok",
+    "why": "E0716: a divisor that is itself an operation is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-expr-for-ok",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[4 / 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a divisor that is itself an operation is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-not-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(4 / !0));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-div-not-id-ok",
+    "why": "E0716: a divisor that is a `!` of a literal is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-not-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(4 / 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a divisor that is a `!` of a literal is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-not-for",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[4 / !0] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 4},
+    "pair": "temp-promo-div-not-for-ok",
+    "why": "E0716: a divisor that is a `!` of a literal is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-not-for-ok",
+    "src": "fn main() {\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[4 / 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a divisor that is a `!` of a literal is not a literal, so the division is not promoted", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-var-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(x / 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 7},
+    "pair": "temp-promo-div-var-id-ok",
+    "why": "E0716: a division of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-var-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(4 / 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a division of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-var-for",
+    "src": "fn main() {\n    let x = 4;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[x / 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 5},
+    "pair": "temp-promo-div-var-for-ok",
+    "why": "E0716: a division of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-var-for-ok",
+    "src": "fn main() {\n    let x = 4;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[4 / 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a division of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-cast-var-id",
+    "src": "fn id(s: &i64) -> &i64 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(x as i64));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 7},
+    "pair": "temp-promo-cast-var-id-ok",
+    "why": "E0716: a cast of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-cast-var-id-ok",
+    "src": "fn id(s: &i64) -> &i64 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(4 as i64));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a cast of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-cast-var-for",
+    "src": "fn main() {\n    let x = 4;\n    let d: i64 = 0;\n    let mut l = &d;\n    for x in &[x as i64] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 5},
+    "pair": "temp-promo-cast-var-for-ok",
+    "why": "E0716: a cast of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-cast-var-for-ok",
+    "src": "fn main() {\n    let x = 4;\n    let d: i64 = 0;\n    let mut l = &d;\n    for x in &[4 as i64] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a cast of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-not-var-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(!x));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 7},
+    "pair": "temp-promo-not-var-id-ok",
+    "why": "E0716: a `!` of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-not-var-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 4;\n    let r = id(&(!4));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "-5\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a `!` of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-not-var-for",
+    "src": "fn main() {\n    let x = 4;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[!x] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 5},
+    "pair": "temp-promo-not-var-for-ok",
+    "why": "E0716: a `!` of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-not-var-for-ok",
+    "src": "fn main() {\n    let x = 4;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[!4] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "-5\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a `!` of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-div-cast",
+    "src": "fn n(s: &i32) -> &i32 {\n    s\n}\n\nfn f(s: &f64) -> &f64 {\n    s\n}\n\nfn b(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let a = n(&(4 / 2));\n    let r = n(&(7 % 3));\n    let c = n(&(-7 / -1));\n    let d = n(&(3.9 as i32));\n    let e = n(&(true as i32));\n    let g = f(&(1.0 / 0.0));\n    let h = f(&(5.0 % 2.0));\n    let i = n(&!5);\n    let j = b(&(true ^ true));\n    let k = b(&(4 / 2 > 1));\n    println!(\"{} {} {} {} {} {} {} {} {} {}\", a, r, c, d, e, g, h, i, j, k);\n    let mut l = &0;\n    for x in &[10 / 2, 9 / 3, 1 as i32] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "2 1 7 3 1 inf 1 -6 false true\n1\n", "err": "", "exit": 0,
+    "why": "a borrow of a division by a nonzero literal, a remainder, a cast, a `!` of a number or a bool bit operation on constants is promoted to a static", "pr": "unit"
+  },
+  {
+    "id": "temp-promo-div-fn-arg",
+    "src": "fn show(n: &i32) {\n    println!(\"{}\", n);\n}\n\nfn main() {\n    show(&(100 / 4));\n    show(&(7 % 4));\n}\n",
+    "expect": "ok", "out": "25\n3\n", "err": "", "exit": 0,
+    "why": "a borrowed division passed to a function", "pr": "unit"
+  },
+  {
+    "id": "shift-lint-lit-u8",
+    "src": "fn main() {\n    println!(\"{}\", 1u8 << 8);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-lit-u8-ok",
+    "why": "arithmetic_overflow: a shift by the width of the type or more", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-lit-u8-ok",
+    "src": "fn main() {\n    println!(\"{}\", 1u8 << 7);\n}\n",
+    "expect": "ok", "out": "128\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift by the width of the type or more", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-lit-i32",
+    "src": "fn main() {\n    let x = 1 << 32;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-lit-i32-ok",
+    "why": "arithmetic_overflow: a shift of an i32 by 32", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-lit-i32-ok",
+    "src": "fn main() {\n    let x = 1 << 31;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "-2147483648\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift of an i32 by 32", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-right",
+    "src": "fn main() {\n    let x = 8 >> 32;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-right-ok",
+    "why": "arithmetic_overflow: a right shift by the width of the type", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-right-ok",
+    "src": "fn main() {\n    let x = 8 >> 3;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a right shift by the width of the type", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-negative",
+    "src": "fn main() {\n    let x = 1 << -1;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-negative-ok",
+    "why": "arithmetic_overflow: a negative shift amount", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-negative-ok",
+    "src": "fn main() {\n    let x = 1 << 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a negative shift amount", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-local",
+    "src": "fn main() {\n    let n = 40;\n    let x: i32 = 1;\n    println!(\"{}\", x << n);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 4 },
+    "pair": "shift-lint-local-ok",
+    "why": "arithmetic_overflow: a shift amount rustc knows through a local", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-local-ok",
+    "src": "fn main() {\n    let n = 30;\n    let x: i32 = 1;\n    println!(\"{}\", x << n);\n}\n",
+    "expect": "ok", "out": "1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift amount rustc knows through a local", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-assign",
+    "src": "fn main() {\n    let mut a = 1;\n    a <<= 33;\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 3 },
+    "pair": "shift-lint-assign-ok",
+    "why": "arithmetic_overflow: a compound shift by the width of the type or more", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-assign-ok",
+    "src": "fn main() {\n    let mut a = 1;\n    a <<= 3;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "8\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound shift by the width of the type or more", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-typed",
+    "src": "fn main() {\n    let x: u8 = 1 << 8;\n    println!(\"{}\", x);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-typed-ok",
+    "why": "arithmetic_overflow: a shift whose type comes from the let", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-typed-ok",
+    "src": "fn main() {\n    let x: u8 = 1 << 7;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "128\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift whose type comes from the let", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-unknown-left",
+    "src": "fn f(x: i32) -> i32 {\n    x << 40\n}\n\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-unknown-left-ok",
+    "why": "arithmetic_overflow: rustc checks the amount even when the value shifted is a parameter", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-unknown-left-ok",
+    "src": "fn f(x: i32) -> i32 {\n    x << 30\n}\n\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": "ok", "out": "1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: rustc checks the amount even when the value shifted is a parameter", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-element",
+    "src": "fn f(v: &mut [u8]) {\n    v[0] <<= 8;\n}\n\nfn main() {\n    let mut a = [1u8, 2];\n    f(&mut a);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "shift-lint-element-ok",
+    "why": "arithmetic_overflow: a compound shift of an array element by the width of its type", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-element-ok",
+    "src": "fn f(v: &mut [u8]) {\n    v[0] <<= 7;\n}\n\nfn main() {\n    let mut a = [1u8, 2];\n    f(&mut a);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[128, 2]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound shift of an array element by the width of its type", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-promoted",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 << 32));\n    println!(\"{}\", r);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 6 },
+    "pair": "shift-lint-promoted-ok",
+    "why": "arithmetic_overflow: a borrowed shift that overflows is the lint, not E0716", "pr": "P4"
+  },
+  {
+    "id": "shift-lint-promoted-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let r = id(&(1 << 31));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "-2147483648\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrowed shift that overflows is the lint, not E0716", "pr": "P4"
+  },
+  {
+    "id": "shift-float",
+    "src": "fn main() {\n    let x = 1.0 << 2;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0369", "line": 2},
+    "pair": "shift-float-ok",
+    "why": "E0369: a decimal number cannot be shifted", "pr": "P4"
+  },
+  {
+    "id": "shift-float-ok",
+    "src": "fn main() {\n    let x = 1 << 2;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a decimal number cannot be shifted", "pr": "P4"
+  },
+  {
+    "id": "shift-bool",
+    "src": "fn main() {\n    let x = true << 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": {"code": "E0369", "line": 2},
+    "pair": "shift-bool-ok",
+    "why": "E0369: a bool cannot be shifted", "pr": "P4"
+  },
+  {
+    "id": "shift-bool-ok",
+    "src": "fn main() {\n    let x = 1 << 1;\n    println!(\"{}\", x);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a bool cannot be shifted", "pr": "P4"
+  },
+  {
+    "id": "temp-promo-shl-var-id",
+    "src": "fn id(s: &u8) -> &u8 {\n    s\n}\n\nfn main() {\n    let n = 2;\n    let r = id(&(1u8 << n));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 7},
+    "pair": "temp-promo-shl-var-id-ok",
+    "why": "E0716: a shift by a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shl-var-id-ok",
+    "src": "fn id(s: &u8) -> &u8 {\n    s\n}\n\nfn main() {\n    let n = 2;\n    let r = id(&(1u8 << 2));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift by a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shl-var-for",
+    "src": "fn main() {\n    let n = 2;\n    let d: u8 = 0;\n    let mut l = &d;\n    for x in &[1u8 << n] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 5},
+    "pair": "temp-promo-shl-var-for-ok",
+    "why": "E0716: a shift by a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shl-var-for-ok",
+    "src": "fn main() {\n    let n = 2;\n    let d: u8 = 0;\n    let mut l = &d;\n    for x in &[1u8 << 2] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift by a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shr-var-id",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 8;\n    let r = id(&(x >> 1));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 7},
+    "pair": "temp-promo-shr-var-id-ok",
+    "why": "E0716: a shift of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shr-var-id-ok",
+    "src": "fn id(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let x = 8;\n    let r = id(&(8 >> 1));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shr-var-for",
+    "src": "fn main() {\n    let x = 8;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[x >> 1] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 5},
+    "pair": "temp-promo-shr-var-for-ok",
+    "why": "E0716: a shift of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-shr-var-for-ok",
+    "src": "fn main() {\n    let x = 8;\n    let d: i32 = 0;\n    let mut l = &d;\n    for x in &[8 >> 1] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "4\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a shift of a variable is computed when the program runs, so the borrow outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "shift-values",
+    "src": "fn main() {\n    println!(\"{} {} {}\", 1 << 3, 256 >> 4, 1 + 2 << 3);\n    let a: i64 = 1 << 40;\n    let b = 1u8 << 7;\n    let c = 255u8 << 1;\n    let d = 1i32 << 31;\n    println!(\"{} {} {} {}\", a, b, c, d);\n    println!(\"{} {} {}\", -8 >> 1, -1i32 >> 31, -16i8 >> 2);\n    println!(\"{} {}\", -16i8 << 1, -1i8 << 7);\n    let n: u32 = 3;\n    let m: i64 = 2;\n    println!(\"{} {} {}\", 5u8 << n, 1i32 << m, 200u8 >> n);\n    let k: usize = 63;\n    println!(\"{}\", 1u64 << k);\n    println!(\"{}\", 1 << 2 + 3);\n}\n",
+    "expect": "ok", "out": "8 16 24\n1099511627776 128 254 -2147483648\n-4 -1 -4\n-32 -128\n40 4 25\n9223372036854775808\n32\n", "err": "", "exit": 0,
+    "why": "shifts keep the type of the left side, take any integer type as the amount, shift right with the sign and drop the bits shifted out", "pr": "unit"
+  },
+  {
+    "id": "shift-assign",
+    "src": "fn main() {\n    let mut a = 1;\n    let mut b = 256;\n    a <<= 4;\n    b >>= 2;\n    println!(\"{} {}\", a, b);\n    let mut x = 1u8;\n    x <<= 7;\n    x <<= 1;\n    println!(\"{}\", x);\n    let mut v = [1u8, 2];\n    v[1] <<= 6;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "16 64\n0\n[1, 128]\n", "err": "", "exit": 0,
+    "why": "<<= and >>= on a variable and an element", "pr": "unit"
+  },
+  {
+    "id": "shift-mask",
+    "src": "fn main() {\n    let v = vec![1, 2, 3];\n    let mut mask = 0;\n    for x in v {\n        mask |= 1 << x;\n    }\n    println!(\"{}\", mask);\n    for i in 0..4 {\n        println!(\"{}\", 1u8 << i);\n    }\n}\n",
+    "expect": "ok", "out": "14\n1\n2\n4\n8\n", "err": "", "exit": 0,
+    "why": "a shift amount that comes from a loop or a Vec", "pr": "unit"
+  },
+  {
+    "id": "shift-panic-left",
+    "src": "fn sh(x: i32, n: u32) -> i32 {\n    x << n\n}\n\nfn main() {\n    println!(\"{}\", sh(1, 3));\n    println!(\"{}\", sh(1, 40));\n}\n",
+    "expect": "ok", "out": "8\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to shift left with overflow\n", "exit": 101,
+    "why": "a shift by too much at run time panics", "pr": "unit"
+  },
+  {
+    "id": "shift-panic-right-negative",
+    "src": "fn sh(x: i32, n: i32) -> i32 {\n    x >> n\n}\n\nfn main() {\n    println!(\"{}\", sh(8, 1));\n    println!(\"{}\", sh(8, -1));\n}\n",
+    "expect": "ok", "out": "4\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to shift right with overflow\n", "exit": 101,
+    "why": "a negative shift amount panics at run time", "pr": "unit"
+  },
+  {
+    "id": "shift-panic-assign",
+    "src": "fn go(n: u32) {\n    let mut a = 1;\n    a <<= n;\n    println!(\"{}\", a);\n}\n\nfn main() {\n    go(4);\n    go(32);\n}\n",
+    "expect": "ok", "out": "16\n", "err": "\nthread 'main' panicked at src/main.rs:3:5:\nattempt to shift left with overflow\n", "exit": 101,
+    "why": "a compound shift by too much at run time panics", "pr": "unit"
+  },
+  {
+    "id": "shift-panic-loop",
+    "src": "fn main() {\n    for i in 0..9 {\n        println!(\"{}\", 1u8 << i);\n    }\n}\n",
+    "expect": "ok", "out": "1\n2\n4\n8\n16\n32\n64\n128\n", "err": "\nthread 'main' panicked at src/main.rs:3:24:\nattempt to shift left with overflow\n", "exit": 101,
+    "why": "the ninth shift of a u8 panics", "pr": "unit"
+  },
+  {
+    "id": "temp-promo-shift",
+    "src": "fn n(s: &i32) -> &i32 {\n    s\n}\n\nfn w(s: &i64) -> &i64 {\n    s\n}\n\nfn main() {\n    let a = n(&(1 << 2));\n    let b = n(&(8 >> 1));\n    let c = n(&(-8 >> 1));\n    let d = w(&(1 << 40));\n    let e = n(&(1 << 31 >> 4));\n    println!(\"{} {} {} {} {}\", a, b, c, d, e);\n    let mut l = &0;\n    for x in &[1 << 2, 8 >> 1] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "4 4 -4 1099511627776 -134217728\n4\n", "err": "", "exit": 0,
+    "why": "a borrow of a shift of constants is promoted to a static", "pr": "unit"
+  },
+  {
+    "id": "deref-shl-lint",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r <<= 8;\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 4 },
+    "pair": "deref-shl-lint-ok",
+    "why": "arithmetic_overflow: a compound shift through a reference by the width of the type is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-shl-lint-ok",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r <<= 7;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "128\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound shift through a reference by the width of the type is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-shr-lint",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r >>= 9;\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 4 },
+    "pair": "deref-shr-lint-ok",
+    "why": "arithmetic_overflow: a compound right shift through a reference by more than the width of the type", "pr": "P4"
+  },
+  {
+    "id": "deref-shr-lint-ok",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r >>= 7;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound right shift through a reference by more than the width of the type", "pr": "P4"
+  },
+  {
+    "id": "deref-div-zero-lint",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r /= 0;\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 4 },
+    "pair": "deref-div-zero-lint-ok",
+    "why": "unconditional_panic: a compound division through a reference by the literal 0 is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-div-zero-lint-ok",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r /= 2;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound division through a reference by the literal 0 is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-rem-zero-lint",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r %= 0;\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "unconditional_panic", "line": 4 },
+    "pair": "deref-rem-zero-lint-ok",
+    "why": "unconditional_panic: a compound remainder through a reference by the literal 0 is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-rem-zero-lint-ok",
+    "src": "fn main() {\n    let mut a = 1u8;\n    let r = &mut a;\n    *r %= 2;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound remainder through a reference by the literal 0 is known to rustc", "pr": "P4"
+  },
+  {
+    "id": "deref-shl-param-lint",
+    "src": "fn f(r: &mut u8) {\n    *r <<= 8;\n}\n\nfn main() {\n    let mut a = 1u8;\n    f(&mut a);\n    println!(\"{}\", a);\n}\n",
+    "expect": { "lint": "arithmetic_overflow", "line": 2 },
+    "pair": "deref-shl-param-lint-ok",
+    "why": "arithmetic_overflow: a compound shift through a &mut parameter by the width of the type", "pr": "P4"
+  },
+  {
+    "id": "deref-shl-param-lint-ok",
+    "src": "fn f(r: &mut u8) {\n    *r <<= 7;\n}\n\nfn main() {\n    let mut a = 1u8;\n    f(&mut a);\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "128\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a compound shift through a &mut parameter by the width of the type", "pr": "P4"
+  },
+  {
+    "id": "deref-compound-runtime",
+    "src": "fn main() {\n    let mut a = 200u8;\n    let r = &mut a;\n    *r += 50;\n    *r >>= 1;\n    *r <<= 1;\n    *r /= 5;\n    println!(\"{}\", a);\n}\n",
+    "expect": "ok", "out": "50\n", "err": "", "exit": 0,
+    "why": "compound operators through a reference whose amount is fine", "pr": "unit"
+  },
+  {
+    "id": "deref-add-panic",
+    "src": "fn f(r: &mut u8, n: u8) {\n    *r += n;\n}\n\nfn main() {\n    let mut a = 200u8;\n    f(&mut a, 55);\n    println!(\"{}\", a);\n    f(&mut a, 1);\n}\n",
+    "expect": "ok", "out": "255\n", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to add with overflow\n", "exit": 101,
+    "why": "an addition through a reference that is not known to rustc panics at run time", "pr": "unit"
+  },
+  {
+    "id": "cast-then-shift",
+    "src": "fn main() {\n    let x = 1u8;\n    println!(\"{} {}\", (x as u32) << 1, x as u32 >> 1);\n    let y = x as i32 >> 1 << 1;\n    println!(\"{} {}\", y, x as u32 <= 1);\n}\n",
+    "expect": "ok", "out": "2 0\n0 true\n", "err": "", "exit": 0,
+    "why": "a cast in parentheses can be shifted left, and `as T >>`, `as T <=` and `as T >` are not generic arguments", "pr": "unit"
+  },
+  {
+    "id": "seq-sort-nested-f64-array",
+    "src": "fn main() {\n    let mut a = [[3.0, 1.0]];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "seq-sort-nested-f64-array-ok",
+    "why": "E0277: rustc blames the f64 inside the nested array, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-nested-f64-array-ok",
+    "src": "fn main() {\n    let mut a = [[3, 1]];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[3, 1]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: rustc blames the f64 inside the nested array, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-nested-f64-tuple",
+    "src": "fn main() {\n    let mut a = [(3.0, 1)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "seq-sort-nested-f64-tuple-ok",
+    "why": "E0277: rustc blames the f64 inside the tuple, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-nested-f64-tuple-ok",
+    "src": "fn main() {\n    let mut a = [(3, 1)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[(3, 1)]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: rustc blames the f64 inside the tuple, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-nested-f64-option",
+    "src": "fn main() {\n    let mut a = [Some(1.5)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0277", "line": 3},
+    "pair": "seq-sort-nested-f64-option-ok",
+    "why": "E0277: rustc blames the f64 inside the Option, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "seq-sort-nested-f64-option-ok",
+    "src": "fn main() {\n    let mut a = [Some(1)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[Some(1)]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: rustc blames the f64 inside the Option, which has no Ord", "pr": "P4"
   }
 ]
