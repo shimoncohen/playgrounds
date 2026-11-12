@@ -12115,5 +12115,115 @@
     "src": "fn longest(words: &[&str]) -> usize {\n    let mut n = 0;\n    for w in words {\n        if w.len() > n {\n            n = w.len();\n        }\n    }\n    n\n}\n\nfn main() {\n    for w in &[\"apple\", \"banana\"] {\n        println!(\"{} {}\", w, w.len());\n    }\n    println!(\"{}\", longest(&[\"a\", \"bcd\", \"ef\"]));\n    let mut t = 0;\n    for w in &[\"xx\", \"yyy\"] {\n        t += w.len();\n    }\n    println!(\"{}\", t);\n}\n",
     "expect": "ok", "out": "apple 5\nbanana 6\n3\n5\n", "err": "", "exit": 0,
     "why": "len on the &&str of a for over a constant array of strings, and over a &[&str] parameter", "pr": "unit"
+  },
+  {
+    "id": "temp-promo-and-id",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(true && false));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-and-id-ok",
+    "why": "E0716: a borrow of `true && false` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-and-id-ok",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(true == false));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `true && false` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-and-for",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[true && false] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 3},
+    "pair": "temp-promo-and-for-ok",
+    "why": "E0716: a borrow of `true && false` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-and-for-ok",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[true == false] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `true && false` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-or-id",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(false || true));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-or-id-ok",
+    "why": "E0716: a borrow of `false || true` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-or-id-ok",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(false == true));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `false || true` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-or-for",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[false || true] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 3},
+    "pair": "temp-promo-or-for-ok",
+    "why": "E0716: a borrow of `false || true` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-or-for-ok",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[false == true] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `false || true` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-streq-id",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(\"a\" == \"b\"));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-streq-id-ok",
+    "why": "E0716: a borrow of `\"a\" == \"b\"` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-streq-id-ok",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&('a' == 'b'));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `\"a\" == \"b\"` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-streq-for",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[\"a\" == \"b\"] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 3},
+    "pair": "temp-promo-streq-for-ok",
+    "why": "E0716: a borrow of `\"a\" == \"b\"` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-streq-for-ok",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &['a' == 'b'] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `\"a\" == \"b\"` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-strlt-id",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&(\"a\" < \"b\"));\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code": "E0716", "line": 6},
+    "pair": "temp-promo-strlt-id-ok",
+    "why": "E0716: a borrow of `\"a\" < \"b\"` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-strlt-id-ok",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn main() {\n    let r = id(&('a' < 'b'));\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `\"a\" < \"b\"` is not promoted, so a result of id that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-strlt-for",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &[\"a\" < \"b\"] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": {"code": "E0716", "line": 3},
+    "pair": "temp-promo-strlt-for-ok",
+    "why": "E0716: a borrow of `\"a\" < \"b\"` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-strlt-for-ok",
+    "src": "fn main() {\n    let mut l = &false;\n    for x in &['a' < 'b'] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a borrow of `\"a\" < \"b\"` is not promoted, so a loop name that keeps it outlives the temporary", "pr": "P5"
+  },
+  {
+    "id": "temp-promo-scalars",
+    "src": "fn id(s: &bool) -> &bool {\n    s\n}\n\nfn num(s: &i32) -> &i32 {\n    s\n}\n\nfn main() {\n    let a = id(&(1 < 2));\n    let b = id(&(true == false));\n    let c = id(&('a' < 'b'));\n    let d = id(&!true);\n    let e = num(&(2 * 3 - 1));\n    let f = num(&(6 & 3));\n    let g = num(&-5);\n    println!(\"{} {} {} {} {} {} {}\", a, b, c, d, e, f, g);\n    let mut l = &false;\n    for x in &[1 < 2, 2 > 3] {\n        l = x;\n    }\n    println!(\"{}\", l);\n}\n",
+    "expect": "ok", "out": "true false true false 5 2 -5\nfalse\n", "err": "", "exit": 0,
+    "why": "a borrow of a constant comparison, arithmetic, bit operation or negation on numbers, bools and chars is promoted to a static", "pr": "unit"
   }
 ]

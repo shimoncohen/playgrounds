@@ -169,10 +169,16 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     x=peel(x);
     switch(x.t){
       case 'Lit':return 'yes';
-      case 'Unary':return x.op==='-'||x.op==='!'?promo(x.expr):'maybe';
+      case 'Unary':return (x.op==='-'||x.op==='!')&&scalar(x.expr)?promo(x.expr):'maybe';
       case 'Tuple':case 'Array':return worst(x.elems.map(promo));
       case 'ArrayRepeat':return peel(x.len).t==='Lit'?promo(x.elem):'maybe';
-      case 'Binary':return ['+','-','*','&','|','^','==','!=','<','>','<=','>=','&&','||'].includes(x.op)?worst([promo(x.lhs),promo(x.rhs)]):'maybe';
+      // `&&`, `||` and a comparison or operator on a non-scalar (str, tuple, String) are calls or branches, which rustc never promotes
+      case 'Binary':{
+        if(x.op==='&&'||x.op==='||')return 'no';
+        const ok=['+','-','*','&','|','^','==','!=','<','>','<=','>='].includes(x.op);
+        if(!ok)return 'maybe';
+        return scalar(x.lhs)&&scalar(x.rhs)?worst([promo(x.lhs),promo(x.rhs)]):'no';
+      }
       case 'StructLit':{
         if(x.base)return 'maybe';
         return dropTys.has(x.path.segs[x.path.segs.length-1].name)?'no':worst(x.fields.map(f=>promo(f.expr)));
@@ -190,6 +196,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       default:return 'maybe';
     }
   }
+  const scalar=n=>['int','ivar','float','fvar','bool','char'].includes(tyOf(n).k);
   const worst=rs=>rs.includes('no')?'no':rs.includes('maybe')?'maybe':'yes';
   // the same `&mut` local twice among the operands of one call (E0499 in rustc) has no loan here: not modelled
   const rebTwice=(es,nd)=>{

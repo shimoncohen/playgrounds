@@ -38,6 +38,18 @@ describe('a temporary dies with its statement', () => {
     assert.deepEqual(msgs('fn id(s: &Vec<i32>) -> &Vec<i32> {\n    s\n}\n\n' + main('let s = id(&Vec::new());\nprintln!("{:?}", s);')), [`E0716@6 ${NOTE}`]);
   });
 
+  it('only a scalar operation is promoted: && || and a comparison of text are not', () => {
+    const idb = 'fn id(s: &bool) -> &bool {\n    s\n}\n\n';
+    for (const e of ['true && false', 'false || true', '"a" == "b"', '"a" != "b"', '"a" < "b"']) {
+      assert.deepEqual(msgs(idb + main(`let r = id(&(${e}));\nprintln!("{}", r);`)), [`E0716@6 ${NOTE}`], e);
+      assert.deepEqual(msgs(main(`let mut l = &false;\nfor x in &[${e}] {\nl = x;\n}\nprintln!("{}", l);`)), [`E0716@3 ${NOTE}`], e);
+    }
+    for (const e of ['1 < 2', 'true == false', "'a' < 'b'", '!true', '1.5 >= 1.0']) {
+      assert.equal(RQ.run(idb + main(`let r = id(&(${e}));\nprintln!("{}", r);`)).status, 'ok', e);
+    }
+    assert.equal(RQ.run('fn id(s: &i32) -> &i32 {\n    s\n}\n\n' + main('let r = id(&(4 / 2));\nprintln!("{}", r);')).status, 'unsupported');
+  });
+
   it('a type with Drop is never promoted, one without it is, even beside one that has it', () => {
     const drop = 'struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!("drop {}", self.0);\n    }\n}\n\n';
     assert.deepEqual(msgs(drop + 'fn id(s: &N) -> &N {\n    s\n}\n\n' + main('let r = id(&N(1));\nprintln!("{}", r.0);')), [`E0716@14 ${NOTE}`]);
