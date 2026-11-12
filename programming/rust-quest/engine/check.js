@@ -2159,7 +2159,7 @@ RQ.check=ast=>{
           I(e).recv={method:e.name,kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
           return e.name==='len'?T.int('usize'):T.bool;
         }
-        const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):''):'';
+        const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):res(r.to).k==='str'?'s':''):'';
         const sig=RQ.std.methods.get(e.name);
         if(!sig||!shape||!sig.recv.includes(shape))return unsup('method call',e.line);
         if(shape==='m'&&e.name==='as_str')return unsup('reborrow',e.line);

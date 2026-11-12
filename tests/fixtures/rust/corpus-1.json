@@ -12109,5 +12109,11 @@
     "src": "fn main() {\n    let s = String::from(\"a\")\n        .as_str().len();\n    println!(\"{}\", s);\n}\n",
     "expect": "ok", "out": "1\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: as_str on a temporary String, on the next line of the statement", "pr": "P5"
+  },
+  {
+    "id": "temp-for-str-method",
+    "src": "fn longest(words: &[&str]) -> usize {\n    let mut n = 0;\n    for w in words {\n        if w.len() > n {\n            n = w.len();\n        }\n    }\n    n\n}\n\nfn main() {\n    for w in &[\"apple\", \"banana\"] {\n        println!(\"{} {}\", w, w.len());\n    }\n    println!(\"{}\", longest(&[\"a\", \"bcd\", \"ef\"]));\n    let mut t = 0;\n    for w in &[\"xx\", \"yyy\"] {\n        t += w.len();\n    }\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "apple 5\nbanana 6\n3\n5\n", "err": "", "exit": 0,
+    "why": "len on the &&str of a for over a constant array of strings, and over a &[&str] parameter", "pr": "unit"
   }
 ]
