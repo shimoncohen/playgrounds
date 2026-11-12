@@ -141,7 +141,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     },
     showErrors(list){
       errs.textContent='';
-      for(const e of list){const li=el('li','',e.line+': '+e.msg);li.tabIndex=-1;errs.append(li);}
+      for(const e of list){const li=el('li','',(e.line??e.file)+': '+e.msg);li.tabIndex=-1;errs.append(li);}
     },
     focusErrors(){if(errs&&errs.firstChild)errs.firstChild.focus();}
   };

@@ -82,17 +82,19 @@ const CASES = [
 
   { at: [10, 0],
     pass: [H(HEAD + 'after edit src/ run npm run lint\n'), H('after edit src/ run npm run lint'), H('after edit src/price.js run npm run lint'), H(HEAD + 'after edit src/ run npm run lint\nafter edit docs/ run npm test\n')],
-    fail: [{}, H(''), H(HEAD + 'after edit docs/ run npm run lint\n'), H('after edit src/ run npm test'), H('after edit src/ run npm run ghost'), H('before run npm run lint'), H('after src/ run npm run lint'),
-      F({ 'CLAUDE.md': 'Done when: run npm run lint' }), F({ 'CLAUDE.md': 'Done when: run npm test' }), F({ '.claude/hook.txt': 'after edit src/ run npm run lint' }), F({ '.claude/notes.txt': 'after edit src/ run npm run lint' })] },
+    fail: [{}, H(''), H(HEAD + 'after edit docs/ run npm run lint\n'), H('after edit src/ run npm test'), H('after edit src/ run npm run ghost'), H('before run npm run lint'),
+      F({ 'CLAUDE.md': 'Done when: run npm run lint' }), F({ 'CLAUDE.md': 'Done when: run npm test' }), F({ '.claude/hook.txt': 'after edit src/ run npm run lint' }), F({ '.claude/notes.txt': 'after edit src/ run npm run lint' })],
+    refused: [H('after src/ run npm run lint')] },
   { at: [10, 1],
     pass: [H(HEAD + 'after edit src/ run npm run format\n'), H('after edit src/price.js run npm run format'), H('after edit src/ run npm run format\nafter edit src/ run npm run lint')],
     fail: [{}, H(''), H('after edit src/ run npm run lint'), H('after edit src/ run npm run lint\nafter edit src/ run npm run format'), H('after edit docs/ run npm run format'), H('after edit src/ run npm test'), H('before run npm run format'),
       F({ 'CLAUDE.md': 'Done when: run npm run format' }), F({ 'CLAUDE.md': 'Done when: run npm run lint' }), F({ '.claude/formatter.txt': 'after edit src/ run npm run format' })] },
   { at: [10, 2],
     pass: [H(HEAD + 'before run npm run deploy\nafter edit src/ run npm run lint\n'), H('after edit src/ run npm run lint\nbefore run npm run deploy'), H('before run npm run deploy\nafter edit src/price.js run npm run lint')],
-    fail: [{}, H(''), H('before run npm run deploy'), H('after edit src/ run npm run lint'), H('before run npm run deploy\nbefore run npm run lint'), H('after run npm run deploy\nafter edit src/ run npm run lint'), H('before run npm run deploy\nafter edit src/ run npm test'),
+    fail: [{}, H(''), H('before run npm run deploy'), H('after edit src/ run npm run lint'), H('before run npm run deploy\nbefore run npm run lint'), H('before run npm run deploy\nafter edit src/ run npm test'),
       F({ 'CLAUDE.md': 'do not run npm run deploy\nDone when: run npm run lint' }), F({ '.claude/hook.txt': 'before run npm run deploy\nafter edit src/ run npm run lint' }),
-      F({ '.claude/permissions.txt': 'deny run npm run deploy', '.claude/hooks.txt': 'after edit src/ run npm run lint' })] },
+      F({ '.claude/permissions.txt': 'deny run npm run deploy', '.claude/hooks.txt': 'after edit src/ run npm run lint' })],
+    refused: [H('after run npm run deploy\nafter edit src/ run npm run lint')] },
 
   { at: [11, 0],
     pass: [CMD('fix', GOAL + RULE + CHECK), CMD('fix', RULE + CHECK), CMD('fix', GOAL + 'Constraints: only edit src/\n' + CHECK), CMD('fix', GOAL + 'Constraints: ask before edit migrations/\n' + CHECK),
@@ -143,11 +145,12 @@ const CASES = [
     pass: [PERM('allow edit src/price*\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm test\n'), PERM('allow run npm test\nallow edit src/price.js'), PERM('# the job\nallow edit src/price.js\nallow run npm test\nallow read src/'),
       PERM('allow edit src/price.js\nallow run npm test\nallow run npm run lint'), PERM('allow edit src/price.js\nallow run npm test\ndeny run npm run deploy')],
     fail: [{}, PERM('allow edit src/*\nallow run npm test'), PERM('allow edit *\nallow run npm test'), PERM(''), PERM('allow edit src/price.js'), PERM('allow run npm test'), PERM('allow edit src/\nallow run npm'), PERM('allow edit src/\nallow run npm test'), PERM('allow edit src/price.js\nallow run npm'),
-      PERM('allow edit src/price.js\nallow run npm test\nallow run npm run deploy'), PERM('allow edit src/price.js\nallow run npm test\nallow edit src/legacy/old.js'), PERM('allow edt src/price.js\nallow run npm test'),
+      PERM('allow edit src/price.js\nallow run npm test\nallow run npm run deploy'), PERM('allow edit src/price.js\nallow run npm test\nallow edit src/legacy/old.js'),
       PERM('deny edit src/legacy/\ndeny run npm run deploy'),
       F({ 'CLAUDE.md': 'allow edit src/price.js\nallow run npm test' }), F({ 'CLAUDE.md': NOTES + 'Done when: run npm test\n', '.claude/permissions.txt': '' }), F({ '.claude/hooks.txt': 'after edit src/ run npm test' }),
       // a list in a file the job never reads
-      F({ '.claude/allow.txt': 'allow edit src/price.js\nallow run npm test' })] },
+      F({ '.claude/allow.txt': 'allow edit src/price.js\nallow run npm test' })],
+    refused: [PERM('allow edt src/price.js\nallow run npm test')] },
   { at: [13, 2],
     pass: [JOB(TG + 'Files: ci/last-run.log, src/tax.js\nDone when: run npm test\n'), JOB(TG + 'Files: src/tax.js, ci/last-run.log\nDone when: run npm test\n'), JOB(TG + 'Files: ci/last-run.log\nFiles: src/tax.js\nDone when: run npm test\n'),
       JOB(TG + 'Files: ci/, src/tax.js\nDone when: run npm test\n')],
@@ -402,7 +405,7 @@ describe('11.2 A hook that fixes the file', () => {
 describe('11.3 Stop it, then check it', () => {
   it('the deploy is skipped by the hook, and an invalid hook form leaves it running', () => {
     assert.ok(go(10, 2, M(10, 2).answer).outcome.steps.some((s) => s.type === 'skip' && s.by === 'hook' && s.target === 'npm run deploy'));
-    assert.match(go(10, 2, H('after run npm run deploy\nafter edit src/ run npm run lint')).result, /run npm run deploy, and nothing told it not to/);
+    assert.match(go(10, 2, H('after run npm run deploy\nafter edit src/ run npm run lint')).result, /was not run/);
     assert.match(go(10, 2, F({ '.claude/permissions.txt': 'deny run npm run deploy', '.claude/hooks.txt': 'after edit src/ run npm run lint' })).result, /not by a hook/);
   });
   it('no config mission of chapter 11 has a Done when line in its fixed prompt', () => {

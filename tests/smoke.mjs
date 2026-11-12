@@ -3416,6 +3416,25 @@ test('agent-quest: nothing the learner types is ever stored', async () => {
   await o.ctx.close();
 });
 
+test('agent-quest: a malformed setup file line is listed with its file, refuses the run, and clears when fixed', async () => {
+  const o = await agentPage({}, seedAt(5, 0));
+  const { page } = o;
+  await page.click('#tree [data-path=".claude/hooks.txt"]');
+  await page.fill('#fileEditor textarea', 'run npm run deploy');
+  assert.equal(await page.locator('#perrs li').count(), 1);
+  assert.match(await page.textContent('#perrs li'), /^\.claude\/hooks\.txt: .*run npm run deploy.*is not/);
+  assert.doesNotMatch(await page.textContent('#perrs'), /undefined/);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps').count(), 0, 'no run happens while a setup file does not parse');
+  assert.equal(await page.evaluate(() => document.activeElement.closest('#perrs') !== null), true);
+  await page.fill('#fileEditor textarea', 'before run npm run deploy');
+  assert.equal(await page.locator('#perrs li').count(), 0);
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .win').count(), 1);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: the config and budget missions are played in the file editor', async () => {
   const o = await agentPage();
   const { page } = o;
@@ -3650,15 +3669,18 @@ test('agent-quest: the Schedules chapter never scrolls sideways at 390, 1000 and
     await page.click('#tree [data-path=".claude/schedule.txt"]');
     assert.match(await page.inputValue('#fileEditor textarea'), /monday 09:00 use backup-note/);
     await fits('the schedule file view');
-    // a rejected line is shown as text in the schedule step, and nothing it holds becomes an element or runs
+    // a rejected line refuses the run and is listed as text, and nothing it holds becomes an element or runs
     await edit('<b>x</b>');
-    assert.match(await page.textContent('#runPanel .steps'), /Schedule: no line starts the job\. Ignored: "<b>x<\/b>" is not "WHEN HH:MM use NAME"/);
-    assert.equal(await page.locator('#runPanel .steps b').count(), 0);
-    await fits('the Run panel after a run no line started');
+    await pane('mission');
+    assert.match(await page.textContent('#perrs'), /\.claude\/schedule\.txt: "<b>x<\/b>" is not "WHEN HH:MM use NAME"/);
+    assert.equal(await page.locator('#perrs b').count(), 0);
+    assert.equal(await page.locator('#runPanel .steps').count(), 0);
+    await fits('the error list after a refused run');
     await edit('<img src=x onerror="window.__z=1">');
+    await pane('mission');
+    assert.equal(await page.$('#perrs img'), null);
     assert.equal(await page.$('#runPanel img'), null);
     assert.equal(await page.evaluate(() => window.__z), undefined);
-    await pane('mission');
     await page.click('#promptHost [data-act="fill"]');
     await page.click('#runBtn');
     await pane('run');

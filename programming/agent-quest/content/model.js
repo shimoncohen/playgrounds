@@ -32,13 +32,13 @@ function prepare(m,input){
   return {scenario:sc,vfs,setup,prompt};
 }
 
-const REFUSED='Some of your lines did not parse, so the agent was not run. Fix the lines listed under the form first.';
+const REFUSED='Some of your lines or setup files did not parse, so the agent was not run. Fix the lines listed under the form first.';
 const WAITING='The agent made a plan and is waiting for you to approve it.';
 
-/* opts.approved continues a run that paused on Plan: first. A prompt with a rejected line is never run. */
+/* opts.approved continues a run that paused on Plan: first. A prompt line or setup file that does not parse means no run. */
 function evaluate(m,input,opts={}){
   const {scenario,vfs,setup,prompt}=prepare(m,input);
-  if(prompt.errors.length)return {result:REFUSED,refused:true,outcome:null,prompt,setup};
+  if(prompt.errors.length||setup.errors.length)return {result:REFUSED,refused:true,outcome:null,prompt,setup};
   const outcome=AQ.policy.run(scenario,setup,prompt,{vfs,approved:!!opts.approved,history:scenario.history||[]});
   if(outcome.status==='awaiting-approval')return {result:WAITING,awaiting:true,outcome,prompt,setup};
   const c={prompt,setup,scenario};

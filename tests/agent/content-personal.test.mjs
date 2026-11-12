@@ -51,11 +51,6 @@ const CASES = [
       F({ [SCH]: WEEKLY })],
     fail: [{}, S(BACKUP + 'daily 07:30 use weekly-digest'), S(BACKUP + 'weekdays 17:30 use weekly-digest'), S(BACKUP + 'weekdays 07:30 use weekly-digest\nweekdays 08:00 use weekly-digest'),
       S(BACKUP + 'monday 07:30 use weekly-digest'), S(BACKUP + WEEKLY + '\nsaturday 07:30 use weekly-digest'), S(BACKUP + 'weekdays 07:30 use backup-note'),
-      // a line the reader rejects is shown in the Run panel and the mission says so
-      S(BACKUP + 'weekday 07:30 use weekly-digest'), S(BACKUP + 'weekdays 7:30 use weekly-digest'), S(BACKUP + 'weekdays 24:00 use weekly-digest'), S(BACKUP + 'weekdays 07:60 use weekly-digest'),
-      S(BACKUP + 'weekdays 07:30 use weekly-digst'), S(BACKUP + 'weekdays 07:30 weekly-digest'), S(BACKUP + WEEKLY + ' now'),
-      // a good line beside a bad one still reports the bad one
-      S(BACKUP + WEEKLY + '\nweekday 08:00 use backup-note'),
       // the command is the job: emptied, edited, or its check moved into the root CLAUDE.md
       F({ [SCH]: HEAD + WEEKLY + '\n', [WD]: '' }), F({ [SCH]: HEAD + WEEKLY + '\n', [WD]: DIGEST + 'Constraints: do not edit notes/' }),
       F({ [SCH]: HEAD + WEEKLY + '\n', [WD]: '', 'CLAUDE.md': 'Done when: read digest.md' }),
@@ -63,36 +58,35 @@ const CASES = [
       // the job's own permissions
       F({ [SCH]: HEAD + WEEKLY + '\n', [ALLOW]: '' }), F({ [SCH]: HEAD + WEEKLY + '\n', [ALLOW]: 'allow edit digest.md\ndeny edit digest.md' }), F({ [SCH]: HEAD + WEEKLY + '\n', [ALLOW]: 'allow edit notes/\n' }),
       // the line in a file that is not the schedule, or an unshipped .claude/ file
-      F({ 'CLAUDE.md': WEEKLY }), F({ '.claude/hooks.txt': WEEKLY }), F({ '.claude/schedule.json': WEEKLY }), F({ '.claude/crontab.txt': WEEKLY }), F({ '.claude/commands/morning.md': WEEKLY }),
+      F({ 'CLAUDE.md': WEEKLY }), F({ '.claude/schedule.json': WEEKLY }), F({ '.claude/crontab.txt': WEEKLY }), F({ '.claude/commands/morning.md': WEEKLY }),
       F({ [SCH]: '' })],
-    refused: [F({ [SCH]: HEAD + WEEKLY + '\n', [WD]: 'banana' }), F({ [WD]: DIGEST + 'Use: backup-note' })] },
+    refused: [F({ [SCH]: HEAD + WEEKLY + '\n', [WD]: 'banana' }), F({ [WD]: DIGEST + 'Use: backup-note' }), S(BACKUP + 'weekday 07:30 use weekly-digest'), S(BACKUP + 'weekdays 7:30 use weekly-digest'), S(BACKUP + 'weekdays 24:00 use weekly-digest'), S(BACKUP + 'weekdays 07:60 use weekly-digest'), S(BACKUP + 'weekdays 07:30 use weekly-digst'), S(BACKUP + 'weekdays 07:30 weekly-digest'), S(BACKUP + WEEKLY + ' now'), S(BACKUP + WEEKLY + '\nweekday 08:00 use backup-note'), F({ '.claude/hooks.txt': WEEKLY })] },
   { at: [15, 1],
     pass: [S('monday 07:30 use weekly-digest'), S('monday 09:00 use weekly-digest'), S('MONDAY 07:30 USE weekly-digest'), S('monday 07:30 use weekly-digest\n' + BACKUP.trim()), S('#daily 07:30 use weekly-digest\nmonday 07:30 use weekly-digest')],
     fail: [{}, S('weekdays 07:30 use weekly-digest'), S('friday 07:30 use weekly-digest'), S('daily 07:30 use weekly-digest\nmonday 07:30 use weekly-digest'), S('monday 07:30 use weekly-digest\nfriday 07:30 use weekly-digest'),
       S('monday 07:30 use weekly-digest\ndaily 12:00 use weekly-digest'), S('weekdays 07:30 use weekly-digest\nsaturday 07:30 use weekly-digest\nsunday 07:30 use weekly-digest'),
-      S(''), S('monday 07:30 use backup-note'), S('monday 7:30 use weekly-digest'), S('mondey 07:30 use weekly-digest'), S('monday 07:30 use weekly-digst'),
+      S(''), S('monday 07:30 use backup-note'),
       // the command is the job, and the setup the run carries counts toward the week
       F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', [WD]: '' }), F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', [WD]: DIGEST + 'Constraints: do not edit notes/' }),
       F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', [WD]: '', 'CLAUDE.md': 'Done when: read digest.md' }),
       F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', 'CLAUDE.md': 'x '.repeat(2500) }),
       F({ [SCH]: HEAD + 'monday 07:30 use weekly-digest\n', [ALLOW]: '' }),
-      F({ 'CLAUDE.md': 'monday 07:30 use weekly-digest' }), F({ '.claude/schedule.json': 'monday 07:30 use weekly-digest' }), F({ '.claude/hooks.txt': 'monday 07:30 use weekly-digest' })] },
+      F({ 'CLAUDE.md': 'monday 07:30 use weekly-digest' }), F({ '.claude/schedule.json': 'monday 07:30 use weekly-digest' })],
+    refused: [S('monday 7:30 use weekly-digest'), S('mondey 07:30 use weekly-digest'), S('monday 07:30 use weekly-digst'), F({ '.claude/hooks.txt': 'monday 07:30 use weekly-digest' })] },
   { at: [15, 2],
     pass: [R(FIXED), R(FIXED, CREATE), R(FIXED, COMMENT + 'allow call calendar.list\n' + CREATE), R(FIXED, COMMENT + CREATE + 'deny call calendar.delete\n'),
       R("Goal: remind me about today's plan\nPlan: off\nDone when: read notes/today.md\n"), R("Goal: remind me about today's plan\nConstraints: do not call calendar.delete\nDone when: read notes/today.md\n", COMMENT + CREATE),
       R(FIXED, COMMENT + 'allow call calendar.delete\ndeny call calendar.delete\n' + CREATE)],
     fail: [{}, R(FIXED, COMMENT), R(REMIND, COMMENT + CREATE), R(REMIND, COMMENT), R(FIXED, COMMENT + 'allow call calendar\n'), R(FIXED, COMMENT + CREATE + 'allow call calendar.delete\n'),
-      R(FIXED, COMMENT + 'allow call calendar.crate\n'), R(FIXED, COMMENT + 'allow create calendar\n'), R(FIXED, COMMENT + 'allow read calendar.create\n'), R(FIXED, COMMENT + 'allow call mail.send\n'),
+      R(FIXED, COMMENT + 'allow call calendar.crate\n'), R(FIXED, COMMENT + 'allow read calendar.create\n'), R(FIXED, COMMENT + 'allow call mail.send\n'),
       R(FIXED, COMMENT + 'deny call calendar.create\n' + CREATE), R(FIXED, COMMENT + 'allow call calendar.list\n'),
       // the command is the job: emptied, stripped of its check, or the check moved into the root CLAUDE.md
       R('', COMMENT + CREATE), R('', COMMENT + CREATE, { 'CLAUDE.md': 'Done when: read notes/today.md' }), R("Goal: remind me about today's plan\n"), R("Goal: remind me about today's plan\nPlan: off\n"),
       R(FIXED, COMMENT + CREATE, { 'CLAUDE.md': 'do not call calendar.create' }), R(FIXED, COMMENT, { 'CLAUDE.md': 'allow call calendar.create' }), F({ [ALLOW]: COMMENT + CREATE, 'CLAUDE.md': 'allow call calendar.create' }),
       F({ [ALLOW]: COMMENT + CREATE, [MR]: REMIND, 'CLAUDE.md': FIXED }),
       // the list in a file the job never reads
-      R(FIXED, COMMENT, { '.claude/allow.txt': 'allow call calendar.create' }), R(FIXED, COMMENT, { '.claude/hooks.txt': 'allow call calendar.create' }),
-      // the schedule line the job needs, broken or gone
-      R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 08:00 use morning-remindr\n' }), R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 8:00 use morning-reminder\n' }), R(FIXED, COMMENT + CREATE, { [SCH]: '' })],
-    refused: [R('banana'), R(FIXED + 'Use: morning-reminder')] },
+      R(FIXED, COMMENT, { '.claude/allow.txt': 'allow call calendar.create' }), R(FIXED, COMMENT + CREATE, { [SCH]: '' })],
+    refused: [R('banana'), R(FIXED + 'Use: morning-reminder'), R(FIXED, COMMENT + 'allow create calendar\n'), R(FIXED, COMMENT, { '.claude/hooks.txt': 'allow call calendar.create' }), R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 08:00 use morning-remindr\n' }), R(FIXED, COMMENT + CREATE, { [SCH]: HEAD + 'daily 8:00 use morning-reminder\n' })] },
   { at: [16, 0],
     pass: [`Examples: ${SAMPLE}`, `examples: ${SAMPLE}`, `Goal: thank Dana for the tea\nExamples: ${SAMPLE}`, `Examples: ${SAMPLE}, ${FORMAL}`, `Examples: ${SAMPLE}\nFiles: ${FORMAL}`],
     fail: [`Examples: ${FORMAL}`, `Examples: ${FORMAL}, ${SAMPLE}`, 'Examples: drafts/thanks.md', 'Examples: drafts/', `Files: ${SAMPLE}`, 'Goal: write a thank-you note to Dana',
@@ -152,7 +146,8 @@ const CASES = [
     fail: [{}, MC(CAL + 'notes: read'), MC(CAL + 'notes: search'), MC(CAL + 'notes: add'), MC(CAL + 'notes: search, read'), MC(CAL + 'note: search, add'), MC(CAL + 'notes: search, adds'),
       MC(CAL + 'calendar: search, add'), MC(CAL + 'notes: search, add', DENY('call notes.add')), MC(CAL + 'notes: search, add', { 'CLAUDE.md': 'do not call notes.add' }), MC(''),
       // the line in a file that is not the connection list, or an unshipped .claude/ file
-      F({ 'CLAUDE.md': 'notes: search, add' }), F({ '.claude/hooks.txt': 'notes: search, add' }), F({ '.claude/mcp.json': 'notes: search, add' }), F({ '.claude/servers.txt': 'notes: search, add' })] },
+      F({ 'CLAUDE.md': 'notes: search, add' }), F({ '.claude/mcp.json': 'notes: search, add' }), F({ '.claude/servers.txt': 'notes: search, add' })],
+    refused: [F({ '.claude/hooks.txt': 'notes: search, add' })] },
   { at: [18, 1],
     pass: [MC(CAL + 'mail: read, search'), MC(CAL + 'mail: read'), MC('mail: read'), MC(CAL + 'mail: search, read'), MC(CAL + 'mail: read\nmail: search'),
       MC(CAL + 'mail: read, search, send', DENY('call mail.send')), MC(CAL + 'mail: read, send', { 'CLAUDE.md': 'do not call mail.send' }),
@@ -161,13 +156,15 @@ const CASES = [
       MC(CAL + 'mail: read, search, send'), MC(CAL + 'mail: read, send', DENY('call mail.search')), MC(CAL + 'mail: read, send', DENY('read mail.send')), MC(CAL + 'mail: read, send', { 'CLAUDE.md': 'do not send mail.send' }),
       MC(CAL + 'mail: read, send', DENY('call mail.read')), MC(CAL + 'mail: reed, search'), MC(CAL + 'mails: read, search'), MC(''),
       // the connection or the rule in a file that is not the one the mission reads, or an unshipped .claude/ file
-      F({ 'CLAUDE.md': 'mail: read, search' }), F({ [ALLOW]: 'mail: read, search' }), F({ '.claude/mcp.json': 'mail: read, search' }), F({ '.claude/deny.txt': 'deny call mail.send' })] },
+      F({ 'CLAUDE.md': 'mail: read, search' }), F({ '.claude/mcp.json': 'mail: read, search' }), F({ '.claude/deny.txt': 'deny call mail.send' })],
+    refused: [F({ [ALLOW]: 'mail: read, search' })] },
   { at: [18, 2],
     pass: [MC('calendar: list, create'), MC('calendar: list, create, delete'), MC('calendar: create, list'), MC('calendar: create\ncalendar: list'), MC('calendar: list, create\ncalendar: delete')],
     fail: [{}, MC('Calendar: list, create'), MC('calendar: create'), MC('calendar: list'), MC(''), MC('calendar: list, create', DENY('call calendar.create')), MC('calendar: list, create', DENY('call calendar')), MC('calendar: list, create', DENY('call calendar.list')),
       MC('calendar: list, create', { 'CLAUDE.md': 'do not call calendar.create' }), MC('calendar: list, creat'), MC('calendars: list, create'), MC('calendar: delete'),
       // the line in a file that is not the connection list, or an unshipped .claude/ file
-      F({ 'CLAUDE.md': 'calendar: list, create' }), F({ '.claude/hooks.txt': 'calendar: list, create' }), F({ '.claude/mcp.json': 'calendar: list, create' })] },
+      F({ 'CLAUDE.md': 'calendar: list, create' }), F({ '.claude/mcp.json': 'calendar: list, create' })],
+    refused: [F({ '.claude/hooks.txt': 'calendar: list, create' })] },
   { at: [19, 0],
     pass: [RV(FILLED), RV(`${WRULE}\n${WDONE}`), RV(`${WGOAL}\n${WRULE}\n${WDONE}\nConstraints: do not edit notes/this-week.md`), RV(`${WRULE}\nDone when: read ${THIS}`), RV(`Constraints: only delete ${LAST}\n${WDONE}`),
       RV(`done when: read ${ARCH}\nconstraints: do not delete ${THIS}`), RV(FILLED, { 'CLAUDE.md': 'do not edit notes/index.md' })],
@@ -184,17 +181,15 @@ const CASES = [
   { at: [19, 1],
     pass: [QS('schedule'), QS('schedule', NARROW), QS('schedule', SCHED('daily 06:30 use weekly-review')), QS('schedule', SCHED('monday 20:00 use weekly-review')), QS('schedule', SCHED('weekdays 20:00 use weekly-review\ndaily 08:00 use weekly-review')),
       QS('schedule', {}, 'do not call calendar.delete\ndo not read notes/this-week.md\n'), QS('schedule', { [RVW]: '' }), QS('schedule', { [ALLOW]: 'allow call calendar.create\nallow call calendar.delete\n' }), QS('schedule', { 'CLAUDE.md': 'do not edit notes/this-week.md' })],
-    fail: [{}, QS('review'), QS('docs'), QS('schedule', {}, ''), QS('schedule', {}, 'do not call calendar.list\n'), QS('Schedule'), QS('schedule', {}, undefined, 'calm'),
+    fail: [{}, QS('review'), QS('docs'), QS('schedule', {}, ''), QS('schedule', {}, 'do not call calendar.list\n'), QS('schedule', {}, undefined, 'calm'),
       // the skill is the lever: the same stop in another place leaves it asleep
       F({ 'CLAUDE.md': 'do not call calendar.delete' }), F({ '.claude/hooks.txt': 'before call calendar.delete' }), F({ [ALLOW]: '# deny VERB TARGET\ndeny call calendar.delete\n' }), F(NARROW), F({ [ALLOW]: '' }),
       // the skill loads, but the reminder is never made: nothing to approve it, or the skill stops the create too
       QS('schedule', { [ALLOW]: '' }), QS('schedule', { [ALLOW]: 'allow call calendar.delete\n' }), QS('schedule', {}, 'do not call calendar\n'), QS('schedule', {}, 'do not call calendar.create\ndo not call calendar.delete\n'),
       QS('schedule', { [ALLOW]: '# deny VERB TARGET\ndeny call calendar.create\nallow call calendar\n' }),
       // the schedule line that starts the job, gone or broken
-      QS('schedule', { [SCH]: '' }), QS('schedule', SCHED('daily 20:00 use quiet-hours')), QS('schedule', SCHED('daily 20:00 use weekly-reviw')), QS('schedule', SCHED('daily 8:00 use weekly-review')), F({ [SCH]: '' }),
-      // an unshipped .claude/ file
-      F({ '.claude/skills/quiet.md': SK('schedule') }), F({ '.claude/skills/quiet-hours.txt': SK('schedule') })],
-    refused: [RV('banana'), RV("Goal: set up this week's reminders\nUse: weekly-review")] },
+      QS('schedule', { [SCH]: '' }), F({ [SCH]: '' }), F({ '.claude/skills/quiet-hours.txt': SK('schedule') })],
+    refused: [RV('banana'), RV("Goal: set up this week's reminders\nUse: weekly-review"), QS('Schedule'), QS('schedule', SCHED('daily 20:00 use quiet-hours')), QS('schedule', SCHED('daily 20:00 use weekly-reviw')), QS('schedule', SCHED('daily 8:00 use weekly-review')), F({ '.claude/skills/quiet.md': SK('schedule') })] },
   { at: [19, 2],
     pass: ['Use: weekly-review', 'use: weekly-review', "Goal: archive last week's notes\nUse: weekly-review", 'Use: weekly-review, tone', 'Use: tone, weekly-review', 'Use: tone\nUse: weekly-review', 'Use: weekly-review\nUse: weekly-review',
       P('Use: weekly-review', { 'CLAUDE.md': 'do not edit notes/index.md' })],
@@ -210,13 +205,16 @@ runCases(AQ, 'chapters 16 to 20: lazy and nearby answers are caught', CASES, (c)
 
 describe('schedule messages name the problem', () => {
   const msg = (c, i, input) => go(c, i, input).result;
-  it('a line the reader rejects is quoted with its reason, in the mission and in the Run panel step', () => {
-    const bad = S(BACKUP + 'weekday 07:30 use weekly-digest');
-    assert.match(msg(15, 0, bad), /ignored a line in \.claude\/schedule\.txt: "weekday" is not daily, weekdays or a day name/);
-    assert.match(go(15, 0, bad).outcome.steps[0].why, /"weekday"/);
-    assert.match(msg(15, 0, S(BACKUP + 'weekdays 7:30 use weekly-digest')), /is not a time/);
-    assert.match(msg(15, 0, S(BACKUP + 'weekdays 07:30 use weekly-digst')), /is not a saved command/);
-    assert.match(msg(15, 0, S(BACKUP + 'weekdays 07:30 weekly-digest')), /is not "WHEN HH:MM use NAME"/);
+  it('a line the reader rejects refuses the run and is listed with its file and reason', () => {
+    const why = (line) => {
+      const r = go(15, 0, S(BACKUP + line));
+      assert.equal(r.refused, true);
+      return r.setup.errors.filter((e) => e.file === '.claude/schedule.txt').map((e) => e.msg).join('\n');
+    };
+    assert.match(why('weekday 07:30 use weekly-digest'), /"weekday" is not daily, weekdays or a day name/);
+    assert.match(why('weekdays 7:30 use weekly-digest'), /is not a time/);
+    assert.match(why('weekdays 07:30 use weekly-digst'), /is not a saved command/);
+    assert.match(why('weekdays 07:30 weekly-digest'), /is not "WHEN HH:MM use NAME"/);
   });
   it('the lazy digest run is blocked with only the schedule step, and the message says no line starts it', () => {
     const r = go(15, 0, {});
@@ -530,7 +528,9 @@ describe('chapter 20 (index 19): Personal skills and commands messages and outco
   });
   it('19.1 a schedule line that is gone or broken has its own message, with the reader\'s reason when there is one', () => {
     assert.match(msg(19, 1, QS('schedule', { [SCH]: '' })), /No line in \.claude\/schedule\.txt starts weekly-review.*Keep the line that starts it/);
-    assert.match(msg(19, 1, QS('schedule', SCHED('daily 8:00 use weekly-review'))), /The reader ignored a line: .*is not a time/);
+    const r = go(19, 1, QS('schedule', SCHED('daily 8:00 use weekly-review')));
+    assert.equal(r.refused, true);
+    assert.match(r.setup.errors.map((e) => e.msg).join('\n'), /is not a time/);
   });
   it('19.1 an emptied saved command still fires the job and loads the skill, so it is not the lever', () => assert.equal(msg(19, 1, QS('schedule', { [RVW]: '' })), true));
   it('19.2 the answer calls the command, and the tone skill loads by the docs tag and guards the index', () => {

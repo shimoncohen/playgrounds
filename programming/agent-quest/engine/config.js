@@ -129,7 +129,9 @@ function parseSetup(vfs){
   /* raw: every setup file under .claude/, so a size budget counts text the parsers ignore too */
   const setup={memory:vfs.read('CLAUDE.md')||'',raw:vfs.list('.claude/').map(p=>vfs.read(p)).join('\n'),skills:[],mcp:[],rules:[],allow:[],hooks:[],afterHooks:[],subagents:[],commands:[],schedule:[],errors:[],
     memoryFolders:vfs.list().filter(isFolderMemory).map(path=>({path,dir:path.slice(0,-'CLAUDE.md'.length),text:vfs.read(path)}))};
-  for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md'))){
+  /* the editor has no delete: a file emptied to nothing is a removed file, not a malformed one */
+  const blank=p=>!String(vfs.read(p)).trim();
+  for(const p of vfs.list('.claude/skills/').filter(f=>f.endsWith('.md')&&!blank(f))){
     const f=frontmatter(vfs.read(p));
     if(!f.name){setup.errors.push({file:p,msg:'a skill needs a name: line'});continue;}
     if(!TAGS.includes(f.when)){setup.errors.push({file:p,msg:'when: must be one of '+TAGS.join(', ')});continue;}
@@ -158,7 +160,7 @@ function parseSetup(vfs){
   });
   const kinds={skill:setup.skills,subagent:setup.subagents,'MCP server':setup.mcp};
   const clash=(name,of)=>{const k=of.find(k=>kinds[k].some(x=>x.name===name));return k?'the name "'+show(name)+'" is already used by a '+k:'';};
-  for(const p of vfs.list('.claude/agents/').filter(f=>f.endsWith('.md'))){
+  for(const p of vfs.list('.claude/agents/').filter(f=>f.endsWith('.md')&&!blank(f))){
     const f=frontmatter(vfs.read(p));
     if(!(f.name&&own(MODELS,f.model)))setup.errors.push({file:p,msg:'a subagent needs name: and model: small, standard or large'});
     else if(clash(f.name,['skill']))setup.errors.push({file:p,msg:clash(f.name,['skill'])});
