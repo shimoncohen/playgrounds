@@ -437,7 +437,9 @@ RQ.lint=(ast,info)=>{
       case 'Assign':{
         // a write to a field leaves the folded value of its root unknown
         if(e.lhs.t==='Field'||e.lhs.t==='Index'){
-          ev(e.rhs);
+          const r=ev(e.rhs);
+          if(e.lhs.t==='Index')ev(e.lhs);
+          if(e.op==='/='||e.op==='%=')arith(e.op[0],null,r,e);
           const rb=rootBind(e.lhs);
           if(rb)forget([rb]);
           barrier();return null;

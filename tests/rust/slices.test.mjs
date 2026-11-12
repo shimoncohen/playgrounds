@@ -65,7 +65,7 @@ describe('array slices', () => {
     assert.equal(feature(P('fn f(xs: &[i32]) -> i32 {', '    let i: i32 = 0;', '    xs[i]', '}', 'fn main() {}')), 'type checking@3');
   });
   it('what stays unsupported', () => {
-    assert.equal(feature(P('fn f(xs: &mut [i32]) {}', 'fn main() {}')), 'reference@1');
+    assert.equal(RQ.run(P('fn f(xs: &mut [i32]) {}', 'fn main() {}')).status, 'ok');
     assert.equal(feature(main('let a = [1, 2, 3];', 'let b = &mut a[1..];')), 'reference@3');
     assert.equal(feature(main('let a = [String::new(), String::new()];', 'println!("{}", a.len());')), 'method call@3');
     assert.equal(feature(main('let a = [1, 2, 3];', 'let b = a[1..2];')), 'range expression@3');
