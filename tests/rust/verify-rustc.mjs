@@ -42,10 +42,16 @@ const norm = (s) => s.split('\n').filter((l) => !l.startsWith('note: run with `R
 
 const unordered = (s) => norm(s).split('\n').map(sortGroups).sort().join('\n');
 
+// a span inside a std macro (`vec!`, `format!`) is reported at the macro's own source; the learner's line is where it was called
+function userLine(span) {
+  while (span.file_name !== 'src/main.rs' && span.expansion && span.expansion.span) span = span.expansion.span;
+  return span.line_start;
+}
+
 function realResult(f) {
   const diags = f.DIAG.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   const coded = diags.filter((d) => d.level === 'error' && d.code && d.code.code)
-    .map((d) => ({ id: d.code.code, line: (d.spans.find((s) => s.is_primary) || d.spans[0] || {}).line_start }));
+    .map((d) => ({ id: d.code.code, line: userLine(d.spans.find((s) => s.is_primary) || d.spans[0] || {}) }));
   if (f.EXIT === 'compile-failed') return { compiled: false, coded };
   return { compiled: true, stdout: norm(f.STDOUT), stderr: norm(f.STDERR), exit: Number(f.EXIT) };
 }

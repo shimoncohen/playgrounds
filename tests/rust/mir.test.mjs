@@ -195,8 +195,8 @@ describe('what the mir pass leaves unsupported', () => {
   it('reports the trigger with its line, in an analysed fn', () => {
     assert.equal(un('    let a = [1, 2];\n    let r = &a[1];'), 'borrow of a field@4');
     assert.equal(un('    let a = [1, 2];\n    let r = &a[0];'), 'borrow of a field@4');
-    assert.equal(un('    let r = &5;'), 'temporary borrow@3');
-    assert.equal(un('    let r = &String::new();'), 'temporary borrow@3');
+    assert.equal(un('    let t = (&5, 1);'), 'temporary borrow@3');
+    assert.equal(un('    let t = (&String::new(), 1);'), 'temporary borrow@3');
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    let r2 = r;'), 'reborrow@5');
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    let r2: &mut i32 = r;'), 'reborrow@5');
     assert.equal(un('    let x = 1;\n    let r = &x;\n    let r2 = &*r;'), 'reborrow@5');
@@ -207,17 +207,17 @@ describe('what the mir pass leaves unsupported', () => {
     assert.equal(un(S + '    if true {\n    }'), 'constant condition@4');
     assert.equal(un(S + '    while false {\n    }'), 'constant condition@4');
   });
-  it('lets a Copy read through a reference and the implicit reborrows pass, but not a &String of a temporary', () => {
+  it('lets a Copy read through a reference and the implicit reborrows pass, and a &String of a temporary lent to a call', () => {
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    *r = 2;\n    let y = *r;\n    println!("{}", r);'), '');
-    assert.equal(un('    let mut s = String::from("a");\n    let t = String::from("b");\n    s.push_str(&t);\n    s.push_str(&t.clone());'), 'temporary borrow@6');
+    assert.equal(un('    let mut s = String::from("a");\n    let t = String::from("b");\n    s.push_str(&t);\n    s.push_str(&t.clone());'), '');
     assert.equal(un('    let t = (String::from("a"), 1);\n    let n = t.1;'), '');
   });
   it('a fn the pass skips reports nothing', () => {
     assert.equal(un('    let t = (1, 2);\n    let u = t.0;\n    if true {\n    }'), '');
   });
-  it('as_str on a temporary String is a temporary borrow, and nothing else is', () => {
-    assert.equal(un('    let r = String::from("a").as_str();\n    println!("{}", r);'), 'temporary borrow@3');
-    assert.equal(un('    let s = String::from("a");\n    let r = s.clone().as_str();\n    println!("{}", r);'), 'temporary borrow@4');
+  it('a borrow of a temporary String is modeled: it dies with its statement', () => {
+    assert.equal(un('    let r = String::from("a").as_str();\n    println!("{}", r);'), '');
+    assert.equal(un('    let s = String::from("a");\n    let r = s.clone().as_str();\n    println!("{}", r);'), '');
     assert.equal(un('    let s = String::from("a");\n    let r = s.as_str();\n    println!("{}", r);'), '');
     assert.equal(un('    let n = String::from("a").len();'), '');
     assert.equal(un('    let s = String::from("a");\n    let n = s.clone().len();\n    let mut t = String::new();\n    t.clone().push_str("x");'), '');
