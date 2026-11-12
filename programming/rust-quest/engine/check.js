@@ -28,7 +28,7 @@ const MACRO_NAMES='format panic assert assert_eq assert_ne debug_assert debug_as
 RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static','type alias','use','mod','generics','method','nested item','closure','match',
   'method call','field access','slice','reference','dereference','cast','try operator','struct literal','qualified path',
   'fn pointer','impl Trait','inferred type','pattern','deferred initialization','format spec','assignment target','type checking',
-  'const initializer','integer overflow','const folding','main signature','path call','function value','bit shift','block label','call','wrong argument count',
+  'const initializer','integer overflow','const folding','main signature','path call','function value','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
   'error conversion','string concatenation','polymorphic recursion','bounds','where','into','generic reference','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
@@ -814,7 +814,7 @@ RQ.check=ast=>{
   // `v[a..b].m()` borrows the slice itself, as `(&v[a..b]).m()` does
   function lendRange(e){
     const rx=peel(e.recv);
-    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||e.name==='swap',expr:rx};
+    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||MUT_SEQ.includes(e.name),expr:rx};
   }
   function slice(e,x){
     const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);
@@ -1064,6 +1064,14 @@ RQ.check=ast=>{
     const fb=+from.slice(1),tb=+to.slice(1);
     return from[0]===to[0]?fb<tb:from[0]==='u'&&fb<tb;
   };
+  // rustc names the part of the element type that lacks Ord, not the whole element
+  const ordLeaf=t=>{
+    t=res(t);
+    const sub=t.k==='array'||t.k==='slice'?[t.el]:t.k==='tuple'?t.els:t.k==='enum'&&t.builtin||t.k==='coll'&&t.name==='Vec'?t.args:[];
+    const bad=sub.find(x=>!has(x,'Ord'));
+    return bad?ordLeaf(bad):t;
+  };
+  const SORTS=['sort','sort_unstable'],MUT_SEQ=['swap','reverse',...SORTS],SEQ_METHODS=[...MUT_SEQ,'contains','first','last'];
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
   const ITERS=['iter','iter_mut','into_iter','keys','values','values_mut'],STORES=['push','insert','entry.or_insert','entry.or_default'];
   const MAP_KEYED=['insert','get','get_mut','contains_key','remove','entry.or_insert','entry.or_default'];
@@ -1071,7 +1079,17 @@ RQ.check=ast=>{
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(name==='to_string'&&meets(base,'Display')&&base.k!=='coll')return {...rec('&',[],T.string,-1),key:'Display::to_string'};
-    if(name==='swap'&&(base.k==='array'||base.k==='slice'))return {...rec('&mut',[T.int('usize'),T.int('usize')],T.unit,-1),key:'Vec::swap'};
+    if(base.k==='array'||base.k==='slice'){
+      const el=base.el,usz=T.int('usize'),on=(selfKind,params,ret,from)=>({...rec(selfKind,params,ret,from),key:'Vec::'+name});
+      switch(name){
+        case 'swap':return on('&mut',[usz,usz],T.unit,-1);
+        case 'reverse':return on('&mut',[],T.unit,-1);
+        case 'sort':case 'sort_unstable':return has(el,'Ord')?on('&mut',[],T.unit,-1):null;
+        case 'contains':return has(el,'PartialEq')?on('&',[mkRef(false,el)],T.bool,-1):null;
+        case 'first':case 'last':return on('&',[],optTy(mkRef(false,el)),0);
+      }
+      return null;
+    }
     if(base.k==='coll'){
       const [k,v]=base.args,vec=base.name==='Vec',usz=T.int('usize');
       if(name==='len'||name==='is_empty')return rec('&',[],name==='len'?T.int('usize'):T.bool,-1);
@@ -1089,7 +1107,7 @@ RQ.check=ast=>{
           case 'truncate':return rec('&mut',[usz],T.unit,-1);
           case 'swap':return rec('&mut',[usz,usz],T.unit,-1);
           case 'reverse':return rec('&mut',[],T.unit,-1);
-          case 'sort':return has(k,'Ord')?rec('&mut',[],T.unit,-1):null;
+          case 'sort':case 'sort_unstable':return has(k,'Ord')?rec('&mut',[],T.unit,-1):null;
           case 'contains':return has(k,'PartialEq')?rec('&',[mkRef(false,k)],T.bool,-1):null;
           case 'get':return rec('&',[usz],optTy(mkRef(false,k)),0);
           case 'get_mut':return rec('&mut',[usz],optTy(mkRef(true,k)),0);
@@ -1159,14 +1177,22 @@ RQ.check=ast=>{
     if(!m&&spec&&base.k==='iter')return unsup('iterator',e.line);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
+      if(base.k==='array'||base.k==='slice'){
+        const el=res(base.el),need=SORTS.includes(name)&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null;
+        if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
+          errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{trait:need,type:show(need==='Ord'?ordLeaf(el):el)}));
+          return need==='Ord'?T.unit:T.bool;
+        }
+        return unsup('method call',e.line);
+      }
       if(name==='clone'&&isRef&&!r.mut&&!args.length){I(e).um={key:'ref::clone',self:'&',adj:'val',kind:peel(e.recv).t==='Path'?'refvar':'temp',ref:true,text,from:0};return r;}
       if(base.k==='coll'){
         // the method exists but the elements lack a trait it needs; while an element type is open that is not judged
         const map=base.name==='HashMap',bounded=name==='clone'&&!args.length||map&&MAP_KEYED.includes(name)&&!name.includes('.');
         if(ITERS.includes(name)&&!args.length)return unsup('iterator',e.line);
-        const el=base.name==='Vec'?res(base.args[0]):null,need=el&&(name==='sort'&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null);
+        const el=base.name==='Vec'?res(base.args[0]):null,need=el&&(SORTS.includes(name)&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null);
         if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
-          errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{trait:need,type:show(el)}));
+          errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{trait:need,type:show(need==='Ord'?ordLeaf(el):el)}));
           return need==='Ord'?T.unit:T.bool;
         }
         if(!bounded)return unsup('collection method',e.line);
@@ -1703,7 +1729,7 @@ RQ.check=ast=>{
       case 'next':return {build:()=>({...rec('Iter::next','&mut',[],optTy(item),-1),inner:hasRef(item)})};
       case 'min':case 'max':return {build:()=>{
         const i=res(item);
-        if(!isOpen(i,false)&&!has(i,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(i.k==='ref'?i.to:i)}));return rec('Iter::'+name,'val',[],optTy(item),-1);}
+        if(!isOpen(i,false)&&!has(i,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(ordLeaf(i.k==='ref'?i.to:i))}));return rec('Iter::'+name,'val',[],optTy(item),-1);}
         return rec('Iter::'+name,'val',[],optTy(item),hasRef(item)?0:-1);
       }};
       case 'any':case 'all':return {cl:()=>fn('FnMut',[item],T.bool),build:()=>rec('Iter::'+name,'&mut',[T.any],T.bool,-1)};
@@ -1874,16 +1900,24 @@ RQ.check=ast=>{
         if(e.op==='-'&&r.k==='int'&&!RQ.types.isSigned(r.ty)){errors.push(RQ.diag.make('E0600',e.line,e.col,{type:r.ty}));return t;}
         if(e.op==='-'&&r.k==='ivar')negs.push([e,t,r]);
         if(e.op==='-')return r.k==='int'&&RQ.types.isSigned(r.ty)||r.k==='ivar'||r.k==='float'||r.k==='fvar'||r.k==='any'?t:unsup('type checking',e.line);
+        if(r.k==='int'||r.k==='ivar')return t;
         return unify(t,T.bool)?t:unsup('type checking',e.line);
       }
       case 'Binary':{
         let a=ex(e.lhs);
         if(COMPARE.has(e.op)){negFree(e.lhs);negOk(e.rhs,a);}
-        else if(ARITH.has(e.op)){negFree(e.lhs);negFree(e.rhs);}
+        else if(ARITH.has(e.op)||e.op==='<<'||e.op==='>>'){negFree(e.lhs);negFree(e.rhs);}
         let b=ex(e.rhs);
         const op=e.op;
         if(op==='&&'||op==='||')return unify(a,T.bool)&&unify(b,T.bool)?T.bool:unsup('type checking',e.line);
-        if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
+        if(op==='<<'||op==='>>'){
+          // the shift amount is any integer type and does not meet the left side: the result has the left side's type
+          const x=res(a),y=res(b),isI=r=>r.k==='int'||r.k==='ivar';
+          if(['any','never'].includes(x.k)||['any','never'].includes(y.k))return T.any;
+          if(isI(x)&&isI(y))return a;
+          if(['float','fvar','bool','char'].includes(x.k)&&isI(y)){errors.push(RQ.diag.make('E0369',e.oline,e.ocol,{op,type:show(a)}));return T.any;}
+          return unsup('type checking',e.line);
+        }
         const SCALAR=['int','ivar','float','fvar','bool','char'];
         if(op==='+'&&(res(a).k==='str'||res(a).k==='ref'&&res(res(a).to).k==='String')&&(SCALAR.includes(res(b).k)||res(b).k==='str'||res(b).k==='ref'&&res(res(b).to).k==='String')){
           errors.push(RQ.diag.make('E0369',e.oline,e.ocol,{op,type:show(a),right:show(b)}));
@@ -1937,7 +1971,7 @@ RQ.check=ast=>{
         }
         if(COMPARE.has(op))return ['num','bool','char','str','any'].includes(c)?T.bool:unsup('type checking',e.line);
         if(ARITH.has(op))return c==='num'||c==='any'?u:unsup('type checking',e.line);
-        if(op==='&'||op==='|'||op==='^')return ['int','ivar','any'].includes(res(u).k)?u:unsup('type checking',e.line);
+        if(op==='&'||op==='|'||op==='^')return ['int','ivar','bool','any'].includes(res(u).k)?u:unsup('type checking',e.line);
         return unsup(op,e.line);
       }
       case 'Assign':{
@@ -1989,12 +2023,15 @@ RQ.check=ast=>{
         }
         if(e.op!=='='){
           const op=e.op.slice(0,-1);
-          if(op==='<<'||op==='>>')return unsup('bit shift',e.line);
+          if(op==='<<'||op==='>>'){
+            const x=res(ty),y=res(r),isI=t=>t.k==='int'||t.k==='ivar'||t.k==='any';
+            return isI(x)&&isI(y)?T.unit:unsup('type checking',e.line);
+          }
           if(op==='+'&&res(ty).k==='String')return unsup('string concatenation',e.line);
           const rt=res(r),rn=rt.k==='ref'&&!rt.mut&&numeric(res(rt.to))?rt.to:r;
           if(!operands(ty,rn,{rhs:e.rhs,line:e.line}))return T.unit;
           const bit=op==='&'||op==='|'||op==='^',c=cls(ty);
-          if(!(c==='any'||(bit?['int','ivar'].includes(res(ty).k):c==='num')))unsup('type checking',e.line);
+          if(!(c==='any'||(bit?['int','ivar','bool'].includes(res(ty).k):c==='num')))unsup('type checking',e.line);
         }else if(!unify(ty,r)){
           const w=res(ty),g=res(r);
           return unsup(w.k==='str'&&g.k==='ref'&&!g.mut&&res(g.to).k==='String'?'assigned string reference':'type checking',e.line);
@@ -2151,7 +2188,7 @@ RQ.check=ast=>{
           return tgt;
         }
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='swap'&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
