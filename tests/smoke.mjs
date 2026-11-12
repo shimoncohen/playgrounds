@@ -3787,6 +3787,99 @@ test('agent-quest: the active chapter chip is scrolled back into the rail when e
   await o.ctx.close();
 });
 
+test('agent-quest: any edit after a run clears the Run panel and the feedback, in a prompt and in a config mission', async () => {
+  const o = await agentPage();
+  const { page } = o;
+  const cleared = async why => {
+    assert.equal(await page.locator('#run .steps').count(), 0, `${why}: the Run panel is empty`);
+    assert.equal(await page.locator('#feedback .msg').count(), 0, `${why}: the feedback is empty`);
+  };
+  await page.click('#mission .dot[data-mi="1"]');
+  await page.fill('#pf-constraints', 'do not delete data/');
+  await page.click('#runBtn');
+  assert.ok(await page.locator('#run .steps li').count() > 0 && await page.locator('#feedback .msg').count() === 1);
+  await page.fill('#pf-constraints', 'do not delete data/\ndo not edit data/');
+  await cleared('a prompt edit');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .msg').count(), 1);
+  await page.click('#promptHost [data-act="fill"]');
+  await cleared('Type it for me');
+  await page.click('#mission .dot[data-mi="3"]');
+  await page.fill('#fileEditor textarea', 'do not delete data/');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#feedback .msg').count(), 1);
+  await page.fill('#fileEditor textarea', 'do not delete data/\n');
+  await cleared('a file edit');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a new card and a new pane start at their top, and a refused run leaves nothing of the old run', async () => {
+  const last = (await (async () => { const o = await agentPage(); const n = await o.page.evaluate(() => AQ.CH[0].missions.length); await o.ctx.close(); return n; })()) - 1;
+  const done = {};
+  for (let i = 0; i < last; i++) done[`0.${i}`] = true;
+  const seed = seedAgent(JSON.stringify({ ch: 0, mi: last, done }));
+  const inView = async (page, sel) => page.evaluate(s => { const t = document.querySelector(s).getBoundingClientRect().top; return t >= 0 && t < innerHeight; }, sel);
+  for (const width of [390, 1280]) {
+    const o = await agentPage({ viewport: { width, height: width === 390 ? 800 : 700 } }, seed);
+    const { page } = o;
+    await page.click('#promptHost [data-act="fill"]');
+    await page.click('#runBtn');
+    await page.waitForSelector('#feedback [data-act="next"]');
+    await page.evaluate(() => { document.querySelector('#mission').scrollTop = 9999; scrollTo(0, 99999); });
+    const before = await page.evaluate(() => scrollY + document.querySelector('#mission').scrollTop);
+    assert.ok(before > 0, `${width}: the page or the card was scrolled`);
+    await page.evaluate(() => document.querySelector('#feedback [data-act="next"]').click());
+    assert.match(await page.textContent('#missionBody'), /Chapter 1 complete/);
+    assert.equal(await page.evaluate(() => document.querySelector('#mission').scrollTop), 0, `${width}: the card is at its top`);
+    assert.ok(await inView(page, '#mission'), `${width}: the card top is on screen`);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+  const o = await agentPage({ viewport: { width: 390, height: 800 } }, seedAt(7, 0));
+  const { page } = o;
+  await page.click('#promptHost [data-act="fill"]');
+  await page.click('#runBtn');
+  await page.waitForSelector('#feedback [data-act="torun"]');
+  for (const [pane, sel] of [['run', '#runPanel'], ['files', '#filesPanel'], ['meter', '#meterPanel']]) {
+    await page.evaluate(() => scrollTo(0, 99999));
+    await page.evaluate(p => document.querySelector(`.paneSwitch [data-pane="${p}"]`).click(), pane);
+    assert.ok(await inView(page, sel), `the ${pane} pane starts at its top`);
+  }
+  await page.evaluate(() => document.querySelector('.paneSwitch [data-pane="mission"]').click());
+  await page.evaluate(() => { scrollTo(0, 99999); document.querySelector('#feedback [data-act="torun"]').click(); });
+  assert.ok(await inView(page, '#runPanel'), 'See the steps starts the Run pane at its top');
+  await page.evaluate(() => document.querySelector('.paneSwitch [data-pane="mission"]').click());
+  await page.fill('#pf-constraints', 'be careful and do not delete anything');
+  await page.click('#runBtn');
+  assert.equal(await page.locator('#run .steps').count(), 0);
+  assert.equal(await page.locator('#feedback .msg').count(), 0);
+  assert.equal(await page.evaluate(() => document.activeElement.closest('#perrs') !== null), true);
+  const label = await page.evaluate(() => getComputedStyle(document.querySelector('#perrs li'), '::before').content);
+  assert.doesNotMatch(label, /Ignored/);
+  assert.match(label, /before running/);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
+test('agent-quest: a window resize brings the current chapter back into the rail and never scrolls the page', async () => {
+  const o = await agentPage({ viewport: { width: 390, height: 900 } }, seedAgent(JSON.stringify({ ch: 14 })));
+  const { page } = o;
+  await page.evaluate(() => { const r = document.querySelector('#chapters'); r.scrollLeft = 0; r.scrollTop = 0; });
+  const rail = () => page.evaluate(() => { const r = document.querySelector('#chapters'); return { left: r.scrollLeft, top: r.scrollTop, y: scrollY }; });
+  const inRail = () => page.evaluate(() => { const a = document.querySelector('#chapters [aria-current="true"]').getBoundingClientRect(), r = document.querySelector('#chapters').getBoundingClientRect(); return a.top >= r.top - 1 && a.bottom <= r.bottom + 1 && a.left >= r.left - 1 && a.right <= r.right + 1; });
+  assert.equal(await inRail(), false, 'the current chapter starts off screen in the rail');
+  const before = await rail();
+  await page.setViewportSize({ width: 740, height: 900 });
+  await page.waitForTimeout(300);
+  const after = await rail();
+  assert.ok(after.left !== before.left || after.top !== before.top, 'the rail scrolled');
+  assert.equal(await inRail(), true, 'the current chapter is in the rail');
+  assert.equal(after.y, before.y, 'the page did not scroll');
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
   // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
   const done = {};
