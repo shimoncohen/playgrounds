@@ -47,7 +47,26 @@ describe('a temporary dies with its statement', () => {
     for (const e of ['1 < 2', 'true == false', "'a' < 'b'", '!true', '1.5 >= 1.0']) {
       assert.equal(RQ.run(idb + main(`let r = id(&(${e}));\nprintln!("{}", r);`)).status, 'ok', e);
     }
-    assert.equal(RQ.run('fn id(s: &i32) -> &i32 {\n    s\n}\n\n' + main('let r = id(&(4 / 2));\nprintln!("{}", r);')).status, 'unsupported');
+  });
+
+  it('division, remainder, casts and bit operations of constants are promoted; the ones rustc folds into a panic or leaves to run are not', () => {
+    const idn = (t) => `fn id(s: &${t}) -> &${t} {\n    s\n}\n\n`;
+    const yes = [['i32', '4 / 2'], ['i32', '7 % 3'], ['i32', '-7 / -1'], ['i32', '4 / (-2)'], ['i32', '(1 + 2) / 3'], ['u8', '100u8 / 7'], ['i64', '2 as i64'], ['i32', '3.9 as i32'], ['u32', "'a' as u32"], ['i32', 'true as i32'],
+      ['f64', '1.0 / 2.0'], ['f64', '1.0 / 0.0'], ['f64', '5.0 % 2.0'], ['i32', '!5'], ['u8', '!0u8'], ['bool', 'true & false'], ['bool', 'true | false'], ['bool', 'true ^ true'], ['bool', '4 / 2 > 1'], ['i32', '1 << 2'], ['i32', '8 >> 1'], ['i32', '-8 >> 1'], ['i64', '1 << 40'], ['u8', '1u8 << 7'], ['i32', '1 << 31 >> 4']];
+    for (const [t, e] of yes) {
+      assert.equal(RQ.run(idn(t) + main(`let r = id(&(${e}));\nprintln!("{}", r);`)).status, 'ok', e);
+      assert.equal(RQ.run(main(`let d: ${t} = ${t === 'bool' ? 'false' : t === 'f64' ? '0.0' : '0'};\nlet mut l = &d;\nfor x in &[${e}] {\nl = x;\n}\nprintln!("{}", l);`)).status, 'ok', e);
+    }
+    const no = [['i32', '1 / 0'], ['i32', '1 % 0'], ['i32', '4 / (3 - 1)'], ['i32', '4 / (2 as i32)'], ['i32', '4 / !0'], ['i32', '-2147483648 / -1'], ['i8', '-128i8 / -1'], ['i32', '(7 / 0) + 1'], ['i32', 'x / 2'], ['i32', '4 / y'], ['i32', 'x << 1'], ['i32', '8 >> y'], ['i64', 'x as i64'], ['i32', '!x']];
+    for (const [t, e] of no) {
+      assert.deepEqual(msgs(idn(t) + main(`let x = 4;\nlet y = 2;\nlet r = id(&(${e}));\nprintln!("{}", r);`)), [`E0716@8 ${NOTE}`], e);
+    }
+  });
+
+  it('what the promotion rule cannot settle stays unsupported: a named constant as the divisor or the shift amount', () => {
+    const id = 'fn id(s: &i32) -> &i32 {\n    s\n}\n\n';
+    assert.equal(RQ.run('const N: i32 = 2;\n' + id + main('let r = id(&(4 / N));\nprintln!("{}", r);')).status, 'unsupported');
+    assert.equal(RQ.run('const N: u32 = 2;\n' + id + main('let r = id(&(1 << N));\nprintln!("{}", r);')).status, 'unsupported');
   });
 
   it('a type with Drop is never promoted, one without it is, even beside one that has it', () => {
@@ -82,7 +101,7 @@ describe('what a borrow of a temporary still leaves unsupported', () => {
   const OPEN = [
     ['inside a tuple', main('let t = (&String::from("a"), 1);\nprintln!("{}", t.1);')],
     ['inside Some', main('let o = Some(&String::from("a"));\nprintln!("{:?}", o);')],
-    ['a constant that rustc may or may not promote', 'fn id(s: &i32) -> &i32 {\n    s\n}\n\n' + main('let r = id(&(4 / 2));\nprintln!("{}", r);')],
+    ['a constant that rustc may or may not promote', 'const N: i32 = 2;\n\nfn id(s: &i32) -> &i32 {\n    s\n}\n\n' + main('let r = id(&(4 / N));\nprintln!("{}", r);')],
     ['a &mut loop name kept past the loop', main('let mut last = &mut 0;\nfor x in &mut [1, 2, 3] {\nlast = x;\n}\n*last += 1;')],
   ];
   for (const [what, src] of OPEN) {
