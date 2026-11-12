@@ -49,12 +49,11 @@ describe('a temporary lent to a call or a for loop', () => {
     assert.equal(RQ.run(`${drop}${main('for &N(x) in &vec![N(7), N(8)] {\nprintln!("{}", x);\nbreak;\n}\nprintln!("end");')}`).stdout, '7\ndrop 7\ndrop 8\nend\n');
   });
 
-  it('a result that may keep the borrow, or a loop name that stays a reference, is still unsupported', () => {
-    for (const src of ['fn first(a: &[i32]) -> &[i32] {\n    a\n}\n\n' + main('let r = first(&vec![1, 2]);\nprintln!("{:?}", r);'), main('for x in &[1, 2, 3] {\nprintln!("{}", x);\n}')]) {
-      const c = RQ.run(src);
-      assert.equal(c.status, 'unsupported');
-      assert.equal(c.unsupported.feature, 'temporary borrow');
-    }
+  it('a result that keeps the borrow of a lent temporary is E0716 once it is used after the statement', () => {
+    const c = RQ.run('fn first(a: &[i32]) -> &[i32] {\n    a\n}\n\n' + main('let r = first(&vec![1, 2]);\nprintln!("{:?}", r);'));
+    assert.equal(c.status, 'error');
+    assert.deepEqual(Array.from(c.errors, (e) => `${e.code}@${e.line}`), ['E0716@6']);
+    assert.equal(RQ.run('fn first(a: &[i32]) -> &[i32] {\n    a\n}\n\n' + main('let r = first(&vec![1, 2]).len();\nprintln!("{}", r);')).stdout, '2\n');
   });
 });
 

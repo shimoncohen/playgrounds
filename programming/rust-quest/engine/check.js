@@ -811,16 +811,27 @@ RQ.check=ast=>{
     vars=[];negs=[];okNeg=new Set();freeNeg=new Set();lits=[];fmts=[];tvs=[];keyChecks=[];patLits=[];exChecks=[];
   }
 
+  // `v[a..b].m()` borrows the slice itself, as `(&v[a..b]).m()` does
+  function lendRange(e){
+    const rx=peel(e.recv);
+    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||e.name==='swap',expr:rx};
+  }
   function slice(e,x){
     const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);
-    if(e.mut)return unsup('reference',e.line);
     if(b.k==='any'||b.k==='never')return T.any;
     if(!ts.every(t=>unify(t,T.int('usize'))))return unsup('type checking',e.line);
-    if(b.k==='ref'&&b.mut)return unsup('reborrow',e.line);
     const base=b.k==='ref'?res(b.to):b;
     if(base.k==='coll'&&base.name!=='Vec')return unsup('collection method',e.line);
-    if(base.k==='String'||b.k==='str'){I(e).slice='str';return T.str;}
-    if(base.k==='array'||base.k==='slice'||base.k==='coll'){I(e).slice='arr';return mkRef(false,T.slice(base.k==='coll'?base.args[0]:base.el));}
+    if(base.k==='String'||b.k==='str'){
+      if(e.mut)return unsup('reference',e.line);
+      I(e).slice='str';return T.str;
+    }
+    if(base.k==='array'||base.k==='slice'||base.k==='coll'){
+      // IndexMut borrows the base mutably, so behind a `&` it is E0596, as for a Vec element
+      const bx=peel(x.expr),ch=e.mut&&(bx.t==='Path'||bx.t==='Field')?chainOf(bx):null;
+      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+      I(e).slice='arr';return mkRef(!!e.mut,T.slice(base.k==='coll'?base.args[0]:base.el));
+    }
     return unsup('type checking',e.line);
   }
 
@@ -838,6 +849,7 @@ RQ.check=ast=>{
   function forItems(e,it){
     let src=it,mode='val',part='kv',ty,viaRef=false;
     if(it.t==='MethodCall'&&ITERS.includes(it.name)&&!it.args.length){
+      lendRange(it);
       const rt=res(ex(it.recv)),base=rt.k==='ref'?res(rt.to):rt;
       if(base.k!=='coll'){
         reuse=it.recv;
@@ -855,7 +867,11 @@ RQ.check=ast=>{
       if(viaRef&&!rt.mut&&mode==='mut')return unsup('for iterable',it.line);
     }else if(it.t==='Ref'){
       const x=peel(it.expr);
-      if(x.t==='Index'&&peel(x.index).t==='Range'){ex(e.iter);return unsup('for iterable',it.line);}
+      if(x.t==='Index'&&peel(x.index).t==='Range'){
+        const st=res(ex(it));
+        if(st.k==='any'||st.k==='never')return T.any;
+        return st.k==='ref'&&res(st.to).k==='slice'?intoIterFor(e,it):unsup('for iterable',it.line);
+      }
       const rt=res(ex(it));
       if(rt.k!=='ref')return T.any;
       ty=res(rt.to);src=it.expr;mode=it.mut?'mut':'ref';
@@ -1028,6 +1044,7 @@ RQ.check=ast=>{
     const n=sg[0].name==='Self'?curSelf:sg[0].name;
     return n===t.name?vs.findIndex(v=>v.name===sg[1].name):-1;
   }
+  const inIndex=e=>{for(e=peel(e);e.t==='Field'||e.t==='Index';e=peel(e.expr))if(e.t==='Index')return true;return false;};
   function chainOf(e){
     const parts=[];
     let via=null;
@@ -1935,22 +1952,25 @@ RQ.check=ast=>{
           const rt=res(info.get(e.lhs.expr).ty);
           if(rt.k==='ref'&&!rt.mut)return unsup('assignment target',e.line);
           if(rt.k!=='ref')return T.any;
-        }else if(peel(e.lhs).t==='Index'){
+        }else if(inIndex(e.lhs)){
           ty=ex(e.lhs);
-          let b=peel(e.lhs),vec=false,arr=false,depth=0;
-          for(;b.t==='Index';b=peel(b.expr)){if(I(b).vecIdx)vec=true;else arr=true;depth++;}
+          const steps=[];
+          for(let b=peel(e.lhs);b.t==='Index'||b.t==='Field';b=peel(b.expr))steps.unshift(b);
+          const first=steps.findIndex(x=>x.t==='Index'),vecAt=steps.findIndex(x=>x.t==='Index'&&I(x).vecIdx);
+          const b=peel(steps[first].expr);
           const ch=b.t==='Path'||b.t==='Field'?chainOf(b):null,bd=ch&&lookup(ch.name);
-          if(vec&&arr||!ch||!bd)return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
+          const holdsRef=steps.slice(first+1).some(x=>res(info.get(x.expr)&&info.get(x.expr).ty||T.any).k==='ref');
+          if(!ch||!bd||holdsRef)return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
           const bt=res(info.get(b)&&info.get(b).ty||T.any),viaRef=ch.via||bt.k==='ref'&&!ch.parts.length;
-          const shared=ch.via?!ch.via.mut:viaRef&&!bt.mut,locked=arr&&!viaRef&&!bd.mut;
+          const shared=ch.via?!ch.via.mut:viaRef&&!bt.mut,locked=vecAt<0&&!viaRef&&!bd.mut;
           // inside a closure the message names a captured variable, which is not modeled
           if(bd.cl!==curCl&&(shared||locked))return unsup('assignment target',e.line);
+          const tail=to=>steps.slice(first,to).map(x=>x.t==='Index'?'[_]':'.'+x.name).join('');
           // E0594 and E0596 are borrowck errors, like E0384: the borrow pass still runs beside them
-          if(arr){
-            const name=ch.text+'[_]'.repeat(depth);
-            if(shared)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,ref:true}));
-            else if(locked)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,root:ch.name}));
-          }else if(shared)errors.push(RQ.diag.make('E0596',e.line,e.col,{name:bt.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+          if(vecAt<0){
+            if(shared)errors.push(RQ.diag.make('E0594',e.line,e.col,{name:ch.text+tail(),ref:true}));
+            else if(locked)errors.push(RQ.diag.make('E0594',e.line,e.col,{name:ch.text+tail(),root:ch.name}));
+          }else if(shared)errors.push(RQ.diag.make('E0596',e.line,e.col,{name:bt.k==='ref'&&!ch.parts.length&&vecAt===first?'*'+ch.name:ch.text+tail(vecAt),ref:true}));
         }else if(peel(e.lhs).t==='Field'){
           ty=ex(e.lhs);
           const ch=chainOf(e.lhs);
@@ -2106,6 +2126,7 @@ RQ.check=ast=>{
       case 'MethodCall':{
         const hint=['collect','sum','product'].includes(e.name)?takeWant():null;
         if(peel(e.recv).t==='Range')rangeOk=true;
+        if(e.recv!==reuse)lendRange(e);
         const rt=e.recv===reuse?(reuse=null,info.get(e.recv).ty):ex(e.recv),r=res(rt);
         if(r.k==='tvar'&&(r.cparam||r.pendTgt)){
           e.args.forEach(ex);
@@ -2133,12 +2154,12 @@ RQ.check=ast=>{
         if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||e.name==='swap'&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
-        if(e.name==='len'&&seq&&(seq.k==='slice'||isCopy(seq))){
+        if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
           if(args.length)return unsup('wrong argument count',e.line);
-          I(e).recv={method:'len',kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
-          return T.int('usize');
+          I(e).recv={method:e.name,kind:peel(e.recv).t==='Path'?'refvar':'temp',adj:'val'};
+          return e.name==='len'?T.int('usize'):T.bool;
         }
-        const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):''):'';
+        const shape=r.k==='String'?'o':r.k==='str'?'s':r.k==='ref'?(res(r.to).k==='String'?(r.mut?'m':'r'):res(r.to).k==='str'?'s':''):'';
         const sig=RQ.std.methods.get(e.name);
         if(!sig||!shape||!sig.recv.includes(shape))return unsup('method call',e.line);
         if(shape==='m'&&e.name==='as_str')return unsup('reborrow',e.line);
