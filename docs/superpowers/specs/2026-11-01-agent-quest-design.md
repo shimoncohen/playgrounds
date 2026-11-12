@@ -397,6 +397,7 @@ The page follows what `tests/smoke.mjs:96-147` checks for every `NAMES` entry.
 - **390px pane switcher.** At 390px the quest tab shows one pane at a time. The switcher is `.paneSwitch button[data-pane]` with the values `mission`, `files`, `meter`, `run`. It is not `.tabs`, and the panes are not `section[id^="tab-"]`. The switcher is hidden at 721px and wider, where all columns show. Pane state is not saved. `mission` is the default pane, so `#mission` has content on first load.
 - **Run panel and feedback.** Any edit to the prompt or a file, "Type it for me", and a refused run clear the Run panel and the feedback and drop the meter's peak marker, so a result never sits next to lines it was not made from. A win's "Next mission" button goes with it; the rail and the dots still move on. The error list under the form is prefixed "Fix before running:".
 - **Scroll.** A new mission card, chapter card or pane starts at its top: `#mission` is reset where it scrolls (721px and wider) and the page where it does (390px).
+- **Quick-fire.** A question missed more than once in a round is listed once under "Worth another look"; each miss still resets the streak.
 - **Meter strip.** A compact `.meterStrip` stays at the top at 390px. It is not a `.panel`.
 - **No horizontal overflow** at 390px.
 - **Accessibility.** The meter has a text table equivalent; the file tree and run steps are keyboard-navigable lists; no meaning is colour-only.

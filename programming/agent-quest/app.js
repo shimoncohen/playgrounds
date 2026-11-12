@@ -232,7 +232,7 @@ function pick(i){
   bs.forEach((b,j)=>{b.disabled=true;if(fQ.opts[j]===fQ.a)b.classList.add('right');else if(j===i)b.classList.add('wrong');});
   const f=$('#fFb');
   if(ok){fStreak++;const pts=10+Math.min(fStreak-1,5)*2;fScore+=pts;f.className='fb good';f.textContent=`Correct! +${pts}${fStreak>1?` (streak ${fStreak})`:''}`;}
-  else{fStreak=0;fMiss.push(fQ);f.className='fb bad';f.innerHTML='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
+  else{fStreak=0;fMiss=state.addMiss(fMiss,fQ);f.className='fb bad';f.innerHTML='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
   setStats();clearTimeout(fNext);fNext=setTimeout(()=>{if(fireOn)nextQ();},ok?700:2600);
 }
 function startFire(){

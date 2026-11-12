@@ -3880,6 +3880,34 @@ test('agent-quest: a window resize brings the current chapter back into the rail
   await o.ctx.close();
 });
 
+test('agent-quest: Quick-fire lists a missed question once, however often it came back in the round', async () => {
+  const done = {};
+  for (let i = 0; i < 5; i++) done[`0.${i}`] = true;
+  const o = await agentPage({}, async c => { await seedAgent(JSON.stringify({ done }))(c); await c.addInitScript(() => { Math.random = () => 0.999999; }); await c.clock.install(); });
+  const { page } = o;
+  const qf = await page.evaluate(() => AQ.QF.filter(q => q.ch === 0).map(q => ({ c: q.c, a: q.a })));
+  const plain = s => s.replace(/<[^>]+>/g, '');
+  await page.click('.tabs button[data-tab="fire"]');
+  await page.click('#fStart');
+  const asked = [];
+  for (let k = 0; k <= qf.length; k++) {
+    const text = await page.textContent('#fStage .task');
+    asked.push(text);
+    const q = qf.find(x => plain(x.c) === text);
+    assert.ok(q, `an unknown question: ${text}`);
+    const opts = await page.$$eval('#fStage .opt .ot', es => es.map(e => e.innerHTML));
+    await page.click(`#fStage .opt[data-i="${opts.indexOf(q.a) === 0 ? 1 : 0}"]`);
+    await page.clock.runFor(2700);
+  }
+  assert.equal(new Set(asked).size, qf.length, 'one question came back');
+  await page.click('#fStop');
+  const listed = await page.$$eval('#fStage .misses li > span:first-child', es => es.map(e => e.textContent));
+  assert.equal(listed.length, qf.length, 'one entry per distinct missed question');
+  assert.equal(new Set(listed).size, listed.length);
+  assert.deepEqual(o.errors, []);
+  await o.ctx.close();
+});
+
 test('agent-quest: quick-fire shows code in the question, the options, the answer and the misses list, with no literal tags', async () => {
   // Chapters 12 and 15 are done. Math.random is fixed so the deck keeps the data order and is dealt from its end: 15, then 12.
   const done = {};
