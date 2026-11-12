@@ -67,10 +67,8 @@ describe('writing an array element', () => {
 
 describe('what a write to an element still leaves unsupported', () => {
   const OPEN = [
-    ['a write into an array inside a Vec', main('let mut v = vec![[0; 2]; 2];\nv[0][1] = 3;'), 'assignment target'],
     ['a compound write while a loop lends the array mutably (E0503)', main('let mut a = [0; 3];\nfor x in &mut a {\na[1] += *x;\n}'), 'use while borrowed'],
-    ['an element of an array of structs', main('let mut a = [P { x: 0 }; 2];\na[0].x = 1;', '#[derive(Clone, Copy)]\nstruct P {\n    x: i32,\n}\n\n'), 'assignment target'],
-    ['a slice of a slice parameter', `fn f(a: &mut [i32]) {\n    a[0] = 1;\n}\n\n${main('let mut a = [1, 2, 3];\nf(&mut a[..]);')}`, 'reference'],
+    ['a slice of a &mut parameter kept in a variable', `fn f(a: &mut [i32]) {\n    let b = &mut a[1..];\n    b[0] = 7;\n}\n\n${main('let mut a = [1, 2, 3];\nf(&mut a);')}`, 'reborrow'],
   ];
   for (const [what, src, feature] of OPEN) {
     it(what, () => {
