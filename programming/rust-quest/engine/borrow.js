@@ -35,6 +35,7 @@ function uses(i,use){
   };
   if(i.rv)rv(i.rv);
   else if(i.op==='store'){o(i.ref);o(i.x);}
+  else if(i.op==='write')use(i.l,false,'write');
   else if(i.op==='branch'||i.op==='return')o(i.x);
 }
 
@@ -254,7 +255,7 @@ function loanPass(F,errors,un,loans,stats){
     const k=code+'@'+i.line+':'+i.col;
     if(!code||seen.has(k))return;
     seen.add(k);
-    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value'),mut:kind==='mut'||kind==='reb'}));
+    errors.push(RQ.diag.make(code,i.line,i.col,{name:(star||kind==='reb'||kind==='rebs'?'*':'')+(L[l].name||L[l].src||'value')+(i.op==='write'?i.name:''),mut:kind==='mut'||kind==='reb'}));
   };
   for(const b of B){
     if(!inn[b.id])continue;
