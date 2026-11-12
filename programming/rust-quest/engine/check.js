@@ -1028,6 +1028,7 @@ RQ.check=ast=>{
     const n=sg[0].name==='Self'?curSelf:sg[0].name;
     return n===t.name?vs.findIndex(v=>v.name===sg[1].name):-1;
   }
+  const inIndex=e=>{for(e=peel(e);e.t==='Field'||e.t==='Index';e=peel(e.expr))if(e.t==='Index')return true;return false;};
   function chainOf(e){
     const parts=[];
     let via=null;
@@ -1935,22 +1936,25 @@ RQ.check=ast=>{
           const rt=res(info.get(e.lhs.expr).ty);
           if(rt.k==='ref'&&!rt.mut)return unsup('assignment target',e.line);
           if(rt.k!=='ref')return T.any;
-        }else if(peel(e.lhs).t==='Index'){
+        }else if(inIndex(e.lhs)){
           ty=ex(e.lhs);
-          let b=peel(e.lhs),vec=false,arr=false,depth=0;
-          for(;b.t==='Index';b=peel(b.expr)){if(I(b).vecIdx)vec=true;else arr=true;depth++;}
+          const steps=[];
+          for(let b=peel(e.lhs);b.t==='Index'||b.t==='Field';b=peel(b.expr))steps.unshift(b);
+          const first=steps.findIndex(x=>x.t==='Index'),vecAt=steps.findIndex(x=>x.t==='Index'&&I(x).vecIdx);
+          const b=peel(steps[first].expr);
           const ch=b.t==='Path'||b.t==='Field'?chainOf(b):null,bd=ch&&lookup(ch.name);
-          if(vec&&arr||!ch||!bd)return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
+          const holdsRef=steps.slice(first+1).some(x=>res(info.get(x.expr)&&info.get(x.expr).ty||T.any).k==='ref');
+          if(!ch||!bd||holdsRef)return res(ty).k==='any'?T.unit:unsup('assignment target',e.line);
           const bt=res(info.get(b)&&info.get(b).ty||T.any),viaRef=ch.via||bt.k==='ref'&&!ch.parts.length;
-          const shared=ch.via?!ch.via.mut:viaRef&&!bt.mut,locked=arr&&!viaRef&&!bd.mut;
+          const shared=ch.via?!ch.via.mut:viaRef&&!bt.mut,locked=vecAt<0&&!viaRef&&!bd.mut;
           // inside a closure the message names a captured variable, which is not modeled
           if(bd.cl!==curCl&&(shared||locked))return unsup('assignment target',e.line);
+          const tail=to=>steps.slice(first,to).map(x=>x.t==='Index'?'[_]':'.'+x.name).join('');
           // E0594 and E0596 are borrowck errors, like E0384: the borrow pass still runs beside them
-          if(arr){
-            const name=ch.text+'[_]'.repeat(depth);
-            if(shared)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,ref:true}));
-            else if(locked)errors.push(RQ.diag.make('E0594',e.line,e.col,{name,root:ch.name}));
-          }else if(shared)errors.push(RQ.diag.make('E0596',e.line,e.col,{name:bt.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+          if(vecAt<0){
+            if(shared)errors.push(RQ.diag.make('E0594',e.line,e.col,{name:ch.text+tail(),ref:true}));
+            else if(locked)errors.push(RQ.diag.make('E0594',e.line,e.col,{name:ch.text+tail(),root:ch.name}));
+          }else if(shared)errors.push(RQ.diag.make('E0596',e.line,e.col,{name:bt.k==='ref'&&!ch.parts.length&&vecAt===first?'*'+ch.name:ch.text+tail(vecAt),ref:true}));
         }else if(peel(e.lhs).t==='Field'){
           ty=ex(e.lhs);
           const ch=chainOf(e.lhs);

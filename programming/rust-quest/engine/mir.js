@@ -172,10 +172,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   const vecIdx=n=>{const o=n.t==='Index'&&info.get(n);return !!o&&!!o.vecIdx;};
   const hasVecIdx=p=>{for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(vecIdx(p))return true;return false;};
   function vecRoot(e){
-    const idx=[];let inner=null;
-    for(let n=peel(e);n.t==='Field'||n.t==='Index';n=peel(n.expr))if(n.t==='Index'){idx.unshift(n.index);inner=n;}
-    return {c:classify(inner.expr),idx,inner};
+    const idx=[],steps=[];let inner=null;
+    for(let n=peel(e);n.t==='Field'||n.t==='Index';n=peel(n.expr)){steps.unshift(n);if(n.t==='Index'){idx.unshift(n.index);inner=n;}}
+    // the IndexMut borrow is of the place below the first Vec index, which rustc names with `[_]` for each array index on the way
+    return {c:classify(inner.expr),idx,inner,sfx:stepText(steps,steps.indexOf(inner),steps.findIndex(vecIdx))};
   }
+  const stepText=(steps,from,to)=>steps.slice(from,to).map(n=>n.t==='Index'?'[_]':'.'+n.name).join('');
+  const hasIdx=p=>{for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(p.t==='Index')return true;return false;};
   const fieldChain=x=>{const o=[];for(x=peel(x);x.t==='Field';x=peel(x.expr))o.unshift(x.name);return x.t==='Path'?[lid(x),...o]:null;};
   const related=(q,b)=>q[0]===b[0]&&q.slice(1,Math.min(q.length,b.length)).every((y,k)=>y===b[k+1]);
   function chainsOn(n,l,out=[]){
@@ -191,7 +194,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     const viaRef=c.k==='via'||(c.k==='local'||c.k==='path')&&L[c.l].ty.k==='ref';
     if(mut&&r&&viaRef&&r.idx.some(x=>readsPlace(x,r.inner.expr))){un('reborrow',nd);return null;}
     if(viaRef){const t=L[c.l].ty;return opnd(c.l,t.k==='ref'&&t.mut,!mut);}
-    if(c.k==='local'||c.k==='path')return put({k:'ref',l:c.l,mut,implicit},nd,undefined,T.ref(mut,L[c.l].ty,0));
+    if(c.k==='local'||c.k==='path')return put({k:'ref',l:c.l,mut,implicit,...r&&r.sfx&&{sfx:r.sfx}},nd,undefined,T.ref(mut,L[c.l].ty,0));
     un('temporary borrow',nd);return null;
   }
   const kidsOf=n=>Object.values(n).flatMap(v=>Array.isArray(v)?v:[v]).filter(x=>x&&typeof x==='object'&&typeof x.t==='string');
@@ -489,12 +492,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
 
   // an array element is a place inside the array, so a write borrows nothing: it conflicts with a loan on the array or on a field above it
   function arrayWrite(e,lhs,compound,v){
-    const idx=[];
-    let b=lhs;
-    for(;b.t==='Index';b=peel(b.expr))idx.unshift(b.index);
+    const idx=[],steps=[];
+    let b=lhs,inner=null;
+    for(;b.t==='Index'||b.t==='Field';b=peel(b.expr)){steps.unshift(b);if(b.t==='Index'){idx.unshift(b.index);inner=b;}}
+    b=peel(inner.expr);
     const c=classify(b);
     if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('assignment target',e);return;}
-    const ops=idx.map(x=>ex(x)),t=tyOf(lhs),name='[_]'.repeat(idx.length);
+    const ops=idx.map(x=>ex(x)),t=tyOf(lhs),name=stepText(steps,steps.indexOf(inner));
     if(c.k==='via'||L[c.l].ty.k==='ref'){
       const r=opnd(c.l,L[c.l].ty.k==='ref'&&L[c.l].ty.mut,false);
       if(ops.some(x=>x.k!=='const'))emit('eval',e,{rv:{k:'op',args:ops}});
@@ -505,7 +509,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     let root=c.l;
     while(L[root].parent!==undefined)root=L[root].parent;
     if(c.k==='path'&&uninit.has(root)){un('deferred initialization',e);return;}
-    const args=[...(compound?[opnd(c.l)]:[]),...ops,v].filter(x=>x.k!=='const');
+    const args=[...(compound?[{k:'copy',l:c.l}]:[]),...ops,v].filter(x=>x.k!=='const');
     if(args.length)emit('eval',e,{rv:{k:'op',args}});
     emit('write',e,{l:c.l,name});
   }
@@ -522,13 +526,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       emit('store',e,{ref:r,x:v});
       return;
     }
-    if(lhs.t==='Index'&&hasVecIdx(lhs)){
+    if(hasIdx(lhs)&&hasVecIdx(lhs)){
       // IndexMut borrows first, then the index operands run: `v[v.len()-1] = 5` is E0502
       const r=vecRoot(lhs),ro=vecRef(r.c,true,e,true,r);
       if(ro)emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x)),v]}});
       return;
     }
-    if(lhs.t==='Index'){arrayWrite(e,lhs,compound,v);return;}
+    if(hasIdx(lhs)){arrayWrite(e,lhs,compound,v);return;}
     if(lhs.t==='Field'){
       const c=classify(lhs);
       if(c.k==='path'){

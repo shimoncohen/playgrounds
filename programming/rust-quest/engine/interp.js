@@ -139,6 +139,13 @@ RQ.interp=(ast,opts)=>{
     const k=Number(i.v);
     return elemCell(vec,k,c);
   }
+  const hasIdx=p=>{for(p=peel(p);p.t==='Field'||p.t==='Index';p=peel(p.expr))if(p.t==='Index')return true;return false;};
+  function idxPlace(e,env){
+    e=peel(e);
+    if(e.t==='Index')return {cell:indexCell(e,env),path:[]};
+    const b=idxPlace(e.expr,env);
+    return {cell:b.cell,path:[...b.path,e.name]};
+  }
   function elemCell(vec,k,pc){
     const root=pc&&(pc.proxy?pc.parent:pc),label=(pc&&pc.proxy?pc.label:'')+'['+k+']';
     return {proxy:true,parent:root||null,label,name:root&&root.name?root.name+(pc.proxy?'.'+pc.label:'')+'['+k+']':null,
@@ -402,7 +409,7 @@ RQ.interp=(ast,opts)=>{
     if(cur.k==='ref')return {cell:cur.cell,path:[e.name],loan:cur.loan};
     return {cell:b.cell,path:[...b.path,e.name],loan:b.loan};
   }
-  const rootName=c=>{while(c.proxy)c=c.parent;return c.name;};
+  const rootName=c=>{while(c&&c.proxy)c=c.parent;return c?c.name:null;};
   const pathName=(c,path)=>{const r=rootName(c);return r?[r,...(c.proxy?[c.label]:[]),...path].join('.'):null;};
   function eqv(a,b){
     tick();
@@ -1427,10 +1434,13 @@ RQ.interp=(ast,opts)=>{
           ic.val=r;
           return UNIT;
         }else if(peel(e.lhs).t==='Field'){
-          const pl=placeOf(e.lhs,env);
+          // below an index the right side runs first, as for `a[i] = v`
+          const first=hasIdx(e.lhs);
+          let r=first?(e.op==='='?mv(e.rhs,env):ev(e.rhs,env)):null,pl;
+          try{pl=first?idxPlace(e.lhs,env):placeOf(e.lhs,env);}catch(x){if(first&&x instanceof Panic&&e.op==='=')dropValue(r,null,e.line);throw x;}
           if(!pl)throw new Unsup('assignment target',e.line);
           const old=getAt(read(pl.cell,e.line),pl.path);
-          let r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
+          if(!first)r=e.op==='='?mv(e.rhs,env):ev(e.rhs,env);
           if(e.op!=='=')r=binop(e.op.slice(0,-1),old,r,e);
           else if(old.k!=='moved')dropValue(old,pathName(pl.cell,pl.path),e.line,true);
           pl.cell.val=setAt(pl.cell.val,pl.path,r);

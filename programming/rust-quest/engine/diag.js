@@ -358,7 +358,7 @@ const HINTS={
   pattern:'Modeled patterns: a name or `_`, literals, ranges like `1..=5`, `|` between patterns that bind nothing, tuples, `struct` and `enum` variants (`Shape::Rect { w, h }`, `Some(n)`), and `n @ 1..=5`. `&` and `&mut` patterns are modeled only as the pattern of a `for` loop, like `for &x in &a` or `for (i, &x) in a.iter().enumerate()`. Not modeled: `ref`, `&` anywhere else, slices, constants, floats, a `&` inside a `struct` or `enum` pattern, a wrong field list, and a name that repeats.',
   'deferred initialization':'Give the variable its value right in the `let`, like `let x = 5;`. To set it later, write its type: `let x: i32;`.',
   'format spec':'Only `{}`, `{:?}`, `{:#?}`, `{:.N}` on a decimal number and `{:>N}` are modeled. Print the value with one of those.',
-  'assignment target':'Assign to a variable, a field, or an element of an array or a `Vec` you own or hold by `&mut`, like `a[0] = 1` or `v[0] = 1`. An element of a `Vec` of arrays, or a field of an element, like `a[0].x = 1`, is not modeled.',
+  'assignment target':'Assign to a variable, a field, or an element of an array or a `Vec` you own or hold by `&mut`, like `a[0] = 1`, `v[0][1] = 2` or `a[0].x = 3`. Writing through a `&` reference, like `*r = 1` with `r: &i32`, is not modeled.',
   'assigned string reference':'Assigning a `&String` to a `&str` place is not modeled. Write `&b[..]` or `b.as_str()` instead of `&b`.',
   'string concatenation':'Only `String + &str` (or `+ &String`) is modeled. Build text with `push_str`, or with `format!("{}{}", a, b)`.',
   'polymorphic recursion':'A generic function that calls itself with a bigger type, like `(x,)`, never finishes compiling in Rust. Call itself with the same type, or use a loop.',

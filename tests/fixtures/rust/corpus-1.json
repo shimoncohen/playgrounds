@@ -10892,5 +10892,457 @@
     "src": "fn main() {\n    for &x in &[String::from(\"a\")] {\n        println!(\"{}\", x);\n    }\n}\n",
     "expect": {"code": "E0507", "line": 2},
     "why": "E0507: a & pattern cannot move a String out of a temporary array", "pr": "unit"
+  },
+  {
+    "id": "nest-vv-grid",
+    "src": "fn main() {\n    let mut grid = vec![vec![0; 4]; 3];\n    for r in 0..3 {\n        for c in 0..4 {\n            grid[r][c] = r * 4 + c;\n        }\n    }\n    grid[1][2] += 100;\n    println!(\"{:?}\", grid);\n}\n",
+    "expect": "ok", "out": "[[0, 1, 2, 3], [4, 5, 106, 7], [8, 9, 10, 11]]\n", "err": "", "exit": 0,
+    "why": "a Vec of Vecs is filled and updated element by element", "pr": "unit"
+  },
+  {
+    "id": "nest-va",
+    "src": "fn main() {\n    let mut v = vec![[0; 3]; 2];\n    v[1][2] = 7;\n    v[0][0] += 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[1, 0, 0], [0, 0, 7]]\n", "err": "", "exit": 0,
+    "why": "an array inside a Vec is written through two indexes", "pr": "unit"
+  },
+  {
+    "id": "nest-av",
+    "src": "fn main() {\n    let mut a = [vec![1, 2], vec![3]];\n    a[0][1] = 9;\n    a[1][0] *= 5;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[1, 9], [15]]\n", "err": "", "exit": 0,
+    "why": "a Vec inside an array is written through two indexes", "pr": "unit"
+  },
+  {
+    "id": "nest-slice-param",
+    "src": "fn fill(g: &mut [Vec<u8>]) {\n    for r in 0..g.len() {\n        g[r][0] = r as u8;\n    }\n    g[0][1] = 4;\n}\n\nfn main() {\n    let mut g = vec![vec![0; 3]; 2];\n    fill(&mut g);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[0, 4, 0], [1, 0, 0]]\n", "err": "", "exit": 0,
+    "why": "a &mut [Vec<u8>] parameter is written through two indexes", "pr": "unit"
+  },
+  {
+    "id": "nest-3deep",
+    "src": "fn main() {\n    let mut v = vec![vec![vec![0; 2]; 2]; 2];\n    v[1][1][1] = 8;\n    v[0][1][0] += 3;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[[0, 0], [3, 0]], [[0, 0], [0, 8]]]\n", "err": "", "exit": 0,
+    "why": "three indexes deep on Vec<Vec<Vec<_>>>", "pr": "unit"
+  },
+  {
+    "id": "nest-oob-inner-run",
+    "src": "fn main() {\n    let mut v = vec![vec![0; 2]; 2];\n    let j = 5;\n    v[1][j] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:9:\nindex out of bounds: the len is 2 but the index is 5\n", "exit": 101,
+    "why": "the inner index past the end of a nested Vec panics at run time", "pr": "unit"
+  },
+  {
+    "id": "nest-oob-outer-run",
+    "src": "fn main() {\n    let mut v = vec![vec![0; 2]; 2];\n    let i = 2;\n    v[i][0] += 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:6:\nindex out of bounds: the len is 2 but the index is 2\n", "exit": 101,
+    "why": "the outer index past the end of a nested Vec panics at run time", "pr": "unit"
+  },
+  {
+    "id": "nest-oob-lint",
+    "src": "fn main() {\n    let mut a = vec![[0; 2]; 2];\n    a[0][2] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 3},
+    "pair": "nest-oob-lint-ok",
+    "why": "unconditional_panic: a constant inner index past the end of an array inside a Vec", "pr": "P4"
+  },
+  {
+    "id": "nest-oob-lint-ok",
+    "src": "fn main() {\n    let mut a = vec![[0; 2]; 2];\n    a[0][1] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[0, 1], [0, 0]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a constant inner index past the end of an array inside a Vec", "pr": "P4"
+  },
+  {
+    "id": "nest-immut-vv",
+    "src": "fn main() {\n    let v = vec![vec![0; 2]; 2];\n    v[0][1] = 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "nest-immut-vv-ok",
+    "why": "E0596: writing an element of a Vec of Vecs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-immut-vv-ok",
+    "src": "fn main() {\n    let mut v = vec![vec![0; 2]; 2];\n    v[0][1] = 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[0, 1], [0, 0]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a Vec of Vecs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-immut-av",
+    "src": "fn main() {\n    let a = [vec![0; 2], vec![1]];\n    a[0][1] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "nest-immut-av-ok",
+    "why": "E0596: writing an element of an array of Vecs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-immut-av-ok",
+    "src": "fn main() {\n    let mut a = [vec![0; 2], vec![1]];\n    a[0][1] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[0, 1], [1]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array of Vecs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-immut-va",
+    "src": "fn main() {\n    let v = vec![[0; 2]; 2];\n    v[0][1] = 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code": "E0596", "line": 3},
+    "pair": "nest-immut-va-ok",
+    "why": "E0596: writing an element of a Vec of arrays that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-immut-va-ok",
+    "src": "fn main() {\n    let mut v = vec![[0; 2]; 2];\n    v[0][1] = 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[0, 1], [0, 0]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a Vec of arrays that is not mut", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-av",
+    "src": "fn f(a: &[Vec<i32>; 2]) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&[vec![0; 2], vec![1]]);\n}\n",
+    "expect": {"code": "E0596", "line": 2},
+    "pair": "nest-shared-av-ok",
+    "why": "E0596: writing an element of an array of Vecs behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-av-ok",
+    "src": "fn f(a: &mut [Vec<i32>; 2]) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&mut [vec![0; 2], vec![1]]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of an array of Vecs behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-va",
+    "src": "fn f(a: &Vec<[i32; 2]>) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&vec![[0; 2]]);\n}\n",
+    "expect": {"code": "E0596", "line": 2},
+    "pair": "nest-shared-va-ok",
+    "why": "E0596: writing an element of a Vec of arrays behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-va-ok",
+    "src": "fn f(a: &mut Vec<[i32; 2]>) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&mut vec![[0; 2]]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a Vec of arrays behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-sv",
+    "src": "fn f(a: &[Vec<i32>]) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&[vec![0; 2]]);\n}\n",
+    "expect": {"code": "E0596", "line": 2},
+    "pair": "nest-shared-sv-ok",
+    "why": "E0596: writing an element of a slice of Vecs behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-shared-sv-ok",
+    "src": "fn f(a: &mut [Vec<i32>]) {\n    a[0][1] = 1;\n}\n\nfn main() {\n    f(&mut [vec![0; 2]]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an element of a slice of Vecs behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-av",
+    "src": "fn main() {\n    let mut a = [vec![1], vec![2]];\n    let r = &a;\n    a[0][0] = 1;\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "nest-borrowed-av-ok",
+    "why": "E0502: writing an array of Vecs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-av-ok",
+    "src": "fn main() {\n    let mut a = [vec![1], vec![2]];\n    let r = &a;\n    a[0][0] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[1], [2]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an array of Vecs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-va",
+    "src": "fn main() {\n    let mut a = vec![[1], [2]];\n    let r = &a;\n    a[0][0] = 1;\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "nest-borrowed-va-ok",
+    "why": "E0502: writing a Vec of arrays while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-va-ok",
+    "src": "fn main() {\n    let mut a = vec![[1], [2]];\n    let r = &a;\n    a[0][0] = 1;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[[1], [2]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a Vec of arrays while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-row",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3, 4]];\n    let r = &v[1];\n    v[0][1] = 1;\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code": "E0502", "line": 4},
+    "pair": "nest-borrowed-row-ok",
+    "why": "E0502: writing a row of a Vec of Vecs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-borrowed-row-ok",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3, 4]];\n    let r = &v[1];\n    v[0][1] = 1;\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[1, 1], [3, 4]]\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a row of a Vec of Vecs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-twice-av",
+    "src": "fn main() {\n    let mut a = [vec![1], vec![2]];\n    let r = &mut a;\n    a[0][0] = 1;\n    r[0][0] = 2;\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "pair": "nest-twice-av-ok",
+    "why": "E0499: writing an array of Vecs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-twice-av-ok",
+    "src": "fn main() {\n    let mut a = [vec![1], vec![2]];\n    let r = &mut a;\n    r[0][0] = 1;\n    a[0][0] = 2;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing an array of Vecs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-twice-vv",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3, 4]];\n    let r = &mut v;\n    v[0][1] = 1;\n    r[0][0] = 2;\n}\n",
+    "expect": {"code": "E0499", "line": 4},
+    "pair": "nest-twice-vv-ok",
+    "why": "E0499: writing a Vec of Vecs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "nest-twice-vv-ok",
+    "src": "fn main() {\n    let mut v = vec![vec![1, 2], vec![3, 4]];\n    let r = &mut v;\n    r[0][1] = 1;\n    v[0][0] = 2;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a Vec of Vecs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-arr",
+    "src": "#[derive(Clone, Copy, Debug)]\nstruct P {\n    x: i32,\n    y: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0, y: 0 }; 3];\n    a[0].x = 1;\n    a[2].y += 5;\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[P { x: 1, y: 0 }, P { x: 0, y: 0 }, P { x: 0, y: 5 }]\n", "err": "", "exit": 0,
+    "why": "fields of the elements of an array of structs are written", "pr": "unit"
+  },
+  {
+    "id": "elem-vec",
+    "src": "#[derive(Debug)]\nstruct Item {\n    name: String,\n    count: u32,\n}\n\nfn main() {\n    let mut items = vec![\n        Item { name: String::from(\"a\"), count: 3 },\n        Item { name: String::from(\"b\"), count: 1 },\n    ];\n    let i = 1;\n    items[i].count -= 1;\n    items[0].name = String::from(\"z\");\n    println!(\"{:?}\", items);\n}\n",
+    "expect": "ok", "out": "[Item { name: \"z\", count: 3 }, Item { name: \"b\", count: 0 }]\n", "err": "", "exit": 0,
+    "why": "fields of the elements of a Vec of structs are written, a String field replaced", "pr": "unit"
+  },
+  {
+    "id": "elem-particles",
+    "src": "#[derive(Debug, Clone, Copy)]\nstruct V {\n    x: f64,\n    y: f64,\n}\n\n#[derive(Debug, Clone, Copy)]\nstruct Particle {\n    pos: V,\n    vel: V,\n}\n\nfn main() {\n    let mut ps = vec![Particle { pos: V { x: 0.0, y: 0.0 }, vel: V { x: 1.0, y: 2.0 } }; 2];\n    for i in 0..ps.len() {\n        ps[i].pos.x += ps[i].vel.x;\n        ps[i].pos.y += ps[i].vel.y;\n    }\n    ps[1].pos.x = 0.0;\n    println!(\"{:?}\", ps);\n}\n",
+    "expect": "ok", "out": "[Particle { pos: V { x: 1.0, y: 2.0 }, vel: V { x: 1.0, y: 2.0 } }, Particle { pos: V { x: 0.0, y: 2.0 }, vel: V { x: 1.0, y: 2.0 } }]\n", "err": "", "exit": 0,
+    "why": "a nested field of every element is updated in a loop", "pr": "unit"
+  },
+  {
+    "id": "elem-grid",
+    "src": "#[derive(Clone, Copy, Debug)]\nstruct Tile {\n    alive: bool,\n    n: u8,\n}\n\nfn main() {\n    let mut g = vec![vec![Tile { alive: false, n: 0 }; 3]; 2];\n    g[1][2].alive = true;\n    g[0][0].n += 2;\n    for r in 0..2 {\n        for c in 0..3 {\n            if g[r][c].alive {\n                println!(\"{} {}\", r, c);\n            }\n        }\n    }\n    println!(\"{:?}\", g[0][0]);\n}\n",
+    "expect": "ok", "out": "1 2\nTile { alive: false, n: 2 }\n", "err": "", "exit": 0,
+    "why": "a field of a cell in a Vec of Vecs of structs", "pr": "unit"
+  },
+  {
+    "id": "elem-params",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump_vec(v: &mut Vec<P>) {\n    v[0].x += 1;\n}\n\nfn bump_slice(v: &mut [P]) {\n    v[0].x += 10;\n}\n\nfn bump_array(v: &mut [P; 2]) {\n    v[1].x += 100;\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }];\n    bump_vec(&mut v);\n    bump_slice(&mut v);\n    let mut a = [P { x: 0 }, P { x: 5 }];\n    bump_array(&mut a);\n    bump_slice(&mut a);\n    println!(\"{} {} {}\", v[0].x, a[0].x, a[1].x);\n}\n",
+    "expect": "ok", "out": "11 10 105\n", "err": "", "exit": 0,
+    "why": "a field of an element through &mut Vec, &mut slice and &mut array parameters", "pr": "unit"
+  },
+  {
+    "id": "elem-self",
+    "src": "struct P {\n    x: i32,\n}\n\nstruct W {\n    ps: Vec<P>,\n    arr: [P; 2],\n}\n\nimpl W {\n    fn go(&mut self, i: usize) {\n        self.ps[i].x += 1;\n        self.arr[i].x -= 1;\n    }\n}\n\nfn main() {\n    let mut w = W { ps: vec![P { x: 1 }, P { x: 2 }], arr: [P { x: 5 }, P { x: 6 }] };\n    w.go(1);\n    println!(\"{} {}\", w.ps[1].x, w.arr[1].x);\n}\n",
+    "expect": "ok", "out": "3 5\n", "err": "", "exit": 0,
+    "why": "a field of an element of a Vec and of an array field through &mut self", "pr": "unit"
+  },
+  {
+    "id": "elem-tuple",
+    "src": "fn main() {\n    let mut a = [(0, 'a'); 2];\n    a[1].0 = 5;\n    a[0].1 = 'z';\n    let mut v = vec![(1, 2), (3, 4)];\n    v[0].1 = 9;\n    v[1].0 += 1;\n    println!(\"{:?} {:?}\", a, v);\n}\n",
+    "expect": "ok", "out": "[(0, 'z'), (5, 'a')] [(1, 9), (4, 4)]\n", "err": "", "exit": 0,
+    "why": "a tuple field of an element of an array and of a Vec", "pr": "unit"
+  },
+  {
+    "id": "elem-deep",
+    "src": "struct S {\n    a: [i32; 3],\n}\n\nstruct T {\n    ins: Vec<S>,\n}\n\nfn main() {\n    let mut v = vec![T { ins: vec![S { a: [0; 3] }] }];\n    v[0].ins[0].a[2] = 7;\n    println!(\"{}\", v[0].ins[0].a[2]);\n}\n",
+    "expect": "ok", "out": "7\n", "err": "", "exit": 0,
+    "why": "a field, a Vec element and an array element below one another", "pr": "unit"
+  },
+  {
+    "id": "elem-drop",
+    "src": "struct N(i32);\n\nimpl Drop for N {\n    fn drop(&mut self) {\n        println!(\"drop {}\", self.0);\n    }\n}\n\nstruct W {\n    n: N,\n}\n\nfn main() {\n    let mut v = vec![W { n: N(1) }, W { n: N(2) }];\n    v[0].n = N(3);\n    println!(\"set\");\n}\n",
+    "expect": "ok", "out": "drop 1\nset\ndrop 3\ndrop 2\n", "err": "", "exit": 0,
+    "why": "an overwritten field of an element is dropped at once", "pr": "unit"
+  },
+  {
+    "id": "elem-order",
+    "src": "fn idx() -> usize {\n    println!(\"idx\");\n    0\n}\n\nfn val() -> i32 {\n    println!(\"val\");\n    1\n}\n\nstruct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 1 }, P { x: 2 }];\n    a[idx()].x = val();\n    let mut v = vec![vec![0; 2]; 2];\n    v[idx()][idx()] += val();\n    println!(\"{} {:?}\", a[0].x, v);\n}\n",
+    "expect": "ok", "out": "val\nidx\nval\nidx\nidx\n1 [[1, 0], [0, 0]]\n", "err": "", "exit": 0,
+    "why": "the right side runs before the index operands of a field write", "pr": "unit"
+  },
+  {
+    "id": "elem-oob-run",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }];\n    let i = 3;\n    v[i].x = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:6:\nindex out of bounds: the len is 1 but the index is 3\n", "exit": 101,
+    "why": "a field write past the end of a Vec panics at run time", "pr": "unit"
+  },
+  {
+    "id": "elem-oob-lint",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = [P { x: 0 }, P { x: 1 }];\n    v[2].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 7},
+    "pair": "elem-oob-lint-ok",
+    "why": "unconditional_panic: a constant index past the end of an array of structs in a field write", "pr": "P4"
+  },
+  {
+    "id": "elem-oob-lint-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = [P { x: 0 }, P { x: 1 }];\n    v[1].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a constant index past the end of an array of structs in a field write", "pr": "P4"
+  },
+  {
+    "id": "elem-div-zero-lint",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 1 }];\n    v[0].x /= 0;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": {"lint": "unconditional_panic", "line": 7},
+    "pair": "elem-div-zero-lint-ok",
+    "why": "unconditional_panic: a field of an element divided by a constant zero", "pr": "P4"
+  },
+  {
+    "id": "elem-div-zero-lint-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 1 }];\n    v[0].x /= 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: a field of an element divided by a constant zero", "pr": "P4"
+  },
+  {
+    "id": "elem-overflow-run",
+    "src": "struct P {\n    x: u8,\n}\n\nfn main() {\n    let mut v = vec![P { x: 250 }];\n    for _ in 0..10 {\n        v[0].x += 1;\n    }\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:8:9:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a field of an element overflows its type at run time", "pr": "unit"
+  },
+  {
+    "id": "elem-immut-arr",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let a = [P { x: 0 }, P { x: 1 }];\n    a[0].x = 1;\n    println!(\"{}\", a[0].x);\n}\n",
+    "expect": {"code": "E0594", "line": 7},
+    "pair": "elem-immut-arr-ok",
+    "why": "E0594: writing a field of an element of an array of structs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "elem-immut-arr-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0 }, P { x: 1 }];\n    a[0].x = 1;\n    println!(\"{}\", a[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of an array of structs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "elem-immut-vec",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let v = vec![P { x: 0 }, P { x: 1 }];\n    v[0].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": {"code": "E0596", "line": 7},
+    "pair": "elem-immut-vec-ok",
+    "why": "E0596: writing a field of an element of a Vec of structs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "elem-immut-vec-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }, P { x: 1 }];\n    v[0].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a Vec of structs that is not mut", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-slice",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &[P]) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&[P { x: 0 }]);\n}\n",
+    "expect": {"code": "E0594", "line": 6},
+    "pair": "elem-shared-slice-ok",
+    "why": "E0594: writing a field of an element of a slice behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-slice-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &mut [P]) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&mut [P { x: 0 }]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a slice behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-vec",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &Vec<P>) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&vec![P { x: 0 }]);\n}\n",
+    "expect": {"code": "E0596", "line": 6},
+    "pair": "elem-shared-vec-ok",
+    "why": "E0596: writing a field of an element of a Vec behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-vec-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &mut Vec<P>) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&mut vec![P { x: 0 }]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a Vec behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-arr",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &[P; 1]) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&[P { x: 0 }]);\n}\n",
+    "expect": {"code": "E0594", "line": 6},
+    "pair": "elem-shared-arr-ok",
+    "why": "E0594: writing a field of an element of an array behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-shared-arr-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn bump(v: &mut [P; 1]) {\n    v[0].x += 1;\n}\n\nfn main() {\n    bump(&mut [P { x: 0 }]);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of an array behind a & reference", "pr": "P5"
+  },
+  {
+    "id": "elem-self-vec",
+    "src": "struct P {\n    x: i32,\n}\n\nstruct W {\n    v: Vec<P>,\n}\n\nimpl W {\n    fn go(&self) {\n        self.v[0].x = 1;\n    }\n}\n\nfn main() {\n    let w = W { v: vec![P { x: 5 }] };\n    w.go();\n}\n",
+    "expect": {"code": "E0596", "line": 11},
+    "pair": "elem-self-vec-ok",
+    "why": "E0596: writing a field of an element of a Vec field through &self", "pr": "P5"
+  },
+  {
+    "id": "elem-self-vec-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nstruct W {\n    v: Vec<P>,\n}\n\nimpl W {\n    fn go(&mut self) {\n        self.v[0].x = 1;\n    }\n}\n\nfn main() {\n    let mut w = W { v: vec![P { x: 5 }] };\n    w.go();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a Vec field through &self", "pr": "P5"
+  },
+  {
+    "id": "elem-self-arr",
+    "src": "struct P {\n    x: i32,\n}\n\nstruct W {\n    a: [P; 1],\n}\n\nimpl W {\n    fn go(&self) {\n        self.a[0].x = 1;\n    }\n}\n\nfn main() {\n    let w = W { a: [P { x: 5 }] };\n    w.go();\n}\n",
+    "expect": {"code": "E0594", "line": 11},
+    "pair": "elem-self-arr-ok",
+    "why": "E0594: writing a field of an element of an array field through &self", "pr": "P5"
+  },
+  {
+    "id": "elem-self-arr-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nstruct W {\n    a: [P; 1],\n}\n\nimpl W {\n    fn go(&mut self) {\n        self.a[0].x = 1;\n    }\n}\n\nfn main() {\n    let mut w = W { a: [P { x: 5 }] };\n    w.go();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of an array field through &self", "pr": "P5"
+  },
+  {
+    "id": "elem-borrowed-arr",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0 }, P { x: 1 }];\n    let r = &a;\n    a[0].x = 1;\n    println!(\"{}\", r[0].x);\n}\n",
+    "expect": {"code": "E0506", "line": 8},
+    "pair": "elem-borrowed-arr-ok",
+    "why": "E0506: writing a field of an element of an array of structs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-borrowed-arr-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0 }, P { x: 1 }];\n    let r = &a;\n    a[0].x = 1;\n    println!(\"{}\", a[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of an array of structs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-borrowed-vec",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }, P { x: 1 }];\n    let r = &v;\n    v[0].x = 1;\n    println!(\"{}\", r[0].x);\n}\n",
+    "expect": {"code": "E0502", "line": 8},
+    "pair": "elem-borrowed-vec-ok",
+    "why": "E0502: writing a field of an element of a Vec of structs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-borrowed-vec-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }, P { x: 1 }];\n    let r = &v;\n    v[0].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a Vec of structs while a borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-mutborrow-arr",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0 }, P { x: 1 }];\n    let r = &mut a;\n    a[0].x = 1;\n    r[0].x = 2;\n}\n",
+    "expect": {"code": "E0506", "line": 8},
+    "pair": "elem-mutborrow-arr-ok",
+    "why": "E0506: writing a field of an element of an array of structs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-mutborrow-arr-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut a = [P { x: 0 }, P { x: 1 }];\n    let r = &mut a;\n    r[0].x = 1;\n    a[0].x = 2;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of an array of structs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-mutborrow-vec",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }, P { x: 1 }];\n    let r = &mut v;\n    v[0].x = 1;\n    r[0].x = 2;\n}\n",
+    "expect": {"code": "E0499", "line": 8},
+    "pair": "elem-mutborrow-vec-ok",
+    "why": "E0499: writing a field of an element of a Vec of structs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-mutborrow-vec-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 0 }, P { x: 1 }];\n    let r = &mut v;\n    r[0].x = 1;\n    v[0].x = 2;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element of a Vec of structs while a &mut borrow of it is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-moved",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 1 }];\n    let w = v;\n    v[0].x = 1;\n    println!(\"{}\", w[0].x);\n}\n",
+    "expect": {"code": "E0382", "line": 8},
+    "pair": "elem-moved-ok",
+    "why": "E0382: writing a field of an element after the Vec moved", "pr": "P5"
+  },
+  {
+    "id": "elem-moved-ok",
+    "src": "struct P {\n    x: i32,\n}\n\nfn main() {\n    let mut v = vec![P { x: 1 }];\n    let w = v.len();\n    v[0].x = 1;\n    println!(\"{}\", v[0].x);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles once the cause is gone: writing a field of an element after the Vec moved", "pr": "P5"
   }
 ]
