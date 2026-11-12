@@ -293,6 +293,8 @@ A segmented bar with a text table of the same segments, pattern fills (no colour
 
 Four check kinds: `prompt`, `config`, `budget` and `choose` (quick-fire only). A `budget` mission needs the setup total at or below N and `accept` still holding, so deleting everything fails.
 
+A `prompt` mission is answered in the prompt form, but the setup files the scenario ships stay editable, so a prompt mission whose check does not read `c.prompt` can be passed from a file: a rule or a `Files` scope in `CLAUDE.md`, `permissions.txt` or `hooks.txt`, or a shipped helper rewritten to a cheaper model. Such a check therefore reads the prompt (the typed `Files` line, a typed constraint that stops the action, or an unchanged shipped helper or command), except where a mission deliberately accepts another route (a `Done when:` line in the root `CLAUDE.md`). `tests/agent/prompt-files.test.mjs` sweeps every prompt mission of chapters 2 to 15 for these routes.
+
 Every mission carries `answer`, `wrong` and `lazy`. The solvability test requires the answer to pass and the other two to fail. Answers are computed by the sim, never hardcoded. Mission shape otherwise follows the other quests (goal, `how`, hint, explain), plus a `scenario` name.
 
 ### Worked missions
