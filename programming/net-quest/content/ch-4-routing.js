@@ -13,12 +13,13 @@ const gw=c=>bare(c.net.devices.r1.ifaces.eth0.ip); // the office router's addres
 const addrOf=(c,d)=>bare(c.net.devices[d].ifaces.eth0.ip);
 const SHOW_ROUTE=/^\s*ip\s+(r|route)(\s+(show|list))?\s*$/;
 /* the latest traceroute the learner ran that worked (and, with pred, that satisfies pred, so an extra comparison
-   traceroute after the right one changes nothing), re-run on a clone of the final network from the terminal's device:
-   {ip, hops}, or null */
+   traceroute after the right one changes nothing), re-run on a clone of the final network from the terminal's device
+   (once per address, however often it was typed): {ip, hops}, or null */
 const traced=(c,pred)=>{
+  const seen={};
   const ts=c.history.filter(x=>x.code===0&&/^\s*traceroute\s+\S+\s*$/.test(x.line)).map(h=>{
     const ip=h.line.trim().split(/\s+/)[1];
-    return {ip,hops:NQ.sim.traceroute(c.net.clone(),c.net.me,ip).hops};
+    return seen[ip]||(seen[ip]={ip,hops:NQ.sim.traceroute(c.net.probe(),c.net.me,ip).hops});
   });
   return (pred?ts.filter(pred):ts).at(-1)||null;
 };
