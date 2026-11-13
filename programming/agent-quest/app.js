@@ -50,7 +50,15 @@ function clearRun(){
 function startSession(){
   ed.load(sessionMission());clearRun();refresh();
 }
-function changed(){clearRun();refresh();}
+function showNext(){
+  const host=fb();
+  if(!host||!curMission()||!S.done[mkey()])return;
+  const last=S.mi>=CH[S.ch].missions.length-1,row=el('div','nextline'),b=el('button','btn ghost small',(last?'Finish the chapter':'Next mission')+' →');
+  b.type='button';b.dataset.act='next';
+  row.append(el('span','note','This mission is already done. '),b);
+  host.append(row);
+}
+function changed(){clearRun();refresh();showNext();}
 function runAgent(approve){
   const m=sessionMission();
   const input=approve&&awaitingRun?awaitingRun.input:ed.getInput();

@@ -76,6 +76,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .btn.ghost{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);color:var(--ink)}
 .btn.ghost:hover{background:var(--surface-2)}
 .btn.small{padding:4px 10px;font-size:13px}
+.nextline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
 @media (pointer:coarse){.btn.small{min-height:40px}}
 .hint{margin:0;padding:8px 12px;border-radius:10px;border:1.5px dashed var(--line);font-size:14px}
 .hint summary{cursor:pointer;font-weight:700}

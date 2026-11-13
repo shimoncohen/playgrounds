@@ -3833,6 +3833,28 @@ test('agent-quest: a file the learner may edit can be deleted and restored from 
   }
 });
 
+test('agent-quest: after an edit, a mission that is already done offers Next mission without showing the old result', async () => {
+  for (const [mi, label, after] of [[1, 'Next mission →', /Mission 3 of 5/], [4, 'Finish the chapter →', /Chapter 1 complete/]]) {
+    const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 0, mi, done: { [`0.${mi}`]: true } })));
+    const { page } = o;
+    assert.equal(await page.locator('#feedback [data-act="next"]').count(), 0, 'nothing before an edit');
+    await page.click('#promptHost [data-act="fill"]');
+    assert.equal(await page.locator('#feedback .msg').count(), 0, 'no old result');
+    assert.equal(await page.locator('#run .steps').count(), 0);
+    const next = page.locator('#feedback [data-act="next"]');
+    assert.equal((await next.textContent()).trim(), label);
+    await next.click();
+    assert.match(await page.textContent('#missionBody'), after);
+    assert.equal(await page.locator('#feedback [data-act="next"]').count(), 0, 'the new mission starts clean');
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+  const o = await agentPage({}, seedAgent(JSON.stringify({ ch: 0, mi: 1, done: {} })));
+  await o.page.click('#promptHost [data-act="fill"]');
+  assert.equal(await o.page.locator('#feedback [data-act="next"]').count(), 0, 'a mission not done yet offers none');
+  await o.ctx.close();
+});
+
 test('agent-quest: any edit after a run clears the Run panel and the feedback, in a prompt and in a config mission', async () => {
   const o = await agentPage();
   const { page } = o;
