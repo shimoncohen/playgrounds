@@ -962,7 +962,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           return opnd(d);
         }
         // == and the others take their operands by reference, so comparing two Strings or structs moves neither
-        if(['==','!=','<','>','<=','>='].includes(e.op)&&!isCopy(tyOf(e.lhs)))return put({k:'op',args:seq([e.lhs,e.rhs],x=>printArg(x,e))},e,dest,tyOf(e));
+        if(['==','!=','<','>','<=','>='].includes(e.op)&&!(isCopy(tyOf(e.lhs))&&isCopy(tyOf(e.rhs))))return put({k:'op',args:seq([e.lhs,e.rhs],x=>printArg(x,e))},e,dest,tyOf(e));
         return put({k:'op',args:seq([e.lhs,e.rhs],ex)},e,dest,tyOf(e));
       }
       case 'Assign':assign(e);return fin(NIL,e,dest);
