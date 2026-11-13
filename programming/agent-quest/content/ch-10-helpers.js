@@ -6,6 +6,8 @@ const DEV=['goal','donewhen','constraints','files','examples','plan','use'];
 const MOST=3;
 const searched=o=>o.steps.some(s=>s.type==='delegate'&&s.files>0);
 const NOBODY='Nobody searched for you. Hand the search to a helper.';
+const helpersEdited=c=>{const base=AQ.config.parseSetup(AQ.vfs.create(c.scenario.vfs)).subagents;return c.setup.subagents.length!==base.length||c.setup.subagents.some((s,i)=>s.name!==base[i].name||s.model!==base[i].model);};
+const EDITED='You changed what a helper costs in its own file. This mission is about choosing which helpers to name in Use.';
 const tooDear=o=>{const n=AQ.helperCost(o);return n>MOST?'The helpers you used cost '+n+' units. The most allowed here is '+MOST+'.':null;};
 
 AQ.CH.push({
@@ -44,7 +46,7 @@ AQ.CH.push({
       answer:'Use: scout\nDone when: run npm test',
       wrong:'Use: architect\nDone when: run npm test',
       lazy:'Done when: run npm test',
-      check:(o,c)=>searched(o)?(tooDear(o)||AQ.verdict(o,c)):NOBODY
+      check:(o,c)=>helpersEdited(c)?EDITED:searched(o)?(tooDear(o)||AQ.verdict(o,c)):NOBODY
     },
     {
       title:'Split a huge search',scenario:'huge',kind:'prompt',fields:DEV,facts:['subagents','worktrees'],
@@ -62,6 +64,7 @@ AQ.CH.push({
       wrong:'Use: scout',
       lazy:'Done when: run npm test',
       check:(o,c)=>{
+        if(helpersEdited(c))return EDITED;
         if(!searched(o))return NOBODY;
         if(o.steps.some(s=>s.type==='delegate'&&s.over))return 'A helper held more than its window of '+AQ.context.WINDOW+' tokens and lost track of files. Split the search over two helpers.';
         return tooDear(o)||AQ.verdict(o,c);
