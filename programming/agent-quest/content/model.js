@@ -1,5 +1,5 @@
 /* Agent Quest mission model. A mission is {title, goal, how[], explain, hint, scenario, kind, prompt?, answer, wrong, lazy, check?,
-   facts?}. Its input is a prompt string, or {prompt, files} where files holds edits to setup files. runMission builds the
+   facts?}. Its input is a prompt string, or {prompt, files} where files holds edits to setup files (a string is the new text, null deletes the file). runMission builds the
    scenario, runs the policy and grades the Outcome, so a check never depends on UI state. */
 (()=>{
 'use strict';
@@ -28,7 +28,11 @@ function verdict(o,c){
 function prepare(m,input){
   const sc=AQ.scenarios[m.scenario],inp=norm(input),vfs=AQ.vfs.create(sc.vfs);
   /* a folder memory file is editable only where the scenario ships one, so an input cannot invent it */
-  for(const p of Object.keys(inp.files))if(canEdit(m,p)&&typeof inp.files[p]==='string'&&(!AQ.isFolderMemory(p)||AQ.vfs.own(sc.vfs,p)))vfs.write(p,inp.files[p]);
+  for(const p of Object.keys(inp.files)){
+    const t=inp.files[p];
+    if(!canEdit(m,p)||!(typeof t==='string'||t===null)||(AQ.isFolderMemory(p)&&!AQ.vfs.own(sc.vfs,p)))continue;
+    if(t===null)vfs.remove(p);else vfs.write(p,t);
+  }
   const setup=AQ.config.parseSetup(vfs);
   /* config and budget missions send their own prompt: the learner's work is the setup files */
   /* a tool the mission's own prompt names resolves even when mcp.txt lacks it: the run then skips it as not connected */

@@ -3787,6 +3787,52 @@ test('agent-quest: the active chapter chip is scrolled back into the rail when e
   await o.ctx.close();
 });
 
+test('agent-quest: a file the learner may edit can be deleted and restored from the Files panel, by keyboard too', async () => {
+  const SKILL = '.claude/skills/release-notes.md';
+  for (const width of [390, 1440]) {
+    const o = await agentPage({ viewport: { width, height: 900 } }, seedAt(4, 1));
+    const { page } = o;
+    const pane = async p => { if (width < 721) await page.evaluate(p => document.querySelector(`.paneSwitch [data-pane="${p}"]`).click(), p); };
+    await pane('files');
+    await page.click('#tree [data-path="CLAUDE.md"]');
+    assert.equal(await page.locator('#fileEditor button[data-act="delete"]').count(), 1, `${width}: CLAUDE.md can be deleted`);
+    const readonly = await page.$$eval('#tree [role="option"]', es => es.filter(e => /read-only/.test(e.textContent)).map(e => e.dataset.path));
+    for (const p of readonly.slice(0, 1)) { await page.click(`#tree [data-path="${p}"]`); assert.equal(await page.locator('#fileEditor button').count(), 0, `${width}: no delete on the read-only ${p}`); }
+    await page.click(`#tree [data-path="${SKILL}"]`);
+    const del = page.locator('#fileEditor button[data-act="delete"]');
+    assert.equal(await del.textContent(), 'Delete file');
+    assert.match(await del.getAttribute('aria-label'), /Delete .*release-notes/);
+    await del.focus();
+    await page.keyboard.press('Enter');
+    assert.match(await page.textContent(`#tree [data-path="${SKILL}"]`), /\(deleted\)/);
+    assert.equal(await page.locator('#fileEditor textarea').count(), 0);
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.act), 'restore', `${width}: focus moves to Restore`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${width}: no sideways scroll`);
+    await pane('mission');
+    await page.click('#runBtn');
+    assert.equal(await page.locator('#feedback .win').count(), 1, `${width}: deleting the duplicate skill passes 5.2`);
+    await pane('files');
+    await page.click('#fileEditor button[data-act="restore"]');
+    assert.equal(await page.evaluate(() => document.activeElement.tagName), 'TEXTAREA');
+    assert.match(await page.inputValue('#fileEditor textarea'), /name: release-notes/);
+    assert.doesNotMatch(await page.textContent(`#tree [data-path="${SKILL}"]`), /deleted/);
+    await page.click('#fileEditor button[data-act="delete"]');
+    await pane('mission');
+    await page.click('#mission .dot[data-mi="2"]');
+    await page.click('#mission .dot[data-mi="1"]');
+    await pane('files');
+    await page.click(`#tree [data-path="${SKILL}"]`);
+    assert.match(await page.inputValue('#fileEditor textarea'), /name: release-notes/, `${width}: starting the mission again restores the file`);
+    await page.reload();
+    await page.waitForSelector('#runBtn');
+    await pane('files');
+    await page.click(`#tree [data-path="${SKILL}"]`);
+    assert.match(await page.inputValue('#fileEditor textarea'), /name: release-notes/, `${width}: a reload brings it back, since nothing typed is saved`);
+    assert.deepEqual(o.errors, []);
+    await o.ctx.close();
+  }
+});
+
 test('agent-quest: any edit after a run clears the Run panel and the feedback, in a prompt and in a config mission', async () => {
   const o = await agentPage();
   const { page } = o;
