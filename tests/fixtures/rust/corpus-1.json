@@ -13335,5 +13335,156 @@
     "src": "fn tail(x: &mut [i32], n: usize) {\n    x[n..].sort();\n}\n\nfn main() {\n    let mut v = vec![9, 3, 1, 2];\n    tail(&mut v, 9);\n}\n",
     "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:6:\nrange start index 9 out of range for slice of length 4\n", "exit": 101,
     "why": "a range start past the end panics at the range", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-row",
+    "src": "fn main() {\n    let mut g = [[3, 1], [2, 0]];\n    g[0].sort();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 3], [2, 0]]\n", "err": "", "exit": 0,
+    "why": "a method call on a row of an array of arrays changes that row", "pr": "unit"
+  },
+  {
+    "id": "elem-swap-row",
+    "src": "fn main() {\n    let mut g = [[3, 1], [2, 0]];\n    let i = 1;\n    g[i].swap(0, 1);\n    g[i - 1].reverse();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 3], [0, 2]]\n", "err": "", "exit": 0,
+    "why": "swap and reverse on a row picked by a variable index", "pr": "unit"
+  },
+  {
+    "id": "elem-vec-of-arrays",
+    "src": "fn main() {\n    let mut v = vec![[3, 1, 2], [9, 8, 7]];\n    for r in 0..v.len() {\n        v[r].sort();\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[1, 2, 3], [7, 8, 9]]\n", "err": "", "exit": 0,
+    "why": "sorting each array of a Vec of arrays", "pr": "unit"
+  },
+  {
+    "id": "elem-len-iter",
+    "src": "fn main() {\n    let g = [[1, 2, 3], [4, 5, 6]];\n    let mut t = 0;\n    for r in 0..g.len() {\n        let s: i32 = g[r].iter().sum();\n        t += s + g[r].len() as i32;\n    }\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "27\n", "err": "", "exit": 0,
+    "why": "len and iter on a row of an array", "pr": "unit"
+  },
+  {
+    "id": "elem-ref-row",
+    "src": "fn row_sum(r: &[i32; 3]) -> i32 {\n    r[0] + r[1] + r[2]\n}\n\nfn total(r: &[i32]) -> i32 {\n    let mut t = 0;\n    for x in r {\n        t += x;\n    }\n    t\n}\n\nfn main() {\n    let g = [[1, 2, 3], [4, 5, 6]];\n    let first = &g[0];\n    let second = &g[1];\n    println!(\"{:?} {:?} {} {}\", first, second, row_sum(&g[1]), total(&g[1][1..]));\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [4, 5, 6] 15 11\n", "err": "", "exit": 0,
+    "why": "a shared borrow of a row, lent to a function or a slice of it", "pr": "unit"
+  },
+  {
+    "id": "elem-mut-row",
+    "src": "fn bump(r: &mut [i32; 3]) {\n    r[0] += 10;\n}\n\nfn main() {\n    let mut g = [[1, 2, 3], [4, 5, 6]];\n    bump(&mut g[1]);\n    let first = &mut g[0];\n    first[1] = 9;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 9, 3], [14, 5, 6]]\n", "err": "", "exit": 0,
+    "why": "a mutable borrow of a row, lent to a function or kept in a variable", "pr": "unit"
+  },
+  {
+    "id": "elem-for-row",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut t = 0;\n    for r in 0..2 {\n        for x in &g[r] {\n            t += x;\n        }\n        for x in g[r].iter_mut() {\n            *x *= 2;\n        }\n    }\n    println!(\"{} {:?}\", t, g);\n}\n",
+    "expect": "ok", "out": "10 [[2, 4], [6, 8]]\n", "err": "", "exit": 0,
+    "why": "a for loop over a row, shared and mutable", "pr": "unit"
+  },
+  {
+    "id": "elem-field-array",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n    name: String,\n}\n\nfn main() {\n    let mut b = B { cells: [[1, 2], [3, 4]], name: String::from(\"b\") };\n    b.cells[0].swap(0, 1);\n    let r = &b.cells[1];\n    println!(\"{:?} {:?} {}\", r, b.cells, b.name);\n}\n",
+    "expect": "ok", "out": "[3, 4] [[2, 1], [3, 4]] b\n", "err": "", "exit": 0,
+    "why": "a row of an array that is a field of a struct", "pr": "unit"
+  },
+  {
+    "id": "elem-through-ref",
+    "src": "fn f(g: &mut [[i32; 2]; 2]) {\n    g[0].sort();\n    g[1].reverse();\n}\n\nfn main() {\n    let mut g = [[2, 1], [3, 4]];\n    f(&mut g);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [4, 3]]\n", "err": "", "exit": 0,
+    "why": "rows of an array reached through a &mut parameter", "pr": "unit"
+  },
+  {
+    "id": "elem-index-panic",
+    "src": "fn pick(g: &mut [[i32; 2]; 2], i: usize) {\n    g[i].sort();\n}\n\nfn main() {\n    let mut g = [[1, 2], [3, 4]];\n    pick(&mut g, 5);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 2 but the index is 5\n", "exit": 101,
+    "why": "an index past the end of the outer array panics at the index", "pr": "unit"
+  },
+  {
+    "id": "elem-mut-immutable",
+    "src": "fn main() {\n    let a = [[1, 2], [3, 4]];\n    let r = &mut a[0];\n    r[0] = 5;\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "elem-mut-immutable-ok",
+    "why": "E0596: a mutable borrow of a row needs the array to be mut", "pr": "P5"
+  },
+  {
+    "id": "elem-mut-immutable-ok",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    let r = &mut a[0];\n    r[0] = 5;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-immutable",
+    "src": "fn main() {\n    let a = [[1, 2], [3, 4]];\n    a[0].sort();\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "elem-sort-immutable-ok",
+    "why": "E0596: sorting a row changes the array, so it has to be mut", "pr": "P5"
+  },
+  {
+    "id": "elem-sort-immutable-ok",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    a[0].sort();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "elem-behind-shared",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n}\n\nimpl B {\n    fn flip(&self) {\n        self.cells[0].reverse();\n    }\n}\n\nfn main() {\n    let b = B { cells: [[1, 2], [3, 4]] };\n    b.flip();\n}\n",
+    "expect": {"code":"E0596","line":7},
+    "pair": "elem-behind-shared-ok",
+    "why": "E0596: a row behind a & reference cannot change", "pr": "P5"
+  },
+  {
+    "id": "elem-behind-shared-ok",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n}\n\nimpl B {\n    fn flip(&mut self) {\n        self.cells[0].reverse();\n    }\n}\n\nfn main() {\n    let mut b = B { cells: [[1, 2], [3, 4]] };\n    b.flip();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the method takes &mut self", "pr": "unit"
+  },
+  {
+    "id": "elem-two-mut",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut h = [[5, 6], [7, 8]];\n    let first = &mut g[0];\n    let second = &mut g[1];\n    first[0] = 9;\n    second[0] = 8;\n    h[0][0] = 1;\n}\n",
+    "expect": {"code":"E0499","line":5},
+    "pair": "elem-two-mut-ok",
+    "why": "E0499: rustc sees both rows as g[_], so the second borrow overlaps the first", "pr": "P5"
+  },
+  {
+    "id": "elem-two-mut-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut h = [[5, 6], [7, 8]];\n    let first = &mut g[0];\n    let second = &mut h[1];\n    first[0] = 9;\n    second[0] = 8;\n    h[0][0] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the second borrow is of another array", "pr": "unit"
+  },
+  {
+    "id": "elem-write-while-borrowed",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let first = &g[0];\n    g[1][0] = 9;\n    println!(\"{:?}\", first);\n}\n",
+    "expect": {"code":"E0506","line":4},
+    "pair": "elem-write-while-borrowed-ok",
+    "why": "E0506: writing any element of g while a row is borrowed", "pr": "P5"
+  },
+  {
+    "id": "elem-write-while-borrowed-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let first = &g[0];\n    g[1][0] = 9;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [9, 4]]\n", "err": "", "exit": 0,
+    "why": "compiles once the borrow is not used after the write", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-while-borrowed",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let r = &g[0];\n    g[0].sort();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "elem-sort-while-borrowed-ok",
+    "why": "E0502: sorting a row needs the array mutably while the shared borrow is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-sort-while-borrowed-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let r = &g[0];\n    g[0].sort();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [3, 4]]\n", "err": "", "exit": 0,
+    "why": "compiles once the borrow is not used after the sort", "pr": "unit"
+  },
+  {
+    "id": "slice-mut-immutable",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    let r = &mut a[..];\n    r.sort();\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "slice-mut-immutable-ok",
+    "why": "E0596: a mutable slice of an array needs the array to be mut", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-immutable-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let r = &mut a[..];\n    r.sort();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
   }
 ]

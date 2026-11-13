@@ -83,12 +83,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     return id;
   };
   const lid=p=>{const o=info.get(p),b=o&&o.bind;return b?lidBind(b):-1;};
-  const put=(rv,nd,dest,ty)=>{
+  const put=(rv,nd,dest,ty,pos)=>{
+    const at=pos?{line:pos.line,col:pos.col,nline:nd.line,ncol:nd.col}:{};
     if(dest===undefined){
-      if(isUnit(res(ty))){emit('eval',nd,{rv});return NIL;}
+      if(isUnit(res(ty))){emit('eval',nd,{rv,...at});return NIL;}
       dest=temp(ty);
     }
-    emit('assign',nd,{l:dest,rv});
+    emit('assign',nd,{l:dest,rv,...at});
     return opnd(dest);
   };
   const fin=(x,nd,dest)=>dest===undefined?x:put({k:'use',x},nd,dest);
@@ -261,12 +262,35 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   // Reborrows of a `&mut` local are not tracked, so an index operand that reads the collection being written cannot be judged
   const readsPlace=(n,base)=>{const b=fieldChain(base);return !b||chainsOn(n,b[0]).some(q=>related(q,b));};
   // an operand that borrows the collection at c; a reference local is reused, so its loans stay on the result
-  function vecRef(c,mut,nd,implicit,r){
+  function vecRef(c,mut,nd,implicit,r,pos){
     const viaRef=c.k==='via'||(c.k==='local'||c.k==='path')&&L[c.l].ty.k==='ref';
     if(mut&&r&&viaRef&&r.idx.some(x=>readsPlace(x,r.inner.expr))){un('reborrow',nd);return null;}
     if(viaRef){const t=L[c.l].ty;return opnd(c.l,t.k==='ref'&&t.mut,!mut);}
-    if(c.k==='local'||c.k==='path')return put({k:'ref',l:c.l,mut,implicit,...r&&r.sfx&&{sfx:r.sfx}},nd,undefined,T.ref(mut,L[c.l].ty,0));
+    if(c.k==='local'||c.k==='path')return put({k:'ref',l:c.l,mut,implicit,...r&&r.sfx&&{sfx:r.sfx}},nd,undefined,T.ref(mut,L[c.l].ty,0),pos);
     un('temporary borrow',nd);return null;
+  }
+  // An array element is a place of the array itself, so borrowing it lends the whole array (rustc names it `a[_]`); the indices run before the borrow starts.
+  function elemRoot(e){
+    const idx=[],steps=[];let inner=null;
+    for(let n=peel(e);n.t==='Field'||n.t==='Index';n=peel(n.expr)){steps.unshift(n);if(n.t==='Index'){idx.unshift(n.index);inner=n;}}
+    return {c:classify(inner.expr),idx,inner,sfx:stepText(steps,steps.indexOf(inner),steps.length)};
+  }
+  function elemRef(r,mut,nd,implicit,pos){
+    const c=r.c;
+    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('temporary borrow',nd);return null;}
+    const t=L[c.l].ty,viaRef=c.k==='via'||t.k==='ref';
+    if(mut&&viaRef&&r.idx.some(x=>readsPlace(x,r.inner.expr))){un('reborrow',nd);return null;}
+    if(mut&&viaRef&&t.k==='ref'&&!t.mut){err('E0596',pos||nd,{name:chainText(r.inner.expr)+r.sfx,ref:true});return null;}
+    emit('eval',nd,{rv:{k:'op',args:r.idx.map(x=>ex(x))}});
+    if(viaRef)return opnd(c.l,t.k==='ref'&&t.mut,!mut);
+    return put({k:'ref',l:c.l,mut,implicit,sfx:r.sfx},nd,undefined,T.ref(mut,t,0),pos);
+  }
+  // the reference a method call or loop takes of an indexed place: a Vec index borrows the Vec first and runs the indices under it
+  function idxRef(p,mut,nd,implicit){
+    if(!hasVecIdx(p))return elemRef(elemRoot(p),mut,nd,implicit);
+    const r=vecRoot(p),ro=vecRef(r.c,mut,nd,implicit,r);
+    if(ro)emit('eval',nd,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x))]}});
+    return ro;
   }
   const kidsOf=n=>Object.values(n).flatMap(v=>Array.isArray(v)?v:[v]).filter(x=>x&&typeof x==='object'&&typeof x.t==='string');
   // A `&mut` method call may read its receiver while it computes the arguments (a two-phase borrow). The arguments then run before the
@@ -465,11 +489,9 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           target=t.k==='const'?-1:t.l;
         }
         if(target>=0)ownRecv(e,target);
-      }else if(c.k==='idx'&&hasVecIdx(e.recv)){
-        const r=vecRoot(e.recv);
-        ro=vecRef(r.c,mut,e,true,r);
+      }else if(c.k==='idx'){
+        ro=idxRef(e.recv,mut,e,true);
         if(!ro)return fin(NIL,e,dest);
-        emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(x=>ex(x))]}});
       }else{un('borrow of a field',e);return fin(NIL,e,dest);}
       let early=null;
       if(ro===undefined){
@@ -523,11 +545,9 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           const t=L[c.l].ty;
           ro=opnd(c.l,t.k==='ref'&&t.mut,!mut);
           text=chainText(e.recv);
-        }else if(c.k==='idx'&&hasVecIdx(e.recv)){
-          const vr=vecRoot(e.recv);
-          ro=vecRef(vr.c,mut,e,true,vr);
+        }else if(c.k==='idx'){
+          ro=idxRef(e.recv,mut,e,true);
           if(!ro)return fin(NIL,e,dest);
-          emit('eval',e,{rv:{k:'op',args:[ro,...vr.idx.map(x=>ex(x))]}});
         }else{un(p.t==='Deref'?'reborrow':'borrow of a field',e);return fin(NIL,e,dest);}
         if(mut&&target>=0){
           let q=p;
@@ -569,7 +589,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         return put({k:'use',x:opnd(rc.l)},e,dest,tyOf(e));
       }
       if(mut){
-        const ro=vecRef(rc,true,e,true,r);
+        const ro=vecRef(rc,true,e,true,r,b);
         if(!ro)return fin(NIL,e,dest);
         emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(y=>ex(y))]}});
         evalBounds();
@@ -577,9 +597,15 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       }
       emit('eval',e,{rv:{k:'op',args:r.idx.map(y=>ex(y))}});
       evalBounds();
-      return put({k:'ref',l:rc.l,mut:false,slice:true},e,dest,tyOf(e));
+      return put({k:'ref',l:rc.l,mut:false,slice:true},e,dest,tyOf(e),b);
     }
-    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return fin(NIL,e,dest);}
+    if(c.k==='idx'){
+      const ro=elemRef(elemRoot(b),mut,e,false,b);
+      if(!ro)return fin(NIL,e,dest);
+      evalBounds();
+      return put({k:'use',x:ro},e,dest,tyOf(e));
+    }
+    if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('temporary borrow',e);return fin(NIL,e,dest);}
     const l=c.l,t=L[l].ty;
     if(t.k==='ref'&&t.mut){
       // the other mentions of the reference in the call may read what the reborrow holds: not judged
@@ -592,14 +618,14 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     }
     // IndexMut borrows the base before the bounds run, so a bound that reads it conflicts
     if(!(t.k==='ref'||t.k==='str'||c.k==='via')&&mut){
-      const r=put({k:'ref',l,mut,slice:true},e,dest,tyOf(e));
+      const r=put({k:'ref',l,mut,slice:true},e,dest,tyOf(e),b);
       evalBounds();
       return r;
     }
     evalBounds();
     // a field behind a reference lives as long as the reference does
     if(c.k==='via')return put({k:'use',x:opnd(l)},e,dest,tyOf(e));
-    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut,slice:true},e,dest,tyOf(e));
+    return put(t.k==='ref'||t.k==='str'?{k:'use',x:opnd(l)}:{k:'ref',l,mut,slice:true},e,dest,tyOf(e),b);
   }
 
   // an array element is a place inside the array, so a write borrows nothing: it conflicts with a loan on the array or on a field above it
@@ -831,6 +857,9 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       emit('eval',e,{rv:{k:'op',args:r.idx.map(x=>ex(x))}});
       ro=vecRef(r.c,fi.mode==='mut',e,peel(e.iter).t!=='Ref');
       if(!ro)return NIL;
+    }else if(hasIdx(src)){
+      ro=elemRef(elemRoot(src),fi.mode==='mut',e,peel(e.iter).t!=='Ref',peel(e.iter));
+      if(!ro)return NIL;
     }else{
       const c=classify(src);
       if(c.k==='local'||c.k==='path')ro=put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:peel(e.iter).t!=='Ref'},e,undefined,T.ref(fi.mode==='mut',L[c.l].ty,0));
@@ -958,7 +987,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           if(c.k!=='local'&&c.k!=='path'&&c.k!=='via'){un('temporary borrow',e);return fin(NIL,e,dest);}
           const t=L[c.l].ty;
           if(e.mut&&c.k!=='via'&&t.k!=='ref'){
-            const ro=vecRef(c,true,e,true,r);
+            const ro=vecRef(c,true,e,true,r,peel(r.inner.expr));
             if(!ro)return fin(NIL,e,dest);
             emit('eval',e,{rv:{k:'op',args:[ro,...r.idx.map(y=>ex(y))]}});
             return put({k:'use',x:ro},e,dest,tyOf(e));
@@ -971,9 +1000,14 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
             if(t.k==='ref'&&t.mut)return put({k:'ref',l:c.l,mut:false,implicit:true,deref:true},e,dest,tyOf(e));
             return put({k:'use',x:opnd(c.l)},e,dest,tyOf(e));
           }
-          return put({k:'ref',l:c.l,mut:e.mut,slice:true},e,dest,tyOf(e));
+          return put({k:'ref',l:c.l,mut:e.mut,slice:true},e,dest,tyOf(e),peel(r.inner.expr));
         }
         if(x.t==='Path'&&lid(x)>=0)return put({k:'ref',l:lid(x),mut:e.mut},e,dest,tyOf(e));
+        if((x.t==='Index'||x.t==='Field')&&hasIdx(x)){
+          const r=elemRoot(x),ro=elemRef(r,e.mut,e,false);
+          if(!ro)return fin(NIL,e,dest);
+          return put({k:'use',x:ro},e,dest,tyOf(e));
+        }
         if(x.t==='Field'){
           const c=classify(x);
           if(c.k==='path')return put({k:'ref',l:c.l,mut:e.mut},e,dest,tyOf(e));

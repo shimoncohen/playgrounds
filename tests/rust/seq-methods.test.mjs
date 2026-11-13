@@ -87,9 +87,8 @@ describe('what stays unsupported', () => {
     assert.equal(feature(main('let mut a = [3, 1];\na.sort(1);')), 'wrong argument count');
   });
 
-  it('a range of a slice reached through a &mut reference, and a row of a two-level array', () => {
+  it('a range of a slice reached through a &mut reference that is kept', () => {
     assert.equal(feature('fn s(x: &mut [i32]) {\n    let r = &mut x[1..];\n    x.reverse();\n    r.sort();\n}\n\n' + main('s(&mut [3, 1, 2]);')), 'reborrow');
-    assert.equal(feature(main('let mut g = [[3, 1], [2, 0]];\ng[0].sort();')), 'borrow of a field');
   });
 
   it('the hint for a method it does not know names the array and slice methods', () => {

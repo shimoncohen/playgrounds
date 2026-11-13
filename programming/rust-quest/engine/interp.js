@@ -152,6 +152,7 @@ RQ.interp=(ast,opts)=>{
     const b=idxPlace(e.expr,env);
     return {cell:b.cell,path:[...b.path,e.name]};
   }
+  const idxCell=(e,env)=>{const pl=idxPlace(e,env);return fieldCell(pl.cell,pl.path);};
   function elemCell(vec,k,pc){
     const root=pc&&(pc.proxy?pc.parent:pc),label=(pc&&pc.proxy?pc.label:'')+'['+k+']';
     return {proxy:true,parent:root||null,label,name:root&&root.name?root.name+(pc.proxy?'.'+pc.label:'')+'['+k+']':null,
@@ -1076,7 +1077,8 @@ RQ.interp=(ast,opts)=>{
     else{
       const pl=isPlace(e.recv)&&placeOf(e.recv,env),r0=peel(e.recv);
       if(pl){read(pl.cell,e.line);rv={k:'ref',cell:fieldCell(pl.cell,pl.path),mut:u.adj==='&mut',loan:pl.loan??e.id};}
-      else if(r0.t==='Index'&&isVecIdx(r0))rv={k:'ref',cell:indexCell(r0,env),mut:u.adj==='&mut',loan:e.id};
+      else if(r0.t==='Index')rv={k:'ref',cell:indexCell(r0,env),mut:u.adj==='&mut',loan:e.id};
+      else if(r0.t==='Field'&&hasIdx(r0))rv={k:'ref',cell:idxCell(r0,env),mut:u.adj==='&mut',loan:e.id};
       else{
         const v=ev(e.recv,env);
         if(owns(v))temps.push({v,line:e.line});
@@ -1548,16 +1550,17 @@ RQ.interp=(ast,opts)=>{
       case 'Ref':{
         const x=peel(e.expr);
         if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,env);
+        if(x.t==='Field'&&hasIdx(x)){
+          const pl=idxPlace(x,env);
+          return {k:'ref',cell:fieldCell(pl.cell,pl.path),mut:e.mut,loan:e.id};
+        }
         if(x.t==='Field'){
           const pl=placeOf(x,env);
           if(!pl)throw new Unsup('borrow of a field',e.line);
           read(pl.cell,x.line);
           return {k:'ref',cell:fieldCell(pl.cell,pl.path),mut:e.mut,loan:pl.loan??e.id};
         }
-        if(x.t==='Index'){
-          if(!isVecIdx(x))throw new Unsup('borrow of a field',e.line);
-          return {k:'ref',cell:indexCell(x,env),mut:e.mut,loan:e.id};
-        }
+        if(x.t==='Index')return {k:'ref',cell:indexCell(x,env),mut:e.mut,loan:e.id};
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
@@ -1575,8 +1578,7 @@ RQ.interp=(ast,opts)=>{
         if(!RQ.std.methods.has(e.name)&&e.name!=='is_empty')throw new Unsup('method call',e.line);
         if(e.name==='push_str'){
           const r=peel(e.recv);
-          if(r.t==='Index'&&!isVecIdx(r))throw new Unsup('borrow of a field',e.line);
-          const c=r.t==='Index'?indexCell(r,env):cellOf(r,env),add=unref(ev(e.args[0],env)).v;
+          const c=r.t==='Index'?indexCell(r,env):hasIdx(r)?idxCell(r,env):cellOf(r,env),add=unref(ev(e.args[0],env)).v;
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
         const rv=ev(e.recv,env);

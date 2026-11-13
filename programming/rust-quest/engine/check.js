@@ -829,7 +829,7 @@ RQ.check=ast=>{
     if(base.k==='array'||base.k==='slice'||base.k==='coll'){
       // IndexMut borrows the base mutably, so behind a `&` it is E0596, as for a Vec element
       const bx=peel(x.expr),ch=e.mut&&(bx.t==='Path'||bx.t==='Field')?chainOf(bx):null;
-      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',bx.line,bx.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
       I(e).slice='arr';return mkRef(!!e.mut,T.slice(base.k==='coll'?base.args[0]:base.el));
     }
     return unsup('type checking',e.line);
