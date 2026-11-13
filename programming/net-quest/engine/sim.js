@@ -221,12 +221,12 @@ const ipRx=(ctx,dev,iface,p,tag)=>{
   if(dev.dropPrivate&&pn!==null&&NQ.ip.isPrivate(pn))return silent(ctx,dev,iface,p,'dropped: private source address '+ip.src,tag);
   /* return traffic through NAT is addressed to our outside IP: translate it back before the own-address check. Echo
      requests to that IP are answered by the router itself; replies and errors with no mapping are dropped, unless they
-     belong to the router's own ping (this session's origin), which is never translated even if a mapping uses its id. A
-     mapped packet must leave by the inside iface: with it down, a default route would send the private address out. */
+     belong to the router's own ping (this session's origin), which is never translated. */
   const ownReply=ctx.from===dev.id&&ic&&ic.fields.id===ctx.id&&ic.fields.seq===ctx.seq;
   if(nat&&iface===nat.outside&&ic&&!ownReply&&ownIface(dev,ip.dst)===iface&&(ic.fields.type==='echo-reply'||ERRTYPES.includes(ic.fields.type))){
     const m=natBack(nat,ip,ic.fields);
     if(m){
+      // simplification, unlike Linux (which would route the private address out the default route): drop it instead
       const h=nextHop(dev,m.inside);
       if(!h||h.iface!==nat.inside){
         const why=dev.ifaces[nat.inside].up?REASONS.noRoute:REASONS.ifDown;

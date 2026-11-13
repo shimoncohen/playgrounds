@@ -200,7 +200,7 @@ test('the router\'s own ping is not mistaken for return traffic when its id equa
   assert.ok(![...r.entries].some((e) => e.dir === 'nat'), 'nothing of the router\'s own ping is translated');
 });
 
-test('a router pinging its own addresses is answered locally, with no packet and no mapping', () => {
+test('regression guard (passes on main too): a router pinging its own addresses is answered locally, with no packet and no mapping', () => {
   const net = NQ.createNet('home');
   for (const ip of [OUT, '192.168.1.1']) {
     const r = NQ.sim.ping(net, 'home', ip, { id: 1024 });
@@ -221,7 +221,7 @@ test('a reply for a mapping whose inside iface is down is dropped, never sent ou
   assert.deepEqual([...entries.filter((e) => e.dev === 'home' && e.dir === 'drop').map((e) => e.verdict)], ['cannot send to 192.168.1.10: interface down']);
 });
 
-test('an ICMP error for inside-originated traffic is translated back to the inside host', () => {
+test('regression guard (passes on main too): an ICMP error for inside-originated traffic is translated back to the inside host', () => {
   const net = NQ.createNet('home');
   const r = NQ.sim.ping(net, 'laptop', '198.51.100.99');
   assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'host unreachable', '203.0.113.6']);

@@ -43,3 +43,14 @@ test('a long session still reaches the same verdict as a short one', () => {
   const answer = NQ.runMission(LOOP, ['traceroute 8.8.8.8'], null) === NQ.ASK;
   assert.ok(answer);
 });
+
+test('a NAT mission check never executes a command, however long the session', () => {
+  const m = NQ.CH[4].missions[2];
+  const s = NQ.session(m);
+  for (let i = 0; i < 50; i++) s.run('ping -c 1 198.51.100.10');
+  const real = NQ.exec;
+  let calls = 0;
+  NQ.exec = (...a) => { calls++; return real(...a); };
+  try { s.check(null); } finally { NQ.exec = real; }
+  assert.equal(calls, 0);
+});
