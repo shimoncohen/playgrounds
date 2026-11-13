@@ -1,2 +1,0 @@
-/* Written only by tests/rust/verify-rustc.mjs. Do not edit. */
-globalThis.RQ=globalThis.RQ||{};RQ.verified={"rustc":"1.99.1","edition":"2024","image":"rust@sha256:b8e062b1c3a80183df83d9ba187cadd2b5ab84bc78d453dbfeb2fccd5f982247","date":"2026-11-13","inputsHash":"2e992e735130c32304354fb393f62636320a76dfe9b3dae6b3e6cffbc3added1","resultsHash":"4a6403849a7d4a38793a4047112f2a7b747ff0684f48af5e85dc392985873527","counts":{"corpus":2204,"missions":943,"guide":109}};
