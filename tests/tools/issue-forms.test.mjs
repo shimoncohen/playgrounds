@@ -18,5 +18,8 @@ for (const form of ['bug', 'feature-request', 'mission-idea']) {
     assert.ok(m, 'no "where" dropdown with an inline options list');
     const options = m[1].split(',').map(s => s.trim());
     assert.deepEqual(options.slice(0, names.length), names);
+    // GitHub refuses a form whose dropdown has a duplicate or empty option.
+    assert.equal(new Set(options).size, options.length, 'duplicate option');
+    assert.ok(options.every(Boolean), 'empty option');
   });
 }
