@@ -17,13 +17,12 @@ const tuneDesc={...S.release,vfs:{...S.release.vfs,'.claude/skills/release-guard
 /* tuneDead: three rule-shaped lines point at folders and commands this project no longer has, so the rule reader rejects them and they only cost tokens. */
 const tuneDead={...S.tidy,vfs:{...S.tidy.vfs,'CLAUDE.md':'# Shop notes\nPrices are in dollars.\ndo not delete data/\ndo not edit old-api/\nonly edit billing/\nask before run npm run legacy-build\n'}};
 
-/* tuneMcp: the job needs one tool from two of five servers. Every listed tool is also in tools, so a kept tool is connected. */
+/* tuneMcp: the job needs one tool from two of five servers. */
 const MCPTXT='calendar: list, create, delete, update, search, invite, decline, accept, reschedule, remind\nmail: read, send, search, archive, label, draft, reply, forward, snooze, unsubscribe\nbrowser: open, click, screenshot, scroll\ntracker: list_issues, create_issue, comment, close\nchat: post, read, react\n';
-const MCPTOOLS=MCPTXT.trim().split('\n').flatMap(l=>{const [s,t]=l.split(': ');return t.split(', ').map(x=>s+'.'+x);});
 const tuneMcp={
   task:"Read today's calendar and the newest mail.",
   vfs:{'CLAUDE.md':'','notes/today.md':'Today: dentist at 10:00, then tea with Dana.\n','.claude/mcp.txt':MCPTXT},
-  commands:{},tools:MCPTOOLS,connected:true,
+  commands:{},tools:[],
   script:[{verb:'read',target:'notes/today.md'},{verb:'call',target:'calendar.list'},{verb:'call',target:'mail.read'}],
   hidden:[],
   accept:o=>['calendar.list','mail.read'].every(t=>o.calls.some(c=>c.target===t))||'The agent did not both read the calendar and read the mail.'
