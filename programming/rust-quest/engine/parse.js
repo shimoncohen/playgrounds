@@ -119,7 +119,7 @@ RQ.parse=tokens=>{
       if(!(x.k==='ident'||(x.k==='kw'&&['self','Self','super','crate'].includes(x.v))))fail('expected identifier, found '+desc(x));
       p++;
       if(OUT.has(x.v))feat(x.v,x.line);
-      const seg={name:x.v,args:null,fn:null,line:x.line};
+      const seg={name:x.v,args:null,fn:null,line:x.line,col:x.col};
       if(!expr&&isP('<')){p++;seg.args=genericArgs();}
       else if(isP('::')&&isP('<',pk())){p+=2;seg.args=genericArgs();}
       else if(!expr&&/^Fn(Mut|Once)?$/.test(x.v)&&isP('(')){
@@ -135,8 +135,8 @@ RQ.parse=tokens=>{
   function ty(){
     const x=T();
     if(isP('&')||isP('&&')){
-      const dbl=isP('&&');p++;let lt=null;if(T().k==='lifetime')lt=toks[p++].v;if(lt==='_')lt=null;
-      const mut=!!eatK('mut');let r=mk('Ref',x,{mut,lt,ty:ty()});
+      const dbl=isP('&&');p++;let lt=null,ltAt=null;if(T().k==='lifetime'){ltAt={line:T().line,col:T().col};lt=toks[p++].v;}if(lt==='_')lt=null;
+      const mut=!!eatK('mut');let r=mk('Ref',x,{mut,lt,ltAt,ty:ty()});
       if(dbl)r=mk('Ref',x,{mut:false,lt:null,ty:r});
       return r;
     }
@@ -187,7 +187,7 @@ RQ.parse=tokens=>{
   function lit(x){
     if(x.byte)feat('byte literal',x.line);
     if(x.suffix&&OUT.has(x.suffix))feat(x.suffix,x.line);
-    return mk('Lit',x,{kind:x.k,v:x.v,suffix:x.suffix||null});
+    return mk('Lit',x,{kind:x.k,v:x.v,suffix:x.suffix||null,plain:x.k==='str'&&x.el===x.line&&Array.from(x.v).length+2===x.ec-x.col});
   }
   function pat(){
     const s=T();eatP('|');
@@ -203,7 +203,7 @@ RQ.parse=tokens=>{
     if(isP('..')&&!(['int','char','float'].includes(pk().k)||isP('-',pk())||pk().k==='ident'&&isP('::',pk(2)))){p++;return mk('Rest',x);}
     if(isP('..=')||isP('..')){const inclusive=isP('..=');p++;return mk('RangePat',x,{lo:null,hi:rangeEnd(),inclusive});}
     if(isP('&')||isP('&&')){
-      const dbl=isP('&&');p++;const mut=!!eatK('mut');let r=mk('RefPat',x,{mut,pat:patNoOr()});
+      const dbl=isP('&&');p++;const mut=!!eatK('mut');let r=mk('RefPat',dbl?{...x,col:x.col+1}:x,{mut,pat:patNoOr()});
       if(dbl)r=mk('RefPat',x,{mut:false,pat:r});return r;
     }
     if(isP('(')){
@@ -392,7 +392,7 @@ RQ.parse=tokens=>{
         const blockOf=e=>mk('Block',e,{stmts:[],tail:e,unsafe:false,label:null});
         const letOn=(pat,scrut,inner)=>mk('Match',pat,{scrut,arms:[mk('Arm',pat,{pat,guard:null,body:inner})],kind:'let',annot:null});
         // an `&` is a name in the outer pattern and a let on its deref inside, so E0507 and the loan rules come from that let
-        const derefOf=r=>mk('Deref',r,{expr:mk('Path',r,{segs:[{name:r.nm,args:null,fn:null,line:r.line}],global:false}),pat:{mut:r.mut}});
+        const derefOf=r=>mk('Deref',r,{expr:mk('Path',r,{segs:[{name:r.nm,args:null,fn:null,line:r.line}],global:false}),pat:{mut:r.mut,at:{line:it.line,col:it.col}}});
         let nref=0;
         const lower=(pat,scrut,inner)=>{
           const found=[];
@@ -590,7 +590,7 @@ RQ.parse=tokens=>{
       p++;const n=ident(),gs=generics();let kind='unit',fields=[];
       if(isP('(')){kind='tuple';fields=fieldsTuple();where();semi();}
       else{const wh=where();void wh;if(isP('{')){kind='named';fields=fieldsNamed();}else semi();}
-      return mk('Struct',x,{name:n.v,generics:gs,kind,fields,attrs:at,pub});
+      return mk('Struct',x,{name:n.v,nline:n.line,ncol:n.col,generics:gs,kind,fields,attrs:at,pub});
     }
     if(isK('enum')){
       p++;const n=ident(),gs=generics();where();expP('{');const variants=[];

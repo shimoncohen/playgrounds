@@ -135,7 +135,7 @@ RQ.check=ast=>{
   // a named lifetime is modeled only in a signature or a struct field, and must be declared there (E0261)
   function lifetimeOk(node,name){
     if(!sigLts)return false;
-    if(!sigLts.has(name)&&!ltSeen.has(node)){ltSeen.add(node);errors.push(RQ.diag.make('E0261',node.line,node.col,{name}));}
+    if(!sigLts.has(name)&&!ltSeen.has(node)){ltSeen.add(node);errors.push(RQ.diag.make('E0261',(node.ltAt||node).line,(node.ltAt||node).col,{name}));}
     return true;
   }
   const hasMutRef=n=>n.t==='Ref'?n.mut||hasMutRef(n.ty):kids(n).some(hasMutRef);
@@ -597,7 +597,7 @@ RQ.check=ast=>{
     traitImpls.set(tr.name,set);
     if(set.has(owner)){errors.push(RQ.diag.make('E0119',it.line,it.col,{trait:tr.name,type:owner}));return;}
     set.add(owner);adtRec(owner).impls.add(tr.name);
-    if(tr.name==='Drop'&&rec.der.includes('Copy'))errors.push(RQ.diag.make('E0184',rec.node.line,rec.node.col,{}));
+    if(tr.name==='Drop'&&rec.der.includes('Copy'))errors.push(RQ.diag.make('E0184',rec.node.nline||rec.node.line,rec.node.ncol||rec.node.col,{}));
     curSelf=owner;
     const mm=methods.get(owner)||new Map();
     methods.set(owner,mm);
@@ -618,7 +618,7 @@ RQ.check=ast=>{
         else if(!unify(m.params[0].ty,mkRef(true,T.fmtr)))errors.push(RQ.diag.make('E0053',f.params[0].ty.line,f.params[0].ty.col,{name:f.name}));
         else if(!unify(m.ret,fmtResult()))errors.push(RQ.diag.make('E0053',f.ret.line,f.ret.col,{name:f.name}));
       }else if(!!tm.node.selfParam!==!!f.selfParam||(f.selfParam&&tm.selfKind!==m.selfKind))unsup('impl',f.line);
-      else if(tm.params.length!==m.params.length)errors.push(RQ.diag.make('E0050',f.line,f.col,{name:f.name,trait:tr.name,got:m.params.length+(f.selfParam?1:0),want:tm.params.length+(tm.node.selfParam?1:0)}));
+      else if(tm.params.length!==m.params.length)errors.push(RQ.diag.make('E0050',...paramsAt(f),{name:f.name,trait:tr.name,got:m.params.length+(f.selfParam?1:0),want:tm.params.length+(tm.node.selfParam?1:0)}));
       else if(tm.tps.length||m.tps.length)unsup('impl',f.line);
       else if(!sameSig(m,tm,owner)){
         const bad=tm.params.findIndex((q,i)=>!unify(subst(q.ty,new Map([[tm.selfPar,adtTy(owner)]])),m.params[i].ty));
@@ -663,6 +663,7 @@ RQ.check=ast=>{
   for(const it of ast.items)if(it.t==='Impl'&&!it.trait)implDecl(it);
   for(const it of ast.items)if(it.t==='Impl')noVis(it);
   for(const it of ast.items)if(it.t==='Impl'&&it.trait)traitImpl(it);
+  function paramsAt(f){const n=f.selfParam||f.params[0]&&f.params[0].pat||f;return [n.line,n.col];}
   // a tuple or unit struct is also a value, so it cannot share a name with a fn or a const
   for(const [name,rec] of structs)if(rec.kind!=='named'&&(fns.has(name)||consts.has(name)))unsup('struct',rec.node.line);
   // a type that holds itself, directly or through a tuple, an array, a variant or an Option, has infinite size (E0072), which is not modeled
@@ -959,9 +960,11 @@ RQ.check=ast=>{
           const l=lookup(part.name);if(l)varUses++;
           const b=l||consts.get(part.name);
           if(b)caps.push({name:part.name,bind:l});
-          if(b)fmts.push({t:b.ty,line:f.line,col:f.col,fmt:part.fmt});
+          // inside a plain one-line literal rustc points at the `{name}` and, for an unknown name, at the name
+          const brace=f.plain?f.col+1+part.at:f.col;
+          if(b)fmts.push({t:b.ty,line:f.line,col:brace,fmt:part.fmt});
           else if(fns.has(part.name))unsup('function value',f.line);
-          else unknown(part.name,f);
+          else unknown(part.name,f.plain?{line:f.line,col:brace+1}:f);
         }
       }
     }
@@ -1293,7 +1296,7 @@ RQ.check=ast=>{
         if(!dp&&(path.length!==1||!last.variant)){unsup('move out of reference',p.line);return WILD;}
         if(!st.cov.err){
           st.cov.err=true;
-          if(dp)errors.push(RQ.diag.make('E0507',p.line,p.col,{pat:true,mut:dp.mut}));
+          if(dp)errors.push(RQ.diag.make('E0507',dp.at?dp.at.line:p.line,dp.at?dp.at.col:p.col,{pat:true,mut:dp.mut}));
           else{
             const x=peel(st.scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
             errors.push(RQ.diag.make('E0507',st.scrut.line,st.scrut.col,{name:ch?ch.text:'value',variant:last.variant,mut:!!via&&via.mut}));
@@ -1596,7 +1599,8 @@ RQ.check=ast=>{
     const n=e.params.length;
     const wrongCount=!!exp&&exp.params.length!==n;
     let badParam=false;
-    if(wrongCount)errors.push(RQ.diag.make('E0593',e.line,e.col,{want:exp.params.length,got:n}));
+    const at=exp&&exp.at||e;
+    if(wrongCount)errors.push(RQ.diag.make('E0593',at.line,at.col,{want:exp.params.length,got:n}));
     const ps=e.params.map((p,i)=>{
       const v=exp&&!wrongCount?exp.params[i]:null;
       if(!p.ty)return v||fresh(p.pat.line);
@@ -1604,7 +1608,7 @@ RQ.check=ast=>{
       if(v&&!unify(d,v)){
         badParam=true;
         // on a std adapter rustc adds a second error (E0599, E0277) for whatever uses the result
-        if(exp.std)unsup('type checking',e.line);else errors.push(RQ.diag.make('E0631',e.line,e.col,{}));
+        if(exp.std)unsup('type checking',e.line);else errors.push(RQ.diag.make('E0631',at.line,at.col,{}));
       }
       return d;
     });
@@ -1651,7 +1655,7 @@ RQ.check=ast=>{
     const ts=[];
     e.args.forEach((a,i)=>{
       const w=sig&&sig(i,ts);
-      if(w&&peel(a).t==='Closure'){expSig={...w,std:true};ts.push(ex(a));return;}
+      if(w&&peel(a).t==='Closure'){expSig={...w,std:true,at:{line:e.nline,col:e.ncol}};ts.push(ex(a));return;}
       if(e.name==='zip'&&peel(a).t==='Range')rangeOk=true;
       const t=ex(a);
       if(w)fnMeet(t,w,a);
@@ -1911,7 +1915,7 @@ RQ.check=ast=>{
         const owner=e.segs[0].name==='Self'?curSelf:e.segs[0].name;
         if(!adtRec(owner))return unsup('path call',e.line);
         if(methods.get(owner)&&methods.get(owner).has(e.segs[1].name))return unsup('function value',e.line);
-        errors.push(RQ.diag.make('E0599',e.segs[1].line,e.col,{what:'item',name:e.segs[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));
+        errors.push(RQ.diag.make('E0599',e.segs[1].line,e.segs[1].col,{what:'item',name:e.segs[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));
         return T.any;
       }
       case 'Unary':{
@@ -2133,7 +2137,7 @@ RQ.check=ast=>{
             I(e).sig={params:[],ret:ty};I(e).dflt=ty;
             return ty;
           }
-          if(adtRec(owner)){errors.push(RQ.diag.make('E0599',sg[1].line,e.callee.col,{what:'item',name:sg[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));return T.any;}
+          if(adtRec(owner)){errors.push(RQ.diag.make('E0599',sg[1].line,sg[1].col,{what:'item',name:sg[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));return T.any;}
           return unsup('path call',e.line);
         }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
@@ -2142,7 +2146,7 @@ RQ.check=ast=>{
         const ts=e.args.map((a,i)=>{
           const w=gi&&gi.fnw[i];
           if(!w)return exW(a,gi?gi.params[i]:f&&f.params.length===e.args.length?f.params[i].ty:null);
-          if(peel(a).t==='Closure'){expSig=w;return ex(a);}
+          if(peel(a).t==='Closure'){expSig={...w,at:{line:e.callee.line,col:e.callee.col}};return ex(a);}
           const t=ex(a);fnMeet(t,w,a);return t;
         });
         const lb=lookup(n);

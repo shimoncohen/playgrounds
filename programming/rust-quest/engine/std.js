@@ -25,7 +25,7 @@ function parseFormat(s){
       const f=fmt||fmtOf('');
       if(arg==='')parts.push({idx:next++,fmt:f});
       else if(/^\d+$/.test(arg))parts.push({idx:+arg,fmt:f});
-      else if(/^[\p{L}_][\p{L}\p{N}_]*$/u.test(arg))parts.push({name:arg,fmt:f});
+      else if(/^[\p{L}_][\p{L}\p{N}_]*$/u.test(arg))parts.push({name:arg,fmt:f,at:Array.from(s.slice(0,i)).length});
       else return {parts,spec,error:'invalid format string: invalid argument name `'+arg+'`'};
       i=end;
     }else if(c==='}'){
