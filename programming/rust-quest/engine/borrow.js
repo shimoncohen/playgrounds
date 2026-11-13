@@ -285,8 +285,9 @@ function loanPass(F,errors,un,loans,stats){
           const key='E0373@'+lo[k].i.line+':'+lo[k].i.col;
           if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0373',lo[k].i.line,lo[k].i.col,{name:L[lo[k].l].name}));}
         }else if(k>=0){
-          const key='E0515@'+i.line+':'+i.col;
-          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',i.line,i.col,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param,path:!!L[lo[k].l].path}));}
+          // rustc reports a returned borrow at the whole expression, not at the indexed value it names elsewhere
+          const rl=i.nline??i.line,rc=i.ncol??i.col,key='E0515@'+rl+':'+rc;
+          if(!seen.has(key)){seen.add(key);errors.push(RQ.diag.make('E0515',rl,rc,{name:L[lo[k].l].name||L[lo[k].l].src||'value',direct:i.rv.k==='ref'&&!i.rv.slice,param:L[lo[k].l].param,path:!!L[lo[k].l].path}));}
         }
       }
       if(reg&&i.op==='assign'&&L[i.l].ret){

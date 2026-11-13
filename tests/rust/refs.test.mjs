@@ -391,8 +391,8 @@ describe('run: String and reference programs', () => {
       assert.equal(bareFeat(`    let x: i32;\n    ${use}`), 'deferred initialization@4', use);
     }
   });
-  it('a borrow of a field is unsupported at run time too (no copy standing in for the place)', () => {
-    assert.equal(feat('    let mut t = [1, 2];\n    let r = &mut t[0];\n    *r = 5;'), 'borrow of a field@4');
+  it('a borrow of an array element is the element itself, not a copy', () => {
+    assert.equal(out('    let mut t = [1, 2];\n    let r = &mut t[0];\n    *r = 5;\n    println!("{:?}", t);'), '[5, 2]\n');
   });
   it('a string that grows past 100,000 characters stops with limit "string size"', () => {
     for (const body of [

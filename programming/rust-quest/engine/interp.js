@@ -22,7 +22,7 @@ class Brk{constructor(v){this.v=v;}}
 class Cont{}
 class Panic{constructor(msg,e){this.msg=msg;this.line=e.line;this.col=e.col;}}
 const UNIT={k:'unit'},MOVED={k:'moved'};
-const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]]});
+const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]],Ordering:[['Less','unit',[]],['Equal','unit',[]],['Greater','unit',[]]]});
 const MAX_EVENTS=200000,MAX_SNAPS=2000;
 const bool=v=>({k:'bool',v});
 const OPNAME={'+':'add','-':'subtract','*':'multiply'};
@@ -54,8 +54,10 @@ RQ.interp=(ast,opts)=>{
   }
   for(const [k,f] of (adts&&adts.methodNodes)||[])methodFns.set(k,f);
   const declFields=d=>d.kind==='tuple'?d.fields.map((_,i)=>String(i)):d.kind==='unit'?[]:d.fields.map(f=>f.name);
+  // a program may declare its own enum with the name of a builtin one
+  const bvars=a=>enumDecl.has(a)?null:BVARS[a];
   const variantInfo=(adt,vi)=>{
-    if(BVARS[adt]){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
+    if(bvars(adt)){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
     const v=enumDecl.get(adt).variants[vi];
     return {name:v.name,kind:v.kind,fields:declFields(v)};
   };
@@ -152,6 +154,7 @@ RQ.interp=(ast,opts)=>{
     const b=idxPlace(e.expr,env);
     return {cell:b.cell,path:[...b.path,e.name]};
   }
+  const idxCell=(e,env)=>{const pl=idxPlace(e,env);return fieldCell(pl.cell,pl.path);};
   function elemCell(vec,k,pc){
     const root=pc&&(pc.proxy?pc.parent:pc),label=(pc&&pc.proxy?pc.label:'')+'['+k+']';
     return {proxy:true,parent:root||null,label,name:root&&root.name?root.name+(pc.proxy?'.'+pc.label:'')+'['+k+']':null,
@@ -437,7 +440,7 @@ RQ.interp=(ast,opts)=>{
     return bug('equality of '+a.k);
   }
   const mapFind=(m,key)=>m.v.find(en=>eqv(en.key,key));
-  const variantIndex=v=>BVARS[v.name]?BVARS[v.name].findIndex(x=>x[0]===v.variant):enumDecl.get(v.name).variants.findIndex(x=>x.name===v.variant);
+  const variantIndex=v=>bvars(v.name)?BVARS[v.name].findIndex(x=>x[0]===v.variant):enumDecl.get(v.name).variants.findIndex(x=>x.name===v.variant);
   // -1, 0 or 1; null when a NaN makes the two unordered, which makes every comparison false
   function cmpv(a,b){
     tick();
@@ -1076,7 +1079,8 @@ RQ.interp=(ast,opts)=>{
     else{
       const pl=isPlace(e.recv)&&placeOf(e.recv,env),r0=peel(e.recv);
       if(pl){read(pl.cell,e.line);rv={k:'ref',cell:fieldCell(pl.cell,pl.path),mut:u.adj==='&mut',loan:pl.loan??e.id};}
-      else if(r0.t==='Index'&&isVecIdx(r0))rv={k:'ref',cell:indexCell(r0,env),mut:u.adj==='&mut',loan:e.id};
+      else if(r0.t==='Index')rv={k:'ref',cell:indexCell(r0,env),mut:u.adj==='&mut',loan:e.id};
+      else if(r0.t==='Field'&&hasIdx(r0))rv={k:'ref',cell:idxCell(r0,env),mut:u.adj==='&mut',loan:e.id};
       else{
         const v=ev(e.recv,env);
         if(owns(v))temps.push({v,line:e.line});
@@ -1090,6 +1094,9 @@ RQ.interp=(ast,opts)=>{
     if(f)return callFn(f,[rv,...args],e.line,key);
     return builtinMethod(u.key,e,rv,args);
   }
+  const ordVal=c=>ctorVal({adt:'Ordering',variant:c+1},[]);
+  // a sort calls its closure as often and in the order its algorithm likes, so a closure with output or a panic has no one verdict
+  const hasPrint=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Macro'&&x.name!=='vec'&&x.name!=='format')f=true;});return f;};
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
     if(key==='Into::id')return rv;
@@ -1100,6 +1107,26 @@ RQ.interp=(ast,opts)=>{
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
+    if(key==='Ord::cmp')return ordVal(cmpv(rv,args[0]));
+    if(key==='PartialOrd::partial_cmp'){const c=cmpv(rv,args[0]);return optVal(c===null?undefined:ordVal(c));}
+    if(key==='f64::total_cmp'){
+      const a=unref(rv).v,b=unref(args[0]).v;
+      if(Number.isNaN(a)||Number.isNaN(b))throw new Unsup('float total order of NaN',e.line);
+      return ordVal(a<b?-1:a>b?1:Object.is(a,-0)&&!Object.is(b,-0)?-1:!Object.is(a,-0)&&Object.is(b,-0)?1:0);
+    }
+    if(key.startsWith('Ordering::')){
+      const v=unref(rv),i=variantIndex(v);
+      switch(key.slice(10)){
+        case 'reverse':return ordVal(1-i);
+        case 'then':return i===1?args[0]:v;
+        case 'then_with':{
+          if(i!==1){dropClosure(args[0],e.line);return v;}
+          const r=callClosure(args[0],[],e.line);
+          dropClosure(args[0],e.line);
+          return r;
+        }
+      }
+    }
     if(key==='Clone::clone'||key.endsWith('::clone'))return cloneVal(rv,e.line);
     if(key.startsWith('Vec::')||key.startsWith('HashMap::')){
       const c=unref(rv);
@@ -1164,13 +1191,29 @@ RQ.interp=(ast,opts)=>{
           const {arr,off,len}=win();
           arr.splice(off,len,...arr.slice(off,off+len).reverse());return UNIT;
         }
-        case 'sort_by_key':{
-          const f=args[0];
-          if(f.kind!=='Fn')throw new Unsup('sort_by_key with side effects',e.line);
-          const ks=c.v.map((_,i)=>callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line));
-          const order=c.v.map((_,i)=>i).sort((a,b)=>cmpv(ks[a],ks[b])||a-b);
-          const old=c.v.slice();
-          order.forEach((o,i)=>{c.v[i]=old[o];});
+        case 'sort_by_key':case 'sort_unstable_by_key':case 'sort_by':case 'sort_unstable_by':{
+          const f=args[0],name=key.slice(key.indexOf('::')+2),{arr,off,len}=win();
+          if(f.kind!=='Fn'||hasPrint(f.node.body))throw new Unsup('sort_by with side effects',e.line);
+          const el=i=>({k:'ref',cell:elemCell({v:arr},off+i,cell),mut:false,loan:e.id});
+          const idx=Array.from({length:len},(_,i)=>i);
+          let cmp;
+          if(name.endsWith('_key')){
+            const ks=idx.map(i=>callClosure(f,[el(i)],e.line));
+            cmp=(a,b)=>cmpv(ks[a],ks[b]);
+          }else{
+            cmp=(a,b)=>variantIndex(callClosure(f,[el(a),el(b)],e.line))-1;
+          }
+          const order=idx.slice().sort((a,b)=>cmp(a,b)||a-b);
+          // rustc may panic or order ties differently for a comparison that is not a total order, so only a consistent one gets a verdict
+          const bad=()=>new Unsup('sort_by with an order that is not total',e.line);
+          if(!name.endsWith('_key')){
+            for(let i=0;i<len;i++)if(cmp(i,i)!==0)throw bad();
+            for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])>0||cmp(order[i+1],order[i])<0)throw bad();
+          }
+          // the unstable sorts keep the order of ties up to 20 elements and shuffle them beyond that; ties that print alike (not 0.0 and -0.0) cannot be told apart
+          if(name.includes('unstable')&&len>20)for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])===0&&RQ.std.debug(arr[off+order[i]])!==RQ.std.debug(arr[off+order[i+1]]))throw new Unsup('unstable sort of equal keys',e.line);
+          const old=arr.slice(off,off+len);
+          order.forEach((o,i)=>{arr[off+i]=old[o];});
           dropClosure(f,e.line);
           return UNIT;
         }
@@ -1420,6 +1463,8 @@ RQ.interp=(ast,opts)=>{
       case 'Path':{
         const ct=(info.get(e)||{}).ctor;
         if(ct)return ctorVal(ct,[]);
+        const ic=(info.get(e)||{}).ic;
+        if(ic)return int(INT[ic.ty][ic.max?1:0],ic.ty);
         const n=e.segs[0].name,c=find(env,n);
         if(c)return read(c,e.line);
         if(consts.has(n))return constVal(n);
@@ -1507,16 +1552,17 @@ RQ.interp=(ast,opts)=>{
       case 'Ref':{
         const x=peel(e.expr);
         if(x.t==='Index'&&peel(x.index).t==='Range')return slice(e,x,env);
+        if(x.t==='Field'&&hasIdx(x)){
+          const pl=idxPlace(x,env);
+          return {k:'ref',cell:fieldCell(pl.cell,pl.path),mut:e.mut,loan:e.id};
+        }
         if(x.t==='Field'){
           const pl=placeOf(x,env);
           if(!pl)throw new Unsup('borrow of a field',e.line);
           read(pl.cell,x.line);
           return {k:'ref',cell:fieldCell(pl.cell,pl.path),mut:e.mut,loan:pl.loan??e.id};
         }
-        if(x.t==='Index'){
-          if(!isVecIdx(x))throw new Unsup('borrow of a field',e.line);
-          return {k:'ref',cell:indexCell(x,env),mut:e.mut,loan:e.id};
-        }
+        if(x.t==='Index')return {k:'ref',cell:indexCell(x,env),mut:e.mut,loan:e.id};
         if(x.t==='Deref')throw new Unsup('reborrow',e.line);
         const own=x.t==='Path'&&find(env,x.segs[0].name);
         if(own){read(own,x.line);return {k:'ref',cell:own,mut:e.mut,loan:e.id};}
@@ -1534,8 +1580,7 @@ RQ.interp=(ast,opts)=>{
         if(!RQ.std.methods.has(e.name)&&e.name!=='is_empty')throw new Unsup('method call',e.line);
         if(e.name==='push_str'){
           const r=peel(e.recv);
-          if(r.t==='Index'&&!isVecIdx(r))throw new Unsup('borrow of a field',e.line);
-          const c=r.t==='Index'?indexCell(r,env):cellOf(r,env),add=unref(ev(e.args[0],env)).v;
+          const c=r.t==='Index'?indexCell(r,env):hasIdx(r)?idxCell(r,env):cellOf(r,env),add=unref(ev(e.args[0],env)).v;
           c.val=string(c.val.v+add,c.val.id);return UNIT;
         }
         const rv=ev(e.recv,env);
