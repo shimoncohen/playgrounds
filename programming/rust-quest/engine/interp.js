@@ -22,7 +22,7 @@ class Brk{constructor(v){this.v=v;}}
 class Cont{}
 class Panic{constructor(msg,e){this.msg=msg;this.line=e.line;this.col=e.col;}}
 const UNIT={k:'unit'},MOVED={k:'moved'};
-const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]]});
+const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]],Ordering:[['Less','unit',[]],['Equal','unit',[]],['Greater','unit',[]]]});
 const MAX_EVENTS=200000,MAX_SNAPS=2000;
 const bool=v=>({k:'bool',v});
 const OPNAME={'+':'add','-':'subtract','*':'multiply'};
@@ -1090,6 +1090,9 @@ RQ.interp=(ast,opts)=>{
     if(f)return callFn(f,[rv,...args],e.line,key);
     return builtinMethod(u.key,e,rv,args);
   }
+  const ordVal=c=>ctorVal({adt:'Ordering',variant:c+1},[]);
+  // a sort calls its closure as often and in the order its algorithm likes, so a closure with output or a panic has no one verdict
+  const hasPrint=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Macro'&&x.name!=='vec'&&x.name!=='format')f=true;});return f;};
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
   function builtinMethod(key,e,rv,args){
     if(key==='Into::id')return rv;
@@ -1100,6 +1103,26 @@ RQ.interp=(ast,opts)=>{
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
+    if(key==='Ord::cmp')return ordVal(cmpv(rv,args[0]));
+    if(key==='PartialOrd::partial_cmp'){const c=cmpv(rv,args[0]);return optVal(c===null?undefined:ordVal(c));}
+    if(key==='f64::total_cmp'){
+      const a=unref(rv).v,b=unref(args[0]).v;
+      if(Number.isNaN(a)||Number.isNaN(b))throw new Unsup('float total order of NaN',e.line);
+      return ordVal(a<b?-1:a>b?1:Object.is(a,-0)&&!Object.is(b,-0)?-1:!Object.is(a,-0)&&Object.is(b,-0)?1:0);
+    }
+    if(key.startsWith('Ordering::')){
+      const v=unref(rv),i=variantIndex(v);
+      switch(key.slice(10)){
+        case 'reverse':return ordVal(1-i);
+        case 'then':return i===1?args[0]:v;
+        case 'then_with':{
+          if(i!==1){dropClosure(args[0],e.line);return v;}
+          const r=callClosure(args[0],[],e.line);
+          dropClosure(args[0],e.line);
+          return r;
+        }
+      }
+    }
     if(key==='Clone::clone'||key.endsWith('::clone'))return cloneVal(rv,e.line);
     if(key.startsWith('Vec::')||key.startsWith('HashMap::')){
       const c=unref(rv);
@@ -1164,13 +1187,29 @@ RQ.interp=(ast,opts)=>{
           const {arr,off,len}=win();
           arr.splice(off,len,...arr.slice(off,off+len).reverse());return UNIT;
         }
-        case 'sort_by_key':{
-          const f=args[0];
-          if(f.kind!=='Fn')throw new Unsup('sort_by_key with side effects',e.line);
-          const ks=c.v.map((_,i)=>callClosure(f,[{k:'ref',cell:elemCell(c,i,cell),mut:false,loan:e.id}],e.line));
-          const order=c.v.map((_,i)=>i).sort((a,b)=>cmpv(ks[a],ks[b])||a-b);
-          const old=c.v.slice();
-          order.forEach((o,i)=>{c.v[i]=old[o];});
+        case 'sort_by_key':case 'sort_unstable_by_key':case 'sort_by':case 'sort_unstable_by':{
+          const f=args[0],name=key.slice(key.indexOf('::')+2),{arr,off,len}=win();
+          if(f.kind!=='Fn'||hasPrint(f.node.body))throw new Unsup('sort_by with side effects',e.line);
+          const el=i=>({k:'ref',cell:elemCell({v:arr},off+i,cell),mut:false,loan:e.id});
+          const idx=Array.from({length:len},(_,i)=>i);
+          let cmp;
+          if(name.endsWith('_key')){
+            const ks=idx.map(i=>callClosure(f,[el(i)],e.line));
+            cmp=(a,b)=>cmpv(ks[a],ks[b]);
+          }else{
+            cmp=(a,b)=>variantIndex(callClosure(f,[el(a),el(b)],e.line))-1;
+          }
+          const order=idx.slice().sort((a,b)=>cmp(a,b)||a-b);
+          // rustc may panic or order ties differently for a comparison that is not a total order, so only a consistent one gets a verdict
+          const bad=()=>new Unsup('sort_by with an order that is not total',e.line);
+          if(!name.endsWith('_key')){
+            for(let i=0;i<len;i++)if(cmp(i,i)!==0)throw bad();
+            for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])>0||cmp(order[i+1],order[i])<0)throw bad();
+          }
+          // the unstable sorts keep the order of ties up to 20 elements and shuffle them beyond that
+          if(name.includes('unstable')&&len>20)for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])===0&&!eqv(arr[off+order[i]],arr[off+order[i+1]]))throw new Unsup('unstable sort of equal keys',e.line);
+          const old=arr.slice(off,off+len);
+          order.forEach((o,i)=>{arr[off+i]=old[o];});
           dropClosure(f,e.line);
           return UNIT;
         }

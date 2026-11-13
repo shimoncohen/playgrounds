@@ -82,8 +82,7 @@ describe('the type rustc names when an element lacks Ord', () => {
 describe('what stays unsupported', () => {
   const feature = (src) => { const c = RQ.run(src); assert.equal(c.status, 'unsupported', src); return c.unsupported.feature; };
 
-  it('sort_by and sort_by_key on an array or a slice, get on an array, and a wrong argument count', () => {
-    assert.equal(feature(main('let mut a = [3, 1, 2];\na.sort_by(|x, y| y.cmp(x));')), 'method call');
+  it('get on an array and a wrong argument count', () => {
     assert.equal(feature(main('let a = [3, 1, 2];\nprintln!("{:?}", a.get(1));')), 'method call');
     assert.equal(feature(main('let mut a = [3, 1];\na.sort(1);')), 'wrong argument count');
   });
