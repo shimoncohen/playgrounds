@@ -102,8 +102,9 @@ NQ.exec=(net,line,devId)=>{
   return r;
 };
 
-NQ.reg('help','list the commands you can use',()=>{
-  const names=Object.keys(NQ.CMDS).sort(),w=Math.max(...names.map(n=>n.length));
+/* net.known (set by NQ.session) narrows the list to the commands taught so far; a bare net lists every command */
+NQ.reg('help','list the commands you can use',net=>{
+  const names=Object.keys(NQ.CMDS).filter(n=>!net.known||net.known.has(n)).sort(),w=Math.max(...names.map(n=>n.length));
   return res(names.map(n=>n.padEnd(w)+'  '+NQ.HELP[n]),[],0);
 });
 })();

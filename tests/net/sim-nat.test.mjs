@@ -190,3 +190,42 @@ test('deterministic: the same session on two fresh nets logs identical entries a
   const go = () => { const n = NQ.createNet('home'); NQ.sim.ping(n, 'laptop', WEB); NQ.sim.ping(n, 'phone', WEB); NQ.sim.traceroute(n, 'laptop', WEB); return J({ log: n.log, t: n.devices.home.nat.table }); };
   assert.deepEqual(go(), go());
 });
+
+test('the router\'s own ping is not mistaken for return traffic when its id equals a live outId', () => {
+  const net = NQ.createNet('home');
+  NQ.sim.ping(net, 'laptop', WEB);
+  const r = NQ.sim.ping(net, 'home', WEB, { id: 1024 });
+  assert.deepEqual([r.delivered, r.replyFrom], [true, WEB]);
+  assert.deepEqual(J(net.devices.home.nat.table), [entry('192.168.1.10', 1, 1024)]);
+  assert.ok(![...r.entries].some((e) => e.dir === 'nat'), 'nothing of the router\'s own ping is translated');
+});
+
+test('regression guard (passes on main too): a router pinging its own addresses is answered locally, with no packet and no mapping', () => {
+  const net = NQ.createNet('home');
+  for (const ip of [OUT, '192.168.1.1']) {
+    const r = NQ.sim.ping(net, 'home', ip, { id: 1024 });
+    assert.deepEqual([r.delivered, r.replyFrom, r.entries.length], [true, ip, 0]);
+  }
+  assert.deepEqual(J(net.devices.home.nat.table), []);
+});
+
+test('a reply for a mapping whose inside iface is down is dropped, never sent out towards the ISP', () => {
+  const net = NQ.createNet('home');
+  NQ.sim.ping(net, 'laptop', WEB);
+  net.devices.home.ifaces.eth0.up = false;
+  const reply = NQ.pkt.stack(NQ.pkt.eth(net.devices.isp.ifaces.eth0.mac, net.devices.home.ifaces.eth1.mac, 'IPv4'),
+    NQ.pkt.ipv4(WEB, OUT, 64, 'ICMP'), NQ.pkt.icmp('echo-reply', 1024, 1));
+  const { entries } = NQ.sim.inject(net, 'home', 'eth1', reply);
+  assert.ok(![...entries].some((e) => e.dev === 'home' && (e.dir === 'fwd' || e.dir === 'nat')), 'the reply is not translated or forwarded');
+  assert.ok(![...entries].some((e) => e.dev === 'isp' && e.dir === 'drop'), 'the ISP never sees the private address');
+  assert.deepEqual([...entries.filter((e) => e.dev === 'home' && e.dir === 'drop').map((e) => e.verdict)], ['cannot send to 192.168.1.10: interface down']);
+});
+
+test('regression guard (passes on main too): an ICMP error for inside-originated traffic is translated back to the inside host', () => {
+  const net = NQ.createNet('home');
+  const r = NQ.sim.ping(net, 'laptop', '198.51.100.99');
+  assert.deepEqual([r.delivered, r.reason, r.replyFrom], [false, 'host unreachable', '203.0.113.6']);
+  const back = at(r, 'laptop', 'rx', 'dest-unreachable');
+  assert.equal(L(back, 'IPv4').fields.dst, '192.168.1.10');
+  assert.equal(L(back, 'ICMP').fields.id, 1);
+});

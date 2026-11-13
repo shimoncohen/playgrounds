@@ -1,6 +1,6 @@
 /* Network Quest app: state and saving, chapters and the mission card, the mission session (a fresh simulated network,
    the terminal, the packet inspector and the map), XP and ranks, quick-fire and the field guide. Missions are checked
-   by replaying the session's lines on a fresh network (NQ.runMission), so the check never depends on UI state. */
+   by the mission's own session (NQ.session: a fresh network and the lines run on it), so the check never depends on UI state. */
 (()=>{
 'use strict';
 const {CH,RANKS,QF,GUIDE,ASK,KINDS}=NQ;
@@ -47,7 +47,7 @@ const askBox=$('#answerBox'),askText=$('#askText'),askIn=$('#answer'),afb=$('#af
 /* ---------- mission session ---------- */
 /* a session is one go at a mission: a fresh network, an empty terminal, inspector and history. ran: anything typed
    yet (no nagging before that); won: this session already completed the mission (never celebrate it twice). */
-let net=null,dev=null,lines=[],groups=[],ran=false,won=false,asking=false,selEntry=null;
+let sess=null,net=null,dev=null,groups=[],ran=false,won=false,asking=false,selEntry=null;
 const term=NQUI.terminal({screen:$('#screen'),input:cmdIn,form:$('#cmdline'),prompt:$('#prompt'),onRun:runLine});
 const insp=NQUI.inspector({list:$('#inspector'),detail:$('#pdetail'),onSelect:e=>{selEntry=e;drawMap();}});
 const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.dev,iface:selEntry.iface}:null,dev);};
@@ -55,8 +55,8 @@ const drawMap=()=>{if(net)NQUI.diagram($('#diagram'),net,selEntry?{dev:selEntry.
 const sessionMission=()=>curMission()||CH[S.ch].missions[CH[S.ch].missions.length-1];
 function startSession(){
   const m=sessionMission();
-  net=NQ.createNet(m.scenario,m.setup);dev=m.dev||net.me;
-  lines=[];groups=[];ran=false;won=false;asking=false;selEntry=null;
+  sess=NQ.session(m);net=sess.net;dev=sess.dev;
+  groups=[];ran=false;won=false;asking=false;selEntry=null;
   term.reset();term.setPrompt(dev+':~$');
   term.print(`You are on ${dev}. Type help to see the commands you can use.`,'sys');
   insp.reset();drawMap();renderFeedback(null);renderAsk();
@@ -65,16 +65,16 @@ function runLine(line){
   term.echo(line);
   if(!line.trim())return;
   let r;
-  try{r=net.exec(line,dev);}catch(e){r={out:[],err:['Something went wrong inside the simulator. Press Reset scenario to start this network again.'],code:1,entries:[]};}
+  try{r=sess.run(line);}catch(e){r={out:[],err:['Something went wrong inside the simulator. Press Reset scenario to start this network again.'],code:1,entries:[]};}
   for(const l of r.out)term.print(l);
   for(const l of r.err)term.print(l,'err');
-  lines.push(line);ran=true;
+  ran=true;
   if(r.entries.length){groups.push({line,entries:r.entries});insp.update(groups);}
   drawMap();evaluate(r.code);save();
 }
 function evaluate(code,answer){
   const m=curMission();if(!m)return;
-  let r;try{r=NQ.runMission(m,lines,answer??null);}catch(e){r=null;}
+  let r;try{r=sess.check(answer??null);}catch(e){r=null;}
   if(code!==0){ // a failed command is checked too, but only to open the question (a ping with no reply is the point of some missions)
     if(r===ASK&&!won){asking=true;renderAsk();renderFeedback({ask:true});}
     else if(typeof r==='string'&&!won)renderFeedback({tip:r});
@@ -166,7 +166,7 @@ missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)
   if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);const d=missionEl.querySelector(`[data-mi="${S.mi}"]`);if(d)d.focus({preventScroll:true});return;}
   const a=b.dataset.act;
   if(a==='toterm'){setView('term');$('#termPanel').scrollIntoView({block:'start',behavior:reduced()?'auto':'smooth'});cmdIn.focus({preventScroll:true});}
-  else if(a==='fill'){const m=curMission();if(!m)return;const ans=m.answer||[];term.fill(ans.find(x=>!lines.includes(x))||ans[ans.length-1]||'');setView('term');}
+  else if(a==='fill'){const m=curMission();if(!m)return;const ans=m.answer||[];term.fill(ans.find(x=>!sess.history.some(h=>h.line===x))||ans[ans.length-1]||'');setView('term');}
   else if(a==='nextch')gotoMission(S.ch+1,0);
   else if(a&&a.startsWith('tab-'))showTab(a.slice(4),true);});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;let mi=CH[ci].missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi);const c=chaptersEl.querySelector(`[data-ch="${ci}"]`);if(c)c.focus({preventScroll:true});});
