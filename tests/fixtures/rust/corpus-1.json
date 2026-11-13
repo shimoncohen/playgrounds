@@ -13524,5 +13524,2093 @@
     "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let v = vec![P { a: 2 }];\n    let n = v.iter().filter(|p| p.a > 0).count();\n    println!(\"{}\", n);\n}\n",
     "expect": "ok", "out": "1\n", "err": "", "exit": 0,
     "why": "compiles with the real field", "pr": "unit"
+  },
+  {
+    "id": "guide-e0433-ordering",
+    "src": "fn main() {\n    let a = 3;\n    let b = 5;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        _ => println!(\"not less\"),\n    }\n}\n",
+    "expect": {"code":"E0433","line":5},
+    "why": "E0433: Ordering used without the use", "pr": "unit"
+  },
+  {
+    "id": "guide-e0689-abs",
+    "src": "fn main() {\n    let a = -3;\n    println!(\"{}\", a.abs());\n}\n",
+    "expect": {"code":"E0689","line":3},
+    "why": "E0689: abs on a number whose type is still open", "pr": "unit"
+  },
+  {
+    "id": "sc-a01",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s == \"hi\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a02",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", \"hi\" == s);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", \"hi\" ", "pr": "unit"
+  },
+  {
+    "id": "sc-a03",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s != \"ho\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s !", "pr": "unit"
+  },
+  {
+    "id": "sc-a04",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"hi\");\n    println!(\"{}\", s == t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a05",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"hi\";\n    println!(\"{}\", s == t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a06",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"hi\";\n    println!(\"{}\", t == s);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", t ", "pr": "unit"
+  },
+  {
+    "id": "sc-a07",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    println!(\"{}\", r == \"hi\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", r ", "pr": "unit"
+  },
+  {
+    "id": "sc-a08",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    let t: &str = \"hi\";\n    println!(\"{}\", r == t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", r ", "pr": "unit"
+  },
+  {
+    "id": "sc-a09",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    let t = String::from(\"hi\");\n    println!(\"{}\", r == &t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", r ", "pr": "unit"
+  },
+  {
+    "id": "sc-a10",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"hi\");\n    println!(\"{}\", &s == &t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", &s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a11",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"hi\";\n    println!(\"{}\", &s == t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", &s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a15",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    println!(\"{}\", *r == \"hi\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", *r ", "pr": "unit"
+  },
+  {
+    "id": "sc-a16",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    println!(\"{}\", r == \"hi\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", r ", "pr": "unit"
+  },
+  {
+    "id": "sc-a17",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    let t = \"hi\";\n    println!(\"{}\", t == r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", t ", "pr": "unit"
+  },
+  {
+    "id": "sc-a18",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s < \"ho\");\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare: println!(\"{}\", s < \"ho\");", "pr": "unit"
+  },
+  {
+    "id": "sc-a19",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", \"ho\" > s);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare: println!(\"{}\", \"ho\" > s);", "pr": "unit"
+  },
+  {
+    "id": "sc-a20",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"ho\");\n    println!(\"{}\", s < t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s < t);", "pr": "unit"
+  },
+  {
+    "id": "sc-a21",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    println!(\"{}\", s <= t);\n}\n",
+    "expect": {"code":"E0308","line":5},
+    "why": "text compare: println!(\"{}\", s <", "pr": "unit"
+  },
+  {
+    "id": "sc-a22",
+    "src": "\nfn main() {\n    let s: &str = \"hi\";\n    let t: &str = \"ho\";\n    println!(\"{} {}\", s < t, s >= t);\n}\n",
+    "expect": "ok", "out": "true false\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{} {}\", s < t, s >", "pr": "unit"
+  },
+  {
+    "id": "sc-a23",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", &s < \"ho\");\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare: println!(\"{}\", &s < \"ho\");", "pr": "unit"
+  },
+  {
+    "id": "sc-a24",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"ho\");\n    println!(\"{}\", &s > &t);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", &s > &t);", "pr": "unit"
+  },
+  {
+    "id": "sc-a25",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let n = 3;\n    println!(\"{}\", s == n);\n}\n",
+    "expect": {"code":"E0277","line":5},
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a26",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s == 'h');\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a27",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s == 3);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a28",
+    "src": "\nfn main() {\n    let s: &str = \"hi\";\n    let t = String::from(\"hi\");\n    let r = &t;\n    println!(\"{}\", s == r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a29",
+    "src": "\nfn main() {\n    let s: &str = \"hi\";\n    let t = String::from(\"hi\");\n    println!(\"{}\", s == &t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a32",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"hi\");\n    println!(\"{}\", s == &t);\n}\n",
+    "expect": {"code":"E0277","line":5},
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a33",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = String::from(\"hi\");\n    println!(\"{}\", &s == t);\n}\n",
+    "expect": {"code":"E0277","line":5},
+    "why": "text compare: println!(\"{}\", &s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a35",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s == \"hi\" && s != \"x\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a36",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    if s == \"hi\" { println!(\"yes\"); } else { println!(\"no\"); }\n}\n",
+    "expect": "ok", "out": "yes\n", "err": "", "exit": 0,
+    "why": "text compare: if s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a38",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 2 }];\n    let n = ps.iter().filter(|p| p.name != \"a\").count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "sc-a39",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    for p in &ps {\n        if p.name == \"a\" { println!(\"{}\", p.score); }\n    }\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: if p.name ", "pr": "unit"
+  },
+  {
+    "id": "sc-a40",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    for p in ps.iter() {\n        if \"a\" == p.name { println!(\"{}\", p.score); }\n    }\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: if \"a\" ", "pr": "unit"
+  },
+  {
+    "id": "sc-a41",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().find(|p| p.name == \"a\");\n    println!(\"{}\", f.is_some());\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f.is_some());", "pr": "unit"
+  },
+  {
+    "id": "sc-a42",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().any(|p| p.name == \"a\");\n    println!(\"{}\", f);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a43",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().position(|p| p.name == \"a\");\n    println!(\"{:?}\", f);\n}\n",
+    "expect": "ok", "out": "Some(0)\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{:?}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a44",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.into_iter().filter(|p| p.name == \"a\").count();\n    println!(\"{}\", f);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a45",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().filter(|p| &p.name == \"a\").count();\n    println!(\"{}\", f);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a46",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().filter(|p| p.name == String::from(\"a\")).count();\n    println!(\"{}\", f);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a47",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let ps = vec![P { name: String::from(\"a\"), score: 1 }];\n    let f = ps.iter().filter(|p| p.name.as_str() == \"a\").count();\n    println!(\"{}\", f);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", f);", "pr": "unit"
+  },
+  {
+    "id": "sc-a53",
+    "src": "\nfn main() {\n    let v = vec![String::from(\"a\")];\n    let n = v.iter().filter(|s| *s == \"a\").count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "sc-a55",
+    "src": "\nfn main() {\n    let v = vec![String::from(\"a\")];\n    let n = v.iter().filter(|s| s == \"a\").count();\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text compare: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "sc-a57",
+    "src": "\nfn main() {\n    let v = vec![String::from(\"a\")];\n    println!(\"{}\", v[0] == \"a\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", v[0] ", "pr": "unit"
+  },
+  {
+    "id": "sc-a58",
+    "src": "\nfn main() {\n    let v = vec![String::from(\"a\")];\n    println!(\"{}\", \"a\" == v[0]);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", \"a\" ", "pr": "unit"
+  },
+  {
+    "id": "sc-a60",
+    "src": "\nfn main() {\n    let v = vec![String::from(\"a\")];\n    println!(\"{}\", v.contains(&String::from(\"a\")));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", v.contains(&String::from(\"a\")));", "pr": "unit"
+  },
+  {
+    "id": "sc-a64",
+    "src": "\nfn main() {\n    let o = Some(String::from(\"a\"));\n    println!(\"{}\", o == Some(String::from(\"a\")));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", o ", "pr": "unit"
+  },
+  {
+    "id": "sc-a66",
+    "src": "\nfn main() {\n    let o: Option<&str> = Some(\"a\");\n    println!(\"{}\", o == Some(\"a\"));\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", o ", "pr": "unit"
+  },
+  {
+    "id": "sc-a68",
+    "src": "\nfn main() {\n    let s = String::from(\"a\");\n    let n = s.len() == 1;\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "sc-a69",
+    "src": "\nfn main() {\n    let s = String::from(\"a\");\n    let t = &s[..];\n    println!(\"{}\", t == \"a\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", t ", "pr": "unit"
+  },
+  {
+    "id": "sc-a70",
+    "src": "\nfn main() {\n    let s = String::from(\"a\");\n    let t = s.as_str();\n    println!(\"{}\", t == s);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", t ", "pr": "unit"
+  },
+  {
+    "id": "sc-a71",
+    "src": "\nfn main() {\n    let s = String::from(\"a\");\n    let t = s.as_str();\n    println!(\"{}\", s == t);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a72",
+    "src": "\nfn main() {\n    let s = String::from(\"a\");\n    println!(\"{}\", s == \"a\".to_string());\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a73",
+    "src": "\nfn main() {\n    let a = String::from(\"a\");\n    let b = String::from(\"b\");\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{:?}\", a.cmp(&b));", "pr": "unit"
+  },
+  {
+    "id": "sc-a74",
+    "src": "\nfn main() {\n    let a = String::from(\"a\");\n    let b = String::from(\"b\");\n    println!(\"{}\", a.partial_cmp(&b).is_some());\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", a.partial_cmp(&b).is_some());", "pr": "unit"
+  },
+  {
+    "id": "sc-a75",
+    "src": "\nfn main() {\n    let a = \"a\";\n    let b = \"b\";\n    println!(\"{:?}\", a.cmp(b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{:?}\", a.cmp(b));", "pr": "unit"
+  },
+  {
+    "id": "sc-a76",
+    "src": "\nfn main() {\n    let a = \"a\";\n    let b = \"b\";\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{:?}\", a.cmp(&b));", "pr": "unit"
+  },
+  {
+    "id": "sc-a77",
+    "src": "\nfn main() {\n    let a = String::from(\"a\");\n    let b = \"b\";\n    println!(\"{:?}\", a.cmp(b));\n}\n",
+    "expect": {"code":"E0308","line":5},
+    "why": "text compare: println!(\"{:?}\", a.cmp(b));", "pr": "unit"
+  },
+  {
+    "id": "sc-a78",
+    "src": "\nfn main() {\n    let c = 'a';\n    println!(\"{}\", c == \"a\");\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare: println!(\"{}\", c ", "pr": "unit"
+  },
+  {
+    "id": "sc-a80",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let t = s;\n    println!(\"{}\", s == \"hi\");\n}\n",
+    "expect": {"code":"E0382","line":5},
+    "why": "text compare: println!(\"{}\", s ", "pr": "unit"
+  },
+  {
+    "id": "sc-a81",
+    "src": "\nfn main() {\n    let s = String::from(\"hi\");\n    let r = &s;\n    println!(\"{}\", r == r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare: println!(\"{}\", r ", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-T-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s == t;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-T-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s < t;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-rS-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s == &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-S-rS-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = s < &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-T-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t == t;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-T-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t < t;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-rS-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t == &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-T-rS-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = t < &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-T-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s == t;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-T-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s < t;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-rS-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s == &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sm-m-rS-rS-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let t: &str = \"ho\";\n    let r = &s < &s;\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "text compare matrix: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-bool-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == true;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-bool-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < true;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-ch-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == 'h';\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-ch-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < 'h';\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-fl-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == 1.5;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-fl-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < 1.5;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-int-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == 3;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-int-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < 3;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-iv-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == n;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-iv-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < n;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-u-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s == ();\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-x-S-u-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = s < ();\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-bool-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = true == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-bool-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = true < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-ch-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 'h' == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-ch-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 'h' < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-fl-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 1.5 == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-fl-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 1.5 < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-int-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 3 == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-int-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = 3 < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-iv-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = n == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-iv-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = n < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-u-S-eq",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = () == s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "sx-y-u-S-lt",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    let n: i32 = 3;\n    let r = () < s;\n    println!(\"{}\", r);\n}\n",
+    "expect": {"code":"E0308","line":4},
+    "why": "text against a scalar: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "ord-b01",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3;\n    let b = 5;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        Ordering::Equal => println!(\"equal\"),\n        Ordering::Greater => println!(\"greater\"),\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: Ordering::Greater ", "pr": "unit"
+  },
+  {
+    "id": "ord-b02",
+    "src": "\nfn main() {\n    let a = 3;\n    let b = 5;\n    match a.cmp(&b) {\n        std::cmp::Ordering::Less => println!(\"less\"),\n        std::cmp::Ordering::Equal => println!(\"equal\"),\n        std::cmp::Ordering::Greater => println!(\"greater\"),\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: std::cmp::Ordering::Greater ", "pr": "unit"
+  },
+  {
+    "id": "ord-b03",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3;\n    let b = 5;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        Ordering::Greater => println!(\"greater\"),\n    }\n}\n",
+    "expect": {"code":"E0004","line":6},
+    "why": "Ordering and Reverse: Ordering::Greater ", "pr": "unit"
+  },
+  {
+    "id": "ord-b04",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3;\n    let b = 5;\n    let o = a.cmp(&b);\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", o);", "pr": "unit"
+  },
+  {
+    "id": "ord-b05",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3;\n    let b = 5;\n    let o = a.cmp(&b);\n    println!(\"{}\", o == Ordering::Less);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", o ", "pr": "unit"
+  },
+  {
+    "id": "ord-b06",
+    "src": "\nfn main() {\n    let a = 3;\n    let b = 5;\n    let o = a.cmp(&b);\n    println!(\"{:?}\", o);\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", o);", "pr": "unit"
+  },
+  {
+    "id": "ord-b07",
+    "src": "\nfn main() {\n    let a = 3;\n    let b = 5;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", a.cmp(&b));", "pr": "unit"
+  },
+  {
+    "id": "ord-b08",
+    "src": "\nfn main() {\n    let a = 3;\n    let b = 5;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", a.partial_cmp(&b));", "pr": "unit"
+  },
+  {
+    "id": "ord-b09",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3.5;\n    let b = 5.0;\n    match a.partial_cmp(&b) {\n        Some(Ordering::Less) => println!(\"less\"),\n        Some(Ordering::Equal) => println!(\"eq\"),\n        Some(Ordering::Greater) => println!(\"gt\"),\n        None => println!(\"none\"),\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: None ", "pr": "unit"
+  },
+  {
+    "id": "ord-b10",
+    "src": "use std::cmp::Ordering;\n\nfn main() {\n    let a = 3;\n    let b = 5;\n    let o = match a.cmp(&b) {\n        Ordering::Less => -1,\n        Ordering::Equal => 0,\n        Ordering::Greater => 1,\n    };\n    println!(\"{}\", o);\n}\n",
+    "expect": "ok", "out": "-1\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", o);", "pr": "unit"
+  },
+  {
+    "id": "ord-b11",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let mut w = v.clone();\n    w.sort_by(|a, b| b.cmp(a));\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "ord-b12",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let mut w = v.clone();\n    w.sort_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "ord-b13",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let mut v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    v.sort_by(|a, b| b.score.cmp(&a.score));\n    println!(\"{}\", v[0].name);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", v[0].name);", "pr": "unit"
+  },
+  {
+    "id": "ord-b15",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let n = v.iter().filter(|a| **a > 1).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "ord-b16",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let m = v.iter().max_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(3)\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "ord-b17",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let m = v.iter().min_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "ord-b18",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let m = v.iter().max_by_key(|a| **a);\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(3)\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "ord-b19",
+    "src": "\nfn main() {\n    let v = vec![3, 1, 2];\n    let m = v.iter().min_by_key(|a| **a);\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(1)\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "ord-b21",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    let m = v.iter().min_by_key(|p| p.score).unwrap();\n    println!(\"{}\", m.name);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", m.name);", "pr": "unit"
+  },
+  {
+    "id": "ord-b22",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    let m = v.iter().max_by(|a, b| a.score.cmp(&b.score)).unwrap();\n    println!(\"{}\", m.name);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", m.name);", "pr": "unit"
+  },
+  {
+    "id": "ord-b23",
+    "src": "struct P { name: String, score: i32 }\n\nfn main() {\n    let v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    let m = v.iter().min_by(|a, b| a.score.cmp(&b.score)).unwrap();\n    println!(\"{}\", m.name);\n}\n",
+    "expect": "ok", "out": "a\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", m.name);", "pr": "unit"
+  },
+  {
+    "id": "ord-b24",
+    "src": "struct P { name: String, score: i32 }\nuse std::cmp::Reverse;\n\nfn main() {\n    let mut v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    v.sort_by_key(|p| Reverse(p.score));\n    println!(\"{}\", v[0].name);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", v[0].name);", "pr": "unit"
+  },
+  {
+    "id": "ord-b25",
+    "src": "use std::cmp::Reverse;\n\nfn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by_key(|x| Reverse(*x));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "ord-b27",
+    "src": "use std::cmp::Reverse;\n\nfn main() {\n    let r = Reverse(3);\n    println!(\"{:?} {}\", r, r.0);\n}\n",
+    "expect": "ok", "out": "Reverse(3) 3\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?} {}\", r, r.0);", "pr": "unit"
+  },
+  {
+    "id": "ord-b28",
+    "src": "use std::cmp::Reverse;\n\nfn main() {\n    println!(\"{}\", Reverse(3) < Reverse(4));\n}\n",
+    "expect": "ok", "out": "false\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", Reverse(3) < Reverse(4));", "pr": "unit"
+  },
+  {
+    "id": "ord-b29",
+    "src": "use std::cmp::Reverse;\n\nfn main() {\n    let mut v = vec![String::from(\"b\"), String::from(\"a\")];\n    v.sort_by_key(|s| Reverse(s.clone()));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[\"b\", \"a\"]\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "ord-b30",
+    "src": "struct P { name: String, score: i32 }\nuse std::cmp::Reverse;\n\nfn main() {\n    let mut v = vec![P { name: String::from(\"a\"), score: 1 }, P { name: String::from(\"b\"), score: 5 }];\n    v.sort_by_key(|p| (Reverse(p.score), p.name.clone()));\n    println!(\"{}\", v[0].name);\n}\n",
+    "expect": "ok", "out": "b\n", "err": "", "exit": 0,
+    "why": "Ordering and Reverse: println!(\"{}\", v[0].name);", "pr": "unit"
+  },
+  {
+    "id": "int-ab-i16",
+    "src": "fn f(b: i16) -> i16 { b.abs() }\nfn main() {\n    println!(\"{}\", f(i16::MIN));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:404:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i16::MIN));", "pr": "unit"
+  },
+  {
+    "id": "int-ab-i32",
+    "src": "fn f(b: i32) -> i32 { b.abs() }\nfn main() {\n    println!(\"{}\", f(i32::MIN));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:429:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i32::MIN));", "pr": "unit"
+  },
+  {
+    "id": "int-ab-i64",
+    "src": "fn f(b: i64) -> i64 { b.abs() }\nfn main() {\n    println!(\"{}\", f(i64::MIN));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:454:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i64::MIN));", "pr": "unit"
+  },
+  {
+    "id": "int-ab-i8",
+    "src": "fn f(b: i8) -> i8 { b.abs() }\nfn main() {\n    println!(\"{}\", f(i8::MIN));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:379:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i8::MIN));", "pr": "unit"
+  },
+  {
+    "id": "int-ab-isize",
+    "src": "fn f(b: isize) -> isize { b.abs() }\nfn main() {\n    println!(\"{}\", f(isize::MIN));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:559:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(isize::MIN));", "pr": "unit"
+  },
+  {
+    "id": "int-abs-chain",
+    "src": "\nfn main() {\n    let a: i32 = 7;\n    let b: i32 = 10;\n    let d = (a - b).abs();\n    println!(\"{}\", d);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", d);", "pr": "unit"
+  },
+  {
+    "id": "int-abs-diff-s",
+    "src": "\nfn main() {\n    let a: i32 = -5;\n    let b: i32 = i32::MAX;\n    println!(\"{}\", a.abs_diff(b));\n}\n",
+    "expect": "ok", "out": "2147483652\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", a.abs_diff(b));", "pr": "unit"
+  },
+  {
+    "id": "int-abs-lit",
+    "src": "\nfn main() {\n    println!(\"{}\", (-5i32).abs());\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", (-5i32).abs());", "pr": "unit"
+  },
+  {
+    "id": "int-abs-neg",
+    "src": "\nfn main() {\n    let a: i32 = -5;\n    println!(\"{}\", -a.abs());\n}\n",
+    "expect": "ok", "out": "-5\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", -a.abs());", "pr": "unit"
+  },
+  {
+    "id": "int-chk-ch",
+    "src": "\nfn main() {\n    let a: i32 = 3;\n    println!(\"{:?}\", a.checked_add(2).unwrap_or(0));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", a.checked_add(2).unwrap_or(0));", "pr": "unit"
+  },
+  {
+    "id": "int-chk-expect",
+    "src": "\nfn main() {\n    let a: u8 = 250;\n    println!(\"{}\", a.checked_add(10).expect(\"big\"));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:38:\nbig\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", a.checked_add(10).expect(\"big\"));", "pr": "unit"
+  },
+  {
+    "id": "int-chk-match",
+    "src": "\nfn main() {\n    let a: u8 = 250;\n    match a.checked_add(10) {\n        Some(v) => println!(\"{}\", v),\n        None => println!(\"overflow\"),\n    }\n}\n",
+    "expect": "ok", "out": "overflow\n", "err": "", "exit": 0,
+    "why": "whole-number method: None ", "pr": "unit"
+  },
+  {
+    "id": "int-chk-unwrap",
+    "src": "\nfn main() {\n    let a: u8 = 250;\n    println!(\"{}\", a.checked_add(10).unwrap());\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:38:\ncalled `Option::unwrap()` on a `None` value\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", a.checked_add(10).unwrap());", "pr": "unit"
+  },
+  {
+    "id": "int-clos-abs",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, -9, 2];\n    let s: Vec<i32> = v.iter().map(|x| x.abs()).collect();\n    println!(\"{:?}\", s);\n}\n",
+    "expect": "ok", "out": "[3, 9, 2]\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", s);", "pr": "unit"
+  },
+  {
+    "id": "int-clos-abs2",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, -9, 2];\n    let s: i32 = v.iter().map(|&x| x.abs()).sum();\n    println!(\"{}\", s);\n}\n",
+    "expect": "ok", "out": "14\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", s);", "pr": "unit"
+  },
+  {
+    "id": "int-clos-pow",
+    "src": "\nfn main() {\n    let v: Vec<u32> = vec![3, 9, 2];\n    let s: Vec<u32> = v.iter().map(|x| x.pow(2)).collect();\n    println!(\"{:?}\", s);\n}\n",
+    "expect": "ok", "out": "[9, 81, 4]\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", s);", "pr": "unit"
+  },
+  {
+    "id": "int-fold-max",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, 9, 2];\n    let b = v.iter().fold(i32::MIN, |m, x| m.max(*x));\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", b);", "pr": "unit"
+  },
+  {
+    "id": "int-fold-max-it",
+    "src": "\nfn main() {\n    let v = vec![3, 9, 2];\n    let b = v.iter().fold(0, |m, x| m.max(*x));\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", b);", "pr": "unit"
+  },
+  {
+    "id": "int-iv-abs",
+    "src": "\nfn main() {\n    let a = -3;\n    println!(\"{}\", a.abs());\n}\n",
+    "expect": {"code":"E0689","line":4},
+    "why": "whole-number method: println!(\"{}\", a.abs());", "pr": "unit"
+  },
+  {
+    "id": "int-iv-chk",
+    "src": "\nfn main() {\n    let a = 3;\n    println!(\"{:?}\", a.checked_add(2));\n}\n",
+    "expect": {"code":"E0689","line":4},
+    "why": "whole-number method: println!(\"{:?}\", a.checked_add(2));", "pr": "unit"
+  },
+  {
+    "id": "int-iv-fix",
+    "src": "\nfn main() {\n    let a = 3;\n    let b: i32 = a;\n    println!(\"{}\", a.pow(2) + b);\n}\n",
+    "expect": "ok", "out": "12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", a.pow(2) + b);", "pr": "unit"
+  },
+  {
+    "id": "int-iv-fix2",
+    "src": "\nfn main() {\n    let a = 3;\n    let c = a.pow(2);\n    let b: i32 = a;\n    println!(\"{} {}\", c, b);\n}\n",
+    "expect": {"code":"E0689","line":4},
+    "why": "whole-number method: println!(\"{} {}\", c, b);", "pr": "unit"
+  },
+  {
+    "id": "int-iv-fix3",
+    "src": "\nfn main() {\n    let a = 3;\n    let b: u8 = a;\n    println!(\"{} {}\", a.pow(2), b);\n}\n",
+    "expect": "ok", "out": "9 3\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {}\", a.pow(2), b);", "pr": "unit"
+  },
+  {
+    "id": "int-iv-lit-abs",
+    "src": "\nfn main() {\n    println!(\"{}\", (-3).abs());\n}\n",
+    "expect": {"code":"E0689","line":3},
+    "why": "whole-number method: println!(\"{}\", (-3).abs());", "pr": "unit"
+  },
+  {
+    "id": "int-iv-lit-pow",
+    "src": "\nfn main() {\n    println!(\"{}\", 2.pow(3));\n}\n",
+    "expect": {"code":"E0689","line":3},
+    "why": "whole-number method: println!(\"{}\", 2.pow(3));", "pr": "unit"
+  },
+  {
+    "id": "int-iv-max-f",
+    "src": "\nfn main() {\n    let a = 3;\n    let b: u8 = a.max(2);\n    println!(\"{}\", b);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", b);", "pr": "unit"
+  },
+  {
+    "id": "int-iv-min",
+    "src": "\nfn main() {\n    let a = 3;\n    println!(\"{}\", a.min(2));\n}\n",
+    "expect": "ok", "out": "2\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", a.min(2));", "pr": "unit"
+  },
+  {
+    "id": "int-iv-pow",
+    "src": "\nfn main() {\n    let a = 3;\n    println!(\"{}\", a.pow(2));\n}\n",
+    "expect": {"code":"E0689","line":4},
+    "why": "whole-number method: println!(\"{}\", a.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-max-abs-diff",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, -9, 2];\n    let m = v.iter().max_by_key(|x| (**x - 1).abs());\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(-9)\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "int-min-by-abs",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, -9, 2];\n    let m = v.iter().min_by_key(|x| x.abs());\n    println!(\"{:?}\", m);\n}\n",
+    "expect": "ok", "out": "Some(2)\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "int-min-mis",
+    "src": "\nfn main() {\n    let a: i32 = 3;\n    let b: i64 = 4;\n    println!(\"{}\", a.min(b));\n}\n",
+    "expect": {"code":"E0308","line":5},
+    "why": "whole-number method: println!(\"{}\", a.min(b));", "pr": "unit"
+  },
+  {
+    "id": "int-minmax-chain",
+    "src": "\nfn main() {\n    let a: i32 = 7;\n    println!(\"{}\", a.max(0).min(5));\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", a.max(0).min(5));", "pr": "unit"
+  },
+  {
+    "id": "int-minmax-expr",
+    "src": "\nfn main() {\n    let a: i32 = 7;\n    let b: i32 = 9;\n    println!(\"{}\", (a + b).max(a * b));\n}\n",
+    "expect": "ok", "out": "63\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", (a + b).max(a * b));", "pr": "unit"
+  },
+  {
+    "id": "int-minmax-ref",
+    "src": "\nfn main() {\n    let v = vec![3, 9, 2];\n    let mut best = 0;\n    for x in &v {\n        best = best.max(*x);\n    }\n    println!(\"{}\", best);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", best);", "pr": "unit"
+  },
+  {
+    "id": "int-minmax-ref2",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, 9, 2];\n    let mut best = 0;\n    for x in &v {\n        best = best.max(*x);\n    }\n    println!(\"{}\", best);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", best);", "pr": "unit"
+  },
+  {
+    "id": "int-minmax-ref3",
+    "src": "\nfn main() {\n    let v: Vec<i32> = vec![3, 9, 2];\n    let mut best = 0;\n    for x in &v {\n        best = best.max(x);\n    }\n    println!(\"{}\", best);\n}\n",
+    "expect": {"code":"E0308","line":6},
+    "why": "whole-number method: println!(\"{}\", best);", "pr": "unit"
+  },
+  {
+    "id": "int-ok-i16",
+    "src": "\nfn main() {\n    let a: i16 = 3;\n    let b: i16 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) -1 -1\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-i32",
+    "src": "\nfn main() {\n    let a: i32 = 3;\n    let b: i32 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) -1 -1\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-i64",
+    "src": "\nfn main() {\n    let a: i64 = 3;\n    let b: i64 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) -1 -1\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-i8",
+    "src": "\nfn main() {\n    let a: i8 = 3;\n    let b: i8 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) -1 -1\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-isize",
+    "src": "\nfn main() {\n    let a: isize = 3;\n    let b: isize = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) -1 -1\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-u16",
+    "src": "\nfn main() {\n    let a: u16 = 3;\n    let b: u16 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) 65535 0\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-u32",
+    "src": "\nfn main() {\n    let a: u32 = 3;\n    let b: u32 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) 4294967295 0\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-u64",
+    "src": "\nfn main() {\n    let a: u64 = 3;\n    let b: u64 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) 18446744073709551615 0\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-u8",
+    "src": "\nfn main() {\n    let a: u8 = 3;\n    let b: u8 = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) 255 0\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-ok-usize",
+    "src": "\nfn main() {\n    let a: usize = 3;\n    let b: usize = 4;\n    println!(\"{} {} {:?} {} {}\", a.min(b), a.max(b), a.checked_add(b), a.wrapping_sub(b), a.saturating_sub(b));\n    println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a.saturating_mul(b));\n}\n",
+    "expect": "ok", "out": "3 4 Some(7) 18446744073709551615 0\n27 1 Some(12) 12\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{} {} {:?} {}\", a.pow(3), a.abs_diff(b), a.checked_mul(b), a", "pr": "unit"
+  },
+  {
+    "id": "int-pow-chain",
+    "src": "\nfn main() {\n    let a: i32 = 7;\n    let r = a.pow(2).pow(2);\n    println!(\"{}\", r);\n}\n",
+    "expect": "ok", "out": "2401\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", r);", "pr": "unit"
+  },
+  {
+    "id": "int-pow-i",
+    "src": "\nfn main() {\n    let a: i32 = 3;\n    let n: i32 = 2;\n    println!(\"{}\", a.pow(n));\n}\n",
+    "expect": {"code":"E0308","line":5},
+    "why": "whole-number method: println!(\"{}\", a.pow(n));", "pr": "unit"
+  },
+  {
+    "id": "int-pow-u64",
+    "src": "\nfn main() {\n    let a: i32 = 3;\n    let n: u64 = 2;\n    println!(\"{}\", a.pow(n));\n}\n",
+    "expect": {"code":"E0308","line":5},
+    "why": "whole-number method: println!(\"{}\", a.pow(n));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-i16",
+    "src": "\nfn main() {\n    let b: i16 = i16::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:404:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-i32",
+    "src": "\nfn main() {\n    let b: i32 = i32::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:429:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-i64",
+    "src": "\nfn main() {\n    let b: i64 = i64::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:454:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-i8",
+    "src": "\nfn main() {\n    let b: i8 = i8::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:379:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-isize",
+    "src": "\nfn main() {\n    let b: isize = isize::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:559:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-lit",
+    "src": "\nfn main() {\n    println!(\"{}\", 10u64.pow(18));\n}\n",
+    "expect": "ok", "out": "1000000000000000000\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", 10u64.pow(18));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-lit2",
+    "src": "\nfn main() {\n    println!(\"{}\", 10i32.pow(9));\n}\n",
+    "expect": "ok", "out": "1000000000\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", 10i32.pow(9));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-lit3",
+    "src": "\nfn main() {\n    println!(\"{}\", 10i32.pow(10));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:429:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", 10i32.pow(10));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-lit4",
+    "src": "\nfn main() {\n    let x: u32 = 2;\n    println!(\"{}\", x.pow(31) + x.pow(31));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:4:20:\nattempt to add with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", x.pow(31) + x.pow(31));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-u16",
+    "src": "\nfn main() {\n    let b: u16 = u16::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1234:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-u32",
+    "src": "\nfn main() {\n    let b: u32 = u32::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1290:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-u64",
+    "src": "\nfn main() {\n    let b: u64 = u64::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1322:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-u8",
+    "src": "\nfn main() {\n    let b: u8 = u8::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:586:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pw-usize",
+    "src": "\nfn main() {\n    let b: usize = usize::MAX;\n    println!(\"{}\", b.pow(2));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1452:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", b.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-i16",
+    "src": "fn f(b: i16) -> i16 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(i16::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:404:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i16::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-i32",
+    "src": "fn f(b: i32) -> i32 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(i32::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:429:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i32::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-i64",
+    "src": "fn f(b: i64) -> i64 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(i64::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:454:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i64::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-i8",
+    "src": "fn f(b: i8) -> i8 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(i8::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:379:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(i8::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-isize",
+    "src": "fn f(b: isize) -> isize { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(isize::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:559:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(isize::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-u16",
+    "src": "fn f(b: u16) -> u16 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(u16::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1234:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(u16::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-u32",
+    "src": "fn f(b: u32) -> u32 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(u32::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1290:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(u32::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-u64",
+    "src": "fn f(b: u64) -> u64 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(u64::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1322:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(u64::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-u8",
+    "src": "fn f(b: u8) -> u8 { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(u8::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:586:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(u8::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-pwf-usize",
+    "src": "fn f(b: usize) -> usize { b.pow(2) }\nfn main() {\n    println!(\"{}\", f(usize::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1452:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "whole-number method: println!(\"{}\", f(usize::MAX));", "pr": "unit"
+  },
+  {
+    "id": "int-ref-abs",
+    "src": "\nfn main() {\n    let a: i32 = -3;\n    let r = &a;\n    println!(\"{}\", r.abs());\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", r.abs());", "pr": "unit"
+  },
+  {
+    "id": "int-ref-pow",
+    "src": "\nfn main() {\n    let a: i32 = -3;\n    let r = &a;\n    println!(\"{}\", r.pow(2));\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{}\", r.pow(2));", "pr": "unit"
+  },
+  {
+    "id": "int-sort-abs",
+    "src": "\nfn main() {\n    let mut v: Vec<i32> = vec![3, -9, 2];\n    v.sort_by_key(|x| x.abs());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[2, 3, -9]\n", "err": "", "exit": 0,
+    "why": "whole-number method: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "int-un-abs",
+    "src": "\nfn main() {\n    let a: u32 = 3;\n    println!(\"{}\", a.abs());\n}\n",
+    "expect": {"code":"E0599","line":4},
+    "why": "whole-number method: println!(\"{}\", a.abs());", "pr": "unit"
+  },
+  {
+    "id": "lrn-d02",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let n = players.iter().filter(|p| p.name == \"bo\").count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d03",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let n = players.iter().filter(|p| p.name != \"bo\").count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "3\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", n);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d04",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    for p in &players {\n        if p.name == \"cy\" {\n            println!(\"found {}\", p.score);\n        }\n    }\n}\n",
+    "expect": "ok", "out": "found 55\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"found {}\", p.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d05",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let want = String::from(\"di\");\n    let found = players.iter().any(|p| p.name == want);\n    println!(\"{}\", found);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", found);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d06",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let want = \"di\";\n    let idx = players.iter().position(|p| p.name == want);\n    println!(\"{:?}\", idx);\n}\n",
+    "expect": "ok", "out": "Some(3)\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", idx);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d07",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let top = players.iter().max_by_key(|p| p.score).unwrap();\n    println!(\"{} {}\", top.name, top.score);\n}\n",
+    "expect": "ok", "out": "cy 55\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", top.name, top.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d08",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let low = players.iter().min_by_key(|p| p.score).unwrap();\n    println!(\"{} {}\", low.name, low.score);\n}\n",
+    "expect": "ok", "out": "di 12\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", low.name, low.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d09",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let top = players.iter().max_by(|a, b| a.score.cmp(&b.score)).unwrap();\n    println!(\"{} {}\", top.name, top.score);\n}\n",
+    "expect": "ok", "out": "cy 55\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", top.name, top.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d10",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let low = players.iter().min_by(|a, b| a.score.cmp(&b.score)).unwrap();\n    println!(\"{} {}\", low.name, low.score);\n}\n",
+    "expect": "ok", "out": "di 12\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", low.name, low.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d11",
+    "src": "use std::cmp::Reverse;\n#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by_key(|p| Reverse(p.score));\n    for p in &board {\n        println!(\"{} {}\", p.name, p.score);\n    }\n}\n",
+    "expect": "ok", "out": "bo 55\ncy 55\nana 30\ndi 12\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", p.name, p.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d12",
+    "src": "use std::cmp::Reverse;\n#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by_key(|p| (Reverse(p.score), p.name.clone()));\n    for p in &board {\n        println!(\"{} {}\", p.name, p.score);\n    }\n}\n",
+    "expect": "ok", "out": "bo 55\ncy 55\nana 30\ndi 12\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", p.name, p.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d13",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by(|a, b| b.score.cmp(&a.score).then(a.name.cmp(&b.name)));\n    for p in &board {\n        println!(\"{} {}\", p.name, p.score);\n    }\n}\n",
+    "expect": "ok", "out": "bo 55\ncy 55\nana 30\ndi 12\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", p.name, p.score);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d14",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by(|a, b| a.name.cmp(&b.name));\n    println!(\"{}\", board[0].name);\n}\n",
+    "expect": "ok", "out": "ana\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", board[0].name);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d15",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by(|a, b| b.name.cmp(&a.name));\n    println!(\"{}\", board[0].name);\n}\n",
+    "expect": "ok", "out": "di\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", board[0].name);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d16",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let mut board = players.clone();\n    board.sort_by_key(|p| p.name.clone());\n    println!(\"{}\", board[0].name);\n}\n",
+    "expect": "ok", "out": "ana\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", board[0].name);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d17",
+    "src": "#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let best = players.iter().map(|p| p.score).max().unwrap();\n    let worst = players.iter().map(|p| p.score).min().unwrap();\n    println!(\"{}\", (best - worst).abs());\n}\n",
+    "expect": "ok", "out": "43\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", (best - worst).abs());", "pr": "unit"
+  },
+  {
+    "id": "lrn-d18",
+    "src": "fn main() {\n    let a: i32 = 12;\n    let b: i32 = 30;\n    println!(\"gap {}\", (a - b).abs());\n}\n",
+    "expect": "ok", "out": "gap 18\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"gap {}\", (a - b).abs());", "pr": "unit"
+  },
+  {
+    "id": "lrn-d19",
+    "src": "fn gap(a: i32, b: i32) -> i32 {\n    (a - b).abs()\n}\n\nfn main() {\n    println!(\"{} {}\", gap(3, 10), gap(10, 3));\n}\n",
+    "expect": "ok", "out": "7 7\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", gap(3, 10), gap(10, 3));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d20",
+    "src": "fn gap(a: u32, b: u32) -> u32 {\n    a.abs_diff(b)\n}\n\nfn main() {\n    println!(\"{} {}\", gap(3, 10), gap(10, 3));\n}\n",
+    "expect": "ok", "out": "7 7\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", gap(3, 10), gap(10, 3));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d21",
+    "src": "fn square(x: i32) -> i32 {\n    x.pow(2)\n}\n\nfn main() {\n    for n in 1..=5 {\n        println!(\"{}\", square(n));\n    }\n}\n",
+    "expect": "ok", "out": "1\n4\n9\n16\n25\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", square(n));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d22",
+    "src": "fn power(base: u64, exp: u32) -> u64 {\n    base.pow(exp)\n}\n\nfn main() {\n    println!(\"{}\", power(2, 10));\n    println!(\"{}\", power(10, 18));\n}\n",
+    "expect": "ok", "out": "1024\n1000000000000000000\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", power(10, 18));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d23",
+    "src": "fn power(base: u32, exp: u32) -> u32 {\n    base.pow(exp)\n}\n\nfn main() {\n    println!(\"{}\", power(2, 31));\n    println!(\"{}\", power(2, 32));\n}\n",
+    "expect": "ok", "out": "2147483648\n", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1290:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "learner program: println!(\"{}\", power(2, 32));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d24",
+    "src": "fn main() {\n    let big: u8 = 250;\n    match big.checked_add(10) {\n        Some(v) => println!(\"sum {}\", v),\n        None => println!(\"overflow\"),\n    }\n}\n",
+    "expect": "ok", "out": "overflow\n", "err": "", "exit": 0,
+    "why": "learner program: None ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d25",
+    "src": "fn main() {\n    let big: u8 = 250;\n    println!(\"{} {}\", big.wrapping_add(10), big.saturating_add(10));\n}\n",
+    "expect": "ok", "out": "4 255\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", big.wrapping_add(10), big.saturating_add(10));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d26",
+    "src": "fn main() {\n    let hp: u32 = 5;\n    let dmg: u32 = 9;\n    println!(\"{} {}\", hp.saturating_sub(dmg), hp.wrapping_sub(dmg));\n}\n",
+    "expect": "ok", "out": "0 4294967292\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", hp.saturating_sub(dmg), hp.wrapping_sub(dmg));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d27",
+    "src": "fn main() {\n    let hp: u32 = 5;\n    let dmg: u32 = 9;\n    println!(\"{:?}\", hp.checked_sub(dmg));\n}\n",
+    "expect": "ok", "out": "None\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", hp.checked_sub(dmg));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d28",
+    "src": "fn main() {\n    let xs = [4, 9, 2];\n    let mut hi = i32::MIN;\n    let mut lo = i32::MAX;\n    for x in xs {\n        hi = hi.max(x);\n        lo = lo.min(x);\n    }\n    println!(\"{} {}\", lo, hi);\n}\n",
+    "expect": "ok", "out": "2 9\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", lo, hi);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d29",
+    "src": "fn main() {\n    let xs: Vec<i32> = vec![4, 9, 2];\n    let total: i32 = xs.iter().sum();\n    let clamp = total.min(10).max(0);\n    println!(\"{}\", clamp);\n}\n",
+    "expect": "ok", "out": "10\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", clamp);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d31",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let secret = 7;\n    let guess = 9;\n    match guess.cmp(&secret) {\n        Ordering::Less => println!(\"too small\"),\n        Ordering::Greater => println!(\"too big\"),\n        Ordering::Equal => println!(\"you win\"),\n    }\n}\n",
+    "expect": "ok", "out": "too big\n", "err": "", "exit": 0,
+    "why": "learner program: Ordering::Equal ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d32",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    for guess in [3, 7, 9] {\n        match guess.cmp(&7) {\n            Ordering::Less => println!(\"{} too small\", guess),\n            Ordering::Greater => println!(\"{} too big\", guess),\n            Ordering::Equal => println!(\"{} you win\", guess),\n        }\n    }\n}\n",
+    "expect": "ok", "out": "3 too small\n7 you win\n9 too big\n", "err": "", "exit": 0,
+    "why": "learner program: Ordering::Equal ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d33",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = String::from(\"pear\");\n    let b = String::from(\"plum\");\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"pear first\"),\n        Ordering::Greater => println!(\"plum first\"),\n        Ordering::Equal => println!(\"same\"),\n    }\n}\n",
+    "expect": "ok", "out": "pear first\n", "err": "", "exit": 0,
+    "why": "learner program: Ordering::Equal ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d34",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 2.5;\n    let b = 1.5;\n    match a.partial_cmp(&b) {\n        Some(Ordering::Greater) => println!(\"bigger\"),\n        Some(_) => println!(\"not bigger\"),\n        None => println!(\"nan\"),\n    }\n}\n",
+    "expect": "ok", "out": "bigger\n", "err": "", "exit": 0,
+    "why": "learner program: None ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d35",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 5;\n    let b = 5;\n    if a.cmp(&b) == Ordering::Equal {\n        println!(\"equal\");\n    }\n}\n",
+    "expect": "ok", "out": "equal\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"equal\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d36",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 5;\n    let b = 8;\n    let o = a.cmp(&b);\n    println!(\"{:?} {:?}\", o, o.reverse());\n}\n",
+    "expect": "ok", "out": "Less Greater\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?} {:?}\", o, o.reverse());", "pr": "unit"
+  },
+  {
+    "id": "lrn-d37",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 5;\n    let b = 8;\n    println!(\"{}\", a.cmp(&b) != Ordering::Greater);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", a.cmp(&b) !", "pr": "unit"
+  },
+  {
+    "id": "lrn-d38",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 5;\n    let b = 8;\n    let word = match a.cmp(&b) {\n        Ordering::Less => \"less\",\n        Ordering::Equal => \"equal\",\n        Ordering::Greater => \"greater\",\n    };\n    println!(\"{}\", word);\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", word);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d39",
+    "src": "use std::cmp::Ordering;\nfn main() {\n    let a = 5;\n    let b = 8;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        Ordering::Equal => println!(\"equal\"),\n    }\n}\n",
+    "expect": {"code":"E0004","line":5},
+    "why": "learner program: Ordering::Equal ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d40",
+    "src": "fn main() {\n    let a = 5;\n    let b = 8;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        _ => println!(\"other\"),\n    }\n}\n",
+    "expect": {"code":"E0433","line":5},
+    "why": "learner program: _ ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d41",
+    "src": "fn main() {\n    let a = 5;\n    let b = 8;\n    match a.cmp(&b) {\n        std::cmp::Ordering::Less => println!(\"less\"),\n        std::cmp::Ordering::Equal => println!(\"equal\"),\n        std::cmp::Ordering::Greater => println!(\"greater\"),\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "learner program: std::cmp::Ordering::Greater ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d42",
+    "src": "fn main() {\n    let a = 5;\n    let b = 8;\n    if a.cmp(&b) == std::cmp::Ordering::Less {\n        println!(\"less\");\n    }\n}\n",
+    "expect": "ok", "out": "less\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"less\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d43",
+    "src": "use std::cmp::{Ordering, Reverse};\nfn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by_key(|x| Reverse(*x));\n    println!(\"{:?}\", v);\n    println!(\"{:?}\", 1.cmp(&2) == Ordering::Less);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\ntrue\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", 1.cmp(&2) ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d44",
+    "src": "fn main() {\n    let s = String::from(\"hi\");\n    println!(\"{}\", s == \"hi\");\n    println!(\"{}\", \"hi\" == s);\n    println!(\"{}\", s != \"ho\");\n}\n",
+    "expect": "ok", "out": "true\ntrue\ntrue\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", s !", "pr": "unit"
+  },
+  {
+    "id": "lrn-d45",
+    "src": "fn main() {\n    let name = String::from(\"ana\");\n    let other = String::from(\"ana\");\n    if name == other {\n        println!(\"same\");\n    }\n}\n",
+    "expect": "ok", "out": "same\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"same\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d46",
+    "src": "fn main() {\n    let name = String::from(\"ana\");\n    let guess: &str = \"bo\";\n    println!(\"{} {}\", name == guess, guess == name);\n}\n",
+    "expect": "ok", "out": "false false\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", name ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d47",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    let b = String::from(\"banana\");\n    println!(\"{} {}\", a < b, a >= b);\n}\n",
+    "expect": "ok", "out": "true false\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", a < b, a >", "pr": "unit"
+  },
+  {
+    "id": "lrn-d48",
+    "src": "fn main() {\n    let a = \"apple\";\n    let b = \"banana\";\n    println!(\"{} {}\", a < b, a >= b);\n}\n",
+    "expect": "ok", "out": "true false\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{} {}\", a < b, a >", "pr": "unit"
+  },
+  {
+    "id": "lrn-d49",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    let b = String::from(\"banana\");\n    println!(\"{}\", &a < &b);\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", &a < &b);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d50",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    println!(\"{}\", a < \"banana\");\n}\n",
+    "expect": {"code":"E0308","line":3},
+    "why": "learner program: println!(\"{}\", a < \"banana\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d51",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    println!(\"{}\", a == 5);\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "why": "learner program: println!(\"{}\", a ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d52",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    println!(\"{}\", a == 'a');\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "why": "learner program: println!(\"{}\", a ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d53",
+    "src": "fn main() {\n    let a = String::from(\"apple\");\n    let r = &a;\n    println!(\"{}\", r == \"apple\");\n    println!(\"{}\", *r == \"apple\");\n}\n",
+    "expect": "ok", "out": "true\ntrue\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", *r ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d56",
+    "src": "fn main() {\n    let words = vec![String::from(\"a\"), String::from(\"bb\")];\n    for w in &words {\n        if w == \"bb\" {\n            println!(\"two\");\n        }\n    }\n}\n",
+    "expect": "ok", "out": "two\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"two\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d57",
+    "src": "fn main() {\n    let words = vec![String::from(\"a\"), String::from(\"bb\")];\n    for w in words.iter() {\n        if *w == \"a\" {\n            println!(\"one\");\n        }\n    }\n}\n",
+    "expect": "ok", "out": "one\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"one\");", "pr": "unit"
+  },
+  {
+    "id": "lrn-d58",
+    "src": "fn main() {\n    let words = vec![String::from(\"a\"), String::from(\"bb\")];\n    let first = &words[0];\n    println!(\"{}\", first == \"a\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", first ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d59",
+    "src": "fn main() {\n    let words = vec![String::from(\"a\"), String::from(\"bb\")];\n    println!(\"{}\", words[1] == \"bb\");\n}\n",
+    "expect": "ok", "out": "true\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", words[1] ", "pr": "unit"
+  },
+  {
+    "id": "lrn-d60",
+    "src": "fn main() {\n    let v = vec![5, 3, 9];\n    let m = v.iter().max_by(|a, b| a.cmp(b)).unwrap();\n    println!(\"{}\", m);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d61",
+    "src": "fn main() {\n    let v = vec![5, 3, 9];\n    let m = v.iter().min_by(|a, b| b.cmp(a)).unwrap();\n    println!(\"{}\", m);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d62",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![5, -3, 9];\n    let m = v.iter().min_by_key(|x| x.abs()).unwrap();\n    println!(\"{}\", m);\n}\n",
+    "expect": "ok", "out": "-3\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d63",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![5, -3, 9];\n    let m = v.iter().max_by_key(|x| x.abs()).unwrap();\n    println!(\"{}\", m);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d64",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![5, -3, 9];\n    let mut w = v.clone();\n    w.sort_by_key(|x| x.abs());\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[-3, 5, 9]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d65",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![5, -3, 9];\n    let mut w = v.clone();\n    w.sort_by(|a, b| b.cmp(&a));\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[9, 5, -3]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d66",
+    "src": "fn main() {\n    let v: Vec<i32> = vec![5, -3, 9];\n    let mut w = v.clone();\n    w.sort_by(|a, b| a.abs().cmp(&b.abs()));\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[-3, 5, 9]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d68",
+    "src": "fn main() {\n    let v: Vec<f64> = vec![5.5, 3.25, 9.0];\n    let m = v.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();\n    println!(\"{}\", m);\n}\n",
+    "expect": "ok", "out": "9\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d69",
+    "src": "fn main() {\n    let v: Vec<f64> = vec![5.5, 3.25, 9.0];\n    let mut w = v.clone();\n    w.sort_by(|a, b| b.partial_cmp(a).unwrap());\n    println!(\"{:?}\", w);\n}\n",
+    "expect": "ok", "out": "[9.0, 5.5, 3.25]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", w);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d70",
+    "src": "fn main() {\n    let v: Vec<f64> = vec![5.5, 3.25, 9.0];\n    let m = v.iter().max_by_key(|x| **x);\n    println!(\"{:?}\", m);\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "why": "learner program: println!(\"{:?}\", m);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d71",
+    "src": "fn main() {\n    let a: i32 = i32::MIN;\n    println!(\"{}\", a.abs());\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:429:5:\nattempt to negate with overflow\n", "exit": 101,
+    "why": "learner program: println!(\"{}\", a.abs());", "pr": "unit"
+  },
+  {
+    "id": "lrn-d72",
+    "src": "fn main() {\n    let n: u32 = 2;\n    println!(\"{}\", n.pow(40));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:1290:5:\nattempt to exponentiate with overflow\n", "exit": 101,
+    "why": "learner program: println!(\"{}\", n.pow(40));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d73",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let mut v = vec![String::from(\"b\"), String::from(\"a\"), String::from(\"c\")];\n    v.sort_by_key(|s| Reverse(s.clone()));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[\"c\", \"b\", \"a\"]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d74",
+    "src": "use std::cmp::Reverse;\n#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let best = players.iter().min_by_key(|p| Reverse(p.score)).unwrap();\n    println!(\"{}\", best.name);\n}\n",
+    "expect": "ok", "out": "bo\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", best.name);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d75",
+    "src": "use std::cmp::Reverse;\n#[derive(Debug, Clone)]\nstruct Player {\n    name: String,\n    score: i32,\n}\n\nfn main() {\n    let players = vec![\n        Player { name: String::from(\"ana\"), score: 30 },\n        Player { name: String::from(\"bo\"), score: 55 },\n        Player { name: String::from(\"cy\"), score: 55 },\n        Player { name: String::from(\"di\"), score: 12 },\n    ];\n    let best = players.iter().max_by_key(|p| Reverse(p.score)).unwrap();\n    println!(\"{}\", best.name);\n}\n",
+    "expect": "ok", "out": "di\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", best.name);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d76",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let r = Reverse(5);\n    println!(\"{:?} {}\", r, r.0);\n    println!(\"{}\", Reverse(1) > Reverse(2));\n}\n",
+    "expect": "ok", "out": "Reverse(5) 5\ntrue\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{}\", Reverse(1) > Reverse(2));", "pr": "unit"
+  },
+  {
+    "id": "lrn-d78",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let mut v = vec![1, 5, 3];\n    v.sort_by_key(|&x| Reverse(x));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[5, 3, 1]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d79",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let mut v = vec![1, 5, 3];\n    v.sort_unstable_by_key(|x| Reverse(*x));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[5, 3, 1]\n", "err": "", "exit": 0,
+    "why": "learner program: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "lrn-d80",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let mut v = vec![1.5, 0.5];\n    v.sort_by_key(|x| Reverse(*x));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "learner program: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-00",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-03",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-05",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-06",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-07",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": {"code":"E0689","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-00",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-03",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-05",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-06",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-07",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-08",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-09",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-10",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-00",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-01",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-02",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-03",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-04",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-05",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-06",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-07",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-08",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-09",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-10",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-17",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-00",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-01",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-02",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-03",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-04",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-05",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-06",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-07",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-08",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-09",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-10",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-17",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-s1",
+    "src": "fn main() {\n    println!(\"a\\n {y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s2",
+    "src": "fn main() {\n    println!(\"a\\t{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s3",
+    "src": "fn main() {\n    println!(\"a\\\\{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s4",
+    "src": "fn main() {\n    println!(\"a\\\"{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s5",
+    "src": "fn main() {\n    println!(\"a\\u{41}{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s6",
+    "src": "fn main() {\n    println!(\"{{ {y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s7",
+    "src": "struct P;\nfn main() {\n    let p = P;\n    println!(\"a\\n {p}\");\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s8",
+    "src": "struct P;\nfn main() {\n    let p = P;\n    println!(\"\\u{e9}{p}\");\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-u1",
+    "src": "use std::cmp::{Ordering, Ordering};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-u2",
+    "src": "use std::cmp::{Reverse, Reverse};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-u3",
+    "src": "use std::fmt::{Display, Display};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-v1",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    println!(\"{:?}\", Reverse(1).max(Reverse(2)));\n}\n",
+    "expect": "ok", "out": "Reverse(1)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v2",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    println!(\"{:?}\", Reverse(1).min(Reverse(2)));\n}\n",
+    "expect": "ok", "out": "Reverse(2)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v3",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": "ok", "out": "R(2)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v4",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).min(R(2)));\n}\n",
+    "expect": "ok", "out": "R(1)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v5",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]\nenum E {\n    A,\n    B,\n}\nfn main() {\n    println!(\"{:?}\", E::A.max(E::B));\n}\n",
+    "expect": "ok", "out": "B\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v6",
+    "src": "#[derive(Debug, PartialEq, PartialOrd)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": {"code":"E0599","line":4},
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v7",
+    "src": "#[derive(Debug)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": {"code":"E0599","line":4},
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v9",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct P {\n    n: i32,\n}\nfn main() {\n    println!(\"{:?}\", P { n: 1 }.max(P { n: 2 }));\n}\n",
+    "expect": "ok", "out": "P { n: 2 }\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-w1",
+    "src": "struct R(i32);\nfn main() {\n    let R = 5;\n    println!(\"{}\", R);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w10",
+    "src": "struct R(i32);\nfn main() {\n    let mut R = 5;\n    R += 1;\n    println!(\"{}\", R);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w12",
+    "src": "fn main() {\n    let Some = 5;\n    println!(\"{}\", Some);\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w2",
+    "src": "struct R(i32);\nfn f(R: i32) -> i32 {\n    R\n}\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w3",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let Reverse = 5;\n    println!(\"{}\", Reverse);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w4",
+    "src": "use std::cmp::Reverse;\nfn f(Reverse: i32) -> i32 {\n    Reverse\n}\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w6",
+    "src": "struct R { a: i32 }\nfn main() {\n    let R = 5;\n    println!(\"{}\", R);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w7",
+    "src": "enum E {\n    A,\n}\nfn main() {\n    let A = 5;\n    println!(\"{}\", A);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w8",
+    "src": "struct R(i32);\nfn main() {\n    let v = vec![1];\n    for R in v {\n        println!(\"{}\", R);\n    }\n}\n",
+    "expect": {"code":"E0530","line":4},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w9",
+    "src": "struct R(i32);\nfn main() {\n    let f = |R: i32| R;\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
   }
 ]
