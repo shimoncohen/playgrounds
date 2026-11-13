@@ -391,12 +391,8 @@ describe('rustc folding shapes, each probed on the pinned image', () => {
     for (const [src, out] of [['255 as u8', '255'], ['-128 as i8', '-128'], ['256 as u16', '256'], ['300u16 as u8', '44']]) assert.equal(ok(`    let x = ${src};\n    println!("{}", x);`).out(), out + '\n');
     assert.equal(ok('    let n = 256;\n    println!("{}", n as u8);').out(), '0\n');
   });
-  it('MIN / -1 and MIN % -1 are unsupported integer overflow', () => {
-    for (const op of ['/', '%']) {
-      const c = RQ.run(main(`    let a: i8 = -128;\n    let b: i8 = -1;\n    println!("{}", a ${op} b);`));
-      assert.equal(c.status, 'unsupported');
-      assert.equal(c.unsupported.feature, 'integer overflow');
-    }
+  it('MIN / -1 and MIN % -1 are the unconditional_panic lint once both sides are known', () => {
+    for (const op of ['/', '%']) lint(`    let a: i8 = -128;\n    let b: i8 = -1;\n    println!("{}", a ${op} b);`, 'unconditional_panic', 5);
   });
 });
 

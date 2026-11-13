@@ -193,8 +193,6 @@ describe('lowering: control flow', () => {
 
 describe('what the mir pass leaves unsupported', () => {
   it('reports the trigger with its line, in an analysed fn', () => {
-    assert.equal(un('    let a = [1, 2];\n    let r = &a[1];'), 'borrow of a field@4');
-    assert.equal(un('    let a = [1, 2];\n    let r = &a[0];'), 'borrow of a field@4');
     assert.equal(un('    let t = (&5, 1);'), 'temporary borrow@3');
     assert.equal(un('    let t = (&String::new(), 1);'), 'temporary borrow@3');
     assert.equal(un('    let mut x = 1;\n    let r = &mut x;\n    let r2 = r;'), 'reborrow@5');

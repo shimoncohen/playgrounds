@@ -13026,5 +13026,503 @@
     "src": "fn main() {\n    let mut a = [Some(1)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
     "expect": "ok", "out": "[Some(1)]\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: rustc blames the f64 inside the Option, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "paren-overflow-let",
+    "src": "fn add(x: u8, n: u8) -> u8 {\n    let y = (x + n);\n    y\n}\nfn main() { println!(\"{}\", add(250, 10)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a panic inside parentheses is reported at the opening parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-arg",
+    "src": "fn g(a: u8) -> u8 { a }\nfn f(x: u8, n: u8) -> u8 {\n    g((x + n))\n}\nfn main() { println!(\"{}\", f(250, 9)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:7:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a parenthesised argument is reported at its own parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-operand",
+    "src": "fn f(x: u8, n: u8) -> u8 {\n    let y = 2 * (x + n);\n    y\n}\nfn main() { println!(\"{}\", f(250, 9)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:17:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the parenthesised operand of a larger expression is reported at its parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-nested",
+    "src": "fn f(x: u8, n: u8, m: u8) -> u8 {\n    let y = ((x + n) + m);\n    y\n}\nfn main() { println!(\"{}\", f(250, 10, 1)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:14:\nattempt to add with overflow\n", "exit": 101,
+    "why": "nested parentheses: the inner sum overflows first and is reported at the inner parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-lint-overflow",
+    "src": "fn main() {\n    let x: u8 = 250;\n    let y = (x + 10);\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint":"arithmetic_overflow","line":3},
+    "why": "the lint on a parenthesised sum is reported at line 3, column 13 (the parenthesis)", "pr": "unit"
+  },
+  {
+    "id": "limits-print",
+    "src": "fn main() {\n    println!(\"{} {} {} {}\", i32::MIN, i32::MAX, u8::MAX, i64::MIN);\n    println!(\"{} {} {}\", u8::MIN, u32::MAX, usize::MAX);\n}\n",
+    "expect": "ok", "out": "-2147483648 2147483647 255 -9223372036854775808\n0 4294967295 18446744073709551615\n", "err": "", "exit": 0,
+    "why": "the MIN and MAX of the whole-number types are values", "pr": "unit"
+  },
+  {
+    "id": "limits-running-min",
+    "src": "fn main() {\n    let mut lo = i32::MAX;\n    let mut hi = i32::MIN;\n    for x in [3, -1, 7] {\n        if x < lo { lo = x; }\n        if x > hi { hi = x; }\n    }\n    println!(\"{} {}\", lo, hi);\n}\n",
+    "expect": "ok", "out": "-1 7\n", "err": "", "exit": 0,
+    "why": "MAX and MIN as the start of a running minimum and maximum", "pr": "unit"
+  },
+  {
+    "id": "limits-const",
+    "src": "const LIMIT: u8 = u8::MAX;\n\nfn main() {\n    println!(\"{} {}\", LIMIT, u8::MAX as u32 + 1);\n}\n",
+    "expect": "ok", "out": "255 256\n", "err": "", "exit": 0,
+    "why": "a const may hold a MAX, and a cast of one widens it", "pr": "unit"
+  },
+  {
+    "id": "limits-min-div-known",
+    "src": "fn main() {\n    let n: i32 = -1;\n    println!(\"{}\", i32::MIN / n);\n}\n",
+    "expect": {"lint":"unconditional_panic","line":3},
+    "pair": "limits-min-div-known-ok",
+    "why": "unconditional_panic: the smallest i32 divided by a known -1 overflows, and rustc says so at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-min-div-known-ok",
+    "src": "fn main() {\n    let n: i32 = 2;\n    println!(\"{}\", i32::MIN / n);\n}\n",
+    "expect": "ok", "out": "-1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the divisor is not -1", "pr": "P4"
+  },
+  {
+    "id": "limits-min-rem-known",
+    "src": "fn main() {\n    let x = i64::MIN;\n    let n: i64 = -1;\n    println!(\"{}\", x % n);\n}\n",
+    "expect": {"lint":"unconditional_panic","line":4},
+    "pair": "limits-min-rem-known-ok",
+    "why": "unconditional_panic: the remainder of the smallest i64 by a known -1 overflows at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-min-rem-known-ok",
+    "src": "fn main() {\n    let x = i64::MIN;\n    let n: i64 = 1;\n    println!(\"{}\", x % n);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the divisor is not -1", "pr": "P4"
+  },
+  {
+    "id": "limits-min-div-param",
+    "src": "fn div(n: i32) -> i32 {\n    i32::MIN / n\n}\n\nfn main() {\n    println!(\"{}\", div(-1));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to divide with overflow\n", "exit": 101,
+    "why": "a divisor that comes from a parameter is not folded: the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "limits-min-rem-param",
+    "src": "fn rem(x: i32, n: i32) -> i32 {\n    x % n\n}\n\nfn main() {\n    println!(\"{}\", rem(i32::MIN, -1));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to calculate the remainder with overflow\n", "exit": 101,
+    "why": "a remainder by a parameter is a run-time panic when it overflows", "pr": "unit"
+  },
+  {
+    "id": "limits-max-plus-one",
+    "src": "fn main() {\n    let x = i32::MAX;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint":"arithmetic_overflow","line":3},
+    "pair": "limits-max-plus-one-ok",
+    "why": "arithmetic_overflow: the largest i32 plus one is known at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-max-plus-one-ok",
+    "src": "fn main() {\n    let x = i32::MAX;\n    let y = x - 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "2147483646\n", "err": "", "exit": 0,
+    "why": "compiles once the sum stays in range", "pr": "P4"
+  },
+  {
+    "id": "limits-max-param",
+    "src": "fn bump(x: i32) -> i32 {\n    x + 1\n}\n\nfn main() {\n    println!(\"{}\", bump(i32::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to add with overflow\n", "exit": 101,
+    "why": "MAX passed through a parameter overflows at run time, not at compile time", "pr": "unit"
+  },
+  {
+    "id": "sortby-desc-array",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    a.sort_by(|x, y| y.cmp(x));\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\n", "err": "", "exit": 0,
+    "why": "sort_by with the arguments swapped sorts an array in descending order", "pr": "unit"
+  },
+  {
+    "id": "sortby-struct-field",
+    "src": "#[derive(Debug)]\nstruct Player {\n    name: String,\n    score: u32,\n}\n\nfn main() {\n    let mut ps = vec![\n        Player { name: String::from(\"ann\"), score: 30 },\n        Player { name: String::from(\"bob\"), score: 50 },\n        Player { name: String::from(\"cy\"), score: 30 },\n    ];\n    ps.sort_by(|a, b| b.score.cmp(&a.score));\n    for p in &ps {\n        println!(\"{} {}\", p.name, p.score);\n    }\n}\n",
+    "expect": "ok", "out": "bob 50\nann 30\ncy 30\n", "err": "", "exit": 0,
+    "why": "a leaderboard: sort_by on a field, and ties keep their order because the sort is stable", "pr": "unit"
+  },
+  {
+    "id": "sortby-key-tuple-field",
+    "src": "fn main() {\n    let mut a = [(1, 'b'), (0, 'a')];\n    a.sort_by_key(|p| p.0);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[(0, 'a'), (1, 'b')]\n", "err": "", "exit": 0,
+    "why": "a tuple field of the closure parameter is the sort key", "pr": "unit"
+  },
+  {
+    "id": "sortby-then",
+    "src": "struct P {\n    name: String,\n    hp: i32,\n}\n\nfn main() {\n    let mut v = vec![\n        P { name: \"b\".to_string(), hp: 1 },\n        P { name: \"a\".to_string(), hp: 1 },\n        P { name: \"c\".to_string(), hp: 2 },\n    ];\n    v.sort_by(|a, b| b.hp.cmp(&a.hp).then(a.name.cmp(&b.name)));\n    for p in &v {\n        println!(\"{} {}\", p.name, p.hp);\n    }\n}\n",
+    "expect": "ok", "out": "c 2\na 1\nb 1\n", "err": "", "exit": 0,
+    "why": "then breaks a tie in the first comparison with a second one", "pr": "unit"
+  },
+  {
+    "id": "sortby-then-with",
+    "src": "struct P {\n    name: String,\n    hp: i32,\n}\n\nfn main() {\n    let mut v = vec![\n        P { name: \"b\".to_string(), hp: 1 },\n        P { name: \"a\".to_string(), hp: 1 },\n        P { name: \"c\".to_string(), hp: 2 },\n    ];\n    v.sort_by(|a, b| b.hp.cmp(&a.hp).then_with(|| a.name.cmp(&b.name)));\n    for p in &v {\n        println!(\"{} {}\", p.name, p.hp);\n    }\n}\n",
+    "expect": "ok", "out": "c 2\na 1\nb 1\n", "err": "", "exit": 0,
+    "why": "then_with computes the tie breaker only when the first comparison is equal", "pr": "unit"
+  },
+  {
+    "id": "sortby-reverse",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by(|a, b| b.cmp(a).reverse());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "Ordering::reverse flips the comparison back to ascending", "pr": "unit"
+  },
+  {
+    "id": "sortby-partial-cmp",
+    "src": "fn main() {\n    let mut v = vec![3.5, 1.0, 2.0];\n    v.sort_by(|a, b| a.partial_cmp(b).unwrap());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1.0, 2.0, 3.5]\n", "err": "", "exit": 0,
+    "why": "floats have no cmp, so partial_cmp(..).unwrap() sorts them", "pr": "unit"
+  },
+  {
+    "id": "sortby-total-cmp",
+    "src": "fn main() {\n    let mut v = vec![3.5f64, 1.0, 2.0];\n    v.sort_by(|a, b| a.total_cmp(b));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1.0, 2.0, 3.5]\n", "err": "", "exit": 0,
+    "why": "total_cmp orders f64 values without an unwrap", "pr": "unit"
+  },
+  {
+    "id": "sortby-partial-cmp-nan",
+    "src": "fn main() {\n    let mut v = vec![1.0, 0.0 / 0.0];\n    v.sort_by(|a, b| a.partial_cmp(b).unwrap());\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:39:\ncalled `Option::unwrap()` on a `None` value\n", "exit": 101,
+    "why": "a NaN has no order, so partial_cmp is None and the unwrap panics inside the comparison", "pr": "unit"
+  },
+  {
+    "id": "sortby-slice-param",
+    "src": "fn sort_desc(x: &mut [i32]) {\n    x.sort_by(|a, b| b.cmp(a));\n}\n\nfn main() {\n    let mut v = vec![3, 1, 2];\n    sort_desc(&mut v);\n    let mut a = [9, 7, 8];\n    sort_desc(&mut a);\n    println!(\"{:?} {:?}\", v, a);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1] [9, 8, 7]\n", "err": "", "exit": 0,
+    "why": "sort_by through a &mut slice parameter reaches a Vec and an array", "pr": "unit"
+  },
+  {
+    "id": "sortby-window",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v[1..].sort_by(|a, b| b.cmp(a));\n    let mut a = [4, 3, 2, 1];\n    a[1..3].sort_by_key(|x| *x);\n    println!(\"{:?} {:?}\", v, a);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1] [4, 2, 3, 1]\n", "err": "", "exit": 0,
+    "why": "sorting a range changes only that window", "pr": "unit"
+  },
+  {
+    "id": "sortby-unstable-small",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4, 5, 6];\n    v.sort_unstable_by_key(|x| x % 3);\n    let mut w = vec![5, 3, 4];\n    w.sort_unstable_by(|a, b| b.cmp(a));\n    println!(\"{:?} {:?}\", v, w);\n}\n",
+    "expect": "ok", "out": "[3, 6, 1, 4, 2, 5] [5, 4, 3]\n", "err": "", "exit": 0,
+    "why": "up to 20 elements the unstable sorts keep the order of equal keys", "pr": "unit"
+  },
+  {
+    "id": "sortby-key-vec-tie",
+    "src": "fn main() {\n    let mut v = vec![1, 2, 3, 4, 5, 6];\n    v.sort_by_key(|x| x % 3);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 6, 1, 4, 2, 5]\n", "err": "", "exit": 0,
+    "why": "sort_by_key is stable: elements with equal keys keep their order", "pr": "unit"
+  },
+  {
+    "id": "filter-field-closure",
+    "src": "struct P {\n    hp: i32,\n}\n\nfn main() {\n    let v = vec![P { hp: 3 }, P { hp: 0 }];\n    let n = v.iter().filter(|p| p.hp > 0).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "a field of the closure parameter of filter, which is a reference to a reference", "pr": "unit"
+  },
+  {
+    "id": "map-tuple-field-closure",
+    "src": "fn main() {\n    let v = vec![(1, 'a'), (0, 'b')];\n    let n: Vec<i32> = v.iter().map(|p| p.0).collect();\n    println!(\"{:?}\", n);\n}\n",
+    "expect": "ok", "out": "[1, 0]\n", "err": "", "exit": 0,
+    "why": "a tuple field of the closure parameter, read through the reference", "pr": "unit"
+  },
+  {
+    "id": "cmp-values",
+    "src": "fn main() {\n    let x = 3;\n    let y = 4;\n    println!(\"{:?} {:?} {:?}\", x.cmp(&y), 2.5.partial_cmp(&1.0), 'a'.cmp(&'b'));\n    println!(\"{:?} {:?}\", (1, 2).cmp(&(1, 3)), [1, 2].cmp(&[1, 1]));\n}\n",
+    "expect": "ok", "out": "Less Some(Greater) Less\nLess Greater\n", "err": "", "exit": 0,
+    "why": "cmp and partial_cmp give an Ordering that prints as Less, Equal or Greater", "pr": "unit"
+  },
+  {
+    "id": "sortby-float-cmp",
+    "src": "fn main() {\n    let mut v = vec![3.5, 1.5];\n    v.sort_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0599","line":3},
+    "pair": "sortby-float-cmp-ok",
+    "why": "E0599: a float has no cmp because it has no total order", "pr": "P5"
+  },
+  {
+    "id": "sortby-float-cmp-ok",
+    "src": "fn main() {\n    let mut v = vec![3, 1];\n    v.sort_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the elements are whole numbers", "pr": "unit"
+  },
+  {
+    "id": "sortby-key-float",
+    "src": "fn main() {\n    let mut a = [(1.5, 'b'), (0.5, 'a')];\n    a.sort_by_key(|p| p.0);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": {"code":"E0277","line":3},
+    "pair": "sortby-key-float-ok",
+    "why": "E0277: the key is a float, which is not Ord", "pr": "P5"
+  },
+  {
+    "id": "sortby-key-float-ok",
+    "src": "fn main() {\n    let mut a = [(1, 'b'), (0, 'a')];\n    a.sort_by_key(|p| p.0);\n    println!(\"{:?}\", a);\n}\n",
+    "expect": "ok", "out": "[(0, 'a'), (1, 'b')]\n", "err": "", "exit": 0,
+    "why": "compiles once the key is a whole number", "pr": "unit"
+  },
+  {
+    "id": "sortby-returns-bool",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by(|a, b| a < b);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": {"code":"E0308","line":3},
+    "pair": "sortby-returns-bool-ok",
+    "why": "E0308: the comparison closure has to give an Ordering, not a bool", "pr": "P5"
+  },
+  {
+    "id": "sortby-returns-bool-ok",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by(|a, b| a.cmp(b));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "compiles once the closure gives an Ordering", "pr": "unit"
+  },
+  {
+    "id": "sortby-key-moves-string",
+    "src": "struct P {\n    name: String,\n    hp: i32,\n}\n\nfn main() {\n    let mut v = vec![P { name: String::from(\"a\"), hp: 3 }];\n    v.sort_by_key(|p| p.name);\n}\n",
+    "expect": {"code":"E0507","line":8},
+    "pair": "sortby-key-moves-string-ok",
+    "why": "E0507: the key closure cannot move the String out of the borrowed element", "pr": "P5"
+  },
+  {
+    "id": "sortby-key-moves-string-ok",
+    "src": "struct P {\n    name: String,\n    hp: i32,\n}\n\nfn main() {\n    let mut v = vec![P { name: String::from(\"a\"), hp: 3 }];\n    v.sort_by_key(|p| p.hp);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the key is a number the closure can copy", "pr": "unit"
+  },
+  {
+    "id": "sortby-immutable",
+    "src": "fn main() {\n    let v = vec![3, 1, 2];\n    v.sort_by(|a, b| b.cmp(a));\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "sortby-immutable-ok",
+    "why": "E0596: sort_by changes the Vec, so the variable has to be mut", "pr": "P5"
+  },
+  {
+    "id": "sortby-immutable-ok",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    v.sort_by(|a, b| b.cmp(a));\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the variable is mut", "pr": "unit"
+  },
+  {
+    "id": "sortby-while-borrowed",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    let r = &v;\n    v.sort_by(|a, b| b.cmp(a));\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "sortby-while-borrowed-ok",
+    "why": "E0502: the shared borrow is still used after the sort needs the Vec mutably", "pr": "P5"
+  },
+  {
+    "id": "sortby-while-borrowed-ok",
+    "src": "fn main() {\n    let mut v = vec![3, 1, 2];\n    let r = &v;\n    v.sort_by(|a, b| b.cmp(a));\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 2, 1]\n", "err": "", "exit": 0,
+    "why": "compiles once the borrow is not used after the sort", "pr": "unit"
+  },
+  {
+    "id": "reborrow-range-sort",
+    "src": "fn tail(x: &mut [i32]) {\n    x[1..].sort();\n}\n\nfn main() {\n    let mut v = vec![9, 3, 1, 2];\n    tail(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[9, 1, 2, 3]\n", "err": "", "exit": 0,
+    "why": "a range of a &mut slice parameter is a reborrow that ends with the call", "pr": "unit"
+  },
+  {
+    "id": "reborrow-range-array",
+    "src": "fn tail(x: &mut [i32; 4]) {\n    x[1..].sort();\n    x[..2].reverse();\n}\n\nfn main() {\n    let mut v = [9, 3, 1, 2];\n    tail(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[1, 9, 2, 3]\n", "err": "", "exit": 0,
+    "why": "the same through a reference to an array, and the reference stays usable for the next statement", "pr": "unit"
+  },
+  {
+    "id": "reborrow-range-closure",
+    "src": "fn tail(x: &mut [i32]) {\n    x[1..3].sort_by(|a, b| b.cmp(a));\n}\n\nfn main() {\n    let mut v = [9, 1, 3, 2];\n    tail(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[9, 3, 1, 2]\n", "err": "", "exit": 0,
+    "why": "sort_by on a range of a &mut slice parameter", "pr": "unit"
+  },
+  {
+    "id": "reborrow-range-halves",
+    "src": "fn halves(x: &mut [i32]) {\n    let n = x.len() / 2;\n    x[..n].sort();\n    x[n..].sort();\n}\n\nfn main() {\n    let mut v = [9, 3, 2, 1];\n    halves(&mut v);\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[3, 9, 1, 2]\n", "err": "", "exit": 0,
+    "why": "two ranges of the same slice, one after the other", "pr": "unit"
+  },
+  {
+    "id": "reborrow-range-panic",
+    "src": "fn tail(x: &mut [i32], n: usize) {\n    x[n..].sort();\n}\n\nfn main() {\n    let mut v = vec![9, 3, 1, 2];\n    tail(&mut v, 9);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:6:\nrange start index 9 out of range for slice of length 4\n", "exit": 101,
+    "why": "a range start past the end panics at the range", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-row",
+    "src": "fn main() {\n    let mut g = [[3, 1], [2, 0]];\n    g[0].sort();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 3], [2, 0]]\n", "err": "", "exit": 0,
+    "why": "a method call on a row of an array of arrays changes that row", "pr": "unit"
+  },
+  {
+    "id": "elem-swap-row",
+    "src": "fn main() {\n    let mut g = [[3, 1], [2, 0]];\n    let i = 1;\n    g[i].swap(0, 1);\n    g[i - 1].reverse();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 3], [0, 2]]\n", "err": "", "exit": 0,
+    "why": "swap and reverse on a row picked by a variable index", "pr": "unit"
+  },
+  {
+    "id": "elem-vec-of-arrays",
+    "src": "fn main() {\n    let mut v = vec![[3, 1, 2], [9, 8, 7]];\n    for r in 0..v.len() {\n        v[r].sort();\n    }\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[[1, 2, 3], [7, 8, 9]]\n", "err": "", "exit": 0,
+    "why": "sorting each array of a Vec of arrays", "pr": "unit"
+  },
+  {
+    "id": "elem-len-iter",
+    "src": "fn main() {\n    let g = [[1, 2, 3], [4, 5, 6]];\n    let mut t = 0;\n    for r in 0..g.len() {\n        let s: i32 = g[r].iter().sum();\n        t += s + g[r].len() as i32;\n    }\n    println!(\"{}\", t);\n}\n",
+    "expect": "ok", "out": "27\n", "err": "", "exit": 0,
+    "why": "len and iter on a row of an array", "pr": "unit"
+  },
+  {
+    "id": "elem-ref-row",
+    "src": "fn row_sum(r: &[i32; 3]) -> i32 {\n    r[0] + r[1] + r[2]\n}\n\nfn total(r: &[i32]) -> i32 {\n    let mut t = 0;\n    for x in r {\n        t += x;\n    }\n    t\n}\n\nfn main() {\n    let g = [[1, 2, 3], [4, 5, 6]];\n    let first = &g[0];\n    let second = &g[1];\n    println!(\"{:?} {:?} {} {}\", first, second, row_sum(&g[1]), total(&g[1][1..]));\n}\n",
+    "expect": "ok", "out": "[1, 2, 3] [4, 5, 6] 15 11\n", "err": "", "exit": 0,
+    "why": "a shared borrow of a row, lent to a function or a slice of it", "pr": "unit"
+  },
+  {
+    "id": "elem-mut-row",
+    "src": "fn bump(r: &mut [i32; 3]) {\n    r[0] += 10;\n}\n\nfn main() {\n    let mut g = [[1, 2, 3], [4, 5, 6]];\n    bump(&mut g[1]);\n    let first = &mut g[0];\n    first[1] = 9;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 9, 3], [14, 5, 6]]\n", "err": "", "exit": 0,
+    "why": "a mutable borrow of a row, lent to a function or kept in a variable", "pr": "unit"
+  },
+  {
+    "id": "elem-for-row",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut t = 0;\n    for r in 0..2 {\n        for x in &g[r] {\n            t += x;\n        }\n        for x in g[r].iter_mut() {\n            *x *= 2;\n        }\n    }\n    println!(\"{} {:?}\", t, g);\n}\n",
+    "expect": "ok", "out": "10 [[2, 4], [6, 8]]\n", "err": "", "exit": 0,
+    "why": "a for loop over a row, shared and mutable", "pr": "unit"
+  },
+  {
+    "id": "elem-field-array",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n    name: String,\n}\n\nfn main() {\n    let mut b = B { cells: [[1, 2], [3, 4]], name: String::from(\"b\") };\n    b.cells[0].swap(0, 1);\n    let r = &b.cells[1];\n    println!(\"{:?} {:?} {}\", r, b.cells, b.name);\n}\n",
+    "expect": "ok", "out": "[3, 4] [[2, 1], [3, 4]] b\n", "err": "", "exit": 0,
+    "why": "a row of an array that is a field of a struct", "pr": "unit"
+  },
+  {
+    "id": "elem-through-ref",
+    "src": "fn f(g: &mut [[i32; 2]; 2]) {\n    g[0].sort();\n    g[1].reverse();\n}\n\nfn main() {\n    let mut g = [[2, 1], [3, 4]];\n    f(&mut g);\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [4, 3]]\n", "err": "", "exit": 0,
+    "why": "rows of an array reached through a &mut parameter", "pr": "unit"
+  },
+  {
+    "id": "elem-index-panic",
+    "src": "fn pick(g: &mut [[i32; 2]; 2], i: usize) {\n    g[i].sort();\n}\n\nfn main() {\n    let mut g = [[1, 2], [3, 4]];\n    pick(&mut g, 5);\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nindex out of bounds: the len is 2 but the index is 5\n", "exit": 101,
+    "why": "an index past the end of the outer array panics at the index", "pr": "unit"
+  },
+  {
+    "id": "elem-mut-immutable",
+    "src": "fn main() {\n    let a = [[1, 2], [3, 4]];\n    let r = &mut a[0];\n    r[0] = 5;\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "elem-mut-immutable-ok",
+    "why": "E0596: a mutable borrow of a row needs the array to be mut", "pr": "P5"
+  },
+  {
+    "id": "elem-mut-immutable-ok",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    let r = &mut a[0];\n    r[0] = 5;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-immutable",
+    "src": "fn main() {\n    let a = [[1, 2], [3, 4]];\n    a[0].sort();\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "elem-sort-immutable-ok",
+    "why": "E0596: sorting a row changes the array, so it has to be mut", "pr": "P5"
+  },
+  {
+    "id": "elem-sort-immutable-ok",
+    "src": "fn main() {\n    let mut a = [[1, 2], [3, 4]];\n    a[0].sort();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "elem-behind-shared",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n}\n\nimpl B {\n    fn flip(&self) {\n        self.cells[0].reverse();\n    }\n}\n\nfn main() {\n    let b = B { cells: [[1, 2], [3, 4]] };\n    b.flip();\n}\n",
+    "expect": {"code":"E0596","line":7},
+    "pair": "elem-behind-shared-ok",
+    "why": "E0596: a row behind a & reference cannot change", "pr": "P5"
+  },
+  {
+    "id": "elem-behind-shared-ok",
+    "src": "struct B {\n    cells: [[u8; 2]; 2],\n}\n\nimpl B {\n    fn flip(&mut self) {\n        self.cells[0].reverse();\n    }\n}\n\nfn main() {\n    let mut b = B { cells: [[1, 2], [3, 4]] };\n    b.flip();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the method takes &mut self", "pr": "unit"
+  },
+  {
+    "id": "elem-two-mut",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut h = [[5, 6], [7, 8]];\n    let first = &mut g[0];\n    let second = &mut g[1];\n    first[0] = 9;\n    second[0] = 8;\n    h[0][0] = 1;\n}\n",
+    "expect": {"code":"E0499","line":5},
+    "pair": "elem-two-mut-ok",
+    "why": "E0499: rustc sees both rows as g[_], so the second borrow overlaps the first", "pr": "P5"
+  },
+  {
+    "id": "elem-two-mut-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let mut h = [[5, 6], [7, 8]];\n    let first = &mut g[0];\n    let second = &mut h[1];\n    first[0] = 9;\n    second[0] = 8;\n    h[0][0] = 1;\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the second borrow is of another array", "pr": "unit"
+  },
+  {
+    "id": "elem-write-while-borrowed",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let first = &g[0];\n    g[1][0] = 9;\n    println!(\"{:?}\", first);\n}\n",
+    "expect": {"code":"E0506","line":4},
+    "pair": "elem-write-while-borrowed-ok",
+    "why": "E0506: writing any element of g while a row is borrowed", "pr": "P5"
+  },
+  {
+    "id": "elem-write-while-borrowed-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let first = &g[0];\n    g[1][0] = 9;\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [9, 4]]\n", "err": "", "exit": 0,
+    "why": "compiles once the borrow is not used after the write", "pr": "unit"
+  },
+  {
+    "id": "elem-sort-while-borrowed",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let r = &g[0];\n    g[0].sort();\n    println!(\"{:?}\", r);\n}\n",
+    "expect": {"code":"E0502","line":4},
+    "pair": "elem-sort-while-borrowed-ok",
+    "why": "E0502: sorting a row needs the array mutably while the shared borrow is still used", "pr": "P5"
+  },
+  {
+    "id": "elem-sort-while-borrowed-ok",
+    "src": "fn main() {\n    let mut g = [[1, 2], [3, 4]];\n    let r = &g[0];\n    g[0].sort();\n    println!(\"{:?}\", g);\n}\n",
+    "expect": "ok", "out": "[[1, 2], [3, 4]]\n", "err": "", "exit": 0,
+    "why": "compiles once the borrow is not used after the sort", "pr": "unit"
+  },
+  {
+    "id": "slice-mut-immutable",
+    "src": "fn main() {\n    let a = [3, 1, 2];\n    let r = &mut a[..];\n    r.sort();\n}\n",
+    "expect": {"code":"E0596","line":3},
+    "pair": "slice-mut-immutable-ok",
+    "why": "E0596: a mutable slice of an array needs the array to be mut", "pr": "P5"
+  },
+  {
+    "id": "slice-mut-immutable-ok",
+    "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let r = &mut a[..];\n    r.sort();\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "unstable-float-ties-20",
+    "src": "fn main() {\n    let mut v = vec![-0.0, 0.0, -0.0, -0.0, 6.0, 7.0, 0.0, 3.0, 0.0, 0.0, 4.0, 1.0, 10.0, -0.0, 5.0, 2.0, 0.0, 8.0, 9.0, -0.0];\n    v.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[-0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, 0.0, -0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]\n", "err": "", "exit": 0,
+    "why": "up to 20 elements the unstable sort keeps 0.0 and -0.0 in their original order", "pr": "unit"
+  },
+  {
+    "id": "unstable-float-ties-20-rev",
+    "src": "fn main() {\n    let mut v = vec![5.0, 2.0, -0.0, -0.0, -0.0, 9.0, 4.0, 7.0, 0.0, 0.0, -0.0, -0.0, 0.0, 1.0, 0.0, 0.0, 3.0, 6.0, 10.0, 8.0];\n    v.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, -0.0, -0.0, -0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0]\n", "err": "", "exit": 0,
+    "why": "the same sorted descending", "pr": "unit"
+  },
+  {
+    "id": "field-unknown-closure",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let mut v = vec![P { a: 2 }];\n    v.sort_by_key(|p| p.zz);\n}\n",
+    "expect": {"code":"E0609","line":7},
+    "pair": "field-unknown-closure-ok",
+    "why": "E0609: the closure parameter is a &P and has no field zz", "pr": "P5"
+  },
+  {
+    "id": "field-unknown-closure-ok",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let mut v = vec![P { a: 2 }];\n    v.sort_by_key(|p| p.a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles with the real field", "pr": "unit"
+  },
+  {
+    "id": "field-unknown-filter",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let v = vec![P { a: 2 }];\n    let n = v.iter().filter(|p| p.zz > 0).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code":"E0609","line":7},
+    "pair": "field-unknown-filter-ok",
+    "why": "E0609: filter hands the closure a &&P, and zz is not a field", "pr": "P5"
+  },
+  {
+    "id": "field-unknown-filter-ok",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let v = vec![P { a: 2 }];\n    let n = v.iter().filter(|p| p.a > 0).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles with the real field", "pr": "unit"
   }
 ]

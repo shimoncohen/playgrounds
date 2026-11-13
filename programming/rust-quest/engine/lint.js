@@ -50,7 +50,7 @@ RQ.lint=(ast,info)=>{
       // dead side of a literal condition and of a literal pattern, and evaluates nothing else there
       if(prune||!bor||id!=='arithmetic_overflow')return;
       if(litOnly(n)){if(unsure)unsup('const folding',n.line);else flag(id,n,o);}
-      else{let c=false;RQ.walk(n,x=>{if(x.t==='Path'&&!bindOf(x)&&consts.has(x.segs[0].name))c=true;});if(c)unsup('const folding',n.line);}
+      else{let c=false;RQ.walk(n,x=>{if(x.t==='Path'&&!bindOf(x)&&(consts.has(x.segs[0].name)||(info.get(x)||{}).ic))c=true;});if(c)unsup('const folding',n.line);}
     }else if(dead||dub||d)unsup('const folding',n.line);
     else flag(id,n,o);
   }
@@ -86,7 +86,7 @@ RQ.lint=(ast,info)=>{
   function arith(op,a,b,e){
     if(op==='/'||op==='%'){
       if(b&&b.k==='int'&&b.v===0n)trap('unconditional_panic',e,{why:op==='/'?'attempt to divide by zero':'attempt to calculate the remainder with a divisor of zero'},dbt(a,b));
-      else if(a&&b&&a.k==='int'&&b.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]&&b.v===-1n)unsup('integer overflow',e.line);
+      else if(a&&b&&a.k==='int'&&b.k==='int'&&a.ty[0]==='i'&&a.v===INT[a.ty][0]&&b.v===-1n)trap('unconditional_panic',e,{why:'attempt to compute `'+a.ty+'::MIN '+op+' -1_'+a.ty+'`, which would overflow'},dbt(a,b));
       else if(a&&b&&a.k==='int'&&b.k==='int')return int(op==='/'?a.v/b.v:a.v%b.v,a.ty,dbt(a,b));
       return null;
     }
@@ -387,6 +387,8 @@ RQ.lint=(ast,info)=>{
           if(!s||!s.val)return null;
           return valueOf(b,s);
         }
+        const ic=(info.get(e)||{}).ic;
+        if(ic)return int(INT[ic.ty][ic.max?1:0],ic.ty);
         const n=e.segs[0].name;
         if(!consts.has(n))return null;
         return constKnown(n);

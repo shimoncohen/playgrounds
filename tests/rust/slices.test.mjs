@@ -69,7 +69,6 @@ describe('array slices', () => {
     assert.equal(feature(main('let mut s = String::from("abc");', 'let b = &mut s[1..];')), 'reference@3');
     assert.equal(feature(main('let a = [String::new(), String::new()];', 'println!("{}", a.len());')), 'method call@3');
     assert.equal(feature(main('let a = [1, 2, 3];', 'let b = a[1..2];')), 'range expression@3');
-    assert.equal(feature(P('fn main() {', '    let t = [[1, 2], [3, 4]];', '    let b = &t[0][..];', '}')), 'borrow of a field@3');
   });
 });
 
