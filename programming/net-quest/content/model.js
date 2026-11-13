@@ -41,8 +41,18 @@ NQ.makeCtx=(net,history,answered)=>({
    answer must end on a line that exits 0 (tests/net/content.test.mjs 'every reference line succeeds' enforces it for
    every line of the answer; a mission whose point is a failing command, like a ping that gets no reply, lists that line in
    m.expectFail, and the test then requires it to exit 1; the UI shows the question once the check passes, whatever the exit code). */
+/* the commands a mission's learner has met by then: those no mission answer uses, plus those first used by this mission or
+   an earlier one (an unknown mission, such as a test's copy, sees every command). help lists only these. */
+const known=m=>{
+  const flat=NQ.CH.flatMap(c=>c.missions),at=flat.indexOf(m);
+  if(at<0)return null;
+  const later=new Set(),used=new Set();
+  flat.forEach((x,i)=>[...x.answer,...(x.expectFail||[])].forEach(l=>{const w=l.trim().split(/\s+/)[0];if(!used.has(w)){used.add(w);if(i>at)later.add(w);}}));
+  return new Set(Object.keys(NQ.CMDS).filter(n=>!later.has(n)));
+};
 NQ.session=m=>{
   const net=NQ.createNet(m.scenario,m.setup),history=[];
+  Object.defineProperty(net,'known',{value:known(m),writable:true});
   return {net,dev:m.dev||net.me,history,
     run(line){const r=net.exec(line,m.dev);history.push({line,code:r.code,entries:r.entries});return r;},
     check(answered){
