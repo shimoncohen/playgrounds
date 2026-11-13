@@ -31,6 +31,7 @@ const proto={
     return i>0&&own(this.files,p.slice(0,i))?section(this.files[p.slice(0,i)],p.slice(i+1)):null;
   },
   list(prefix=''){return Object.keys(this.files).filter(f=>f.startsWith(prefix)).sort();},
+  expand(f){return this.read(f)!==null?[f]:this.list(dir(f));},
   write(p,text){
     if(!valid(p)||p.endsWith('/')||typeof text!=='string')return false;
     this.files[p]=text.slice(0,MAXTEXT);return true;

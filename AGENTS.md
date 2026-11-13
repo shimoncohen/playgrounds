@@ -89,6 +89,7 @@ Use the `pre-pr-check` skill, or by hand: run the commands above, re-read your o
 ## Agent etiquette
 
 - Branch from `main`; one branch per issue. Do not push to `main` or to someone else's branch.
+- Stack a branch on another open PR only when your work needs code that is not on `main` yet. Open the PR against that base branch, write "Depends on #N" in its body, and retarget or rebase onto `main` once the base merges. Never merge a stacked PR before its base.
 - **Conventional Commits** for commit messages and the PR title (`type(scope): subject`, see CONTRIBUTING.md; enforced by commitlint locally and in CI). Never bump the version or edit `CHANGELOG.md`; releases are cut by maintainers. Keep any attribution trailer your tooling adds.
 - Do not weaken, skip or delete a test to get green. If a test is wrong, say so in the PR and explain.
 - Unsure or the issue is ambiguous? Ask on the issue before building; a question is cheaper than a rewrite.

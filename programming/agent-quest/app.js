@@ -38,7 +38,7 @@ function refresh(){
   if(!m)return;
   const p=AQ.prepare(m,ed.getInput());
   ed.showErrors([...p.prompt.errors,...p.setup.errors]);
-  const scope=[...new Set(p.prompt.files.flatMap(f=>p.vfs.read(f)!==null?[f]:p.vfs.list(AQ.vfs.dir(f))))];
+  const scope=[...new Set(p.prompt.files.flatMap(f=>p.vfs.expand(f)))];
   const skills=AQ.config.loadedSkills(p.setup,p.vfs,p.scenario.tag||(AQ.config.fired(p.scenario,p.setup,p.prompt)?'schedule':undefined)).loaded;
   const ctx=AQ.context.build(p.setup,p.prompt,p.scenario.history||[],scope.map(f=>({path:f,text:p.vfs.read(f)||''})),{skills});
   AQMETER.render({panel:$('#meter'),strip:$('#meterStrip')},ctx,lastPeak);
