@@ -1420,6 +1420,8 @@ RQ.interp=(ast,opts)=>{
       case 'Path':{
         const ct=(info.get(e)||{}).ctor;
         if(ct)return ctorVal(ct,[]);
+        const ic=(info.get(e)||{}).ic;
+        if(ic)return int(INT[ic.ty][ic.max?1:0],ic.ty);
         const n=e.segs[0].name,c=find(env,n);
         if(c)return read(c,e.line);
         if(consts.has(n))return constVal(n);

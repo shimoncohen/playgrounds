@@ -13056,5 +13056,80 @@
     "src": "fn main() {\n    let x: u8 = 250;\n    let y = (x + 10);\n    println!(\"{}\", y);\n}\n",
     "expect": {"lint":"arithmetic_overflow","line":3},
     "why": "the lint on a parenthesised sum is reported at line 3, column 13 (the parenthesis)", "pr": "unit"
+  },
+  {
+    "id": "limits-print",
+    "src": "fn main() {\n    println!(\"{} {} {} {}\", i32::MIN, i32::MAX, u8::MAX, i64::MIN);\n    println!(\"{} {} {}\", u8::MIN, u32::MAX, usize::MAX);\n}\n",
+    "expect": "ok", "out": "-2147483648 2147483647 255 -9223372036854775808\n0 4294967295 18446744073709551615\n", "err": "", "exit": 0,
+    "why": "the MIN and MAX of the whole-number types are values", "pr": "unit"
+  },
+  {
+    "id": "limits-running-min",
+    "src": "fn main() {\n    let mut lo = i32::MAX;\n    let mut hi = i32::MIN;\n    for x in [3, -1, 7] {\n        if x < lo { lo = x; }\n        if x > hi { hi = x; }\n    }\n    println!(\"{} {}\", lo, hi);\n}\n",
+    "expect": "ok", "out": "-1 7\n", "err": "", "exit": 0,
+    "why": "MAX and MIN as the start of a running minimum and maximum", "pr": "unit"
+  },
+  {
+    "id": "limits-const",
+    "src": "const LIMIT: u8 = u8::MAX;\n\nfn main() {\n    println!(\"{} {}\", LIMIT, u8::MAX as u32 + 1);\n}\n",
+    "expect": "ok", "out": "255 256\n", "err": "", "exit": 0,
+    "why": "a const may hold a MAX, and a cast of one widens it", "pr": "unit"
+  },
+  {
+    "id": "limits-min-div-known",
+    "src": "fn main() {\n    let n: i32 = -1;\n    println!(\"{}\", i32::MIN / n);\n}\n",
+    "expect": {"lint":"unconditional_panic","line":3},
+    "pair": "limits-min-div-known-ok",
+    "why": "unconditional_panic: the smallest i32 divided by a known -1 overflows, and rustc says so at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-min-div-known-ok",
+    "src": "fn main() {\n    let n: i32 = 2;\n    println!(\"{}\", i32::MIN / n);\n}\n",
+    "expect": "ok", "out": "-1073741824\n", "err": "", "exit": 0,
+    "why": "compiles once the divisor is not -1", "pr": "P4"
+  },
+  {
+    "id": "limits-min-rem-known",
+    "src": "fn main() {\n    let x = i64::MIN;\n    let n: i64 = -1;\n    println!(\"{}\", x % n);\n}\n",
+    "expect": {"lint":"unconditional_panic","line":4},
+    "pair": "limits-min-rem-known-ok",
+    "why": "unconditional_panic: the remainder of the smallest i64 by a known -1 overflows at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-min-rem-known-ok",
+    "src": "fn main() {\n    let x = i64::MIN;\n    let n: i64 = 1;\n    println!(\"{}\", x % n);\n}\n",
+    "expect": "ok", "out": "0\n", "err": "", "exit": 0,
+    "why": "compiles once the divisor is not -1", "pr": "P4"
+  },
+  {
+    "id": "limits-min-div-param",
+    "src": "fn div(n: i32) -> i32 {\n    i32::MIN / n\n}\n\nfn main() {\n    println!(\"{}\", div(-1));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to divide with overflow\n", "exit": 101,
+    "why": "a divisor that comes from a parameter is not folded: the overflow is a run-time panic", "pr": "unit"
+  },
+  {
+    "id": "limits-min-rem-param",
+    "src": "fn rem(x: i32, n: i32) -> i32 {\n    x % n\n}\n\nfn main() {\n    println!(\"{}\", rem(i32::MIN, -1));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to calculate the remainder with overflow\n", "exit": 101,
+    "why": "a remainder by a parameter is a run-time panic when it overflows", "pr": "unit"
+  },
+  {
+    "id": "limits-max-plus-one",
+    "src": "fn main() {\n    let x = i32::MAX;\n    let y = x + 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint":"arithmetic_overflow","line":3},
+    "pair": "limits-max-plus-one-ok",
+    "why": "arithmetic_overflow: the largest i32 plus one is known at compile time", "pr": "P4"
+  },
+  {
+    "id": "limits-max-plus-one-ok",
+    "src": "fn main() {\n    let x = i32::MAX;\n    let y = x - 1;\n    println!(\"{}\", y);\n}\n",
+    "expect": "ok", "out": "2147483646\n", "err": "", "exit": 0,
+    "why": "compiles once the sum stays in range", "pr": "P4"
+  },
+  {
+    "id": "limits-max-param",
+    "src": "fn bump(x: i32) -> i32 {\n    x + 1\n}\n\nfn main() {\n    println!(\"{}\", bump(i32::MAX));\n}\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:5:\nattempt to add with overflow\n", "exit": 101,
+    "why": "MAX passed through a parameter overflows at run time, not at compile time", "pr": "unit"
   }
 ]

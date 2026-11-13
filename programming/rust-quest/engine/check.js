@@ -28,7 +28,7 @@ const MACRO_NAMES='format panic assert assert_eq assert_ne debug_assert debug_as
 RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static','type alias','use','mod','generics','method','nested item','closure','match',
   'method call','field access','slice','reference','dereference','cast','try operator','struct literal','qualified path',
   'fn pointer','impl Trait','inferred type','pattern','deferred initialization','format spec','assignment target','type checking',
-  'const initializer','integer overflow','const folding','main signature','path call','function value','block label','call','wrong argument count',
+  'const initializer','const folding','main signature','path call','function value','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
   'error conversion','string concatenation','polymorphic recursion','bounds','where','into','generic reference','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
@@ -1881,6 +1881,8 @@ RQ.check=ast=>{
         const n=e.segs[0].name,local=e.segs.length===1&&lookup(n),b=local||(e.segs.length===1&&consts.get(n));
         if(local){varUses++;I(e).bind=local;}
         if(b)return b.ty;
+        const [tn,cn]=e.segs.map(g=>g.name);
+        if(e.segs.length===2&&RQ.types.isInt(tn)&&(cn==='MIN'||cn==='MAX')&&!adtRec(tn)){I(e).ic={ty:tn,max:cn==='MAX'};return T.int(tn);}
         const ct=ctorOf(e);
         if(ct){
           if(ct.kind!=='unit')return unsup('function value',e.line);
