@@ -85,3 +85,22 @@ describe('the default chapters list', () => {
     assert.equal(S.xp, 2 * AQ.tierXp(AQ.CH[0].tier));
   });
 });
+
+describe('addMiss', () => {
+  const [a, b] = AQ.QF;
+  it('lists a question once however often it is missed, keeping the order', () => {
+    const once = AQ.state.addMiss([], a);
+    assert.equal(AQ.state.addMiss(once, a).length, 1);
+    const twice = AQ.state.addMiss(AQ.state.addMiss(AQ.state.addMiss([], a), b), a);
+    assert.deepEqual(J(twice.map((q) => q.c)), [a.c, b.c]);
+  });
+  it('keys on the question, so two questions with equal text are two entries', () => {
+    const twin = { ...a };
+    assert.equal(AQ.state.addMiss(AQ.state.addMiss([], a), twin).length, 2);
+  });
+  it('does not change the list it is given', () => {
+    const list = [a];
+    AQ.state.addMiss(list, b);
+    assert.equal(list.length, 1);
+  });
+});

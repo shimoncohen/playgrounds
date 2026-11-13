@@ -53,7 +53,7 @@ describe('every mission of every chapter', () => {
         for (const f of ['title', 'goal', 'explain', 'hint']) assert.ok(typeof m[f] === 'string' && m[f].trim(), f);
         for (const id of m.facts || []) assert.ok(AQ.facts.byId(id), `fact ${id}`);
         if (m.kind !== 'prompt') assert.ok(m.answer && typeof m.answer === 'object' && m.answer.files, 'config answers are setup files');
-        if (m.prompt) assert.deepEqual(AQ.config.parsePrompt(m.prompt, AQ.scenarios[m.scenario], AQ.config.parseSetup(AQ.vfs.create(AQ.scenarios[m.scenario].vfs))).errors.length, 0, 'the mission prompt parses');
+        if (m.prompt) assert.deepEqual(AQ.prepare(m, '').prompt.errors.length, 0, 'the mission prompt parses');
       });
       // approved: a Plan: first answer pauses until approved, and the pause itself is covered by its own test below
       it('the reference answer passes', () => assert.equal(AQ.runMission(m, m.answer, APPROVED), true));
@@ -239,7 +239,7 @@ describe('extras', () => {
     for (const g of AQ.GUIDE) for (const [t] of g.ex) {
       if (/^(Done when|Constraints|Files|Examples|Use|Plan):/.test(t)) {
         const sc = AQ.scenarios[g.sc || 'tidy'];
-        const p = AQ.config.parsePrompt(t, { ...sc, commands: { ...AQ.scenarios.price.commands, ...sc.commands } },AQ.config.parseSetup(AQ.vfs.create(sc.vfs)));
+        const p = AQ.config.parsePrompt(t, { ...sc, commands: { ...AQ.scenarios.price.commands, ...sc.commands } },AQ.config.parseSetup(AQ.vfs.create(sc.vfs)), new Set([...t.matchAll(/(?:call|send)\s+([\w.-]+)/g)].map((x) => x[1])));
         assert.equal(p.errors.length, 0, t);
       }
     }

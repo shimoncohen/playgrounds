@@ -17,7 +17,7 @@ function run(scenario,setup,prompt,opts={}){
   const {loaded,skipped}=AQ.config.loadedSkills(setup,vfs,tag);
   const styles=scenario.style?prompt.examples.map(p=>scenario.style(vfs.read(p)||'')):[];
   const refresh=()=>{ctx=AQ.context.build(setup,prompt,history,read.map(p=>({path:p,text:vfs.read(p)||''})),{skills:loaded});peak=Math.max(peak,ctx.peak);};
-  const memRules=(text,by)=>AQ.config.memoryRules({memory:text},scenario,false).rules.map(c=>({...c,by}));
+  const memRules=(text,by)=>AQ.config.memoryRules({...setup,memory:text},scenario,false).rules.map(c=>({...c,by}));
   /* only the root CLAUDE.md can supply a default check; a typed Done when wins */
   const memCheck=AQ.config.memoryRules(setup,scenario).check;
   const rules=()=>[
@@ -25,7 +25,7 @@ function run(scenario,setup,prompt,opts={}){
     ...memRules(setup.memory,'CLAUDE.md'),
     ...AQ.config.folderMemory(setup,read).flatMap(f=>memRules(f.text,f.path)),
     ...loaded.flatMap(s=>memRules(s.body,'skill '+s.name)),
-    ...AQ.context.rules(ctx,scenario).map(c=>({...c,by:'an earlier message'}))
+    ...AQ.context.rules(ctx,scenario,setup).map(c=>({...c,by:'an earlier message'}))
   ];
   const hidden=a=>(scenario.hidden||[]).some(h=>h.verb===a.verb&&AQ.permissions.matches(h.target,a.target));
   /* returns false when skipped, else the shell result. The order of the gates is the order a skip reason can win. */
@@ -36,8 +36,8 @@ function run(scenario,setup,prompt,opts={}){
     if(!p.allowed)return skip(p.by);
     /* a whole-file read also covers a section of it */
     if(a.needs&&a.needs.some(n=>!read.some(r=>r===n||n.startsWith(r+'#'))))return skip('not seen yet');
-    if(scenario.connected&&a.verb==='call'&&!AQ.config.hasTool(setup,a.target))return skip('not connected');
-    const r=AQ.shell.exec(scenario,a,vfs,styles),bad=hidden(a);
+    if((a.verb==='call'||a.verb==='send')&&!AQ.config.hasTool(setup,scenario,a.target))return skip('not connected');
+    const r=AQ.shell.exec(scenario,a,vfs,styles,setup),bad=hidden(a);
     calls.push({verb:a.verb,target:a.target});
     total+=AQ.tokens.estimate(a.verb+' '+a.target+' '+r.out);
     steps.push({type:'act',...base,ok:r.ok,violation:bad});
@@ -127,7 +127,7 @@ function run(scenario,setup,prompt,opts={}){
       status=r&&r.ok?'done':'failed';
     }
   }else if(hookLast.size)status=[...hookLast.values()].every(Boolean)?'done':'failed';
-  if(script.length&&!ran)status='blocked';
+  if(script.length&&!ran&&status==='unverified')status='blocked';
   return outcome(status);
 }
 

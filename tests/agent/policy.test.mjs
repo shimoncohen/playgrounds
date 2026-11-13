@@ -115,6 +115,11 @@ describe('plan, verification and the correction step', () => {
     const { outcome } = run('Constraints: do not edit src/\nConstraints: do not edit migrations/\nConstraints: do not read src/');
     assert.equal(outcome.status, 'blocked');
   });
+  it('a check that ran and failed stays failed when every script action was skipped', () => {
+    const { outcome } = run('Constraints: do not edit src/\nConstraints: do not edit migrations/\nConstraints: do not read src/\nDone when: run npm test');
+    assert.ok(outcome.steps.some((s) => s.type === 'act' && s.tag === 'verify' && !s.ok));
+    assert.equal(outcome.status, 'failed');
+  });
 });
 
 describe('what the agent has seen', () => {

@@ -37,26 +37,33 @@ function refresh(){
   const m=sessionMission();
   if(!m)return;
   const p=AQ.prepare(m,ed.getInput());
-  ed.showErrors(p.prompt.errors);
+  ed.showErrors([...p.prompt.errors,...p.setup.errors]);
   const scope=[...new Set(p.prompt.files.flatMap(f=>p.vfs.read(f)!==null?[f]:p.vfs.list(AQ.vfs.dir(f))))];
   const skills=AQ.config.loadedSkills(p.setup,p.vfs,p.scenario.tag||(AQ.config.fired(p.scenario,p.setup,p.prompt)?'schedule':undefined)).loaded;
   const ctx=AQ.context.build(p.setup,p.prompt,p.scenario.history||[],scope.map(f=>({path:f,text:p.vfs.read(f)||''})),{skills});
   AQMETER.render({panel:$('#meter'),strip:$('#meterStrip')},ctx,lastPeak);
 }
-function startSession(){
-  lastPeak=null;awaitingRun=null;
-  ed.load(sessionMission());runv.clear();refresh();
-}
 let awaitingRun=null;
-function changed(){
-  if(awaitingRun){awaitingRun=null;runv.clear();renderFeedback(null);}
-  refresh();
+function clearRun(){
+  lastPeak=null;awaitingRun=null;runv.clear();renderFeedback(null);
 }
+function startSession(){
+  ed.load(sessionMission());clearRun();refresh();
+}
+function showNext(){
+  const host=fb();
+  if(!host||!curMission()||!S.done[mkey()])return;
+  const last=S.mi>=CH[S.ch].missions.length-1,row=el('div','nextline'),b=el('button','btn ghost small',(last?'Finish the chapter':'Next mission')+' →');
+  b.type='button';b.dataset.act='next';
+  row.append(el('span','note','This mission is already done. '),b);
+  host.append(row);
+}
+function changed(){clearRun();refresh();showNext();}
 function runAgent(approve){
   const m=sessionMission();
   const input=approve&&awaitingRun?awaitingRun.input:ed.getInput();
   const r=AQ.evaluate(m,input,{approved:!!approve});
-  if(r.refused){ed.focusErrors();return;}
+  if(r.refused){clearRun();ed.focusErrors();return;}
   runv.show(r.outcome);
   awaitingRun=r.awaiting?{input}:null;
   lastPeak=r.outcome.tokens.peak;refresh();
@@ -99,12 +106,20 @@ function renderFeedback(f){
 }
 
 const PANES=['mission','files','meter','run'];
-function setPane(p){
+const PANE_EL={mission:'#mission',files:'#filesPanel',meter:'#meterPanel',run:'#runPanel'};
+/* the page scrolls from 390 px and the card from 721 px, so a new card or pane resets whichever one moved */
+function toTop(el){
+  el.scrollTop=0;
+  const t=el.getBoundingClientRect().top;
+  if(t<0)scrollBy({top:Math.floor(t),behavior:'instant'});
+}
+function setPane(p,top){
   if(!PANES.includes(p))p='mission';
   $('.quest').dataset.pane=p;
   document.querySelectorAll('.paneSwitch button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pane===p)));
+  if(top)toTop($(PANE_EL[p]));
 }
-$('.paneSwitch').addEventListener('click',e=>{const b=e.target.closest('button[data-pane]');if(b)setPane(b.dataset.pane);});
+$('.paneSwitch').addEventListener('click',e=>{const b=e.target.closest('button[data-pane]');if(b)setPane(b.dataset.pane,true);});
 
 const mq=q=>{try{return !!(window.matchMedia&&matchMedia(q).matches);}catch(e){return false;}};
 const wide=()=>mq('(min-width:721px)');
@@ -160,13 +175,13 @@ cardEl.addEventListener('click',e=>{
   else if(a==='fill'){const m=sessionMission();if(m){ed.setInput(m.answer);setPane('mission');}}
   else if(a==='next')gotoMission(S.ch,S.mi+1);
   else if(a==='nextch')gotoMission(S.ch+1,0);
-  else if(a==='torun')setPane('run');
+  else if(a==='torun')setPane('run',true);
   else if(a&&a.startsWith('tab-'))showTab(a.slice(4),true);
 });
 function gotoMission(ci,mi){
   if(!CH[ci])return;
   S.ch=ci;S.mi=Math.max(0,Math.min(mi,CH[ci].missions.length));save();
-  renderChapters();renderMission();startSession();setPane('mission');
+  renderChapters();renderMission();startSession();setPane('mission',true);
 }
 
 function renderXP(){
@@ -225,7 +240,7 @@ function pick(i){
   bs.forEach((b,j)=>{b.disabled=true;if(fQ.opts[j]===fQ.a)b.classList.add('right');else if(j===i)b.classList.add('wrong');});
   const f=$('#fFb');
   if(ok){fStreak++;const pts=10+Math.min(fStreak-1,5)*2;fScore+=pts;f.className='fb good';f.textContent=`Correct! +${pts}${fStreak>1?` (streak ${fStreak})`:''}`;}
-  else{fStreak=0;fMiss.push(fQ);f.className='fb bad';f.innerHTML='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
+  else{fStreak=0;fMiss=state.addMiss(fMiss,fQ);f.className='fb bad';f.innerHTML='Not this time. The answer is “'+fQ.a+'”. '+fQ.why;}
   setStats();clearTimeout(fNext);fNext=setTimeout(()=>{if(fireOn)nextQ();},ok?700:2600);
 }
 function startFire(){

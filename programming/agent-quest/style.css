@@ -75,6 +75,9 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .btn:hover{filter:brightness(1.05)}
 .btn.ghost{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line);color:var(--ink)}
 .btn.ghost:hover{background:var(--surface-2)}
+.btn.small{padding:4px 10px;font-size:13px}
+.nextline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+@media (pointer:coarse){.btn.small{min-height:40px}}
 .hint{margin:0;padding:8px 12px;border-radius:10px;border:1.5px dashed var(--line);font-size:14px}
 .hint summary{cursor:pointer;font-weight:700}
 .hint p{margin:6px 0 2px}
@@ -121,7 +124,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .perrs{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px}
 .perrs:empty{display:none}
 .perrs li{padding:5px 9px;border-radius:8px;background:color-mix(in srgb,var(--err) 10%,var(--surface));box-shadow:inset 3px 0 0 var(--err)}
-.perrs li::before{content:"Ignored: ";font-weight:700}
+.perrs li::before{content:"Fix before running: ";font-weight:700}
 @media (max-width:720px),(pointer:coarse){.promptForm input[type=text],.promptForm textarea,.fileEditor textarea{font-size:16px}}
 
 @media (min-width:721px){.narrow-only{display:none}}

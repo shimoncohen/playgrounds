@@ -117,7 +117,7 @@ describe('E3: after-edit hooks', () => {
 
 describe('E4: connected tools', () => {
   const CALL = { verb: 'call', target: 'tracker.close' };
-  const scn = { ...scenario, hidden: [], connected: true, tools: ['tracker.close', 'tracker.open'], script: [CALL] };
+  const scn = { ...scenario, hidden: [], script: [CALL] };
   const skip = (o) => kinds(o, 'skip').find((s) => s.verb === 'call');
   it('a call is skipped not connected unless a setup server provides the tool', () => {
     const o = run('Goal: x', { scn }).outcome;
@@ -130,7 +130,11 @@ describe('E4: connected tools', () => {
       assert.ok(ok.calls.some((c) => c.verb === 'call' && c.target === 'tracker.close'), mcp);
     }
   });
-  it('without the flag a call needs no server', () => assert.equal(skip(run('Goal: x', { scn: { ...scn, connected: undefined } }).outcome), undefined));
+  it('a send needs a server too', () => {
+    const o = run('Goal: x', { scn: { ...scn, script: [{ verb: 'send', target: 'tracker.close' }] } }).outcome;
+    assert.equal(kinds(o, 'skip')[0].by, 'not connected');
+    assert.equal(o.violations.length, 0);
+  });
   it('a permission rule shows first: deny call tracker.close is never reported as not connected', () => {
     const o = run('Goal: x', { scn, files: { '.claude/permissions.txt': 'deny call tracker.close' } }).outcome;
     assert.equal(skip(o).by, 'permission rule');
@@ -140,7 +144,9 @@ describe('E4: connected tools', () => {
     assert.equal(skip(run('Files: src/tax.js', { scn: needy }).outcome).by, 'not seen yet');
   });
   it('a Done when that calls an unconnected tool ends unverified', () => {
-    const o = run('Done when: call tracker.open', { scn: { ...scn, script: [{ verb: 'read', target: 'src/price.js' }] } }).outcome;
+    const typed = run('Done when: call tracker.open', { scn });
+    assert.match(typed.prompt.errors[0].msg, /not a tool the agent has/);
+    const o = run('Done when: call tracker.open', { scn: { ...scn, script: [{ verb: 'read', target: 'src/price.js' }] }, allow: new Set(['tracker.open']) }).outcome;
     assert.equal(o.status, 'unverified');
     assert.deepEqual(J(kinds(o, 'skip').map((s) => [s.tag, s.by])), [['verify', 'not connected']]);
   });
@@ -241,7 +247,7 @@ describe('E1: helpers take the search', () => {
     }
   });
   it('a name that is not a subagent starts no helper', () => {
-    const o = run('Use: tracker', { scn: { ...hs, tools: ['tracker.close'] }, files: { '.claude/mcp.txt': 'tracker: close' } }).outcome;
+    const o = run('Use: tracker', { scn: hs, files: { '.claude/mcp.txt': 'tracker: close' } }).outcome;
     assert.equal(kinds(o, 'delegate').length, 0);
     assert.deepEqual(J(explored(o)), hs.explore);
   });
@@ -359,7 +365,7 @@ describe('determinism of the dev engine', () => {
       ['Goal: x', { scn: lintScn(), files: HOOK }],
       ['Done when: run npm test', { scn: lintScn(), files: HOOK }],
       ['Plan: first', { scn: { ...scenario, unattended: true } }],
-      ['Goal: x', { scn: { ...scenario, connected: true, tools: ['tracker.close'], script: [{ verb: 'call', target: 'tracker.close' }] } }],
+      ['Goal: x', { files: { '.claude/mcp.txt': 'tracker: close' }, scn: { ...scenario, script: [{ verb: 'call', target: 'tracker.close' }] } }],
       ['Goal: x', { files: { 'CLAUDE.md': 'Done when: run npm test' } }],
     ];
     for (const [p, o] of cases) assert.equal(snap(run(p, o).outcome), snap(run(p, o).outcome), p);

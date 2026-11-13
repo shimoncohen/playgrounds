@@ -73,7 +73,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
       // wbr lets a long path wrap at its slashes; textContent stays the plain path
       const segs=p.split('/');
       segs.forEach((s,i)=>{if(i<segs.length-1)li.append(s+'/',document.createElement('wbr'));else li.append(s);});
-      li.append((p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
+      li.append((edits[p]===null?' (deleted)':p in edits?' (edited)':'')+(AQ.canEdit(mission,p)?'':' (read-only)'));
       li.setAttribute('role','option');li.dataset.path=p;
       li.setAttribute('aria-selected',String(p===sel));li.tabIndex=p===sel?0:-1;
       ul.append(li);
@@ -85,9 +85,21 @@ ED.create=({tree,fileEl,host,onChange})=>{
   function renderFile(){
     fileEl.textContent='';
     if(sel===null)return;
-    const p=sel,can=AQ.editable(p);
-    const head=el('div','fname');
-    head.append(el('code','',p),el('span','note',can?'You can edit this file. Edits are for this practice run only.':'Read-only: this is the project the agent works on.'));
+    const p=sel,can=AQ.canEdit(mission,p);
+    const head=el('div','fname'),gone=edits[p]===null;
+    head.append(el('code','',p),el('span','note',gone?'Deleted for this practice run.':can?'You can edit this file. Edits are for this practice run only.':'Read-only: this is the project the agent works on.'));
+    if(can){
+      const b=el('button','btn ghost small',gone?'Restore file':'Delete file');
+      b.type='button';b.dataset.act=gone?'restore':'delete';b.setAttribute('aria-label',(gone?'Restore file ':'Delete file ')+p);
+      b.addEventListener('click',()=>{
+        if(gone)delete edits[p];else edits[p]=null;
+        renderTree();renderFile();onChange();
+        const next=fileEl.querySelector(gone?'textarea':'button[data-act="restore"]');
+        if(next)next.focus();
+      });
+      head.append(b);
+    }
+    if(gone){fileEl.append(head);return;}
     const ta=el('textarea');
     ta.value=p in edits?edits[p]:base[p];ta.readOnly=!can;ta.rows=8;ta.spellcheck=false;ta.maxLength=8000;
     ta.setAttribute('aria-label','Contents of '+p);
@@ -96,7 +108,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
       rulesEl=el('p','rules');fileEl.append(rulesEl);
       const root=p==='CLAUDE.md';
       const upd=()=>{
-        const r=AQ.config.memoryRules({memory:ta.value},sc,root),n=r.ignored.length;
+        const r=AQ.config.memoryRules({...AQ.prepare(mission,getInput()).setup,memory:ta.value},sc,root),n=r.ignored.length;
         /* only the root file can supply a default check, so a folder file shows neither phrase */
         const sep=root?(r.check?', 1 acts as the default check, ':', no default check, '):'. ';
         rulesEl.textContent=plural(r.rules.length,'line')+' act'+(r.rules.length===1?'s':'')+' as rules'+sep+plural(n,'other line')+' only cost'+(n===1?'s':'')+' tokens.';
@@ -129,7 +141,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     setInput(inp){
       const o=typeof inp==='string'?{prompt:inp,files:{}}:inp||{};
       edits={};
-      for(const p of Object.keys(o.files||{}))if(AQ.editable(p)&&p in base&&typeof o.files[p]==='string'&&o.files[p]!==base[p])edits[p]=o.files[p];
+      for(const p of Object.keys(o.files||{}))if(AQ.canEdit(mission,p)&&p in base&&(o.files[p]===null||typeof o.files[p]==='string'&&o.files[p]!==base[p]))edits[p]=o.files[p];
       if(mission.kind==='prompt'){
         const f=AQ.config.splitFields(o.prompt||'').fields;
         const set=(k,val)=>{if(inputs[k])inputs[k].value=val;};
@@ -141,7 +153,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     },
     showErrors(list){
       errs.textContent='';
-      for(const e of list){const li=el('li','',e.line+': '+e.msg);li.tabIndex=-1;errs.append(li);}
+      for(const e of list){const li=el('li','',(e.line??e.file)+': '+e.msg);li.tabIndex=-1;errs.append(li);}
     },
     focusErrors(){if(errs&&errs.firstChild)errs.firstChild.focus();}
   };

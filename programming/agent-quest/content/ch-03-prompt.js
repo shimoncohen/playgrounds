@@ -3,6 +3,7 @@
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const BASE='Goal: fix the rounding bug in src/price.js';
+const typedFiles=(v,c)=>v===true&&!c.prompt.files.length?'The run passed, but because of a rule outside your prompt. This mission is about the Files line you type.':v;
 const EXAMPLES=['goal','donewhen','constraints','files','examples'];
 const ALL=['goal','donewhen','constraints','files','examples','plan'];
 
@@ -40,7 +41,8 @@ AQ.CH.push({
       hint:'Open the files in the Files panel and look for the one with <code>total()</code> in it.',
       answer:'Files: src/price.js',
       wrong:'Files: src/',
-      lazy:BASE
+      lazy:BASE,
+      check:(o,c)=>typedFiles(AQ.verdict(o,c),c)
     },
     {
       title:'When not to be specific',scenario:'ledger',kind:'prompt',fields:EXAMPLES,

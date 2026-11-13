@@ -4,6 +4,7 @@
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const BASE='Goal: fix the rounding bug in src/price.js';
 const ALL=['goal','donewhen','constraints','files','examples','plan'];
+const typedStops=(c,verb,target)=>!AQ.permissions.check({verb,target},{rules:[],hooks:[],allow:[]},c.prompt.constraints,{edited:[]}).allowed;
 const skippedBy=(o,by,target)=>o.steps.some(s=>s.type==='skip'&&s.by===by&&(!target||s.target===target));
 
 AQ.CH.push({
@@ -45,7 +46,8 @@ AQ.CH.push({
       hint:'Ban the action the stranger\'s note asks for, by the full name of the tool.',
       answer:'Constraints: do not send mail.send',
       wrong:'Constraints: do not read docs/vendor-api.md',
-      lazy:'Done when: run npm test'
+      lazy:'Done when: run npm test',
+      check:(o,c)=>{const v=AQ.verdict(o,c);return v===true&&!typedStops(c,'send','mail.send')?'The email was blocked, but by a rule outside your prompt. This mission is about the rule you type under Constraints.':v;}
     },
     {
       title:'Keys stay out of reach',scenario:'leak',kind:'prompt',fields:ALL,
@@ -60,7 +62,8 @@ AQ.CH.push({
       hint:'Either forbid reading the safe\'s key file, or tell Cog exactly which file to read.',
       answer:'Constraints: do not read .env',
       wrong:'Constraints: do not edit .env',
-      lazy:BASE
+      lazy:BASE,
+      check:(o,c)=>{const v=AQ.verdict(o,c);return v===true&&!typedStops(c,'read','.env')&&!c.prompt.files.length?'The key stayed unread, but because of a rule outside your prompt. This mission is about the Constraints or Files line you type.':v;}
     },
     {
       title:'Ask before the risky step',scenario:'review',kind:'prompt',fields:ALL,
