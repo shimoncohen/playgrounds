@@ -54,8 +54,10 @@ RQ.interp=(ast,opts)=>{
   }
   for(const [k,f] of (adts&&adts.methodNodes)||[])methodFns.set(k,f);
   const declFields=d=>d.kind==='tuple'?d.fields.map((_,i)=>String(i)):d.kind==='unit'?[]:d.fields.map(f=>f.name);
+  // a program may declare its own enum with the name of a builtin one
+  const bvars=a=>enumDecl.has(a)?null:BVARS[a];
   const variantInfo=(adt,vi)=>{
-    if(BVARS[adt]){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
+    if(bvars(adt)){const [name,kind,fields]=BVARS[adt][vi];return {name,kind,fields};}
     const v=enumDecl.get(adt).variants[vi];
     return {name:v.name,kind:v.kind,fields:declFields(v)};
   };
@@ -438,7 +440,7 @@ RQ.interp=(ast,opts)=>{
     return bug('equality of '+a.k);
   }
   const mapFind=(m,key)=>m.v.find(en=>eqv(en.key,key));
-  const variantIndex=v=>BVARS[v.name]?BVARS[v.name].findIndex(x=>x[0]===v.variant):enumDecl.get(v.name).variants.findIndex(x=>x.name===v.variant);
+  const variantIndex=v=>bvars(v.name)?BVARS[v.name].findIndex(x=>x[0]===v.variant):enumDecl.get(v.name).variants.findIndex(x=>x.name===v.variant);
   // -1, 0 or 1; null when a NaN makes the two unordered, which makes every comparison false
   function cmpv(a,b){
     tick();

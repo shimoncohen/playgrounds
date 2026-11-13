@@ -64,6 +64,13 @@ describe('cmp, partial_cmp, total_cmp and Ordering', () => {
     assert.equal(feature(main('let n: f64 = 0.0 / 0.0;\nprintln!("{:?}", n.total_cmp(&1.0));')), 'float total order of NaN');
   });
 
+  it('a program with its own enum named Ordering keeps it, and its cmp stays unsupported', () => {
+    const own = '#[derive(Debug)]\nenum Ordering {\n    Up,\n    Flat,\n}\n\n';
+    assert.equal(out(main('let o = Ordering::Flat;\nprintln!("{:?} {:?}", o, Ordering::Up);', own)), 'Flat Up\n');
+    assert.equal(feature(main('let mut v = vec![3, 1, 2];\nv.sort_by(|a, b| a.cmp(b));', own)), 'collection method');
+    assert.equal(feature(main('println!("{:?}", 1.cmp(&2));', own)), 'method call');
+  });
+
   it('reverse, then and then_with combine orderings, and then_with runs its closure only on a tie', () => {
     assert.equal(out(main('let o = 1.cmp(&2);\nprintln!("{:?} {:?} {:?}", o.reverse(), o.then(2.cmp(&1)), 1.cmp(&1).then(2.cmp(&1)));')), 'Greater Less Greater\n');
     assert.equal(out(main('let a = 1.cmp(&2).then_with(|| 2.cmp(&1));\nlet b = 1.cmp(&1).then_with(|| 2.cmp(&1));\nprintln!("{:?} {:?}", a, b);')), 'Less Greater\n');

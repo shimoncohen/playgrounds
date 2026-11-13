@@ -1797,7 +1797,7 @@ RQ.check=ast=>{
   function closureSpec(e,r,base,name){
     const at=e.line,fn=unitSig;
     const seqEl=base.k==='array'||base.k==='slice'?base.el:base.k==='coll'&&base.name==='Vec'?base.args[0]:null;
-    if(seqEl&&SORT_BY.includes(name)){
+    if(seqEl&&SORT_BY.includes(name)&&!(name.endsWith('_by')&&nameTaken('Ordering'))){
       const keyed=name.endsWith('_key'),K=keyed?fresh(at):null;
       return {cl:()=>keyed?fn('FnMut',[mkRef(false,seqEl)],K):fn('FnMut',[mkRef(false,seqEl),mkRef(false,seqEl)],ordTy),build:()=>{
         if(keyed){
@@ -2207,7 +2207,7 @@ RQ.check=ast=>{
           return tgt;
         }
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k)||CMPS.includes(e.name)&&['int','ivar','float','fvar','bool','char','unit','String','str','tuple','array','slice','ref'].includes(adt.k))return adtMethod(e,r,adt,args,null);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k)||CMPS.includes(e.name)&&!nameTaken('Ordering')&&['int','ivar','float','fvar','bool','char','unit','String','str','tuple','array','slice','ref'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
