@@ -88,7 +88,7 @@ describe('what stays unsupported', () => {
   });
 
   it('a range of a slice reached through a &mut reference, and a row of a two-level array', () => {
-    assert.equal(feature('fn s(x: &mut [i32]) {\n    x[1..].sort();\n}\n\n' + main('s(&mut [3, 1, 2]);')), 'reborrow');
+    assert.equal(feature('fn s(x: &mut [i32]) {\n    let r = &mut x[1..];\n    x.reverse();\n    r.sort();\n}\n\n' + main('s(&mut [3, 1, 2]);')), 'reborrow');
     assert.equal(feature(main('let mut g = [[3, 1], [2, 0]];\ng[0].sort();')), 'borrow of a field');
   });
 

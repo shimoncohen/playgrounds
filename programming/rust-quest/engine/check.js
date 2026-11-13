@@ -814,7 +814,7 @@ RQ.check=ast=>{
   // `v[a..b].m()` borrows the slice itself, as `(&v[a..b]).m()` does
   function lendRange(e){
     const rx=peel(e.recv);
-    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||MUT_SEQ.includes(e.name)||SORT_BY.includes(e.name),expr:rx};
+    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,lent:true,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||MUT_SEQ.includes(e.name)||SORT_BY.includes(e.name),expr:rx};
   }
   function slice(e,x){
     const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);

@@ -552,7 +552,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   }
 
   // a slice of a `&mut` parameter lent straight to a call is a reborrow that ends with the call, if the result keeps no reference
-  const lendArgs=e=>{for(const a of e.args)if(peel(a).t==='Ref'){argRef.set(peel(a),e);if(!carries(tyOf(e)))rebArg.set(peel(a),e);}};
+  const lendArgs=e=>{for(const a of e.recv&&e.recv.lent?[e.recv,...e.args]:e.args)if(peel(a).t==='Ref'){argRef.set(peel(a),e);if(!carries(tyOf(e)))rebArg.set(peel(a),e);}};
   // a base that is already a reference passes its loans on instead of making one
   function slice(e,x,dest){
     const rg=peel(x.index),b=peel(x.expr),c=classify(b),bounds=[rg.from,rg.to].filter(Boolean),mut=!!e.mut;
