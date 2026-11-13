@@ -165,8 +165,7 @@ const inboxApp={
   accept:o=>o.calls.some(c=>c.target==='mail.read')||'The agent never read the mail.'
 };
 
-/* 18.2: the create adds
-   a line to the events file and the read-back finds it by name, so a skipped create leaves a failing check. */
+/* 18.2: the create adds a line to the events file and the read-back finds it by name, so a skipped create leaves a failing check. */
 const EVENTS='calendar/events.txt';
 const agenda={
   task:'Put the dentist visit from my note on my calendar.',

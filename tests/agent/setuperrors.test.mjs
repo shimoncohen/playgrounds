@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { AQ } from './fixture.mjs';
 
-const mission = AQ.CH[10].missions[0];
+const mission = AQ.CH[12].missions[0];
 const BAD = {
   '.claude/permissions.txt': 'allow edt src/price.js',
   '.claude/hooks.txt': 'after src/ run npm run lint',

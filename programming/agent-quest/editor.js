@@ -73,7 +73,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
       // wbr lets a long path wrap at its slashes; textContent stays the plain path
       const segs=p.split('/');
       segs.forEach((s,i)=>{if(i<segs.length-1)li.append(s+'/',document.createElement('wbr'));else li.append(s);});
-      li.append((p in edits?' (edited)':'')+(AQ.editable(p)?'':' (read-only)'));
+      li.append((p in edits?' (edited)':'')+(AQ.canEdit(mission,p)?'':' (read-only)'));
       li.setAttribute('role','option');li.dataset.path=p;
       li.setAttribute('aria-selected',String(p===sel));li.tabIndex=p===sel?0:-1;
       ul.append(li);
@@ -85,7 +85,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
   function renderFile(){
     fileEl.textContent='';
     if(sel===null)return;
-    const p=sel,can=AQ.editable(p);
+    const p=sel,can=AQ.canEdit(mission,p);
     const head=el('div','fname');
     head.append(el('code','',p),el('span','note',can?'You can edit this file. Edits are for this practice run only.':'Read-only: this is the project the agent works on.'));
     const ta=el('textarea');
@@ -129,7 +129,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     setInput(inp){
       const o=typeof inp==='string'?{prompt:inp,files:{}}:inp||{};
       edits={};
-      for(const p of Object.keys(o.files||{}))if(AQ.editable(p)&&p in base&&typeof o.files[p]==='string'&&o.files[p]!==base[p])edits[p]=o.files[p];
+      for(const p of Object.keys(o.files||{}))if(AQ.canEdit(mission,p)&&p in base&&typeof o.files[p]==='string'&&o.files[p]!==base[p])edits[p]=o.files[p];
       if(mission.kind==='prompt'){
         const f=AQ.config.splitFields(o.prompt||'').fields;
         const set=(k,val)=>{if(inputs[k])inputs[k].value=val;};

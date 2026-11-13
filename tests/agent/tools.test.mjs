@@ -54,3 +54,38 @@ describe('shipped scenarios take their tools from mcp.txt', () => {
     }
   });
 });
+
+describe('.claude/mcp.txt is editable only where the mission teaches it', () => {
+  const missions = AQ.CH.flatMap((ch) => ch.missions);
+  const ships = missions.filter((m) => '.claude/mcp.txt' in AQ.scenarios[m.scenario].vfs);
+  const lever = (m) => AQ.canEdit(m, '.claude/mcp.txt');
+  const mcpOf = (m, files) => JSON.parse(JSON.stringify(AQ.prepare(m, { prompt: '', files }).setup.mcp));
+  const calendar = missions.find((m) => m.scenario === 'calendar');
+
+  it('mission 5.5 is not passed by dropping mail.send from mcp.txt instead of banning it', () => {
+    const r = AQ.evaluate(calendar, { prompt: 'Done when: call calendar.list', files: { '.claude/mcp.txt': 'calendar: list, create, delete\n' } }, { approved: true });
+    assert.notEqual(r.result, true);
+    assert.equal(mcpOf(calendar, { '.claude/mcp.txt': 'calendar: list\n' }).length, 2, 'the shipped list is kept');
+  });
+  it('the missions that ship mcp.txt without teaching it ignore an edit to it', () => {
+    const shut = ships.filter((m) => !lever(m));
+    assert.deepEqual(JSON.parse(JSON.stringify(shut.map((m) => m.scenario).sort())), ['audit', 'calendar', 'clipping', 'quiet', 'remind', 'vendor']);
+    for (const m of shut) assert.deepEqual(mcpOf(m, { '.claude/mcp.txt': '' }), mcpOf(m, {}), m.title);
+  });
+  it('mcpTrim, whose answer edits it, and the other lever missions still can', () => {
+    const trim = missions.find((m) => m.scenario === 'mcpTrim');
+    assert.deepEqual(mcpOf(trim, { '.claude/mcp.txt': 'calendar: list\n' }), [{ name: 'calendar', tools: ['list'] }]);
+    assert.equal(AQ.evaluate(trim, trim.answer).result, true);
+    for (const m of ships.filter(lever)) assert.equal(AQ.evaluate(m, m.answer, { approved: true }).result, true, m.title);
+  });
+});
+
+describe('a learner-typed Done when is not exempted by the mission prompt', () => {
+  const fake = { scenario: 'ui', kind: 'prompt', fields: ['donewhen'], prompt: 'Done when: call browser.screenshot' };
+  it('the fixed line resolves unlisted, a typed line for another unlisted tool is an error', () => {
+    assert.equal(AQ.prepare(fake, '').prompt.errors.length, 0);
+    const typed = AQ.prepare({ ...fake, prompt: '' }, 'Done when: call browser.screenshot');
+    assert.match(typed.prompt.errors[0].msg, /not a tool the agent has/);
+    assert.equal(AQ.prepare(fake, 'Constraints: do not call browser.scroll').prompt.errors.length, 1);
+  });
+});

@@ -8,6 +8,9 @@ const KINDS=['prompt','config','budget'];
 const isObj=o=>!!o&&typeof o==='object'&&!Array.isArray(o);
 /* only the agent's own setup is editable; the project files are the scenario */
 const editable=p=>p==='CLAUDE.md'||p.startsWith('.claude/')||AQ.isFolderMemory(p);
+const MCP='.claude/mcp.txt';
+/* mcp.txt decides which tools exist, so editing it would skip a rule instead of keeping it: only a mission whose answer edits it, or that lists it in edits as a size lever, may */
+const canEdit=(m,p)=>editable(p)&&(p!==MCP||!!(m.answer&&m.answer.files&&AQ.vfs.own(m.answer.files,MCP))||(m.edits||[]).includes(MCP));
 
 const norm=input=>typeof input==='string'?{prompt:input,files:{}}
   :isObj(input)?{prompt:typeof input.prompt==='string'?input.prompt:'',files:isObj(input.files)?input.files:{}}
@@ -25,7 +28,7 @@ function verdict(o,c){
 function prepare(m,input){
   const sc=AQ.scenarios[m.scenario],inp=norm(input),vfs=AQ.vfs.create(sc.vfs);
   /* a folder memory file is editable only where the scenario ships one, so an input cannot invent it */
-  for(const p of Object.keys(inp.files))if(editable(p)&&typeof inp.files[p]==='string'&&(!AQ.isFolderMemory(p)||AQ.vfs.own(sc.vfs,p)))vfs.write(p,inp.files[p]);
+  for(const p of Object.keys(inp.files))if(canEdit(m,p)&&typeof inp.files[p]==='string'&&(!AQ.isFolderMemory(p)||AQ.vfs.own(sc.vfs,p)))vfs.write(p,inp.files[p]);
   const setup=AQ.config.parseSetup(vfs);
   /* config and budget missions send their own prompt: the learner's work is the setup files */
   /* a tool the mission's own prompt names resolves even when mcp.txt lacks it: the run then skips it as not connected */
@@ -55,6 +58,7 @@ AQ.weekTokens=o=>{const f=o.steps.find(s=>s.type==='fire');return o.tokens.total
 AQ.KINDS=KINDS;
 AQ.verdict=verdict;
 AQ.editable=editable;
+AQ.canEdit=canEdit;
 AQ.prepare=prepare;
 AQ.evaluate=evaluate;
 AQ.runMission=(m,input,opts)=>evaluate(m,input,opts).result;
