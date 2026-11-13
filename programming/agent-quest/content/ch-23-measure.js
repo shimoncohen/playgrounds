@@ -30,7 +30,7 @@ AQ.CH.push({
   learned:['Measuring before and after','Resizing the helper that runs','Tuning memory and helpers together'],
   missions:[
     {
-      title:'Measure before you cut',scenario:'tuneMeasure',kind:'config',prompt:FIX,facts:['memory-files'],
+      title:'Measure before you cut',scenario:'tuneMeasure',kind:'config',edits:['.claude/mcp.txt'],prompt:FIX,facts:['memory-files'],
       goal:'Dana\'s Founders\' Blend tin is in the cellar safe. Run this job before you change anything: the agent holds about '+S0+' tokens at once, and that is your starting number. Three things in the setup fill it that this job does not need: the five <code>Standup note</code> lines in <code>CLAUDE.md</code>, the skill <code>docs-style</code> with its long <code>description:</code> (it is asleep for this job, but its description is loaded anyway) and the five servers in <code>.claude/mcp.txt</code>. Cut the setup until the most the agent holds at once is 60% of the start or less: '+cap(S0)+' tokens or fewer. Keep the rule <code>do not delete data/</code>.',
       how:[
         'Read the Meter after a run: it shows the most the agent held at once. Note the start, about '+S0+', then change <code>CLAUDE.md</code>, <code>.claude/skills/docs-style.md</code> or <code>.claude/mcp.txt</code> and run again. Each time, compare the new number with the start.',
@@ -74,7 +74,7 @@ AQ.CH.push({
       }
     },
     {
-      title:'Tune the whole setup',scenario:'tuneBoth',kind:'config',prompt:BOTH,facts:['memory-files','subagents'],
+      title:'Tune the whole setup',scenario:'tuneBoth',kind:'config',edits:['.claude/mcp.txt'],prompt:BOTH,facts:['memory-files','subagents'],
       goal:'The safe is almost open: now both cuts at once. This job names two helpers, <code>scout</code> and <code>architect</code>, both <code>large</code>, so the run pays '+H2+' units for them. The setup has the same three extras as in mission 23.1: standup notes, an unused skill with a long description and five servers, so the agent holds about '+S2+' tokens at once. Get both numbers down: the most the agent holds at once to 60% of the start ('+cap(S2)+' tokens or fewer) and the helpers to '+COST2+' units or fewer. Keep <code>do not delete data/</code>. And keep <code>architect</code> above <code>small</code>: it decides what to change, and in this practice a helper that decides is not shrunk to the smallest size.',
       how:[
         'Do the two earlier cuts together. For the memory, delete the <code>Standup note</code> lines of <code>CLAUDE.md</code> and shorten one other source, as in 23.1. For the helpers, change the models in <code>.claude/agents/</code>, as in 23.2.',

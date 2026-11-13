@@ -202,9 +202,9 @@ Two shorthands of this simulator are not what real tools do. A `*` in an `edit`,
 
 #### Tool connection
 
-- A scenario with `connected: true` skips a `call` with reason `not connected` unless a setup MCP server provides the tool: the target equals the server name or `server.tool`. A permission rule still shows first, and a missing file the call needs is reported before the connection. `Done when: call X` follows the same path and then ends `unverified`.
+- `.claude/mcp.txt` is the only source of MCP tools, in every scenario. A `call` or `send` is skipped with reason `not connected` unless a setup server provides the tool: the target equals the server name or `server.tool`. The same list decides what a typed `Constraints` rule, a typed `Done when: call X` and `Use` may name; a tool that is not listed is an error there. A mission's own fixed prompt may still name an unlisted tool: it resolves, and the run skips it as not connected. `scenario.tools` lists only tools no server provides (none ship). Because removing a tool from the list would skip a rule instead of keeping it, the learner can edit `.claude/mcp.txt` only in a mission whose answer edits it or that lists it under `edits` (the two size-tuning missions of chapter 23); everywhere else it shows as read-only and an edit is ignored. A permission rule still shows first, and a missing file the call needs is reported before the connection. `Done when: call X` follows the same path and then ends `unverified`.
 - Skip reasons show as words in the Run panel and in the narration: `not seen yet` (the agent has not read what it needs yet), `not connected` (the tool is not connected), `no one to ask` (nobody is there to approve it). A skip by a hook or a permission rule reads "a hook does not allow it" or "a permission rule does not allow it".
-- Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match.
+- Not simulated: no server startup, auth, schema or real tool discovery; the list in `mcp.txt` is a match.
 
 ### Prompt model
 
@@ -228,13 +228,13 @@ Grammar:
 - TARGET is a path prefix, a command or a tool name, and must resolve against the scenario.
 - doneWhen := (`run` CMD | `read` PATH | `call` TOOL): a verification action the agent will perform.
 
-Lines that do not parse, or whose target does not resolve, show an inline error, and the agent does not run until every line parses; a refused run is never a pass and changes no state. The UI says: "Real agents read natural language. The simulator acts only on these lines so checks are exact." `CLAUDE.md` lines in the same grammar act as standing constraints. A `Done when:` line in the root `CLAUDE.md` is the default check (see "Default check"). Other lines cost tokens only.
+Lines that do not parse, or whose target does not resolve, show an inline error, and the agent does not run until every line parses; a setup file line that does not parse (`permissions.txt`, `hooks.txt`, `mcp.txt`, `schedule.txt`, a skill, an agent or a command file) is listed the same way with its file name, and refuses the run too (a skill or agent file emptied to nothing counts as removed, not as malformed); a refused run is never a pass and changes no state. The UI says: "Real agents read natural language. The simulator acts only on these lines so checks are exact." `CLAUDE.md` lines in the same grammar act as standing constraints. A `Done when:` line in the root `CLAUDE.md` is the default check (see "Default check"). Other lines cost tokens only.
 
 **`Use` expansion.** Before the lines are parsed, each `Use` name that is a saved command is expanded: the command's lines are split into fields like a typed prompt and merged in (see "Commands"). A name that is a helper starts a delegated search (see "Helpers"). Either way, the `Use` name must exist in the setup, or the line is an inline error and the run is refused.
 
 ### Scenario
 
-`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended`, `connected`, `scheduled` and `toolFns`:
+`{vfs, tools, task, script, hidden, accept}`, plus optional `tag`, `style`, `history`, `explore`, `focus`, `unattended`, `scheduled` and `toolFns`:
 
 - `script`: the ordered actions the policy would take (reads, edits, tool calls, verifications), including the trap action.
 - `hidden`: the scenario's hidden forbidden set, a list of `{verb, target}` pairs, for example an edit under `migrations/` or a call to `mail.send`. It exists independent of what the learner wrote and alone decides which executed actions log a violation.
@@ -245,9 +245,8 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
 - `explore` (optional): the files an agent with no `Files` line reads before it acts.
 - `focus` (optional): the part of `explore` that matters. With it, `Use` helpers take the search and the agent reads only `focus` (see "Helpers").
 - `unattended` (optional): nobody is there to approve. `Plan` stalls and a non-`read` action needs an `allow` line (see "Unattended runs").
-- `connected` (optional): a `call` needs a setup MCP server that provides the tool (see "Tool connection").
 - `scheduled` (optional): a schedule line must start the run (see "Schedules").
-- `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed` only if at least one script action ran; if every script action was skipped, the run is `blocked`, so a scenario that relies on a failing read-back starts its script with a `read`.
+- `toolFns` (optional): `{ 'server.tool': vfs => ({ok, out}) }`, a real effect and result for a `call`, like `commands` for a `run`. The function gets the run's copy of the files. A `Done when: call X` whose function returns `ok: false` ends `failed`, whether or not a script action ran.
 
 ### Policy
 
@@ -264,7 +263,7 @@ Lines that do not parse, or whose target does not resolve, show an inline error,
    - after an executed edit, the matching after-edit hooks run and push `hook` steps (see "After hooks").
 6. Run the verification if there is one: the typed `Done when`, else the command's, else the default check.
 7. If verification fails, apply the scenario's correction step and re-verify, up to a step cap.
-8. If there is no verification, stop as `unverified`, except that a run with after-edit hooks and no `Done when` is `done` when every hook's last run passed.
+8. If there is no verification, stop as `unverified`, except that a run with after-edit hooks and no `Done when` is `done` when every hook's last run passed. A run that ends `unverified` with a non-empty script in which every action was skipped is `blocked`; a run whose check ran keeps its `done` or `failed`.
 
 ### Outcome
 
@@ -293,6 +292,8 @@ A segmented bar with a text table of the same segments, pattern fills (no colour
 
 Four check kinds: `prompt`, `config`, `budget` and `choose` (quick-fire only). A `budget` mission needs the setup total at or below N and `accept` still holding, so deleting everything fails.
 
+A `prompt` mission is answered in the prompt form, but the setup files the scenario ships stay editable, so a prompt mission whose check does not read `c.prompt` can be passed from a file: a rule or a `Files` scope in `CLAUDE.md`, `permissions.txt` or `hooks.txt`, or a shipped helper rewritten to a cheaper model. Such a check therefore reads the prompt (the typed `Files` line, a typed constraint that stops the action, or an unchanged shipped helper or command), except where a mission deliberately accepts another route (a `Done when:` line in the root `CLAUDE.md`). `tests/agent/prompt-files.test.mjs` sweeps every prompt mission of chapters 2 to 15 for these routes.
+
 Every mission carries `answer`, `wrong` and `lazy`. The solvability test requires the answer to pass and the other two to fail. Answers are computed by the sim, never hardcoded. Mission shape otherwise follows the other quests (goal, `how`, hint, explain), plus a `scenario` name.
 
 ### Worked missions
@@ -304,7 +305,7 @@ Every mission carries `answer`, `wrong` and `lazy`. The solvability test require
 - Lazy: `Constraints: be careful and don't break anything`. It does not parse, so the run is refused with an inline error and the mission fails.
 - Lazy 2: `do not edit nonexistent/`. The target does not resolve, so the line is rejected and the run is refused.
 
-**Personal MCP missions (chapter 19).** Three config missions on `connected` scenarios, graded on connect, deny and read-back. Times and titles are not graded, because a tool call logs only `{verb,target}`.
+**Personal MCP missions (chapter 19).** Three config missions whose scenarios ship `.claude/mcp.txt`, graded on connect, deny and read-back. Times and titles are not graded, because a tool call logs only `{verb,target}`.
 
 - 19.1 `notesApp` connects the notes tools the job calls.
 - 19.2 `inboxApp` reads the mail and never sends it, either by leaving `send` unconnected or with `deny call mail.send`.
@@ -346,7 +347,7 @@ Chapter numbers are 1-based; the array index is the number minus 1.
 | R2 subagents, parallel work, worktrees | Ch 10 (helpers, see "Helpers"). Not simulated: parallel speed-up and worktree isolation are text, quick-fire and the 10.3 explanation only; there is no clock and there are no concurrent agents |
 | R2 hooks for lint, format, guards | Ch 11 (see "After hooks"). Not simulated: hooks are config lines mapped to scripted commands; no exit codes or hook output are used beyond pass or fail |
 | R2 custom slash commands, repo skills | Ch 12 (see "Commands"). Not simulated: no command arguments; commands are merged text, not skills the agent decides to load; repo skills are text only |
-| R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; `connected` is a list match |
+| R2 MCP for trackers, docs, browsers | Ch 13 (see "Tool connection"). Not simulated: no server startup, auth, schema or real tool discovery; the `mcp.txt` list is a match |
 | R2 CI and headless | Ch 14 (see "Unattended runs"). Not simulated: no runner, secrets, exit codes or clock (a schedule line is read and played once; see "Schedules"); `unattended` only blocks `Plan` and non-`read` actions without an `allow` line |
 | R2 writing a project `CLAUDE.md` | Ch 15 (see "Default check"). Not simulated: only the root `CLAUDE.md` supplies the check; global memory, `AGENTS.md`, imports and `/init` stay text |
 | R3 writing and research | Ch 17 |
@@ -393,6 +394,10 @@ The page follows what `tests/smoke.mjs:96-147` checks for every `NAMES` entry.
   - `.missionCol` is the mission column and contains `#mission` (the mission card, with the prompt form and `how` steps). At 1440×800 and 1000×700 it is `position: sticky`, with `overflow-y: visible` on the column and `overflow-y: auto` on `#mission`; its bottom stays within the window. At 390px it is `static`.
   - `.mapCol` is the right column with three panels, each `.mapCol .panel`: Files (the tree and editor), Meter (bar and table) and Run (steps and Outcome). Each has `overflow-y: auto` and `max-height` of at most 800px, copying Net's CSS values, so the `.mapCol .panel` check passes whichever panel `querySelector` returns first.
 - **390px pane switcher.** At 390px the quest tab shows one pane at a time. The switcher is `.paneSwitch button[data-pane]` with the values `mission`, `files`, `meter`, `run`. It is not `.tabs`, and the panes are not `section[id^="tab-"]`. The switcher is hidden at 721px and wider, where all columns show. Pane state is not saved. `mission` is the default pane, so `#mission` has content on first load.
+- **Delete file.** A file the learner may edit has a "Delete file" button in the Files panel (never a read-only one); the engine reads a deleted file as absent, so a deleted skill or agent is removed, as an emptied one already is. The input carries `null` for a deleted path. A deleted file is listed as "(deleted)" with a "Restore file" button, and starting the mission again restores it. Like every edit it is never saved, so a reload restores it too.
+- **Run panel and feedback.** Any edit to the prompt or a file, "Type it for me", and a refused run clear the Run panel and the feedback and drop the meter's peak marker, so a result never sits next to lines it was not made from. A win's "Next mission" button goes with it; when the mission is already done, a compact "Next mission →" ("Finish the chapter →" on the last one) line under the prompt actions takes its place, with the same `data-act="next"`. The rail and the dots still move on. The error list under the form is prefixed "Fix before running:".
+- **Scroll.** A new mission card, chapter card or pane starts at its top: `#mission` is reset where it scrolls (721px and wider) and the page where it does (390px).
+- **Quick-fire.** A question missed more than once in a round is listed once under "Worth another look"; each miss still resets the streak.
 - **Meter strip.** A compact `.meterStrip` stays at the top at 390px. It is not a `.panel`.
 - **No horizontal overflow** at 390px.
 - **Accessibility.** The meter has a text table equivalent; the file tree and run steps are keyboard-navigable lists; no meaning is colour-only.

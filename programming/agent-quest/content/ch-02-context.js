@@ -3,6 +3,7 @@
 'use strict';
 const AQ=globalThis.AQ=globalThis.AQ||{};
 const BASE='Goal: fix the rounding bug in src/price.js';
+const typedFiles=(v,c)=>v===true&&!c.prompt.files.length?'The run passed, but because of a rule outside your prompt. This mission is about the Files line you type.':v;
 const BUDGET=100,CEILING=1;
 const FIELDS=['goal','donewhen','constraints','files'];
 
@@ -57,7 +58,7 @@ AQ.CH.push({
       answer:'Files: src/price.js',
       wrong:'Files: src/',
       lazy:BASE,
-      check:(o,c)=>o.tokens.peak>AQ.context.WINDOW?'The agent held about '+o.tokens.peak+' tokens at once, more than the '+AQ.context.WINDOW+' that fit, so the oldest messages were dropped. Make it read less.':AQ.verdict(o,c)
+      check:(o,c)=>o.tokens.peak>AQ.context.WINDOW?'The agent held about '+o.tokens.peak+' tokens at once, more than the '+AQ.context.WINDOW+' that fit, so the oldest messages were dropped. Make it read less.':typedFiles(AQ.verdict(o,c),c)
     },
     {
       title:'Read just what the fix needs',scenario:'twofiles',kind:'prompt',fields:FIELDS,
@@ -72,7 +73,8 @@ AQ.CH.push({
       hint:'Name the two files Cog must fix, separated by a comma. A folder or one file is not it.',
       answer:'Files: src/price.js, src/tax.js',
       wrong:'Files: src/',
-      lazy:BASE
+      lazy:BASE,
+      check:(o,c)=>typedFiles(AQ.verdict(o,c),c)
     },
     {
       title:'Pick a cheaper helper',scenario:'delegate',kind:'config',prompt:BASE+'\nDone when: run npm test',

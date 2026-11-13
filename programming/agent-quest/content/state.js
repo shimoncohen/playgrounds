@@ -42,5 +42,7 @@ function serialize(S){
   return JSON.stringify({ch:S.ch,mi:S.mi,done,xp:Number.isFinite(S.xp)?S.xp:0,badges,best:S.best,tab:S.tab});
 }
 
-AQ.state={TABS,fresh,load,serialize,xpFor};
+const addMiss=(list,q)=>list.includes(q)?list:[...list,q];
+
+AQ.state={TABS,fresh,load,serialize,xpFor,addMiss};
 })();
