@@ -498,7 +498,11 @@ RQ.parse=tokens=>{
     if(isP('(')){
       p++;if(eatP(')'))return mk('Tuple',x,{elems:[]});
       const first=expr(false);
-      if(eatP(')'))return mk('Paren',x,{expr:first});
+      if(eatP(')')){
+        // typeck and borrowck spans of a parenthesised expression start at the `(`; name resolution still points at the name
+        if(first.pcol===undefined){first.pline=first.line;first.pcol=first.col;}
+        first.line=x.line;first.col=x.col;return mk('Paren',x,{expr:first});
+      }
       const elems=[first];while(eatP(',')){if(isP(')'))break;elems.push(expr(false));}
       expP(')');return mk('Tuple',x,{elems});
     }

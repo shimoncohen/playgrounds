@@ -13026,5 +13026,35 @@
     "src": "fn main() {\n    let mut a = [Some(1)];\n    a.sort();\n    println!(\"{:?}\", a);\n}\n",
     "expect": "ok", "out": "[Some(1)]\n", "err": "", "exit": 0,
     "why": "compiles once the cause is gone: rustc blames the f64 inside the Option, which has no Ord", "pr": "P4"
+  },
+  {
+    "id": "paren-overflow-let",
+    "src": "fn add(x: u8, n: u8) -> u8 {\n    let y = (x + n);\n    y\n}\nfn main() { println!(\"{}\", add(250, 10)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:13:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a panic inside parentheses is reported at the opening parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-arg",
+    "src": "fn g(a: u8) -> u8 { a }\nfn f(x: u8, n: u8) -> u8 {\n    g((x + n))\n}\nfn main() { println!(\"{}\", f(250, 9)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:3:7:\nattempt to add with overflow\n", "exit": 101,
+    "why": "a parenthesised argument is reported at its own parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-operand",
+    "src": "fn f(x: u8, n: u8) -> u8 {\n    let y = 2 * (x + n);\n    y\n}\nfn main() { println!(\"{}\", f(250, 9)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:17:\nattempt to add with overflow\n", "exit": 101,
+    "why": "the parenthesised operand of a larger expression is reported at its parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-overflow-nested",
+    "src": "fn f(x: u8, n: u8, m: u8) -> u8 {\n    let y = ((x + n) + m);\n    y\n}\nfn main() { println!(\"{}\", f(250, 10, 1)); }\n",
+    "expect": "ok", "out": "", "err": "\nthread 'main' panicked at src/main.rs:2:14:\nattempt to add with overflow\n", "exit": 101,
+    "why": "nested parentheses: the inner sum overflows first and is reported at the inner parenthesis", "pr": "unit"
+  },
+  {
+    "id": "paren-lint-overflow",
+    "src": "fn main() {\n    let x: u8 = 250;\n    let y = (x + 10);\n    println!(\"{}\", y);\n}\n",
+    "expect": {"lint":"arithmetic_overflow","line":3},
+    "why": "the lint on a parenthesised sum is reported at line 3, column 13 (the parenthesis)", "pr": "unit"
   }
 ]

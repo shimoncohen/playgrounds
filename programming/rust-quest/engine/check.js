@@ -97,7 +97,7 @@ RQ.check=ast=>{
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&w.mut||clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
     return false;
   }
-  const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
+  const unknown=(name,n)=>{n=RQ.peel(n);errors.push(RQ.diag.make('E0425',n.pline??n.line,n.pcol??n.col,{name}));return T.any;};
   const endNode=n=>n.t==='Block'&&n.tail?endNode(n.tail):n;
   // the number of values a type holds, so nested arrays cannot multiply into a print or a clone that freezes the page.
   // A Vec or HashMap counts as one: its elements are made by steps that are counted, and a recursive type such as `Vec<Node>` would not end
