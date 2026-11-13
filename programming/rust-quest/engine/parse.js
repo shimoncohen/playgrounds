@@ -299,7 +299,7 @@ RQ.parse=tokens=>{
       if(isP('.')){
         p++;const n=T();
         if(isK('await')){p++;feat('async',n.line);e=mk('Await',n,{expr:e});continue;}
-        if(n.k==='int'){p++;e=mk('Field',n,{expr:e,name:n.v,line:e.line,col:e.col,nline:n.line});continue;}
+        if(n.k==='int'){p++;e=mk('Field',n,{expr:e,name:n.v,line:e.line,col:e.col,nline:n.line,ncol:n.col});continue;}
         if(n.k==='float'&&/^\d+\.\d+$/.test(n.v)){p++;for(const part of n.v.split('.'))e=mk('Field',n,{expr:e,name:part,line:e.line,col:e.col});continue;}
         const id=ident();let targs=null;
         if(isP('::')&&isP('<',pk())){p+=2;targs=genericArgs();}
@@ -311,7 +311,7 @@ RQ.parse=tokens=>{
             e.recv=r.recv;e.args=[...r.args,...e.args];e.name='entry.'+e.name;
           }
         }
-        else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col,nline:id.line});
+        else e=mk('Field',id,{expr:e,name:id.v,line:e.line,col:e.col,nline:id.line,ncol:id.col});
         continue;
       }
       return e;

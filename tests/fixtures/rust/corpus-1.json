@@ -13486,5 +13486,43 @@
     "src": "fn main() {\n    let mut a = [3, 1, 2];\n    let r = &mut a[..];\n    r.sort();\n}\n",
     "expect": "ok", "out": "", "err": "", "exit": 0,
     "why": "compiles once the array is mut", "pr": "unit"
+  },
+  {
+    "id": "unstable-float-ties-20",
+    "src": "fn main() {\n    let mut v = vec![-0.0, 0.0, -0.0, -0.0, 6.0, 7.0, 0.0, 3.0, 0.0, 0.0, 4.0, 1.0, 10.0, -0.0, 5.0, 2.0, 0.0, 8.0, 9.0, -0.0];\n    v.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[-0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0, -0.0, 0.0, -0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]\n", "err": "", "exit": 0,
+    "why": "up to 20 elements the unstable sort keeps 0.0 and -0.0 in their original order", "pr": "unit"
+  },
+  {
+    "id": "unstable-float-ties-20-rev",
+    "src": "fn main() {\n    let mut v = vec![5.0, 2.0, -0.0, -0.0, -0.0, 9.0, 4.0, 7.0, 0.0, 0.0, -0.0, -0.0, 0.0, 1.0, 0.0, 0.0, 3.0, 6.0, 10.0, 8.0];\n    v.sort_unstable_by(|a, b| b.partial_cmp(a).unwrap());\n    println!(\"{:?}\", v);\n}\n",
+    "expect": "ok", "out": "[10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, -0.0, -0.0, -0.0, 0.0, 0.0, -0.0, -0.0, 0.0, 0.0, 0.0]\n", "err": "", "exit": 0,
+    "why": "the same sorted descending", "pr": "unit"
+  },
+  {
+    "id": "field-unknown-closure",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let mut v = vec![P { a: 2 }];\n    v.sort_by_key(|p| p.zz);\n}\n",
+    "expect": {"code":"E0609","line":7},
+    "pair": "field-unknown-closure-ok",
+    "why": "E0609: the closure parameter is a &P and has no field zz", "pr": "P5"
+  },
+  {
+    "id": "field-unknown-closure-ok",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let mut v = vec![P { a: 2 }];\n    v.sort_by_key(|p| p.a);\n}\n",
+    "expect": "ok", "out": "", "err": "", "exit": 0,
+    "why": "compiles with the real field", "pr": "unit"
+  },
+  {
+    "id": "field-unknown-filter",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let v = vec![P { a: 2 }];\n    let n = v.iter().filter(|p| p.zz > 0).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": {"code":"E0609","line":7},
+    "pair": "field-unknown-filter-ok",
+    "why": "E0609: filter hands the closure a &&P, and zz is not a field", "pr": "P5"
+  },
+  {
+    "id": "field-unknown-filter-ok",
+    "src": "struct P {\n    a: i32,\n}\n\nfn main() {\n    let v = vec![P { a: 2 }];\n    let n = v.iter().filter(|p| p.a > 0).count();\n    println!(\"{}\", n);\n}\n",
+    "expect": "ok", "out": "1\n", "err": "", "exit": 0,
+    "why": "compiles with the real field", "pr": "unit"
   }
 ]

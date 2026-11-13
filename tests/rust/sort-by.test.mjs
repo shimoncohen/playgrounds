@@ -51,6 +51,40 @@ describe('sort_by, sort_by_key and the unstable twins', () => {
   });
 });
 
+describe('the 20 and 21 element boundary of the unstable sorts', () => {
+  const vecOf = (n, f) => '[' + Array.from({ length: n }, (_, i) => f(i)).join(', ') + ']';
+  const run = (n, el, call) => main(`let mut v = vec!${vecOf(n, el)};\nv.${call};\nprintln!("{:?}", v[0]);`);
+  it('exactly 20 elements keep the order of ties, 21 give no verdict when the tied elements differ', () => {
+    assert.equal(out(run(20, (i) => `(${i % 3}, ${i})`, 'sort_unstable_by_key(|p| p.0)')), '(0, 0)\n');
+    assert.equal(feature(run(21, (i) => `(${i % 3}, ${i})`, 'sort_unstable_by_key(|p| p.0)')), 'unstable sort of equal keys');
+    assert.equal(out(run(21, (i) => `(${i % 3}, 0)`, 'sort_unstable_by_key(|p| p.0)')), '(0, 0)\n');
+  });
+  it('0.0 and -0.0 tie but print differently, so 21 floats with both give no verdict', () => {
+    const fl = (i) => (i < 5 ? '0.0' : i < 10 ? '-0.0' : `${i}.0`);
+    for (const cmp of ['sort_unstable_by(|a, b| a.partial_cmp(b).unwrap())', 'sort_unstable_by(|a, b| b.partial_cmp(a).unwrap())']) {
+      assert.equal(feature(run(21, fl, cmp)), 'unstable sort of equal keys');
+      assert.equal(RQ.run(run(20, fl, cmp)).status, 'ok');
+    }
+    assert.equal(out(run(21, fl, 'sort_unstable_by(|a, b| a.total_cmp(b))').replace('let mut v =', 'let mut v: Vec<f64> =')), '-0.0\n');
+  });
+  it('tied tuples and structs holding such floats give no verdict either', () => {
+    const t = (i) => `(${i < 5 ? '0.0' : i < 10 ? '-0.0' : i + '.0'}, 1)`;
+    assert.equal(feature(run(21, t, 'sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap())')), 'unstable sort of equal keys');
+  });
+});
+
+describe('an unknown field of a closure parameter', () => {
+  it('is E0609 at the field name, naming the reference type', () => {
+    const pre = 'struct P {\n    a: i32,\n}\n\n';
+    const at = (body) => { const c = RQ.run(main(body, pre)); assert.equal(c.status, 'error', body); const e = c.errors[0]; return `${e.code}@${e.line}:${e.col} ${e.msg}`; };
+    assert.equal(at('let mut v = vec![P { a: 2 }];\nv.sort_by_key(|p| p.zz);'), 'E0609@7:25 no field `zz` on type `&P`'.replace('7:25', '7:25'));
+    assert.match(at('let v = vec![P { a: 2 }];\nlet n = v.iter().filter(|p| p.zz > 0).count();'), /no field `zz` on type `&&P`/);
+    assert.match(at('let mut v = vec![P { a: 2 }];\nfor p in v.iter_mut() {\n    p.zz = 1;\n}'), /no field `zz` on type `&mut P`/);
+    assert.match(at('let p = P { a: 2 };\nprintln!("{}", p.zz);'), /no field `zz` on type `P`/);
+    assert.match(at('let t = (1, 2);\nprintln!("{}", t.5);'), /E0609@\d+:22 no field `5`/);
+  });
+});
+
 describe('cmp, partial_cmp, total_cmp and Ordering', () => {
   it('compare whole numbers, text, chars, bools, tuples, arrays and options', () => {
     assert.equal(out(main('println!("{:?} {:?} {:?}", 3.cmp(&4), \'b\'.cmp(&\'a\'), true.cmp(&true));')), 'Less Greater Equal\n');

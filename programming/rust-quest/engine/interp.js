@@ -1210,8 +1210,8 @@ RQ.interp=(ast,opts)=>{
             for(let i=0;i<len;i++)if(cmp(i,i)!==0)throw bad();
             for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])>0||cmp(order[i+1],order[i])<0)throw bad();
           }
-          // the unstable sorts keep the order of ties up to 20 elements and shuffle them beyond that
-          if(name.includes('unstable')&&len>20)for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])===0&&!eqv(arr[off+order[i]],arr[off+order[i+1]]))throw new Unsup('unstable sort of equal keys',e.line);
+          // the unstable sorts keep the order of ties up to 20 elements and shuffle them beyond that; ties that print alike (not 0.0 and -0.0) cannot be told apart
+          if(name.includes('unstable')&&len>20)for(let i=0;i+1<len;i++)if(cmp(order[i],order[i+1])===0&&RQ.std.debug(arr[off+order[i]])!==RQ.std.debug(arr[off+order[i+1]]))throw new Unsup('unstable sort of equal keys',e.line);
           const old=arr.slice(off,off+len);
           order.forEach((o,i)=>{arr[off+i]=old[o];});
           dropClosure(f,e.line);

@@ -2282,18 +2282,19 @@ RQ.check=ast=>{
       }
       case 'Field':{
         let b=res(ex(e.expr));
+        const b0=b;
         if(b.k==='any'||b.k==='never')return T.any;
         // a field of a reference to a struct reads through it; only the `self` of a Drop impl is one
         while(b.k==='ref'&&['struct','tuple','ref'].includes(res(b.to).k))b=res(b.to);
         if(b.k==='struct'){
           const f=fieldsOf(b).find(x=>x.name===e.name);
-          if(!f){errors.push(RQ.diag.make('E0609',e.nline||e.line,e.col,{name:e.name,type:b.name}));return T.any;}
+          if(!f){errors.push(RQ.diag.make('E0609',e.nline||e.line,e.ncol||e.col,{name:e.name,type:show(b0,true)}));return T.any;}
           return placeChain(e.expr)?f.ty:unsup('field of a temporary',e.line);
         }
         const i=/^\d+$/.test(e.name)?Number(e.name):-1;
         if(b.k==='tuple'){
           if(i>=0&&i<b.els.length)return b.els[i];
-          errors.push(RQ.diag.make('E0609',e.nline||e.line,e.col,{name:e.name,type:show(b)}));return T.any;
+          errors.push(RQ.diag.make('E0609',e.nline||e.line,e.ncol||e.col,{name:e.name,type:show(b0,true)}));return T.any;
         }
         return unsup('field access',e.line);
       }
