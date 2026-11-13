@@ -15216,5 +15216,401 @@
     "src": "use std::cmp::Reverse;\nfn main() {\n    let mut v = vec![1.5, 0.5];\n    v.sort_by_key(|x| Reverse(*x));\n    println!(\"{:?}\", v);\n}\n",
     "expect": {"code":"E0277","line":4},
     "why": "learner program: println!(\"{:?}\", v);", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-00",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-03",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-05",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-06",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-of-07",
+    "src": "fn main() {\n    let a = 5.0;\n    let b = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": {"code":"E0689","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-00",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-03",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-05",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-06",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-07",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-08",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-09",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-oi-10",
+    "src": "fn main() {\n    let a = 5;\n    let b = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-00",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-01",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-02",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-03",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-04",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-05",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-06",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-07",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-08",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-09",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-10",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": {"code":"E0599","line":6},
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-tf-17",
+    "src": "fn main() {\n    let a: f64 = 5.0;\n    let b: f64 = 6.0;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-00",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-01",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-02",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-03",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-04",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-05",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(rb));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-06",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-07",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-08",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-09",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", a.cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-10",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.cmp(&rb));\n}\n",
+    "expect": "ok", "out": "Less\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-r-ti-17",
+    "src": "fn main() {\n    let a: i32 = 5;\n    let b: i32 = 6;\n    let rb = &b;\n    let ra = &a;\n    println!(\"{:?}\", ra.partial_cmp(&&b));\n}\n",
+    "expect": "ok", "out": "Some(Less)\n", "err": "", "exit": 0,
+    "why": "a comparison method on a reference argument", "pr": "unit"
+  },
+  {
+    "id": "rv-s1",
+    "src": "fn main() {\n    println!(\"a\\n {y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s2",
+    "src": "fn main() {\n    println!(\"a\\t{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s3",
+    "src": "fn main() {\n    println!(\"a\\\\{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s4",
+    "src": "fn main() {\n    println!(\"a\\\"{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s5",
+    "src": "fn main() {\n    println!(\"a\\u{41}{y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s6",
+    "src": "fn main() {\n    println!(\"{{ {y}\");\n}\n",
+    "expect": {"code":"E0425","line":2},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s7",
+    "src": "struct P;\nfn main() {\n    let p = P;\n    println!(\"a\\n {p}\");\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-s8",
+    "src": "struct P;\nfn main() {\n    let p = P;\n    println!(\"\\u{e9}{p}\");\n}\n",
+    "expect": {"code":"E0277","line":4},
+    "why": "column of a name captured after an escape", "pr": "unit"
+  },
+  {
+    "id": "rv-u1",
+    "src": "use std::cmp::{Ordering, Ordering};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-u2",
+    "src": "use std::cmp::{Reverse, Reverse};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-u3",
+    "src": "use std::fmt::{Display, Display};\nfn main() {}\n",
+    "expect": {"code":"E0252","line":1},
+    "why": "a name repeated in one use list", "pr": "unit"
+  },
+  {
+    "id": "rv-v1",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    println!(\"{:?}\", Reverse(1).max(Reverse(2)));\n}\n",
+    "expect": "ok", "out": "Reverse(1)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v2",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    println!(\"{:?}\", Reverse(1).min(Reverse(2)));\n}\n",
+    "expect": "ok", "out": "Reverse(2)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v3",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": "ok", "out": "R(2)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v4",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).min(R(2)));\n}\n",
+    "expect": "ok", "out": "R(1)\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v5",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]\nenum E {\n    A,\n    B,\n}\nfn main() {\n    println!(\"{:?}\", E::A.max(E::B));\n}\n",
+    "expect": "ok", "out": "B\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v6",
+    "src": "#[derive(Debug, PartialEq, PartialOrd)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": {"code":"E0599","line":4},
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v7",
+    "src": "#[derive(Debug)]\nstruct R(i32);\nfn main() {\n    println!(\"{:?}\", R(1).max(R(2)));\n}\n",
+    "expect": {"code":"E0599","line":4},
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-v9",
+    "src": "#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]\nstruct P {\n    n: i32,\n}\nfn main() {\n    println!(\"{:?}\", P { n: 1 }.max(P { n: 2 }));\n}\n",
+    "expect": "ok", "out": "P { n: 2 }\n", "err": "", "exit": 0,
+    "why": "max and min on a type that derives Ord", "pr": "unit"
+  },
+  {
+    "id": "rv-w1",
+    "src": "struct R(i32);\nfn main() {\n    let R = 5;\n    println!(\"{}\", R);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w10",
+    "src": "struct R(i32);\nfn main() {\n    let mut R = 5;\n    R += 1;\n    println!(\"{}\", R);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w12",
+    "src": "fn main() {\n    let Some = 5;\n    println!(\"{}\", Some);\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w2",
+    "src": "struct R(i32);\nfn f(R: i32) -> i32 {\n    R\n}\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w3",
+    "src": "use std::cmp::Reverse;\nfn main() {\n    let Reverse = 5;\n    println!(\"{}\", Reverse);\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w4",
+    "src": "use std::cmp::Reverse;\nfn f(Reverse: i32) -> i32 {\n    Reverse\n}\nfn main() {\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":2},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w6",
+    "src": "struct R { a: i32 }\nfn main() {\n    let R = 5;\n    println!(\"{}\", R);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w7",
+    "src": "enum E {\n    A,\n}\nfn main() {\n    let A = 5;\n    println!(\"{}\", A);\n}\n",
+    "expect": "ok", "out": "5\n", "err": "", "exit": 0,
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w8",
+    "src": "struct R(i32);\nfn main() {\n    let v = vec![1];\n    for R in v {\n        println!(\"{}\", R);\n    }\n}\n",
+    "expect": {"code":"E0530","line":4},
+    "why": "a binding named like a tuple struct", "pr": "unit"
+  },
+  {
+    "id": "rv-w9",
+    "src": "struct R(i32);\nfn main() {\n    let f = |R: i32| R;\n    println!(\"{}\", f(1));\n}\n",
+    "expect": {"code":"E0530","line":3},
+    "why": "a binding named like a tuple struct", "pr": "unit"
   }
 ]

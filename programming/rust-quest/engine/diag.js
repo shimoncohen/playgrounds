@@ -30,8 +30,8 @@ const ERRORS={
   },
   E0530:{
     title:'a pattern name is also a variant',
-    msg:o=>'match bindings cannot shadow tuple variants',
-    tip:'`Some`, `Ok` and `Err` hold a value, so write the part in parentheses, like `Some(x)`. A bare name in a pattern is a new variable, and it may not reuse a variant\'s name.'
+    msg:o=>(o.what||'match bindings')+' cannot shadow tuple '+(o.what&&!o.variant?'structs':'variants'),
+    tip:'`Some`, `Ok`, `Err` and your own tuple structs hold a value, so write the part in parentheses, like `Some(x)`. A bare name in a pattern is a new variable, and it may not reuse their names.'
   },
   E0004:{
     title:'a match leaves some cases out',
@@ -269,8 +269,13 @@ const ERRORS={
   },
   E0689:{
     title:'a method is called on a number whose type is not known yet',
-    msg:o=>'can\'t call method `'+o.name+'` on ambiguous numeric type `{integer}`',
+    msg:o=>'can\'t call method `'+o.name+'` on ambiguous numeric type `'+(o.type||'{integer}')+'`',
     tip:'`abs`, `pow` and the other number methods need the type to be settled when they are called. Write the type on the `let`, like `let x: i32 = 5;`, or on the number, like `5i32`.'
+  },
+  E0252:{
+    title:'a name is imported twice',
+    msg:o=>'the name `'+o.name+'` is defined multiple times',
+    tip:'Each name can be brought in by `use` only once. Delete the repeat.'
   },
   E0433:{
     title:'a name is not in scope',

@@ -187,7 +187,7 @@ RQ.parse=tokens=>{
   function lit(x){
     if(x.byte)feat('byte literal',x.line);
     if(x.suffix&&OUT.has(x.suffix))feat(x.suffix,x.line);
-    return mk('Lit',x,{kind:x.k,v:x.v,suffix:x.suffix||null,plain:x.k==='str'&&x.el===x.line&&Array.from(x.v).length+2===x.ec-x.col});
+    return mk('Lit',x,{kind:x.k,v:x.v,suffix:x.suffix||null,raw:x.raw});
   }
   function pat(){
     const s=T();eatP('|');
@@ -225,7 +225,7 @@ RQ.parse=tokens=>{
     if(isK('ref')||isK('mut')||(x.k==='ident'&&!isP('::',pk())&&!isP('(',pk())&&!isP('{',pk())&&!isP('!',pk()))){
       const byRef=!!eatK('ref'),mut=!!eatK('mut'),n=ident();
       const sub=eatP('@')?patNoOr():null;
-      return mk('IdentPat',x,{name:n.v,mut,byRef,sub});
+      return mk('IdentPat',x,{name:n.v,mut,byRef,sub,nline:n.line,ncol:n.col});
     }
     const pa=path(true);
     if(isP('(')){p++;const ps=[];while(!isP(')')){ps.push(pat());if(!eatP(','))break;}expP(')');return mk('TupleStructPat',x,{path:pa,pats:ps});}
@@ -628,9 +628,9 @@ RQ.parse=tokens=>{
       return mk('TypeAlias',x,{name:n.v,generics:gs,bounds:bs,ty:t,pub});
     }
     if(isK('use')){
-      p++;let depth=0;const txt=[];
-      while(T().k!=='eof'&&!(depth===0&&isP(';'))){const z=T();if(z.k==='punct'){if(z.v==='{')depth++;else if(z.v==='}')depth--;}if(z.k==='ident'&&OUT.has(z.v))feat(z.v,z.line);txt.push(z.v);p++;}
-      semi();return mk('Use',x,{pub,txt:txt.join(' ')});
+      p++;let depth=0;const txt=[],at=[];
+      while(T().k!=='eof'&&!(depth===0&&isP(';'))){const z=T();if(z.k==='punct'){if(z.v==='{')depth++;else if(z.v==='}')depth--;}if(z.k==='ident'&&OUT.has(z.v))feat(z.v,z.line);txt.push(z.v);at.push({line:z.line,col:z.col});p++;}
+      semi();return mk('Use',x,{pub,txt:txt.join(' '),at});
     }
     if(isK('mod')){
       p++;const n=ident();

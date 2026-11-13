@@ -292,9 +292,16 @@ RQ.check=ast=>{
     return list.every(x=>USE_NAMES[x])?list.map(x=>USE_NAMES[x]):null;
   };
   // a `use` counts for the whole file; a name imported twice, or shadowed by an item, is not judged
-  const usable=new Set();
+  const usable=new Set(),repeated=new Set();
   for(const it of ast.items){
     const ns=useNames(it);
+    const toks=it.t==='Use'?it.txt.split(' '):[],seenName=new Set();
+    for(let k=toks.indexOf('{')+1;ns&&k>0&&k<toks.length;k++){
+      if(toks[k]===','||toks[k]==='}')continue;
+      if(seenName.has(toks[k])){errors.push(RQ.diag.make('E0252',it.at[k].line,it.at[k].col,{name:toks[k]}));ns.forEach(n=>uses.add(n));repeated.add(it);break;}
+      seenName.add(toks[k]);
+    }
+    if(repeated.has(it))continue;
     if(ns&&ns.every(n=>!uses.has(n)&&!ast.items.some(x=>x.name===n&&x.t!=='Use'))){ns.forEach(n=>uses.add(n));usable.add(it);}
   }
   // std's `Reverse` is declared as a program would write it; only the interpreter's comparison knows it flips the order
@@ -679,7 +686,7 @@ RQ.check=ast=>{
       const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
     }else if(mapUse&&useMap(it)){}
-    else if(usable.has(it)){}
+    else if(usable.has(it)||repeated.has(it)){}
     else if(it.t!=='Impl'&&it.t!=='Trait'&&(ITEM[it.t]||!['Extern','MacroRules','Union'].includes(it.t)))unsup(ITEM[it.t]||it.t,it.line);
   }
   for(const it of ast.items)if(it.t==='Trait')traitSigs(it);
@@ -729,8 +736,15 @@ RQ.check=ast=>{
     else if(!(e.t==='Lit'&&e.kind==='str')&&!['Return','Break','Continue'].includes(e.t))unsup('explicit lifetime',e.line);
   }
   const lookup=n=>{for(let i=scopes.length-1;i>=0;i--)if(scopes[i].has(n))return scopes[i].get(n);return null;};
-  const bindVar=(n,mut,kind,ty,node)=>{
+  const bindVar=(n,mut,kind,ty,node,what)=>{
     const b={mut,kind,ty,assigns:0,cl:curCl};
+    // a tuple struct or tuple variant is a pattern as well as a value, so a binding cannot take its name; the other names that are patterns are not judged
+    const own=structs.get(n),user=own||enums.has(n)||fns.has(n)||consts.has(n);
+    if(node&&n!=='self'){
+      const std=!user&&['Some','Ok','Err'].includes(n);
+      if(own&&own.kind==='tuple'||std)errors.push(RQ.diag.make('E0530',node.nline||node.line,node.ncol||node.col,{what:what||(kind==='param'?'function parameters':'let bindings'),variant:std}));
+      else if(own&&own.kind!=='named'||consts.has(n)||!user&&n==='None')unsup('pattern',node.line);
+    }
     // a by-value binding named like a unit variant of its own enum type is E0170, deny-by-default in rustc
     if(node&&!mut&&!node.byRef&&!node.sub){
       let u=res(ty);while(u.k==='ref')u=res(u.to);
@@ -982,11 +996,11 @@ RQ.check=ast=>{
           const l=lookup(part.name);if(l)varUses++;
           const b=l||consts.get(part.name);
           if(b)caps.push({name:part.name,bind:l});
-          // inside a plain one-line literal rustc points at the `{name}` and, for an unknown name, at the name
-          const brace=f.plain?f.col+1+part.at:f.col;
-          if(b)fmts.push({t:b.ty,line:f.line,col:brace,fmt:part.fmt});
+          // rustc points into the literal: at the `{name}`, and for an unknown name at the name
+          const at=f.raw?litPos(f,part.at):null,brace=at||f;
+          if(b)fmts.push({t:b.ty,line:brace.line,col:brace.col,fmt:part.fmt});
           else if(fns.has(part.name))unsup('function value',f.line);
-          else unknown(part.name,f.plain?{line:f.line,col:brace+1}:f);
+          else unknown(part.name,at?{line:at.line,col:at.col+1}:f);
         }
       }
     }
@@ -1042,6 +1056,23 @@ RQ.check=ast=>{
     return g.length===2&&g[0]==='Ordering'&&uses.has('Ordering')&&!nameTaken('Ordering')?g[1]:null;
   }
   const ordUndeclared=p=>noArgs(p)&&p.segs.length===2&&p.segs[0].name==='Ordering'&&!uses.has('Ordering')&&!nameTaken('Ordering');
+  // where the k-th character of a string literal's value starts in the source, walking past its escapes
+  function litPos(f,k){
+    const r=Array.from(f.raw);
+    let line=f.line,col=f.col,n=0,i=0;
+    const step=c=>{if(c==='\n'){line++;col=1;}else col++;};
+    step(r[i++]);
+    while(i<r.length-1){
+      if(n===k)return {line,col};
+      if(r[i]!=='\\'){step(r[i++]);n++;continue;}
+      const e=r[i+1];
+      if(e==='\n'||e==='\r'){let j=i+1;while(j<r.length-1&&/\s/.test(r[j]))j++;for(;i<j;i++)step(r[i]);continue;}
+      const len=e==='x'?4:e==='u'?r.indexOf('}',i)-i+1:2;
+      for(let t=0;t<len;t++)step(r[i+t]);
+      i+=len;n++;
+    }
+    return n===k?{line,col}:null;
+  }
   function ctorOf(p){
     const ov=ordVariant(p);
     if(ov){
@@ -1132,6 +1163,7 @@ RQ.check=ast=>{
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(name==='to_string'&&meets(base,'Display')&&base.k!=='coll')return {...rec('&',[],T.string,-1),key:'Display::to_string'};
+    if((name==='max'||name==='min'||name==='clamp')&&(base.k==='struct'||base.k==='enum')&&has(base,'Ord'))return name==='clamp'?null:{...rec('val',[base],base,-1),key:'Ord::'+name};
     if(name==='cmp'&&has(base,'Ord'))return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'Ord::cmp'};
     if(name==='partial_cmp'&&has(base,'PartialOrd'))return {...rec('&',[mkRef(false,base)],optTy(ordTy),-1),key:'PartialOrd::partial_cmp'};
     if(name==='total_cmp'&&base.k==='float')return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'f64::total_cmp'};
@@ -1244,6 +1276,7 @@ RQ.check=ast=>{
     if(!m&&spec&&base.k==='iter')return unsup('iterator',e.line);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
+      if(name==='clamp'&&(base.k==='struct'||base.k==='enum')&&has(base,'Ord'))return unsup('method call',e.line);
       if(base.k==='array'||base.k==='slice'){
         const el=res(base.el),need=SORTS.includes(name)&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null;
         if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
@@ -1268,6 +1301,7 @@ RQ.check=ast=>{
         return T.any;
       }
       if(name==='total_cmp'&&base.k==='fvar')return unsup('inferred type',e.line);
+      if(base.k==='fvar'&&!isRef&&name==='cmp'){errors.push(RQ.diag.make('E0689',e.nline,e.ncol,{name,type:'{float}'}));return T.any;}
       if(base.k==='ivar'&&INT_INHERENT.has(name)){
         errors.push(isRef?RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(r,true),kind:'reference'}):RQ.diag.make('E0689',e.nline,e.ncol,{name}));
         return T.any;
@@ -2286,9 +2320,10 @@ RQ.check=ast=>{
         const hint=['collect','sum','product'].includes(e.name)?takeWant():null;
         if(peel(e.recv).t==='Range')rangeOk=true;
         if(e.recv!==reuse)lendRange(e);
-        // `a.cmp(&b)` with `b` already a reference is a `&&T` that coerces back to the `&T` cmp takes
-        if(CMPS.includes(e.name)&&e.args.length===1&&peel(e.args[0]).t==='Ref')refArg.add(peel(e.args[0]));
         const rt=e.recv===reuse?(reuse=null,info.get(e.recv).ty):ex(e.recv),r=res(rt);
+        // `a.cmp(&b)` with `b` already a reference is a `&&T` that coerces back to the `&T` cmp takes; an open number has more than one impl, so rustc does not coerce
+        let rb=r;while(rb.k==='ref')rb=res(rb.to);
+        if(CMPS.includes(e.name)&&e.args.length===1&&peel(e.args[0]).t==='Ref'&&(!['ivar','fvar','tvar'].includes(rb.k)||e.name==='cmp'&&rb.k==='ivar'))refArg.add(peel(e.args[0]));
         if(r.k==='tvar'&&(r.cparam||r.pendTgt)){
           e.args.forEach(ex);
           if(r.cparam){if(!r.pendDone)errors.push(RQ.diag.make('E0282',r.cparam.line,r.cparam.col,{}));r.pendDone=true;}
@@ -2461,7 +2496,7 @@ RQ.check=ast=>{
           if(!unify(a,b)||!['int','ivar','any'].includes(res(a).k))unsup('type checking',it.line);else el=a;
         }else el=forItems(e,it);
         scopes.push(new Map());
-        if(named)bindVar(pt.name,pt.mut,'let',el,pt);
+        if(named)bindVar(pt.name,pt.mut,'let',el,pt,'for bindings');
         loops.push({ty:null,value:false});
         const t=block(e.body);loops.pop();scopes.pop();
         if(!['unit','never','any'].includes(res(t).k))unsup('type checking',e.line);

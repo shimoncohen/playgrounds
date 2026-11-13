@@ -1152,6 +1152,11 @@ RQ.interp=(ast,opts)=>{
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
+    if(key==='Ord::max'||key==='Ord::min'){
+      const first=cmpv(rv,args[0])>0,keep=key==='Ord::max'===first?rv:args[0];
+      dropValue(keep===rv?args[0]:rv,null,e.line);
+      return keep;
+    }
     if(key.startsWith('Int::'))return intMethod(key.slice(5),unref(rv),args.map(a=>unref(a)),at0);
     if(key==='Ord::cmp')return ordVal(cmpv(rv,args[0]));
     if(key==='PartialOrd::partial_cmp'){const c=cmpv(rv,args[0]);return optVal(c===null?undefined:ordVal(c));}

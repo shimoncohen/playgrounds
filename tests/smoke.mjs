@@ -837,7 +837,7 @@ test('rust-quest: the field guide lists the error glossary in a section of its o
   const heads = await page.$$eval('#guide .gsec h3', hs => hs.map(h => h.textContent.trim()));
   assert.equal(heads.filter(h => h.startsWith('Chapter')).length, 12, 'chapter 13 has no section of its own');
   assert.deepEqual(heads.slice(-2), ['Error glossary', 'Your progress']);
-  assert.equal(await page.$$eval('#guide .gsec:nth-last-child(2) .card', cs => cs.length), 13);
+  assert.equal(await page.$$eval('#guide .gsec:nth-last-child(2) .card', cs => cs.length), 14);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

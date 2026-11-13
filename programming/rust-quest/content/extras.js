@@ -211,6 +211,8 @@ RQ.GUIDE=[
  {ch:12,gl:1,c:"E0433: a type that is not imported",what:"<code>E0433</code>: a path starts with a type the file has not brought in. <code>Ordering</code> lives in <code>std::cmp</code>, so <code>Ordering::Less</code> needs <code>use std::cmp::Ordering;</code> at the top, or the whole path <code>std::cmp::Ordering::Less</code>.",
   ex:[["fn main() {\n    let a = 3;\n    let b = 5;\n    match a.cmp(&b) {\n        Ordering::Less => println!(\"less\"),\n        _ => println!(\"not less\"),\n    }\n}\n", "rejected: <code>Ordering</code> is not imported", "E0433"]]},
  {ch:12,gl:1,c:"E0689: a number method before the type is known",what:"<code>E0689</code>: a method like <code>abs</code> or <code>pow</code> is called on a number whose type is still open, such as a plain <code>let a = -3;</code>. The compiler picks <code>i32</code> only at the end, too late for the call. Write the type, like <code>let a: i32 = -3;</code>.",
-  ex:[["fn main() {\n    let a = -3;\n    println!(\"{}\", a.abs());\n}\n", "rejected: the type of <code>a</code> is not settled when <code>abs</code> is called", "E0689"]]}
+  ex:[["fn main() {\n    let a = -3;\n    println!(\"{}\", a.abs());\n}\n", "rejected: the type of <code>a</code> is not settled when <code>abs</code> is called", "E0689"]]},
+ {ch:12,gl:1,c:"E0252: a name imported twice",what:"<code>E0252</code>: the same name is brought in by <code>use</code> more than once, for example <code>Ordering</code> twice in one <code>{ }</code> list. Each name needs one <code>use</code>; delete the repeat.",
+  ex:[["use std::cmp::{Ordering, Ordering};\nfn main() {}\n", "rejected: <code>Ordering</code> is imported twice", "E0252"]]}
 ];
 })();
