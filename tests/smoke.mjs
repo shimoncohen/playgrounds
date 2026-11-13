@@ -3801,7 +3801,7 @@ test('agent-quest: a file the learner may edit can be deleted and restored from 
     await page.click(`#tree [data-path="${SKILL}"]`);
     const del = page.locator('#fileEditor button[data-act="delete"]');
     assert.equal(await del.textContent(), 'Delete file');
-    assert.match(await del.getAttribute('aria-label'), /Delete .*release-notes/);
+    assert.match(await del.getAttribute('aria-label'), /^Delete file .*release-notes/);
     await del.focus();
     await page.keyboard.press('Enter');
     assert.match(await page.textContent(`#tree [data-path="${SKILL}"]`), /\(deleted\)/);

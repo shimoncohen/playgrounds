@@ -90,7 +90,7 @@ ED.create=({tree,fileEl,host,onChange})=>{
     head.append(el('code','',p),el('span','note',gone?'Deleted for this practice run.':can?'You can edit this file. Edits are for this practice run only.':'Read-only: this is the project the agent works on.'));
     if(can){
       const b=el('button','btn ghost small',gone?'Restore file':'Delete file');
-      b.type='button';b.dataset.act=gone?'restore':'delete';b.setAttribute('aria-label',(gone?'Restore ':'Delete ')+p);
+      b.type='button';b.dataset.act=gone?'restore':'delete';b.setAttribute('aria-label',(gone?'Restore file ':'Delete file ')+p);
       b.addEventListener('click',()=>{
         if(gone)delete edits[p];else edits[p]=null;
         renderTree();renderFile();onChange();
