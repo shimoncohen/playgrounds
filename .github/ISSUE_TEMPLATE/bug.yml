@@ -6,7 +6,7 @@ body:
     id: where
     attributes:
       label: Which playground?
-      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Rust Quest, Landing page, Progress saving, Other]
+      options: [Script Quest, Python Quest, C++ Quest, Shell Quest, Harbor Quest, Data Structures Quest, Network Quest, Agent Quest, Rust Quest, Arithmetic, Algebra, Geometry, Trigonometry, Landing page, Progress saving, Other]
     validations:
       required: true
   - type: textarea
