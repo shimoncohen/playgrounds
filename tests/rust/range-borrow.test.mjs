@@ -49,7 +49,6 @@ describe('a &mut slice of an array or a Vec', () => {
 describe('what a slice still leaves unsupported', () => {
   const OPEN = [
     ['kept in a variable', 'fn f(a: &mut [i32]) {\n    let b = &mut a[1..];\n    b[0] = 7;\n}\n\nfn main() {\n    f(&mut [1, 2, 3]);\n}\n', 'reborrow'],
-    ['of a row of an array', main('let g = [[1, 2], [3, 4]];\nlet s = &g[0][1..];\nprintln!("{:?}", s);'), 'borrow of a field'],
     ['of a row, through a &mut parameter', `${ZERO}fn f(g: &mut Vec<Vec<i32>>) {\n    zero(&mut g[0][1..]);\n}\n\nfn main() {\n    f(&mut vec![vec![1, 2]]);\n}\n`, 'reborrow'],
     ['with the parameter read in a bound', `${ZERO}fn f(a: &mut [i32]) {\n    zero(&mut a[..a.len() / 2]);\n}\n\nfn main() {\n    f(&mut [1, 2, 3, 4]);\n}\n`, 'reborrow'],
     ['beside another use of the parameter in the call', 'fn z(a: &mut [i32], n: usize) {\n    a[0] = n as i32;\n}\n\nfn f(a: &mut [i32]) {\n    z(&mut a[1..], a.len());\n}\n\nfn main() {\n    f(&mut [1, 2, 3, 4]);\n}\n', 'reborrow'],

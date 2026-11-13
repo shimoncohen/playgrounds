@@ -28,7 +28,7 @@ const MACRO_NAMES='format panic assert assert_eq assert_ne debug_assert debug_as
 RQ.CHECK_FEATURES=['derive','match guard','struct','enum','impl','trait','static','type alias','use','mod','generics','method','nested item','closure','match',
   'method call','field access','slice','reference','dereference','cast','try operator','struct literal','qualified path',
   'fn pointer','impl Trait','inferred type','pattern','deferred initialization','format spec','assignment target','type checking',
-  'const initializer','integer overflow','const folding','main signature','path call','function value','block label','call','wrong argument count',
+  'const initializer','const folding','main signature','path call','function value','block label','call','wrong argument count',
   'range expression','for iterable','let condition','array length','break outside loop','field of a temporary',
   'explicit lifetime','lifetime elision','reference coercion','reference to reference','reborrow',
   'error conversion','string concatenation','polymorphic recursion','bounds','where','into','generic reference','String','Vec','HashMap','Option','Result','Box','str','collection method','iterator','closure kind','closure bound','closure returning a reference','hash key','reference in collection',...MACRO_NAMES.filter(n=>n!=='format').map(n=>n+'!')];
@@ -97,7 +97,7 @@ RQ.check=ast=>{
     if(g.k==='ref'&&w.k==='ref'&&!g.mut&&w.mut||clashes(g,w))mism(want,got,n);else unsup('reference coercion',n.line);
     return false;
   }
-  const unknown=(name,n)=>{errors.push(RQ.diag.make('E0425',n.line,n.col,{name}));return T.any;};
+  const unknown=(name,n)=>{n=RQ.peel(n);errors.push(RQ.diag.make('E0425',n.pline??n.line,n.pcol??n.col,{name}));return T.any;};
   const endNode=n=>n.t==='Block'&&n.tail?endNode(n.tail):n;
   // the number of values a type holds, so nested arrays cannot multiply into a print or a clone that freezes the page.
   // A Vec or HashMap counts as one: its elements are made by steps that are counted, and a recursive type such as `Vec<Node>` would not end
@@ -180,7 +180,7 @@ RQ.check=ast=>{
     return has(t,tr);
   };
   // `top` is set only for a fn's whole return type (and a const's type): that is the one place `&'static str` is checked against its leaves
-  const fmtErr=T.enum('Error',[],STD_TRAITS,true);
+  const fmtErr=T.enum('Error',[],STD_TRAITS,true),ordTy=T.enum('Ordering',[],STD_TRAITS,true);
   const fmtResult=()=>resTy(T.unit,fmtErr);
   function fmtType(n){
     const names=n.segs.map(g=>g.name),last=names[names.length-1],sg=n.segs[n.segs.length-1];
@@ -814,7 +814,7 @@ RQ.check=ast=>{
   // `v[a..b].m()` borrows the slice itself, as `(&v[a..b]).m()` does
   function lendRange(e){
     const rx=peel(e.recv);
-    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||MUT_SEQ.includes(e.name),expr:rx};
+    if(rx.t==='Index'&&peel(rx.index).t==='Range')e.recv={t:'Ref',id:rx.id+0.25,lent:true,line:rx.line,col:rx.col,mut:e.name==='iter_mut'||MUT_SEQ.includes(e.name)||SORT_BY.includes(e.name),expr:rx};
   }
   function slice(e,x){
     const rg=peel(x.index),b=res(ex(x.expr)),ts=[rg.from,rg.to].filter(Boolean).map(ex);
@@ -829,7 +829,7 @@ RQ.check=ast=>{
     if(base.k==='array'||base.k==='slice'||base.k==='coll'){
       // IndexMut borrows the base mutably, so behind a `&` it is E0596, as for a Vec element
       const bx=peel(x.expr),ch=e.mut&&(bx.t==='Path'||bx.t==='Field')?chainOf(bx):null;
-      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',e.line,e.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
+      if(ch&&(ch.via?!ch.via.mut:b.k==='ref'&&!ch.parts.length&&!b.mut))errors.push(RQ.diag.make('E0596',bx.line,bx.col,{name:b.k==='ref'&&!ch.parts.length?'*'+ch.name:ch.text,ref:true}));
       I(e).slice='arr';return mkRef(!!e.mut,T.slice(base.k==='coll'?base.args[0]:base.el));
     }
     return unsup('type checking',e.line);
@@ -1004,6 +1004,7 @@ RQ.check=ast=>{
     t=res(t);
     if(!t.builtin){const vs=enums.get(t.name).variants;return pmap(t)?vs.map(v=>({...v,fields:v.fields.map(f=>({...f,ty:inst(t,f.ty)}))})):vs;}
     const f=ty=>[{name:'0',ty}];
+    if(t.name==='Ordering')return ['Less','Equal','Greater'].map(name=>({name,kind:'unit',fields:[]}));
     return t.name==='Option'?[{name:'None',kind:'unit',fields:[]},{name:'Some',kind:'tuple',fields:f(t.args[0])}]
       :[{name:'Ok',kind:'tuple',fields:f(t.args[0])},{name:'Err',kind:'tuple',fields:f(t.args[1])}];
   }
@@ -1071,6 +1072,7 @@ RQ.check=ast=>{
     const bad=sub.find(x=>!has(x,'Ord'));
     return bad?ordLeaf(bad):t;
   };
+  const SORT_BY=['sort_by','sort_unstable_by','sort_by_key','sort_unstable_by_key'],CMPS=['cmp','partial_cmp','total_cmp'];
   const SORTS=['sort','sort_unstable'],MUT_SEQ=['swap','reverse',...SORTS],SEQ_METHODS=[...MUT_SEQ,'contains','first','last'];
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
   const ITERS=['iter','iter_mut','into_iter','keys','values','values_mut'],STORES=['push','insert','entry.or_insert','entry.or_default'];
@@ -1079,6 +1081,14 @@ RQ.check=ast=>{
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(name==='to_string'&&meets(base,'Display')&&base.k!=='coll')return {...rec('&',[],T.string,-1),key:'Display::to_string'};
+    if(name==='cmp'&&has(base,'Ord'))return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'Ord::cmp'};
+    if(name==='partial_cmp'&&has(base,'PartialOrd'))return {...rec('&',[mkRef(false,base)],optTy(ordTy),-1),key:'PartialOrd::partial_cmp'};
+    if(name==='total_cmp'&&base.k==='float')return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'f64::total_cmp'};
+    if(base.builtin&&base.name==='Ordering'){
+      if(name==='reverse')return rec('val',[],ordTy,-1);
+      if(name==='then')return rec('val',[ordTy],ordTy,-1);
+      return null;
+    }
     if(base.k==='array'||base.k==='slice'){
       const el=base.el,usz=T.int('usize'),on=(selfKind,params,ret,from)=>({...rec(selfKind,params,ret,from),key:'Vec::'+name});
       switch(name){
@@ -1174,6 +1184,8 @@ RQ.check=ast=>{
     if(base.k==='param'&&base.lenient)return T.any;
     const isRef=r.k==='ref',name=e.name,own=base.builtin||base.k==='coll'?null:base.k==='param'?paramMethods(base):methods.get(base.name);
     let m=(spec&&spec.build(args))||(own&&own.get(name))||builtinMethod(base,name,args);
+    // a `&str` is a `str` type here, so its own comparison takes one more `&` only behind a reference
+    if(m&&m.builtin&&CMPS.includes(name)&&base.k==='str'&&!isRef)m={...m,params:[{ty:T.str}]};
     if(!m&&spec&&base.k==='iter')return unsup('iterator',e.line);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
@@ -1200,8 +1212,9 @@ RQ.check=ast=>{
         errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'bounds',name,type:show(base)}));
         return T.any;
       }
+      if(name==='total_cmp'&&base.k==='fvar')return unsup('inferred type',e.line);
       if(base.builtin||UNIVERSAL.includes(name)||(name==='eq'||name==='ne')&&has(base,'PartialEq'))return unsup('method call',e.line);
-      errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base),kind:base.k==='param'?'type parameter':base.k,trait:base.k!=='param'&&missingTrait(base,name)}));
+      errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base,true),kind:base.k==='param'?'type parameter':['int','ivar','float','fvar','bool','char'].includes(base.k)?'type':base.k,trait:base.k!=='param'&&missingTrait(base,name)}));
       return T.any;
     }
     if(name==='drop'&&base.k==='struct'&&drops.has(base.name)){errors.push(RQ.diag.make('E0040',e.nline,e.ncol,{}));return T.unit;}
@@ -1783,16 +1796,19 @@ RQ.check=ast=>{
   }
   function closureSpec(e,r,base,name){
     const at=e.line,fn=unitSig;
+    const seqEl=base.k==='array'||base.k==='slice'?base.el:base.k==='coll'&&base.name==='Vec'?base.args[0]:null;
+    if(seqEl&&SORT_BY.includes(name)&&!(name.endsWith('_by')&&nameTaken('Ordering'))){
+      const keyed=name.endsWith('_key'),K=keyed?fresh(at):null;
+      return {cl:()=>keyed?fn('FnMut',[mkRef(false,seqEl)],K):fn('FnMut',[mkRef(false,seqEl),mkRef(false,seqEl)],ordTy),build:()=>{
+        if(keyed){
+          if(hasRef(K))return null;
+          if(!isOpen(K,false)&&!has(K,'Ord'))errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(K)}));
+        }
+        return rec('Vec::'+name,'&mut',[T.any],T.unit,-1);
+      }};
+    }
     if(base.k==='coll'){
       const [k,v]=base.args;
-      if(base.name==='Vec'&&name==='sort_by_key'){
-        const K=fresh(at);
-        return {cl:()=>fn('FnMut',[mkRef(false,k)],K),build:()=>{
-          if(hasRef(K))return null;
-          if(!isOpen(K,false)&&!has(K,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(K)}));}
-          return rec('Vec::sort_by_key','&mut',[T.any],T.unit,-1);
-        }};
-      }
       if(name==='retain'){
         const vec=base.name==='Vec';
         return {cl:()=>fn('FnMut',vec?[mkRef(false,k)]:[mkRef(false,k),mkRef(true,v)],T.bool),build:()=>rec(base.name+'::retain','&mut',[T.any],T.unit,-1)};
@@ -1805,6 +1821,7 @@ RQ.check=ast=>{
       return null;
     }
     if(!base.builtin)return null;
+    if(base.name==='Ordering')return name==='then_with'?{cl:()=>fn('FnOnce',[],ordTy),build:()=>rec('Ordering::then_with','val',[T.any],ordTy,-1)}:null;
     const opt=base.name==='Option',[a,b]=base.args;
     const val=(cl,ret,params)=>({cl,build:()=>hasRef(ret)?null:rec((opt?'Option::':'Result::')+name,'val',params||[T.any],ret,-1)});
     if(opt){
@@ -1832,7 +1849,7 @@ RQ.check=ast=>{
     if(base.k==='iter')return iterSpec(e,base,name,hint);
     const src=['iter','iter_mut','into_iter','keys','values','values_mut','chars'].includes(name)?srcSpec(e,r,base,name):null;
     if(src)return src;
-    if(base.k==='coll'||base.builtin)return closureSpec(e,r,base,name);
+    if(base.k==='coll'||base.builtin||base.k==='array'||base.k==='slice')return closureSpec(e,r,base,name);
     return null;
   }
   function callValue(e){
@@ -1881,6 +1898,8 @@ RQ.check=ast=>{
         const n=e.segs[0].name,local=e.segs.length===1&&lookup(n),b=local||(e.segs.length===1&&consts.get(n));
         if(local){varUses++;I(e).bind=local;}
         if(b)return b.ty;
+        const [tn,cn]=e.segs.map(g=>g.name);
+        if(e.segs.length===2&&RQ.types.isInt(tn)&&(cn==='MIN'||cn==='MAX')&&!adtRec(tn)){I(e).ic={ty:tn,max:cn==='MAX'};return T.int(tn);}
         const ct=ctorOf(e);
         if(ct){
           if(ct.kind!=='unit')return unsup('function value',e.line);
@@ -2188,7 +2207,7 @@ RQ.check=ast=>{
           return tgt;
         }
         const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k))return adtMethod(e,r,adt,args,null);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k)||CMPS.includes(e.name)&&!nameTaken('Ordering')&&['int','ivar','float','fvar','bool','char','unit','String','str','tuple','array','slice','ref'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
@@ -2263,18 +2282,19 @@ RQ.check=ast=>{
       }
       case 'Field':{
         let b=res(ex(e.expr));
+        const b0=b;
         if(b.k==='any'||b.k==='never')return T.any;
         // a field of a reference to a struct reads through it; only the `self` of a Drop impl is one
-        if(b.k==='ref'&&res(b.to).k==='struct')b=res(b.to);
+        while(b.k==='ref'&&['struct','tuple','ref'].includes(res(b.to).k))b=res(b.to);
         if(b.k==='struct'){
           const f=fieldsOf(b).find(x=>x.name===e.name);
-          if(!f){errors.push(RQ.diag.make('E0609',e.nline||e.line,e.col,{name:e.name,type:b.name}));return T.any;}
+          if(!f){errors.push(RQ.diag.make('E0609',e.nline||e.line,e.ncol||e.col,{name:e.name,type:show(b0,true)}));return T.any;}
           return placeChain(e.expr)?f.ty:unsup('field of a temporary',e.line);
         }
         const i=/^\d+$/.test(e.name)?Number(e.name):-1;
         if(b.k==='tuple'){
           if(i>=0&&i<b.els.length)return b.els[i];
-          errors.push(RQ.diag.make('E0609',e.nline||e.line,e.col,{name:e.name,type:show(b)}));return T.any;
+          errors.push(RQ.diag.make('E0609',e.nline||e.line,e.ncol||e.col,{name:e.name,type:show(b0,true)}));return T.any;
         }
         return unsup('field access',e.line);
       }
