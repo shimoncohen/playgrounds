@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import { loadNet } from './harness.mjs';
 
 const NQ = loadNet();
-const names = ['pair', 'office', 'home'];
+const names = ['pair', 'office', 'home', 'dns', 'dns-stale'];
 const J = (x) => JSON.parse(JSON.stringify(x));
 const addrs = (net) => J(Object.fromEntries(Object.values(net.devices).map((d) => [d.id, Object.fromEntries(Object.entries(d.ifaces).map(([n, i]) => [n, i.ip]))])));
 const gw = (net, id) => J(net.devices[id].routes.filter((r) => r.dst === 'default').map((r) => r.via));
 
-test('scenarios: exactly pair, office, home', () => {
+test('scenarios: pair, office, home, dns and dns-stale', () => {
   assert.deepEqual(Object.keys(NQ.SCENARIOS), names);
 });
 
@@ -145,4 +145,50 @@ test('createNet: an empty setup changes nothing; every device has a permanent li
 test('exec, clone and reset are not enumerable', () => {
   const net = NQ.createNet('pair');
   assert.deepEqual(Object.keys(net).sort(), ['clock', 'devices', 'log', 'me', 'name']);
+});
+
+test('dns: seven devices with the documented addresses and routes', () => {
+  const net = NQ.createNet('dns');
+  assert.equal(net.me, 'laptop');
+  assert.deepEqual(Object.keys(net.devices), ['laptop', 'resolver', 'sw1', 'r1', 'root', 'tld', 'auth']);
+  assert.deepEqual(addrs(net).r1, { eth0: '192.168.1.1/24', eth1: '192.0.2.1/24', eth2: '198.51.100.1/24', eth3: '203.0.113.1/24' });
+  assert.deepEqual([net.devices.laptop, net.devices.resolver].map((d) => d.ifaces.eth0.ip), ['192.168.1.10/24', '192.168.1.53/24']);
+  assert.deepEqual(['root', 'tld', 'auth'].map((d) => net.devices[d].ifaces.eth0.ip), ['192.0.2.10/24', '198.51.100.10/24', '203.0.113.10/24']);
+  assert.deepEqual(['laptop', 'resolver', 'root', 'tld', 'auth'].map((d) => gw(net, d)), [['192.168.1.1'], ['192.168.1.1'], ['192.0.2.1'], ['198.51.100.1'], ['203.0.113.1']]);
+  assert.deepEqual(J(net.devices.r1.routes), []);
+  assert.deepEqual(J(net.devices.sw1.ifaces.p3.peer), 'r1.eth0');
+  assert.equal(Object.values(net.devices).some((d) => d.nat || d.dropPrivate), false);
+});
+
+test('dns: stub, resolver and name server data; zones glue the delegations together', () => {
+  const d = NQ.createNet('dns').devices;
+  assert.deepEqual(J(d.laptop.dns), { resolver: '192.168.1.53', roots: ['192.0.2.10'] });
+  assert.deepEqual(J(d.resolver.dns), { recursive: true, roots: ['192.0.2.10'], now: 0, cache: [] });
+  assert.deepEqual(J([d.root, d.tld, d.auth].map((x) => x.dns.zones.map((z) => z.origin))), [['.'], ['test.'], ['example.test.']]);
+  const rec = (dev, name, type) => J(d[dev].dns.zones[0].records.filter((r) => r.name === name && r.type === type).map((r) => r.data));
+  assert.deepEqual(rec('root', 'test.', 'NS'), ['a.nic.test.']);
+  assert.deepEqual(rec('root', 'a.nic.test.', 'A'), ['198.51.100.10']);
+  assert.deepEqual(rec('tld', 'example.test.', 'NS'), ['ns1.example.test.']);
+  assert.deepEqual(rec('tld', 'ns1.example.test.', 'A'), ['203.0.113.10']);
+  assert.deepEqual(rec('auth', 'www.example.test.', 'A'), ['198.18.0.80']);
+  assert.deepEqual(rec('auth', 'www.example.test.', 'AAAA'), ['2001:db8::80']);
+  assert.deepEqual(rec('auth', 'shop.example.test.', 'CNAME'), ['www.example.test.']);
+  assert.deepEqual(rec('auth', 'example.test.', 'MX'), ['10 mail.example.test.']);
+  assert.deepEqual(rec('auth', 'mail.example.test.', 'A'), ['198.18.0.25']);
+  for (const x of [d.root, d.tld, d.auth]) assert.deepEqual([x.dns.zones[0].soa.ttl, x.dns.zones[0].soa.minimum], [300, 60]);
+});
+
+test('dns-stale seeds one cache entry and nothing else differs', () => {
+  const a = NQ.createNet('dns'), b = NQ.createNet('dns-stale');
+  assert.deepEqual(J(b.devices.resolver.dns.cache), [{ name: 'www.example.test.', type: 'A', expires: 3600, rcode: 'NOERROR', rrs: [{ name: 'www.example.test.', ttl: 300, type: 'A', data: '198.18.0.99' }] }]);
+  assert.equal(b.devices.resolver.dns.now, 0);
+  b.devices.resolver.dns.cache = [];
+  assert.deepEqual(J(b.devices), J(a.devices));
+});
+
+test('the other scenarios carry no dns field, and scenarios do not share zone data', () => {
+  for (const n of ['pair', 'office', 'home']) for (const d of Object.values(NQ.createNet(n).devices)) assert.equal('dns' in d, false, n + '.' + d.id);
+  const x = NQ.createNet('dns');
+  x.devices.auth.dns.zones[0].records.length = 0;
+  assert.ok(NQ.createNet('dns').devices.auth.dns.zones[0].records.length > 0);
 });
