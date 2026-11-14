@@ -17,11 +17,12 @@ NQ.pingTo=ip=>new RegExp('^\\s*ping\\s(.*\\s)?'+ip.replace(/\./g,'\\.')+'\\s*$')
 NQ.ASK='Now type your answer in the box under the question.'; // runMission's "check passed, waiting for the answer"
 /* the check context. history: [{line, code, out, entries}] the learner ran, entries being the log slice that line added
    (net.exec's r.entries); answered: their answer to the question, or null. lastPing() is the
-   latest history item whose command is ping, or null. ping runs on a probe copy, so a check's probe never changes the
-   learner's ARP caches, NAT table or log. */
+   latest history item whose command is ping, or null. ping and dig run on a probe copy, so a check's probe never changes the
+   learner's ARP caches, NAT table, DNS cache or log. */
 NQ.makeCtx=(net,history,answered)=>({
   net,history:history||[],answered:answered??null,entries:net.log,
   ping:(from,ip)=>{const r=NQ.sim.ping(net.probe(),from,ip);return {delivered:r.delivered,reason:r.reason,replyFrom:r.replyFrom,hops:r.hops};},
+  dig:(from,name,type,opts)=>{const o=opts||{},d=net.devices[from].dns;return NQ.dns.query(net.probe(),from,{server:o.server||(d&&d.resolver),name,type:type||'A',rd:o.rd});},
   route:(dev,ip)=>NQ.sim.route(net.devices[dev],ip),
   addr:dev=>Object.fromEntries(Object.entries(net.devices[dev].ifaces).map(([k,i])=>[k,i.ip])),
   last:pred=>{for(let i=net.log.length-1;i>=0;i--)if(pred(net.log[i]))return net.log[i];return null;},

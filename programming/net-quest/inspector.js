@@ -15,7 +15,11 @@ const NOTE={
   Ethernet:{src:'sender’s MAC',dst:'receiver’s MAC',type:'what is inside'},
   ARP:{op:'question or answer',sha:'sender’s MAC',spa:'sender’s IP address',tha:'target’s MAC (unknown in a request)',tpa:'target’s IP address'},
   IPv4:{src:'sender’s IP address',dst:'receiver’s IP address',ttl:'time to live: routers left before it is dropped',proto:'what is inside'},
-  ICMP:{type:'kind of message',id:'which ping it belongs to',seq:'request number'}
+  ICMP:{type:'kind of message',id:'which ping it belongs to',seq:'request number'},
+  UDP:{sport:'sender’s port',dport:'receiver’s port'},
+  DNS:{id:'matches an answer to its question',qr:'0 for a question, 1 for an answer',opcode:'kind of request',aa:'1 if the server that owns the name answered',rd:'1 if it asks the server to look the name up for you',ra:'1 if the server looks names up for others',rcode:'how it went',
+    qname:'the name asked about',qtype:'the kind of record asked for',ancount:'records in the answer',nscount:'records in the authority section',arcount:'records in the additional section',
+    ...Object.fromEntries([['an',9,'a record in the answer'],['ns',2,'a record in the authority section'],['ar',2,'a record in the additional section']].flatMap(([k,n,t])=>Array.from({length:n},(_,i)=>[k+(i+1),t])))}
 };
 const layersOf=p=>{try{return NQ.pkt.layerNames(p).join(' › ');}catch(e){return '';}};
 const hexDump=p=>{

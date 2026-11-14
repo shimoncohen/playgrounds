@@ -6,8 +6,10 @@
 const NQ=globalThis.NQ=globalThis.NQ||{};
 const MAX_LINE=1000,MAX_OUT=200;
 NQ.CMDS={};NQ.HELP={};
+NQ.AVAIL={}; // name -> (dev) => bool; a command with no entry exists everywhere
 NQ.reg=(name,help,fn)=>{NQ.CMDS[name]=fn;NQ.HELP[name]=help;};
 const has=name=>Object.prototype.hasOwnProperty.call(NQ.CMDS,name);
+const avail=(name,dev)=>!NQ.AVAIL[name]||NQ.AVAIL[name](dev);
 const res=(out,err,code)=>({out,err,code});
 const fail=(code,...err)=>res([],err,code);
 
@@ -38,10 +40,10 @@ const lev=(a,b)=>{
   }
   return prev[b.length];
 };
-/* the one registered command nearest to name within edit distance 2 (none if two tie) */
-const suggest=name=>{
+/* only commands this device has; none if two tie */
+const suggest=(name,dev)=>{
   let best=null,tie=false;
-  for(const c of Object.keys(NQ.CMDS)){
+  for(const c of Object.keys(NQ.CMDS).filter(n=>avail(n,dev))){
     const d=lev(name,c);
     if(d>2)continue;
     if(!best||d<best.d){best={c,d};tie=false;}else if(d===best.d)tie=true;
@@ -81,8 +83,8 @@ const run=(net,dev,line)=>{
     filters.push(f);
   }
   const name=first[0];
-  if(!has(name)){
-    const s=suggest(name);
+  if(!has(name)||!avail(name,dev)){
+    const s=suggest(name,dev);
     return fail(127,'bash: '+name+': command not found',...(s?["Did you mean '"+s+"'?"]:[]));
   }
   let r;
@@ -103,8 +105,8 @@ NQ.exec=(net,line,devId)=>{
 };
 
 /* net.known (set by NQ.session) narrows the list to the commands taught so far; a bare net lists every command */
-NQ.reg('help','list the commands you can use',net=>{
-  const names=Object.keys(NQ.CMDS).filter(n=>!net.known||net.known.has(n)).sort(),w=Math.max(...names.map(n=>n.length));
+NQ.reg('help','list the commands you can use',(net,dev)=>{
+  const names=Object.keys(NQ.CMDS).filter(n=>avail(n,dev)&&(!net.known||net.known.has(n))).sort(),w=Math.max(...names.map(n=>n.length));
   return res(names.map(n=>n.padEnd(w)+'  '+NQ.HELP[n]),[],0);
 });
 })();
