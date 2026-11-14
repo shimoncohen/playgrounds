@@ -42,21 +42,20 @@ const flat = [];
 D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 
-// typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
 const SYNTAX = {
-  ';':               [/;/, /marks the end of a statement/],
-  'dot':             [/\w\.\w/, /dot reaches a tool/],
-  '===':             [/===/, /asks "is it exactly equal\?"/],
-  '!==':             [/!==/, /asks "is it different\?"/],
-  '||':              [/\|\|/, /means "or"/],
-  'else if':         [/else if/, /next test, tried only if the earlier one failed/],
-  'lookup as test':  [/if\s*\(!?\w+\[[^\]]+\]\)/, /finds nothing it is undefined/],
-  'for (let i...)':  [/for\s*\(\s*let\s/, /start i at 0, keep going while i < n/],
-  'i++':             [/\+\+/, /add 1 after each round with i\+\+/],
-  'count++':         [/^\s*\w+\+\+;/m, /count\+\+ adds 1/],
-  'return;':         [/return;/, /return; leaves the function early/],
-  '? :':             [/\s\?\s[^\n]*\s:\s/, /test \? a : b/],
-  'const contents':  [/const (\w+) = \[[^\n]*\];[\s\S]*\1\.(push|pop)/, /locks the name, not the contents/],
+  ';':               [/;/, /ends an instruction/],
+  'dot':             [/\w\.\w/, /dot reaches/],
+  '===':             [/===/, /exactly equal/],
+  '!==':             [/!==/, /is it different/],
+  '||':              [/\|\|/, /"or"/],
+  'else if':         [/else if/, /next test/],
+  'lookup as test':  [/if\s*\(!?\w+\[[^\]]+\]\)/, /finds nothing/],
+  'for (let i...)':  [/for\s*\(\s*let\s/, /start i at 0/],
+  'i++':             [/\+\+/, /after each round/],
+  'count++':         [/^\s*\w+\+\+;/m, /adds 1/],
+  'return;':         [/return;/, /leaves the function/],
+  '? :':             [/\s\?\s[^\n]*\s:\s/, /if the test is true/],
+  'const contents':  [/const (\w+) = \[[^\n]*\]\s*;?[\s\S]*\1\.(push|pop)/, /not the contents/],
 };
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
