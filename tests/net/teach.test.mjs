@@ -85,17 +85,49 @@ const FIRST = {
   'rndc flush': [/rndc/, 6, 7],
   '+trace': [/\+trace/, 6, 8],
 };
-// same shape; kept apart because the chapter-intro checks below walk FIRST and these chapters' own intros may use them
+// item -> [regex for a use, chapter, mission (0-based) that explains it, regex for the explanation]. Kept apart from FIRST because
+// the chapter-intro checks below walk FIRST, and the intros of later chapters may use these items. The explanation must sit in
+// what the learner reads before solving (title, goal, how, question, and for a chapter's first mission its intro).
 const EARLY = {
-  byte: [/\bbytes?\b/, 0, 0],
-  Ethernet: [/\bEthernet\b/, 0, 1],
-  IPv4: [/\bIPv4\b/, 0, 1],
-  ICMP: [/\bICMP\b/, 0, 1],
-  ARP: [/\bARP\b/, 0, 3],
-  'packet loss': [/packet loss|\d+% loss/i, 1, 2],
-  'last part of a name': [/\blast part\b/i, 6, 0],
+  byte: [/\bbytes?\b/, 0, 0, /\bbyte\b[^.]*\bsmall unit of data\b/],
+  Ethernet: [/\bEthernet\b/, 0, 1, /\bEthernet crosses one wire\b/],
+  IPv4: [/\bIPv4\b/, 0, 1, /\bIPv4 carries the addresses for the whole trip\b/],
+  ICMP: [/\bICMP\b/, 0, 1, /\bICMP is the kind of message a ping sends\b/],
+  ARP: [/\bARP\b/, 0, 3, /\bARP, the Address Resolution Protocol, is how a device finds the MAC behind an IP address\b/],
+  'packet loss': [/packet loss|\d+% loss/i, 1, 2, /\bPacket loss\b[^.]*\bshare of your requests\b[^.]*\bno reply\b/],
+  'last part of a name': [/\blast part\b/i, 6, 0, /\blast part of www\.example\.test is test\b/],
 };
-for (const [term, [re, ci, mi]] of Object.entries({ ...FIRST, ...EARLY })) {
+const pre = (ci, mi) => {
+  const m = NQ.CH[ci].missions[mi];
+  return plain([mi === 0 && NQ.CH[ci].intro, m.title, m.goal, ...(m.how || []), m.question && m.question.ask].filter(Boolean).join('\n'));
+};
+const intros = NQ.CH.map((c, ci) => ({ ci, text: plain(c.intro) }));
+for (const [term, [re, ci, mi, def]] of Object.entries(EARLY)) {
+  describe(`"${term}" (explained at ${ci}.${mi})`, () => {
+    it('is not used before, on a card, hint or chapter intro', () => {
+      for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is explained`);
+      for (const x of intros) if (x.ci < ci || (x.ci === ci && mi > 0)) assert.ok(!re.test(x.text), `the intro of chapter ${x.ci} uses "${term}" before it is explained`);
+    });
+    it('is explained in what its mission shows before solving', () => assert.match(pre(ci, mi), def));
+    it('is not used in quick-fire or the field guide before its chapter', () => {
+      for (const q of NQ.QF) if (re.test(plain([q.c, q.a, ...q.w, q.why].join(' ')))) assert.ok(q.ch >= ci, `quick-fire "${q.c}" needs chapter ${ci}`);
+      for (const g of NQ.GUIDE) if (re.test(plain([g.c, g.what, ...g.ex.flat()].join(' ')))) assert.ok(g.ch >= ci, `guide "${g.c}" needs chapter ${ci}`);
+    });
+  });
+}
+
+describe('1.2 names the three layers without giving the order away', () => {
+  const sentence = plain(NQ.CH[0].missions[1].goal).split(/(?<=\.)\s/).find((x) => /IPv4 carries/.test(x));
+  it('has a sentence that glosses them', () => assert.ok(sentence));
+  it('uses no wording about position or wrapping', () => assert.doesNotMatch(sentence, /\b(inside|outside|outer|inner|innermost|outermost|wraps?|rides|top|bottom|first|last|then)\b/i));
+  it('lists the names in neither the real order nor its reverse', () => {
+    const at = (w) => sentence.indexOf(w);
+    const order = ['Ethernet', 'IPv4', 'ICMP'].map(at);
+    assert.ok(order.every((i) => i >= 0));
+    assert.ok(!(order[0] < order[1] && order[1] < order[2]) && !(order[2] < order[1] && order[1] < order[0]));
+  });
+});
+for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
     it(`is not used before ${ci}.${mi}, where it is introduced`, () => {
       for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
@@ -107,17 +139,6 @@ for (const [term, [re, ci, mi]] of Object.entries({ ...FIRST, ...EARLY })) {
     });
   });
 }
-
-describe('chapter 1 and 2 say what an item is before the learner meets it', () => {
-  const goal = (ci, mi) => plain(NQ.CH[ci].missions[mi].goal + ' ' + NQ.CH[ci].missions[mi].how.join(' '));
-  it('byte (1.1), Ethernet, IPv4 and ICMP (1.2), ARP (1.4), packet loss (2.3), last part of a name (7.1)', () => {
-    assert.match(goal(0, 0), /a byte is a small unit of data, so 64 bytes is the size of the reply/);
-    assert.match(goal(0, 1), /IPv4 carries the addresses for the whole trip, ICMP is the ping message itself, and Ethernet crosses one wire/);
-    assert.match(goal(0, 3), /ARP, the Address Resolution Protocol, is how a device finds the MAC behind an IP address/);
-    assert.match(goal(1, 2), /Packet loss, in the statistics at the end, is the share of your requests that got no reply/);
-    assert.match(goal(6, 0), /the last part of www\.example\.test is test/);
-  });
-});
 
 describe('chapter 2 does not use words that later chapters teach', () => {
   // routing and addressing come in chapters 3 and 4; NAT in chapter 5 ("router" and "TTL" were taught in chapter 1)
