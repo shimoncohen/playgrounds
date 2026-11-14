@@ -3,11 +3,11 @@
   "edition": "2024",
   "image": "rust@sha256:b8e062b1c3a80183df83d9ba187cadd2b5ab84bc78d453dbfeb2fccd5f982247",
   "date": "2026-11-13",
-  "inputsHash": "2e992e735130c32304354fb393f62636320a76dfe9b3dae6b3e6cffbc3added1",
-  "resultsHash": "4a6403849a7d4a38793a4047112f2a7b747ff0684f48af5e85dc392985873527",
+  "inputsHash": "679d6ef45c7007092cc63f5dc8c1e5815c9d741a3044e3dbf7fe8d1d05719708",
+  "resultsHash": "1c658c0e44da46a86c151ef240d9e4cf4210a80c7bcd247a094ee331d553a359",
   "counts": {
-    "corpus": 2204,
+    "corpus": 2552,
     "missions": 943,
-    "guide": 109
+    "guide": 112
   }
 }

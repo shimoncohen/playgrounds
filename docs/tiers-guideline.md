@@ -290,7 +290,7 @@ Anything the learner could type or that names a part of the code is shown as cod
 ## 7. Guide and quick-fire tags
 
 - **Guide.** Entries are `{c, ch, what, syn, ex}`. `ch` is the chapter index; the entry's tier is `tierOf(ch)`, so there is no separate tier tag to forget. `ch: 'extras'` puts an entry under "Handy extras", which has its own key and shows only under the All filter. The tier filter buttons are built from the tiers that have chapters.
-- **Quick-fire.** Entries are `[task, [accepted answers], tier?, {exact:true}?]`. A missing tier means `'beginner'`. The tier picker shows "Mixed" plus every tier that has at least one question, and a round draws only from the chosen pool.
+- **Quick-fire.** Entries are `[task, [accepted answers], tier?, {exact:true}?]`. A missing tier means `'beginner'`. A quest that opens each question once its chapter is finished (Harbor Quest) carries the chapter index as the third element instead, and the tier comes from that chapter (`tierOf(ch)`); one quest uses one of the two shapes, never both. The tier picker shows "Mixed" plus every tier that has at least one question, and a round draws only from the chosen pool.
 
 ## 8. File layout for a playground
 
@@ -312,12 +312,12 @@ Load order in `index.html`: `shared/progress.js`, `shared/tiers.js`, `engine/*`,
 
 1. Put the new playground's saved-state shape on paper: where chapter, mission, `done`, `badges` and XP live, and the `localStorage` key. Keep all of it.
 2. Capture a golden: export a complete save and a transcript of every existing mission, and add a test that replays them. Do this **before** touching anything.
-3. Split code into engine / content / ui / app files with a shared namespace, keeping behaviour byte-identical; run the golden after each step.
+3. Split code into engine / content / ui / app files with a shared namespace, keeping behaviour the same; the golden passing after every step is the proof a split is safe, not identical bytes.
 4. Add `shared/tiers.js` and `shared/tiers.css`; create `content/tiers.js` with `Tiers.create`; tag every existing chapter `tier: 'beginner'` (this changes no behaviour).
 5. Replace the hardcoded XP-per-mission, badge XP and rank table with `tiers.missionXp(ch)`, `chapterBadgeXp` and `rankFor`. Pick `baseRanks` and `tierEndRanks` so existing thresholds are unchanged.
 6. Draw the rail with `Tiers.renderRail` and keep the chapter button markup the same.
 7. Add a `check` context with helpers like the ones in section 3, and write the first new tier as outcome-style checks.
 8. Add solvability and wrong-command tests for every new chapter, and an import test for the old save fixture.
-9. Tag guide entries by chapter and quick-fire by tier; add the tier filter and picker.
+9. Tag guide entries by chapter and quick-fire by tier (or by chapter index, as in section 7, when the quest already opens questions by chapter); add the tier filter and picker.
 10. Add the bundle smoke test, run `python3 tools/build.py --check`, and wire the Node tests into CI before the browser tests.
 11. Play every new chapter by hand at desktop width and 390 px, in light and dark.

@@ -15,17 +15,13 @@ const WEB='198.51.100.10',FAR='8.8.8.8'; // FAR: an address no route on home cov
 const addrOf=(c,d,i)=>bare(c.net.devices[d].ifaces[i||'eth0'].ip);
 const home=c=>c.net.devices.home;
 const NAT_TABLE=/^\s*nat\s+table\s*$/;
-/* did the learner print a NAT table with a line in it? Their lines are replayed on a clone started over, because nat off
-   forgets the table and the lines before it are what the learner saw. */
-const sawTable=c=>{
-  const n=c.net.clone();n.reset();
-  return c.history.some(h=>{const r=n.exec(h.line,'home');return h.code===0&&NAT_TABLE.test(h.line)&&/^proto /.test(r.out[0]||'');});
-};
+// did the learner print a NAT table with a line in it? Judged by what each run printed then, since nat off forgets the table
+const sawTable=c=>c.history.some(h=>h.code===0&&NAT_TABLE.test(h.line)&&/^proto /.test((h.out||[])[0]||''));
 /* the inside address of the first translation: from the table, or, if NAT was switched off since (which forgets the
    table), from a clone of the network started over, where the setup's ping makes the translation again */
 const firstInside=c=>{
   let t=(home(c).nat&&home(c).nat.table)||[];
-  if(!t.length){const n=c.net.clone();n.reset();t=(n.devices.home.nat&&n.devices.home.nat.table)||[];}
+  if(!t.length){const n=c.net.probe();n.reset();t=(n.devices.home.nat&&n.devices.home.nat.table)||[];}
   return t.length?t[0].inside:'';
 };
 const RUN_PING=/^\s*ping(\s|$)/,RUN_TRACE=/^\s*traceroute\s+\S+\s*$/;

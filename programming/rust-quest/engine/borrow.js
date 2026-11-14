@@ -24,11 +24,11 @@ const VISITS=50;
 
 // use(local, isMove, kind): kind is copy, move, reb (implicit reborrow of a `&mut` local), ref (shared borrow) or mut (&mut borrow)
 function uses(i,use){
-  const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move',x.k);};
+  const o=x=>{if(x&&x.k!=='const')use(x.l,x.k==='move',x.k,x.at);};
   // a call or method operand that reborrows a `&mut` local needs it unborrowed; reading or writing through it (deref, store) does not
-  const a=x=>{if(x&&x.reb)use(x.l,false,x.sh?'rebs':'reb');else o(x);};
+  const a=x=>{if(x&&x.reb)use(x.l,false,x.sh?'rebs':'reb',x.at);else o(x);};
   const rv=r=>{
-    if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref');
+    if(r.k==='ref')use(r.l,false,r.mut?'mut':'ref',r.at);
     else if(r.k==='use'||r.k==='deref'||r.k==='peek')o(r.x);
     else if(r.k==='method'){a(r.recv);r.args.forEach(a);}
     else if(r.args)r.args.forEach(a);
@@ -66,12 +66,12 @@ function analyse(F,errors,un){
     return s[R[l]]&UNINIT?{code:'E0381',at:R[l]}:null;
   };
   const step=(s,i,rep)=>{
-    uses(i,(l,mv,kind)=>{
+    uses(i,(l,mv,kind,at)=>{
       if(rep&&L[l].name!==null){
         const b=bad(s,l);
         if(b){
           if(b.partial&&kind==='copy'&&i.grp!==undefined&&binds.has(i.grp)&&D[l].some(d=>s[d]&MOVED&&binds.get(i.grp).has(d)))rep('AMBIG',l,i);
-          else rep(b.code,l,i,{at:b.at,partial:b.partial,borrow:BORROWS.has(kind)});
+          else rep(b.code,l,at?{...i,line:at.line,col:at.col}:i,{at:b.at,partial:b.partial,borrow:BORROWS.has(kind)});
         }
       }
       if(mv)s[l]|=MOVED;
@@ -238,7 +238,8 @@ function loanPass(F,errors,un,loans,stats){
   const seen=new Set();
   let lm=0n;
   // star: the access goes through the reference local `l`, so rustc names `*l`
-  const access=(l,kind,i,star)=>{
+  const access=(l,kind,i0,star,at)=>{
+    const i=at?{...i0,line:at.line,col:at.col}:i0;
     const sh=lm&onS[l],mu=lm&onM[l];
     if(!(sh|mu))return;
     const ownMut=!!mu&&lo.every((x,k)=>!(mu&lb[k])||x.deref);
@@ -300,13 +301,13 @@ function loanPass(F,errors,un,loans,stats){
           else un('lifetime mismatch',i);
         });
       }
-      uses(i,(l,_mv,kind)=>access(l,kind,i));
+      uses(i,(l,_mv,kind,at)=>access(l,kind,i,false,at));
       if(i.op==='store'&&i.ref.k!=='const')access(i.ref.l,'write',i,true);
       if(i.op==='dead'){
         const hit=lm&(onS[i.l]|onM[i.l]);
         if(hit)lo.forEach((x,k)=>{
-          const code=L[i.l].tmp?'E0716':'E0597',key=code+'@'+x.i.line+':'+x.i.col;
-          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make(code,x.i.line,x.i.col,{name:L[i.l].name}));}
+          const code=L[i.l].tmp?'E0716':'E0597',at=code==='E0716'&&x.i.rv.tpos||x.i,key=code+'@'+at.line+':'+at.col;
+          if(hit&lb[k]&&!seen.has(key)){seen.add(key);errors.push(RQ.diag.make(code,at.line,at.col,{name:L[i.l].name}));}
         });
       }
       if(i.op==='assign'){

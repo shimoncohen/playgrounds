@@ -217,3 +217,25 @@ describe('learner text only names things the page really shows', () => {
     }
   });
 });
+
+describe('help lists only the commands taught so far', () => {
+  const helpAt = (ci, mi) => Array.from(NQ.session(NQ.CH[ci].missions[mi]).run('help').out, (l) => l.split(/\s+/)[0]);
+  it('chapter 1 starts with ping and help, then adds ip and arping where they are taught', () => {
+    assert.deepEqual(helpAt(0, 0), ['help', 'ping']);
+    assert.deepEqual(helpAt(0, 5), ['help', 'ping']);
+    assert.deepEqual(helpAt(0, 6), ['help', 'ip', 'ping']);
+    assert.deepEqual(helpAt(0, 7), ['arping', 'help', 'ip', 'ping']);
+  });
+  it('ipcalc, traceroute and nat appear on the mission that teaches them, not before', () => {
+    assert.ok(!helpAt(2, 1).includes('ipcalc') && helpAt(2, 2).includes('ipcalc'));
+    assert.ok(!helpAt(3, 2).includes('traceroute') && helpAt(3, 3).includes('traceroute'));
+    assert.ok(!helpAt(4, 1).includes('nat') && helpAt(4, 2).includes('nat'));
+  });
+  it('by the last mission every command is listed', () => {
+    const last = NQ.CH.at(-1);
+    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), [...Object.keys(NQ.CMDS)].sort());
+  });
+  it('a locked command still runs: help only hides it', () => {
+    assert.equal(NQ.session(NQ.CH[0].missions[0]).run('ipcalc 10.0.0.0/24').code, 0);
+  });
+});

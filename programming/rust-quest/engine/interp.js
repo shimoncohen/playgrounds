@@ -20,7 +20,7 @@ class Limit{constructor(why){this.why=why;}}
 class Ret{constructor(v){this.v=v;}}
 class Brk{constructor(v){this.v=v;}}
 class Cont{}
-class Panic{constructor(msg,e){this.msg=msg;this.line=e.line;this.col=e.col;}}
+class Panic{constructor(msg,e,at){this.msg=msg;this.line=e.line;this.col=e.col;if(at)this.at=at;}}
 const UNIT={k:'unit'},MOVED={k:'moved'};
 const BVARS=Object.assign(Object.create(null),{Option:[['None','unit',[]],['Some','tuple',['0']]],Result:[['Ok','tuple',['0']],['Err','tuple',['0']]],Ordering:[['Less','unit',[]],['Equal','unit',[]],['Greater','unit',[]]]});
 const MAX_EVENTS=200000,MAX_SNAPS=2000;
@@ -82,7 +82,7 @@ RQ.interp=(ast,opts)=>{
     else heap.get(id).v=s;
     return {k:'String',v:s,id};
   };
-  const panic=(msg,e)=>{const p=new Panic(msg,e);err+=RQ.diag.panicText(p);return p;};
+  const panic=(msg,e,at)=>{const p=new Panic(msg,e,at);err+=RQ.diag.panicText(p);return p;};
   const typeOf=e=>{const o=info.get(e);return o&&o.ty;};
   const isPlace=e=>{e=peel(e);return e.t==='Path'||e.t==='Field'||e.t==='Index'||e.t==='Deref';};
   const view=v=>{
@@ -217,6 +217,7 @@ RQ.interp=(ast,opts)=>{
         case '>=':return bool(x>=y);
       }
     }
+    if(['String','str'].includes(a.k)&&['String','str'].includes(b.k)&&(op==='=='||op==='!='))return bool((a.v===b.v)===(op==='=='));
     if(['struct','enum','vec','map'].includes(a.k)&&(op==='=='||op==='!='))return bool(eqv(a,b)===(op==='=='));
     if(op==='<'||op==='>'||op==='<='||op==='>='){
       const c=cmpv(a,b);
@@ -456,7 +457,10 @@ RQ.interp=(ast,opts)=>{
       case 'float':return Number.isNaN(a.v)||Number.isNaN(b.v)?null:ord(a.v,b.v);
       case 'char':case 'str':case 'String':return Math.sign(cmpCodePoints(a.v,b.v));
       case 'tuple':case 'array':case 'vec':return seq(a.v,b.v);
-      case 'struct':return seq(a.fields.map(f=>f.val),b.fields.map(f=>f.val));
+      case 'struct':{
+        const c=seq(a.fields.map(f=>f.val),b.fields.map(f=>f.val));
+        return c!==null&&a.name==='Reverse'&&adts.structs.get('Reverse').node.std?-c:c;
+      }
       case 'enum':{
         const x=variantIndex(a),y=variantIndex(b);
         return x!==y?ord(x,y):seq(a.fields.map(f=>f.val),b.fields.map(f=>f.val));
@@ -1037,6 +1041,27 @@ RQ.interp=(ast,opts)=>{
         }
         src.drop(line);return optVal(best);
       }
+      case 'max_by':case 'min_by':{
+        let best;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          if(best===undefined){best=x;continue;}
+          const greater=variantIndex(unref(callClosure(f,[itemRef(best,e),itemRef(x,e)],line)))===2;
+          if(name==='max_by'?!greater:greater){dropValue(best,null,line);best=x;}else dropValue(x,null,line);
+        }
+        src.drop(line);dropClosure(f,line);return optVal(best);
+      }
+      case 'max_by_key':case 'min_by_key':{
+        let best,bk;
+        for(let x=src.next();x!==undefined;x=src.next()){
+          tick();
+          const k=callClosure(f,[itemRef(x,e)],line);
+          if(best===undefined){best=x;bk=k;continue;}
+          const c=cmpv(k,bk);
+          if(name==='max_by_key'?c>=0:c<0){dropValue(best,null,line);dropValue(bk,null,line);best=x;bk=k;}else{dropValue(x,null,line);dropValue(k,null,line);}
+        }
+        src.drop(line);dropClosure(f,line);return optVal(best);
+      }
       case 'fold':{
         let acc=args[0];
         for(let x=src.next();x!==undefined;x=src.next()){tick();acc=callClosure(args[1],[acc,x],line);}
@@ -1095,6 +1120,26 @@ RQ.interp=(ast,opts)=>{
     return builtinMethod(u.key,e,rv,args);
   }
   const ordVal=c=>ctorVal({adt:'Ordering',variant:c+1},[]);
+  // abs and pow overflow inside core, so rustc names the line of that macro expansion, which differs for each type
+  const NUM_LINE={i8:379,i16:404,i32:429,i64:454,isize:559,u8:586,u16:1234,u32:1290,u64:1322,usize:1452};
+  function intMethod(name,a,args,at){
+    const ty=a.ty,[lo,hi]=INT[ty],x=a.v,y=args[0]&&args[0].v;
+    const std=msg=>panic(msg,at,'/rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/num/mod.rs:'+NUM_LINE[ty]+':5');
+    switch(name){
+      case 'min':return x<=y?a:args[0];
+      case 'max':return y>=x?args[0]:a;
+      case 'abs':if(-x>hi&&x<0n)throw std('attempt to negate with overflow');return x<0n?int(-x,ty):a;
+      case 'pow':{
+        const r=y===0n?1n:x===0n||x===1n?x:x===-1n?(y%2n?-1n:1n):y>=70n?hi+1n:x**y;
+        if(r<lo||r>hi)throw std('attempt to exponentiate with overflow');
+        return int(r,ty);
+      }
+      case 'abs_diff':return int(x>y?x-y:y-x,ty[0]==='i'?'u'+ty.slice(1):ty);
+    }
+    const r=name.endsWith('add')?x+y:name.endsWith('sub')?x-y:x*y,ok=r>=lo&&r<=hi;
+    if(name.startsWith('checked'))return optVal(ok?int(r,ty):undefined);
+    return int(name.startsWith('wrapping')?wrap(r,ty):ok?r:r<lo?lo:hi,ty);
+  }
   // a sort calls its closure as often and in the order its algorithm likes, so a closure with output or a panic has no one verdict
   const hasPrint=n=>{let f=false;RQ.walk(n,x=>{if(x.t==='Macro'&&x.name!=='vec'&&x.name!=='format')f=true;});return f;};
   const okUnit=()=>ctorVal({adt:'Result',variant:0},[UNIT]);
@@ -1107,6 +1152,12 @@ RQ.interp=(ast,opts)=>{
     if(key==='Display::to_string')return string(RQ.std.render(rv,PLAIN,tick,MAX_OUTPUT,userDisplay),undefined,e.line);
     const at0={line:e.nline,col:e.ncol};
     if(key==='ref::clone')return rv;
+    if(key==='Ord::max'||key==='Ord::min'){
+      const first=cmpv(rv,args[0])>0,keep=key==='Ord::max'===first?rv:args[0];
+      dropValue(keep===rv?args[0]:rv,null,e.line);
+      return keep;
+    }
+    if(key.startsWith('Int::'))return intMethod(key.slice(5),unref(rv),args.map(a=>unref(a)),at0);
     if(key==='Ord::cmp')return ordVal(cmpv(rv,args[0]));
     if(key==='PartialOrd::partial_cmp'){const c=cmpv(rv,args[0]);return optVal(c===null?undefined:ordVal(c));}
     if(key==='f64::total_cmp'){

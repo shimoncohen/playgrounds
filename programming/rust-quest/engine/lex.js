@@ -24,10 +24,10 @@ RQ.lex=src=>{
     return null;
   }
   function str(l,c,byte){
-    adv();let v='';
+    const from=i;adv();let v='';
     while(i<n){
       const ch=adv();
-      if(ch==='"'){tok('str',v,l,c,byte?{byte:true}:null);return;}
+      if(ch==='"'){tok('str',v,l,c,byte?{byte:true}:{raw:cs.slice(from,i).join('')});return;}
       if(ch!=='\\'){v+=ch;continue;}
       if(cs[i]==='\n'||(cs[i]==='\r'&&cs[i+1]==='\n')){while(i<n&&/\s/.test(cs[i]))adv();continue;}
       const e=escape();if(e===null){err('unknown character escape',l,c);return;}v+=e;

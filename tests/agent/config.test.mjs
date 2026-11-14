@@ -157,6 +157,13 @@ describe('virtual files', () => {
     assert.equal(v.read('ok.md'), 'x');
     assert.deepEqual(J(v.list('a/')), ['a/b.txt']);
   });
+  it('expand gives a file as itself and a folder as its files, with or without the slash', () => {
+    const e = vfs.create({ 'src/a.js': '1', 'src/b.js': '2', 'srcx.js': '3', 'top.md': '4' });
+    assert.deepEqual(J(e.expand('top.md')), ['top.md']);
+    assert.deepEqual(J(e.expand('src')), ['src/a.js', 'src/b.js']);
+    assert.deepEqual(J(e.expand('src/')), ['src/a.js', 'src/b.js']);
+    assert.deepEqual(J(e.expand('nope')), []);
+  });
 });
 
 describe('after-edit hooks and allow lines in the setup', () => {

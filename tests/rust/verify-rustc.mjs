@@ -42,16 +42,20 @@ const norm = (s) => s.split('\n').filter((l) => !l.startsWith('note: run with `R
 
 const unordered = (s) => norm(s).split('\n').map(sortGroups).sort().join('\n');
 
-// a span inside a std macro (`vec!`, `format!`) is reported at the macro's own source; the learner's line is where it was called
-function userLine(span) {
+// a span inside a std macro (`vec!`, `format!`) is reported at the macro's own source; the learner's position is where it was called
+function userSpan(span) {
   while (span.file_name !== 'src/main.rs' && span.expansion && span.expansion.span) span = span.expansion.span;
-  return span.line_start;
+  return span;
 }
+
+// programs whose primary column is known to differ from rustc's: id -> {rustc: 'line:col', rq: 'line:col'}. The check holds a listed program to
+// exactly that pair, so a gap that closes (or moves) fails the verify until the list is updated.
+const GAPS = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/rust/column-gaps.json'), 'utf8'));
 
 function realResult(f) {
   const diags = f.DIAG.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   const coded = diags.filter((d) => d.level === 'error' && d.code && d.code.code)
-    .map((d) => ({ id: d.code.code, line: userLine(d.spans.find((s) => s.is_primary) || d.spans[0] || {}) }));
+    .map((d) => { const s = userSpan(d.spans.find((x) => x.is_primary) || d.spans[0] || {}); return { id: d.code.code, line: s.line_start, col: s.column_start }; });
   if (f.EXIT === 'compile-failed') return { compiled: false, coded };
   return { compiled: true, stdout: norm(f.STDOUT), stderr: norm(f.STDERR), exit: Number(f.EXIT) };
 }
@@ -61,14 +65,20 @@ function compare(p, real, c) {
   const same = (what, a, b) => { if (a !== b) bad.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
   if (!real.compiled) {
     if (real.coded.length !== 1) { bad.push(`rustc: expected exactly one coded error, got ${JSON.stringify(real.coded)}`); return bad; }
-    const { id, line } = real.coded[0];
+    const { id, line, col } = real.coded[0];
     if (e) {
       if (e.expect === 'ok') bad.push(`entry expects ok but rustc reports ${id} at line ${line}`);
       else { same('entry id', e.expect.code || e.expect.lint, id); same('entry line', e.expect.line, line); }
     }
     const mine = c.errors.filter((x) => x.code || x.lint);
     if (c.status !== 'error' || mine.length !== 1) bad.push(`RQ.run: expected one coded error, got status ${c.status} with ${JSON.stringify(c.errors)}`);
-    else { same('RQ.run id', mine[0].code || mine[0].lint, id); same('RQ.run line', mine[0].line, line); }
+    else {
+      same('RQ.run id', mine[0].code || mine[0].lint, id);
+      same('RQ.run line', mine[0].line, line);
+      const gap = GAPS[p.id], at = `${mine[0].line}:${mine[0].col}`;
+      if (!gap) same('RQ.run column', mine[0].col, col);
+      else if (gap.rustc !== `${line}:${col}` || gap.rq !== at) bad.push(`column gap: listed rustc ${gap.rustc} and RQ ${gap.rq}, but rustc is at ${line}:${col} and RQ at ${at}`);
+    }
     return bad;
   }
   if (e) {

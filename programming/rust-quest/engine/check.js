@@ -86,6 +86,7 @@ RQ.check=ast=>{
     if(unify(got,want))return true;
     const g=res(got),w=res(want);
     if(g.k==='ref'&&!g.mut&&res(g.to).k==='String'&&w.k==='str')return true;
+    if(g.k==='ref'&&!g.mut&&res(g.to).k==='str'&&w.k==='str')return true;
     if(g.k==='str'&&w.k==='ref'&&!w.mut&&res(w.to).k==='String'){mism(want,got,n);return false;}
     if(g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&res(g.to).k==='array'&&res(w.to).k==='slice'&&unify(res(g.to).el,res(w.to).el))return true;
     if(g.k==='ref'&&w.k==='ref'&&g.mut===w.mut&&res(g.to).k==='coll'&&res(g.to).name==='Vec'&&res(w.to).k==='slice'&&unify(res(g.to).args[0],res(w.to).el))return true;
@@ -135,7 +136,7 @@ RQ.check=ast=>{
   // a named lifetime is modeled only in a signature or a struct field, and must be declared there (E0261)
   function lifetimeOk(node,name){
     if(!sigLts)return false;
-    if(!sigLts.has(name)&&!ltSeen.has(node)){ltSeen.add(node);errors.push(RQ.diag.make('E0261',node.line,node.col,{name}));}
+    if(!sigLts.has(name)&&!ltSeen.has(node)){ltSeen.add(node);errors.push(RQ.diag.make('E0261',(node.ltAt||node).line,(node.ltAt||node).col,{name}));}
     return true;
   }
   const hasMutRef=n=>n.t==='Ref'?n.mut||hasMutRef(n.ty):kids(n).some(hasMutRef);
@@ -193,6 +194,10 @@ RQ.check=ast=>{
     return null;
   }
   function tyOf(n,top){
+    if(n.t==='Path'&&!n.global&&!n.segs.some(g=>g.fn||g.args)){
+      const g=n.segs.map(x=>x.name).join('::');
+      if(g==='std::cmp::Ordering'||g==='Ordering'&&uses.has('Ordering')&&!structs.has('Ordering')&&!enums.has('Ordering'))return ordTy;
+    }
     if(n.t==='Path'&&!n.segs.some(g=>g.fn)){const ft=fmtType(n);if(ft)return ft;}
     if(n.t==='Path'&&n.segs.length===1&&!n.global&&!n.segs[0].fn){
       const sg=n.segs[0],s=sg.name;
@@ -279,6 +284,31 @@ RQ.check=ast=>{
       }
     }
     return out;
+  }
+  const USE_NAMES=dict({'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter','std :: cmp :: Ordering':'Ordering','std :: cmp :: Reverse':'Reverse'});
+  const useNames=it=>{
+    if(it.t!=='Use'||it.pub)return null;
+    const g=/^(.*) :: \{ (.*?)(?: ,)? \}$/.exec(it.txt),list=g?g[2].split(' , ').map(x=>g[1]+' :: '+x):[it.txt];
+    return list.every(x=>USE_NAMES[x])?list.map(x=>USE_NAMES[x]):null;
+  };
+  // a `use` counts for the whole file; a name imported twice, or shadowed by an item, is not judged
+  const usable=new Set(),repeated=new Set();
+  for(const it of ast.items){
+    const ns=useNames(it);
+    const toks=it.t==='Use'?it.txt.split(' '):[],seenName=new Set();
+    for(let k=toks.indexOf('{')+1;ns&&k>0&&k<toks.length;k++){
+      if(toks[k]===','||toks[k]==='}')continue;
+      if(seenName.has(toks[k])){errors.push(RQ.diag.make('E0252',it.at[k].line,it.at[k].col,{name:toks[k]}));ns.forEach(n=>uses.add(n));repeated.add(it);break;}
+      seenName.add(toks[k]);
+    }
+    if(repeated.has(it))continue;
+    if(ns&&ns.every(n=>!uses.has(n)&&!ast.items.some(x=>x.name===n&&x.t!=='Use'))){ns.forEach(n=>uses.add(n));usable.add(it);}
+  }
+  // std's `Reverse` is declared as a program would write it; only the interpreter's comparison knows it flips the order
+  if(ast.items.some(it=>(useNames(it)||[]).includes('Reverse'))&&!ast.items.some(it=>it.name==='Reverse')){
+    const r=RQ.parse(RQ.lex('#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]\nstruct Reverse<T>(T);'));
+    r.ast.items[0].std=true;
+    ast.items=[r.ast.items[0],...ast.items];
   }
   // a struct and an enum live in the type namespace, so they may share a name with a fn or a const
   for(const it of ast.items)if(it.t==='Struct'||it.t==='Enum'){
@@ -597,7 +627,7 @@ RQ.check=ast=>{
     traitImpls.set(tr.name,set);
     if(set.has(owner)){errors.push(RQ.diag.make('E0119',it.line,it.col,{trait:tr.name,type:owner}));return;}
     set.add(owner);adtRec(owner).impls.add(tr.name);
-    if(tr.name==='Drop'&&rec.der.includes('Copy'))errors.push(RQ.diag.make('E0184',rec.node.line,rec.node.col,{}));
+    if(tr.name==='Drop'&&rec.der.includes('Copy'))errors.push(RQ.diag.make('E0184',rec.node.nline||rec.node.line,rec.node.ncol||rec.node.col,{}));
     curSelf=owner;
     const mm=methods.get(owner)||new Map();
     methods.set(owner,mm);
@@ -618,7 +648,7 @@ RQ.check=ast=>{
         else if(!unify(m.params[0].ty,mkRef(true,T.fmtr)))errors.push(RQ.diag.make('E0053',f.params[0].ty.line,f.params[0].ty.col,{name:f.name}));
         else if(!unify(m.ret,fmtResult()))errors.push(RQ.diag.make('E0053',f.ret.line,f.ret.col,{name:f.name}));
       }else if(!!tm.node.selfParam!==!!f.selfParam||(f.selfParam&&tm.selfKind!==m.selfKind))unsup('impl',f.line);
-      else if(tm.params.length!==m.params.length)errors.push(RQ.diag.make('E0050',f.line,f.col,{name:f.name,trait:tr.name,got:m.params.length+(f.selfParam?1:0),want:tm.params.length+(tm.node.selfParam?1:0)}));
+      else if(tm.params.length!==m.params.length)errors.push(RQ.diag.make('E0050',...paramsAt(f),{name:f.name,trait:tr.name,got:m.params.length+(f.selfParam?1:0),want:tm.params.length+(tm.node.selfParam?1:0)}));
       else if(tm.tps.length||m.tps.length)unsup('impl',f.line);
       else if(!sameSig(m,tm,owner)){
         const bad=tm.params.findIndex((q,i)=>!unify(subst(q.ty,new Map([[tm.selfPar,adtTy(owner)]])),m.params[i].ty));
@@ -640,8 +670,8 @@ RQ.check=ast=>{
     curSelf=null;
   }
 
+  function paramsAt(f){const n=f.selfParam||f.params[0]&&f.params[0].pat||f;return [n.line,n.col];}
   const useMap=it=>it.t==='Use'&&!it.pub&&it.txt==='std :: collections :: HashMap';
-  const USE_NAMES=dict({'std :: fmt':'fmt','std :: fmt :: Display':'Display','std :: fmt :: Debug':'Debug','std :: fmt :: Formatter':'Formatter'});
   const mapUse=ast.items.filter(useMap).length===1;
   for(const it of ast.items){
     if(it.t==='Struct')structDecl(it);
@@ -656,7 +686,7 @@ RQ.check=ast=>{
       const ty=tyOf(it.ty,true);
       if(defined(it))consts.set(it.name,{node:it,ty});
     }else if(mapUse&&useMap(it)){}
-    else if(it.t==='Use'&&!it.pub&&USE_NAMES[it.txt]&&!uses.has(USE_NAMES[it.txt]))uses.add(USE_NAMES[it.txt]);
+    else if(usable.has(it)||repeated.has(it)){}
     else if(it.t!=='Impl'&&it.t!=='Trait'&&(ITEM[it.t]||!['Extern','MacroRules','Union'].includes(it.t)))unsup(ITEM[it.t]||it.t,it.line);
   }
   for(const it of ast.items)if(it.t==='Trait')traitSigs(it);
@@ -706,8 +736,15 @@ RQ.check=ast=>{
     else if(!(e.t==='Lit'&&e.kind==='str')&&!['Return','Break','Continue'].includes(e.t))unsup('explicit lifetime',e.line);
   }
   const lookup=n=>{for(let i=scopes.length-1;i>=0;i--)if(scopes[i].has(n))return scopes[i].get(n);return null;};
-  const bindVar=(n,mut,kind,ty,node)=>{
+  const bindVar=(n,mut,kind,ty,node,what)=>{
     const b={mut,kind,ty,assigns:0,cl:curCl};
+    // a tuple struct or tuple variant is a pattern as well as a value, so a binding cannot take its name; the other names that are patterns are not judged
+    const own=structs.get(n),user=own||enums.has(n)||fns.has(n)||consts.has(n);
+    if(node&&n!=='self'){
+      const std=!user&&['Some','Ok','Err'].includes(n);
+      if(own&&own.kind==='tuple'||std)errors.push(RQ.diag.make('E0530',node.nline||node.line,node.ncol||node.col,{what:what||(kind==='param'?'function parameters':'let bindings'),variant:std}));
+      else if(own&&own.kind!=='named'||consts.has(n)||!user&&n==='None')unsup('pattern',node.line);
+    }
     // a by-value binding named like a unit variant of its own enum type is E0170, deny-by-default in rustc
     if(node&&!mut&&!node.byRef&&!node.sub){
       let u=res(ty);while(u.k==='ref')u=res(u.to);
@@ -959,9 +996,11 @@ RQ.check=ast=>{
           const l=lookup(part.name);if(l)varUses++;
           const b=l||consts.get(part.name);
           if(b)caps.push({name:part.name,bind:l});
-          if(b)fmts.push({t:b.ty,line:f.line,col:f.col,fmt:part.fmt});
+          // rustc points into the literal: at the `{name}`, and for an unknown name at the name
+          const at=f.raw?litPos(f,part.at):null,brace=at||f;
+          if(b)fmts.push({t:b.ty,line:brace.line,col:brace.col,fmt:part.fmt});
           else if(fns.has(part.name))unsup('function value',f.line);
-          else unknown(part.name,f);
+          else unknown(part.name,at?{line:at.line,col:at.col+1}:f);
         }
       }
     }
@@ -1009,7 +1048,37 @@ RQ.check=ast=>{
       :[{name:'Ok',kind:'tuple',fields:f(t.args[0])},{name:'Err',kind:'tuple',fields:f(t.args[1])}];
   }
   const noArgs=p=>p.t==='Path'&&!p.global&&p.segs.every(g=>!g.args&&!g.fn);
+  // `Ordering::Less` once `use std::cmp::Ordering;` is in, and `std::cmp::Ordering::Less` always; a program's own Ordering keeps its own variants
+  function ordVariant(p){
+    if(!noArgs(p))return null;
+    const g=p.segs.map(x=>x.name);
+    if(g.length===4&&g[0]==='std'&&g[1]==='cmp'&&g[2]==='Ordering')return g[3];
+    return g.length===2&&g[0]==='Ordering'&&uses.has('Ordering')&&!nameTaken('Ordering')?g[1]:null;
+  }
+  const ordUndeclared=p=>noArgs(p)&&p.segs.length===2&&p.segs[0].name==='Ordering'&&!uses.has('Ordering')&&!nameTaken('Ordering');
+  // where the k-th character of a string literal's value starts in the source, walking past its escapes
+  function litPos(f,k){
+    const r=Array.from(f.raw);
+    let line=f.line,col=f.col,n=0,i=0;
+    const step=c=>{if(c==='\n'){line++;col=1;}else col++;};
+    step(r[i++]);
+    while(i<r.length-1){
+      if(n===k)return {line,col};
+      if(r[i]!=='\\'){step(r[i++]);n++;continue;}
+      const e=r[i+1];
+      if(e==='\n'||e==='\r'){let j=i+1;while(j<r.length-1&&/\s/.test(r[j]))j++;for(;i<j;i++)step(r[i]);continue;}
+      const len=e==='x'?4:e==='u'?r.indexOf('}',i)-i+1:2;
+      for(let t=0;t<len;t++)step(r[i+t]);
+      i+=len;n++;
+    }
+    return n===k?{line,col}:null;
+  }
   function ctorOf(p){
+    const ov=ordVariant(p);
+    if(ov){
+      const vi=variantsOf(ordTy).findIndex(v=>v.name===ov);
+      return vi<0?null:{name:'Ordering',ty:ordTy,kind:'unit',fields:[],vi};
+    }
     if(!noArgs(p)||p.segs.length>2)return null;
     const sg=p.segs;
     let n=sg[0].name,ty,vn=null;
@@ -1039,6 +1108,7 @@ RQ.check=ast=>{
     return {name:res(ty).name,ty,kind:v.kind,fields:v.fields,vi};
   }
   function variantIndex(t,p){
+    if(t.builtin&&t.name==='Ordering'){const ov=ordVariant(p);return ov===null?-1:variantsOf(t).findIndex(v=>v.name===ov);}
     if(!noArgs(p)||p.segs.length>2)return -1;
     const sg=p.segs,vs=variantsOf(t);
     if(sg.length===1)return t.builtin?vs.findIndex(v=>v.name===sg[0].name):-1;
@@ -1072,18 +1142,35 @@ RQ.check=ast=>{
     const bad=sub.find(x=>!has(x,'Ord'));
     return bad?ordLeaf(bad):t;
   };
+  const refArg=new Set();
   const SORT_BY=['sort_by','sort_unstable_by','sort_by_key','sort_unstable_by_key'],CMPS=['cmp','partial_cmp','total_cmp'];
   const SORTS=['sort','sort_unstable'],MUT_SEQ=['swap','reverse',...SORTS],SEQ_METHODS=[...MUT_SEQ,'contains','first','last'];
   const UNIVERSAL=['into','try_into','borrow','borrow_mut','type_id'];
   const ITERS=['iter','iter_mut','into_iter','keys','values','values_mut'],STORES=['push','insert','entry.or_insert','entry.or_default'];
   const MAP_KEYED=['insert','get','get_mut','contains_key','remove','entry.or_insert','entry.or_default'];
+  // min and max come from Ord, so an open number takes them; the rest are inherent to a whole-number type, which an open one cannot call (E0689)
+  const INT_INHERENT=new Set(['abs','pow','abs_diff','checked_add','checked_sub','checked_mul','wrapping_add','wrapping_sub','wrapping_mul','saturating_add','saturating_sub','saturating_mul']);
+  function intMethod(base,name,rec){
+    if(name==='min'||name==='max')return rec('val',[base],base,-1);
+    if(base.k!=='int'||!INT_INHERENT.has(name))return null;
+    const signed=RQ.types.isSigned(base.ty);
+    if(name==='abs')return signed?rec('val',[],base,-1):null;
+    if(name==='pow')return rec('val',[T.int('u32')],base,-1);
+    if(name==='abs_diff')return rec('val',[base],signed?T.int('u'+base.ty.slice(1)):base,-1);
+    return rec('val',[base],name.startsWith('checked')?optTy(base):base,-1);
+  }
   function builtinMethod(base,name,args){
     const rec=(selfKind,params,ret,from)=>({key:name==='clone'?'Clone::clone':(base.builtin||base.k==='coll'?base.name+'::':'')+name,selfKind,params:params.map(ty=>({ty})),ret,from:from??(hasRef(base)?0:-1),builtin:true});
     if(name==='clone'&&has(base,'Clone'))return rec('&',[],base);
     if(name==='to_string'&&meets(base,'Display')&&base.k!=='coll')return {...rec('&',[],T.string,-1),key:'Display::to_string'};
+    if((name==='max'||name==='min'||name==='clamp')&&(base.k==='struct'||base.k==='enum')&&has(base,'Ord'))return name==='clamp'?null:{...rec('val',[base],base,-1),key:'Ord::'+name};
     if(name==='cmp'&&has(base,'Ord'))return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'Ord::cmp'};
     if(name==='partial_cmp'&&has(base,'PartialOrd'))return {...rec('&',[mkRef(false,base)],optTy(ordTy),-1),key:'PartialOrd::partial_cmp'};
     if(name==='total_cmp'&&base.k==='float')return {...rec('&',[mkRef(false,base)],ordTy,-1),key:'f64::total_cmp'};
+    if(base.k==='int'||base.k==='ivar'){
+      const m=intMethod(base,name,rec);
+      if(m)return {...m,key:'Int::'+name};
+    }
     if(base.builtin&&base.name==='Ordering'){
       if(name==='reverse')return rec('val',[],ordTy,-1);
       if(name==='then')return rec('val',[ordTy],ordTy,-1);
@@ -1189,6 +1276,7 @@ RQ.check=ast=>{
     if(!m&&spec&&base.k==='iter')return unsup('iterator',e.line);
     const ch=chainOf(e.recv),text=isRef?(peel(e.recv).t==='Path'?'*':'')+(ch?ch.text:'value'):ch?ch.text:'value';
     if(!m){
+      if(name==='clamp'&&(base.k==='struct'||base.k==='enum')&&has(base,'Ord'))return unsup('method call',e.line);
       if(base.k==='array'||base.k==='slice'){
         const el=res(base.el),need=SORTS.includes(name)&&!args.length?'Ord':name==='contains'&&args.length===1?'PartialEq':null;
         if(need&&!isOpen(el,false)&&el.k!=='any'&&(need==='Ord'||unify(args[0],mkRef(false,el)))){
@@ -1213,6 +1301,11 @@ RQ.check=ast=>{
         return T.any;
       }
       if(name==='total_cmp'&&base.k==='fvar')return unsup('inferred type',e.line);
+      if(base.k==='fvar'&&!isRef&&name==='cmp'){errors.push(RQ.diag.make('E0689',e.nline,e.ncol,{name,type:'{float}'}));return T.any;}
+      if(base.k==='ivar'&&INT_INHERENT.has(name)){
+        errors.push(isRef?RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(r,true),kind:'reference'}):RQ.diag.make('E0689',e.nline,e.ncol,{name}));
+        return T.any;
+      }
       if(base.builtin||UNIVERSAL.includes(name)||(name==='eq'||name==='ne')&&has(base,'PartialEq'))return unsup('method call',e.line);
       errors.push(RQ.diag.make('E0599',e.nline,e.ncol,{what:'method',name,type:show(base,true),kind:base.k==='param'?'type parameter':['int','ivar','float','fvar','bool','char'].includes(base.k)?'type':base.k,trait:base.k!=='param'&&missingTrait(base,name)}));
       return T.any;
@@ -1293,7 +1386,7 @@ RQ.check=ast=>{
         if(!dp&&(path.length!==1||!last.variant)){unsup('move out of reference',p.line);return WILD;}
         if(!st.cov.err){
           st.cov.err=true;
-          if(dp)errors.push(RQ.diag.make('E0507',p.line,p.col,{pat:true,mut:dp.mut}));
+          if(dp)errors.push(RQ.diag.make('E0507',dp.at?dp.at.line:p.line,dp.at?dp.at.col:p.col,{pat:true,mut:dp.mut}));
           else{
             const x=peel(st.scrut),inner=x.t==='Deref'?peel(x.expr):x,ch=chainOf(inner),via=x.t==='Deref'?res(info.get(inner).ty):ch&&ch.via;
             errors.push(RQ.diag.make('E0507',st.scrut.line,st.scrut.col,{name:ch?ch.text:'value',variant:last.variant,mut:!!via&&via.mut}));
@@ -1374,6 +1467,7 @@ RQ.check=ast=>{
         return args?wrapRef({c:'single',args},q.wraps):WILD;
       }
       case 'PathPat':case 'TupleStructPat':case 'StructPat':{
+        if(ordUndeclared(p.path)){errors.push(RQ.diag.make('E0433',p.line,p.col,{name:'Ordering'}));return WILD;}
         const q=peelPat(p,t,mode,path);
         if(!q)return WILD;
         const u=q.t,kind=p.t==='PathPat'?'unit':p.t==='StructPat'?'named':'tuple';
@@ -1432,7 +1526,7 @@ RQ.check=ast=>{
         const r=structs.get(t.name),fl=fieldsOf(t);
         return {k:'struct',name:t.name,kind:r.kind,names:fl.map(f=>f.name),tys:()=>fl.map(f=>exDesc(f.ty))};
       }
-      case 'enum':return {k:'enum',prefix:t.builtin?'':t.name+'::',variants:variantsOf(t).map(v=>({name:v.name,kind:v.kind,names:v.fields.map(f=>f.name),tys:()=>v.fields.map(f=>exDesc(f.ty))}))};
+      case 'enum':return {k:'enum',prefix:t.builtin?t.name==='Ordering'?'std::cmp::Ordering::':'':t.name+'::',variants:variantsOf(t).map(v=>({name:v.name,kind:v.kind,names:v.fields.map(f=>f.name),tys:()=>v.fields.map(f=>exDesc(f.ty))}))};
       default:return {k:'opaque'};
     }
   }
@@ -1596,7 +1690,8 @@ RQ.check=ast=>{
     const n=e.params.length;
     const wrongCount=!!exp&&exp.params.length!==n;
     let badParam=false;
-    if(wrongCount)errors.push(RQ.diag.make('E0593',e.line,e.col,{want:exp.params.length,got:n}));
+    const at=exp&&exp.at||e;
+    if(wrongCount)errors.push(RQ.diag.make('E0593',at.line,at.col,{want:exp.params.length,got:n}));
     const ps=e.params.map((p,i)=>{
       const v=exp&&!wrongCount?exp.params[i]:null;
       if(!p.ty)return v||fresh(p.pat.line);
@@ -1604,7 +1699,7 @@ RQ.check=ast=>{
       if(v&&!unify(d,v)){
         badParam=true;
         // on a std adapter rustc adds a second error (E0599, E0277) for whatever uses the result
-        if(exp.std)unsup('type checking',e.line);else errors.push(RQ.diag.make('E0631',e.line,e.col,{}));
+        if(exp.std)unsup('type checking',e.line);else errors.push(RQ.diag.make('E0631',at.line,at.col,{}));
       }
       return d;
     });
@@ -1651,7 +1746,7 @@ RQ.check=ast=>{
     const ts=[];
     e.args.forEach((a,i)=>{
       const w=sig&&sig(i,ts);
-      if(w&&peel(a).t==='Closure'){expSig={...w,std:true};ts.push(ex(a));return;}
+      if(w&&peel(a).t==='Closure'){expSig={...w,std:true,at:{line:e.nline,col:e.ncol}};ts.push(ex(a));return;}
       if(e.name==='zip'&&peel(a).t==='Range')rangeOk=true;
       const t=ex(a);
       if(w)fnMeet(t,w,a);
@@ -1664,6 +1759,31 @@ RQ.check=ast=>{
   const iterOf=(item,o)=>T.iter(item,o.lent,o.de,o.es);
   const peelOne=t=>{t=res(t);return t.k==='ref'?res(t.to):t;};
   const numeric=t=>['int','ivar','float','fvar'].includes(res(t).k);
+  // a `&str` is one reference over an unsized str
+  const textOf=t=>{let n=0;t=res(t);while(t.k==='ref'){n++;t=res(t.to);}return t.k==='String'?{str:false,n}:t.k==='str'?{str:true,n:n+1}:null;};
+  // `==` equates equal reference counts of String and str in any mix, plus `String == &str` and `&str == String`; an order operator
+  // takes the left type for the right side, which can be coerced down through references and from String to str at one reference
+  function textCmp(a,b,op,e){
+    const x=textOf(a),y=textOf(b),eq=op==='=='||op==='!=';
+    const scalar=t=>['int','ivar','float','fvar','bool','char','unit'].includes(res(t).k);
+    if(!x&&!y)return false;
+    if(!x||!y){
+      const lone=res(x?b:a);
+      if(!scalar(lone)||lone.k==='float')return false;
+      const bad=()=>errors.push(RQ.diag.make('E0277',e.oline,e.ocol,{what:'cmp',left:show(a,true),right:show(b,true)}));
+      if(x?eq:lone.k==='ivar'||lone.k==='fvar')bad();else mism(a,b,e.rhs);
+      return true;
+    }
+    let ok;
+    if(eq){
+      const k=Math.min(x.n,y.n),p=x.n-k,q=y.n-k;
+      ok=p===q||p===0&&!x.str&&y.str&&q===1||q===0&&!y.str&&x.str&&p===1;
+    }else ok=x.n===0&&y.n===0&&x.str===y.str||x.str===y.str&&x.n>=1&&x.n<=y.n||x.str&&!y.str&&x.n===1&&y.n>=1;
+    if(ok)return true;
+    if(eq)errors.push(RQ.diag.make('E0277',e.oline,e.ocol,{what:'cmp',left:show(a,true),right:show(b,true)}));
+    else mism(a,b,e.rhs);
+    return true;
+  }
   function itemOfInto(t){
     t=res(t);
     if(t.k==='iter')return t.item;
@@ -1745,6 +1865,18 @@ RQ.check=ast=>{
         if(!isOpen(i,false)&&!has(i,'Ord')){errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(ordLeaf(i.k==='ref'?i.to:i))}));return rec('Iter::'+name,'val',[],optTy(item),-1);}
         return rec('Iter::'+name,'val',[],optTy(item),hasRef(item)?0:-1);
       }};
+      case 'max_by':case 'min_by':{
+        if(nameTaken('Ordering'))return {unsup:'iterator'};
+        return {cl:()=>fn('FnMut',[mkRef(false,item),mkRef(false,item)],ordTy),build:()=>rec('Iter::'+name,'val',[T.any],optTy(item),hasRef(item)?0:-1)};
+      }
+      case 'max_by_key':case 'min_by_key':{
+        const K=fresh(at);
+        return {cl:()=>fn('FnMut',[mkRef(false,item)],K),build:()=>{
+          if(hasRef(K))return null;
+          if(!isOpen(K,false)&&!has(K,'Ord'))errors.push(RQ.diag.make('E0277',e.nline,e.ncol,{what:'bound',trait:'Ord',type:show(K)}));
+          return rec('Iter::'+name,'val',[T.any],optTy(item),hasRef(item)?0:-1);
+        }};
+      }
       case 'any':case 'all':return {cl:()=>fn('FnMut',[item],T.bool),build:()=>rec('Iter::'+name,'&mut',[T.any],T.bool,-1)};
       case 'position':return {cl:()=>fn('FnMut',[item],T.bool),build:()=>rec('Iter::position','&mut',[T.any],optTy(usz),-1)};
       case 'find':return {cl:()=>fn('FnMut',[mkRef(false,item)],T.bool),build:()=>({...rec('Iter::find','&mut',[T.any],optTy(item),-1),inner:hasRef(item)})};
@@ -1894,12 +2026,13 @@ RQ.check=ast=>{
       }
       case 'Paren':return ex(e.expr);
       case 'Path':{
-        if(e.segs.length>2||e.global||e.segs.some(g=>g.args))return unsup('path call',e.line);
+        if(e.segs.length>2&&!ordVariant(e)||e.global||e.segs.some(g=>g.args))return unsup('path call',e.line);
         const n=e.segs[0].name,local=e.segs.length===1&&lookup(n),b=local||(e.segs.length===1&&consts.get(n));
         if(local){varUses++;I(e).bind=local;}
         if(b)return b.ty;
         const [tn,cn]=e.segs.map(g=>g.name);
         if(e.segs.length===2&&RQ.types.isInt(tn)&&(cn==='MIN'||cn==='MAX')&&!adtRec(tn)){I(e).ic={ty:tn,max:cn==='MAX'};return T.int(tn);}
+        if(ordUndeclared(e)){errors.push(RQ.diag.make('E0433',e.line,e.col,{name:'Ordering'}));return T.any;}
         const ct=ctorOf(e);
         if(ct){
           if(ct.kind!=='unit')return unsup('function value',e.line);
@@ -1911,7 +2044,7 @@ RQ.check=ast=>{
         const owner=e.segs[0].name==='Self'?curSelf:e.segs[0].name;
         if(!adtRec(owner))return unsup('path call',e.line);
         if(methods.get(owner)&&methods.get(owner).has(e.segs[1].name))return unsup('function value',e.line);
-        errors.push(RQ.diag.make('E0599',e.segs[1].line,e.col,{what:'item',name:e.segs[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));
+        errors.push(RQ.diag.make('E0599',e.segs[1].line,e.segs[1].col,{what:'item',name:e.segs[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));
         return T.any;
       }
       case 'Unary':{
@@ -1960,6 +2093,10 @@ RQ.check=ast=>{
             }
             if(da>1){if(!unify(ca,cb))mism(a,b,e.rhs);return T.bool;}
           }
+        }
+        if(COMPARE.has(op)){
+          const v=textCmp(a,b,op,e);
+          if(v)return T.bool;
         }
         // a shared reference to a number works like the number in arithmetic, and two of them compare like the numbers they point at
         const num=t=>{const r=res(t);return r.k==='ref'&&!r.mut&&['int','ivar','float','fvar'].includes(res(r.to).k)?r.to:null;};
@@ -2133,7 +2270,7 @@ RQ.check=ast=>{
             I(e).sig={params:[],ret:ty};I(e).dflt=ty;
             return ty;
           }
-          if(adtRec(owner)){errors.push(RQ.diag.make('E0599',sg[1].line,e.callee.col,{what:'item',name:sg[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));return T.any;}
+          if(adtRec(owner)){errors.push(RQ.diag.make('E0599',sg[1].line,sg[1].col,{what:'item',name:sg[1].name,type:owner,kind:structs.has(owner)?'struct':'enum'}));return T.any;}
           return unsup('path call',e.line);
         }
         if(e.callee.t!=='Path'||e.callee.segs.length!==1||e.callee.segs[0].args||e.callee.global){e.args.forEach(ex);return unsup(e.callee.t==='Path'?'path call':'call',e.line);}
@@ -2142,7 +2279,7 @@ RQ.check=ast=>{
         const ts=e.args.map((a,i)=>{
           const w=gi&&gi.fnw[i];
           if(!w)return exW(a,gi?gi.params[i]:f&&f.params.length===e.args.length?f.params[i].ty:null);
-          if(peel(a).t==='Closure'){expSig=w;return ex(a);}
+          if(peel(a).t==='Closure'){expSig={...w,at:{line:e.callee.line,col:e.callee.col}};return ex(a);}
           const t=ex(a);fnMeet(t,w,a);return t;
         });
         const lb=lookup(n);
@@ -2165,7 +2302,7 @@ RQ.check=ast=>{
         if(e.mut&&guardRoot&&scrutRoot(sx)===guardRoot)guardBorrow(sx,e.line,e.col);
         if(sx.t==='Index'&&peel(sx.index).t==='Range')return slice(e,sx);
         const t=ex(e.expr),r=res(t);
-        if(r.k==='ref'||r.k==='str')return unsup('reference to reference',e.line);
+        if((r.k==='ref'||r.k==='str')&&!(refArg.has(e)&&!e.mut&&!r.mut))return unsup('reference to reference',e.line);
         return mkRef(e.mut,t);
       }
       case 'Deref':{
@@ -2184,6 +2321,9 @@ RQ.check=ast=>{
         if(peel(e.recv).t==='Range')rangeOk=true;
         if(e.recv!==reuse)lendRange(e);
         const rt=e.recv===reuse?(reuse=null,info.get(e.recv).ty):ex(e.recv),r=res(rt);
+        // `a.cmp(&b)` with `b` already a reference is a `&&T` that coerces back to the `&T` cmp takes; an open number has more than one impl, so rustc does not coerce
+        let rb=r;while(rb.k==='ref')rb=res(rb.to);
+        if(CMPS.includes(e.name)&&e.args.length===1&&peel(e.args[0]).t==='Ref'&&(!['ivar','fvar','tvar'].includes(rb.k)||e.name==='cmp'&&rb.k==='ivar'))refArg.add(peel(e.args[0]));
         if(r.k==='tvar'&&(r.cparam||r.pendTgt)){
           e.args.forEach(ex);
           if(r.cparam){if(!r.pendDone)errors.push(RQ.diag.make('E0282',r.cparam.line,r.cparam.col,{}));r.pendDone=true;}
@@ -2206,8 +2346,10 @@ RQ.check=ast=>{
           intos.push({e,src:rt,tgt});
           return tgt;
         }
-        const adt=r.k==='ref'?res(r.to):r;
-        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k)||CMPS.includes(e.name)&&!nameTaken('Ordering')&&['int','ivar','float','fvar','bool','char','unit','String','str','tuple','array','slice','ref'].includes(adt.k))return adtMethod(e,r,adt,args,null);
+        let adt=r.k==='ref'?res(r.to):r;
+        if(INT_INHERENT.has(e.name))while(adt.k==='ref')adt=res(adt.to);
+        if((adt.k==='int'||adt.k==='ivar')&&(e.name==='min'||e.name==='max')&&r.k==='ref')return unsup('method call',e.line);
+        if(adt.k==='struct'||adt.k==='enum'||adt.k==='coll'||adt.k==='param'||(adt.k==='int'||adt.k==='ivar')&&(e.name==='min'||e.name==='max'||INT_INHERENT.has(e.name))||SEQ_METHODS.includes(e.name)&&(adt.k==='array'||adt.k==='slice')||e.name==='to_string'&&!args.length&&['int','ivar','float','fvar','bool','char'].includes(adt.k)||CMPS.includes(e.name)&&!nameTaken('Ordering')&&['int','ivar','float','fvar','bool','char','unit','String','str','tuple','array','slice','ref'].includes(adt.k))return adtMethod(e,r,adt,args,null);
         // o owned String, r &String, m &mut String, s &str
         const seq=r.k==='array'?r:r.k==='ref'&&['array','slice'].includes(res(r.to).k)?res(r.to):null;
         if((e.name==='len'||e.name==='is_empty')&&seq&&(seq.k==='slice'||isCopy(seq))){
@@ -2354,7 +2496,7 @@ RQ.check=ast=>{
           if(!unify(a,b)||!['int','ivar','any'].includes(res(a).k))unsup('type checking',it.line);else el=a;
         }else el=forItems(e,it);
         scopes.push(new Map());
-        if(named)bindVar(pt.name,pt.mut,'let',el,pt);
+        if(named)bindVar(pt.name,pt.mut,'let',el,pt,'for bindings');
         loops.push({ty:null,value:false});
         const t=block(e.body);loops.pop();scopes.pop();
         if(!['unit','never','any'].includes(res(t).k))unsup('type checking',e.line);
