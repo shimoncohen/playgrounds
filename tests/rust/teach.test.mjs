@@ -28,14 +28,13 @@ describe('feature tags follow the course order', () => {
 
 describe('previews', () => {
   for (const { ci, m } of flat) for (const p of m.previews) {
-    it(`${p.tag} is explained in the card text${p.home ? ' and names its home chapter' : ''}`, () => {
+    it(`${p.tag} is explained in the card text and names the later chapter that teaches it`, () => {
       assert.ok(p.wording);
       assert.ok(m.how.some((h) => h.includes(p.wording)) || m.explain.includes(p.wording), 'the preview wording must appear on the mission card');
-      if (p.home) {
-        assert.match(plain(p.wording), new RegExp(`Chapter ${p.home}\\b`));
-        assert.ok(p.home - 1 > ci, 'the home chapter must come later in the course');
-        assert.ok(RQ.CH[p.home - 1]?.missions.some((h) => h.defines.includes(p.tag)), `chapter ${p.home} must define "${p.tag}"`);
-      } else assert.match(plain(p.wording), /macro/);
+      assert.ok(p.home, 'a preview must name its home chapter, or the mission must define the term in place');
+      assert.match(plain(p.wording), new RegExp(`Chapter ${p.home}\\b`));
+      assert.ok(p.home - 1 > ci, 'the home chapter must come later in the course');
+      assert.ok(RQ.CH[p.home - 1]?.missions.some((h) => h.defines.includes(p.tag)), `chapter ${p.home} must define "${p.tag}"`);
     });
   }
 });

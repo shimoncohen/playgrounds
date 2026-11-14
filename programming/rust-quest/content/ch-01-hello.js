@@ -20,7 +20,7 @@ RQ.CH.push({
         'The whole program is one function, <code>main</code>, where every Rust program starts. Inside it, <code>println!</code> prints one line of text.',
         '<code>fn main() { ... }</code> declares the function <code>main</code>. The curly braces hold what it does.',
         '<code>println!("Hello, Rust!");</code> prints the text between the quotes and then starts a new line. The <code>;</code> ends the statement.',
-        'The <code>!</code> in <code>println!</code> marks a macro, a built-in code writer. It isn\'t a normal function.'
+        'The <code>!</code> in <code>println!</code> marks a macro: code that writes more code for you before the program runs. <code>println!</code> has to be one because it can print any number of values, and Rust checks before running that the text and the values match. A normal function, like <code>main</code>, always takes the same fixed list. When a name ends in <code>!</code>, read it as a macro.'
       ],
       explain:'Rust runs the lines inside <code>main</code> from top to bottom and then stops. <code>println!</code> is how you see what happened.',
       hint:'Type <code>println!("Hello, Rust!");</code> between the curly braces.',
@@ -29,8 +29,7 @@ RQ.CH.push({
       alts:[prog('    print!("Hello, ");\n    println!("Rust!");\n'),prog('    println!("Hello, Rust!")\n')],
       wrong:[{src:prog('    println!("Hello Rust!");\n'),wrongWhy:'check'},{src:prog(''),wrongWhy:'check'}],
       lazy:[{src:prog('    print!("Hello, Rust!");\n'),wrongWhy:'check'}],
-      defines:['fn-main','println'],
-      previews:[{tag:'macro',wording:'The <code>!</code> in <code>println!</code> marks a macro, a built-in code writer. It isn\'t a normal function.'}],
+      defines:['fn-main','println','macro'],previews:[],
       check:c=>c.out()==='Hello, Rust!\n'?true:c.out()==='Hello, Rust!'?'Close. The line needs to end, so use `println!`: the `ln` starts a new line.':'The program has to print exactly `Hello, Rust!`, capital letters, comma and exclamation mark included.'
     },
     {
