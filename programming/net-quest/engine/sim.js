@@ -241,6 +241,7 @@ const ipRx=(ctx,dev,iface,p,tag)=>{
   }
   if(!ownIface(dev,ip.dst))return forward(ctx,dev,iface,p,tag);
   if(tag&&!tag.reason){ctx.hops=via(tag,dev.id).path;ctx.hit=true;}
+  if(layer(p,'UDP'))return udpRx(ctx,dev,iface,p);
   if(!ic)return drop(ctx,dev.id,iface,p,'no one is listening for this protocol');
   const f=ic.fields;
   if(f.type==='echo-request'){
@@ -258,6 +259,18 @@ const ipRx=(ctx,dev,iface,p,tag)=>{
     return;
   }
   log(ctx,dev.id,iface,'rx','delivered: ICMP '+f.type+' from '+ip.src,p);
+};
+/* a handler returns true once it took the datagram; an untaken one is dropped with no ICMP */
+const services={};
+const udp={
+  listen:(port,fn)=>{services[port]=fn;},
+  expect:(ctx,devId,port,fn)=>{ctx.claims[devId+'|'+port]=fn;}
+};
+const udpRx=(ctx,dev,iface,p)=>{
+  const port=layer(p,'UDP').fields.dport,claim=ctx.claims[dev.id+'|'+port],svc=services[port];
+  if(claim&&claim(ctx,dev,iface,p))return;
+  if(svc&&svc(ctx,dev,iface,p))return;
+  drop(ctx,dev.id,iface,p,'no one is listening on UDP port '+port);
 };
 const nodeRx=(ctx,dev,iface,p,tag)=>{
   const e=p.layers[0].fields;
@@ -302,16 +315,15 @@ const lost=ctx=>{
   }
   return any;
 };
-/* run, then settle unanswered ARPs, until nothing is left to do. Each round only adds ICMP errors, which never cause
-   errors of their own, so this ends; the step limit still caps the whole session. */
-const settle=ctx=>{do run(ctx);while(!ctx.limited&&lost(ctx));};
+/* idle hooks return true if they queued work; each must use up what it waits on, so this ends (the step limit still caps it) */
+const settle=ctx=>{do run(ctx);while(!ctx.limited&&[lost(ctx),...ctx.idle.map(h=>h(ctx))].some(Boolean));};
 
 const int=(v,lo,hi,what)=>{
   if(v===undefined)return null;
   if(!Number.isInteger(v)||v<lo||v>hi)throw new RangeError(what+' must be an integer '+lo+'..'+hi);
   return v;
 };
-const session=(net,from,id,seq)=>({net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,left:false,replyFrom:null,err:null,hit:false});
+const session=(net,from,id,seq)=>({net,from,id,seq,queue:[],pending:{},entries:[],hops:[],steps:0,limited:false,left:false,replyFrom:null,err:null,hit:false,claims:{},idle:[],ext:{}});
 const ping=(net,from,dstIp,opts)=>{
   const o=opts||{},dev=net.devices[from];
   if(!dev)throw new Error('unknown device: '+from);
@@ -376,5 +388,5 @@ const inject=(net,devId,ifaceName,packet)=>{
   settle(ctx);
   return {entries:ctx.entries};
 };
-NQ.sim={ping,traceroute,arping,inject,route,nextHop,REASONS,STEP_LIMIT};
+NQ.sim={ping,traceroute,arping,inject,route,nextHop,REASONS,STEP_LIMIT,udp,kit:{ipSend,settle,session,layer,ownIface,nextHop,log}};
 })();
