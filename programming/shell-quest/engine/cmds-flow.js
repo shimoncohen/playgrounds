@@ -50,8 +50,9 @@ function condTokens(raw){
     let j=i,depth=0;
     try{while(j<n){const ch=raw[j];
       if(ch==="'"){const k=raw.indexOf("'",j+1);if(k<0)throw syn();j=k+1;continue}
-      if(ch==='"'){j++;while(j<n&&raw[j]!=='"'){if(raw[j]==='\\')j++;else if(raw[j]==='$'&&raw[j+1]==='(')j=SQ.scanSub(raw,j);j++}if(j>=n)throw syn();j++;continue}
+      if(ch==='"'){j++;while(j<n&&raw[j]!=='"'){if(raw[j]==='\\')j++;else if(raw[j]==='`')j=SQ.bqEnd(raw,j);else if(raw[j]==='$'&&raw[j+1]==='(')j=SQ.scanSub(raw,j);j++}if(j>=n)throw syn();j++;continue}
       if(ch==='\\'){j+=2;continue}
+      if(ch==='`'){j=SQ.bqEnd(raw,j)+1;continue}
       if(ch==='$'&&raw[j+1]==='('){j=SQ.scanSub(raw,j)+1;continue}
       if(ch==='$'&&raw[j+1]==='{'){j=SQ.scanBrace(raw,j,false)+1;continue}
       if(rxNext){if(ch==='(')depth++;else if(ch===')'){if(depth===0)break;depth--}else if(/\s/.test(ch)&&depth===0)break}
