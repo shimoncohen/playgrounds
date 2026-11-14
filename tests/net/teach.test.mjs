@@ -8,10 +8,10 @@ import { loadNet } from './harness.mjs';
 
 const NQ = loadNet();
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-/* everything a learner reads on a mission card (the answer key is not teaching text) */
-const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || []), m.question && m.question.ask, ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || ''))].filter(Boolean).join('\n'));
+/* everything a learner reads on a mission card (the answer key is not teaching text); a hint counts as use of a term but not as teaching it */
+const cardText = (m, hint) => plain([m.title, m.goal, hint && m.hint, m.explain, ...(m.how || []), m.question && m.question.ask, ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || ''))].filter(Boolean).join('\n'));
 const flat = [];
-NQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
+NQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) })));
 const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && x.mi < mi));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches it or defines it in place (its own card may use it)]
@@ -85,11 +85,21 @@ const FIRST = {
   'rndc flush': [/rndc/, 6, 7],
   '+trace': [/\+trace/, 6, 8],
 };
-for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
+// same shape; kept apart because the chapter-intro checks below walk FIRST and these chapters' own intros may use them
+const EARLY = {
+  byte: [/\bbytes?\b/, 0, 0],
+  Ethernet: [/\bEthernet\b/, 0, 1],
+  IPv4: [/\bIPv4\b/, 0, 1],
+  ICMP: [/\bICMP\b/, 0, 1],
+  ARP: [/\bARP\b/, 0, 3],
+  'packet loss': [/packet loss|\d+% loss/i, 1, 2],
+  'last part of a name': [/\blast part\b/i, 6, 0],
+};
+for (const [term, [re, ci, mi]] of Object.entries({ ...FIRST, ...EARLY })) {
   describe(`"${term}"`, () => {
     it(`is not used before ${ci}.${mi}, where it is introduced`, () => {
       for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
     });
     it('is not used in quick-fire or the field guide before its chapter', () => {
       for (const q of NQ.QF) if (re.test(plain([q.c, q.a, ...q.w, q.why].join(' ')))) assert.ok(q.ch >= ci, `quick-fire "${q.c}" needs chapter ${ci}`);
@@ -98,10 +108,21 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   });
 }
 
+describe('chapter 1 and 2 say what an item is before the learner meets it', () => {
+  const goal = (ci, mi) => plain(NQ.CH[ci].missions[mi].goal + ' ' + NQ.CH[ci].missions[mi].how.join(' '));
+  it('byte (1.1), Ethernet, IPv4 and ICMP (1.2), ARP (1.4), packet loss (2.3), last part of a name (7.1)', () => {
+    assert.match(goal(0, 0), /a byte is a small unit of data, so 64 bytes is the size of the reply/);
+    assert.match(goal(0, 1), /IPv4 carries the addresses for the whole trip, ICMP is the ping message itself, and Ethernet crosses one wire/);
+    assert.match(goal(0, 3), /ARP, the Address Resolution Protocol, is how a device finds the MAC behind an IP address/);
+    assert.match(goal(1, 2), /Packet loss, in the statistics at the end, is the share of your requests that got no reply/);
+    assert.match(goal(6, 0), /the last part of www\.example\.test is test/);
+  });
+});
+
 describe('chapter 2 does not use words that later chapters teach', () => {
   // routing and addressing come in chapters 3 and 4; NAT in chapter 5 ("router" and "TTL" were taught in chapter 1)
   const LATER = /\b(subnet|netmask|gateway|NAT|routing|default route|DHCP|VLAN|CIDR|prefix)\b|\broute\b/i;
-  NQ.CH[1].missions.forEach((m, i) => it(`2.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  NQ.CH[1].missions.forEach((m, i) => it(`2.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a later term')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[1].intro))));
 });
 
@@ -127,7 +148,7 @@ describe('chapter 2 defines its new words in place', () => {
 describe('chapter 3 does not use words that later chapters teach', () => {
   // routing, the gateway and NAT come in chapters 4 and 5 ("router" was taught in chapter 1)
   const LATER = /\b(gateway|NAT|routing|default route|DHCP|VLAN|traceroute|hops?|ISP)\b|\broute\b/i;
-  NQ.CH[2].missions.forEach((m, i) => it(`3.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  NQ.CH[2].missions.forEach((m, i) => it(`3.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a later term')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[2].intro))));
 });
 
@@ -162,7 +183,7 @@ describe('chapter 3 defines its new words in place', () => {
 describe('chapter 4 does not use words that chapter 5 teaches', () => {
   // NAT, address translation and the public side of the internet come in chapter 5 ("public" and "private" were taught in chapter 3)
   const LATER = /\bNAT\b|\bnat\b|translat|masquerad|\bISP\b|port forward|dropPrivate/i;
-  NQ.CH[3].missions.forEach((m, i) => it(`4.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  NQ.CH[3].missions.forEach((m, i) => it(`4.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a later term')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[3].intro))));
 });
 
@@ -199,7 +220,7 @@ describe('chapter 4 defines its new words in place', () => {
 describe('chapter 5 does not use words that nothing has taught', () => {
   // no firewalls, DHCP, ports or forwarding rules: this chapter only needs NAT, the table and the public side
   const LATER = /port forward|firewall|DHCP|VLAN|masquerad|conntrack|\bPAT\b|\bUDP\b|\bTCP\b|dropPrivate|\bDNS\b|RFC ?1918|\bCIDR\b|netmask/i;
-  NQ.CH[4].missions.forEach((m, i) => it(`5.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a term nothing has taught')));
+  NQ.CH[4].missions.forEach((m, i) => it(`5.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a term nothing has taught')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[4].intro))));
 });
 
@@ -233,7 +254,7 @@ describe('chapter 5 defines its new words in place', () => {
 describe('chapter 6 does not use words that chapter 7 teaches', () => {
   // chapter 7 teaches the lookups below the resolver, caching and DNS TTL
   const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b|\b(?:rd|ra|aa)\b/i;
-  NQ.CH[5].missions.forEach((m, i) => it(`6.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  NQ.CH[5].missions.forEach((m, i) => it(`6.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a later term')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[5].intro))));
 });
 
@@ -273,7 +294,7 @@ describe('chapter 6 defines its new words in place', () => {
 
 describe('chapter 7 does not use words that nothing has taught', () => {
   const LATER = /\bTCP\b|DNSSEC|\bEDNS\b|\bPTR\b|zone transfer|\bDHCP\b|\bVLAN\b|wildcard|\bBIND\b/i;
-  NQ.CH[6].missions.forEach((m, i) => it(`7.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a term nothing has taught')));
+  NQ.CH[6].missions.forEach((m, i) => it(`7.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m, true)), 'uses a term nothing has taught')));
   it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[6].intro))));
 });
 
