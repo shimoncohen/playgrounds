@@ -69,6 +69,21 @@ const FIRST = {
   SERVFAIL: [/SERVFAIL/, 5, 7],
   REFUSED: [/REFUSED/, 5, 7],
   resolvectl: [/resolvectl/, 5, 8],
+  recursive: [/\brecursi/i, 6, 0],
+  'root server': [/root server/i, 6, 0],
+  '@server': [/@(?:server|\d)/, 6, 1],
+  referral: [/\breferral/i, 6, 1],
+  rd: [/\brd\b/, 6, 1],
+  TLD: [/\bTLD\b/, 6, 2],
+  glue: [/\bglue\b/i, 6, 2],
+  authoritative: [/authoritative/i, 6, 3],
+  ra: [/\bra\b/, 6, 3],
+  'DNS cache': [/\bcache/i, 6, 4],
+  '+norecurse': [/\+norecurse/, 6, 5],
+  'DNS TTL': [/DNS TTL/, 6, 6],
+  sleep: [/\bsleep\b/, 6, 6],
+  'rndc flush': [/rndc/, 6, 7],
+  '+trace': [/\+trace/, 6, 8],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -253,6 +268,48 @@ describe('chapter 6 defines its new words in place', () => {
   it('resolvectl is explained in 6.9', () => assert.match(plain(card(8)), /resolvectl shows and sets which server this laptop asks/));
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 5 && mi > 0) assert.ok(!re.test(plain(NQ.CH[5].intro)), term);
+  });
+});
+
+describe('chapter 7 does not use words that nothing has taught', () => {
+  const LATER = /\bTCP\b|DNSSEC|\bEDNS\b|\bPTR\b|zone transfer|\bDHCP\b|\bVLAN\b|wildcard|\bBIND\b/i;
+  NQ.CH[6].missions.forEach((m, i) => it(`7.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a term nothing has taught')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[6].intro))));
+});
+
+describe('chapter 7 defines its new words in place', () => {
+  const card = (i) => NQ.CH[6].missions[i].goal + ' ' + NQ.CH[6].missions[i].how.join(' ');
+  it('recursive and root server are defined in 7.1', () => {
+    assert.match(card(0), /<b>recursive<\/b> resolver does the whole search/);
+    assert.match(card(0), /<b>root server<\/b>: a server that knows/);
+  });
+  it('referral and rd are defined in 7.2, and the warning is mentioned', () => {
+    assert.match(card(1), /<b>referral<\/b>: not an answer but a pointer/);
+    assert.match(plain(card(1)), /\brd\s+means recursion desired/);
+    assert.match(plain(card(1)), /prints a warning/);
+  });
+  it('TLD and glue are defined in 7.3', () => {
+    assert.match(card(2), /<b>TLD<\/b> server, short for top-level domain/);
+    assert.match(card(2), /<b>glue<\/b>/);
+  });
+  it('authoritative and ra are defined in 7.4, by contrast with the resolver\'s reply', () => {
+    assert.match(card(3), /<b>authoritative<\/b> for/);
+    assert.match(plain(card(3)), /\bra\s+means recursion available/);
+  });
+  it('the DNS cache, +norecurse, the DNS TTL and rndc flush are defined where they first appear (7.5 to 7.8)', () => {
+    assert.match(card(4), /<b>DNS cache<\/b>: its memory of answers/);
+    assert.match(plain(card(5)), /\+norecurse is the option/);
+    assert.match(card(6), /<b>DNS TTL<\/b>, short for time to live/);
+    assert.match(plain(card(7)), /rndc controls a name server/);
+  });
+  it('the terminal device is announced where it is not the laptop (7.8)', () => {
+    assert.match(card(7), /runs <b>on <code>resolver<\/code><\/b>/);
+  });
+  it('the flag aa is never written on a card before chapter 7 ends, because 7.4 asks for it', () => {
+    for (const x of flat) assert.ok(!/\baa\b/.test(x.text), `${x.ci}.${x.mi} names the flag`);
+  });
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 6 && mi > 0) assert.ok(!re.test(plain(NQ.CH[6].intro)), term);
   });
 });
 

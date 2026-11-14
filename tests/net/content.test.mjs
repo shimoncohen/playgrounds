@@ -968,6 +968,23 @@ describe('chapter 6: quick-fire and field guide', () => {
   });
 });
 
+describe('chapter 7: quick-fire and field guide', () => {
+  const qf = NQ.QF.filter((q) => q.ch === 6), guide = NQ.GUIDE.filter((g) => g.ch === 6);
+  it('has six quick-fire questions and four guide entries that run on the dns network', () => {
+    assert.equal(qf.length, 6);
+    assert.equal(guide.length, 4);
+    for (const g of guide) assert.equal(g.sc, 'dns', g.c);
+  });
+  it('the flag aa is only named in chapter 7 entries', () => {
+    for (const q of NQ.QF) if (/\baa\b/.test(plain([q.c, q.a, ...q.w, q.why].join(' ')))) assert.equal(q.ch, 6, q.c);
+    for (const g of NQ.GUIDE) if (/\baa\b/.test(plain([g.c, g.what, ...g.ex.flat()].join(' ')))) assert.equal(g.ch, 6, g.c);
+  });
+  it('the rndc example runs on the resolver, where the command exists', () => {
+    const ex = guide.flatMap((g) => g.ex).find(([line]) => /^rndc/.test(line));
+    assert.equal(ex[2], 'resolver');
+  });
+});
+
 describe('review fixes for chapters 2 to 5', () => {
   const mm = (c, i) => NQ.CH[c].missions[i];
   const run = (c, i, lines, a) => NQ.runMission(mm(c, i), lines, a);
