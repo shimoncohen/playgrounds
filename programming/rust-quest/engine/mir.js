@@ -71,6 +71,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     B[cur].instrs.push({op,ast:nd.id,line:nd.line,col:nd.col,...o});
   };
   const opnd=(l,reb,sh)=>reb?{k:'copy',l,reb:true,sh:!!sh}:{k:isCopy(L[l].ty)?'copy':'move',l};
+  // where the name was written, so a use after a move is reported there and not at the call or macro around it
+  const opAt=(l,p,reb,sh)=>({...opnd(l,reb,sh),at:{line:p.line,col:p.col}});
   // a closure body sees the locals of the fn around it as captures: a local of its own that starts out holding the value
   const caps=new Map();
   const lidBind=b=>{
@@ -136,13 +138,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
   // a Path argument or receiver: a `&mut` local is reborrowed here, not moved; sh: the callee takes `&`, so the reborrow is shared
   const argOp=(x,sh)=>{
     const p=peel(x),l=p.t==='Path'?lid(p):-1;
-    if(l>=0){const t=L[l].ty;return opnd(l,t.k==='ref'&&t.mut,sh);}
+    if(l>=0){const t=L[l].ty;return opAt(l,p,t.k==='ref'&&t.mut,sh);}
     return ex(x);
   };
   // std `drop<T>(x: T)` takes its argument by value: a generic parameter gets no reborrow, so a `&mut` local is moved
   const moveOp=x=>{
     const p=peel(x),l=p.t==='Path'?lid(p):-1;
-    return l>=0?opnd(l):ex(x);
+    return l>=0?opAt(l,p):ex(x);
   };
   // Operands are read left to right. A named local read before a sibling that emits instrs is copied or moved into a temp now,
   // not by the instr that consumes it; a reborrow is left alone, its use at the consumer keeps the loans live (see rebTwice).
@@ -308,14 +310,14 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     return args.every(ok);
   }
   // format_args! takes `&arg` of every argument first, so a reference local is borrowed too and a later arg cannot reassign it
-  const printLocal=(l,nd)=>put({k:'ref',l,mut:false,implicit:true},nd,undefined,T.ref(false,L[l].ty,0));
+  const printLocal=(l,nd,at=nd)=>put({k:'ref',l,mut:false,implicit:true,at:{line:at.line,col:at.col}},nd,undefined,T.ref(false,L[l].ty,0));
   function printArg(x,nd){
     const p=peel(x);
-    if(p.t==='Path'){const l=lid(p);if(l>=0)return printLocal(l,nd);}
+    if(p.t==='Path'){const l=lid(p);if(l>=0)return printLocal(l,nd,p);}
     // rustc takes `&*r` of a `*r` argument, which keeps r's loan alive to the call like `&r`
     if(p.t==='Deref'){
       const q=peel(p.expr),l=q.t==='Path'?lid(q):-1;
-      if(l>=0&&L[l].ty.k==='ref')return printLocal(l,nd);
+      if(l>=0&&L[l].ty.k==='ref')return printLocal(l,nd,p);
     }
     if(p.t==='Field'){
       const c=classify(p);
@@ -344,7 +346,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       if((kind==='mut'||kind==='write')&&!m.mut)m.mut={i,write:kind==='write'};
     };
     for(const b of F.blocks)for(const i of b.instrs){
-      const o=x=>{if(x&&x.k!=='const')note(x.l,x.k==='move'?'move':x.reb&&!x.sh?'mut':'copy',i);};
+      const o=x=>{if(x&&x.k!=='const')note(x.l,x.k==='move'?'move':x.reb&&!x.sh?'mut':'copy',x.at||i);};
       const rv=r=>{
         if(r.k==='ref')note(r.l,r.mut?'mut':'ref',i);
         else if(r.k==='use'||r.k==='deref'||r.k==='peek')o(r.x);
@@ -849,8 +851,8 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
     if(fi.mode==='val'||fi.viaRef){
       const p=src,l=p.t==='Path'?lid(p):-1;
       // a `&mut` variable that is lent, not moved, is reborrowed: the loan is on the variable, and no `mut` is needed to make it
-      if(l>=0&&fi.mode!=='val'&&peel(e.iter)!==src&&L[l].ty.k==='ref'&&L[l].ty.mut)ro=put({k:'ref',l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',L[l].ty,0));
-      else ro=l>=0?opnd(l):ex(src);
+      if(l>=0&&fi.mode!=='val'&&peel(e.iter)!==src&&L[l].ty.k==='ref'&&L[l].ty.mut)ro=put({k:'ref',l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',L[l].ty,0),e.iter);
+      else ro=l>=0?opAt(l,p):ex(src);
       if(ro.k==='const'){un('temporary borrow',e);return NIL;}
     }else if(hasVecIdx(src)){
       const r=vecRoot(src);
@@ -862,7 +864,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
       if(!ro)return NIL;
     }else{
       const c=classify(src);
-      if(c.k==='local'||c.k==='path')ro=put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:peel(e.iter).t!=='Ref'},e,undefined,T.ref(fi.mode==='mut',L[c.l].ty,0));
+      if(c.k==='local'||c.k==='path')ro=put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:peel(e.iter).t!=='Ref'},e,undefined,T.ref(fi.mode==='mut',L[c.l].ty,0),e.iter);
       else if(c.k==='via'){
         const t=L[c.l].ty;
         // the field is reached through the reference, so the loan goes on the reference like a `for` over `&mut` variable
@@ -872,13 +874,13 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           if(!b||cs.some(q=>!related(q,b))&&cs.some(q=>related(q,b))){un('reborrow',e);return NIL;}
           loan=cs.some(q=>related(q,b));
         }
-        ro=loan?put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',t,0)):opnd(c.l,t.k==='ref'&&t.mut,fi.mode!=='mut');
+        ro=loan?put({k:'ref',l:c.l,mut:fi.mode==='mut',implicit:true,deref:true},e,undefined,T.ref(fi.mode==='mut',t,0),e.iter):opnd(c.l,t.k==='ref'&&t.mut,fi.mode!=='mut');
       }else if(c.k==='other'&&!['Path','Field','Index','Deref'].includes(src.t)){
         // the temporary lives as long as the loop; a constant is promoted to a static and lives forever
         const pr=fi.mode==='mut'?'no':promo(src);
         if(pr==='maybe'){un('temporary borrow',e);return NIL;}
         const v=ex(src),t=v.k==='const'?put({k:'use',x:v},src,undefined,tyOf(src)):v;
-        ro=put({k:'ref',l:t.l,mut:fi.mode==='mut',implicit:true},e,undefined,T.ref(fi.mode==='mut',tyOf(src),0));
+        ro=put({k:'ref',l:t.l,mut:fi.mode==='mut',implicit:true,tpos:{line:src.line,col:src.col}},e,undefined,T.ref(fi.mode==='mut',tyOf(src),0),e.iter);
         if(pr==='no'){L[t.l].tmp=true;loopTemp=t.l;}
       }else{un(c.k==='idx'?'borrow of a field':'temporary borrow',e);return NIL;}
     }
@@ -946,7 +948,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
         if(l<0)return fin(NIL,e,dest);
         const t=L[l].ty;
         if(t.k==='ref'&&t.mut){un('reborrow',e);return fin(NIL,e,dest);}
-        return fin(opnd(l),e,dest);
+        return fin(opAt(l,e),e,dest);
       }
       case 'Unary':case 'Cast':return put({k:'op',args:[ex(e.expr)]},e,dest,tyOf(e));
       case 'Binary':{
@@ -960,7 +962,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
           return opnd(d);
         }
         // == and the others take their operands by reference, so comparing two Strings or structs moves neither
-        if(['==','!=','<','>','<=','>='].includes(e.op)&&!isCopy(tyOf(e.lhs)))return put({k:'op',args:seq([e.lhs,e.rhs],x=>printArg(x,e))},e,dest,tyOf(e));
+        if(['==','!=','<','>','<=','>='].includes(e.op)&&!(isCopy(tyOf(e.lhs))&&isCopy(tyOf(e.rhs))))return put({k:'op',args:seq([e.lhs,e.rhs],x=>printArg(x,e))},e,dest,tyOf(e));
         return put({k:'op',args:seq([e.lhs,e.rhs],ex)},e,dest,tyOf(e));
       }
       case 'Assign':assign(e);return fin(NIL,e,dest);
@@ -1026,7 +1028,7 @@ function lowerFn(f,info,un,err,userDrop,dropTys,fname,sink,ctx){
             if(extRef.has(e)){L[t.l].tmp=true;scopes[scopes.length-1].push(t.l);}
             else ownTemp(t.l);
           }
-          return put({k:'ref',l:t.l,mut:e.mut},e,dest,tyOf(e));
+          return put({k:'ref',l:t.l,mut:e.mut,tpos:{line:e.expr.line,col:e.expr.col}},e,dest,tyOf(e));
         }
         un(x.t==='Field'||x.t==='Index'?'borrow of a field':x.t==='Deref'?'reborrow':'temporary borrow',e);
         return fin(NIL,e,dest);
