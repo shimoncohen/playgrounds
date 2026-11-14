@@ -1,6 +1,6 @@
 # Network Quest phase 2 (DNS) design
 
-Date: 2026-11-01. Status: design approved; PRs B, C, D pending. Line numbers and `path:line` facts are as of `cd80fac`; PRs B, C and D re-check them before relying on them. Phase 1 design: `docs/superpowers/specs/2026-10-20-net-quest-design.md`. Plan: `docs/superpowers/plans/2026-11-01-net-quest-phase2-dns.md`.
+Date: 2026-11-01. Status: built (PRs B, C and D merged; see "As built"). Line numbers and `path:line` facts are as of `cd80fac`; PRs B, C and D re-check them before relying on them. Phase 1 design: `docs/superpowers/specs/2026-10-20-net-quest-design.md`. Plan: `docs/superpowers/plans/2026-11-01-net-quest-phase2-dns.md`.
 
 ## 1. Goal and summary
 
@@ -64,7 +64,7 @@ Seven devices: `laptop`, `resolver`, `sw1`, `r1`, `root`, `tld`, `auth`.
 
 **`dns-stale`** seeds the resolver cache with `www.example.test A 198.18.0.99`, `expires:3600` (absolute; `now` starts at 0). The `auth` zone says 198.18.0.80. Missions 5.0 to 6.6 run on `dns` with an empty cache, so the stale entry never shows there.
 
-**Step budget.** A cold resolution is estimated at about 45 to 70 simulator steps (hand count; PR B measures). PR B's tests assert under 150 and record the measured count. `STEP_LIMIT` stays 500.
+**Step budget.** A cold resolution costs 38 simulator steps (measured; the hand estimate was 45 to 70). The tests assert under 150. `STEP_LIMIT` stays 500.
 
 ## 4. Module seams
 
@@ -166,17 +166,18 @@ Flat scalars, so the inspector's field list renders without nested sections: `id
 | 6.1 | `dig @192.0.2.10 www.example.test`; teaches `@server`, referral and `rd` with the warning | `@server`, referral, `rd` | referred server's name |
 | 6.2 | `dig @198.51.100.10 www.example.test` | TLD, glue | glue address |
 | 6.3 | `dig @203.0.113.10 www.example.test`; `ra` stays here; the authoritative reply carries `rd` but no `ra`, so `ra` is taught by contrast with the resolver's reply | authoritative, flags `aa` `ra` | two-letter flag for "I own this answer" |
-| 6.4 | ask twice | DNS cache | second query time (0) |
+| 6.4 | `dig www.example.test` twice, full output | DNS cache | second query time (0) |
 | 6.5 | `dig +norecurse`, before and after a normal `dig` | peek at the cache | address returned once cached |
 | 6.6 | `sleep 120`, then `dig`; the card says the practice shell skips the wait | DNS TTL counts down | new TTL (180) |
-| 6.7 | fix-it on `resolver`, scenario `dns-stale` | `rndc flush` | none |
+| 6.7 | fix-it at the `resolver` terminal, scenario `dns-stale`; the card names the stale address and says the terminal runs on `resolver` | `rndc flush` | none |
 | 6.8 | `dig +trace www.example.test` | whole chain | name of the last server asked |
 
 Notes on specific missions:
 
 - **6.1 and `rd`.** `rd` taught in 6.1, together with the warning; `ra` stays in 6.3.
-- **6.6 setup.** Setup warms the cache with `dig www.example.test` on `laptop`; the clock and cache are kept through setup. After `sleep 120`, `dig` shows a TTL of 300 minus seconds since cached (180). The check computes the expected TTL from the net, and past 300 s the entry expires, so the next `dig` shows 300.
-- **6.7 check.** `ctx.dig('laptop', 'www.example.test')` on a clone returns the `auth` zone's address. Doing nothing fails (the stale 198.18.0.99 is returned). `sleep 3600` also passes: the check is on the outcome.
+- **Checks read the learner's own replies.** Values are read from the full (not `+short`) `dig` reply or output the learner got, and are accepted with or without a trailing dot and in any case. 6.4 reads `Query time` from the output of the last full `dig`; 6.8 reads the last `;; Received` server name from the trace output.
+- **6.6 setup.** Setup warms the cache with `dig www.example.test` on `laptop`; the clock and cache are kept through setup. After `sleep 120`, `dig` shows a TTL of 300 minus seconds since cached (180). The check requires a `sleep` followed by a full `dig` whose TTL is below the authoritative TTL (read with `ctx.dig` against `auth`); the question reads the TTL from that reply. Past 300 s the entry expires, so the next `dig` shows 300.
+- **6.7 check.** `ctx.dig('laptop', 'www.example.test')` on a clone returns the same address as `ctx.dig` with `server` set to `auth`. Doing nothing fails (the stale 198.18.0.99 is returned). `sleep 3600` also passes: the check is on the outcome.
 - **Answer `0` in 5.7 and 6.4.** The card text of both (goal, explain, hint, how, ask) must not contain the word `0`, because `content.test.mjs:57` forbids a question's computed answer there. The rule binds the text written in PRs C and D, not the table above.
 - **5.4 card text** never names `mail.example.test`. The question asks for "the mail server's name".
 - **Guide and quick-fire.** AAAA and TXT appear in guide and quick-fire, not in missions. Each chapter gets 4 guide entries and 6 quick-fire questions (`ch:5`, `ch:6`). SERVFAIL is in 5.7's explain and in a quick-fire question.
@@ -210,8 +211,7 @@ New `FIRST` rows in `teach.test.mjs`, written as term → key:
 - TLD → 6.2
 - glue → 6.2
 - authoritative → 6.3
-- `aa` → 6.3
-- `ra` → 6.3
+- `ra` → 6.3 (`aa` has no row: 6.3 asks for that flag, so no card may name it; `teach.test.mjs` checks it is named nowhere on a card)
 - DNS cache → 6.4
 - `+norecurse` → 6.5
 - DNS TTL → 6.6
@@ -304,7 +304,7 @@ Line numbers are from the files as of `cd80fac`; the PRs re-check them.
 
 ## As built
 
-Seeded in PR A; PR D completes it.
+Seeded in PR A; completed in PR D.
 
 - The home NAT scenario drops non-echo traffic, so UDP over NAT is phase 3.
 - ICMP errors for UDP senders carry id 0. `dig` ignores them, and phase 3 owns the fix.
@@ -314,6 +314,13 @@ Seeded in PR A; PR D completes it.
 - `dig @<own IP>` times out: there is no loopback delivery.
 - The UDP checksum is zero and DNS has no name compression.
 - `dns.now` is per device; phase 3 may move it to a net-level counter.
+- A cold lookup (laptop to resolver, then root, TLD and authoritative, with every ARP exchange) is 38 steps, 36 ms of query time (12 ms per upstream query).
+- `dig` with no name prints `Usage: dig [@server] name [type] [+short] [+norecurse] [+trace]` and exits 2; an unknown type or option exits 1.
+- `ctx.dig(from, name, type, opts)` takes `opts.server` (default: the device's resolver) and `opts.rd`, runs on a probe clone and returns the `NQ.dns.query` result.
+- A CNAME chain of up to 8 links is kept whole in the answer section (`AN_MAX` 9); a ninth link gives SERVFAIL.
+- `help` hides a command until a mission answer uses it, and `sleep` follows the same rule now that 6.6 uses it (the old hide-until-chapter-7 line is gone). `rndc` shows only on the resolver, `resolvectl` only on a stub, `dig` and `sleep` on any device with a DNS role.
+- Chapter 7's 6.7 runs at the resolver terminal, so `dig` there has no resolver of its own: only `dig @server` works.
+- The seeded `dns-stale` entry is the one in section 3; no other scenario is seeded.
 
 ## 18. Diagrams
 
