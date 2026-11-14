@@ -3165,7 +3165,7 @@ test('net-quest: chapter 6 plays through the page on the laptop, and the seven-d
   for (const width of [1280, 390]) {
     const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
     const over = () => overflow(page);
-    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 6);
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 7);
     await page.click('#chapters .chap[data-ch="5"]');
     assert.equal(await page.$$eval('#mission .dot', e => e.length), 9);
     assert.match(await page.textContent('#prompt'), /^laptop:/);
@@ -3177,6 +3177,37 @@ test('net-quest: chapter 6 plays through the page on the laptop, and the seven-d
     let done = 0;
     for (const [i, lines, answer] of steps) {
       await page.click(`#mission .dot[data-mi="${i}"]`);
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), ++done * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test('net-quest: chapter 7 plays through the page on the laptop and the resolver, and the map marks the terminal device as (you)', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => overflow(page);
+    await page.click('#chapters .chap[data-ch="6"]');
+    assert.equal(await page.$$eval('#mission .dot', e => e.length), 9);
+    const steps = [[0, ['dig www.example.test'], '192.0.2.10', 'laptop'], [4, ['dig www.example.test', 'dig www.example.test'], '0', 'laptop'], [7, ['rndc flush'], null, 'resolver']];
+    let done = 0;
+    for (const [i, lines, answer, dev] of steps) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      assert.match(await page.textContent('#prompt'), new RegExp('^' + dev + ':'), `mission ${i + 1} prompt`);
+      const you = await page.locator('#diagram .dg-list li', { hasText: '(you)' }).allTextContents();
+      assert.equal(you.length, 1, 'exactly one device is marked (you)');
+      assert.match(you[0], new RegExp('^' + dev + ' '), `mission ${i + 1}: the map marks ${dev}`);
       if (width < 820) await page.click('.seg button[data-view="term"]');
       for (const l of lines) await type(l);
       if (answer) {
@@ -3257,10 +3288,10 @@ test('net-quest: quick-fire and field guide render', async () => {
   await ctx.close();
 });
 
-test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all six are', async () => {
-  const sizes = [8, 5, 6, 6, 7, 9];
+test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all seven are', async () => {
+  const sizes = [8, 5, 6, 6, 7, 9, 9];
   const seed = (n) => JSON.stringify({ done: Object.fromEntries(sizes.flatMap((k, c) => [...Array(k).keys()].filter(() => c < n).map(i => [`${c}.${i}`, true]))), xp: 0 });
-  for (const [n, label] of [[1, 'chapter 1 only'], [6, 'all six chapters']]) {
+  for (const [n, label] of [[1, 'chapter 1 only'], [7, 'all seven chapters']]) {
     const { ctx, page, errors, console: cerr } = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, seed(n)));
     await page.click('.tabs button[data-tab="fire"]');
     const allowed = await page.evaluate((n) => NQ.QF.filter(q => q.ch < n).map(q => q.c), n);
@@ -3273,7 +3304,7 @@ test('net-quest: quick-fire draws only from chapters that are done, and from eve
     }
     for (const c of seen) assert.ok(allowed.includes(c), `${label}: asked "${c}" before its chapter was done`);
     const later = await page.evaluate(() => NQ.QF.filter(q => q.ch > 0).map(q => q.c));
-    assert.equal([...seen].some(c => later.includes(c)), n === 6, `${label}: questions from later chapters`);
+    assert.equal([...seen].some(c => later.includes(c)), n === 7, `${label}: questions from later chapters`);
     assert.deepEqual(errors, []);
     assert.deepEqual(cerr, []);
     await ctx.close();
