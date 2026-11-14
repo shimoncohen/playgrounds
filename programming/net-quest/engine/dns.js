@@ -69,8 +69,9 @@ const fromCache=(d,e)=>{
   return {ra:true,rcode:e.rcode==='NXDOMAIN'?'NXDOMAIN':'NOERROR',ns:e.rrs.map(rr)};
 };
 /* the simulated root hints name each root a.root-servers.test., b..., in the order of dns.roots */
+const rootName=i=>String.fromCharCode(97+i)+'.root-servers.test.';
 const hintRRs=d=>{
-  const names=d.roots.map((ip,i)=>String.fromCharCode(97+i)+'.root-servers.test.');
+  const names=d.roots.map((ip,i)=>rootName(i));
   return {ns:names.map(n=>({name:'.',type:'NS',ttl:TTL_ROOT_HINT,data:n})),ar:names.map((n,i)=>({name:n,type:'A',ttl:TTL_ROOT_HINT,data:d.roots[i]}))};
 };
 
@@ -175,5 +176,5 @@ const query=(net,from,o)=>{
   }
   return {status:got?'ok':'timeout',msg:got,server:o.server,entries:ctx.entries,steps:ctx.steps,ms:got?MS_PER_QUERY*S.up:0};
 };
-NQ.dns={query,recs,fq};
+NQ.dns={query,recs,fq,rootName};
 })();

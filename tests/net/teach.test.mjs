@@ -232,8 +232,8 @@ describe('help lists only the commands taught so far', () => {
     assert.ok(!helpAt(4, 1).includes('nat') && helpAt(4, 2).includes('nat'));
   });
   it('by the last mission every command is listed', () => {
-    const last = NQ.CH.at(-1);
-    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), [...Object.keys(NQ.CMDS)].sort());
+    const last = NQ.CH.at(-1), m = last.missions.at(-1), dev = NQ.session(m).net.devices[m.dev || NQ.session(m).net.me];
+    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), Object.keys(NQ.CMDS).filter((n) => !NQ.AVAIL[n] || NQ.AVAIL[n](dev)).sort());
   });
   it('a locked command still runs: help only hides it', () => {
     assert.equal(NQ.session(NQ.CH[0].missions[0]).run('ipcalc 10.0.0.0/24').code, 0);

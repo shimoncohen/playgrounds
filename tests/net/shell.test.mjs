@@ -119,3 +119,31 @@ test('odd input never throws', () => {
   }
   for (const l of [undefined, null, 5]) assert.equal(net.exec(l).code, 0);
 });
+
+const helpNames = (net, dev) => J(net.exec('help', dev).out).map((l) => l.split(/\s+/)[0]);
+const DNS_CMDS = ['dig', 'resolvectl', 'rndc', 'sleep'];
+
+test('help lists dig, sleep and resolvectl only where the device has them', () => {
+  for (const s of ['pair', 'office', 'home']) for (const id of Object.keys(NQ.createNet(s).devices).filter((d) => NQ.createNet(s).devices[d].kind !== 'switch')) {
+    assert.deepEqual(helpNames(NQ.createNet(s), id).filter((n) => DNS_CMDS.includes(n)), [], s + '.' + id);
+  }
+  const net = NQ.createNet('dns');
+  assert.deepEqual(helpNames(net, 'laptop').filter((n) => DNS_CMDS.includes(n)), ['dig', 'resolvectl', 'sleep']);
+  assert.deepEqual(helpNames(net, 'resolver').filter((n) => DNS_CMDS.includes(n)), ['dig', 'rndc', 'sleep']);
+  assert.deepEqual(helpNames(net, 'auth').filter((n) => DNS_CMDS.includes(n)), ['dig', 'sleep']);
+  assert.deepEqual(helpNames(net, 'r1').filter((n) => DNS_CMDS.includes(n)), []);
+});
+
+test('a command a device does not have is not found and is never suggested', () => {
+  const office = NQ.createNet('office'), dns = NQ.createNet('dns');
+  assert.deepEqual(J(office.exec('dog').err), ['bash: dog: command not found']);
+  assert.deepEqual(J(office.exec('dig www.example.test').err), ['bash: dig: command not found']);
+  assert.deepEqual(J(dns.exec('dog').err), ['bash: dog: command not found', "Did you mean 'dig'?"]);
+  assert.deepEqual(J(dns.exec('rnd flush').err), ['bash: rnd: command not found']);
+  assert.deepEqual(J(dns.exec('rnd flush', 'resolver').err), ['bash: rnd: command not found', "Did you mean 'rndc'?"]);
+  assert.equal(dns.exec('dig').code, 2);
+});
+
+test('help text for the new commands avoids DNS terms', () => {
+  for (const c of DNS_CMDS) assert.doesNotMatch(NQ.HELP[c], /\b(DNS|resolver|recursive|authoritative|TTL|cache|UDP|record)\b/i, c);
+});
