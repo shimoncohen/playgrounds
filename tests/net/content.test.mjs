@@ -573,6 +573,110 @@ describe('chapter 5: lazy answers are caught', () => {
   });
 });
 
+describe('chapter 6: names and DNS', () => {
+  const m = (i) => NQ.CH[5].missions[i];
+  const run = (i, lines, a) => NQ.runMission(m(i), lines, a);
+  const WWW = 'dig www.example.test';
+  it('has nine missions, all on the dns network, with the expected answers', () => {
+    assert.equal(NQ.CH[5].name, 'Names and DNS');
+    assert.deepEqual([...NQ.CH[5].missions.map((x) => x.scenario)], Array(9).fill('dns'));
+    const want = ['198.18.0.80', '300', '53', undefined, 'mail.example.test.', 'ns1.example.test.', 'www.example.test.', '0', undefined];
+    want.forEach((a, i) => assert.equal(m(i).question ? solve(m(i)).expect : undefined, a, String(i)));
+  });
+  it('doing nothing fails every mission, and the answer without the command does not count', () => {
+    for (const [i, a] of [[0, '198.18.0.80'], [1, '300'], [2, '53'], [4, 'mail.example.test'], [5, 'ns1.example.test'], [6, 'www.example.test'], [7, '0']])
+      assert.notEqual(run(i, [], a), true, String(i));
+    for (const i of [3, 8]) assert.notEqual(run(i, []), true, String(i));
+  });
+  it('2: the port is asked only once dig www.example.test has run', () => {
+    assert.equal(run(2, [WWW]), NQ.ASK);
+    assert.equal(run(2, [WWW], '53'), true);
+    assert.equal(run(2, ['dig +short www.example.test'], '53'), true);
+    assert.match(run(2, ['dig example.test MX'], '53'), /dig www\.example\.test/);
+  });
+  it('1, 2, 4, 5, 6: a wrong value and an empty value fail, the right one passes', () => {
+    for (const [i, right, wrong, lines] of [[1, '300', '60', [WWW]], [2, '53', '33000', [WWW]], [4, 'mail.example.test', 'ns1.example.test', ['dig example.test MX']],
+      [5, 'ns1.example.test', 'mail.example.test', ['dig example.test NS']], [6, 'www.example.test', 'shop.example.test', ['dig shop.example.test']]]) {
+      assert.equal(run(i, lines, right), true, String(i));
+      assert.notEqual(run(i, lines, wrong), true, `${i} ${wrong}`);
+      assert.equal(run(i, lines, ''), NQ.ASK, String(i));
+    }
+  });
+  it('1: the number comes from the answer the learner got, not from a cold-cache guess', () => {
+    assert.equal(run(1, [WWW, 'sleep 120', WWW], '180'), true);
+    assert.notEqual(run(1, [WWW, 'sleep 120', WWW], '300'), true);
+  });
+  it('1: the number is read from the last full dig, not from a +short one', () => {
+    const lines = [WWW, 'sleep 120', 'dig +short www.example.test'];
+    assert.equal(run(1, lines, '300'), true);
+    assert.notEqual(run(1, lines, '180'), true);
+    assert.notEqual(run(1, ['dig +short www.example.test'], '300'), true);
+  });
+  it('0: a lookup of another name does not pass, and +short does', () => {
+    for (const l of ['dig example.test MX', 'dig shop.example.test', 'ping -c 1 192.168.1.53']) assert.notEqual(run(0, [l], '198.18.0.80'), true, l);
+    assert.equal(run(0, ['dig +short www.example.test'], '198.18.0.80'), true);
+  });
+  it('3: only +short on www.example.test counts', () => {
+    assert.equal(run(3, ['dig +short www.example.test']), true);
+    assert.equal(run(3, ['dig www.example.test +short']), true);
+    for (const l of [WWW, 'dig +short example.test MX', 'dig +short shop.example.test', 'dig +short wwww.example.test']) assert.notEqual(run(3, [l]), true, l);
+  });
+  it('4, 5: the type has to be the one asked for', () => {
+    for (const l of ['dig example.test', 'dig example.test NS', 'dig mail.example.test', WWW]) assert.notEqual(run(4, [l], 'mail.example.test'), true, l);
+    assert.equal(run(4, ['dig +short example.test MX'], 'mail.example.test'), true);
+    assert.equal(run(4, ['dig example.test MX'], 'Mail.Example.Test'), true);
+    assert.equal(run(4, ['dig example.test MX'], 'mail.example.test.'), true);
+    for (const l of ['dig example.test', 'dig example.test MX', 'dig ns1.example.test']) assert.notEqual(run(5, [l], 'ns1.example.test'), true, l);
+  });
+  it('6: dig for the alias, not for the name it points at', () => {
+    assert.notEqual(run(6, [WWW], 'www.example.test'), true);
+    assert.notEqual(run(6, ['dig shop.example.test MX'], 'www.example.test'), true);
+  });
+  it('7: any name that does not exist counts, and the count comes from the reply', () => {
+    assert.equal(run(7, ['dig wwww.example.test'], '0'), true);
+    assert.equal(run(7, ['dig wwww.example.test'], 'zero'), true);
+    assert.equal(run(7, ['dig nothing.example.test'], '0'), true);
+    for (const l of [WWW, 'dig example.test TXT']) assert.notEqual(run(7, [l], '0'), true, l);
+    for (const a of ['1', 'NXDOMAIN']) assert.notEqual(run(7, ['dig wwww.example.test'], a), true, a);
+  });
+  it('7: +short shows no ANSWER line, so only a full dig counts', () => {
+    assert.notEqual(run(7, ['dig +short wwww.example.test'], '0'), true);
+    assert.equal(run(7, ['dig +short wwww.example.test', 'dig wwww.example.test'], '0'), true);
+  });
+  it('7: the card text has no standalone 0 (it is the answer)', () => {
+    const t = [m(7).goal, m(7).explain, m(7).hint, m(7).question.ask, ...m(7).how].map(plain).join(' ');
+    assert.ok(!toks(t).includes('0') && !toks(t).includes('zero'));
+  });
+  it('4: the card text never names the mail server', () => {
+    const t = [m(4).goal, m(4).explain, m(4).hint, m(4).question.ask, ...m(4).how].map(plain).join(' ');
+    assert.ok(!/mail\.example\.test/.test(t));
+  });
+  it('8: starts with the laptop pointing at a dead resolver and a timed-out lookup', () => {
+    const net = NQ.createNet(m(8).scenario, m(8).setup);
+    assert.equal(net.devices.laptop.dns.resolver, '192.168.1.99');
+    const r = net.exec(WWW);
+    assert.equal(r.code, 9);
+    assert.match(r.out.join('\n'), /no servers could be reached/);
+  });
+  it('8: fails until resolvectl has fixed it and a dig proves it', () => {
+    const FIX = 'resolvectl dns eth0 192.168.1.53';
+    assert.notEqual(run(8, [WWW]), true);
+    assert.match(run(8, [FIX]), /Now run <code>dig/);
+    assert.equal(run(8, [FIX, WWW]), true);
+    assert.equal(run(8, [WWW, FIX, 'dig +short www.example.test']), true);
+    assert.match(run(8, ['resolvectl dns eth0 192.168.1.1', WWW]), /still asks a server that is not there/);
+  });
+  it('8: another server that answers is not the resolver', () => {
+    assert.match(run(8, ['resolvectl dns eth0 203.0.113.10', WWW]), /not the resolver/);
+    assert.notEqual(run(8, ['resolvectl dns eth0 192.0.2.10', WWW]), true);
+  });
+  it('8: the card says the laptop asks the resolver directly, and names the local helper address', () => {
+    const t = plain(m(8).goal);
+    assert.match(t, /asks the resolver directly/);
+    assert.match(t, /127\.0\.0\.53/);
+  });
+});
+
 // Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
@@ -685,11 +789,12 @@ describe('chapters, ranks, quick-fire and guide', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const ch of NQ.CH) assert.ok(ch.name && ch.badge && ch.intro && ch.learned.length && ch.missions.length);
   });
-  it('six ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
+  it('seven ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
     const total = NQ.CH.reduce((n, c) => n + c.missions.length, 0) * NQ.XP;
-    assert.equal(total, 320);
-    assert.equal(NQ.RANKS.length, 6);
+    assert.equal(total, 410);
+    assert.equal(NQ.RANKS.length, 7);
     assert.deepEqual([...NQ.RANKS[0]], [0, 'Packet Rookie']);
+    assert.deepEqual([...NQ.RANKS[5]], [360, 'Name Finder']);
     assert.deepEqual([...NQ.RANKS.at(-1)], [total, 'Packet Whisperer']);
     for (let i = 1; i < NQ.RANKS.length; i++) assert.ok(NQ.RANKS[i][0] > NQ.RANKS[i - 1][0]);
     assert.equal(NQ.XP, 10);
@@ -697,7 +802,7 @@ describe('chapters, ranks, quick-fire and guide', () => {
   it('the ranks are spread over the course: none before the first chapter is done, only the top one in the last 30 XP', () => {
     const ends = []; let n = 0;
     for (const c of NQ.CH) { n += c.missions.length * NQ.XP; ends.push(n); }
-    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 320]);
+    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 360, 410]);
     assert.ok(NQ.RANKS[1][0] >= ends[0]);
     assert.ok(NQ.RANKS.slice(0, -1).every((r) => r[0] <= ends.at(-1) - 30));
   });
@@ -720,6 +825,24 @@ describe('chapters, ranks, quick-fire and guide', () => {
       const net = NQ.createNet(g.sc || 'pair');
       for (const [line, , dev] of g.ex) assert.equal(net.exec(line, dev).code, 0, g.c + ': ' + line);
     }
+  });
+});
+
+describe('chapter 6: quick-fire and field guide', () => {
+  const qf = NQ.QF.filter((q) => q.ch === 5), guide = NQ.GUIDE.filter((g) => g.ch === 5);
+  it('has six quick-fire questions, one on SERVFAIL, and four guide entries that run on the dns network', () => {
+    assert.equal(qf.length, 6);
+    assert.ok(qf.some((q) => /SERVFAIL/.test(q.c + q.a)));
+    assert.equal(guide.length, 4);
+    for (const g of guide) assert.equal(g.sc, 'dns', g.c);
+  });
+  it('the AAAA question defines AAAA in place', () => {
+    for (const q of qf.filter((x) => /AAAA/.test(x.c))) assert.match(plain(q.c), /AAAA\s+is the record type for the longer IPv6 addresses/);
+  });
+  it('none of them uses a word that chapter 7 teaches', () => {
+    const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b/i;
+    for (const q of qf) assert.doesNotMatch(plain([q.c, q.a, ...q.w, q.why].join(' ')), LATER, q.c);
+    for (const g of guide) assert.doesNotMatch(plain([g.c, g.what, ...g.ex.flat()].join(' ')), LATER, g.c);
   });
 });
 

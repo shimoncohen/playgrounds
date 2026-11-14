@@ -14,7 +14,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`programming/shell-quest/`](programming/shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`programming/harbor-quest/`](programming/harbor-quest/) |
 | 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`programming/ds-quest/`](programming/ds-quest/) |
-| ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing and NAT on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
+| ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing, NAT and DNS on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
 | 🦀 | **Rust Quest** | Rust from `println!` and `let` onwards, run by a small Rust checker whose error codes are checked against a real `rustc` for the programs the quest supports; anything else is reported as unsupported | [`programming/rust-quest/`](programming/rust-quest/) |
 | ∑ | **Math** | Arithmetic, algebra, geometry and trigonometry, with prerequisite hints between chapters | [`math/`](math/) |
@@ -116,7 +116,7 @@ programming/            the Programming section: index.html (hub with a card per
   script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
-  net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, five chapters, ranks, quick-fire, guide), ui.js + inspector.js
+  net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, six chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
   rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js + memview.js
   shell-quest/          split by job (below)

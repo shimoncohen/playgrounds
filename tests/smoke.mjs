@@ -3161,6 +3161,39 @@ test('net-quest: chapter 5 plays through the page, on the laptop, home and web, 
   }
 });
 
+test('net-quest: chapter 6 plays through the page on the laptop, and the seven-device map fits', async () => {
+  for (const width of [1280, 390]) {
+    const { ctx, page, errors, type, xp } = await netPage({ viewport: { width, height: 900 } });
+    const over = () => overflow(page);
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 6);
+    await page.click('#chapters .chap[data-ch="5"]');
+    assert.equal(await page.$$eval('#mission .dot', e => e.length), 9);
+    assert.match(await page.textContent('#prompt'), /^laptop:/);
+    assert.equal(await page.$$eval('#diagram .dg-list li', e => e.length), 13, 'seven devices and six cables in the text map');
+    const boxes = await page.$$eval('#diagram .dg-dev', gs => gs.map(g => { const b = g.querySelector('.dg-box').getBBox(); return [b.x, b.y, b.width, b.height]; }));
+    assert.equal(boxes.length, 7);
+    for (const [i, a] of boxes.entries()) for (const b of boxes.slice(i + 1)) assert.ok(a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1], `${width}: two devices overlap on the map`);
+    const steps = [[0, ['dig www.example.test'], '198.18.0.80'], [3, ['dig +short www.example.test'], null], [8, ['resolvectl dns eth0 192.168.1.53', 'dig www.example.test'], null]];
+    let done = 0;
+    for (const [i, lines, answer] of steps) {
+      await page.click(`#mission .dot[data-mi="${i}"]`);
+      if (width < 820) await page.click('.seg button[data-view="term"]');
+      for (const l of lines) await type(l);
+      if (answer) {
+        if (width < 820) await page.click('#feedback [data-act="ask"]');
+        await page.fill('#answer', answer); await page.click('#answerBox button[type="submit"]'); }
+      assert.equal(await xp(), ++done * 10 + ' XP', `mission ${i + 1} completes`);
+      assert.equal(await over(), false, `${width}: no horizontal scroll in mission ${i + 1}`);
+    }
+    if (width < 820) for (const v of ['pkts', 'map', 'term']) {
+      await page.click(`.seg button[data-view="${v}"]`);
+      assert.equal(await over(), false, `${width}: ${v} view`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('net-quest: layout at 390px', async () => {
   for (const width of [390, 360]) {
     const { ctx, page, errors, type } = await netPage({ viewport: { width, height: 800 } });
@@ -3224,10 +3257,10 @@ test('net-quest: quick-fire and field guide render', async () => {
   await ctx.close();
 });
 
-test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all five are', async () => {
-  const sizes = [8, 5, 6, 6, 7];
+test('net-quest: quick-fire draws only from chapters that are done, and from every chapter once all six are', async () => {
+  const sizes = [8, 5, 6, 6, 7, 9];
   const seed = (n) => JSON.stringify({ done: Object.fromEntries(sizes.flatMap((k, c) => [...Array(k).keys()].filter(() => c < n).map(i => [`${c}.${i}`, true]))), xp: 0 });
-  for (const [n, label] of [[1, 'chapter 1 only'], [5, 'all five chapters']]) {
+  for (const [n, label] of [[1, 'chapter 1 only'], [6, 'all six chapters']]) {
     const { ctx, page, errors, console: cerr } = await netPage({}, c => c.addInitScript(v => { if (!sessionStorage.seeded) { localStorage.setItem('net-quest-v1', v); sessionStorage.seeded = 1; } }, seed(n)));
     await page.click('.tabs button[data-tab="fire"]');
     const allowed = await page.evaluate((n) => NQ.QF.filter(q => q.ch < n).map(q => q.c), n);
@@ -3240,7 +3273,7 @@ test('net-quest: quick-fire draws only from chapters that are done, and from eve
     }
     for (const c of seen) assert.ok(allowed.includes(c), `${label}: asked "${c}" before its chapter was done`);
     const later = await page.evaluate(() => NQ.QF.filter(q => q.ch > 0).map(q => q.c));
-    assert.equal([...seen].some(c => later.includes(c)), n === 5, `${label}: questions from later chapters`);
+    assert.equal([...seen].some(c => later.includes(c)), n === 6, `${label}: questions from later chapters`);
     assert.deepEqual(errors, []);
     assert.deepEqual(cerr, []);
     await ctx.close();
