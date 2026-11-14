@@ -105,9 +105,7 @@ RQ.CH.push({
       how:[
         'The whole program looks for something that may not exist, and says so in the type instead of inventing a fake value like <code>-1</code>. <code>Option</code> is an <code>enum</code> that comes with Rust: it is either <code>Some(value)</code> or <code>None</code>.',
         'The return type <code>Option&lt;i32&gt;</code> says "an <code>i32</code>, or nothing". The <code>&lt;i32&gt;</code> says what\'s inside. <code>Option&lt;T&gt;</code> means <code>T</code> stands for any type. Chapter 11 shows how to write your own.',
-        'Inside, <code>if a % 2 == 0 { Some(a) } ...</code> builds the <code>Some</code> case, and <code>None</code> is the empty case. Both are written without <code>Option::</code> in front.',
-        '<code>%</code> gives what is left over after dividing (<code>7 % 2</code> is <code>1</code>), so an even number leaves <code>0</code> when divided by <code>2</code>.',
-        '<code>==</code> asks whether two values are equal and answers true or false, so <code>a % 2 == 0</code> asks whether <code>a</code> is even.',
+        'Inside, <code>if a % 2 == 0 { Some(a) } ...</code> builds the <code>Some</code> case, and <code>None</code> is the empty case. Both are written without <code>Option::</code> in front. <code>%</code> gives what is left over after dividing (<code>7 % 2</code> is <code>1</code>), so an even number leaves <code>0</code> when divided by <code>2</code>. <code>==</code> asks whether two values are equal and answers true or false, so <code>a % 2 == 0</code> asks whether <code>a</code> is even.',
         '<code>else if</code> adds another question after an <code>if</code>: Rust tries them from the top and runs only the first block whose condition is true.',
         'The caller has to <code>match</code> on the result, and because <code>match</code> is exhaustive it cannot forget the <code>None</code> case. That is the whole point.'
       ],
