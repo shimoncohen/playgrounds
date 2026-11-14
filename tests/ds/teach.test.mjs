@@ -35,10 +35,35 @@ const FIRST = {
   subtree:     [/\bsubtree\b/i, 5, 3],
 };
 
-const texts = m => [m.goal, m.explain, m.note, m.starter, m.answer].filter(Boolean).join('\n');
+// answer is only shown by the hint button, so it does not teach
+const texts = m => [m.title, m.goal, m.explain, m.note, m.starter, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n');
 const flat = [];
 D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
+
+// typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
+const SYNTAX = {
+  ';':               [/;/, /marks the end of a statement/],
+  'dot':             [/\w\.\w/, /dot reaches a tool/],
+  '===':             [/===/, /asks "is it exactly equal\?"/],
+  '!==':             [/!==/, /asks "is it different\?"/],
+  '||':              [/\|\|/, /means "or"/],
+  'else if':         [/else if/, /next test, tried only if the earlier one failed/],
+  'lookup as test':  [/else if \(\w+\[/, /finds nothing it is undefined/],
+  'for (let i...)':  [/for \(let i/, /start i at 0, keep going while i < n/],
+  'i++':             [/\+\+/, /add 1 after each round with i\+\+/],
+  'count++':         [/count\+\+/, /count\+\+ adds 1/],
+  'return;':         [/return;/, /return; leaves the function early/],
+  '? :':             [/\? .* : /, /test \? a : b/],
+  'const contents':  [/const bag/, /locks the name, not the contents/],
+};
+for (const [name, [use, say]] of Object.entries(SYNTAX)) {
+  test(`syntax "${name}" is explained by the first mission that uses it`, () => {
+    const i = flat.findIndex(x => use.test(D.CH[x.ci].missions[x.mi].starter + '\n' + D.CH[x.ci].missions[x.mi].answer));
+    assert.ok(i >= 0, 'no mission code uses it');
+    assert.ok(say.test(flat.slice(0, i + 1).map(x => x.text).join('\n').replace(/<\/?[a-z][^>]*>/gi, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+  });
+}
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
