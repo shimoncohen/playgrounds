@@ -49,8 +49,9 @@ function condTokens(raw){
       if(c==='&'||c==='|')throw syn()}
     let j=i,depth=0;
     try{while(j<n){const ch=raw[j];
+      if(ch==="'"&&raw[j-1]==='$'&&raw[j-2]!=='\\'){j=SQ.ansiEnd(raw,j)+1;continue}
       if(ch==="'"){const k=raw.indexOf("'",j+1);if(k<0)throw syn();j=k+1;continue}
-      if(ch==='"'){j++;while(j<n&&raw[j]!=='"'){if(raw[j]==='\\')j++;else if(raw[j]==='`')j=SQ.bqEnd(raw,j);else if(raw[j]==='$'&&raw[j+1]==='(')j=SQ.scanSub(raw,j);j++}if(j>=n)throw syn();j++;continue}
+      if(ch==='"'){j=SQ.dqEnd(raw,j+1);if(j<0)throw syn();j++;continue}
       if(ch==='\\'){j+=2;continue}
       if(ch==='`'){j=SQ.bqEnd(raw,j)+1;continue}
       if(ch==='$'&&raw[j+1]==='('){j=SQ.scanSub(raw,j)+1;continue}
@@ -83,7 +84,7 @@ function regexSrc(raw){let o='',run='',i=0;const n=raw.length;
   const flush=()=>{if(run){o+=expandStr(run.replace(/\\/g,'\\\\'));run=''}};
   const lit=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   while(i<n){const c=raw[i];
-    if(c==="'"||c==='"'){let k=i+1;while(k<n&&raw[k]!==c){if(c==='"'&&raw[k]==='\\')k++;k++}
+    if(c==="'"||c==='"'){let k=c==='"'?SQ.dqEnd(raw,i+1):raw.indexOf(c,i+1);if(k<0)k=n;
       flush();o+=lit(expandStr(raw.slice(i,k+1)));i=k+1;continue}
     if(c==='\\'&&i+1<n){run+=raw.slice(i,i+2);i+=2;continue}
     run+=c;i++}
