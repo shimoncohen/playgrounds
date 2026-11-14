@@ -11,9 +11,10 @@ const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = loadContent('harbor-quest', {
 });
 
 const plain = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-const cardText = m => plain([m.t, m.i, m.g, m.h, (m.a || []).map(x => x[0]).join(' '), ...(m.steps || []).map(s => [s.g, s.h, (s.a || []).map(x => x[0]).join(' ')].join('\n')), m.after].filter(Boolean).join('\n'));
+/* a hint counts as use of a term but not as teaching it */
+const cardText = (m, hint) => plain([m.t, m.i, m.g, hint && m.h, (m.a || []).map(x => x[0]).join(' '), ...(m.steps || []).map(s => [s.g, hint && s.h, (s.a || []).map(x => x[0]).join(' ')].join('\n')), m.after].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches or defines it in place (its own card may use it)]
@@ -51,13 +52,26 @@ const FIRST = {
   object: [/\bobjects?\b/, 10, 99, true],
   manifest: [/manifest/i, 11, 1],
   ConfigMap: [/ConfigMap/, 11, 1],
+  '-it': [/(^|\s)-(?:it|ti)\b/, 2, 3],
+  'kubectl run': [/\bkubectl run\b/, 7, 3],
+  '--image': [/--image\b/, 7, 3],
+  '--port': [/--port\b/, 9, 1],
+  'svc/web': [/\bsvc\/\w/, 9, 4],
+  'deployment/web': [/\bdeployments?\/\w/, 10, 0],
+  'nginx=nginx': [/(?<![-\w])\w+=nginx:/, 10, 0],
+  'apply/delete -f': [/\b(apply|delete|create) -f\b/, 11, 2],
+  'edit FILE': [/\bedit \w/, 5, 6],
+  FROM: [/\bFROM\b/, 5, 1],
+  RUN: [/\bRUN\b/, 5, 1],
+  CMD: [/\bCMD\b/, 5, 1],
+  '80/tcp': [/\b\d+\/tcp\b/, 2, 1],
 };
 
 for (const [term, [re, ci, mi, soft]] of Object.entries(FIRST)) {
   if (soft) continue;
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci + 1} (which teaches it) is done`, () => {
     for (const q of QF) if (re.test(q[0])) assert.ok(q[2] >= ci, `"${q[0]}" needs chapter ${ci}`);
@@ -81,7 +95,7 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(3, 6), /ping sends a few tiny test messages/);
   assert.match(m(3, 6), /DNS is the phone book/);
   assert.match(m(4, 1), /echo prints the text you give it/);
-  assert.match(plain(CH[4].missions[2].h), /&& means "and then/);
+  assert.match(m(4, 2), /&& means "and then, but only if the first command worked"/);
   assert.match(m(4, 3), /docker volume ls lists your volumes/);
   assert.match(m(4, 8), /named settings handed to a program when it starts/);
   assert.match(m(6, 0), /YAML, a simple indented text format/);
@@ -92,6 +106,16 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(9, 1), /NodePort also opens a door on every machine/);
   assert.match(m(9, 1), /ClusterIP, works only inside it/);
   assert.match(m(10, 0), /rolling update/);
+  assert.match(m(2, 3), /-i keeps your keyboard connected to the container and -t gives it a terminal/);
+  assert.match(m(2, 1), /80\/tcp in the PORTS column is door 80 over tcp, the kind of connection web traffic uses/);
+  assert.match(m(5, 1), /FROM picks the image to build on, RUN happens once while building, and CMD runs each time a container starts/);
+  assert.match(m(5, 6), /edit FILE, a small editor that appears on the right/);
+  assert.match(m(7, 3), /kubectl run hello names the pod and --image=nginx says which image/);
+  assert.match(m(9, 1), /--port=80 is the door the service opens/);
+  assert.match(m(9, 4), /svc\/web means "the service called web"; 9090:80 is your laptop's port first/);
+  assert.match(m(10, 0), /nginx=nginx:1\.27 means "the container called nginx should now run image nginx:1\.27"/);
+  assert.match(m(11, 1), /ConfigMap, a named bundle of settings/);
+  assert.match(m(11, 2), /-f names the file to read/);
 });
 
 test('puzzle intros gloss the YAML and Compose keys they use', () => {
