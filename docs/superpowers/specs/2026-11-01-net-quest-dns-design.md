@@ -1,6 +1,6 @@
 # Network Quest phase 2 (DNS) design
 
-Date: 2026-11-01. Status: built (PRs B, C and D merged; see "As built"). Line numbers and `path:line` facts are as of `cd80fac`; PRs B, C and D re-check them before relying on them. Phase 1 design: `docs/superpowers/specs/2026-10-20-net-quest-design.md`. Plan: `docs/superpowers/plans/2026-11-01-net-quest-phase2-dns.md`.
+Date: 2026-11-01. Status: built (see "As built"). Line numbers and `path:line` facts are as of `cd80fac`; PRs B, C and D re-check them before relying on them. Phase 1 design: `docs/superpowers/specs/2026-10-20-net-quest-design.md`. Plan: `docs/superpowers/plans/2026-11-01-net-quest-phase2-dns.md`.
 
 ## 1. Goal and summary
 
@@ -99,7 +99,7 @@ New file, loaded after `sim.js`. `NQ.dns.query(net, from, {server, name, type, r
 - **Zone lookup.** Longest-origin zone wins. An exact name gives an answer with `aa`. An NS cut gives a referral with glue. CNAME is followed in-zone. NODATA and NXDOMAIN carry the SOA. A name outside every zone gets REFUSED.
 - **Resolver.** Checks the cache, starts at the nearest cached delegation (else the root hints), follows referrals, follows a CNAME up to 8 deep, then answers SERVFAIL.
 - **Cache.** Three kinds of entry: positive, negative and delegation. The negative TTL is min(SOA record TTL, SOA minimum), per RFC 2308.
-- **Determinism.** `id` is a 16-bit FNV hash of name, type and server. `Query time` is 12 ms per upstream query the queried server sent while answering, and 0 when it answers from its own data or cache. No `Math.random`, no `Date.now`.
+- **Determinism.** `id` is a 16-bit FNV hash of name, type and server. `Query time` is 12 ms per upstream query the queried server sent while answering, plus 12 ms when the queried server is past a router; a server on the same wire answering from its own data or cache costs 0. No `Math.random`, no `Date.now`.
 - **Continuation.** In-flight queries live in `ctx.ext.dns.pending`, keyed `resolver|serverIp|id` (client address, port, id, question). They last one `settle` and never survive `clone`. When the queue is empty with queries still pending, the idle hook makes the resolver answer SERVFAIL to its client (mirrors `lost()`). Each round removes entries, so the loop ends.
 - **Failure path.** `dig` tries once. With no answer it prints `;; communications error to S#53: timed out` and `;; no servers could be reached`, and exits 9.
 
@@ -314,7 +314,7 @@ Seeded in PR A; completed in PR D.
 - `dig @<own IP>` times out: there is no loopback delivery.
 - The UDP checksum is zero and DNS has no name compression.
 - `dns.now` is per device; phase 3 may move it to a net-level counter.
-- A cold lookup (laptop to resolver, then root, TLD and authoritative, with every ARP exchange) is 38 steps, 36 ms of query time (12 ms per upstream query).
+- A cold lookup (laptop to resolver, then root, TLD and authoritative, with every ARP exchange) is 38 steps, 36 ms of query time (12 ms per upstream query). A direct `dig @server` to the root, TLD or authoritative server, and each `+trace` hop, costs one round trip past the router, 12 ms, so it is never mistaken for a cache hit (0 ms).
 - `dig` with no name prints `Usage: dig [@server] name [type] [+short] [+norecurse] [+trace]` and exits 2; an unknown type or option exits 1.
 - `ctx.dig(from, name, type, opts)` takes `opts.server` (default: the device's resolver) and `opts.rd`, runs on a probe clone and returns the `NQ.dns.query` result.
 - A CNAME chain of up to 8 links is kept whole in the answer section (`AN_MAX` 9); a ninth link gives SERVFAIL.

@@ -86,7 +86,7 @@ test('dig @server to a server that is not a resolver warns about recursion: flag
   assert.equal(root[root.indexOf(warn) - 1].startsWith(';; flags'), true);
   assert.ok(root.includes('test.' + T + '300' + T + 'IN' + T + 'NS' + T + 'a.nic.test.'));
   assert.ok(root.includes(';; SERVER: 192.0.2.10#53(192.0.2.10) (UDP)'));
-  assert.ok(root.includes(';; Query time: 0 msec'));
+  assert.ok(root.includes(';; Query time: 12 msec'));
   const auth = out(net, 'dig @203.0.113.10 www.example.test');
   assert.ok(auth.includes(';; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0'));
   assert.ok(auth.includes(warn));
@@ -116,13 +116,13 @@ test('dig +trace asks root, tld and auth in turn with recursion off and prints n
     '; <<>> DiG <<>> +trace www.example.test',
     ';; global options: +cmd',
     'test.' + T + '300' + T + 'IN' + T + 'NS' + T + 'a.nic.test.',
-    ';; Received 88 bytes from 192.0.2.10#53(a.root-servers.test) in 0 ms',
+    ';; Received 88 bytes from 192.0.2.10#53(a.root-servers.test) in 12 ms',
     '',
     'example.test.' + T + '300' + T + 'IN' + T + 'NS' + T + 'ns1.example.test.',
-    ';; Received 108 bytes from 198.51.100.10#53(a.nic.test) in 0 ms',
+    ';; Received 108 bytes from 198.51.100.10#53(a.nic.test) in 12 ms',
     '',
     'www.example.test.' + T + '300' + T + 'IN' + T + 'A' + T + '198.18.0.80',
-    ';; Received 66 bytes from 203.0.113.10#53(ns1.example.test) in 0 ms',
+    ';; Received 66 bytes from 203.0.113.10#53(ns1.example.test) in 12 ms',
     ''
   ]);
   const asked = J(r.entries).filter((e) => e.dir === 'rx' && /^delivered: DNS query/.test(e.verdict)).map((e) => e.dev);

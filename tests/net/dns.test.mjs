@@ -77,6 +77,13 @@ test('the second lookup is a cache hit: query time 0, fewer steps; the cold one 
   assert.deepEqual(J(warm.msg), J(cold.msg));
 });
 
+test('a direct query to a server past the router costs one round trip, 12 ms; the resolver on the LAN keeps its own times', () => {
+  const net = NQ.createNet('dns');
+  for (const ip of ['192.0.2.10', '198.51.100.10', '203.0.113.10']) assert.equal(dig(net, ip, 'www.example.test').ms, 12, ip);
+  assert.equal(dig(net, RES, 'www.example.test', 'A', false).ms, 0);
+  assert.deepEqual([dig(net, RES, 'www.example.test').ms, dig(net, RES, 'www.example.test').ms], [36, 0]);
+});
+
 test('cold lookup step count stays under 150', () => {
   const r = dig(NQ.createNet('dns'), RES, 'www.example.test');
   console.log('cold lookup: ' + r.steps + ' steps, ' + r.entries.length + ' log entries');
