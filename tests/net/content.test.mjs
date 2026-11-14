@@ -606,6 +606,12 @@ describe('chapter 6: names and DNS', () => {
     assert.equal(run(1, [WWW, 'sleep 120', WWW], '180'), true);
     assert.notEqual(run(1, [WWW, 'sleep 120', WWW], '300'), true);
   });
+  it('1: the number is read from the last full dig, not from a +short one', () => {
+    const lines = [WWW, 'sleep 120', 'dig +short www.example.test'];
+    assert.equal(run(1, lines, '300'), true);
+    assert.notEqual(run(1, lines, '180'), true);
+    assert.notEqual(run(1, ['dig +short www.example.test'], '300'), true);
+  });
   it('0: a lookup of another name does not pass, and +short does', () => {
     for (const l of ['dig example.test MX', 'dig shop.example.test', 'ping -c 1 192.168.1.53']) assert.notEqual(run(0, [l], '198.18.0.80'), true, l);
     assert.equal(run(0, ['dig +short www.example.test'], '198.18.0.80'), true);
@@ -619,6 +625,7 @@ describe('chapter 6: names and DNS', () => {
     for (const l of ['dig example.test', 'dig example.test NS', 'dig mail.example.test', WWW]) assert.notEqual(run(4, [l], 'mail.example.test'), true, l);
     assert.equal(run(4, ['dig +short example.test MX'], 'mail.example.test'), true);
     assert.equal(run(4, ['dig example.test MX'], 'Mail.Example.Test'), true);
+    assert.equal(run(4, ['dig example.test MX'], 'mail.example.test.'), true);
     for (const l of ['dig example.test', 'dig example.test MX', 'dig ns1.example.test']) assert.notEqual(run(5, [l], 'ns1.example.test'), true, l);
   });
   it('6: dig for the alias, not for the name it points at', () => {
@@ -631,6 +638,10 @@ describe('chapter 6: names and DNS', () => {
     assert.equal(run(7, ['dig nothing.example.test'], '0'), true);
     for (const l of [WWW, 'dig example.test TXT']) assert.notEqual(run(7, [l], '0'), true, l);
     for (const a of ['1', 'NXDOMAIN']) assert.notEqual(run(7, ['dig wwww.example.test'], a), true, a);
+  });
+  it('7: +short shows no ANSWER line, so only a full dig counts', () => {
+    assert.notEqual(run(7, ['dig +short wwww.example.test'], '0'), true);
+    assert.equal(run(7, ['dig +short wwww.example.test', 'dig wwww.example.test'], '0'), true);
   });
   it('7: the card text has no standalone 0 (it is the answer)', () => {
     const t = [m(7).goal, m(7).explain, m(7).hint, m(7).question.ask, ...m(7).how].map(plain).join(' ');
@@ -824,6 +835,9 @@ describe('chapter 6: quick-fire and field guide', () => {
     assert.ok(qf.some((q) => /SERVFAIL/.test(q.c + q.a)));
     assert.equal(guide.length, 4);
     for (const g of guide) assert.equal(g.sc, 'dns', g.c);
+  });
+  it('the AAAA question defines AAAA in place', () => {
+    for (const q of qf.filter((x) => /AAAA/.test(x.c))) assert.match(plain(q.c), /AAAA\s+is the record type for the longer IPv6 addresses/);
   });
   it('none of them uses a word that chapter 7 teaches', () => {
     const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b/i;

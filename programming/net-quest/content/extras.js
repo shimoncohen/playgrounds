@@ -53,7 +53,7 @@ NQ.QF=[
  {ch:5,c:'<code>dig</code> reports the status NXDOMAIN. What does it mean?',a:'the name does not exist',w:['the server is broken','the server refused to answer','the name is an alias'],why:'NXDOMAIN is a clear no: the lookup worked and the name is wrong. Check the spelling.'},
  {ch:5,c:'A lookup ends with the status SERVFAIL. What happened?',a:'the server tried and could not find the answer',w:['the name does not exist','the server would not answer','the answer is an alias'],why:'SERVFAIL means the server failed to find out, for example because a server it needed never replied. REFUSED is different: the server would not answer.'},
  {ch:5,c:'Which UDP port do DNS servers listen on?',a:'53',w:['22','80','443'],why:'Every DNS server listens on the same port, so a laptop can ask one it has never met. The laptop picks its own sender port for each question.'},
- {ch:5,c:'You ask for the <code>AAAA</code> record of a name instead of its <code>A</code> record. What does it hold?',a:'an IPv6 address, the longer kind',w:['a mail server\'s name','an alias','a name server\'s name'],why:'AAAA is the address record for IPv6, the newer and longer kind of address. A holds an IPv4 address.'}
+ {ch:5,c:'<code>AAAA</code> is the record type for the longer IPv6 addresses. How does an <code>AAAA</code> record differ from an <code>A</code> record?',a:'it holds an IPv6 address instead of an IPv4 one',w:['it holds a mail server\'s name','it makes the name an alias','it names the name server'],why:'AAAA is the address record for IPv6, the newer and longer kind of address. A holds an IPv4 address.'}
 ];
 
 /* ch: chapter index, c: the topic, what: one line (HTML), syn: anatomy tokens, ex: [command, what to look at] pairs.

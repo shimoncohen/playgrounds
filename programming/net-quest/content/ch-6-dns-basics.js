@@ -10,6 +10,16 @@ const got=e=>{const f=e.dev==='laptop'&&e.dir==='rx'&&dnsOf(e);return f&&f.qr===
 const asked=(es,name,type)=>es.some(e=>{const f=sent(e);return f&&f.qname===name&&f.qtype===type;});
 const reply=(c,name,type)=>{const e=c.last(x=>{const f=got(x);return f&&f.qname===name&&f.qtype===type;});return e?dnsOf(e):null;};
 const rec=(c,name,type,kind)=>{const f=reply(c,name,type);return (f&&NQ.dns.recs(f,'an').find(r=>r.type===(kind||type)))||null;};
+const fullGot=(c,pred)=>{
+  for(const h of [...c.history].reverse()){
+    if(h.code!==0||!/^\s*dig\s/.test(h.line)||/\+short(\s|$)/.test(h.line))continue;
+    const e=h.entries.find(x=>{const f=got(x);return f&&pred(f);});
+    if(e)return dnsOf(e);
+  }
+  return null;
+};
+const fullReply=(c,name,type)=>fullGot(c,f=>f.qname===name&&f.qtype===type);
+const nx=c=>fullGot(c,f=>f.rcode==='NXDOMAIN');
 const ranDig=(c,re,name,type)=>c.history.some(h=>h.code===0&&re.test(h.line)&&asked(h.entries,name,type));
 const DIG=[['dig','cmd','look a name up']];
 const WWW_ANAT=[...DIG,['www.example.test','arg','the name to look up']];
@@ -41,8 +51,8 @@ NQ.CH.push({name:'Names and DNS',badge:'Name Board',
   explain:'Each column has a job. The name says whom the record is about, the type says what kind of fact it is and the data is the fact itself. The number of seconds is a time limit set by whoever owns the name: a short one lets them change an address quickly, and a long one saves everybody from asking again and again.',
   hint:'Run <code>dig www.example.test</code> and read the number between the name and <code>IN</code>.',
   answer:['dig www.example.test'],
-  check:c=>rec(c,WWW,'A')?true:'Run <code>dig www.example.test</code> first and look for the record under <code>ANSWER SECTION</code>.',
-  question:{ask:'How many seconds does the answer line say it may be kept?',expect:c=>{const r=rec(c,WWW,'A');return r?String(r.ttl):'';}}},
+  check:c=>fullReply(c,WWW,'A')?true:'Run <code>dig www.example.test</code> without <code>+short</code> and look for the record under <code>ANSWER SECTION</code>.',
+  question:{ask:'How many seconds does the answer line say it may be kept?',expect:c=>{const f=fullReply(c,WWW,'A'),r=f&&NQ.dns.recs(f,'an').find(x=>x.type==='A');return r?String(r.ttl):'';}}},
  {title:'The question is a packet too',scenario:'dns',
   goal:'A question to a resolver is a packet like any other. Run <code>dig www.example.test</code>, then open the entry on <code>laptop</code> marked sent (<code>tx</code>) whose note starts <code>DNS query</code>. Its layers are Ethernet and IPv4, which you know, then two new ones. <b>UDP</b> sends one short message and gets one short reply back, with no set-up first. <b>DNS</b> holds the question itself: its <code>qname</code> field is the name being asked about. Under UDP are two port numbers. A <b>UDP port</b> is a number that tells the receiving device which program should get the message; it has nothing to do with the ports on a switch. Type the receiver\'s port (<code>dport</code>) of the question.',
   anat:WWW_ANAT,
@@ -113,9 +123,9 @@ NQ.CH.push({name:'Names and DNS',badge:'Name Board',
   explain:'NXDOMAIN is the DNS way of saying "no such name", and it is a complete, correct reply: the lookup worked and the name is wrong. SERVFAIL is different: the server could not find the answer at all, perhaps because a server it needed never replied. REFUSED means a server would not answer that question. When a lookup fails, the status tells you whether to fix the name or to look at the servers.',
   hint:'Run <code>dig wwww.example.test</code> and read the number after <code>ANSWER:</code> on the flags line.',
   answer:['dig wwww.example.test'],
-  check:c=>c.last(e=>{const f=got(e);return f&&f.rcode==='NXDOMAIN';})?true:'Run <code>dig wwww.example.test</code>, with four <code>w</code>, and look for <code>status: NXDOMAIN</code>.',
+  check:c=>nx(c)?true:'Run <code>dig wwww.example.test</code>, with four <code>w</code>, and look for <code>status: NXDOMAIN</code>.',
   question:{ask:'What number follows <code>ANSWER:</code> in the reply?',
-   expect:c=>{const e=c.last(x=>{const f=got(x);return f&&f.rcode==='NXDOMAIN';});return e?String(dnsOf(e).ancount):'';},
+   expect:c=>{const f=nx(c);return f?String(f.ancount):'';},
    accept:()=>['zero']}},
  {title:'The lost name finder',scenario:'dns',setup:[{dev:'laptop',cmd:'resolvectl dns eth0 192.168.1.99'}],
   goal:'Tally knocked the laptop\'s setting loose: it now asks a server that is not there, so every lookup waits and then gives up. Run <code>dig www.example.test</code> to see it fail with <code>communications error</code> and <code>no servers could be reached</code>. Then point the laptop back at the resolver with <code>resolvectl dns eth0 192.168.1.53</code> and run <code>dig www.example.test</code> again. <code>resolvectl</code> shows and sets which server this laptop asks. This laptop asks the resolver directly, so the resolver\'s address is the setting you change. Many real computers put a small helper on themselves, at <code>127.0.0.53</code>, that passes each question on to the resolver; this practice network leaves the helper out.',
