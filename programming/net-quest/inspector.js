@@ -19,7 +19,7 @@ const NOTE={
   UDP:{sport:'sender’s port',dport:'receiver’s port'},
   DNS:{id:'matches an answer to its question',qr:'0 for a question, 1 for an answer',opcode:'kind of request',aa:'1 if the server that owns the name answered',rd:'1 if it asks the server to look the name up for you',ra:'1 if the server looks names up for others',rcode:'how it went',
     qname:'the name asked about',qtype:'the kind of record asked for',ancount:'records in the answer',nscount:'records in the authority section',arcount:'records in the additional section',
-    ...Object.fromEntries([['an',3,'a record in the answer'],['ns',2,'a record in the authority section'],['ar',2,'a record in the additional section']].flatMap(([k,n,t])=>Array.from({length:n},(_,i)=>[k+(i+1),t])))}
+    ...Object.fromEntries([['an',9,'a record in the answer'],['ns',2,'a record in the authority section'],['ar',2,'a record in the additional section']].flatMap(([k,n,t])=>Array.from({length:n},(_,i)=>[k+(i+1),t])))}
 };
 const layersOf=p=>{try{return NQ.pkt.layerNames(p).join(' › ');}catch(e){return '';}};
 const hexDump=p=>{

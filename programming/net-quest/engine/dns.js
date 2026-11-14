@@ -1,17 +1,16 @@
-/* Network Quest DNS model: name-server zones, the recursive resolver and its cache, built on the simulator's UDP seams.
-   Device data (written by topology.js): stub {resolver, roots}, resolver {recursive, roots, now, cache}, name server
-   {zones}. DOM-free, deterministic: ids, ports and query times come from hashes and counts. */
+/* Network Quest DNS model. Device data (written by topology.js): stub {resolver, roots}, resolver {recursive, roots,
+   now, cache}, name server {zones}. DOM-free and deterministic: ids, ports and query times come from hashes and counts. */
 (()=>{
 'use strict';
 const NQ=globalThis.NQ=globalThis.NQ||{};
 const P=NQ.pkt,K=NQ.sim.kit,U=NQ.sim.udp;
-/* the flat message fields hold at most AN_MAX, NS_MAX and AR_MAX records, so a longer CNAME chain arrives in pieces */
-const AN_MAX=3,NS_MAX=2,AR_MAX=2,MAX_CNAME=8,MAX_HOPS=16,MS_PER_QUERY=12,TTL_ROOT_HINT=300;
+/* AN_MAX fits a full CNAME chain plus its final record */
+const MAX_CNAME=8,AN_MAX=MAX_CNAME+1,NS_MAX=2,AR_MAX=2,MAX_HOPS=16,MS_PER_QUERY=12,TTL_ROOT_HINT=300;
 const fq=n=>{n=String(n).toLowerCase();return n.endsWith('.')?n:n+'.';};
 const inZone=(origin,name)=>origin==='.'||name===origin||name.endsWith('.'+origin);
 const deepest=(a,b)=>b.name.length-a.name.length;
 const addr=c=>c.split('/')[0];
-const hash=s=>{let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193)>>>0;}return h;}; // FNV-1a, 32 bits
+const hash=s=>{let h=0x811c9dc5;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193)>>>0;}return h;};
 const ident=(name,type,server)=>{const h=hash(name+'|'+type+'|'+server);return (h^(h>>>16))&0xFFFF;};
 const egress=(dev,dst)=>{const h=K.nextHop(dev,dst);return h&&addr(dev.ifaces[h.iface].ip);};
 
@@ -26,8 +25,6 @@ const recs=(f,k)=>{const out=[];for(let i=1;f[k+i];i++)out.push(P.parseRR(f[k+i]
 const sendDns=(ctx,dev,src,dst,sport,dport,fields,verdict,o)=>K.ipSend(ctx,dev,[P.ipv4(src,dst,64,'UDP'),P.udp(sport,dport),P.dns(fields)],verdict,o);
 const state=ctx=>ctx.ext.dns||(ctx.ext.dns={pending:{},up:0},ctx.idle.push(idle),ctx.ext.dns);
 
-/* authoritative side: the longest-origin zone that holds the name answers; a cut (NS below the origin) gives a referral
-   with glue; a CNAME is followed inside the zone; no data is NODATA, no name NXDOMAIN, both with the SOA; no zone REFUSED */
 const soaRR=z=>({name:z.origin,type:'SOA',ttl:z.soa.ttl,data:[z.soa.mname,z.soa.rname,z.soa.serial,z.soa.refresh,z.soa.retry,z.soa.expire,z.soa.minimum].join(' ')});
 const authAnswer=(zones,qname,qtype)=>{
   const z=zones.filter(x=>inZone(x.origin,qname)).sort((a,b)=>b.origin.length-a.origin.length)[0];
@@ -62,7 +59,7 @@ const live=(d,e)=>e.expires>d.now;
 const hit=(d,name,type)=>d.cache.find(e=>e.rcode!=='DELEGATION'&&live(d,e)&&e.name===name&&(e.type===type||e.rcode==='NXDOMAIN'));
 const deleg=(d,name)=>d.cache.filter(e=>e.rcode==='DELEGATION'&&live(d,e)&&inZone(e.name,name)).sort(deepest)[0];
 const remember=(d,e)=>{d.cache=d.cache.filter(x=>live(d,x)&&!(x.name===e.name&&x.type===e.type&&(x.rcode==='DELEGATION')===(e.rcode==='DELEGATION')));d.cache.push(e);};
-/* a cache entry as a reply: every record counts its TTL down to the entry's expiry */
+/* every record counts its TTL down to the entry's expiry */
 const fromCache=(d,e)=>{
   const rr=r=>({...r,ttl:e.expires-d.now});
   if(e.rcode==='NOERROR')return {ra:true,an:e.rrs.map(rr),ar:(e.ar||[]).map(rr)};
@@ -83,11 +80,10 @@ const negative=(ctx,dev,st,rcode,soa)=>{
   finish(ctx,dev,st,{name:st.client.name,type:st.type,expires:d.now+ttl,rcode,rrs:soa?[soa]:[]});
 };
 
-/* one resolution on a resolver: ask the nearest cached delegation (else a root), follow referrals and CNAMEs, answer the
-   client. Every upstream query is one pending entry, keyed resolver|serverIp|id, and one claim on its source port. */
+/* every upstream query is one pending entry, keyed resolver|serverIp|id, and one claim on its source port */
 const resolve=(ctx,dev,st)=>{
   const d=dev.dns,e=hit(d,st.name,st.type);
-  if(e)return reply(ctx,dev,st.client,fromCache(d,e));
+  if(e){const o=fromCache(d,e);return reply(ctx,dev,st.client,{...o,an:[...st.cnames,...(o.an||[])]});}
   const dl=deleg(d,st.name),servers=dl?dl.rrs.filter(r=>r.type==='A').map(r=>r.data):d.roots,ip=servers[0],src=ip&&egress(dev,ip);
   if(!src||++st.hops>MAX_HOPS)return servfail(ctx,dev,st);
   const S=state(ctx),id=ident(st.name,st.type,ip),key=[dev.id,ip,id].join('|');
@@ -127,9 +123,9 @@ const gotReply=(ctx,dev,st,m)=>{
     st.name=an.at(-1).data;
     return resolve(ctx,dev,st);
   }
-  finish(ctx,dev,st,{name:st.client.name,type:st.type,expires:d.now+Math.min(...all.map(r=>r.ttl)),rcode:'NOERROR',rrs:all.slice(-AN_MAX),ar});
+  finish(ctx,dev,st,{name:st.client.name,type:st.type,expires:d.now+Math.min(...all.map(r=>r.ttl)),rcode:'NOERROR',rrs:all,ar});
 };
-/* the queue ran dry with resolutions still waiting for an answer: the resolver gives up on each and tells its client */
+/* runs only when the queue is dry: each waiting resolution is given up, which is what ends the settle loop */
 const idle=ctx=>{
   const S=ctx.ext.dns,keys=Object.keys(S.pending);
   for(const k of keys){
@@ -140,7 +136,7 @@ const idle=ctx=>{
   return keys.length>0;
 };
 
-/* port 53 on a name server or resolver; every other device returns false and the datagram is dropped */
+/* false on any other device, so the datagram is dropped */
 const service=(ctx,dev,iface,p)=>{
   const d=dev.dns,q=K.layer(p,'DNS');
   if(!d||!(d.zones||d.recursive)||!q||q.fields.qr!==0)return false;
@@ -157,8 +153,7 @@ const service=(ctx,dev,iface,p)=>{
 };
 U.listen(53,service);
 
-/* one question from `from` to a server over UDP, run on net itself (caches and log change). status is 'timeout' when no
-   matching reply came back; ms is 12 per upstream query the server sent while answering, 0 from its own data or cache */
+/* runs on net itself (caches and log change); ms is 12 per upstream query the server sent, 0 from its own data or cache */
 const query=(net,from,o)=>{
   const dev=net.devices[from],name=fq(o.name),type=o.type||'A',rd=o.rd===false?0:1;
   const ctx=K.session(net,from,0,0),S=state(ctx),id=ident(name,type,o.server),sport=33000+hash(from+'|'+name+'|'+type+'|'+o.server)%1000,src=egress(dev,o.server);

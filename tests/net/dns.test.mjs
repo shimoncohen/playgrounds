@@ -181,7 +181,7 @@ test('a chain of eight CNAMEs resolves; nine, and a loop, are SERVFAIL', () => {
   chain(bad, 9);
   loop.devices.auth.dns.zones[0].records.push({ name: 'a.example.test.', type: 'CNAME', ttl: 300, data: 'b.example.test.' }, { name: 'b.example.test.', type: 'CNAME', ttl: 300, data: 'a.example.test.' });
   const r = dig(ok, RES, 'c1.example.test');
-  assert.deepEqual([r.msg.rcode, r.msg.an3], ['NOERROR', 'www.example.test. 300 IN A 198.18.0.80']);
+  assert.deepEqual([r.msg.rcode, r.msg.ancount, r.msg.an1, r.msg.an9], ['NOERROR', 9, 'c1.example.test. 300 IN CNAME c2.example.test.', 'www.example.test. 300 IN A 198.18.0.80']);
   assert.equal(dig(bad, RES, 'c1.example.test').msg.rcode, 'SERVFAIL');
   assert.equal(dig(loop, RES, 'a.example.test').msg.rcode, 'SERVFAIL');
 });
@@ -232,4 +232,35 @@ test('ctx.dig probes on a copy: the learner net keeps its log, clock, cache and 
   assert.equal(ctx.dig('laptop', 'www.example.test', 'A', { server: '203.0.113.10' }).msg.aa, 1);
   assert.equal(ctx.dig('laptop', 'www.example.test', 'A', { rd: false }).msg.ra, 1);
   assert.equal(snap(), before);
+});
+
+test('a long CNAME chain keeps every record, the queried name first, from the server and from the cache', () => {
+  const net = NQ.createNet('dns');
+  net.devices.auth.dns.zones[0].records.push(...Array.from({ length: 11 }, (_, i) => ({ name: `c${i}.example.test.`, type: 'CNAME', ttl: 300, data: i === 10 ? 'www.example.test.' : `c${i + 1}.example.test.` })));
+  for (const pass of ['cold', 'cached']) {
+    const m = msgOf(net, RES, 'c3.example.test', 'A');
+    assert.deepEqual([m.rcode, m.ancount, m.an1, m.an8, m.an9], ['NOERROR', 9, 'c3.example.test. 300 IN CNAME c4.example.test.', 'c10.example.test. 300 IN CNAME www.example.test.', 'www.example.test. 300 IN A 198.18.0.80'], pass);
+  }
+});
+
+test('a cached target reached through a CNAME in another zone still answers with the CNAME first', () => {
+  const net = NQ.createNet('dns');
+  net.devices.auth.dns.zones[0].records.push({ name: 'a.example.test.', type: 'CNAME', ttl: 300, data: 'www.other.test.' }, { name: 'b.example.test.', type: 'CNAME', ttl: 300, data: 'www.other.test.' });
+  net.devices.tld.dns.zones[0].records.push({ name: 'www.other.test.', type: 'A', ttl: 300, data: '198.18.0.9' });
+  const cold = msgOf(net, RES, 'a.example.test', 'A');
+  assert.deepEqual([cold.ancount, cold.an1, cold.an2], [2, 'a.example.test. 300 IN CNAME www.other.test.', 'www.other.test. 300 IN A 198.18.0.9']);
+  dig(net, RES, 'www.other.test');
+  const hit = msgOf(net, RES, 'b.example.test', 'A');
+  assert.deepEqual([hit.ancount, hit.an1, hit.an2], [2, 'b.example.test. 300 IN CNAME www.other.test.', 'www.other.test. 300 IN A 198.18.0.9']);
+});
+
+test('the negative TTL is the SOA TTL when that is smaller than the SOA minimum', () => {
+  const net = NQ.createNet('dns');
+  net.devices.auth.dns.zones[0].soa.ttl = 20;
+  const m = msgOf(net, RES, 'wwww.example.test', 'A');
+  assert.equal(m.ns1, SOA.replace(' 300 ', ' 20 '));
+  sleep(net, 19);
+  assert.equal(dig(net, RES, 'wwww.example.test').ms, 0);
+  sleep(net, 1);
+  assert.equal(dig(net, RES, 'wwww.example.test').ms, 12);
 });
