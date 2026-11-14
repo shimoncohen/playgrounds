@@ -30,8 +30,8 @@ const ERRORS={
   },
   E0530:{
     title:'a pattern name is also a variant',
-    msg:o=>'match bindings cannot shadow tuple variants',
-    tip:'`Some`, `Ok` and `Err` hold a value, so write the part in parentheses, like `Some(x)`. A bare name in a pattern is a new variable, and it may not reuse a variant\'s name.'
+    msg:o=>(o.what||'match bindings')+' cannot shadow tuple '+(o.what&&!o.variant?'structs':'variants'),
+    tip:'`Some`, `Ok`, `Err` and your own tuple structs hold a value, so write the part in parentheses, like `Some(x)`. A bare name in a pattern is a new variable, and it may not reuse their names.'
   },
   E0004:{
     title:'a match leaves some cases out',
@@ -267,6 +267,21 @@ const ERRORS={
     },
     tip:'Every value has one type, and the two sides here have to agree. Change the value to the type the other side expects, or change the type you wrote.'
   },
+  E0689:{
+    title:'a method is called on a number whose type is not known yet',
+    msg:o=>'can\'t call method `'+o.name+'` on ambiguous numeric type `'+(o.type||'{integer}')+'`',
+    tip:'`abs`, `pow` and the other number methods need the type to be settled when they are called. Write the type on the `let`, like `let x: i32 = 5;`, or on the number, like `5i32`.'
+  },
+  E0252:{
+    title:'a name is imported twice',
+    msg:o=>'the name `'+o.name+'` is defined multiple times',
+    tip:'Each name can be brought in by `use` only once. Delete the repeat.'
+  },
+  E0433:{
+    title:'a name is not in scope',
+    msg:o=>'failed to resolve: use of undeclared type `'+o.name+'`',
+    tip:'`Ordering` lives in `std::cmp`. Add `use std::cmp::Ordering;` at the top of the file, or write the full path `std::cmp::Ordering::Less`.'
+  },
   E0425:{
     title:'a name cannot be found',
     msg:o=>'cannot find `'+o.name+'` in this scope',
@@ -292,7 +307,7 @@ const ERRORS={
   }
 };
 // the stderr a panic prints, minus the thread id rustc adds (verify-rustc.mjs drops it from the real output); rustc starts it with a blank line
-const panicText=p=>"\nthread 'main' panicked at src/main.rs:"+p.line+':'+p.col+':\n'+p.msg+'\n';
+const panicText=p=>"\nthread 'main' panicked at "+(p.at||'src/main.rs:'+p.line+':'+p.col)+':\n'+p.msg+'\n';
 
 const HINTS={
   HashSet:'Rust Quest does not model `HashSet`. A `HashMap<T, ()>`, or a `Vec` with `contains`, does the same job.',
@@ -334,10 +349,10 @@ const HINTS={
   derive:'Only `#[derive(...)]` of `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Default` and `Hash` is modeled. Every field must have the trait too. `Copy` needs `Clone`, `Eq` and `PartialOrd` need `PartialEq`, and `Ord` needs `PartialOrd` and `Eq`. An `enum` derives `Default` from the one unit variant marked `#[default]`.',
   'match guard':'A `match` guard that moves a name its arm binds, like `Some(s) if eat(s)` (rustc reports `E0507`), or assigns to or borrows mutably part of the value being matched (`E0506`, `E0502`), is not modeled. Make the guard only read.',
   impl:'Modeled: `impl Name { ... }`, `impl Trait for Name` for your own traits, and the std traits `Display`, `Drop` and `From`. Writing `impl Iterator for Name`, `impl Debug` or `impl Clone` by hand is not modeled: derive what can be derived, or give the type a method that returns a `Vec`.',trait:'A `trait` is modeled with plain methods, with or without a default body. A supertrait (`trait A: B`), a generic trait, an associated type or constant, an attribute and a method declared twice are not modeled. Write a trait of methods, and use a generic function with a bound for the rest.',static:'`static` items are not modeled. Use a `const`, which the quest does model.',
-  'type alias':'A `type` alias is not modeled. Write the full type each time, or give it a name with a `struct`.',use:'The only `use` modeled is `use std::collections::HashMap;` once at the top of the file. The missions otherwise use what Rust gives every program.',mod:'Modules are not modeled. Put every `fn`, `struct`, `enum` and `trait` at the top of the file.',generics:'Modeled: type names with bounds, like `<T: Trait>`, and lifetime names. A type name that reuses the name of a type, a default like `T = i32` and `const` generics are not.',
+  'type alias':'A `type` alias is not modeled. Write the full type each time, or give it a name with a `struct`.',use:'The `use` lines modeled are `use std::collections::HashMap;`, the `std::fmt` names, and `use std::cmp::{Ordering, Reverse};`, each once at the top of the file. The missions otherwise use what Rust gives every program.',mod:'Modules are not modeled. Put every `fn`, `struct`, `enum` and `trait` at the top of the file.',generics:'Modeled: type names with bounds, like `<T: Trait>`, and lifetime names. A type name that reuses the name of a type, a default like `T = i32` and `const` generics are not.',
   method:'A method takes `self`, `&self` or `&mut self` as its first parameter. A receiver with a type written out, like `self: Box<Self>`, is not modeled.','nested item':'Put `fn` and `const` items at the top of the file, outside `main`.',closure:'This use of a closure is not modeled. Bind it with `let f = |x| x + 1;` or pass it straight to a function or an iterator method.',
   match:'A `match` on a `&mut` reference is not modeled. Match on the value itself, or on a `&` reference.',
-  'method call':'This method is not modeled on this type. Modeled: the methods you write in an `impl` or a `trait`; `clone` on a type that derives `Clone`; `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on text; `is_some`, `is_none`, `is_ok`, `is_err`, `unwrap`, `expect`, `unwrap_or`, `unwrap_or_default`, `ok_or`, `ok`, `err`, `copied` and `cloned` on `Option` and `Result`; the methods named by the `collection method` and `iterator` hints. Numbers have no methods here except `to_string`: use an operator, `as` to change the type, or `format!("{}", n)` to make text.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled. An `enum` has no fields: use a `match`. For anything else, call a method.',
+  'method call':'This method is not modeled on this type. Modeled: the methods you write in an `impl` or a `trait`; `clone` on a type that derives `Clone`; `len`, `clone`, `to_string`, `to_owned`, `as_str` and `push_str` on text; `is_some`, `is_none`, `is_ok`, `is_err`, `unwrap`, `expect`, `unwrap_or`, `unwrap_or_default`, `ok_or`, `ok`, `err`, `copied` and `cloned` on `Option` and `Result`; the methods named by the `collection method` and `iterator` hints. Whole numbers have `to_string`, `abs`, `pow`, `min`, `max`, `abs_diff` and the `checked_`, `wrapping_` and `saturating_` forms of `add`, `sub` and `mul`. For anything else on a number use an operator, `as` to change the type, or `format!("{}", n)` to make text.','field access':'Only the numbered fields of a tuple, like `t.0`, and the fields of your own `struct` are modeled. An `enum` has no fields: use a `match`. For anything else, call a method.',
   'field of a temporary':'Reading a field of a value that is not in a variable, like `make().id`, is not modeled. Put the value in a variable first.',slice:'A bare slice type `[T]` has no size, so it only appears behind a `&`, as `&[T]`.',
   'slice of non-ASCII text':'Slicing text with accented letters, emoji or other non-English characters is not modeled, because one letter can take several bytes. Use plain English letters, which take one byte each.',
   reference:'Only `&T` and `&mut T` on a `String`, a number, an array or a `Vec` are modeled, `&str` for text, and `&[T]` or `&mut [T]` for a slice. A `&mut` slice of text, like `&mut s[1..]`, is not modeled. Use one of those, or pass the value itself.',
@@ -404,7 +419,7 @@ const HINTS={
   HashMap:'Add `use std::collections::HashMap;` at the top, then write `HashMap<K, V>` with both types, like `HashMap<String, i32>`, and build one with `HashMap::new()`.',
   'map index':'Indexing a `HashMap` with `m[&key]` is not modeled: a missing key panics inside the standard library. Use `m.get(&key)`, which gives an `Option`, and match on it.',
   'collection method':'Modeled on a `Vec`: `push`, `pop`, `len`, `is_empty`, `insert`, `remove`, `clear`, `truncate`, `swap`, `reverse`, `sort`, `sort_unstable`, `sort_by`, `sort_by_key`, `sort_unstable_by`, `sort_unstable_by_key`, `contains`, `get`, `get_mut`, `first`, `last`, `extend` and `clone`; an array or a slice (also `v[1..]`) has `swap`, `reverse`, `sort`, `sort_unstable`, `sort_by`, `sort_by_key`, `sort_unstable_by`, `sort_unstable_by_key`, `contains`, `first` and `last`. On a `HashMap`: `insert`, `get`, `get_mut`, `contains_key`, `remove`, `extend`, `len`, `is_empty`, `clear`, `clone` and `entry(k).or_insert(v)`, plus the closure methods `retain` and `entry(k).or_insert_with(f)`, and iterators with `iter()`.',
-  iterator:'Modeled iterators come from a `Vec`, an array, a slice, a `HashMap`, a range or `chars()`. Adapters: `map`, `filter`, `enumerate`, `zip`, `rev`, `take`, `skip`, `take_while`, `skip_while`, `copied` and `cloned`. Consumers: `sum`, `product`, `count`, `collect`, `fold`, `any`, `all`, `find`, `position`, `min`, `max`, `last`, `for_each` and `next`. `rev` works on a plain source, `map`, `filter`, `copied`, `cloned` and `enumerate`. Write the loop by hand for anything else, or use one of those.',
+  iterator:'Modeled iterators come from a `Vec`, an array, a slice, a `HashMap`, a range or `chars()`. Adapters: `map`, `filter`, `enumerate`, `zip`, `rev`, `take`, `skip`, `take_while`, `skip_while`, `copied` and `cloned`. Consumers: `sum`, `product`, `count`, `collect`, `fold`, `any`, `all`, `find`, `position`, `min`, `max`, `last`, `max_by`, `min_by`, `max_by_key`, `min_by_key`, `for_each` and `next`. `rev` works on a plain source, `map`, `filter`, `copied`, `cloned` and `enumerate`. Write the loop by hand for anything else, or use one of those.',
   'hash key':'A `HashMap` key must be `Eq` and `Hash`, and Rust Quest could not tell whether this key is. Write the map\'s type out, like `let mut m: HashMap<String, i32> = HashMap::new();`.',
   'reference in collection':'A `Vec` or `HashMap` that holds a reference, like `Vec<&str>` or `v.push(&x)`, is not modeled. Keep owned values in it, like `String`.',
   Option:'Write `Option<T>` with its type argument, like `Option<i32>`, and build it with `Some(x)` or `None`.',Result:'Write `Result<T, E>` with both type arguments, like `Result<i32, String>`, and build it with `Ok(x)` or `Err(e)`.',Box:'`Box` is not modeled. Keep the value itself, borrow it with `&`, or use a `Vec` for a growing collection.',

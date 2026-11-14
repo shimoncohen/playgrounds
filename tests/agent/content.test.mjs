@@ -34,7 +34,7 @@ describe('chapters', () => {
   it('every scenario tag is in the closed task-tag list', () => {
     for (const [name, s] of Object.entries(AQ.scenarios)) assert.ok(s.tag === undefined || AQ.config.TAGS.includes(s.tag), name);
   });
-  it('the answer, wrong and lazy inputs of chapters 2 to 15 only edit files their scenario ships, so the editor can type them', () => {
+  it('the answer, wrong and lazy inputs of every chapter after the first only edit files their scenario ships, so the editor can type them', () => {
     AQ.CH.slice(1).forEach((ch) => ch.missions.forEach((m) => {
       for (const x of [m.answer, m.wrong, m.lazy]) if (x && typeof x === 'object') for (const p of Object.keys(x.files || {})) assert.ok(Object.prototype.hasOwnProperty.call(AQ.scenarios[m.scenario].vfs, p), `${m.title}: ${p}`);
     }));

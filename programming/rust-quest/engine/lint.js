@@ -24,13 +24,13 @@ RQ.lint=(ast,info)=>{
   let borrowed=new Set(); // per fn: the locals that are the root of a & or &mut operand, or of an autoref method receiver
 
   // overflowing_literals is a type-based lint, so it covers every literal, reachable or not
-  const negated=new Set();
-  RQ.walk(ast,n=>{if(n.t==='Unary'&&n.op==='-'){const x=peel(n.expr);if(x.t==='Lit'&&x.kind==='int')negated.add(x);}});
+  const negated=new Map();
+  RQ.walk(ast,n=>{if(n.t==='Unary'&&n.op==='-'){const x=peel(n.expr);if(x.t==='Lit'&&x.kind==='int')negated.set(x,n);}});
   const badLit=new Set();
   RQ.walk(ast,n=>{
     if(n.t!=='Lit'||n.kind!=='int')return;
     const ty=rtyOf(n),v=negated.has(n)?-BigInt(n.v):BigInt(n.v);
-    if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',n,{ty});}
+    if(!fits(v,ty)){badLit.add(n);flag('overflowing_literals',negated.get(n)||n,{ty});}
   });
 
   let st=new Map(),defVal=new Map(),outerDef=null,keeps=[],dead=0,skip=0,prune=0,unsure=0,bor=0,softK=0,dub=0,frames=[],barriers=0,div=false,constLine=0;
