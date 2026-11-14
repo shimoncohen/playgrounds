@@ -293,7 +293,7 @@ describe('help lists only the commands taught so far', () => {
   });
   it('by the last mission every command is listed', () => {
     const last = NQ.CH.at(-1), m = last.missions.at(-1), dev = NQ.session(m).net.devices[m.dev || NQ.session(m).net.me];
-    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), Object.keys(NQ.CMDS).filter((n) => n !== 'sleep' && (!NQ.AVAIL[n] || NQ.AVAIL[n](dev))).sort());
+    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), Object.keys(NQ.CMDS).filter((n) => !NQ.AVAIL[n] || NQ.AVAIL[n](dev)).sort());
   });
   it('chapter 6: dig is not listed before 5.0, resolvectl not before 5.8, and sleep through the whole chapter', () => {
     assert.ok(!helpAt(4, 6).includes('dig'));
@@ -301,6 +301,14 @@ describe('help lists only the commands taught so far', () => {
     for (let i = 0; i < 8; i++) assert.ok(!helpAt(5, i).includes('resolvectl'), String(i));
     assert.ok(helpAt(5, 8).includes('resolvectl'));
     for (let i = 0; i < 9; i++) assert.ok(!helpAt(5, i).includes('sleep'), String(i));
+  });
+  it('chapter 7: sleep is not listed before 6.6, and rndc not before 6.7, where it is listed only on the resolver', () => {
+    for (let i = 0; i < 5; i++) assert.ok(!helpAt(6, i).includes('sleep'), String(i));
+    assert.ok(helpAt(6, 5).includes('sleep') === false && helpAt(6, 6).includes('sleep'));
+    for (let i = 0; i < 7; i++) assert.ok(!helpAt(6, i).includes('rndc'), String(i));
+    assert.ok(helpAt(6, 7).includes('rndc'));
+    assert.ok(!helpAt(6, 8).includes('rndc'), 'the laptop has no rndc');
+    assert.ok(helpAt(6, 8).includes('sleep'));
   });
   it('a locked command still runs: help only hides it', () => {
     assert.equal(NQ.session(NQ.CH[0].missions[0]).run('ipcalc 10.0.0.0/24').code, 0);

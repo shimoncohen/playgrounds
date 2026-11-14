@@ -12,7 +12,7 @@
     { key: 'shell-quest-v1', name: 'Shell Quest', subject: 'programming', href: 'programming/shell-quest/', sep: '.', missions: [8, 7, 7, 7, 7, 7, 9, 7, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7] },
     { key: 'harbor-quest-v1', name: 'Harbor Quest', subject: 'programming', href: 'programming/harbor-quest/', sep: '.', missions: [6, 6, 9, 8, 10, 9, 7, 7, 8, 7, 7, 7] },
     { key: 'ds-quest-v1', name: 'Data Structures Quest', subject: 'programming', href: 'programming/ds-quest/', sep: '.', missions: [5, 4, 3, 4, 5, 5] },
-    { key: 'net-quest-v1', name: 'Network Quest', subject: 'programming', href: 'programming/net-quest/', sep: '.', missions: [8, 5, 6, 6, 7, 9] },
+    { key: 'net-quest-v1', name: 'Network Quest', subject: 'programming', href: 'programming/net-quest/', sep: '.', missions: [8, 5, 6, 6, 7, 9, 9] },
     { key: 'agent-quest-v1', name: 'Agent Quest', subject: 'programming', href: 'programming/agent-quest/', sep: '.', missions: [5, 5, 4, 5, 5, 4, 5, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3] },
     { key: 'rust-quest-v1', name: 'Rust Quest', subject: 'programming', href: 'programming/rust-quest/', sep: '.', missions: [6, 8, 8, 6, 9, 7, 12, 9, 9, 9, 9, 9, 8] },
     { key: 'math-arithmetic-v1', name: 'Arithmetic', subject: 'math', href: 'math/arithmetic/', sep: '.', missions: [5, 5, 5, 5, 5] },

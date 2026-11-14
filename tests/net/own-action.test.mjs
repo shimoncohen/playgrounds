@@ -11,7 +11,7 @@ const ALSO_OWN = { 'ip link': ['ip addr'] };
 const expectOf = (m) => {
   if (!m.question) return null;
   const net = NQ.createNet(m.scenario, m.setup);
-  const history = m.answer.map((line) => { const r = net.exec(line, m.dev); return { line, code: r.code, entries: r.entries }; });
+  const history = m.answer.map((line) => { const r = net.exec(line, m.dev); return { line, code: r.code, out: r.out, entries: r.entries }; });
   return m.question.expect(NQ.makeCtx(net, history, null));
 };
 
