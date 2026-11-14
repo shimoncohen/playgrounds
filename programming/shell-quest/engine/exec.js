@@ -23,7 +23,9 @@ function runCmd(words,io,assigns){const t=SQ.rt.scopeNode.traps;
   if(d.ctl)return {out:'',err:[],code:d.ctl.n,ctl:d.ctl,xt:d.out}; /* exit in the handler: the command does not run */
   const r=runCmd1(words,io,assigns);
   return d.out.length?Object.assign({},r,{xt:d.out.concat(r.xt||[])}):r}
-function runCmd1(words,io,assigns){
+/* lastSub (the status of the last $( ) or ` ` this command expanded) is read by $?, an assignment-only command and a command left with no words; it must not outlive the command */
+function runCmd1(words,io,assigns){try{return runCmd2(words,io,assigns)}finally{CTX.lastSub=null}}
+function runCmd2(words,io,assigns){
   if(!words.length)return ok();
   SQ.step();
   const X=SQ.rt.opts.x;let ew,pre=null,bad=null,xt=null;
@@ -43,7 +45,7 @@ function runCmd1(words,io,assigns){
     if(SQ.rt.ro)pre=pre.filter(([k])=>{if(!SQ.isRO(k))return true;pend.push(SQ.roMsg(k));roFail=true;return false})} /* bash 5.2: X=2 cmd with X readonly reports it and runs cmd with the old X */
   if(all){const r=bad||ok();if(!bad&&CTX.lastSub!==null)r.code=CTX.lastSub;if(xt)r.xt=xt;return finishCmd(r,'(assign)',ew.slice(1).map(w=>w.v),false,io,pend)} /* each one was set above, left to right */
   if(!ew.length){if(pre){for(const [k,v] of pre){S.vars[k]=v;SQ.canSet(k)}const r=Object.assign(ok(),{err:pend});if(CTX.lastSub!==null)r.code=CTX.lastSub;if(roFail)r.code=1;if(xt)r.xt=xt;return r}
-    return Object.assign(ok(),{err:pend})}
+    return Object.assign(ok(),{err:pend,code:CTX.lastSub===null?0:CTX.lastSub})}
   if(pre){const saved=pre.map(([k])=>[k,own(S.vars,k)?S.vars[k]:undefined,!!(S.exp&&own(S.exp,k))]);
     for(const [k,v] of pre){S.vars[k]=v;(S.exp=S.exp||{})[k]=1}
     try{return runCmd0(ew,io,pend,true,xt)} /* never deferred: the prefix assignments must hold while the function runs */
