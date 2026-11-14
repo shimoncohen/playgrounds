@@ -53,10 +53,38 @@ const FIRST = {
 };
 
 const noTags = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '');
-const texts = m => noTags([m.title, m.goal, m.code, m.explain, m.hint, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
+// a hint is hidden until asked for, so it does not teach
+const texts = m => noTags([m.title, m.goal, m.code, m.explain, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
 const flat = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
+// typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
+const SYNTAX = {
+  'dot (console.log)':   [/\w\.\w/, /dot means/],
+  'call brackets':       [/\w\(/, /Round brackets after a name run/],
+  '< > <= >=':           [/\s[<>]=?\s/, /less than/],
+  'dot (.length)':       [/\.length\b/, /dot reaches/],
+  '+ 1 after floor':     [/\)\s*\+\s*1\b/, /shifts it to 1 to 6/],
+  'const in for...of':   [/for \(const /, /fresh wagon, so const/],
+  '<T>':                 [/<T>/, /introduces T,/],
+  '() =>':               [/\(\)\s*=>/, /Empty brackets/],
+  '{ add } shorthand':   [/exports = \{ add \}/, /short for \{ add: add \}/],
+  'braces destructure':  [/const \{ \w+/, /names in braces must match property names/],
+  'event loop':          [/setTimeout\(.*, 0\)/, /lines up waiting jobs/],
+  'terminal':            [/^node -v/, /a terminal is where you type commands/],
+  'quotes in node -e':   [/node -e "/, /quotes keep the whole code as one piece/],
+  'single in double':    [/\('[^']+'\)/, /single quotes inside the double ones/],
+  'require without .js': [/require\("\.\/\w+"\)/, /adds \.js itself/],
+};
+for (const [name, [use, say]] of Object.entries(SYNTAX)) {
+  test(`syntax "${name}" is explained by the first mission that uses it`, () => {
+    const i = flat.findIndex((x, k) => use.test(CH[x.ci].missions[x.mi].code));
+    assert.ok(i >= 0, `no mission code uses it`);
+    const upto = flat.slice(0, i + 1).map(x => x.text).join('\n');
+    assert.ok(say.test(upto), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+  });
+}
+
 const qtext = q => q.c + '\n' + q.o.join('\n') + '\n' + q.w;
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
