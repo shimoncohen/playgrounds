@@ -124,3 +124,66 @@ test('invalid input throws a clear error', () => {
   assert.throws(() => pkt.hex(pkt.stack(pkt.eth(A, B, 'IPv4'), pkt.ipv4('10.0.0.1', 'nope', 64, 'ICMP'))), { message: /address.*nope/i });
   assert.throws(() => pkt.hex(pkt.stack(pkt.eth(A, 'zz:00', 'IPv4'))), { message: /MAC.*zz:00/i });
 });
+
+const udpQuery = (over = {}) => pkt.stack(pkt.eth(A, B, 'IPv4'), pkt.ipv4('10.0.0.1', '10.0.0.2', 64, 'UDP'), pkt.udp(33001, 53),
+  pkt.dns({ id: 0x1234, qr: 0, opcode: 'QUERY', aa: 0, rd: 1, ra: 0, rcode: 'NOERROR', qname: 'www.example.test', qtype: 'A', ancount: 0, nscount: 0, arcount: 0, ...over }));
+const hexOf = (p) => pkt.hex(p);
+const DNS_Q = '12 34 01 00 00 01 00 00 00 00 00 00 03 77 77 77 07 65 78 61 6d 70 6c 65 04 74 65 73 74 00 00 01 00 01';
+
+test('udp hex: ports, length from the body, zero checksum', () => {
+  const b = bytes(udpQuery()).slice(34);
+  assert.deepEqual(b.slice(0, 8), [0x80, 0xe9, 0, 53, 0, 42, 0, 0]);
+  assert.equal(b.length, 42);
+  assert.deepEqual(plain(pkt.udp(1, 2)), { name: 'UDP', fields: { sport: 1, dport: 2 } });
+});
+
+test('ipv4 protocol byte for udp is 17 and the header checksum still verifies', () => {
+  const b = bytes(udpQuery()).slice(14, 34);
+  assert.equal(b[9], 17);
+  assert.equal(rfc1071(b), 0);
+});
+
+test('dns query hex: 12-byte header, label-length name, rd set, tc clear', () => {
+  assert.equal(hexOf(pkt.stack(udpQuery().layers[3])), DNS_Q);
+});
+
+test('dns answer: flags, counts and a record in wire format', () => {
+  const an = 'www.example.test. 300 IN A 198.18.0.80';
+  const h = hexOf(pkt.stack(udpQuery({ qr: 1, aa: 1, ra: 1, ancount: 1, an1: an }).layers[3]));
+  assert.match(h, /^12 34 85 80 00 01 00 01 00 00 00 00 /);
+  assert.ok(h.endsWith('03 77 77 77 07 65 78 61 6d 70 6c 65 04 74 65 73 74 00 00 01 00 01 00 00 01 2c 00 04 c6 12 00 50'));
+});
+
+test('dns record types: AAAA, MX, CNAME and SOA rdata', () => {
+  // from the record's rdlength on: its name, type, class and ttl take nameLen + 8 bytes after the 34-byte header and question
+  const rd = (s, nameLen) => hexOf(pkt.stack(udpQuery({ qr: 1, ancount: 1, an1: s }).layers[3])).split(' ').slice(34 + nameLen + 8);
+  const aaaa = rd('www.example.test. 300 IN AAAA 2001:db8::80', 18);
+  assert.equal(aaaa.join(' '), '00 10 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 80');
+  assert.equal(rd('example.test. 300 IN MX 10 mail.example.test.', 14).slice(2, 5).join(' '), '00 0a 04');
+  assert.equal(rd('shop.example.test. 300 IN CNAME www.example.test.', 19)[1], '12');
+  assert.equal(rd('example.test. 300 IN SOA ns1.example.test. h.example.test. 1 3600 600 86400 60', 14).at(-1), '3c');
+});
+
+test('dns record fields round trip through the shared parser', () => {
+  for (const s of ['www.example.test. 300 IN A 198.18.0.80', 'example.test. 300 IN MX 10 mail.example.test.', 'example.test. 300 IN SOA ns1.example.test. h.example.test. 1 3600 600 86400 60']) {
+    assert.equal(pkt.fmtRR(pkt.parseRR(s)), s);
+  }
+  assert.deepEqual(plain(pkt.parseRR('www.example.test. 300 IN A 198.18.0.80')), { name: 'www.example.test.', ttl: 300, type: 'A', data: '198.18.0.80' });
+  assert.equal(pkt.parseRR('not a record'), null);
+});
+
+test('dns encoding rejects what it cannot write', () => {
+  assert.throws(() => hexOf(pkt.stack(udpQuery({ qtype: 'PTR' }).layers[3])), { message: /DNS type.*PTR/ });
+  assert.throws(() => hexOf(pkt.stack(udpQuery({ rcode: 'WAT' }).layers[3])), { message: /DNS rcode.*WAT/ });
+  assert.throws(() => hexOf(pkt.stack(udpQuery({ qname: 'a'.repeat(64) + '.test' }).layers[3])), { message: /label/ });
+  assert.throws(() => hexOf(pkt.stack(udpQuery({ ancount: 1, an1: 'x.test. 1 IN TXT hi' }).layers[3])), { message: /record type.*TXT/ });
+  assert.throws(() => hexOf(pkt.stack(udpQuery({ ancount: 1, an1: 'garbage' }).layers[3])), { message: /record.*garbage/ });
+});
+
+test('chapters 1 to 5 bytes unchanged: ICMP, ARP and IPv4 hex pinned to the values from before the UDP layer', () => {
+  assert.equal(hexOf(echo()), '02 00 00 00 00 0b 02 00 00 00 00 0a 08 00 45 00 00 1c 00 00 00 00 40 01 66 df 0a 00 00 01 0a 00 00 02 08 00 f7 fd 00 01 00 01');
+  assert.equal(hexOf(pkt.stack(pkt.eth(A, 'ff:ff:ff:ff:ff:ff', 'ARP'), pkt.arp('request', A, '10.0.0.1', '00:00:00:00:00:00', '10.0.0.2'))),
+    'ff ff ff ff ff ff 02 00 00 00 00 0a 08 06 00 01 08 00 06 04 00 01 02 00 00 00 00 0a 0a 00 00 01 00 00 00 00 00 00 0a 00 00 02');
+  assert.equal(hexOf(pkt.stack(pkt.eth(A, B, 'IPv4'), pkt.ipv4('10.0.0.1', '10.0.0.2', 1, 'ICMP'), pkt.icmp('time-exceeded', 0, 0))),
+    '02 00 00 00 00 0b 02 00 00 00 00 0a 08 00 45 00 00 1c 00 00 00 00 01 01 a5 df 0a 00 00 01 0a 00 00 02 0b 00 f4 ff 00 00 00 00');
+});
