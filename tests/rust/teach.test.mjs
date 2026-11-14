@@ -40,7 +40,7 @@ describe('previews', () => {
 });
 
 describe('terms on a mission card are not used before the mission that teaches them', () => {
-  const text = (m) => plain([m.title, m.goal, m.hint, m.explain, ...m.how].join('\n'));
+  const text = (m) => plain([m.title, m.goal, m.explain, ...m.how].join('\n'));
   // term -> [regex, chapter, mission (0-based) that first teaches it]
   const FIRST = {
     hole: [/\bholes?\b/i, 0, 1],
@@ -79,4 +79,34 @@ describe('terms on a mission card are not used before the mission that teaches t
     for (const q of RQ.QF.filter((x) => x.ch === 0)) assert.doesNotMatch(plain([q.c, q.a, ...q.w, q.why].join(' ')), later);
     for (const g of RQ.GUIDE.filter((x) => x.ch === 0)) assert.doesNotMatch(plain(g.what), later);
   });
+});
+
+describe('syntax the learner reads in a starter or answer is explained on a card before that mission', () => {
+  const taught = (m) => plain([m.title, m.goal, ...m.how].join('\n'));
+  const code = (m) => `${m.starter}\n${m.answer}`;
+  // item -> [code regex, card regex, chapter, mission (0-based) that teaches it]
+  const SYNTAX = {
+    comment: [/\/\//, /starts with \/\/ is a comment/, 0, 0],
+    modulo: [/ % /, /% gives what is left/, 6, 3],
+    equals: [/ == /, /== asks whether/, 6, 3],
+    elseIf: [/else if/, /else if adds another question/, 6, 3],
+    plusEquals: [/\+=/, /self\.n \+= 1; is short for/, 5, 5],
+    len: [/\.len\(\)/, /a\.len\(\) gives how long/, 4, 7],
+    usize: [/usize/, /usize is the whole-number type/, 4, 5],
+    toOwned: [/\.to_owned\(\)/, /s\.to_owned\(\) makes an owned/, 4, 8],
+    u32: [/\bu32\b/, /u32 is a whole number/, 5, 0],
+    fieldShorthand: [/age \}/, /age alone means/, 5, 3],
+    insert: [/\.insert\(/, /counts\.insert\(key, value\) adds/, 7, 8],
+    letNoValue: [/let \w+: &str;/, /let result: &str; only reserves/, 9, 1],
+    atLeast: [/>=/, />= means "bigger than or equal to"/, 9, 3],
+    underscoreLoop: [/for _ in/, /for _ in 0\.\.3 runs/, 11, 2],
+  };
+  for (const [item, [codeRe, cardRe, ci, mi]] of Object.entries(SYNTAX)) {
+    it(`${item} is explained in ${ci}.${mi} and not used before`, () => {
+      assert.match(taught(RQ.CH[ci].missions[mi]), cardRe, `${ci}.${mi} should explain ${item} before the learner solves it`);
+      for (const f of flat) {
+        if (f.ci < ci || (f.ci === ci && f.mi < mi)) assert.doesNotMatch(code(f.m), codeRe, `${f.ci}.${f.mi} shows ${item} before ${ci}.${mi} explains it`);
+      }
+    });
+  }
 });

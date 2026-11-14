@@ -196,6 +196,7 @@ RQ.CH.push({
       goal:'This program prints a <code>HashMap</code> with <code>{:?}</code>, and real Rust prints its entries in a different order on every run. Change it to print one line per find, <code>name count</code>, in alphabetical order: <code>crab 2</code>, <code>moon 5</code>, <code>star 1</code>.',
       how:[
         'The whole program prints a tally table, and the table has to look the same on every run. A <code>HashMap</code> finds keys fast by scrambling them, so it lists its entries in whatever order the scramble gives, and a different order each time you run. Rust Quest runs your program twice with two different scrambles, and refuses an output that changes.',
+        '<code>counts.insert(key, value)</code> adds one entry to the map: the key is what you look it up by, the value is what it holds.',
         'The way out is to fix the order yourself. Copy the keys into a <code>Vec</code> with a loop over <code>counts.keys()</code>, pushing <code>name.clone()</code> each time, because the <code>Vec</code> must own its names.',
         '<code>names.sort();</code> puts the <code>Vec</code> in alphabetical order. A <code>Vec</code> has an order, and sorting makes it the same on every run.',
         'Then loop over <code>&amp;names</code> and look each count up with <code>counts.get(name).unwrap()</code>. <code>unwrap</code> takes the number out of the <code>Some</code>, and it is safe here because every name in the list is a key of the map.'
