@@ -4,11 +4,12 @@
 const NQ=globalThis.NQ=globalThis.NQ||{};
 
 /* [xp, title]: 10 XP a mission. Chapter 1 ends at 80, chapter 2 at 130, chapter 3 at 190, chapter 4 at 250, chapter 5 at
-   320 and chapter 6 at 410: ARP Detective comes when chapter 1 has taught ARP, Subnet Scout when addressing is done,
-   Gateway Keeper when routing is done, NAT Navigator partway through the NAT chapter, Name Finder after the first four
-   missions of the DNS chapter, and the top title only when every mission is finished. Add a mission, move the top
-   threshold with it (tests/net/content.test.mjs). */
-NQ.RANKS=[[0,'Packet Rookie'],[80,'ARP Detective'],[190,'Subnet Scout'],[250,'Gateway Keeper'],[290,'NAT Navigator'],[360,'Name Finder'],[410,'Packet Whisperer']];
+   320, chapter 6 at 410 and chapter 7 at 500: ARP Detective comes when chapter 1 has taught ARP, Subnet Scout when
+   addressing is done, Gateway Keeper when routing is done, NAT Navigator partway through the NAT chapter, Name Finder
+   after the first four missions of the DNS chapter, Cache Keeper once the cache is taught (5 missions into chapter 7),
+   and the top title only when every mission is finished. Add a mission, move the top threshold with it
+   (tests/net/content.test.mjs). */
+NQ.RANKS=[[0,'Packet Rookie'],[80,'ARP Detective'],[190,'Subnet Scout'],[250,'Gateway Keeper'],[290,'NAT Navigator'],[360,'Name Finder'],[460,'Cache Keeper'],[500,'Packet Whisperer']];
 
 /* ch: the chapter whose missions must all be done before the question is played (quick-fire is gated on it)
    c: the question, a: the answer, w: three wrong answers, why: shown after a miss */
