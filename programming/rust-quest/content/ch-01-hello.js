@@ -10,7 +10,7 @@ RQ.CH.push({
   badge:'Moss\'s Note',
   story:'A message rock on Saltwhistle Cove answers only to someone who greets it; say hello, name what you carry, and find Moss\'s first note.',
   intro:'Old Moss the sea turtle hid the Moon Pearl somewhere on Saltwhistle Cove and left clues for Pip to follow, starting at a message rock that answers only to someone who greets it. Her first note says the pearl rises in the deepest pool only at the last low tide of the season. Every Rust program starts in a function called <code>main</code>. In this chapter you print your first line, give values names with <code>let</code>, and meet the compiler\'s favourite rule: values do not change unless you say so.',
-  toolbox:'In this chapter: <code>fn main</code>, <code>println!</code>, <code>print!</code>, <code>let</code>, <code>let mut</code>, whole numbers with <code>+ - * / %</code>, and <code>true</code> and <code>false</code>.',
+  toolbox:'In this chapter: <code>fn main</code>, <code>println!</code>, <code>print!</code>, <code>let</code>, <code>let mut</code>, whole numbers with <code>+ - * /</code>, and <code>true</code> and <code>false</code>.',
   learned:['fn main','println!','{}','let','let mut','shadowing'],
   missions:[
     {
@@ -18,7 +18,7 @@ RQ.CH.push({
       goal:'The message rock answers only to a greeting. Make the program print <code>Hello, Rust!</code> on its own line.',
       how:[
         'The whole program is one function, <code>main</code>, where every Rust program starts. Inside it, <code>println!</code> prints one line of text.',
-        '<code>fn main() { ... }</code> declares the function <code>main</code>. The curly braces hold what it does.',
+        '<code>fn main() { ... }</code> declares the function <code>main</code>. The empty <code>()</code> is where the inputs of a function go; <code>main</code> takes none. The curly braces hold what it does.',
         '<code>println!("Hello, Rust!");</code> prints the text between the quotes and then starts a new line. The <code>;</code> ends the statement.',
         'The <code>!</code> in <code>println!</code> marks a macro: code that writes more code for you before the program runs. <code>println!</code> has to be one because it can print any number of values, and Rust checks before running that the text and the values match. A normal function, like <code>main</code>, always takes the same fixed list. When a name ends in <code>!</code>, read it as a macro.',
         'A line that starts with <code>//</code> is a comment: a note for people that Rust skips. The starter uses one to say where your code goes.'
