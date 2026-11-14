@@ -35,23 +35,24 @@ const FIRST = {
 // typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
 const SYNTAX = {
   '# note':           [/^#/m, /note Python ignores/],
-  'colon and indent': [/:\n {4}/, /colon at the end says/],
-  'mutable':          [/\w\[\d\] =/, /mutable means you can change it in place/],
-  'module dot':       [/random\.\w/, /tool inside the random module/],
-  'except ValueError':[/except ValueError/, /catches only that mistake/],
-  'store it back':    [/\w = refill\(/, /assign the returned value back/],
+  'colon and indent': [/:[ \t]*\n[ \t]+\S/, /colon at the end says/],
+  'mutable':          [/\w\[[^\]]+\]\s*=[^=]/, /mutable means you can change it in place/],
+  'module dot':       [/\b(random|math|datetime|time|os|json)\.\w/, /tool inside the random module/],
+  'except ValueError':[/except\s+\w+/, /catches only that mistake/],
+  'store it back':    [/(\w+)\s*=\s*\w+\(\1\)/, /assign the returned value back/],
 };
 
 const noTags = t => t.replace(/<\/?[a-z][^>]*>/gi, '');
+const taught = m => noTags([m.title, m.goal, m.explain, m.note, m.starter, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n'));
 const texts = m => noTags([m.title, m.goal, m.explain, m.note, m.starter, m.answer, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n')) + '\n' + String(m.check).match(/'[^']*'/g)?.join('\n');
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
     const i = flat.findIndex(x => use.test(CH[x.ci].missions[x.mi].starter + '\n' + CH[x.ci].missions[x.mi].answer));
     assert.ok(i >= 0, 'no mission code uses it');
-    assert.ok(say.test(flat.slice(0, i + 1).map(x => x.text).join('\n')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+    assert.ok(say.test(flat.slice(0, i + 1).map(x => x.teach).join('\n')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
   });
 }
 
@@ -67,7 +68,7 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   }
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.teach)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of QF) if (re.test(qtext(q))) assert.ok(q.ch >= ci, `quick-fire "${q.c.slice(0, 40)}" needs chapter ${ci}`);
