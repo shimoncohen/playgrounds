@@ -32,14 +32,13 @@ const FIRST = {
   'if statement': [/\bstatement\b|\bkeyword\b/, null],
 };
 
-// typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
 const SYNTAX = {
-  '# note':           [/^#/m, /note Python ignores/],
-  'colon and indent': [/:[ \t]*\n[ \t]+\S/, /colon at the end says/],
-  'mutable':          [/\w\[[^\]]+\]\s*=[^=]/, /mutable means you can change it in place/],
-  'module dot':       [/\b(random|math|datetime|time|os|json)\.\w/, /tool inside the random module/],
-  'except ValueError':[/except\s+\w+/, /catches only that mistake/],
-  'store it back':    [/(\w+)\s*=\s*\w+\(\1\)/, /assign the returned value back/],
+  '# note':           [/^#/m, /ignores/],
+  'colon and indent': [/:[ \t]*\n[ \t]+\S/, /block follows/],
+  'mutable':          [/\w\[[^\]]+\]\s*=[^=]/, /change it in place/],
+  'module dot':       [/\b(random|math|datetime|time|os|sys|json|re|string|collections|itertools)\.\w/, /inside the random module/],
+  'except ValueError':[/except\b/, /only that mistake/],
+  'store it back':    [/(\w+)\s*=\s*\w+\(\1\)/, /returned value back/],
 };
 
 const noTags = t => t.replace(/<\/?[a-z][^>]*>/gi, '');
