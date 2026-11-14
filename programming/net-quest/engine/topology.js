@@ -44,7 +44,8 @@ const SCENARIOS={
     ['web','host',E('198.51.100.10/24'),{routes:[def('198.51.100.1')]}]
   ],[['laptop.eth0','sw1.p1'],['phone.eth0','sw1.p2'],['home.eth0','sw1.p3'],['home.eth1','isp.eth0'],['isp.eth1','web.eth0']])
 };
-/* build a Net from a spec; clone() copies the live state and keeps the same spec and setup. exec/clone/reset are
+/* build a Net from a spec; clone() copies the live state and keeps the same spec and setup; probe() is a clone with an
+   empty log, for a check's own trial runs, which must not pay for the whole session's log. exec/clone/probe/reset are
    non-enumerable so {...net} or Object.assign cannot produce a copy still bound to the original. setup is a list of
    {dev, cmd} lines run through the shell on create and again after every reset(); they leave no log and no clock. */
 const hide=(o,k,f)=>Object.defineProperty(o,k,{value:f,writable:true,configurable:true,enumerable:false});
@@ -59,6 +60,7 @@ const make=(name,sp,setup,state)=>{
   const net=Object.assign({name,me:sp.me},state||{devices:copy(sp.devices),log:[],clock:0});
   hide(net,'exec',(line,devId)=>NQ.exec(net,line,devId));
   hide(net,'clone',()=>make(name,sp,setup,copy({devices:net.devices,log:net.log,clock:net.clock})));
+  hide(net,'probe',()=>make(name,sp,setup,{devices:copy(net.devices),log:[],clock:net.clock}));
   hide(net,'reset',()=>{net.devices=copy(sp.devices);net.log=[];net.clock=0;applySetup(net,setup);});
   return net;
 };
