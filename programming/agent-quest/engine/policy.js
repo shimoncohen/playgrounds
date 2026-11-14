@@ -107,7 +107,7 @@ function run(scenario,setup,prompt,opts={}){
     at+=size;total+=tokens;
     steps.push({type:'delegate',name:s.name,model:s.model,cost:s.cost,files,tokens,over:tokens>AQ.context.WINDOW});
   });
-  const scope=prompt.files.length?prompt.files.flatMap(f=>vfs.read(f)!==null?[f]:vfs.list(AQ.vfs.dir(f))):subs.length&&delegated?focus:explore;
+  const scope=prompt.files.length?prompt.files.flatMap(f=>vfs.expand(f)):subs.length&&delegated?focus:explore;
   for(const p of [...new Set(scope)])act({verb:'read',target:p},'explore');
   let ran=0;
   for(const a of script)if(act(a,'script'))ran++;
