@@ -1,6 +1,6 @@
 # Network Quest (`net-quest/`) design
 
-Date: 2026-10-20. Status: phase 1 built (chapters 1 to 5).
+Date: 2026-10-20. Status: phase 1 built (chapters 1 to 5). Phase 2 (DNS) design: `docs/superpowers/specs/2026-11-01-net-quest-dns-design.md`.
 
 ## Goal
 
@@ -99,7 +99,7 @@ Phase 1 is one PR for engine plus chapters 1 to 5. If review size is too large, 
 
 ## Roadmap (separate specs/plans)
 
-2. DNS: `dig`, resolver chain, record types, caching
+2. DNS: `dig`, resolver chain, record types, caching; spec: docs/superpowers/specs/2026-11-01-net-quest-dns-design.md
 3. Transport: UDP, TCP handshake, retransmit, ports, `nc`
 4. HTTP/1.1, TLS/HTTPS: `curl`
 5. HTTP/2, HTTP/3 with QUIC, gRPC, WebSockets and more
