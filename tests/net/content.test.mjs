@@ -778,11 +778,12 @@ describe('chapters, ranks, quick-fire and guide', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const ch of NQ.CH) assert.ok(ch.name && ch.badge && ch.intro && ch.learned.length && ch.missions.length);
   });
-  it('six ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
+  it('seven ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
     const total = NQ.CH.reduce((n, c) => n + c.missions.length, 0) * NQ.XP;
-    assert.equal(total, 320);
-    assert.equal(NQ.RANKS.length, 6);
+    assert.equal(total, 410);
+    assert.equal(NQ.RANKS.length, 7);
     assert.deepEqual([...NQ.RANKS[0]], [0, 'Packet Rookie']);
+    assert.deepEqual([...NQ.RANKS[5]], [360, 'Name Finder']);
     assert.deepEqual([...NQ.RANKS.at(-1)], [total, 'Packet Whisperer']);
     for (let i = 1; i < NQ.RANKS.length; i++) assert.ok(NQ.RANKS[i][0] > NQ.RANKS[i - 1][0]);
     assert.equal(NQ.XP, 10);
@@ -790,7 +791,7 @@ describe('chapters, ranks, quick-fire and guide', () => {
   it('the ranks are spread over the course: none before the first chapter is done, only the top one in the last 30 XP', () => {
     const ends = []; let n = 0;
     for (const c of NQ.CH) { n += c.missions.length * NQ.XP; ends.push(n); }
-    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 320]);
+    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 360, 410]);
     assert.ok(NQ.RANKS[1][0] >= ends[0]);
     assert.ok(NQ.RANKS.slice(0, -1).every((r) => r[0] <= ends.at(-1) - 30));
   });
@@ -813,6 +814,21 @@ describe('chapters, ranks, quick-fire and guide', () => {
       const net = NQ.createNet(g.sc || 'pair');
       for (const [line, , dev] of g.ex) assert.equal(net.exec(line, dev).code, 0, g.c + ': ' + line);
     }
+  });
+});
+
+describe('chapter 6: quick-fire and field guide', () => {
+  const qf = NQ.QF.filter((q) => q.ch === 5), guide = NQ.GUIDE.filter((g) => g.ch === 5);
+  it('has six quick-fire questions, one on SERVFAIL, and four guide entries that run on the dns network', () => {
+    assert.equal(qf.length, 6);
+    assert.ok(qf.some((q) => /SERVFAIL/.test(q.c + q.a)));
+    assert.equal(guide.length, 4);
+    for (const g of guide) assert.equal(g.sc, 'dns', g.c);
+  });
+  it('none of them uses a word that chapter 7 teaches', () => {
+    const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b/i;
+    for (const q of qf) assert.doesNotMatch(plain([q.c, q.a, ...q.w, q.why].join(' ')), LATER, q.c);
+    for (const g of guide) assert.doesNotMatch(plain([g.c, g.what, ...g.ex.flat()].join(' ')), LATER, g.c);
   });
 });
 
