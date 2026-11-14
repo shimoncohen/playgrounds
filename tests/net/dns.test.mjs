@@ -218,3 +218,18 @@ test('lookups leave no session state on the net: pending queries die with the se
   assert.deepEqual(Object.keys(net).sort(), ['clock', 'devices', 'log', 'me', 'name']);
   assert.deepEqual(J(net.clone().devices.resolver.dns), J(net.devices.resolver.dns));
 });
+
+test('ctx.dig probes on a copy: the learner net keeps its log, clock, cache and dns.now', () => {
+  const net = NQ.createNet('dns');
+  net.exec('dig www.example.test');
+  net.exec('sleep 30');
+  const snap = () => JSON.stringify([net.log.length, net.clock, net.devices.resolver.dns, net.devices.laptop.dns]);
+  const before = snap();
+  const ctx = NQ.makeCtx(net, [], null);
+  const r = ctx.dig('laptop', 'wwww.example.test', 'A', {});
+  assert.deepEqual([r.status, r.msg.rcode], ['ok', 'NXDOMAIN']);
+  assert.equal(ctx.dig('laptop', 'www.example.test').msg.an1, 'www.example.test. 270 IN A 198.18.0.80');
+  assert.equal(ctx.dig('laptop', 'www.example.test', 'A', { server: '203.0.113.10' }).msg.aa, 1);
+  assert.equal(ctx.dig('laptop', 'www.example.test', 'A', { rd: false }).msg.ra, 1);
+  assert.equal(snap(), before);
+});
