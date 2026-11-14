@@ -38,7 +38,6 @@ const known=m=>{
   if(at<0)return null;
   const later=new Set(),used=new Set();
   flat.forEach((x,i)=>[...x.answer,...(x.expectFail||[])].forEach(l=>{const w=l.trim().split(/\s+/)[0];if(!used.has(w)){used.add(w);if(i>at)later.add(w);}}));
-  if(!used.has('sleep'))later.add('sleep'); // shortcut: sleep is taught in chapter 7; drop this line once a mission answer uses it
   return new Set(Object.keys(NQ.CMDS).filter(n=>!later.has(n)));
 };
 /* A session starts on the mission's fresh network: on a warm ARP cache chapter 1's ping sends no ARP request at all.

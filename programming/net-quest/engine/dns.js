@@ -153,7 +153,7 @@ const service=(ctx,dev,iface,p)=>{
 };
 U.listen(53,service);
 
-/* runs on net itself (caches and log change); ms is 12 per upstream query the server sent, 0 from its own data or cache */
+/* runs on net itself (caches and log change); ms is 12 per upstream query the server sent plus 12 when the server is past a router */
 const query=(net,from,o)=>{
   const dev=net.devices[from],name=fq(o.name),type=o.type||'A',rd=o.rd===false?0:1;
   const ctx=K.session(net,from,0,0),S=state(ctx),id=ident(name,type,o.server),sport=33000+hash(from+'|'+name+'|'+type+'|'+o.server)%1000,src=egress(dev,o.server);
@@ -169,7 +169,7 @@ const query=(net,from,o)=>{
     sendDns(ctx,dev,src,o.server,sport,53,ask(id,rd,name,type),'DNS query '+name+' '+type+' to '+o.server,{quiet:true});
     K.settle(ctx);
   }
-  return {status:got?'ok':'timeout',msg:got,server:o.server,entries:ctx.entries,steps:ctx.steps,ms:got?MS_PER_QUERY*S.up:0};
+  return {status:got?'ok':'timeout',msg:got,server:o.server,entries:ctx.entries,steps:ctx.steps,ms:got?MS_PER_QUERY*(S.up+(K.nextHop(dev,o.server).via?1:0)):0};
 };
 NQ.dns={query,recs,fq,rootName};
 })();
