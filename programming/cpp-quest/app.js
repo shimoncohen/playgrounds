@@ -1248,7 +1248,7 @@ if ((hasKey && level >= 3) || isOdile) {
   check:c=>c.ok&&c.has(/&&/)&&c.has(/\|\|/)&&c.lines.length>=1},
  {title:'Roll the dice',goal:'Tock rolls a die to pick the day\'s order: print a dice roll from 1 to 6 using <code>rand() % 6 + 1</code>. Run it several times. Then delete the <code>srand</code> line and run it a few more times.',
   anat:[['rand()','fn'],['%','op'],['6','val'],['+','op'],['1','val']],
-  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed. (<code>rand</code>, <code>srand</code> and <code>time</code> are ready-made tools you call by name with parentheses; <code>time(0)</code> is the clock reading in seconds, and you can ignore the <code>0</code> for now.)`,
+  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed. (<code>rand</code>, <code>srand</code> and <code>time</code> are ready-made tools you call by name with parentheses. <code>#include &lt;cstdlib&gt;</code> brings in <code>rand</code> and <code>srand</code>, and <code>#include &lt;ctime&gt;</code> brings in <code>time</code>; without them the compiler does not know those names. <code>time(0)</code> is the clock reading in seconds, and you can ignore the <code>0</code> for now.)`,
   start:P(R`srand(time(0));
 // roll a six-sided die
 `,{inc:['cstdlib','ctime']}),ans:P(R`srand(time(0));
@@ -1604,7 +1604,7 @@ for (string item : toolbox) {
 }`,{inc:['vector']}),hint:'for (string item : toolbox) { cout << "- " << item << endl; }',
   check:c=>c.ok&&c.has(/for\s*\(\s*(const\s+)?(auto|string|std::string)\s*&?\s*\w+\s*:/)&&c.lines.length>=3},
  {title:'Find the biggest cog',goal:'Find the biggest number in <code>cogs</code> with a loop, and print <code>Biggest cog: 99</code>. Don\'t just type 99.',
-  explain:`Start with <code>best</code> set to the first cog. Then check every cog: if one is bigger than <code>best</code>, it becomes the new best. Step through and watch <code>best</code> update. This "keep the best so far" pattern finds minimums, longest names, closest enemies and much more.`,
+  explain:`Start with <code>best</code> set to the first cog. Then check every cog: if one is bigger than <code>best</code>, it becomes the new best. A <code>{ }</code> list after a vector's name fills it with those items at the start, just like an array. Step through and watch <code>best</code> update. This "keep the best so far" pattern finds minimums, longest names, closest enemies and much more.`,
   start:P(R`vector<int> cogs = {72, 99, 85, 60, 91};
 int best = cogs[0];
 // check every cog
@@ -1619,7 +1619,7 @@ cout << "Biggest cog: " << best << endl;`,{inc:['vector']}),hint:'for (int s : c
   check:c=>c.ok&&c.has(/\bfor\b/)&&/Biggest cog: 99/.test(c.out)&&!c.has(/best\s*=\s*99/)},
  {title:'Drop items',goal:'Remove <code>"oil can"</code> with <code>erase</code> and the last item with <code>pop_back()</code>, leaving just spanner and cog.',
   anat:[['toolbox','name'],['.erase(','fn'],['toolbox.begin() + 1','name'],[')','op']],
-  explain:`<code>pop_back()</code> removes the last item. <code>erase</code> removes from any position, but it wants a position written as <code>toolbox.begin() + index</code>. Watch Memory: everything after the erased item slides down one place.`,
+  explain:`<code>pop_back()</code> removes the last item. <code>erase</code> removes from any position, but it wants a position written as <code>toolbox.begin() + index</code>. <code>begin()</code> is the position of the first item, so adding <code>1</code> moves to the second. Watch Memory: everything after the erased item slides down one place.`,
   start:P(R`vector<string> toolbox = {"spanner", "oil can", "cog", "map"};
 // remove the oil can (index 1), then remove the last item
 for (string item : toolbox) {

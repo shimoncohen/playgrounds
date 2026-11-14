@@ -32,7 +32,7 @@ const FIRST = {
 };
 
 const noTags = t => t.replace(/<\/?[a-z][^>]*>/gi, '');
-const prose = m => noTags([m.title, m.goal, m.explain, m.note, m.hint, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n'));
+const prose = m => noTags([m.title, m.goal, m.explain, m.note].filter(Boolean).join('\n'));
 const code = m => [m.start, m.ans].filter(Boolean).join('\n');
 const flat = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: prose(m) + '\n' + code(m) + (mi === 0 ? '\n' + noTags(ch.intro) : '') })));
@@ -53,6 +53,19 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of QT) for (const s of samples(q)) if (re.test(s)) assert.ok(q.ch >= ci, `quick-fire "${s.slice(0, 40)}" needs chapter ${ci}`);
+  });
+}
+
+// code regex (what the learner sees in a starter or answer), prose regex (the card text that explains it), chapter, mission (0-based)
+const SYNTAX = {
+  'include cstdlib/ctime': [/#include <(cstdlib|ctime)>/, /#include &lt;cstdlib&gt;.*rand.*srand.*#include &lt;ctime&gt;.*time/, 3, 5],
+  'vector {} list':        [/vector<\w+> \w+ = \{/, /\{ \}<\/code> list after a vector's name fills it/, 6, 5],
+  'begin()':               [/\.begin\(\)/, /<code>begin\(\)<\/code> is the position of the first item/, 6, 6],
+};
+for (const [item, [codeRe, proseRe, ci, mi]] of Object.entries(SYNTAX)) {
+  test(`"${item}" is explained in ${ci}.${mi} and not shown before`, () => {
+    assert.match(CH[ci].missions[mi].explain + (CH[ci].missions[mi].note || ''), proseRe, `${ci}.${mi} should explain ${item}`);
+    for (const x of before(ci, mi)) assert.doesNotMatch(code(CH[x.ci].missions[x.mi]), codeRe, `${x.ci}.${x.mi} shows ${item} before ${ci}.${mi} explains it`);
   });
 }
 
