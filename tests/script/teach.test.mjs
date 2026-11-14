@@ -59,23 +59,23 @@ const texts = m => noTags([taught(m), m.hint].filter(Boolean).join('\n'));
 const flat = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
-// typed symbols and syntax: the card text up to and including the first mission whose code uses it must say what it is
 const SYNTAX = {
-  'dot (console.log)':   [/\w\.\w/, /dot means/],
-  'call brackets':       [/\w\(/, /Round brackets after a name run/],
+  'dot (console.log)':   [/\w\.\w/, /\bdot\b/],
+  'call brackets':       [/\w\(/, /Round brackets/],
   '< > <= >=':           [/\s[<>]=?\s|[\w)][<>]=?[\w(]/, /less than/],
-  'dot (.length)':       [/\.length\b/, /dot reaches/],
-  '+ 1 after floor':     [/Math\.floor\([^\n]*\)\s*\+\s*\d/, /shifts it to 1 to 6/],
-  'const in for...of':   [/for\s*\(\s*const\s/, /fresh wagon, so const/],
-  '<T>':                 [/<[A-Z]\w*>/, /introduces T,/],
-  '() =>':               [/\(\)\s*=>/, /Empty brackets/],
-  '{ add } shorthand':   [/=\s*\{\s*\w+\s*(,\s*\w+\s*)*\}/, /short for \{ add: add \}/],
-  'braces destructure':  [/(const|let)\s*\{\s*\w+/, /names in braces must match property names/],
-  'event loop':          [/setTimeout\(.*, 0\)/, /lines up waiting jobs/],
-  'terminal':            [/^(node|npm)\s/m, /a terminal is where you type commands/],
-  'quotes in node -e':   [/^node\s+-e\s+["']/m, /quotes keep the whole code as one piece/],
-  'single in double':    [/\w\('/, /single quotes inside the double ones/],
-  'require without .js': [/require\(\s*["']\.\/[\w-]+["']\s*\)/, /adds \.js itself/],
+  'dot (.length)':       [/\.length\b/, /fact about/],
+  '+ 1 after floor':     [/Math\.floor\([^\n]*\)\s*\+\s*\d|\d\s*\+\s*Math\.floor/, /shifts it/],
+  'const in for...of':   [/for\s*\(\s*const\s/, /fresh wagon/],
+  'generic <T>':         [/\w<[A-Za-z]\w*(\[\])?>/, /introduces T/],
+  'empty () call':       [/\w\(\s*\)/, /Empty brackets/],
+  'empty () definition': [/(function\s+\w+|\w+)\(\s*\)\s*\{|\(\s*\)\s*=>/, /takes nothing/],
+  'shorthand { add }':   [/(?<=[=(,:]\s*|return\s+)\{\s*\w+\s*[,}]/, /add: add/],
+  'braces destructure':  [/(const|let)\s*\{\s*\w+/, /match property names/],
+  'event loop':          [/setTimeout\(.*, 0\)/, /waiting jobs/],
+  'terminal':            [/^(node|npm)\s/m, /terminal is where/],
+  'quotes in node -e':   [/^node\s+-e\s+["']/m, /one piece/],
+  'single in double':    [/\w\('/, /single quotes/],
+  'require without .js': [/require\(\s*["']\.\/[\w-]+["']\s*\)/, /adds \.js/],
 };
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
