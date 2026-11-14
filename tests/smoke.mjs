@@ -2909,6 +2909,25 @@ test('net-quest: ping shows a reply and an inspector entry', async () => {
   await ctx.close();
 });
 
+test('net-quest: the inspector explains the UDP and DNS fields of a dig', async () => {
+  const { ctx, page, errors } = await netPage();
+  await page.evaluate(() => {
+    const host = document.createElement('div');
+    host.innerHTML = '<div id="t-list"></div><div id="t-detail"></div>';
+    document.body.append(host);
+    const r = NQ.createNet('dns').exec('dig www.example.test');
+    NQUI.inspector({ list: host.querySelector('#t-list'), detail: host.querySelector('#t-detail'), onSelect() {} }).update([{ line: 'dig www.example.test', entries: r.entries }]);
+  });
+  await page.locator('#t-list .pkt', { hasText: 'DNS query' }).first().click();
+  const detail = await page.textContent('#t-detail');
+  for (const t of ['UDP', 'DNS', 'sport', 'sender’s port', 'qname', 'the name asked about', 'matches an answer to its question']) assert.ok(detail.includes(t), t);
+  await page.locator('#t-list .pkt', { hasText: 'DNS reply' }).last().click();
+  const reply = await page.textContent('#t-detail');
+  assert.ok(reply.includes('www.example.test. 300 IN A 198.18.0.80') && reply.includes('a record in the answer'));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('net-quest: the packet list works from the keyboard', async () => {
   const { ctx, page, errors, type } = await netPage();
   await type('ping -c 1 10.0.0.3');

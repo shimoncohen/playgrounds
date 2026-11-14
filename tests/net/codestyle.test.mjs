@@ -7,8 +7,8 @@ import { loadNet } from './harness.mjs';
 // Shell Quest tests too); the net rules add the Network Quest commands, interface names, IPv4 addresses, CIDRs and MACs.
 // Lowercase ip and ping are always treated as code, so prose says "IP" for the protocol and uses "Ping" only to start a
 // sentence ("Ping the phone ...").
-const SAFE = 'pwd ls cd mkdir rmdir rm cp mv wc grep uniq chmod whoami hostname nano vi vim tee tr sed seq xargs diff printf tac nl comm basename dirname ln awk ps getopts mktemp realpath printenv readonly'.split(' ');
-const AMBIG = 'cat echo find head tail sort touch cut env date history clear sleep wait kill jobs'.split(' ');
+const SAFE = 'pwd ls cd mkdir rmdir rm cp mv wc grep uniq chmod whoami hostname nano vi vim tee tr sed seq xargs diff printf tac nl comm basename dirname ln awk ps getopts mktemp realpath printenv readonly resolvectl rndc'.split(' ');
+const AMBIG = 'cat echo find head tail sort touch cut env date history clear sleep wait kill jobs dig'.split(' ');
 const VERB = 'prints|shows|puts|scrolls|walks|tells|creates|slices|understands|runs|receives|sees|reverses|keeps|says|swaps|writes|sorts|counts|finds|lists|reads|takes|gives|joins|turns|makes|catches|drops|splits';
 const NET = 'ip ping traceroute arping ipcalc'.split(' ');
 const G = '(?<![\\w§/.$-])', E = '(?![\\w/-])';
@@ -43,6 +43,9 @@ describe('bareMentions (the net rules)', () => {
     assert.equal(bareMentions('use -c to count').length, 1);
     assert.equal(bareMentions('An IP address, an IPv4 header and a MAC address. IP is the internet layer.').length, 0);
     assert.equal(bareMentions('<code>ping -c 3 10.0.0.3</code> on <code>eth0</code>').length, 0);
+    assert.equal(bareMentions('then resolvectl points the laptop at a server and rndc clears it').length, 1);
+    assert.equal(bareMentions('dig prints the answer').length, 1);
+    assert.equal(bareMentions('<code>dig</code> prints the answer, and you can dig deeper').length, 0);
   });
 });
 

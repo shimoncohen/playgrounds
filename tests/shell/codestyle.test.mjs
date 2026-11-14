@@ -6,8 +6,8 @@ import { loadShell } from './harness.mjs';
 // "Code in prose"). A bare `ls` or `-a` reads as part of the sentence, so the learner cannot tell it is something to type.
 // Only names that are not ordinary English words can be checked automatically; ambiguous ones (find, cat, sort, echo, ...)
 // are checked only where a verb follows them ("find walks", "cat prints"), the rest is for the reviewer.
-const SAFE = 'pwd ls cd mkdir rmdir rm cp mv wc grep uniq chmod whoami hostname nano vi vim tee tr sed seq xargs diff printf tac nl comm basename dirname ln awk ps getopts mktemp realpath printenv readonly'.split(' ');
-const AMBIG = 'cat echo find head tail sort touch cut env date history clear sleep wait kill jobs'.split(' ');
+const SAFE = 'pwd ls cd mkdir rmdir rm cp mv wc grep uniq chmod whoami hostname nano vi vim tee tr sed seq xargs diff printf tac nl comm basename dirname ln awk ps getopts mktemp realpath printenv readonly resolvectl rndc'.split(' ');
+const AMBIG = 'cat echo find head tail sort touch cut env date history clear sleep wait kill jobs dig'.split(' ');
 const VERB = 'prints|shows|puts|scrolls|walks|tells|creates|slices|understands|runs|receives|sees|reverses|keeps|says|swaps|writes|sorts|counts|finds|lists|reads|takes|gives|joins|turns|makes|catches|drops|splits';
 const G = '(?<![\\w§/.$-])', E = '(?![\\w/-])';
 const RULES = [
