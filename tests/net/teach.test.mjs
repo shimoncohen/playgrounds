@@ -50,6 +50,25 @@ const FIRST = {
   'NAT table': [/NAT table/, 4, 2],
   id: [/\bid\b/, 4, 2],
   'nat on': [/\bnat (?:on|off)\b/, 4, 6],
+  DNS: [/\bDNS\b/, 5, 0],
+  resolver: [/\bresolver/i, 5, 0],
+  dig: [/\bdig\b/, 5, 0],
+  record: [/\brecords?\b/i, 5, 1],
+  'A record': [/\bA record/, 5, 1],
+  UDP: [/\bUDP\b/, 5, 2],
+  'UDP port': [/UDP port/, 5, 2],
+  qname: [/qname/, 5, 2],
+  '+short': [/\+short/, 5, 3],
+  MX: [/\bMX\b/, 5, 4],
+  NS: [/\bNS\b/, 5, 5],
+  'name server': [/name server/i, 5, 5],
+  CNAME: [/\bCNAME\b/, 5, 6],
+  alias: [/\balias/i, 5, 6],
+  NXDOMAIN: [/NXDOMAIN/, 5, 7],
+  status: [/reply's status/, 5, 7],
+  SERVFAIL: [/SERVFAIL/, 5, 7],
+  REFUSED: [/REFUSED/, 5, 7],
+  resolvectl: [/resolvectl/, 5, 8],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -193,6 +212,47 @@ describe('chapter 5 defines its new words in place', () => {
   });
   it('the chapter introduces nothing in its intro that a mission teaches later', () => {
     for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 4 && mi > 0) assert.ok(!re.test(plain(NQ.CH[4].intro)), term);
+  });
+});
+
+describe('chapter 6 does not use words that chapter 7 teaches', () => {
+  // chapter 7 teaches the lookups below the resolver, caching and DNS TTL
+  const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b|\b(?:rd|ra|aa)\b/i;
+  NQ.CH[5].missions.forEach((m, i) => it(`6.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a later term')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[5].intro))));
+});
+
+describe('chapter 6 defines its new words in place', () => {
+  const card = (i) => NQ.CH[5].missions[i].goal + ' ' + NQ.CH[5].missions[i].how.join(' ');
+  it('DNS and resolver are defined where the chapter first uses them (6.1)', () => {
+    assert.match(card(0), /<b>DNS<\/b>, the Domain Name System/);
+    assert.match(card(0), /<b>resolver<\/b>, a server whose job is to look names up/);
+  });
+  it('record and A record are defined in 6.2, IN is explained', () => {
+    assert.match(card(1), /<b>record<\/b>: a single fact/);
+    assert.match(card(1), /<b>A record<\/b>: it joins a name to an IPv4 address/);
+    assert.match(plain(card(1)), /IN \(short for Internet/);
+  });
+  it('UDP, UDP port, DNS as a layer and qname are defined in 6.3', () => {
+    assert.match(card(2), /<b>UDP<\/b> sends one short message/);
+    assert.match(card(2), /<b>UDP port<\/b> is a number/);
+    assert.match(card(2), /<code>qname<\/code> field is the name being asked about/);
+  });
+  it('+short is explained as an option in 6.4', () => assert.match(plain(card(3)), /\+short is the option/));
+  it('MX, NS, name server, CNAME and alias are defined where they first appear (6.5 to 6.7)', () => {
+    assert.match(card(4), /<b>MX<\/b> record names the server that takes in mail/);
+    assert.match(card(5), /<b>NS<\/b> record names a <b>name server<\/b>/);
+    assert.match(card(6), /<b>CNAME<\/b> record makes a name an <b>alias<\/b>/);
+  });
+  it('status, NXDOMAIN, SERVFAIL and REFUSED are defined in 6.8', () => {
+    assert.match(card(7), /<b>status<\/b>/);
+    assert.match(card(7), /<b>NXDOMAIN<\/b> means the name does not exist/);
+    assert.match(card(7), /<b>SERVFAIL<\/b> means the server tried and could not find out/);
+    assert.match(card(7), /<b>REFUSED<\/b> means the server would not answer/);
+  });
+  it('resolvectl is explained in 6.9', () => assert.match(plain(card(8)), /resolvectl shows and sets which server this laptop asks/));
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 5 && mi > 0) assert.ok(!re.test(plain(NQ.CH[5].intro)), term);
   });
 });
 
