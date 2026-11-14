@@ -228,3 +228,15 @@ test('dig on a resolver or name server asks 127.0.0.1 and gets no answer', () =>
   const r = run(fresh(), 'dig www.example.test', 'auth');
   assert.deepEqual([r.code, r.out.at(-2)], [9, ';; communications error to 127.0.0.1#53: timed out']);
 });
+
+test('dig +trace on a device with no root list reaches no server and exits 9', () => {
+  const r = run(fresh(), 'dig +trace www.example.test', 'auth');
+  assert.deepEqual([r.code, r.out.slice(-2)], [9, [';; communications error to 127.0.0.1#53: timed out', ';; no servers could be reached']]);
+});
+
+test('dig takes the type before the name, as the real one does', () => {
+  const net = fresh();
+  assert.deepEqual(out(net, 'dig +short MX example.test'), ['10 mail.example.test.']);
+  assert.deepEqual(out(net, 'dig mx example.test +short'), ['10 mail.example.test.']);
+  assert.deepEqual(out(net, 'dig +short A'), []);
+});

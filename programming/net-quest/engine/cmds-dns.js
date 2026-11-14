@@ -1,5 +1,4 @@
-/* Network Quest DNS commands: dig, sleep, resolvectl and rndc, printed the way the real ones print. Queries run on
-   NQ.dns; sleep only moves the devices' dns.now, it never waits. DOM-free. */
+/* Network Quest DNS commands, printed the way the real ones print. sleep never waits: it only moves dns.now. DOM-free. */
 (()=>{
 'use strict';
 const NQ=globalThis.NQ=globalThis.NQ||{};
@@ -16,15 +15,19 @@ const size=m=>P.hex(P.stack({name:'DNS',fields:m})).split(' ').length;
 const timeout=(server,head)=>ret([...head,';; communications error to '+server+'#53: timed out',';; no servers could be reached'],[],9);
 
 const parse=args=>{
-  const o={server:null,name:null,type:'A',short:false,rd:true,trace:false};
+  const o={server:null,name:null,type:'A',short:false,rd:true,trace:false},pos=[];
   for(const a of args){
     if(a[0]==='@')o.server=a.slice(1);
     else if(a==='+short')o.short=true;
     else if(a==='+norecurse')o.rd=false;
     else if(a==='+trace')o.trace=true;
     else if(a[0]==='+')return {error:fail(1,'Invalid option: '+a)};
-    else if(o.name===null)o.name=a;
-    else if(TYPES.includes(a.toUpperCase()))o.type=a.toUpperCase();
+    else pos.push(a);
+  }
+  const isType=a=>TYPES.includes(a.toUpperCase());
+  for(const [i,a] of pos.entries()){
+    if(o.name===null&&!(isType(a)&&pos.slice(i+1).some(b=>!isType(b))))o.name=a;
+    else if(isType(a))o.type=a.toUpperCase();
     else return {error:fail(1,"dig: '"+a+"' is not a record type this dig knows ("+TYPES.join(', ')+')')};
   }
   if(o.name===null)return {error:fail(2,DIG_USAGE)};
@@ -44,11 +47,10 @@ const full=(m,server,ms)=>{
     '',';; Query time: '+ms+' msec',';; SERVER: '+server+'#53('+server+') (UDP)',';; MSG SIZE  rcvd: '+size(m)];
 };
 
-/* the client walks the delegations itself from dns.roots, one question per server with recursion off; the sim skips the
-   first query for the root's own NS list */
+/* the sim skips real dig's first query, for the root's own NS list */
 const trace=(net,dev,o,head)=>{
   const out=[...head];
-  let server=(dev.dns.roots||[])[0],name=NQ.dns.rootName(0).replace(/\.$/,'');
+  let server=(dev.dns.roots||[])[0]||'127.0.0.1',name=NQ.dns.rootName(0).replace(/\.$/,'');
   for(let hop=0;hop<MAX_HOPS&&server;hop++){
     const r=NQ.dns.query(net,dev.id,{server,name:o.name,type:o.type,rd:false});
     if(r.status!=='ok')return timeout(server,out);
