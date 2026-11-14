@@ -50,7 +50,7 @@ AQ.CH.push({
         'Deleting the three lines <code>do not edit old-api/</code>, <code>only edit billing/</code> and <code>ask before run npm run legacy-build</code> leaves the notes and the live rule <code>do not delete data/</code>. The file falls under the limit.',
         'A rule line counts only when its target exists. These targets are gone, so the lines are read and then ignored. Under the file, the editor says how many other lines only cost tokens: the notes are in that number too, so look at which lines look like rules.',
         'Check each rule against the project before you cut it. <code>data/</code> is a real folder with the backups in it, so its rule stays.',
-        'A <code>#</code> in front of a line hides it from the rules in this practice, but the line is still in the file and still counted. Delete a line you do not need; do not comment out the line.'
+        'A <code>#</code> in front of a line hides it from the rules in this practice, but the line is still in the file and still counted. Delete a line you do not need; do not comment it out.'
       ],
       explain:'Rules pile up in a memory file, and nobody checks them again. A rule for something that is gone stops nothing, but it is loaded on every run, and a real agent that reads ordinary sentences may be misled by it too. Auditing a file is simple: for every rule line, ask whether the thing it names is still there. If not, delete it. Delete the line, because a commented-out line still sits in the file and still costs.',
       hint:'Delete the three lines whose folder or command is gone. Keep <code>do not delete data/</code>.',

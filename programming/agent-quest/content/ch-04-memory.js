@@ -12,7 +12,7 @@ const LOAD=' A memory file in a folder only loads once the agent reads a file in
 AQ.CH.push({
   name:'Memory',badge:'Corkboard',tier:'core',
   story:'Cog forgets overnight, so pin house rules where he will see them, and find the corkboard.',
-  intro:'Cog forgets everything overnight, so the house rules must be pinned where he will see them: between runs the agent keeps only what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a folder memory file costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
+  intro:'Cog forgets everything overnight, so the house rules must be pinned where he will see them: between runs the agent keeps only what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a memory file kept inside a folder costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
   learned:['Folder memory','Where a rule belongs','Memory size','When memory loads'],
   missions:[
     {

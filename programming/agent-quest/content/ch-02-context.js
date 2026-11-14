@@ -10,7 +10,7 @@ const FIELDS=['goal','donewhen','constraints','files'];
 AQ.CH.push({
   name:'Context and tokens',badge:'Small Note',tier:'core',
   story:'Cog can only hold so much at once; watch the meter while he sorts the receipts and find the small note that keeps slipping out.',
-  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. Everything the agent holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
+  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. Everything the agent holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real AI service.',
   learned:['Setup size','Earlier messages','Window limit','Subagent cost'],
   missions:[
     {
