@@ -9,7 +9,7 @@ const J = (x) => JSON.parse(JSON.stringify(x));
 const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/&(?:gt|lt|amp|quot);/g, ' ');
 // the run a learner would make: the reference lines on a fresh net, then the question's computed answer
 const solve = (m, lines = m.answer) => {
-  const net = NQ.createNet(m.scenario, m.setup), history = lines.map((line) => { const r = net.exec(line, m.dev); return { line, code: r.code, entries: r.entries }; });
+  const net = NQ.createNet(m.scenario, m.setup), history = lines.map((line) => { const r = net.exec(line, m.dev); return { line, code: r.code, out: r.out, entries: r.entries }; });
   const ctx = NQ.makeCtx(net, history, null);
   return { net, ctx, expect: m.question ? m.question.expect(ctx) : undefined, all: m.question ? accepted(m, ctx, m.question.expect(ctx)) : [] };
 };
@@ -411,7 +411,7 @@ describe('chapter 4: lazy answers are caught', () => {
     assert.match(run(3, ['traceroute 172.16.0.10'], 'nope'), /Not quite/);
   });
   it('4: the answer is computed from the trace, so a changed network changes it', () => {
-    const ctx = (setup, lines) => { const net = NQ.createNet('office', setup), history = lines.map((line) => { const r = net.exec(line); return { line, code: r.code, entries: r.entries }; }); return NQ.makeCtx(net, history, null); };
+    const ctx = (setup, lines) => { const net = NQ.createNet('office', setup), history = lines.map((line) => { const r = net.exec(line); return { line, code: r.code, out: r.out, entries: r.entries }; }); return NQ.makeCtx(net, history, null); };
     const re = [{ dev: 'r2', cmd: 'ip addr del 10.0.1.2/30 dev eth0' }, { dev: 'r2', cmd: 'ip addr add 10.0.1.2/30 dev eth0' }];
     assert.equal(m(3).question.expect(ctx(re, ['traceroute 172.16.0.10'])), '10.0.1.2');
     assert.equal(m(3).question.expect(ctx([], [])), '');
@@ -677,6 +677,145 @@ describe('chapter 6: names and DNS', () => {
   });
 });
 
+describe('chapter 7: resolvers and caches', () => {
+  const m = (i) => NQ.CH[6].missions[i];
+  const run = (i, lines, a) => NQ.runMission(m(i), lines, a);
+  const WWW = 'dig www.example.test', ROOT = 'dig @192.0.2.10 www.example.test', TLD = 'dig @198.51.100.10 www.example.test', AUTH = 'dig @203.0.113.10 www.example.test';
+  const text = (x) => [x.goal, x.explain, x.hint, x.question && x.question.ask, ...x.how].filter(Boolean).map(plain).join(' ');
+  it('has nine missions, 6.7 on dns-stale and the rest on dns, with the expected answers', () => {
+    assert.equal(NQ.CH[6].name, 'Resolvers and caches');
+    assert.deepEqual([...NQ.CH[6].missions.map((x) => x.scenario)], [...Array(7).fill('dns'), 'dns-stale', 'dns']);
+    const want = ['192.0.2.10', 'a.nic.test.', '203.0.113.10', 'aa', '0', '198.18.0.80', '180', undefined, 'ns1.example.test'];
+    want.forEach((a, i) => assert.equal(m(i).question ? solve(m(i)).expect : undefined, a, String(i)));
+  });
+  it('doing nothing fails every mission, and the answer without the command does not count', () => {
+    for (const [i, a] of [[0, '192.0.2.10'], [1, 'a.nic.test'], [2, '203.0.113.10'], [3, 'aa'], [4, '0'], [5, '198.18.0.80'], [6, '180'], [8, 'ns1.example.test']]) assert.notEqual(run(i, [], a), true, String(i));
+    assert.notEqual(run(7, []), true);
+  });
+  it('0: the first question the resolver sent, with or without +short', () => {
+    assert.equal(run(0, [WWW], '192.0.2.10'), true);
+    assert.equal(run(0, ['dig +short www.example.test'], '192.0.2.10'), true);
+    assert.equal(run(0, [WWW, WWW], '192.0.2.10'), true);
+    for (const a of ['198.51.100.10', '203.0.113.10', '192.168.1.53']) assert.notEqual(run(0, [WWW], a), true, a);
+    for (const l of ['dig example.test MX', 'ping -c 1 192.168.1.53']) assert.notEqual(run(0, [l], '192.0.2.10'), true, l);
+  });
+  it('1, 2, 3: the reply has to come from the server the mission names, in a full dig', () => {
+    for (const [i, cmd, right, others] of [[1, ROOT, 'a.nic.test', [TLD, AUTH]], [2, TLD, '203.0.113.10', [ROOT, AUTH]], [3, AUTH, 'aa', [ROOT, TLD]]]) {
+      assert.equal(run(i, [cmd], right), true, String(i));
+      assert.equal(run(i, [cmd], ''), NQ.ASK, String(i));
+      for (const o of others) assert.notEqual(run(i, [o], right), true, `${i} ${o}`);
+      assert.notEqual(run(i, [WWW], right), true, `${i} through the resolver`);
+      assert.notEqual(run(i, [cmd.replace('dig ', 'dig +short ')], right), true, `${i} +short`);
+    }
+    for (const a of ['a.nic.test.', 'A.NIC.TEST']) assert.equal(run(1, [ROOT], a), true, a);
+    assert.equal(run(1, ['dig www.example.test @192.0.2.10'], 'a.nic.test'), true);
+    assert.notEqual(run(1, [ROOT], 'ns1.example.test'), true);
+    assert.notEqual(run(2, [TLD], '198.18.0.80'), true);
+    for (const a of ['rd', 'ra', 'qr', 'a']) assert.notEqual(run(3, [AUTH], a), true, a);
+    assert.equal(run(3, [AUTH], 'AA'), true);
+  });
+  it('4: two full digs through the resolver are needed, and the number is the second query time', () => {
+    assert.match(run(4, [WWW]), /twice/);
+    assert.equal(run(4, ['dig +short www.example.test', 'dig +short www.example.test']).slice(0, 14), 'Run <code>dig ');
+    assert.equal(run(4, [WWW, WWW], '0'), true);
+    assert.equal(run(4, [WWW, WWW], 'zero'), true);
+    assert.notEqual(run(4, [WWW, WWW], '36'), true);
+    assert.equal(run(4, [WWW, WWW], ''), NQ.ASK);
+    assert.notEqual(run(4, [ROOT, ROOT], '0'), true);
+    assert.equal(run(4, [WWW, 'sleep 400', WWW], '36'), true);
+    assert.notEqual(run(4, [WWW, 'sleep 400', WWW], '0'), true);
+  });
+  it('5: the peek must find the answer, which needs a normal dig first, and must go to the resolver', () => {
+    const PEEK = 'dig +norecurse www.example.test';
+    assert.equal(run(5, [PEEK, WWW, PEEK], '198.18.0.80'), true);
+    assert.equal(run(5, [WWW, PEEK], '198.18.0.80'), true);
+    assert.match(run(5, [PEEK]), /remembers nothing yet/);
+    assert.match(run(5, [WWW]), /Run <code>dig \+norecurse/);
+    assert.match(run(5, [WWW, 'dig @203.0.113.10 +norecurse www.example.test']), /Run <code>dig \+norecurse/);
+    assert.notEqual(run(5, [PEEK, WWW, PEEK], '198.18.0.99'), true);
+    assert.equal(run(5, [PEEK, WWW, PEEK], ''), NQ.ASK);
+  });
+  it('6: starts with a warm cache, and the number counts down from what sleep let pass', () => {
+    const net = NQ.createNet(m(6).scenario, m(6).setup);
+    assert.equal(net.log.length, 0);
+    assert.equal(net.devices.resolver.dns.cache.some((e) => e.name === 'www.example.test.' && e.type === 'A'), true);
+    net.reset();
+    assert.equal(net.devices.resolver.dns.cache.length > 0, true, 'reset replays the warm-up');
+    assert.equal(run(6, ['sleep 120', WWW], '180'), true);
+    assert.equal(run(6, ['sleep 60', 'sleep 60', WWW], '180'), true);
+    assert.equal(run(6, ['sleep 200', WWW], '100'), true);
+    assert.notEqual(run(6, ['sleep 120', WWW], '300'), true);
+    assert.equal(run(6, ['sleep 120', WWW], ''), NQ.ASK);
+  });
+  it('6: no sleep, a sleep with no dig after it, +short and a sleep that outlasts the entry do not pass', () => {
+    assert.match(run(6, [WWW], '300'), /run <code>sleep 120/);
+    assert.match(run(6, ['sleep 120']), /run <code>dig www\.example\.test<\/code>, without/);
+    assert.match(run(6, [WWW, 'sleep 120']), /Now ask again/);
+    assert.match(run(6, ['sleep 120', 'dig +short www.example.test']), /Now ask again/);
+    assert.match(run(6, ['sleep 400', WWW]), /full time again/);
+    assert.match(run(6, ['sleep 0', WWW]), /full time again/);
+    assert.notEqual(run(6, ['sleep 400', WWW], '300'), true);
+    assert.equal(run(6, ['sleep 400', WWW, 'sleep 120', WWW], '180'), true);
+  });
+  it('7: starts on the resolver with a stale answer; rndc flush or enough sleep fixes it, nothing else does', () => {
+    assert.equal(m(7).dev, 'resolver');
+    const net = NQ.createNet(m(7).scenario, m(7).setup), ctx = NQ.makeCtx(net, [], null);
+    assert.equal(NQ.dns.recs(ctx.dig('laptop', 'www.example.test', 'A').msg, 'an')[0].data, '198.18.0.99');
+    assert.equal(run(7, ['rndc flush']), true);
+    assert.equal(run(7, ['sleep 3600']), true);
+    for (const l of ['sleep 100', 'help', AUTH, 'rndc']) assert.notEqual(run(7, [l]), true, l);
+  });
+  it('7: the card says the terminal runs on resolver, and rndc only exists there', () => {
+    assert.match(m(7).goal, /runs <b>on <code>resolver<\/code><\/b>/);
+    assert.equal(NQ.createNet('dns').exec('rndc flush', 'laptop').code, 127);
+  });
+  it('8: the trace must be for www.example.test, and the answer comes from the last such trace', () => {
+    const TR = 'dig +trace www.example.test';
+    assert.notEqual(run(8, ['dig +trace nosuch.test'], 'ns1.example.test'), true);
+    assert.equal(run(8, [TR, 'dig +trace nosuch.test'], 'ns1.example.test'), true);
+    assert.equal(run(8, [TR, 'dig +trace example.test NS'], 'ns1.example.test'), true);
+  });
+  it('4: the check and the answer use the same pair: the last two recursive digs, so a +norecurse one is not a second ask', () => {
+    assert.equal(run(4, [WWW, 'dig +norecurse www.example.test', WWW], '0'), true);
+    assert.match(run(4, [WWW, 'dig +norecurse www.example.test']), /twice/);
+    assert.match(run(4, ['dig +norecurse www.example.test', WWW]), /twice/);
+  });
+  it('3: qr is taught in place, 2: the glue wording says the last reply carried glue too, 7: the card says dig needs @server there', () => {
+    assert.match(plain(m(3).goal), /\bqr\s+marks a reply/);
+    assert.doesNotMatch(plain(m(3).goal), /You know/);
+    assert.match(plain(m(2).goal), /Like the last reply, this one carries/);
+    assert.match(plain([m(7).hint, ...m(7).how].join(' ')), /needs a server with\s+@/);
+  });
+  it('8: only a trace passes, and the last server\'s name is read from its output', () => {
+    assert.equal(run(8, ['dig +trace www.example.test'], 'ns1.example.test'), true);
+    assert.equal(run(8, ['dig www.example.test +trace'], 'NS1.Example.Test.'), true);
+    for (const l of [WWW, ROOT, 'dig +short www.example.test']) assert.notEqual(run(8, [l], 'ns1.example.test'), true, l);
+    for (const a of ['a.nic.test', 'a.root-servers.test', '203.0.113.10']) assert.notEqual(run(8, ['dig +trace www.example.test'], a), true, a);
+    assert.equal(run(8, ['dig +trace www.example.test'], ''), NQ.ASK);
+  });
+  it('4: the card text has no standalone 0 (it is the answer), and 3: no card names the flag it asks for', () => {
+    assert.ok(!toks(text(m(4))).includes('0') && !toks(text(m(4))).includes('zero'));
+    assert.ok(!toks(text(m(3))).includes('aa'));
+  });
+  it('1: the card teaches rd together with the warning, and ra first appears in 3', () => {
+    assert.match(plain(m(1).goal), /\brd\s+means recursion desired/);
+    assert.match(plain(m(1).goal), /warning/);
+    assert.match(plain(m(3).goal), /\bra\s+means recursion available/);
+  });
+  it('6: the card says the practice shell skips the wait, and tells the DNS TTL from the packet TTL', () => {
+    assert.match(plain(m(6).goal), /practice shell skips the wait/);
+    assert.match(plain(m(6).goal), /TTL of a packet from chapter 1/);
+  });
+  it('every mission still works after Reset: a reset net replays the same setup', () => {
+    for (const x of NQ.CH[6].missions) {
+      const net = NQ.createNet(x.scenario, x.setup), before = JSON.stringify(net.devices);
+      for (const l of x.answer) net.exec(l, x.dev);
+      net.reset();
+      assert.equal(JSON.stringify(net.devices), before, x.title);
+    }
+  });
+});
+
 // Teach before use: a term may appear in a mission's goal or how steps only from the mission that introduces it on.
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
@@ -789,12 +928,13 @@ describe('chapters, ranks, quick-fire and guide', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
     for (const ch of NQ.CH) assert.ok(ch.name && ch.badge && ch.intro && ch.learned.length && ch.missions.length);
   });
-  it('seven ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
+  it('eight ranks, strictly increasing, the top one at exactly the XP of every mission', () => {
     const total = NQ.CH.reduce((n, c) => n + c.missions.length, 0) * NQ.XP;
-    assert.equal(total, 410);
-    assert.equal(NQ.RANKS.length, 7);
+    assert.equal(total, 500);
+    assert.equal(NQ.RANKS.length, 8);
     assert.deepEqual([...NQ.RANKS[0]], [0, 'Packet Rookie']);
     assert.deepEqual([...NQ.RANKS[5]], [360, 'Name Finder']);
+    assert.deepEqual([...NQ.RANKS[6]], [460, 'Cache Keeper']);
     assert.deepEqual([...NQ.RANKS.at(-1)], [total, 'Packet Whisperer']);
     for (let i = 1; i < NQ.RANKS.length; i++) assert.ok(NQ.RANKS[i][0] > NQ.RANKS[i - 1][0]);
     assert.equal(NQ.XP, 10);
@@ -802,7 +942,7 @@ describe('chapters, ranks, quick-fire and guide', () => {
   it('the ranks are spread over the course: none before the first chapter is done, only the top one in the last 30 XP', () => {
     const ends = []; let n = 0;
     for (const c of NQ.CH) { n += c.missions.length * NQ.XP; ends.push(n); }
-    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 360, 410]);
+    assert.deepEqual([...NQ.RANKS.map((r) => r[0])], [0, 80, 190, 250, 290, 360, 460, 500]);
     assert.ok(NQ.RANKS[1][0] >= ends[0]);
     assert.ok(NQ.RANKS.slice(0, -1).every((r) => r[0] <= ends.at(-1) - 30));
   });
@@ -843,6 +983,29 @@ describe('chapter 6: quick-fire and field guide', () => {
     const LATER = /\+norecurse|\+trace|rndc|\bcache|DNS TTL|authoritative|referral|\bglue\b|\brecursi|root server|\bTLD\b|@server|\bsleep\b/i;
     for (const q of qf) assert.doesNotMatch(plain([q.c, q.a, ...q.w, q.why].join(' ')), LATER, q.c);
     for (const g of guide) assert.doesNotMatch(plain([g.c, g.what, ...g.ex.flat()].join(' ')), LATER, g.c);
+  });
+});
+
+describe('chapter 7: quick-fire and field guide', () => {
+  const qf = NQ.QF.filter((q) => q.ch === 6), guide = NQ.GUIDE.filter((g) => g.ch === 6);
+  it('has six quick-fire questions and four guide entries that run on the dns network', () => {
+    assert.equal(qf.length, 6);
+    assert.equal(guide.length, 4);
+    for (const g of guide) assert.equal(g.sc, 'dns', g.c);
+  });
+  it('the flag aa is only named in chapter 7 entries', () => {
+    for (const q of NQ.QF) if (/\baa\b/.test(plain([q.c, q.a, ...q.w, q.why].join(' ')))) assert.equal(q.ch, 6, q.c);
+    for (const g of NQ.GUIDE) if (/\baa\b/.test(plain([g.c, g.what, ...g.ex.flat()].join(' ')))) assert.equal(g.ch, 6, g.c);
+  });
+  it('no guide entry gives the answer of a chapter 7 mission', () => {
+    const answers = NQ.CH[6].missions.filter((x) => x.question).flatMap((x) => solve(x).all);
+    assert.ok(answers.length >= 8);
+    // a bare 0 is a number every traceroute guide line has; it is checked on the chapter 7 entries only
+    for (const g of NQ.GUIDE) for (const a of answers.filter((x) => x !== '0' || g.ch === 6)) assert.ok(!leaks([g.c, g.what, ...g.syn.flatMap(([t, , l]) => [t, l || '']), ...g.ex.flat()].join(' '), a), `"${a}" in guide "${g.c}"`);
+  });
+  it('the rndc example runs on the resolver, where the command exists', () => {
+    const ex = guide.flatMap((g) => g.ex).find(([line]) => /^rndc/.test(line));
+    assert.equal(ex[2], 'resolver');
   });
 });
 

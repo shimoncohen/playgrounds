@@ -116,7 +116,7 @@ programming/            the Programming section: index.html (hub with a card per
   script-quest/ python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
-  net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, six chapters, ranks, quick-fire, guide), ui.js + inspector.js
+  net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, seven chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
   rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js + memview.js
   shell-quest/          split by job (below)

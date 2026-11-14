@@ -69,6 +69,21 @@ const FIRST = {
   SERVFAIL: [/SERVFAIL/, 5, 7],
   REFUSED: [/REFUSED/, 5, 7],
   resolvectl: [/resolvectl/, 5, 8],
+  recursive: [/\brecursi/i, 6, 0],
+  'root server': [/root server/i, 6, 0],
+  '@server': [/@(?:server|\d)/, 6, 1],
+  referral: [/\breferral/i, 6, 1],
+  rd: [/\brd\b/, 6, 1],
+  TLD: [/\bTLD\b/, 6, 2],
+  glue: [/\bglue\b/i, 6, 2],
+  authoritative: [/authoritative/i, 6, 3],
+  ra: [/\bra\b/, 6, 3],
+  'DNS cache': [/\bcache/i, 6, 4],
+  '+norecurse': [/\+norecurse/, 6, 5],
+  'DNS TTL': [/DNS TTL/, 6, 6],
+  sleep: [/\bsleep\b/, 6, 6],
+  'rndc flush': [/rndc/, 6, 7],
+  '+trace': [/\+trace/, 6, 8],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
@@ -256,6 +271,48 @@ describe('chapter 6 defines its new words in place', () => {
   });
 });
 
+describe('chapter 7 does not use words that nothing has taught', () => {
+  const LATER = /\bTCP\b|DNSSEC|\bEDNS\b|\bPTR\b|zone transfer|\bDHCP\b|\bVLAN\b|wildcard|\bBIND\b/i;
+  NQ.CH[6].missions.forEach((m, i) => it(`7.${i + 1} ${m.title}`, () => assert.ok(!LATER.test(cardText(m)), 'uses a term nothing has taught')));
+  it('the chapter intro', () => assert.ok(!LATER.test(plain(NQ.CH[6].intro))));
+});
+
+describe('chapter 7 defines its new words in place', () => {
+  const card = (i) => NQ.CH[6].missions[i].goal + ' ' + NQ.CH[6].missions[i].how.join(' ');
+  it('recursive and root server are defined in 7.1', () => {
+    assert.match(card(0), /<b>recursive<\/b> resolver does the whole search/);
+    assert.match(card(0), /<b>root server<\/b>: a server that knows/);
+  });
+  it('referral and rd are defined in 7.2, and the warning is mentioned', () => {
+    assert.match(card(1), /<b>referral<\/b>: not an answer but a pointer/);
+    assert.match(plain(card(1)), /\brd\s+means recursion desired/);
+    assert.match(plain(card(1)), /prints a warning/);
+  });
+  it('TLD and glue are defined in 7.3', () => {
+    assert.match(card(2), /<b>TLD<\/b> server, short for top-level domain/);
+    assert.match(card(2), /<b>glue<\/b>/);
+  });
+  it('authoritative and ra are defined in 7.4, by contrast with the resolver\'s reply', () => {
+    assert.match(card(3), /<b>authoritative<\/b> for/);
+    assert.match(plain(card(3)), /\bra\s+means recursion available/);
+  });
+  it('the DNS cache, +norecurse, the DNS TTL and rndc flush are defined where they first appear (7.5 to 7.8)', () => {
+    assert.match(card(4), /<b>DNS cache<\/b>: its memory of answers/);
+    assert.match(plain(card(5)), /\+norecurse is the option/);
+    assert.match(card(6), /<b>DNS TTL<\/b>, short for time to live/);
+    assert.match(plain(card(7)), /rndc controls a name server/);
+  });
+  it('the terminal device is announced where it is not the laptop (7.8)', () => {
+    assert.match(card(7), /runs <b>on <code>resolver<\/code><\/b>/);
+  });
+  it('the flag aa is never written on a card before chapter 7 ends, because 7.4 asks for it', () => {
+    for (const x of flat) assert.ok(!/\baa\b/.test(x.text), `${x.ci}.${x.mi} names the flag`);
+  });
+  it('the chapter introduces nothing in its intro that a mission teaches later', () => {
+    for (const [term, [re, ci, mi]] of Object.entries(FIRST)) if (ci === 6 && mi > 0) assert.ok(!re.test(plain(NQ.CH[6].intro)), term);
+  });
+});
+
 describe('quick-fire and guide are gated to a chapter that exists', () => {
   it('every entry names a chapter', () => {
     for (const q of NQ.QF) assert.ok(Number.isInteger(q.ch) && NQ.CH[q.ch], q.c);
@@ -293,7 +350,7 @@ describe('help lists only the commands taught so far', () => {
   });
   it('by the last mission every command is listed', () => {
     const last = NQ.CH.at(-1), m = last.missions.at(-1), dev = NQ.session(m).net.devices[m.dev || NQ.session(m).net.me];
-    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), Object.keys(NQ.CMDS).filter((n) => n !== 'sleep' && (!NQ.AVAIL[n] || NQ.AVAIL[n](dev))).sort());
+    assert.deepEqual(helpAt(NQ.CH.length - 1, last.missions.length - 1), Object.keys(NQ.CMDS).filter((n) => !NQ.AVAIL[n] || NQ.AVAIL[n](dev)).sort());
   });
   it('chapter 6: dig is not listed before 5.0, resolvectl not before 5.8, and sleep through the whole chapter', () => {
     assert.ok(!helpAt(4, 6).includes('dig'));
@@ -301,6 +358,14 @@ describe('help lists only the commands taught so far', () => {
     for (let i = 0; i < 8; i++) assert.ok(!helpAt(5, i).includes('resolvectl'), String(i));
     assert.ok(helpAt(5, 8).includes('resolvectl'));
     for (let i = 0; i < 9; i++) assert.ok(!helpAt(5, i).includes('sleep'), String(i));
+  });
+  it('chapter 7: sleep is not listed before 6.6, and rndc not before 6.7, where it is listed only on the resolver', () => {
+    for (let i = 0; i < 5; i++) assert.ok(!helpAt(6, i).includes('sleep'), String(i));
+    assert.ok(helpAt(6, 5).includes('sleep') === false && helpAt(6, 6).includes('sleep'));
+    for (let i = 0; i < 7; i++) assert.ok(!helpAt(6, i).includes('rndc'), String(i));
+    assert.ok(helpAt(6, 7).includes('rndc'));
+    assert.ok(!helpAt(6, 8).includes('rndc'), 'the laptop has no rndc');
+    assert.ok(helpAt(6, 8).includes('sleep'));
   });
   it('a locked command still runs: help only hides it', () => {
     assert.equal(NQ.session(NQ.CH[0].missions[0]).run('ipcalc 10.0.0.0/24').code, 0);
