@@ -6,10 +6,12 @@ import { loadAgent } from './harness.mjs';
 
 const AQ = loadAgent();
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-// everything a learner reads on a mission card (the answer key is not teaching text)
-const cardText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
+// teaching text: what a learner reads before solving (not the hint or the explain, which show only later, nor the answer key)
+const cardText = (m) => plain([m.title, m.goal, ...(m.how || [])].join('\n'));
+// use text: everything a learner can read on the card, hint and explain included
+const useText = (m) => plain([m.title, m.goal, m.hint, m.explain, ...(m.how || [])].join('\n'));
 const flat = [];
-AQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
+AQ.CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: useText(m), teach: cardText(m) })));
 const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && x.mi < mi));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches it or defines it in place (its own card may use it)]
@@ -75,6 +77,14 @@ const FIRST = {
   'mail tools': [/\bmail\.(?:read|search)\b/, 18, 1],
   // chapter 21 (index 20): 21.2 says a line hidden with # is still in the file and still counted
   'comment out': [/\bcomment(?:ed)?[ -]out\b/i, 20, 1],
+  model: [/\bmodel:|\b(?:bigger|big|small|smaller|large|larger) models?\b|\bmodel size\b/i, 1, 4],
+  changelog: [/\bchange-?log/i, 2, 0],
+  root: [/\broot\b/i, 3, 1],
+  deploy: [/\bdeploy/i, 5, 0],
+  'package.json': [/package\.json/, 8, 0],
+  'git push': [/\bgit push\b|\bpush(?:ing|es)? (?:straight |directly )?(?:to|onto) (?:`?main|origin|a branch|its own branch)|\bgit push/i, 8, 2],
+  origin: [/\borigin\b/, 8, 2],
+  lint: [/\blint/i, 10, 0],
   // chapter 22 (index 21): 22.3 defines the Extra field in place
   'Extra:': [/\bExtra:/, 21, 2],
 };
@@ -87,7 +97,7 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
     it(`is not used before ${ci}.${mi}, where it is introduced`, () => {
       for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.teach)), `${ci}.${mi} should be where "${term}" is introduced`);
     });
     it('is not used in quick-fire or the field guide before its chapter', () => {
       for (const x of extras()) if (x.ch < ci) assert.ok(!re.test(x.text), `${x.where} for chapter ${x.ch + 1} uses "${term}" before chapter ${ci + 1}`);
@@ -97,7 +107,7 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
 
 describe('verbs no chapter 1 mission uses are not taught yet', () => {
   it('call and send appear as code nowhere in chapter 1 text', () => {
-    const raw = [...AQ.CH[0].missions.flatMap((m) => [m.goal, m.explain, m.hint, ...m.how]), ...AQ.QF.filter((q) => q.ch === 0).flatMap((q) => [q.c, q.a, ...q.w, q.why]), ...AQ.GUIDE.filter((g) => g.ch === 0).flatMap((g) => [g.what, ...g.ex.flat()])].join('\n');
+    const raw = [...AQ.CH[0].missions.flatMap((m) => [m.goal, m.hint, ...m.how]), ...AQ.QF.filter((q) => q.ch === 0).flatMap((q) => [q.c, q.a, ...q.w, q.why]), ...AQ.GUIDE.filter((g) => g.ch === 0).flatMap((g) => [g.what, ...g.ex.flat()])].join('\n');
     assert.doesNotMatch(raw, /<code>(?:call|send)<\/code>/);
   });
 });

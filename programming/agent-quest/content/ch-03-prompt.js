@@ -15,7 +15,7 @@ AQ.CH.push({
   missions:[
     {
       title:'Show, do not describe',scenario:'changelog',kind:'prompt',fields:EXAMPLES,
-      goal:'Dana\'s note is smudged, so Cog cannot guess its style. The agent must add a changelog entry for the rounding fix, in the same style as the entries the project already has. Words are a poor way to describe a format, so show it one: point the agent at a file that already has the right style. Look in <code>docs/</code> for the sample.',
+      goal:'Dana\'s note is smudged, so Cog cannot guess its style. The agent must add a changelog entry for the rounding fix (a <b>changelog</b> is the list of what changed in each release), in the same style as the entries the project already has. Words are a poor way to describe a format, so show it one: point the agent at a file that already has the right style. Look in <code>docs/</code> for the sample.',
       how:[
         'The line <code>Examples: docs/changelog-sample.md</code> shows the agent a finished sample, and it copies the format of that sample.',
         '<code>Examples:</code> is the field for sample files. Separate several paths with commas.',

@@ -78,7 +78,7 @@ AQ.CH.push({
     },
     {
       title:'Pick a cheaper helper',scenario:'delegate',kind:'config',prompt:BASE+'\nDone when: run npm test',
-      goal:'Cog can call in a little helper for errands. A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. A bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
+      goal:'Cog can call in a little helper for errands. A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. The <b>model</b> is the AI that helper runs on, and a bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
       how:[
         'Changing <code>model: large</code> to <code>model: small</code> in <code>.claude/agents/helper.md</code> cuts the helper\'s cost from 10 units to 1, and the helper stays.',
         '<code>name: helper</code> is the helper\'s name. Leave it as it is, or the helper is gone.',

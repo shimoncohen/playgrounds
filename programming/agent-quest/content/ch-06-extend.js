@@ -16,7 +16,7 @@ AQ.CH.push({
   missions:[
     {
       title:'A rule the agent cannot argue with',scenario:'deploy',kind:'config',prompt:CHECKED,facts:['hooks'],
-      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
+      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. That command publishes the code to the live shop, which cannot be undone. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
       how:[
         'The line <code>before run npm run deploy</code> in <code>.claude/hooks.txt</code> stops the agent from running that command, whatever its plan says.',
         '<code>before</code> means the check happens ahead of the action.',
@@ -83,7 +83,8 @@ AQ.CH.push({
         'Setting <code>finder</code> to <code>model: small</code> and <code>architect</code> to <code>model: standard</code> costs 1 and 3 units, which is 4 in total and under the limit.',
         '<code>finder</code> only searches, so the smallest model does it well.',
         '<code>architect</code> makes hard calls, so it keeps a stronger model than the smallest.',
-        'The total is the sum over all subagents: the most a run could cost if it used every helper.'
+        'The total is the sum over all subagents: the most a run could cost if it used every helper.',
+        'A <b>plugin</b> bundles skills, subagents, hooks and MCP servers so they install as one unit. This practice only has files to edit, so plugins are text only here.'
       ],
       explain:'Cost grows with the model size, so give each helper the smallest model that can still do its job. Simple lookups go to a small model. Hard thinking should not. A saving that wrecks quality is not a saving. A plugin bundles skills, subagents, hooks and MCP servers so they install as one unit; this practice only has files to edit, so plugins are text only here.',
       hint:'Edit both files in <code>.claude/agents/</code>. The helper that only searches can go smallest, and the one that designs should not.',

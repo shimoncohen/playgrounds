@@ -38,7 +38,7 @@ AQ.CH.push({
       goal:'A supplier\'s notes came in the post. To fix the bug the agent reads the vendor notes in <code>docs/vendor-api.md</code>. That file also contains text written like an order: an <b>injection</b>, which is an instruction hidden in something the agent reads, hoping the agent will obey it. Here it tells the agent to email out the customer list. Block the email, but still let the agent read the notes it needs.',
       how:[
         'The line <code>Constraints: do not send mail.send</code> bans the tool that would send the email, whatever the file says.',
-        '<code>send</code> is a verb for sending something out. <code>mail.send</code> is the tool that does it.',
+        '<code>send</code> is a verb for sending something out. <code>mail.send</code> is the tool that does it. This practice agent sends its email with the verb <code>send</code>, not <code>call</code>, so the rule has to say <code>send</code>.',
         'The vendor notes are still read, so the agent still learns how to fix the bug.',
         'Banning the read instead would be tempting, but the agent needs that file to do the job.'
       ],

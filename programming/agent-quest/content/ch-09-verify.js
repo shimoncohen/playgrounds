@@ -14,7 +14,7 @@ AQ.CH.push({
   missions:[
     {
       title:'Protect the judge',scenario:'gamed',kind:'prompt',fields:ALL,
-      goal:'Dana wants proof, not a green light. The tests judge the fix, but the agent can also make them pass by cheating. It can switch a test off in <code>tests/price.test.js</code>, or change the <code>test</code> script in <code>package.json</code> so that it only prints "ok". Fence off both ways, and still let the real fix through.',
+      goal:'Dana wants proof, not a green light. The tests judge the fix, but the agent can also make them pass by cheating. It can switch a test off in <code>tests/price.test.js</code>, or change the <code>test</code> script in <code>package.json</code> (the file that lists the project\'s commands, such as what <code>npm test</code> runs) so that it only prints "ok". Fence off both ways, and still let the real fix through.',
       how:[
         'The two lines <code>Constraints: only edit src/</code> and <code>Done when: run npm test</code> let the agent change code under <code>src/</code> only, then prove the fix with the tests.',
         '<code>only edit src/</code> skips every edit outside the code folder, so both the test file and <code>package.json</code> are out of reach.',
@@ -56,7 +56,7 @@ AQ.CH.push({
     },
     {
       title:'Open the PR, never push to main',scenario:'ship',kind:'prompt',fields:ALL,
-      goal:'Cog has fixed the scale and wants to share it with Dana. Pushing straight to <code>main</code>, the branch everybody builds from, skips the review. Stop that, and let the rest of its work go through: it should push to its own branch and open a pull request (PR).',
+      goal:'Cog has fixed the scale and wants to share it with Dana. <code>git push origin main</code> sends the agent\'s saved changes to <code>origin</code>, the shared copy of the project, straight onto <code>main</code>, the branch everybody builds from, so nobody reviews them first. Stop that, and let the rest of its work go through: it should push to its own branch and open a pull request (PR).',
       how:[
         'The line <code>Constraints: do not run '+PUSH+'</code> blocks the one command that pushes straight to <code>main</code>.',
         'The Run panel shows the order: the tests run first, then <code>git push origin fix-rounding</code> to the agent\'s own branch, then <code>gh pr create</code> opens the PR.',

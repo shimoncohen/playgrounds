@@ -32,7 +32,7 @@ AQ.CH.push({
     },
     {
       title:'Rules where the code lives',scenario:'legacy',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'Mr. Ledbury\'s old billing code lives in its own corner of the shop. The root <code>CLAUDE.md</code> is read on every run, in every folder, so a rule about one folder costs tokens everywhere. A memory file can also live inside the folder it is about. This is <b>folder memory</b>: the agent loads it once it reads a file there. Two such files are waiting, in <code>src/</code> and in <code>docs/</code>. Put the legacy rule where it belongs.',
+      goal:'Mr. Ledbury\'s old billing code lives in its own corner of the shop. The root <code>CLAUDE.md</code>, the one in the project\'s top folder, is read on every run, in every folder, so a rule about one folder costs tokens everywhere. A memory file can also live inside the folder it is about. This is <b>folder memory</b>: the agent loads it once it reads a file there. Two such files are waiting, in <code>src/</code> and in <code>docs/</code>. Put the legacy rule where it belongs.',
       how:[
         'The line <code>do not edit src/legacy/</code> in <code>src/CLAUDE.md</code> works like the same rule in the root file, but only costs tokens when the agent works in <code>src/</code>.',
         '<code>src/CLAUDE.md</code> is the folder memory file for <code>src/</code>. The agent loads it the first time it reads a file inside that folder.',
