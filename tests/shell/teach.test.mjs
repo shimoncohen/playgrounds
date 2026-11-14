@@ -20,8 +20,12 @@ const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, ''
 const cardText = (m, hint) => plain([m.title, m.goal, m.note, hint && m.hint, m.explain, ...(m.how || []), ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || '')),
   ...(m.steps || []).map((s) => [s.title, s.goal, hint && s.hint, s.explain, ...(s.how || [])].join(' '))].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) })));
-const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && x.mi < mi));
+CH.forEach((c, ci) => {
+  flat.push({ ci, mi: -1, text: plain(c.intro) });
+  c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) }));
+});
+/* a chapter intro is the first card of its chapter: it counts as before every mission but the first, whose card it may explain */
+const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && (x.mi >= 0 ? x.mi < mi : mi > 0)));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches it or defines it in place (its own card may use it)]
 const FIRST = {
@@ -62,6 +66,27 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   });
 }
 
+// item -> [chapter, mission (0-based), regex for the explanation]. It must sit in what the learner reads before solving
+// (title, goal, note, how steps, and for a chapter's first mission its intro); explain and hints do not count.
+const pre = (ci, mi) => {
+  const m = CH[ci].missions[mi];
+  return plain([mi === 0 && CH[ci].intro, m.title, m.goal, m.note, ...(m.how || [])].filter(Boolean).join('\n'));
+};
+const EXPLAINED = {
+  '<': [12, 5, /<\s+is the opposite of\s+>[^.]*\binput\b/],
+  'awk: what': [15, 0, /\bawk\b[^.]*\bsplits each line into fields\b/],
+  'awk: why not cut': [15, 0, /\bUnlike cut, awk\b[^.]*\bsums\b[^.]*\btests\b/],
+  group: [9, 0, /\bgroup\b[^.]*\bset of users\b/],
+  sleep: [16, 1, /\bsleep 30\b[^.]*\bdoes nothing\b[^.]*\bslow job\b/],
+  set: [18, 0, /\bset\b[^.]*\bon with -[^.]*\boff with \+/],
+  'quoting the sed script': [7, 2, /\bQuote\b[^.]*\bsed script\b[^.]*\bbash\b/],
+  'streams': [10, 0, /\bstreams\b[^.]*\bnormal output\b[^.]*\berrors\b/],
+  '/dev/null': [10, 0, /\/dev\/null\b[^.]*\bthrows away\b/],
+};
+for (const [term, [ci, mi, def]] of Object.entries(EXPLAINED)) {
+  it(`"${term}" is explained in what ${ci}.${mi} shows before solving`, () => assert.match(pre(ci, mi), def));
+}
+
 describe('terms are defined in place the first time they appear', () => {
   const card = (c, i) => plain(CH[c].missions[i].goal + ' ' + CH[c].missions[i].explain + ' ' + (CH[c].missions[i].how || []).join(' '));
   it('clear (0.1)', () => assert.match(card(0, 1), /clear<\/code> wipes it|clear wipes it/));
@@ -91,16 +116,6 @@ describe('terms are defined in place the first time they appear', () => {
     assert.match(card(18, 0), /false is a command that does nothing and fails with status 1/);
     assert.match(card(18, 6), /true is a command that does nothing and succeeds/);
     assert.match(card(18, 6), /-- in grep -- "\$level" means options end here/);
-  });
-  it('the goal says what each item is before the learner types it (12.5, 15.0, 9.0, 16.1, 18.0, 7.2, 10.0)', () => {
-    const goal = (c, i) => plain(CH[c].missions[i].goal);
-    assert.match(goal(12, 5), /< is the opposite of >: it sends a file into a command's input/);
-    assert.match(goal(15, 0), /awk is a small tool for working with columns of text/);
-    assert.match(goal(9, 0), /A group is a named set of users who can share a file/);
-    assert.match(goal(16, 1), /sleep 30 does nothing for 30 seconds/);
-    assert.match(goal(18, 0), /set turns shell behaviours on with - and off with \+/);
-    assert.match(goal(7, 2), /Quote the sed script so bash passes it to sed untouched/);
-    assert.match(goal(10, 0), /two output channels, normal output \(1\) and errors \(2\)/);
   });
   it('6.5 no longer points at ls -l before 9.0 teaches it', () => {
     assert.doesNotMatch(card(6, 5), /ls -l/);
