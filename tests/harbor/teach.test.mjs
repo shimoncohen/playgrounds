@@ -52,19 +52,6 @@ const FIRST = {
   object: [/\bobjects?\b/, 10, 99, true],
   manifest: [/manifest/i, 11, 1],
   ConfigMap: [/ConfigMap/, 11, 1],
-  '-it': [/(^|\s)-(?:it|ti)\b/, 2, 3],
-  'kubectl run': [/\bkubectl run\b/, 7, 3],
-  '--image': [/--image\b/, 7, 3],
-  '--port': [/--port\b/, 9, 1],
-  'svc/web': [/\bsvc\/\w/, 9, 4],
-  'deployment/web': [/\bdeployments?\/\w/, 10, 0],
-  'nginx=nginx': [/(?<![-\w])\w+=nginx:/, 10, 0],
-  'apply/delete -f': [/\b(apply|delete|create) -f\b/, 11, 2],
-  'edit FILE': [/\bedit \w/, 5, 6],
-  FROM: [/\bFROM\b/, 5, 1],
-  RUN: [/\bRUN\b/, 5, 1],
-  CMD: [/\bCMD\b/, 5, 1],
-  '80/tcp': [/\b\d+\/tcp\b/, 2, 1],
 };
 
 for (const [term, [re, ci, mi, soft]] of Object.entries(FIRST)) {
@@ -75,6 +62,38 @@ for (const [term, [re, ci, mi, soft]] of Object.entries(FIRST)) {
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci + 1} (which teaches it) is done`, () => {
     for (const q of QF) if (re.test(q[0])) assert.ok(q[2] >= ci, `"${q[0]}" needs chapter ${ci}`);
+  });
+}
+
+// item -> [regex for a use, chapter, mission (0-based) that explains it, regex for the explanation]. The explanation must sit in
+// what the learner reads before solving (intro and goal); the after text, hints and chips do not count.
+const pre = m => plain([m.t, m.i, m.g, ...(m.steps || []).map(s => s.g)].filter(Boolean).join('\n'));
+const EXPLAINED = {
+  '&&': [/&&/, 4, 2, /&& means[^.]*\bonly if\b[^.]*\bfirst\b/],
+  '-it': [/(^|\s)-(?:it|ti)\b/, 2, 3, /-i\b[^.]*\bkeyboard\b[^.]*-t\b[^.]*\bterminal\b/],
+  'kubectl run NAME': [/\bkubectl run\b/, 7, 3, /\brun hello\b[^.]*\bnames the pod\b/],
+  '--image': [/--image\b/, 7, 3, /--image=nginx\b[^.]*\bwhich image\b/],
+  '--port': [/--port\b/, 9, 1, /--port=80\b[^.]*\bdoor\b[^.]*\bsame port\b/],
+  'svc/NAME': [/\bsvc\/\w/, 9, 4, /svc\/web\b[^.]*\bservice called web\b/],
+  'LAPTOP:SERVICE ports': [/\b9090:80\b/, 9, 4, /9090:80\b[^.]*\blaptop\b[^.]*\bfirst\b/],
+  'deployment/NAME': [/\bdeployments?\/\w/, 10, 0, /deployment\/web\b[^.]*\bdeployment called web\b/],
+  'CONTAINER=IMAGE': [/(?<![-\w])\w+=nginx:/, 10, 0, /nginx=nginx:1\.27\b[^.]*\bcontainer\b[^.]*\bimage\b/],
+  'apply -f': [/\b(apply|delete|create) -f\b/, 11, 2, /-f\b[^.]*\bnames the file\b/],
+  'delete -f': [/\bdelete -f\b/, 11, 6, /-f\b[^.]*\bnames the file\b/],
+  'edit FILE': [/\bedit \w/, 5, 6, /edit FILE\b[^.]*\beditor\b[^.]*\bSave\b/],
+  FROM: [/\bFROM\b/, 5, 1, /FROM\b[^.]*\bimage to build on\b/],
+  RUN: [/\bRUN\b/, 5, 1, /RUN\b[^.]*\bonce\b[^.]*\bbuild/],
+  CMD: [/\bCMD\b/, 5, 1, /CMD\b[^.]*\beach time a container starts\b/],
+  '80/tcp': [/\b\d+\/tcp\b/, 2, 1, /80\/tcp\b[^.]*\btcp\b[^.]*\bconnection\b/],
+  ConfigMap: [/ConfigMap/, 11, 1, /ConfigMap\b[^.]*\bbundle of settings\b/],
+  layers: [/\blayers?\b/i, 1, 0, /layers?\b[^.]*\bone per step\b/],
+};
+for (const [term, [re, ci, mi, def]] of Object.entries(EXPLAINED)) {
+  test(`"${term}" is not used before ${ci}.${mi}`, () => {
+    for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is explained at ${ci}.${mi}`);
+  });
+  test(`"${term}" is explained in what ${ci}.${mi} shows before solving`, () => {
+    assert.match(pre(CH[ci].missions[mi]), def);
   });
 }
 
@@ -95,7 +114,6 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(3, 6), /ping sends a few tiny test messages/);
   assert.match(m(3, 6), /DNS is the phone book/);
   assert.match(m(4, 1), /echo prints the text you give it/);
-  assert.match(m(4, 2), /&& means "and then, but only if the first command worked"/);
   assert.match(m(4, 3), /docker volume ls lists your volumes/);
   assert.match(m(4, 8), /named settings handed to a program when it starts/);
   assert.match(m(6, 0), /YAML, a simple indented text format/);
@@ -106,16 +124,6 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(9, 1), /NodePort also opens a door on every machine/);
   assert.match(m(9, 1), /ClusterIP, works only inside it/);
   assert.match(m(10, 0), /rolling update/);
-  assert.match(m(2, 3), /-i keeps your keyboard connected to the container and -t gives it a terminal/);
-  assert.match(m(2, 1), /80\/tcp in the PORTS column is door 80 over tcp, the kind of connection web traffic uses/);
-  assert.match(m(5, 1), /FROM picks the image to build on, RUN happens once while building, and CMD runs each time a container starts/);
-  assert.match(m(5, 6), /edit FILE, a small editor that appears on the right/);
-  assert.match(m(7, 3), /kubectl run hello names the pod and --image=nginx says which image/);
-  assert.match(m(9, 1), /--port=80 is the door the service opens/);
-  assert.match(m(9, 4), /svc\/web means "the service called web"; 9090:80 is your laptop's port first/);
-  assert.match(m(10, 0), /nginx=nginx:1\.27 means "the container called nginx should now run image nginx:1\.27"/);
-  assert.match(m(11, 1), /ConfigMap, a named bundle of settings/);
-  assert.match(m(11, 2), /-f names the file to read/);
 });
 
 test('puzzle intros gloss the YAML and Compose keys they use', () => {
