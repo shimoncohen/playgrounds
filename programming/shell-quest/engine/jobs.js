@@ -199,6 +199,13 @@ function* run(node,ctx){let r;const ls=loneSub(node);
 
 /* ---------- spawning ---------- */
 const forkErr=()=>Object.assign(new Error(SQ.FORK_MSG),{raw:true,code:1,fork:true});
+/* bash looks the command up in the background process, so a job killed first never reports a typo; tag it now so a mission check still sees it */
+function tagNotFound(node){
+  if(node.type!=='andor'||node.rest.length||SQ.rt.slice||!SQ.rt.log)return;
+  const P=node.first,c=P.cmds.length===1?P.cmds[0]:null;if(!c||c.type!=='simple'||!c.words.length)return;
+  const name=c.words[0].raw;
+  if(!/^[A-Za-z][\w.+-]*$/.test(name)||own(SQ.CMDS,name)||SQ.hasFunction(name)||/^(break|continue|local|return)$/.test(name))return;
+  SQ.rt.log.push({name,args:[],globbed:false,piped:false,redirect:null,errRedirect:null,code:127,out:'',nf:true})}
 function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   if(rt.jobs.filter(isLive).length>=MAX_JOBS)throw forkErr();
   const pid=SQ.newPid(),ownerNode=rt.scopeNode,owner=ownerNode.id,start=SQ.now();
@@ -211,6 +218,7 @@ function spawn(node,env,src){const rt=SQ.rt;env=env||{};
     desc:null,endSeq:0,waited:false,told:false,stopSig:0,waitReq:null,fdTab:rt.fdTab,fdOwn:false});
   J.cur=J.seq; /* the newest job is the current one (%+) */
   J.gen=run(node,{depth:J.depth,tty:!!env.tty,record:false,stdin:null,loops:0,job:J});
+  tagNotFound(node);
   rt.jobs.push(J);rt.bang=pid; /* $! of the shell that started it (J itself keeps its parent's $!, copied above) */
   /* ps: a lone simple command shows as itself (sleep 30), anything else as the subshell running it (bash) */
   const one=node.type==='andor'&&!node.rest.length&&node.first.cmds.length===1&&node.first.cmds[0].type==='simple';

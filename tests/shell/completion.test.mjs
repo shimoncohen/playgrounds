@@ -103,8 +103,7 @@ describe('a command-not-found line never completes a mission', () => {
         // a & sends the pipeline to the background, where its errors arrive later: only the plain prefix applies
         const bg = /(?<!&)&(?!&)/.test(solve);
         const variants = bg ? [`nosuchcmd; ${solve}`] : [`nosuchcmd | ${solve}`, `${solve}; nosuchcmd`];
-        // a typo'd background command that is killed before it ever ran (Sleep 100 & kill %1) is not seen as not found: known gap
-        if (!bg && word && SQ.CMDS && SQ.CMDS[word[1]]) variants.push(ucFirst(solve));
+        if (word && SQ.CMDS && SQ.CMDS[word[1]]) variants.push(ucFirst(solve));
         for (const v of variants) {
           SQ = worldBefore(idx, mi);
           run(SQ, v);

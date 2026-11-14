@@ -659,3 +659,18 @@ describe('more of jobs/wait/kill (Task 12b)', () => {
     assert.equal(runN(SQ, 'bash s.sh').out, 'in\nst=0');
   });
 });
+
+describe('a mistyped background command is tagged not found even when it is killed before it runs', () => {
+  const SQ = loadShell();
+  it('Sleep 100 & kill %1 prints what bash prints and logs a not-found', () => {
+    const r = runN(SQ, 'Sleep 100 & kill %1');
+    assert.equal(r.out, '[1] 1235\n[1]+  Terminated              Sleep 100');
+    assert.ok(SQ.rt.log.some((e) => e.nf && e.name === 'Sleep'));
+  });
+  it('a real command, a function and a variable-built name are not tagged', () => {
+    for (const l of ['sleep 100 & kill %1', 'f() { :; }; f & kill %1', 'c=sleep; $c 100 & kill %1']) {
+      runN(SQ, l);
+      assert.equal(SQ.rt.log.some((e) => e.nf), false, l);
+    }
+  });
+});
