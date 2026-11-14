@@ -8,8 +8,7 @@ const arp=(op,sha,spa,tha,tpa)=>({name:'ARP',fields:{op,sha,spa,tha,tpa}});
 const ipv4=(src,dst,ttl,proto)=>({name:'IPv4',fields:{src,dst,ttl,proto}});
 const icmp=(type,id,seq)=>({name:'ICMP',fields:{type,id,seq}});
 const udp=(sport,dport)=>({name:'UDP',fields:{sport,dport}});
-/* flat scalars, so the inspector lists them as they are: records are an1..an3, ns1..ns2, ar1..ar2 as 'name ttl IN TYPE data';
-   ENC.DNS reads as many of each as ancount, nscount and arcount say */
+/* flat scalars for the inspector; records are an1.., ns1.., ar1.. as 'name ttl IN TYPE data', as many as the counts say */
 const dns=fields=>({name:'DNS',fields});
 const RR=/^(\S+) (\d+) IN (\S+) (.+)$/;
 const parseRR=s=>{const m=RR.exec(s);return m&&{name:m[1],ttl:+m[2],type:m[3],data:m[4]};};

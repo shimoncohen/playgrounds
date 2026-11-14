@@ -260,8 +260,7 @@ const ipRx=(ctx,dev,iface,p,tag)=>{
   }
   log(ctx,dev.id,iface,'rx','delivered: ICMP '+f.type+' from '+ip.src,p);
 };
-/* UDP at its destination device: this session's claim for (device, port) first (an ephemeral port nothing else owns),
-   then the port's service, else a silent drop. A handler returns true once it took the datagram; no ICMP is sent. */
+/* a handler returns true once it took the datagram; an untaken one is dropped with no ICMP */
 const services={};
 const udp={
   listen:(port,fn)=>{services[port]=fn;},
@@ -316,9 +315,7 @@ const lost=ctx=>{
   }
   return any;
 };
-/* run, then settle unanswered ARPs and let idle hooks react (each returns true if it queued work), until nothing is
-   left to do. Each round only adds ICMP errors, which never cause errors of their own, and a hook must use up what it
-   waits on, so this ends; the step limit still caps the whole session. */
+/* idle hooks return true if they queued work; each must use up what it waits on, so this ends (the step limit still caps it) */
 const settle=ctx=>{do run(ctx);while(!ctx.limited&&[lost(ctx),...ctx.idle.map(h=>h(ctx))].some(Boolean));};
 
 const int=(v,lo,hi,what)=>{
