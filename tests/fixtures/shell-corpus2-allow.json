@@ -272,8 +272,9 @@
     "code": 0
   },
   "x=`echo a b`; echo $x": {
-    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
-    "out": "bash: a: command not found"
+    "reason": "backquote substitution now runs like $( ), as in bash: x gets `a b` and echo prints it (bash 5.2 prints a b)",
+    "out": "a b",
+    "vars": {"x": "a b"}
   },
   "[ -n $UNSET ] && echo weird": {
     "reason": "Stage 3 Task 4: an empty unquoted expansion vanishes instead of passing one empty argument, as in bash",
@@ -337,9 +338,11 @@
     "out": "bash: b: command not found"
   },
   "x=`echo a`; echo $x": {
-    "reason": "Stage 3 Task 4: NAME=value before a command is a prefix assignment, scoped to that command (expanded after the words, exported to it, restored afterwards), as in bash; backquote substitution is still not supported, so the first word x=`echo is the prefix and the next word runs as the command",
-    "out": "bash: a`: command not found"
+    "reason": "backquote substitution now runs like $( ), as in bash: x gets `a` and echo prints it (bash 5.2 prints a)",
+    "out": "a",
+    "vars": {"x": "a"}
   },
+
   "x=\"a  b\"; echo $x": {
     "reason": "Stage 3 Task 4: an unquoted expansion ($var, ${..}, $( ), $(( )), $@) is split on IFS and the fields are globbed, as in bash",
     "out": "a b"
@@ -1520,5 +1523,17 @@
   "help": {
     "reason": "Stage 3 Task 20: help lists the commands by tier, Beginner to Expert (awk, sed -i, tac/nl/paste/comm, jobs/wait/kill/trap, getopts, mktemp, ...), so the learner can find the Stage 2 and Stage 3 commands",
     "out": "Commands in this practice shell, by tier:\nBeginner\n  Look around   pwd  ls  cd  tree  cat\n  Create        mkdir  touch  echo\n  Organize      cp  mv  rm  rmdir\n  Read          head  tail  wc  grep  sort  uniq\n  Search        find\n  Scripts       NAME=value  chmod  bash  ./file  for … do … done\nIntermediate\n  Text          cut  tr  sed  tee  printf  seq  diff  xargs\n  Quoting       $( )  '…'  \"…\"  export  env  printenv  $?\n  Streams       2>  2>&1  /dev/null\n  Files         ln -s  stat  chmod 755  basename  dirname  realpath\n  Lookup        which  type  command -v\nAdvanced\n  Decisions     if  case  [ ]  [[ ]]  test  true  false\n  Loops         while  until  for  break  continue  $(( ))  (( ))\n  Functions     name() { … }  local  return  shift  $1  $@  $#\n  Scripts       nano  read  source  exit  unset  readonly  <<EOF\nExpert\n  awk & sed     awk  sed -n -i -E  grep -E -o -w -r -A -B\n  More text     tac  nl  paste  comm  find -exec  xargs -I -P  <( )\n  Processes     ps  sleep  &  $!  jobs  wait  kill  trap  timeout\n  Safe scripts  set -euo pipefail  set -x  getopts  mktemp\nOther           history  clear  whoami  hostname  date  man <command>\nSymbols:  |  >  >>  <  &&  ||  ;  &  *  ?  ~  .  ..\nTry: man awk"
+  },
+  "echo `echo bt`": {
+    "reason": "backquote substitution now runs like $( ), as in bash (bash 5.2 prints bt)",
+    "out": "bt"
+  },
+  "echo \"`echo bt`\"": {
+    "reason": "backquote substitution now runs like $( ) inside double quotes, as in bash (bash 5.2 prints bt)",
+    "out": "bt"
+  },
+  "cat <<EOF\n`echo bt`\nEOF": {
+    "reason": "backquote substitution now runs in an unquoted here-document, as in bash (bash 5.2 prints bt)",
+    "out": "bt"
   }
 }

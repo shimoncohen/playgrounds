@@ -9,7 +9,7 @@ const BUILTIN_VARS=()=>({HOME,USER:'explorer',SHELL:'/bin/bash',HOSTNAME:'baseca
 /* Variables live in S.vars; a function's `local` saves the outer value in its frame's locals and puts it back on return (dynamic scope).
    S.vars is a plain object: every lookup is an own-property test (own) so `constructor` or `toString` read as unset, and `__proto__` is refused as a name (badName). */
 function getVar(k){const f=SQ.frame();
-  if(k==='?')return String(S.last);if(k==='$')return '1234';
+  if(k==='?')return String(CTX.lastSub===null?S.last:CTX.lastSub);if(k==='$')return '1234';
   if(k==='!')return SQ.rt.bang==null?'':String(SQ.rt.bang); /* the newest job this shell started (jobs.js; per shell, see interp.js copyShell) */
   if(k==='BASHPID')return SQ.rt.slice?String(SQ.rt.slice.pid):'1234'; /* a job's own pid inside it (kill $BASHPID); else the shell's, also in a subshell (procs.js) */
   if(k==='PPID')return String(SQ.PPID);
@@ -71,6 +71,33 @@ const unsup=x=>Object.assign(new Error('this practice shell does not support '+x
    EXP_NEST levels they stop with the parser's nesting error (status 2) instead of overflowing the JS stack. */
 const EXP_NEST=100;let expDepth=0;
 function guarded(f){if(expDepth>=EXP_NEST)throw perr(SQ.NEST_DEEP,2);expDepth++;try{return f()}finally{expDepth--}}
+/* `...`: index of the closing backquote (a backslash skips the next character); the body runs as $( ) once a backslash before $ ` \ (and " inside double quotes) is dropped */
+function bqEnd(s,i){for(let j=i+1;j<s.length;j++){if(s[j]==='\\')j++;else if(s[j]==='`')return j}
+  throw new Error("unexpected EOF while looking for matching ``'")}
+function bqBody(raw,dq){let o='';
+  for(let j=0;j<raw.length;j++){const c=raw[j],n=raw[j+1];
+    if(c==='\\'&&n!==undefined){if(n==='\n'){j++;continue}if(n==='$'||n==='`'||n==='\\'||(dq&&n==='"')){o+=n;j++;continue}}
+    o+=c}
+  return o}
+/* $'...': index of the closing quote (a backslash skips the next character); ansiDecode turns the body's backslash escapes into characters as bash does, and stops at \0 */
+function ansiEnd(s,i){for(let j=i+1;j<s.length;j++){if(s[j]==='\\')j++;else if(s[j]==="'")return j}
+  throw new Error("unclosed ' quote. Every opening quote needs a closing one.")}
+const ANSI_ESC={a:'\x07',b:'\b',e:'\x1b',E:'\x1b',f:'\f',n:'\n',r:'\r',t:'\t',v:'\v','\\':'\\',"'":"'",'"':'"','?':'?'};
+function ansiDecode(raw){let o='';
+  for(let j=0;j<raw.length;j++){const c=raw[j];
+    if(c!=='\\'||j+1>=raw.length){o+=c;continue}
+    const n=raw[++j];let m;
+    if(own(ANSI_ESC,n)){o+=ANSI_ESC[n];continue}
+    if((m=/^[0-7]{1,3}/.exec(raw.slice(j)))){j+=m[0].length-1;const v=parseInt(m[0],8)&255;if(v===0)return o;o+=String.fromCharCode(v);continue}
+    if((m=n==='x'?/^x([0-9a-fA-F]{1,2})/.exec(raw.slice(j)):n==='u'?/^u([0-9a-fA-F]{1,4})/.exec(raw.slice(j)):n==='U'?/^U([0-9a-fA-F]{1,8})/.exec(raw.slice(j)):null)){
+      j+=m[0].length-1;const v=parseInt(m[1],16);if(v===0)return o;o+=v>0x10ffff?'\\'+m[0]:String.fromCodePoint(v);continue}
+    if(n==='c'&&j+1<raw.length){const k=raw[++j].toUpperCase().charCodeAt(0)^64;if(k===0)return o;o+=String.fromCharCode(k);continue}
+    o+='\\'+n}
+  return o}
+/* the closing " of a double-quoted string whose text starts at j, or -1: a quote inside a ` ` $( ) or ${ } in it does not end the string */
+function dqEnd(s,j){while(j<s.length&&s[j]!=='"'){const c=s[j];
+    if(c==='\\')j++;else if(c==='`')j=bqEnd(s,j);else if(c==='$'&&s[j+1]==='(')j=scanSub(s,j);else if(c==='$'&&s[j+1]==='{')j=scanBrace(s,j,true);j++}
+  return j<s.length?j:-1}
 /* $(( ... )): index of the final ) of the closing )) (nested parentheses balanced). */
 function scanArith(line,i){let d=0;
   for(let j=i+3;j<line.length;j++){const c=line[j];
@@ -80,10 +107,11 @@ function scanArith(line,i){let d=0;
 function scanBrace(line,i,dq){return guarded(()=>scanBrace0(line,i,dq))}
 function scanBrace0(line,i,dq){let d=1,j=i+2;
   while(j<line.length){const c=line[j];
+    if(c==="'"&&line[j-1]==='$'&&line[j-2]!=='\\'){j=ansiEnd(line,j)+1;continue}
     if(c==="'"&&!dq){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
-    if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;else if(line[j]==='$'&&line[j+1]==='(')j=scanSub(line,j);j++}
-      if(j>=line.length)break;j++;continue}
+    if(c==='"'){j=dqEnd(line,j+1);if(j<0)break;j++;continue}
     if(c==='\\'){j+=2;continue}
+    if(c==='`'){j=bqEnd(line,j)+1;continue}
     if(c==='$'&&line[j+1]==='{'){d++;j+=2;continue}
     if(c==='$'&&line[j+1]==='('){j=scanSub(line,j)+1;continue}
     if(c==='}'){d--;if(d===0)return j}
@@ -108,10 +136,11 @@ function scanSub0(line,i,ps){
     if(c==='\n'&&docs.length){j++;
       for(const doc of docs)while(j<line.length){const e=line.indexOf('\n',j),t=line.slice(j,e<0?line.length:e);j=e<0?line.length:e+1;if((doc.strip?t.replace(/^\t+/,''):t)===doc.w)break}
       docs.length=0;continue}
+    if(c==="'"&&line[j-1]==='$'&&line[j-2]!=='\\'){j=ansiEnd(line,j)+1;continue}
     if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)break;j=k+1;continue}
-    if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;else if(line[j]==='$'&&line[j+1]==='(')j=scanSub(line,j);j++}
-      if(j>=line.length)break;j++;continue}
+    if(c==='"'){j=dqEnd(line,j+1);if(j<0)break;j++;continue}
     if(c==='\\'){j+=2;continue}
+    if(c==='`'){j=bqEnd(line,j)+1;continue}
     if(c==='(')d++;else if(c===')'){d--;if(d===0)return j}
     j++}
   throw new Error("unexpected EOF while looking for matching ')'")}
@@ -160,9 +189,11 @@ function expandStr(s,dq,pat){return guarded(()=>expandStr0(s,dq,pat))}
 function expandStr0(s,dq,pat){let o='',j=0;const Q=(x,q)=>pat&&q?x.replace(/[*?[\]\\]/g,'\\$&'):x;
   while(j<s.length){const c=s[j];
     if(c==="'"&&!dq){const k=s.indexOf("'",j+1);if(k<0){o+=c;j++;continue}o+=Q(s.slice(j+1,k),true);j=k+1;continue}
-    if(c==='"'&&!dq){let k=j+1;while(k<s.length&&s[k]!=='"'){if(s[k]==='\\')k++;k++}
-      if(k>=s.length){o+=c;j++;continue}o+=expandStr(s.slice(j+1,k),true,pat);j=k+1;continue}
+    if(c==='"'&&!dq){const k=dqEnd(s,j+1);
+      if(k<0){o+=c;j++;continue}o+=expandStr(s.slice(j+1,k),true,pat);j=k+1;continue}
     if(c==='\\'&&j+1<s.length){if(dq&&!'$`"\\'.includes(s[j+1]))o+=Q('\\',dq);o+=Q(s[j+1],true);j+=2;continue}
+    if(c==='$'&&s[j+1]==="'"&&!dq){const e=ansiEnd(s,j+1);o+=Q(ansiDecode(s.slice(j+2,e)),true);j=e+1;continue}
+    if(c==='`'){const e=bqEnd(s,j);o+=Q(runSub(bqBody(s.slice(j+1,e),dq)),dq);j=e+1;continue}
     if(c==='$'){
       if(s[j+1]==='('&&s[j+2]!=='('){const e=scanSub(s,j);o+=Q(runSub(s.slice(j+2,e)),dq);j=e+1;continue}
       const d=evalDollar(s,j,false,dq);if(d){o+=Q(d.list?d.list.join(' '):d.val,dq);j=d.end;continue}}
@@ -252,8 +283,9 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
   let noAr=false,noCo=false;
   const span=ar=>{let j=i+2,d=0;if(ar?noAr:noCo)return null;const eof=()=>{if(ar)noAr=true;else noCo=true;return null};
     for(;j<line.length;j++){const c=line[j];
+      if(c==="'"&&line[j-1]==='$'&&line[j-2]!=='\\'){j=ansiEnd(line,j);continue}
       if(c==="'"){const k=line.indexOf("'",j+1);if(k<0)return eof();j=k;continue}
-      if(c==='"'){j++;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\')j++;j++}if(j>=line.length)return eof();continue}
+      if(c==='"'){j=dqEnd(line,j+1);if(j<0)return eof();continue}
       if(c==='\\'){j++;continue}
       if(ar){if(c==='(')d++;else if(c===')'){if(d>0)d--;else if(line[j+1]===')')return {t:'arith',raw:line.slice(i+2,j).trim(),s:i,e:j+2};else return null}}
       else if(c===']'&&line[j+1]===']'&&/\s/.test(line[j-1])&&(j+2>=line.length||/[\s;&|)<>]/.test(line[j+2])))return {t:'cond',raw:line.slice(i+2,j).trim(),s:i,e:j+2}}
@@ -303,6 +335,7 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
     cur=cur||fresh();
     if(c==="'"){const j=line.indexOf("'",i+1);if(j<0)throw new Error("unclosed ' quote. Every opening quote needs a closing one.");cur.v+=line.slice(i+1,j);cur.keep=true;i=j+1;continue}
     if(c==='"'){let j=i+1,s='',atEmpty=false;cur.keep=true;while(j<line.length&&line[j]!=='"'){if(line[j]==='\\'&&j+1<line.length){if(line[j+1]==='\n'){j+=2;continue}if(!'$`"\\'.includes(line[j+1]))s+='\\';s+=line[j+1];j+=2;continue}
+        if(line[j]==='`'){const e=bqEnd(line,j);if(!dry)s+=runSub(bqBody(line.slice(j+1,e),true));j=e+1;continue}
         if(line[j]==='$'&&line[j+1]==='('&&line[j+2]!=='('){const e=scanSub(line,j);if(!dry)s+=runSub(line.slice(j+2,e));j=e+1;continue}
         if(line[j]==='$'){const d=evalDollar(line,j,dry,true);if(d){
           if(d.list&&!opt.nosplit&&line[j+1]!=='*'&&line[j+2]!=='*'){ /* "$@": one word per argument */
@@ -310,12 +343,14 @@ function tokenize(line,opt){opt=opt||{};const dry=!!opt.dry;
           else s+=d.list?d.list.join(line[j+1]==='*'||line[j+2]==='*'?ifsJoin():' '):d.val; /* "$*" joins with the first IFS character */
           j=d.end;continue}}s+=line[j];j++}
       if(j>=line.length)throw new Error('unclosed " quote. Every opening quote needs a closing one.');cur.v+=s;if(atEmpty&&s===''&&cur.v==='')cur.empt=true;i=j+1;continue}
+    if(c==='$'&&line[i+1]==="'"){const e=ansiEnd(line,i+1);cur.keep=true;cur.v+=ansiDecode(line.slice(i+2,e));i=e+1;continue}
     if(c==='$'&&line[i+1]==='('&&line[i+2]!=='('){const e=scanSub(line,i);
       if(!dry)splice(runSub(line.slice(i+2,e)));
       i=e+1;continue}
     if(c==='$'){const d=evalDollar(line,i,dry,false);if(d){
       if(dry)cur.v+=d.val;else if(d.list)spliceList(d.list);else splice(d.val);
       i=d.end;continue}}
+    if(c==='`'){const e=bqEnd(line,i);if(!dry)splice(runSub(bqBody(line.slice(i+1,e),false)));i=e+1;continue}
     if(c==='\\'&&i+1<line.length){cur.v+=line[i+1];i+=2;continue}
     if(c==='*'||c==='?')cur.glob=true;
     cur.v+=c;i++}
@@ -336,6 +371,7 @@ function expandOne(w){return expandWord(w,true).map(t=>t.v).join(' ')}
 function expandHeredoc(raw){let o='',j=0;
   while(j<raw.length){const c=raw[j];
     if(c==='\\'&&j+1<raw.length){const n=raw[j+1];if(n==='\n'){j+=2;continue}if(n==='$'||n==='`'||n==='\\'){o+=n;j+=2;continue}o+=c;j++;continue}
+    if(c==='`'){const e=bqEnd(raw,j);o+=runSub(bqBody(raw.slice(j+1,e),false));j=e+1;continue}
     if(c==='$'){
       if(raw[j+1]==='('&&raw[j+2]!=='('){const e=scanSub(raw,j);o+=runSub(raw.slice(j+2,e));j=e+1;continue}
       const d=evalDollar(raw,j,false,true);if(d){o+=d.list?d.list.join(' '):d.val;j=d.end;continue}}
@@ -390,5 +426,5 @@ function paint(name,n,tty){if(!tty)return name;if(n.type==='dir')return M('d',na
 function parseN(a,cmd){let n=10;const rest=[];for(let i=0;i<a.length;i++){const x=a[i];
   if(x==='-n'){n=parseInt(a[++i],10)}else if(/^-n\d+$/.test(x))n=parseInt(x.slice(2),10);else if(/^-\d+$/.test(x))n=parseInt(x.slice(1),10);else rest.push(x)}
   return {n,rest,bad:isNaN(n)}}
-Object.assign(SQ,{isRO,canSet,roMsg,splitFields,ifsNow,isSet,badName,scanSub,scanBrace,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
+Object.assign(SQ,{isRO,canSet,roMsg,splitFields,ifsNow,isSet,badName,scanSub,scanBrace,bqEnd,dqEnd,ansiEnd,expandStr,M,ok,E,lines,getVar,setVar,arithVal,patMatch,VRX,tokenize,expandHeredoc,CTX,expandWords,expandOne,parse,globRe,globExpand,globWords,flags,readInputs,paint,parseN});
 })(window.SQ = window.SQ || {});
