@@ -199,13 +199,19 @@ function* run(node,ctx){let r;const ls=loneSub(node);
 
 /* ---------- spawning ---------- */
 const forkErr=()=>Object.assign(new Error(SQ.FORK_MSG),{raw:true,code:1,fork:true});
-/* bash looks the command up in the background process, so a job killed first never reports a typo; tag it now so a mission check still sees it */
+/* bash looks the command up in the background process, so a job killed first never reports a typo; tag it now so a mission check still sees it.
+   Only commands that start at once count: every pipeline stage, the first command of a group, subshell or list, the left side of && and || */
 function tagNotFound(node){
-  if(node.type!=='andor'||node.rest.length||SQ.rt.slice||!SQ.rt.log)return;
-  const P=node.first,c=P.cmds.length===1?P.cmds[0]:null;if(!c||c.type!=='simple'||!c.words.length)return;
-  const name=c.words[0].raw;
-  if(!/^[A-Za-z][\w.+-]*$/.test(name)||own(SQ.CMDS,name)||SQ.hasFunction(name)||/^(break|continue|local|return)$/.test(name))return;
-  SQ.rt.log.push({name,args:[],globbed:false,piped:false,redirect:null,errRedirect:null,code:127,out:'',nf:true})}
+  if(SQ.rt.slice||!SQ.rt.log)return;
+  const first=n=>{switch(n.type){
+    case 'list':if(n.items.length)first(n.items[0].andor);break;
+    case 'andor':first(n.first);break;
+    case 'pipeline':n.cmds.forEach(first);break;
+    case 'group':case 'subshell':first(n.body);break;
+    case 'simple':{if(!n.words.length)break;const name=n.words[0].raw;
+      if(!/^[A-Za-z][\w.+-]*$/.test(name)||own(SQ.CMDS,name)||SQ.hasFunction(name)||/^(break|continue|local|return)$/.test(name))break;
+      SQ.rt.log.push({name,args:[],globbed:false,piped:false,redirect:null,errRedirect:null,code:127,out:'',nf:true})}}};
+  first(node)}
 function spawn(node,env,src){const rt=SQ.rt;env=env||{};
   if(rt.jobs.filter(isLive).length>=MAX_JOBS)throw forkErr();
   const pid=SQ.newPid(),ownerNode=rt.scopeNode,owner=ownerNode.id,start=SQ.now();

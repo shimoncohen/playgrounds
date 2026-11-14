@@ -667,6 +667,18 @@ describe('a mistyped background command is tagged not found even when it is kill
     assert.equal(r.out, '[1] 1235\n[1]+  Terminated              Sleep 100');
     assert.ok(SQ.rt.log.some((e) => e.nf && e.name === 'Sleep'));
   });
+  it('a typo in a group, pipeline, subshell or the left of && is tagged; one that starts later is not', () => {
+    for (const l of ['{ Sleep 1; } & kill %1', 'Sleep 1 | cat & kill %1', 'cat | Sleep 1 & kill %1', '(Sleep 1) & kill %1', 'Sleep 1 && echo a & kill %1', 'Sleep 1 || echo a & kill %1']) {
+      const S2 = loadShell();
+      const r = runN(S2, l);
+      assert.match(r.out, /^\[1\] \d+\n\[1\]\+  Terminated /, l);
+      assert.ok(S2.rt.log.some((e) => e.nf && e.name === 'Sleep'), l);
+    }
+    for (const l of ['sleep 1 && Sleep 2 & kill %1', 'echo hi | cat & kill %1']) {
+      runN(SQ, l);
+      assert.equal(SQ.rt.log.some((e) => e.nf), false, l);
+    }
+  });
   it('a real command, a function and a variable-built name are not tagged', () => {
     for (const l of ['sleep 100 & kill %1', 'f() { :; }; f & kill %1', 'c=sleep; $c 100 & kill %1']) {
       runN(SQ, l);
