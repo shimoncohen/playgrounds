@@ -643,7 +643,7 @@
         { title: 'A whole-number triangle', kind: 'scene',
           goal: 'Drag the two legs until the hypotenuse is a whole number other than 5.',
           how: [
-            'The scene works out <code>c² = a² + b²</code> for you. You want a total that is a perfect square, like 25 or 100.',
+            'The scene works out <code>c² = a² + b²</code> for you. You want a total that is a perfect square: a whole number you get by squaring a whole number, like 25 = 5 × 5 or 100 = 10 × 10.',
             'The starting triangle, 3 and 4, gives 25 and so <code>c = 5</code>. That one is already used up.',
             'Try doubling it: what do 6 and 8 give? Drag a leg tip, or focus it and press the arrow keys, or use the sliders.',
             'The live line under the picture shows the sum and the root. The mission passes when <code>c</code> is a whole number that is not 5.',
