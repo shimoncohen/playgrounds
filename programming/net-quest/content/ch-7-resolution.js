@@ -9,15 +9,17 @@ const got=e=>{const f=e.dev==='laptop'&&e.dir==='rx'&&dnsOf(e);return f&&f.qr===
 const ans=(f,type)=>NQ.dns.recs(f,'an').find(r=>r.type===type)||null;
 const stripped=s=>String(s).replace(/\.$/,'');
 // +short and +trace replies are skipped: the questions here are about the full output a learner read
-const fullDig=(c,srv,pred)=>{
-  for(let i=c.history.length-1;i>=0;i--){
-    const h=c.history[i];
-    if(h.code!==0||!/^\s*dig\s/.test(h.line)||/\+(short|trace)(\s|$)/.test(h.line))continue;
+const fullDigs=(c,srv,pred)=>{
+  const out=[];
+  c.history.forEach((h,i)=>{
+    if(h.code!==0||!/^\s*dig\s/.test(h.line)||/\+(short|trace)(\s|$)/.test(h.line))return;
     const e=h.entries.find(x=>{const f=got(x);return f&&ipOf(x,'src')===srv&&f.qname===WWW&&f.qtype==='A'&&(!pred||pred(f));});
-    if(e)return {f:dnsOf(e),h,i};
-  }
-  return null;
+    if(e)out.push({f:dnsOf(e),h,i});
+  });
+  return out;
 };
+const fullDig=(c,srv,pred)=>fullDigs(c,srv,pred).at(-1)||null;
+const lastTrace=c=>c.history.findLast(h=>h.code===0&&/\+trace(\s|$)/.test(h.line)&&/;; Received/.test(h.out.join('\n'))&&h.entries.some(e=>{const f=e.dev==='laptop'&&e.dir==='tx'&&dnsOf(e);return f&&f.qr===0&&f.qname===WWW;}));
 const viaResolver=f=>f.rd===1;
 const qtime=h=>{const m=/Query time: (\d+) msec/.exec(h.out.join('\n'));return m?m[1]:'';};
 const DIG=[['dig','cmd','look a name up']];
@@ -56,7 +58,7 @@ NQ.CH.push({name:'Resolvers and caches',badge:'Chart Room Key',
   question:{ask:'What is the name of the server the root points you to?',
    expect:c=>{const d=fullDig(c,ROOT),r=d&&NQ.dns.recs(d.f,'ns').find(x=>x.type==='NS');return r?r.data:'';}}},
  {title:'The next server down',scenario:'dns',
-  goal:'The root pointed to the server for the last part of the name, <code>test</code>. That is a <b>TLD</b> server, short for top-level domain: the server that looks after every name ending in one last part such as <code>test</code>. Its address was in the <code>ADDITIONAL SECTION</code> of the last reply, so ask it: <code>dig @198.51.100.10 www.example.test</code>. It does not hold the record either, so it sends another referral, to the server that looks after <code>example.test</code>. This time the reply also carries the address of that server in the <code>ADDITIONAL SECTION</code>. That record is called <b>glue</b>: the reply names the next server, and glue hands you its address too, so you do not have to look the name up first. Type that address.',
+  goal:'The root pointed to the server for the last part of the name, <code>test</code>. That is a <b>TLD</b> server, short for top-level domain: the server that looks after every name ending in one last part such as <code>test</code>. Its address was in the <code>ADDITIONAL SECTION</code> of the last reply, so ask it: <code>dig @198.51.100.10 www.example.test</code>. It does not hold the record either, so it sends another referral, to the server that looks after <code>example.test</code>. Like the last reply, this one carries the address of that server in the <code>ADDITIONAL SECTION</code>. That record is called <b>glue</b>: the reply names the next server, and glue hands you its address too, so you do not have to look the name up first. Type that address.',
   anat:at(TLD,'the TLD server'),
   how:['<code>dig @198.51.100.10 www.example.test</code> asks the TLD server for the address of <code>www.example.test</code> and prints the referral it sends back.',
    'You know <code>dig</code>, the <code>@</code> server and the name. Only the server has changed: it is the one the root pointed to.',
@@ -69,7 +71,7 @@ NQ.CH.push({name:'Resolvers and caches',badge:'Chart Room Key',
   question:{ask:'Which address does the glue record give?',
    expect:c=>{const d=fullDig(c,TLD),r=d&&NQ.dns.recs(d.f,'ar').find(x=>x.type==='A');return r?r.data:'';}}},
  {title:'The server that owns the answer',scenario:'dns',
-  goal:'The glue gave the address of the last server: <code>dig @203.0.113.10 www.example.test</code> asks it. This one is <b>authoritative</b> for <code>example.test</code>: it holds the records itself, instead of passing questions on or remembering what others said. So at last you get an answer, and the reply says so with a flag. Read the <code>flags:</code> line. You know <code>qr</code> (this is a reply) and <code>rd</code> (your request for a search). Two more matter here. <code>ra</code> means recursion available: your resolver\'s replies carry it, because it does the search, and this server\'s reply has none, because it only answers for what it owns. And one flag, whose two letters stand for authoritative answer, marks a reply from the owner. Type that flag.',
+  goal:'The glue gave the address of the last server: <code>dig @203.0.113.10 www.example.test</code> asks it. This one is <b>authoritative</b> for <code>example.test</code>: it holds the records itself, instead of passing questions on or remembering what others said. So at last you get an answer, and the reply says so with a flag. Read the <code>flags:</code> line. <code>qr</code> marks a reply, and <code>rd</code> is your request for a search. Two more matter here. <code>ra</code> means recursion available: your resolver\'s replies carry it, because it does the search, and this server\'s reply has none, because it only answers for what it owns. And one flag, whose two letters stand for authoritative answer, marks a reply from the owner. Type that flag.',
   anat:at(AUTH,'the authoritative server'),
   how:['<code>dig @203.0.113.10 www.example.test</code> asks the server that holds the records of <code>example.test</code> and prints its answer.',
    'The command, the <code>@</code> server and the name are as before. The server is the one the glue pointed to.',
@@ -91,9 +93,7 @@ NQ.CH.push({name:'Resolvers and caches',badge:'Chart Room Key',
   explain:'A cache trades a little memory for a lot of speed. Most questions are asked again and again, so the resolver pays for the long search once and answers every later question from memory. That also spares the servers above it: the root would be flooded if every lookup in the world started there.',
   hint:'Run <code>dig www.example.test</code> twice and read the number before <code>msec</code> in the second reply.',
   answer:['dig www.example.test','dig www.example.test'],
-  check:c=>{
-    const n=c.history.filter(h=>h.code===0&&/^\s*dig\s/.test(h.line)&&!/\+(short|trace)(\s|$)/.test(h.line)&&h.entries.some(e=>{const f=got(e);return f&&ipOf(e,'src')===RES&&f.qname===WWW&&f.qtype==='A';})).length;
-    return n>=2?true:'Run <code>dig www.example.test</code> twice, without <code>+short</code>, and compare the two query times.';},
+  check:c=>fullDigs(c,RES,viaResolver).length>=2?true:'Run <code>dig www.example.test</code> twice, without <code>+short</code> or <code>+norecurse</code>, and compare the two query times.',
   question:{ask:'What query time does the second reply show, as a number?',
    expect:c=>{const d=fullDig(c,RES,viaResolver);return d?qtime(d.h):'';},
    accept:()=>['zero']}},
@@ -135,7 +135,7 @@ NQ.CH.push({name:'Resolvers and caches',badge:'Chart Room Key',
   anat:[['rndc','cmd','control the name server'],['flush','arg','forget everything it remembers']],
   how:['<code>rndc flush</code> tells the resolver to forget every answer it remembers, so the next lookup of any name goes to the servers that own it.',
    '<code>rndc</code> is the command that controls a name server, and it only exists on a machine that runs one: that is why this terminal is on <code>resolver</code>. <code>flush</code> says what to do: empty the memory.',
-   'It prints nothing when it works. You cannot see the old answer from here; the laptop would be the one to notice it, and the game checks what the laptop would be told.',
+   'If you try <code>dig</code> here, it needs a server with <code>@</code>, as in <code>dig @203.0.113.10 www.example.test</code>: this resolver has no resolver of its own to ask. <code>rndc flush</code> prints nothing when it works. You cannot see the old answer from here; the laptop would be the one to notice it, and the game checks what the laptop would be told.',
    'Run <code>rndc flush</code>. The mission is done when the laptop would get the owner\'s answer.'],
   explain:'Waiting is the other cure: the old answer disappears when its time limit runs out, which here would take an hour. Flushing is the quick fix after a change, for example when you move a website and want everyone to see it now. It costs a little speed, because every name has to be looked up again, one search at a time.',
   hint:'This terminal runs on <code>resolver</code>. Type <code>rndc flush</code>.',
@@ -153,8 +153,8 @@ NQ.CH.push({name:'Resolvers and caches',badge:'Chart Room Key',
   explain:'This is the whole chapter in one command: a root server that refers, a TLD server that refers with glue and an authoritative server that answers. It is also the tool to reach for when a name misbehaves: the first server in the chain that says something wrong is where to look.',
   hint:'Type <code>dig +trace www.example.test</code> and read the name in brackets on the last <code>;; Received</code> line.',
   answer:['dig +trace www.example.test'],
-  check:c=>c.history.some(h=>h.code===0&&/^\s*dig\s(.*\s)?\+trace(\s|$)/.test(h.line)&&/;; Received/.test(h.out.join('\n')))?true:'Run <code>dig +trace www.example.test</code>: the option goes right after <code>dig</code>.',
+  check:c=>lastTrace(c)?true:'Run <code>dig +trace www.example.test</code>: the option goes right after <code>dig</code>.',
   question:{ask:'What is the name of the last server the trace asked?',
-   expect:c=>{const h=c.history.findLast(x=>x.code===0&&/\+trace(\s|$)/.test(x.line)),m=h&&[...h.out.join('\n').matchAll(/;; Received \d+ bytes from \S+#53\((\S+)\)/g)].at(-1);return m?stripped(m[1]):'';}}}
+   expect:c=>{const h=lastTrace(c),m=h&&[...h.out.join('\n').matchAll(/;; Received \d+ bytes from \S+#53\((\S+)\)/g)].at(-1);return m?stripped(m[1]):'';}}}
  ]});
 })();

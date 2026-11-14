@@ -715,7 +715,7 @@ describe('chapter 7: resolvers and caches', () => {
     assert.equal(run(3, [AUTH], 'AA'), true);
   });
   it('4: two full digs through the resolver are needed, and the number is the second query time', () => {
-    assert.equal(run(4, [WWW]), 'Run <code>dig www.example.test</code> twice, without <code>+short</code>, and compare the two query times.');
+    assert.match(run(4, [WWW]), /twice/);
     assert.equal(run(4, ['dig +short www.example.test', 'dig +short www.example.test']).slice(0, 14), 'Run <code>dig ');
     assert.equal(run(4, [WWW, WWW], '0'), true);
     assert.equal(run(4, [WWW, WWW], 'zero'), true);
@@ -768,6 +768,23 @@ describe('chapter 7: resolvers and caches', () => {
   it('7: the card says the terminal runs on resolver, and rndc only exists there', () => {
     assert.match(m(7).goal, /runs <b>on <code>resolver<\/code><\/b>/);
     assert.equal(NQ.createNet('dns').exec('rndc flush', 'laptop').code, 127);
+  });
+  it('8: the trace must be for www.example.test, and the answer comes from the last such trace', () => {
+    const TR = 'dig +trace www.example.test';
+    assert.notEqual(run(8, ['dig +trace nosuch.test'], 'ns1.example.test'), true);
+    assert.equal(run(8, [TR, 'dig +trace nosuch.test'], 'ns1.example.test'), true);
+    assert.equal(run(8, [TR, 'dig +trace example.test NS'], 'ns1.example.test'), true);
+  });
+  it('4: the check and the answer use the same pair: the last two recursive digs, so a +norecurse one is not a second ask', () => {
+    assert.equal(run(4, [WWW, 'dig +norecurse www.example.test', WWW], '0'), true);
+    assert.match(run(4, [WWW, 'dig +norecurse www.example.test']), /twice/);
+    assert.match(run(4, ['dig +norecurse www.example.test', WWW]), /twice/);
+  });
+  it('3: qr is taught in place, 2: the glue wording says the last reply carried glue too, 7: the card says dig needs @server there', () => {
+    assert.match(plain(m(3).goal), /\bqr\s+marks a reply/);
+    assert.doesNotMatch(plain(m(3).goal), /You know/);
+    assert.match(plain(m(2).goal), /Like the last reply, this one carries/);
+    assert.match(plain([m(7).hint, ...m(7).how].join(' ')), /needs a server with\s+@/);
   });
   it('8: only a trace passes, and the last server\'s name is read from its output', () => {
     assert.equal(run(8, ['dig +trace www.example.test'], 'ns1.example.test'), true);
@@ -979,6 +996,12 @@ describe('chapter 7: quick-fire and field guide', () => {
   it('the flag aa is only named in chapter 7 entries', () => {
     for (const q of NQ.QF) if (/\baa\b/.test(plain([q.c, q.a, ...q.w, q.why].join(' ')))) assert.equal(q.ch, 6, q.c);
     for (const g of NQ.GUIDE) if (/\baa\b/.test(plain([g.c, g.what, ...g.ex.flat()].join(' ')))) assert.equal(g.ch, 6, g.c);
+  });
+  it('no guide entry gives the answer of a chapter 7 mission', () => {
+    const answers = NQ.CH[6].missions.filter((x) => x.question).flatMap((x) => solve(x).all);
+    assert.ok(answers.length >= 8);
+    // a bare 0 is a number every traceroute guide line has; it is checked on the chapter 7 entries only
+    for (const g of NQ.GUIDE) for (const a of answers.filter((x) => x !== '0' || g.ch === 6)) assert.ok(!leaks([g.c, g.what, ...g.syn.flatMap(([t, , l]) => [t, l || '']), ...g.ex.flat()].join(' '), a), `"${a}" in guide "${g.c}"`);
   });
   it('the rndc example runs on the resolver, where the command exists', () => {
     const ex = guide.flatMap((g) => g.ex).find(([line]) => /^rndc/.test(line));
