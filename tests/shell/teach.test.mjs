@@ -16,11 +16,11 @@ assert.ok(line, 'content marker moved: const qfOpen=');
 const qfOpen = new Function('QF', 'CH', line + '\nreturn qfOpen;')(QF, CH);
 
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-/* everything a learner reads on a mission card (starter comments and the answer key are not teaching text) */
-const cardText = (m) => plain([m.title, m.goal, m.note, m.hint, m.explain, ...(m.how || []), ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || '')),
-  ...(m.steps || []).map((s) => [s.title, s.goal, s.hint, s.explain, ...(s.how || [])].join(' '))].filter(Boolean).join('\n'));
+/* everything a learner reads on a mission card (starter comments and the answer key are not teaching text); a hint is use but not teaching */
+const cardText = (m, hint) => plain([m.title, m.goal, m.note, hint && m.hint, m.explain, ...(m.how || []), ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || '')),
+  ...(m.steps || []).map((s) => [s.title, s.goal, hint && s.hint, s.explain, ...(s.how || [])].join(' '))].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
+CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) })));
 const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && x.mi < mi));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches it or defines it in place (its own card may use it)]
@@ -41,12 +41,20 @@ const FIRST = {
   CSV: [/\bCSV\b/, 15, 6],
   true: [/\|\| true/, 18, 6],
   'grep --': [/grep -- /, 18, 6],
+  '<': [/(^|\s)<{1,3}\s*[\w$"'.\/-]+\.\w+|\bdone\s*</, 12, 5],
+  awk: [/\bawk\b/, 15, 0],
+  group: [/\bgroups?\b/i, 9, 0],
+  sleep: [/\bsleep\b/, 16, 1],
+  set: [/(^|[;&|\s])set\s*[-+]/, 18, 0],
+  'quoted sed script': [/\bsed\b[^\n]*['"]/, 7, 2],
+  '2>': [/\b2\s*>/, 10, 0],
+  '/dev/null': [/\/dev\/null/, 10, 0],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
     it(`is not used before ${ci}.${mi}, where it is introduced`, () => {
       for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
     });
     it('is not asked in quick-fire before its chapter is done', () => {
       QF.forEach((q) => { if (re.test(q[0] + ' ' + q[1][0])) assert.ok(q.ch >= ci, `"${q[0]}" needs chapter ${ci}`); });
@@ -83,6 +91,16 @@ describe('terms are defined in place the first time they appear', () => {
     assert.match(card(18, 0), /false is a command that does nothing and fails with status 1/);
     assert.match(card(18, 6), /true is a command that does nothing and succeeds/);
     assert.match(card(18, 6), /-- in grep -- "\$level" means options end here/);
+  });
+  it('the goal says what each item is before the learner types it (12.5, 15.0, 9.0, 16.1, 18.0, 7.2, 10.0)', () => {
+    const goal = (c, i) => plain(CH[c].missions[i].goal);
+    assert.match(goal(12, 5), /< is the opposite of >: it sends a file into a command's input/);
+    assert.match(goal(15, 0), /awk is a small tool for working with columns of text/);
+    assert.match(goal(9, 0), /A group is a named set of users who can share a file/);
+    assert.match(goal(16, 1), /sleep 30 does nothing for 30 seconds/);
+    assert.match(goal(18, 0), /set turns shell behaviours on with - and off with \+/);
+    assert.match(goal(7, 2), /Quote the sed script so bash passes it to sed untouched/);
+    assert.match(goal(10, 0), /two output channels, normal output \(1\) and errors \(2\)/);
   });
   it('6.5 no longer points at ls -l before 9.0 teaches it', () => {
     assert.doesNotMatch(card(6, 5), /ls -l/);

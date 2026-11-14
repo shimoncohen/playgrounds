@@ -52,7 +52,7 @@ const CH=[
   anat:[['echo','cmd'],['hello','arg'],['|','op'],['tr','cmd'],['a-z','arg'],['A-Z','arg']],answer:'echo hello | tr a-z A-Z',
   explain:`<code>tr</code> <b>translates</b> characters: every character in the first set becomes the matching one in the second. <code>a-z</code> is a range: every letter from a to z. It reads text from a pipe, never from a file name.`,
   check:c=>c.ran('tr',e=>e.out.trim()==='HELLO')},
- {title:'Swap a word',goal:`Mira has run out of apples and now sells pears. Print the shop list with apple swapped for pear: <code>sed 's/apple/pear/' village/shop.txt</code>`,
+ {title:'Swap a word',goal:`Mira has run out of apples and now sells pears. Print the shop list with apple swapped for pear: <code>sed 's/apple/pear/' village/shop.txt</code>. Quote the <code>sed</code> script so bash passes it to <code>sed</code> untouched.`,
   anat:[['sed','cmd'],[`'s/apple/pear/'`,'arg'],['village/shop.txt','arg']],answer:`sed 's/apple/pear/' village/shop.txt`,
   explain:`<code>sed</code> is a <b>stream editor</b>. The script <code>s/old/new/</code> means <b>substitute</b>: find old, replace it with new. The file itself does not change, <code>sed</code> only prints the edited text.`,
   check:c=>c.ran('sed',e=>/pear/.test(e.out)&&!/apple/.test(e.out))},
@@ -120,7 +120,7 @@ const CH=[
 {tier:'intermediate',name:'Permissions & links',badge:'Locked Secrets',story:'Behind the gate, Ada\'s <code>secrets.txt</code> must stay private; read the lock marks, lock it down and add a shortcut to day one\'s log to leave Ada\'s Locked Secrets safe.',intro:'Behind the gate, Ada\'s <code>secrets.txt</code> must stay private. Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
  learned:['ls -l','chmod 600','chmod u+x','chmod a=r','ln -s','stat'],setup:seedPerms,
  missions:[
- {title:'Read the permissions',goal:`Behind the gate, every file in the gatehouse carries a lock mark. Show the details of each file, including its permissions: <code>ls -l</code>`,note:`Not at home? Run <code>cd ~</code> first.`,
+ {title:'Read the permissions',goal:`Behind the gate, every file in the gatehouse carries a lock mark. Show the details of each file, including its permissions: <code>ls -l</code>. A group is a named set of users who can share a file; the middle <code>rwx</code> triple is for them.`,note:`Not at home? Run <code>cd ~</code> first.`,
   anat:[['ls','cmd'],['-l','opt']],answer:'ls -l',
   explain:`The first column is the <b>mode</b>. After the type (<code>-</code> file, <code>d</code> folder, <code>l</code> a link, a shortcut you will make soon) come three groups of <code>rwx</code>: what the <b>owner</b>, the <b>group</b> and <b>everyone else</b> may do. <code>r</code> read, <code>w</code> write, <code>x</code> run, and <code>-</code> means not allowed.`,
   check:c=>c.ran('ls',e=>c.flag(e,'l')&&e.code===0)},
@@ -154,7 +154,7 @@ const CH=[
 {tier:'intermediate',name:'Streams & xargs',badge:'Complaint Tally',story:'The gate log is full of complaints; send errors aside, sweep the scratch folder and find the Complaint Tally of ERRORs per visitor.',intro:'The gate log is full of complaints, and the scratch folder is a mess. A command has an output stream and an error stream, and you can send each one somewhere different. Then you will turn lists into arguments and finish with a small cleanup job.',
  learned:['2>','2>/dev/null','2>&1','xargs','diff','sort | uniq -c'],setup:seedStreams,
  missions:[
- {title:'Silence errors',goal:`A guard checks a room that does not exist, and the complaint is not worth hearing. Run a command that fails and hide its error message: <code>ls missing 2&gt;/dev/null</code>`,
+ {title:'Silence errors',goal:`A guard checks a room that does not exist, and the complaint is not worth hearing. Run a command that fails and hide its error message: <code>ls missing 2&gt;/dev/null</code>. Every command has two output channels, normal output (1) and errors (2), so you can redirect them apart; <code>/dev/null</code> is a bin that throws away whatever it is given.`,
   anat:[['ls','cmd'],['missing','arg'],['2&gt;','op'],['/dev/null','arg']],answer:'ls missing 2>/dev/null',
   explain:`Stream number 2 is the <b>error</b> stream (1 is the normal output). <code>2&gt;</code> sends it somewhere, and <code>/dev/null</code> is the bin that throws everything away. The command still fails, you just do not see the complaint.`,
   check:c=>c.log.some(e=>{const r=e.errRedirect;if(e.code===0||!r||e.out.trim()!=='')return false;return r.dup?!!e.redirect&&isNull(e.redirect.path):!!r.path&&isNull(r.path)})},
