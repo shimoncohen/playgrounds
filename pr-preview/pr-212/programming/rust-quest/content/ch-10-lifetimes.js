@@ -75,6 +75,7 @@ RQ.CH.push({
       how:[
         `The whole program makes two texts, asks <code>longest</code> for the longer one, and prints it. <code>small</code> is made inside a block, so it is freed at the closing <code>}</code>.`,
         `Both inputs of <code>longest</code> carry <code>'a</code>, which says the answer may come from either of them. So Rust has to treat <code>result</code> as a reference into <code>small</code> too, even though this time the answer was <code>big</code>. After the <code>}</code> that reference would point at freed memory, and <code>E0597</code> says <code>small</code> "does not live long enough".`,
+        `<code>let result: &amp;str;</code> only reserves the name and its type. The value comes later, here inside the block, so the name can be read after the block.`,
         `The compiler does not run the program to see which input was longer. It reads the signature, and the signature says either one.`,
         `Two fixes work: use <code>result</code> inside the block, or make <code>small</code> before the block so it lasts as long as <code>big</code>. Either way the reference is used only while both texts exist.`
       ],
@@ -130,6 +131,7 @@ RQ.CH.push({
       how:[
         `The whole function returns the longer of two texts, like <code>longest</code>, but its signature gives <code>'a</code> to <code>a</code> and to the result only.`,
         `The result promises to be good as long as <code>'a</code>. The body sometimes returns <code>b</code>, and nothing says <code>b</code> is good for that long. Rust refuses with <code>E0621</code>, "explicit lifetime required in the type of <code>b</code>", and the message names the parameter you forgot.`,
+        `<code>&gt;=</code> means "bigger than or equal to", so a tie gives back <code>a</code>.`,
         `The earlier mission removed a label because the answer never used the parameter. This time the answer does use <code>b</code>, so the opposite fix is right: write <code>b: &'a str</code>.`,
         `The hidden <code>main</code> tries other texts than the ones in the card.`
       ],
