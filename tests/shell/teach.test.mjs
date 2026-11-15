@@ -87,6 +87,13 @@ for (const [term, [ci, mi, def]] of Object.entries(EXPLAINED)) {
   it(`"${term}" is explained in what ${ci}.${mi} shows before solving`, () => assert.match(pre(ci, mi), def));
 }
 
+describe('plain-text chapter fields', () => {
+  // ui.js escapes name, badge and intro, so a tag would show as literal text
+  it('no chapter name, badge or intro contains an HTML tag', () => {
+    for (const [i, c] of CH.entries()) for (const k of ['name', 'badge', 'intro']) assert.doesNotMatch(c[k] || '', /<\/?[a-z]/i, `chapter ${i} ${k}`);
+  });
+});
+
 describe('terms are defined in place the first time they appear', () => {
   const card = (c, i) => plain(CH[c].missions[i].goal + ' ' + CH[c].missions[i].explain + ' ' + (CH[c].missions[i].how || []).join(' '));
   it('clear (0.1)', () => assert.match(card(0, 1), /clear<\/code> wipes it|clear wipes it/));
