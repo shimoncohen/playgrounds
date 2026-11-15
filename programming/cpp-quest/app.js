@@ -975,7 +975,7 @@ const CH=[
  {title:'Run your first program',goal:'Knock on the plate: press <b>Run</b> (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) and read what appears in the console.',
   anat:[['#include <iostream>','pp'],['int main()','fn'],['cout','name'],['<<','op'],['"Hello, Tick Tower!"','val'],[';','op']],
   explain:`This is a complete C++ program. When you press Run, two things happen. First the <b>compiler</b> (g++) translates your C++ into machine code. Then the machine code <b>runs</b>. Every program starts at <code>main</code> and runs the lines inside its <code>{ }</code> from top to bottom.`,
-  note:'<code>#include &lt;iostream&gt;</code> brings in the input/output library. <code>cout</code> (say "see-out") is the console. <code>&lt;&lt;</code> sends something to it, and <code>endl</code> ends the line. Every instruction line ends with <code>;</code>. Two lines you did not write: <code>using namespace std;</code> lets you type <code>cout</code> instead of <code>std::cout</code> (a few missions on you will see why), and <code>return 0;</code> at the end of <code>main</code> tells the computer the program finished fine (the console shows that as <code>exit code 0</code>). In the console, the <code>g++</code> line is the compile step and <code>./main</code> is the run step.',
+  note:'<code>#include &lt;iostream&gt;</code> brings in the input/output library. <code>cout</code> (say "see-out") is the console. <code>&lt;&lt;</code> sends something to it, and <code>endl</code> ends the line. Every instruction line ends with <code>;</code>. Two lines you did not write: <code>using namespace std;</code> lets you type <code>cout</code> instead of <code>std::cout</code> (a few missions on you will see why), and <code>return 0;</code> at the end of <code>main</code> tells the computer the program finished fine: the <code>int</code> in <code>int main()</code> says <code>main</code> hands back a whole number when it ends, and that number is the <code>0</code> (the console shows that as <code>exit code 0</code>). In the console, the <code>g++</code> line is the compile step and <code>./main</code> is the run step.',
   start:P(R`cout << "Hello, Tick Tower!" << endl;`),hint:'Press the Run button above the editor.',
   check:c=>c.ok&&/Hello/.test(c.out)},
  {title:'Make it yours',goal:'The plate asks who is knocking: change the text so the program prints <code>Hello, </code> followed by your name.',keep:true,
@@ -1248,7 +1248,7 @@ if ((hasKey && level >= 3) || isOdile) {
   check:c=>c.ok&&c.has(/&&/)&&c.has(/\|\|/)&&c.lines.length>=1},
  {title:'Roll the dice',goal:'Tock rolls a die to pick the day\'s order: print a dice roll from 1 to 6 using <code>rand() % 6 + 1</code>. Run it several times. Then delete the <code>srand</code> line and run it a few more times.',
   anat:[['rand()','fn'],['%','op'],['6','val'],['+','op'],['1','val']],
-  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed. (<code>rand</code>, <code>srand</code> and <code>time</code> are ready-made tools you call by name with parentheses; <code>time(0)</code> is the clock reading in seconds, and you can ignore the <code>0</code> for now.)`,
+  explain:`<code>rand()</code> gives a big random-looking number. <code>% 6</code> turns it into 0 to 5, and <code>+ 1</code> shifts that to 1 to 6. The numbers come from a formula that starts from a <b>seed</b>. Without <code>srand</code>, the seed is always the same, so every run rolls the same numbers. <code>srand(time(0))</code> uses the current time as the seed. (<code>rand</code>, <code>srand</code> and <code>time</code> are ready-made tools you call by name with parentheses; <code>time(0)</code> is the clock reading in seconds, and you can ignore the <code>0</code> for now.) The C++ standard puts <code>rand</code> and <code>srand</code> in <code>#include &lt;cstdlib&gt;</code> and <code>time</code> in <code>#include &lt;ctime&gt;</code>, so portable code includes them, and this quest's compiler requires them.`,
   start:P(R`srand(time(0));
 // roll a six-sided die
 `,{inc:['cstdlib','ctime']}),ans:P(R`srand(time(0));
@@ -1256,7 +1256,7 @@ int roll = rand() % 6 + 1;
 cout << "You rolled a " << roll << endl;`,{inc:['cstdlib','ctime']}),hint:'int roll = rand() % 6 + 1;',
   check:c=>c.ok&&c.has(/rand\s*\(\s*\)\s*%\s*6/)&&/[1-6]/.test(c.out)},
  {title:'switch: the errand menu',goal:'Tock offers three errands: read a menu choice. Use <code>switch</code> to print <code>Wind</code> for 1, <code>Oil</code> for 2, <code>Rest</code> for 3 and <code>Unknown choice</code> otherwise.',
-  explain:`<code>switch</code> jumps to the <code>case</code> that matches the value. Each case needs a <code>break;</code>, or the program "falls through" into the next case and runs that too. Try deleting one break to see it. <code>default</code> catches everything else. switch works with whole numbers and chars, not strings.`,
+  explain:`<code>switch</code> jumps to the <code>case</code> that matches the value. A <code>case</code> label ends with <code>:</code>, and the lines after it run when the value matches. Each case needs a <code>break;</code>, or the program "falls through" into the next case and runs that too. Try deleting one break to see it. <code>default</code> catches everything else. switch works with whole numbers and chars, not strings.`,
   start:P(R`int choice;
 cout << "1) Wind  2) Oil  3) Rest: ";
 cin >> choice;
@@ -1604,7 +1604,7 @@ for (string item : toolbox) {
 }`,{inc:['vector']}),hint:'for (string item : toolbox) { cout << "- " << item << endl; }',
   check:c=>c.ok&&c.has(/for\s*\(\s*(const\s+)?(auto|string|std::string)\s*&?\s*\w+\s*:/)&&c.lines.length>=3},
  {title:'Find the biggest cog',goal:'Find the biggest number in <code>cogs</code> with a loop, and print <code>Biggest cog: 99</code>. Don\'t just type 99.',
-  explain:`Start with <code>best</code> set to the first cog. Then check every cog: if one is bigger than <code>best</code>, it becomes the new best. Step through and watch <code>best</code> update. This "keep the best so far" pattern finds minimums, longest names, closest enemies and much more.`,
+  explain:`A <code>{ }</code> list after a vector's name fills it with those items at the start, just like an array. Start with <code>best</code> set to the first cog. Then check every cog: if one is bigger than <code>best</code>, it becomes the new best. Step through and watch <code>best</code> update. This "keep the best so far" pattern finds minimums, longest names, closest enemies and much more.`,
   start:P(R`vector<int> cogs = {72, 99, 85, 60, 91};
 int best = cogs[0];
 // check every cog
@@ -1619,7 +1619,7 @@ cout << "Biggest cog: " << best << endl;`,{inc:['vector']}),hint:'for (int s : c
   check:c=>c.ok&&c.has(/\bfor\b/)&&/Biggest cog: 99/.test(c.out)&&!c.has(/best\s*=\s*99/)},
  {title:'Drop items',goal:'Remove <code>"oil can"</code> with <code>erase</code> and the last item with <code>pop_back()</code>, leaving just spanner and cog.',
   anat:[['toolbox','name'],['.erase(','fn'],['toolbox.begin() + 1','name'],[')','op']],
-  explain:`<code>pop_back()</code> removes the last item. <code>erase</code> removes from any position, but it wants a position written as <code>toolbox.begin() + index</code>. Watch Memory: everything after the erased item slides down one place.`,
+  explain:`<code>pop_back()</code> removes the last item. <code>erase</code> removes from any position, but it wants a position written as <code>toolbox.begin() + index</code>. <code>begin()</code> is the position of the first item, so adding <code>1</code> moves to the second. Watch Memory: everything after the erased item slides down one place.`,
   start:P(R`vector<string> toolbox = {"spanner", "oil can", "cog", "map"};
 // remove the oil can (index 1), then remove the last item
 for (string item : toolbox) {
