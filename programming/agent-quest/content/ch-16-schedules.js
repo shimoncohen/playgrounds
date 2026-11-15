@@ -20,7 +20,7 @@ const CHANGED='The saved command weekly-digest was changed. This mission is abou
 AQ.CH.push({
   name:'Schedules and reminders',badge:'Egg Timer',tier:'personal',
   story:'Set the kitchen clock so Cog\'s weekly digest starts alone; find the egg timer.',
-  intro:'At Dana\'s kitchen table, the clock can start Cog\'s weekly digest by itself. So far you started every run yourself and watched it. A scheduled job starts by itself, at a time you choose, and then nobody is at the keyboard. In this chapter you write the line that sets the time, count what a job that repeats costs over a week, and get a reminder job ready to run alone.',
+  intro:'At Dana\'s kitchen table, the clock can start Cog\'s weekly digest by itself. So far you started every run yourself and watched it. A scheduled job starts by itself, at a time you choose, and then nobody is at the keyboard. In this chapter you write the line that sets the time, count what a job that repeats costs over a week, and get a job that reminds you ready to run alone.',
   learned:['Starting a job on a schedule','What a repeating job costs','A reminder that can run alone'],
   missions:[
     {

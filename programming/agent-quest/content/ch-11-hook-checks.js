@@ -14,7 +14,7 @@ AQ.CH.push({
   missions:[
     {
       title:'A check after every edit',scenario:'linty',kind:'config',prompt:BASE,facts:['hooks'],
-      goal:'Cog polishes his work after every edit. The agent\'s fix works, but it leaves a stray <code>console.log</code> behind, and <code>npm run lint</code> rejects that. A hook can run a command <b>after</b> the agent edits a file. Add a hook so the lint check runs after every edit in <code>src/</code>, and the agent cleans up on the spot.',
+      goal:'Cog polishes his work after every edit. The agent\'s fix works, but it leaves a stray <code>console.log</code> behind, and <code>npm run lint</code> rejects that. <b>Lint</b> is a check that scans your code for style slips, such as a leftover <code>console.log</code> debug line, and fails when it finds one. A hook can run a command <b>after</b> the agent edits a file. Add a hook so the lint check runs after every edit in <code>src/</code>, and the agent cleans up on the spot.',
       how:[
         'The line <code>after edit src/ run npm run lint</code> in <code>.claude/hooks.txt</code> runs the lint command after every edit of a file under <code>src/</code>.',
         '<code>after edit</code> says when: the hook fires once the agent has changed a file, where <code>before</code> fires ahead of an action.',

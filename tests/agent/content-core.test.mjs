@@ -112,9 +112,9 @@ const CASES = [
     fail: [F({ '.claude/permissions.txt': 'deny delete src/*' }), F({ '.claude/permissions.txt': 'deny read data/' }), F({ '.claude/permissions.txt': 'deny edit src/' }), F({ '.claude/permissions.txt': 'deny delete src/util.js' }), F({ 'CLAUDE.md': 'do not delete data/' }), F({ '.claude/hooks.txt': 'before delete data/' })],
     refused: [F({ '.claude/permissions.txt': 'deny remove data/' })] },
   { at: [6, 1],
-    pass: ['Constraints: do not send mail.send', 'Constraints: ask before send mail.send', 'Constraints: do not send mail'],
-    fail: ['Constraints: do not call mail.send', 'Constraints: do not read docs/vendor-api.md', 'Constraints: do not read docs/', 'Constraints: do not edit src/', 'Done when: run npm test', ''],
-    refused: ['Constraints: be careful with emails', 'Constraints: do not send ghost.send'] },
+    pass: ['Constraints: do not call mail.send', 'Constraints: ask before call mail.send', 'Constraints: do not call mail'],
+    fail: ['Constraints: do not send mail.send', 'Constraints: ask before send mail.send', 'Constraints: do not read docs/vendor-api.md', 'Constraints: do not read docs/', 'Constraints: do not edit src/', 'Done when: run npm test', ''],
+    refused: ['Constraints: be careful with emails', 'Constraints: do not call ghost.send'] },
   { at: [6, 2],
     pass: ['Constraints: do not read .env', 'Files: src/price.js', 'Constraints: ask before read .env'],
     fail: ['Constraints: do not edit .env', 'Files: .env', 'Files: src/price.js, .env', 'Constraints: do not read src/', 'Done when: run npm test', ''],
@@ -124,8 +124,8 @@ const CASES = [
     fail: ['Plan: first', 'Constraints: ask before edit migrations/', 'Plan: first\nConstraints: do not edit migrations/\nConstraints: do not edit src/', 'Plan: first\nConstraints: ask before edit src/', 'Plan: first\nConstraints: ask before read migrations/', 'Plan: first\nConstraints: do not edit migrations/', ''],
     refused: ['Plan: first\nConstraints: ask before edit ghost/', 'Plan: sometimes\nConstraints: ask before edit migrations/'] },
   { at: [6, 4],
-    pass: [F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send' }), F({ 'CLAUDE.md': 'ask before delete data/\nask before read .env\nask before send mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send\nDone when: run npm test' })],
-    fail: [F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send please' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env' }), F({ 'CLAUDE.md': '' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send\nnever reveal keys' }), F({ '.claude/permissions.txt': 'deny delete data/\ndeny read .env\ndeny send mail.send' }), F({ 'CLAUDE.md': 'do not delet data/\ndo not read .env\ndo not send mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not send mail.send\nDone when: it is done' })] },
+    pass: [F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not call mail.send' }), F({ 'CLAUDE.md': 'ask before delete data/\nask before read .env\nask before call mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not call mail.send\nDone when: run npm test' })],
+    fail: [F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not call mail.send please' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env' }), F({ 'CLAUDE.md': '' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not call mail.send\nnever reveal keys' }), F({ '.claude/permissions.txt': 'deny delete data/\ndeny read .env\ndeny call mail.send' }), F({ 'CLAUDE.md': 'do not delet data/\ndo not read .env\ndo not call mail.send' }), F({ 'CLAUDE.md': 'do not delete data\ndo not read .env\ndo not call mail.send\nDone when: it is done' }), F({ 'CLAUDE.md': 'do not delete data/\ndo not read .env\ndo not send mail.send' })] },
 ];
 
 function BASE() { return 'Goal: fix the rounding bug in src/price.js'; }

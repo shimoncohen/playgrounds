@@ -16,7 +16,7 @@ AQ.CH.push({
   missions:[
     {
       title:'A rule the agent cannot argue with',scenario:'deploy',kind:'config',prompt:CHECKED,facts:['hooks'],
-      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
+      goal:'A turnstile at the back door should stop Cog whatever he says. The agent wants to run <code>npm run deploy</code> after it fixes the bug, and nobody asked it to. That command puts the code live for real customers, and that is hard to undo. A <b>hook</b> is a line in <code>.claude/hooks.txt</code> that is checked before an action happens, by the program around the agent and not by the agent. Add a hook that stops the deploy.',
       how:[
         'The line <code>before run npm run deploy</code> in <code>.claude/hooks.txt</code> stops the agent from running that command, whatever its plan says.',
         '<code>before</code> means the check happens ahead of the action.',
