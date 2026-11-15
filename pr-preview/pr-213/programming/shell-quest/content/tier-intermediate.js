@@ -78,7 +78,7 @@ const CH=[
     if(!c.log.some(e=>e.name==='sort'&&c.flag(e,'n')))return false;const cut=c.ran('cut');
     return c.log.some(e=>{const t=e.out.trim();return (e.name==='head'||e.name==='tail'||e.name==='sort')&&(t===top.join(',')||(e.name==='sort'&&t.split('\n')[0]===top.join(','))||(cut&&t===top[1]))})}}
  ]},
-{tier:'intermediate',name:'Substitution & quoting',badge:'Gatehouse Sign',story:'The gatehouse sign needs today\'s date and the wolf count; paste command results into a sentence, hand a greeting on to a helper and find the finished Gatehouse Sign.',intro:'The sign at the gatehouse needs today\'s date and the wolf count. Bash can paste the output of one command into another, and quotes decide what it is allowed to touch. Then you will hand values on to <code>scripts</code>.',
+{tier:'intermediate',name:'Substitution & quoting',badge:'Gatehouse Sign',story:'The gatehouse sign needs today\'s date and the wolf count; paste command results into a sentence, hand a greeting on to a helper and find the finished Gatehouse Sign.',intro:'The sign at the gatehouse needs today\'s date and the wolf count. Bash can paste the output of one command into another, and quotes decide what it is allowed to touch. Then you will hand values on to scripts.',
  learned:['$(command)','"double" vs \'single\'','export','env','$?'],setup:seedVillage,
  missions:[
  {title:'Capture output',goal:`The gatehouse sign needs today's date written on it. Insert a command's output into a sentence: <code>echo "Today is $(date)"</code>`,
@@ -117,7 +117,7 @@ const CH=[
   explain:`<code>$?</code> holds the exit code of the last command. <code>0</code> means success and anything else means failure. Scripts use it to decide what to do next.`,
   check:c=>/\$\?/.test(c.line)&&c.log.some((e,k)=>{if(e.name!=='echo')return false;const code=k>0?c.log[k-1].code:SQ.rt.prevLast;return !!code&&e.out.trim()===String(code)})}
  ]},
-{tier:'intermediate',name:'Permissions & links',badge:'Locked Secrets',story:'Behind the gate, Ada\'s <code>secrets.txt</code> must stay private; read the lock marks, lock it down and add a shortcut to day one\'s log to leave Ada\'s Locked Secrets safe.',intro:'Behind the gate, Ada\'s <code>secrets.txt</code> must stay private. Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
+{tier:'intermediate',name:'Permissions & links',badge:'Locked Secrets',story:'Behind the gate, Ada\'s <code>secrets.txt</code> must stay private; read the lock marks, lock it down and add a shortcut to day one\'s log to leave Ada\'s Locked Secrets safe.',intro:'Behind the gate, Ada\'s secrets.txt must stay private. Every file says who may read it, change it or run it. Learn to read those marks, change them, and create shortcuts to files.',
  learned:['ls -l','chmod 600','chmod u+x','chmod a=r','ln -s','stat'],setup:seedPerms,
  missions:[
  {title:'Read the permissions',goal:`Behind the gate, every file in the gatehouse carries a lock mark. Show the details of each file, including its permissions: <code>ls -l</code>. A group is a named set of users who can share a file; the middle <code>rwx</code> triple is for them.`,note:`Not at home? Run <code>cd ~</code> first.`,
