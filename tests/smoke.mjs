@@ -4276,3 +4276,17 @@ test('script-quest: after the whole chapter is built, an unrelated input complet
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('shell-quest: a long command in the explanation wraps on a phone (chapter 19, mission 1)', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/shell-quest/`, { viewport: { width: 390, height: 844 } });
+  await page.waitForSelector('#mission');
+  await page.evaluate(() => { const o = JSON.parse(localStorage.getItem('shell-quest-v1')); o.ch = 18; o.mi = 0; localStorage.setItem('shell-quest-v1', JSON.stringify(o)); });
+  await page.reload();
+  await page.waitForSelector('#mission h2');
+  assert.match(await page.textContent('#mission h2'), /Stop on error/);
+  // The fallback mono font is narrower than JetBrains Mono; widen it so the test sees what a learner with the web font sees.
+  await page.addStyleTag({ content: 'code{letter-spacing:.07em}' });
+  assert.equal(await overflow(page), false);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

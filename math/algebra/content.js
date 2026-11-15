@@ -480,7 +480,7 @@
       scene: balance(3),
       missions: [
         { title: 'Undo the steps', kind: 'equation', question: '2x+3=11', work: 'required',
-          goal: 'Solve <code>2x + 3 = 11</code>. This one checks your working: write at least one step before your answer, and every step must keep the same solution.',
+          goal: 'Solve <code>2x + 3 = 11</code>. This one checks your working: write at least one step before your answer, and every step must keep the same solution. The scale picture writes the same kind of equation as <code>p x + q = r x + s</code>: <code>p</code> boxes of weight <code>x</code> and <code>q</code> 1-weights on the left, <code>r</code> boxes and <code>s</code> 1-weights on the right.',
           how: [
             '<code>2x + 3 = 11</code> says: double a number, add 3, and you get 11. Solving it means undoing those steps, the last one first.',
             'The last thing done was <code>+ 3</code>, so take 3 off both sides: <code>2x = 8</code>.',
@@ -626,7 +626,7 @@
     }, {
       id: 'algebra.quadratics', name: 'Quadratic equations', badge: 'Strongbox',
       story: 'The bed of the millpond dips below the water line, so you solve for both spots where the water meets the bank to find the strongbox.',
-      intro: 'The key fits a strongbox Odd sank in the millpond, where its bed dips below the water. A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>.',
+      intro: 'The key fits a strongbox Odd sank in the millpond, where its bed dips below the water. A <b>quadratic equation</b> has an <code>x²</code> in it, like <code>x² + 5x + 6 = 0</code>. It can have two solutions, one, or none. The key fact: if two numbers multiply to 0, at least one of them is 0. So factor one side, keep 0 on the other, and set each factor to 0. Write every solution on your last line, joined by <code>or</code> or a comma: <code>x = 1 or x = 2</code>. With the math keyboard on, <code>or</code> shows as ∨, a sign that means "or". The scene draws, for each <code>x</code>, a point at height <code>y = x² + bx + c</code>; together the points make a curve. It crosses the flat <b>x-axis</b>, where <code>y = 0</code>, exactly at the solutions of <code>x² + bx + c = 0</code>. A solution is also called a <b>root</b>.',
       scene: parabola([-6, 6, -7, 10], 0),
       missions: [
         { title: 'Factor, then split', kind: 'equation', scene: parabola([-6, 6, -7, 10], 0, true), at: { b: 5, c: 6 }, reveal: true, question: 'x^2+5x+6=0',

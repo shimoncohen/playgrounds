@@ -56,12 +56,12 @@ test('layers put a chapter one layer after its deepest prerequisite', () => {
 test('trackMap puts tracks in columns by depth and drops links implied through another track', () => {
   assert.deepEqual(plain(G.trackMap()), {
     cols: [['arithmetic'], ['algebra', 'geometry'], ['trigonometry']],
-    links: [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry']],
+    links: [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry'], ['algebra', 'trigonometry']],
   });
 });
 
 test('trackEdges and nextUp', () => {
-  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry'], ['arithmetic', 'trigonometry']]);
+  assert.deepEqual(plain(G.trackEdges()), [['arithmetic', 'algebra'], ['arithmetic', 'geometry'], ['geometry', 'trigonometry'], ['arithmetic', 'trigonometry'], ['algebra', 'trigonometry']]);
   assert.deepEqual(plain(G.nextUp(new Set())), ['arithmetic.order', 'geometry.angles']);
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order']))), ['arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions'], 'at most 3, in graph order');
   assert.deepEqual(plain(G.nextUp(new Set(['arithmetic.order', 'arithmetic.negatives', 'arithmetic.fractions', 'algebra.expressions']))),
