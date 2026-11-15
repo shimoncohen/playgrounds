@@ -10,8 +10,8 @@ const cache = {};
 const load = track => cache[track] ||= loadMath([...BASE, `${track}/content.js`]);
 const str = x => (typeof x === 'string' ? x : '');
 const seen = (m, ch) => (m < 0 ? ch.intro : [ch.missions[m].title, ch.missions[m].goal, ch.missions[m].hint, ch.missions[m].explain, ch.missions[m].question, ch.missions[m].tex, str(ch.missions[m].answer), ...(ch.missions[m].how || [])].join('\n'));
-// only these fields teach: a hint or an explain shows after the learner has already tried
-const taught = (m, ch) => (m < 0 ? ch.intro : [ch.missions[m].title, ch.missions[m].goal, ...(ch.missions[m].how || [])].join('\n'));
+// only the title and goal teach: how steps, hint and explain show only after the learner asks or solves
+const taught = (m, ch) => (m < 0 ? ch.intro : [ch.missions[m].title, ch.missions[m].goal].join('\n'));
 
 // [track, what it is, regex that uses it, chapter, mission (-1 is the intro) that first explains it, regex of the explanation there]
 const FIRST = [
