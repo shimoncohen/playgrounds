@@ -44,8 +44,8 @@
           why: 'a circle\'s area is counted in the same 1 by 1 squares as a rectangle\'s' },
       ],
       trigonometry: [
-        { id: 'trigonometry.ratios', title: 'Sine, cosine and tangent', requires: ['geometry.pythagoras', 'geometry.angles', 'arithmetic.ratios'],
-          why: 'sine, cosine and tangent are ratios of the sides of a right triangle, chosen by one of its angles' },
+        { id: 'trigonometry.ratios', title: 'Sine, cosine and tangent', requires: ['geometry.pythagoras', 'geometry.angles', 'arithmetic.ratios', 'algebra.linear'],
+          why: 'sine, cosine and tangent are ratios of the sides of a right triangle, chosen by one of its angles, and you rearrange them with the same do-the-same-to-both-sides steps as a linear equation' },
       ],
     },
   };

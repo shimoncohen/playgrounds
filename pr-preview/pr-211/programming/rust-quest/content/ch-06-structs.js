@@ -28,7 +28,7 @@ RQ.CH.push({
       goal:'Write a <code>struct</code> called <code>Critter</code> with a <code>name</code> (a <code>String</code>) and an <code>age</code> (a <code>u32</code>). In <code>main</code>, build a <code>Critter</code> called <code>Pip</code> who is <code>5</code>, and print <code>Pip is 5</code> by reading the two fields back.',
       how:[
         'The whole program describes a critter, builds one, and reads its parts back. A <code>struct</code> is a type you design yourself: a group of fields, each with a name and a type. A tuple keeps values together by position, and a <code>struct</code> gives every part a name.',
-        '<code>struct Critter { name: String, age: u32 }</code> declares it. Each field is a name, a <code>:</code> and a type, and the fields are separated by commas.',
+        '<code>struct Critter { name: String, age: u32 }</code> declares it. Each field is a name, a <code>:</code> and a type, and the fields are separated by commas. <code>u32</code> is a whole number that cannot be negative, like <code>u8</code> but with room for billions, which suits an age.',
         '<code>Critter { name: String::from("Pip"), age: 5 }</code> builds one. Every field gets a value, in any order.',
         '<code>pet.name</code> and <code>pet.age</code> read the fields with a <code>.</code>, like the <code>.0</code> on a tuple, but with names.'
       ],
@@ -99,7 +99,7 @@ RQ.CH.push({
       how:[
         'The whole program puts the building of a <code>Critter</code> inside the <code>Critter</code> type itself, so every caller builds critters the same way. This is the promise from chapter 4: <code>::</code> names a function that belongs to a type, and now you write your own.',
         '<code>impl Critter { ... }</code> opens a block of functions that belong to <code>Critter</code>. A function in it with no <code>self</code> parameter is an <em>associated function</em>, and you call it with <code>Critter::new(...)</code>.',
-        '<code>fn new(name: &amp;str, age: u32) -> Critter</code> takes the pieces and returns a finished <code>Critter</code>. Inside, <code>String::from(name)</code> turns the borrowed text into an owned <code>String</code> for the <code>name</code> field.',
+        '<code>fn new(name: &amp;str, age: u32) -> Critter</code> takes the pieces and returns a finished <code>Critter</code>. Inside, <code>String::from(name)</code> turns the borrowed text into an owned <code>String</code> for the <code>name</code> field. A field whose value is a variable of the same name can be written once: <code>age</code> alone means <code>age: age</code>.',
         'The last expression of the body, <code>Critter { name: ..., age: ... }</code>, has no <code>;</code>, so it is the value the function returns. <code>Self</code> is another way to write <code>Critter</code> inside an <code>impl</code>.'
       ],
       explain:'<code>String::from</code> is exactly this kind of function: a function that belongs to <code>String</code> and builds one. An <code>impl</code> block is how you give your own types the same thing. Naming it <code>new</code> is only a habit, not a rule.',
@@ -140,6 +140,7 @@ RQ.CH.push({
         'The whole program makes two counters, bumps the first one twice and the second once, and prints both. <code>bump</code> adds one to the counter it was called on.',
         'A plain <code>&amp;self</code> is a read-only loan, like a plain <code>&amp;</code> in chapter 5, so changing <code>self.n</code> through it is the error <code>E0594</code>.',
         'A method that changes its <code>struct</code> borrows it mutably: <code>&amp;mut self</code>. The caller then needs the variable to be <code>mut</code>, and the hidden <code>main</code> already declares its counters that way.',
+        '<code>self.n += 1;</code> is short for <code>self.n = self.n + 1;</code>: it changes the field in place.',
         'Only the signature changes. The body <code>self.n += 1;</code> stays as it is.'
       ],
       explain:'The three ways to take the value are the three ways to take any argument. <code>self</code> takes it away, <code>&amp;self</code> reads it, and <code>&amp;mut self</code> changes it. Choose the weakest one that does the job, and the caller can do more with its variable afterwards.',

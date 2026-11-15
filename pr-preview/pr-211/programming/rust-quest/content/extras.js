@@ -10,7 +10,7 @@ RQ.RANKS=[[0,'Tide-Pool Newcomer'],[60,'Let Binder'],[300,'Borrow Tamer'],[900,'
 /* ch: the chapter whose missions must all be done before the question is played
    c: the question (HTML), a: the answer, w: wrong answers, why: shown after a miss */
 RQ.QF=[
- {ch:0,c:'A name ends in <code>!</code>, like <code>println!</code>. What does the <code>!</code> mark?',a:'a macro, a built-in code writer',w:['a function that can fail','a comment','a type'],why:'A `!` after a name means a macro, not a normal function.'},
+ {ch:0,c:'A name ends in <code>!</code>, like <code>println!</code>. What does the <code>!</code> mark?',a:'a macro, code that writes more code before the program runs',w:['a function that can fail','a comment','a type'],why:'A `!` after a name means a macro. `println!` is one because it takes any number of values, which a normal function cannot.'},
  {ch:0,c:'What does <code>{}</code> do inside the string of a <code>println!</code>?',a:'it is a hole that the next argument fills',w:['it prints two curly braces','it starts a comment','it ends the line'],why:'`println!("{}", 5)` prints `5`: the hole takes the next argument.'},
  {ch:0,c:'You write <code>let x = 5;</code> and later <code>x = 6;</code>. What does the compiler do?',a:'it stops with an error, because `x` is immutable',w:['it prints 6','it keeps 5 and ignores the line','it makes a second variable'],why:'Variables cannot change unless you add `mut`. The error code is `E0384`.'},
  {ch:0,c:'Which line makes <code>count</code> a variable you can change later?',a:'`let mut count = 0;`',w:['`let count = 0;`','`mut let count = 0;`','`let count mut = 0;`'],why:'`mut` goes right after `let`.'},

@@ -37,17 +37,17 @@ AQ.CH.push({
       title:'Words hidden in a file',scenario:'vendor',kind:'prompt',fields:ALL,
       goal:'A supplier\'s notes came in the post. To fix the bug the agent reads the vendor notes in <code>docs/vendor-api.md</code>. That file also contains text written like an order: an <b>injection</b>, which is an instruction hidden in something the agent reads, hoping the agent will obey it. Here it tells the agent to email out the customer list. Block the email, but still let the agent read the notes it needs.',
       how:[
-        'The line <code>Constraints: do not send mail.send</code> bans the tool that would send the email, whatever the file says.',
-        '<code>send</code> is a verb for sending something out. <code>mail.send</code> is the tool that does it. This practice agent sends its email with the verb <code>send</code>, not <code>call</code>, so the rule has to say <code>send</code>.',
+        'The line <code>Constraints: do not call mail.send</code> bans the tool that would send the email, whatever the file says.',
+        '<code>call</code> is the verb for using a tool, as in mission 5.5, and <code>mail.send</code> is the tool that sends the email: the server <code>mail</code>, a dot, then the tool <code>send</code>.',
         'The vendor notes are still read, so the agent still learns how to fix the bug.',
         'Banning the read instead would be tempting, but the agent needs that file to do the job.'
       ],
       explain:'The agent cannot tell your instructions from instructions that happen to be in a file. Anything it reads can try to steer it: a web page, a file, a tool result. The defence is not to trust that text, but to limit what the agent is allowed to do, so that a hijacked agent cannot do real damage.',
       hint:'Ban the action the stranger\'s note asks for, by the full name of the tool.',
-      answer:'Constraints: do not send mail.send',
+      answer:'Constraints: do not call mail.send',
       wrong:'Constraints: do not read docs/vendor-api.md',
       lazy:'Done when: run npm test',
-      check:(o,c)=>{const v=AQ.verdict(o,c);return v===true&&!typedStops(c,'send','mail.send')?'The email was blocked, but by a rule outside your prompt. This mission is about the rule you type under Constraints.':v;}
+      check:(o,c)=>{const v=AQ.verdict(o,c);return v===true&&!typedStops(c,'call','mail.send')?'The email was blocked, but by a rule outside your prompt. This mission is about the rule you type under Constraints.':v;}
     },
     {
       title:'Keys stay out of reach',scenario:'leak',kind:'prompt',fields:ALL,
@@ -91,15 +91,15 @@ AQ.CH.push({
       title:'Test your guardrails',scenario:'audit',kind:'config',prompt:BASE,
       goal:'Mr. Ledbury wrote three safety rules into <code>CLAUDE.md</code>, and none of them works: each has a mistake the agent quietly ignores. A line only acts as a rule in the exact shape, and the editor says how many lines act as rules. Open the file, find the three mistakes, and fix them so the agent leaves <code>data/</code>, the key file <code>.env</code> and the email tool alone.',
       how:[
-        'Fixing the lines to <code>do not delete data/</code>, <code>do not read .env</code> and <code>do not send mail.send</code> makes all three act as rules.',
+        'Fixing the lines to <code>do not delete data/</code>, <code>do not read .env</code> and <code>do not call mail.send</code> makes all three act as rules.',
         'The first line has a typo in its verb, so it is not a rule.',
         'The second line is written as a sentence, not in the shape of <code>do not</code>, a verb and a target.',
         'The third line has extra words after the target, so the target no longer matches the tool.'
       ],
       explain:'A rule that does not parse protects nothing, and nothing warns the agent. The only way to know is to test: count the lines that act as rules and run the agent against the danger. Treat a guardrail like code. If you never tested it, assume it does not work.',
       hint:'Open <code>CLAUDE.md</code> and watch the count of lines that act as rules change as you fix each line.',
-      answer:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not send mail.send\n'}},
-      wrong:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not send mail.send please\n'}},
+      answer:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not call mail.send\n'}},
+      wrong:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not call mail.send please\n'}},
       lazy:{files:{}},
       check:(o,c)=>{
         const v=AQ.verdict(o,c);

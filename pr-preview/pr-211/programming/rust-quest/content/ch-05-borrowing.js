@@ -174,6 +174,7 @@ RQ.CH.push({
       how:[
         'The whole program asks <code>head</code> for the front of three different texts. <code>head</code> does not build a new <code>String</code>: it hands back a slice that points into the text it was lent.',
         'The signature <code>fn head(s: &str, n: usize) -> &str</code> takes one reference and gives one reference back. Rust reads that as "the result borrows from <code>s</code>", because <code>s</code> is the only reference that comes in.',
+        '<code>usize</code> is the whole-number type Rust uses for lengths and positions, so <code>n</code> is how many letters to keep.',
         'The body is the slice itself: <code>&s[..n]</code>. It is the last line and has no <code>;</code>, so it is the value the function returns.',
         'The slice from <code>head</code> points into the <code>String</code> in <code>main</code>, so it can be used until that <code>String</code> is changed or moved.'
       ],
@@ -233,7 +234,8 @@ RQ.CH.push({
         'The whole program picks the longer of two texts. Today it returns a <code>&str</code>, and Rust cannot tell whether that reference borrows from <code>a</code> or from <code>b</code>. It stops with <code>E0106</code>, "missing lifetime specifier".',
         'A <em>lifetime</em> is how long a reference stays valid. With one reference coming in, Rust knows the answer borrows from it (last mission). With two, it needs to be told which, and with none it has nothing to borrow from at all.',
         'Chapter 10 shows how to tell it. Until then the fix is to return an owned <code>String</code>: change <code>-> &str</code> to <code>-> String</code>, so the caller becomes the owner and nothing is borrowed.',
-        '<code>a.to_string()</code> and <code>b.to_string()</code> build the owned <code>String</code> in each branch. Now the answer does not depend on either input, so it can outlive both.'
+        '<code>a.to_string()</code> and <code>b.to_string()</code> build the owned <code>String</code> in each branch. Now the answer does not depend on either input, so it can outlive both.',
+        '<code>a.len()</code> gives how long a text is, counted in bytes: one for each plain English letter.'
       ],
       explain:'<code>E0106</code> also appears for a function with no reference parameter at all, like <code>fn make() -> &String</code>: the reference would have nothing to point at. In every case the simple way out is the same: return the value itself, as a <code>String</code>, instead of a reference to it. Ownership moves to the caller, as it did in chapter 4. Chapter 10 shows how to return a reference that does borrow from an input.',
       hint:'Change the return type to <code>String</code> and write <code>a.to_string()</code> and <code>b.to_string()</code> in the two branches.',
@@ -261,6 +263,7 @@ RQ.CH.push({
       how:[
         'The whole program makes a copy of the text and hands back the first two letters of the copy. The copy is a local variable, so it is freed at the closing <code>}</code> of the function. A reference to it would point at freed memory, so Rust refuses with <code>E0515</code>.',
         'Here the one-reference rule from the earlier mission is not the problem: there is exactly one reference coming in. The slice borrows from the wrong thing: a value that belongs to the function.',
+        '<code>s.to_owned()</code> makes an owned <code>String</code> copy of borrowed text, just like <code>s.to_string()</code>.',
         'Borrow from what the caller owns instead: slice <code>s</code> itself, with <code>&s[..2]</code>. The copy is not needed, and the slice stays valid for as long as the caller keeps its text.'
       ],
       explain:'<code>E0515</code> means a function tried to return a reference to one of its own locals, or to a parameter it owns. That is called a dangling reference: a pointer to memory that is already gone. Many languages let it compile and fail strangely at run time. Rust cannot: a reference you return has to point at something that outlives the call, such as the input you were lent. If you really need a new text, return an owned <code>String</code> instead.',

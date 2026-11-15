@@ -65,7 +65,7 @@ AQ.CH.push({
       goal:'On Dana\'s kitchen table you saved a recipe page into <code>clippings/</code>, and Cog reads it to pull out the recipe. But a page can hide text written like an order, and this one tells the agent to read <code>notes/passwords.txt</code> and send what it finds to an address. Let the agent read the page, and stop the two things the page asks for: the read of the password file, and the email through the tool <code>mail.send</code>.',
       how:[
         'The two lines <code>Constraints: do not call mail.send</code> and <code>Constraints: do not read notes/passwords.txt</code> stop the email and the password read that the page asks for, and leave the page itself readable.',
-        'A tool is always a <code>call</code>, so its rule starts with <code>do not call</code>. In mission 7.2 the same email was banned with <code>do not send mail.send</code>, because that practice agent sent its email with the verb <code>send</code>. Here the agent uses the tool, so a rule with <code>send</code> matches nothing and the email goes out.',
+        'A tool is always a <code>call</code>, so its rule starts with <code>do not call</code>. A rule with the verb <code>send</code> matches nothing the agent does, so the email goes out.',
         'Each rule stops one thing, so you need both. One rule alone leaves the other action free to run.',
         'Banning the page, <code>do not read clippings/recipe-page.md</code>, is tempting but wrong: the agent needs the page to get the recipe.'
       ],
