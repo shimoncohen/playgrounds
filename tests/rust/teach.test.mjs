@@ -28,20 +28,20 @@ describe('feature tags follow the course order', () => {
 
 describe('previews', () => {
   for (const { ci, m } of flat) for (const p of m.previews) {
-    it(`${p.tag} is explained in the card text${p.home ? ' and names its home chapter' : ''}`, () => {
+    it(`${p.tag} is explained in the card text and names the later chapter that teaches it`, () => {
       assert.ok(p.wording);
       assert.ok(m.how.some((h) => h.includes(p.wording)) || m.explain.includes(p.wording), 'the preview wording must appear on the mission card');
-      if (p.home) {
-        assert.match(plain(p.wording), new RegExp(`Chapter ${p.home}\\b`));
-        assert.ok(p.home - 1 > ci, 'the home chapter must come later in the course');
-        assert.ok(RQ.CH[p.home - 1]?.missions.some((h) => h.defines.includes(p.tag)), `chapter ${p.home} must define "${p.tag}"`);
-      } else assert.match(plain(p.wording), /macro/);
+      assert.ok(p.home, 'a preview must name its home chapter, or the mission must define the term in place');
+      assert.match(plain(p.wording), new RegExp(`Chapter ${p.home}\\b`));
+      assert.ok(p.home - 1 > ci, 'the home chapter must come later in the course');
+      assert.ok(RQ.CH[p.home - 1]?.missions.some((h) => h.defines.includes(p.tag)), `chapter ${p.home} must define "${p.tag}"`);
     });
   }
 });
 
 describe('terms on a mission card are not used before the mission that teaches them', () => {
-  const text = (m) => plain([m.title, m.goal, m.hint, m.explain, ...m.how].join('\n'));
+  const taught = (m) => plain([m.title, m.goal, m.explain, ...m.how].join('\n'));
+  const text = (m) => taught(m) + '\n' + plain(m.hint);
   // term -> [regex, chapter, mission (0-based) that first teaches it]
   const FIRST = {
     hole: [/\bholes?\b/i, 0, 1],
@@ -67,7 +67,7 @@ describe('terms on a mission card are not used before the mission that teaches t
         const used = re.test(text(f.m));
         if (f.ci < ci || (f.ci === ci && f.mi < mi)) assert.equal(used, false, `${f.ci}.${f.mi} uses "${term}" before ${ci}.${mi} teaches it`);
       }
-      assert.equal(re.test(text(RQ.CH[ci].missions[mi])), true, `${ci}.${mi} should teach "${term}"`);
+      assert.equal(re.test(taught(RQ.CH[ci].missions[mi])), true, `${ci}.${mi} should teach "${term}"`);
     });
   }
   it('chapter 1 does not lean on terms of later chapters', () => {
@@ -80,4 +80,35 @@ describe('terms on a mission card are not used before the mission that teaches t
     for (const q of RQ.QF.filter((x) => x.ch === 0)) assert.doesNotMatch(plain([q.c, q.a, ...q.w, q.why].join(' ')), later);
     for (const g of RQ.GUIDE.filter((x) => x.ch === 0)) assert.doesNotMatch(plain(g.what), later);
   });
+});
+
+describe('syntax the learner reads in a starter or answer is explained on a card before that mission', () => {
+  const taught = (m) => plain([m.title, m.goal, ...m.how].join('\n'));
+  const code = (m) => `${m.starter}\n${m.answer}\n${plain(m.hint)}`;
+  // item -> [code regex, card regex, chapter, mission (0-based) that teaches it]
+  const SYNTAX = {
+    comment: [/\/\//, /starts with \/\/ is a comment/, 0, 0],
+    fnMainParens: [/fn main\(\)/, /empty \(\) is where the inputs of a function go/, 0, 0],
+    modulo: [/\s%\s/, /% gives what is left/, 6, 3],
+    equals: [/==/, /== asks whether/, 6, 3],
+    elseIf: [/else if/, /else if adds another question/, 6, 3],
+    plusEquals: [/\+=/, /self\.n \+= 1; is short for/, 5, 5],
+    len: [/\.len\(\)/, /a\.len\(\) gives how long/, 4, 7],
+    usize: [/usize/, /usize is the whole-number type/, 4, 5],
+    toOwned: [/\.to_owned\(\)/, /s\.to_owned\(\) makes an owned/, 4, 8],
+    u32: [/\bu32\b/, /u32 is a whole number/, 5, 0],
+    fieldShorthand: [/\b[A-Z]\w* \{\s*(\w+\s*:[^,}]*,\s*)*\w+\s*[,}]/, /age alone means/, 5, 3],
+    insert: [/\.insert\(/, /counts\.insert\(key, value\) adds/, 7, 8],
+    letNoValue: [/\blet (mut )?\w+(: [^=;\[]+)?;/, /let result: &str; only reserves/, 9, 1],
+    atLeast: [/>=/, />= means "bigger than or equal to"/, 9, 3],
+    underscoreLoop: [/for _ in/, /for _ in 0\.\.3 runs/, 11, 2],
+  };
+  for (const [item, [codeRe, cardRe, ci, mi]] of Object.entries(SYNTAX)) {
+    it(`${item} is explained in ${ci}.${mi} and not used before`, () => {
+      assert.match(taught(RQ.CH[ci].missions[mi]), cardRe, `${ci}.${mi} should explain ${item} before the learner solves it`);
+      for (const f of flat) {
+        if (f.ci < ci || (f.ci === ci && f.mi < mi)) assert.doesNotMatch(code(f.m), codeRe, `${f.ci}.${f.mi} shows ${item} before ${ci}.${mi} explains it`);
+      }
+    });
+  }
 });

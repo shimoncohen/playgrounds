@@ -16,12 +16,16 @@ assert.ok(line, 'content marker moved: const qfOpen=');
 const qfOpen = new Function('QF', 'CH', line + '\nreturn qfOpen;')(QF, CH);
 
 const plain = (t) => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-/* everything a learner reads on a mission card (starter comments and the answer key are not teaching text) */
-const cardText = (m) => plain([m.title, m.goal, m.note, m.hint, m.explain, ...(m.how || []), ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || '')),
-  ...(m.steps || []).map((s) => [s.title, s.goal, s.hint, s.explain, ...(s.how || [])].join(' '))].filter(Boolean).join('\n'));
+/* everything a learner reads on a mission card (starter comments and the answer key are not teaching text); a hint is use but not teaching */
+const cardText = (m, hint) => plain([m.title, m.goal, m.note, hint && m.hint, m.explain, ...(m.how || []), ...(m.anat || []).map((a) => a[0] + ' ' + (a[2] || '')),
+  ...(m.steps || []).map((s) => [s.title, s.goal, hint && s.hint, s.explain, ...(s.how || [])].join(' '))].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((c, ci) => c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
-const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && x.mi < mi));
+CH.forEach((c, ci) => {
+  flat.push({ ci, mi: -1, text: plain(c.intro) });
+  c.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) }));
+});
+/* a chapter intro is the first card of its chapter: it counts as before every mission but the first, whose card it may explain */
+const before = (ci, mi) => flat.filter((x) => x.ci < ci || (x.ci === ci && (x.mi >= 0 ? x.mi < mi : mi > 0)));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches it or defines it in place (its own card may use it)]
 const FIRST = {
@@ -41,18 +45,54 @@ const FIRST = {
   CSV: [/\bCSV\b/, 15, 6],
   true: [/\|\| true/, 18, 6],
   'grep --': [/grep -- /, 18, 6],
+  '<': [/(^|\s)<{1,3}\s*[\w$"'.\/-]+\.\w+|\bdone\s*</, 12, 5],
+  awk: [/\bawk\b/, 15, 0],
+  group: [/\bgroups?\b/i, 9, 0],
+  sleep: [/\bsleep\b/, 16, 1],
+  set: [/(^|[;&|\s])set\s*[-+]/, 18, 0],
+  'quoted sed script': [/\bsed\b[^\n]*['"]/, 7, 2],
+  '2>': [/\b2\s*>/, 10, 0],
+  '/dev/null': [/\/dev\/null/, 10, 0],
 };
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   describe(`"${term}"`, () => {
     it(`is not used before ${ci}.${mi}, where it is introduced`, () => {
       for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+      assert.ok(flat.some((x) => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
     });
     it('is not asked in quick-fire before its chapter is done', () => {
       QF.forEach((q) => { if (re.test(q[0] + ' ' + q[1][0])) assert.ok(q.ch >= ci, `"${q[0]}" needs chapter ${ci}`); });
     });
   });
 }
+
+// item -> [chapter, mission (0-based), regex for the explanation]. It must sit in what the learner reads before solving
+// (title, goal, note, how steps, and for a chapter's first mission its intro); explain and hints do not count.
+const pre = (ci, mi) => {
+  const m = CH[ci].missions[mi];
+  return plain([mi === 0 && CH[ci].intro, m.title, m.goal, m.note, ...(m.how || [])].filter(Boolean).join('\n'));
+};
+const EXPLAINED = {
+  '<': [12, 5, /<\s+is the opposite of\s+>[^.]*\binput\b/],
+  'awk: what': [15, 0, /\bawk\b[^.]*\bsplits each line into fields\b/],
+  'awk: why not cut': [15, 0, /\bUnlike cut, awk\b[^.]*\bsums\b[^.]*\btests\b/],
+  group: [9, 0, /\bgroup\b[^.]*\bset of users\b/],
+  sleep: [16, 1, /\bsleep 30\b[^.]*\bdoes nothing\b[^.]*\bslow job\b/],
+  set: [18, 0, /\bset\b[^.]*\bon with -[^.]*\boff with \+/],
+  'quoting the sed script': [7, 2, /\bQuote\b[^.]*\bsed script\b[^.]*\bbash\b/],
+  'streams': [10, 0, /\bstreams\b[^.]*\bnormal output\b[^.]*\berrors\b/],
+  '/dev/null': [10, 0, /\/dev\/null\b[^.]*\bthrows away\b/],
+};
+for (const [term, [ci, mi, def]] of Object.entries(EXPLAINED)) {
+  it(`"${term}" is explained in what ${ci}.${mi} shows before solving`, () => assert.match(pre(ci, mi), def));
+}
+
+describe('plain-text chapter fields', () => {
+  // ui.js escapes name, badge and intro, so a tag would show as literal text
+  it('no chapter name, badge or intro contains an HTML tag', () => {
+    for (const [i, c] of CH.entries()) for (const k of ['name', 'badge', 'intro']) assert.doesNotMatch(c[k] || '', /<\/?[a-z]/i, `chapter ${i} ${k}`);
+  });
+});
 
 describe('terms are defined in place the first time they appear', () => {
   const card = (c, i) => plain(CH[c].missions[i].goal + ' ' + CH[c].missions[i].explain + ' ' + (CH[c].missions[i].how || []).join(' '));

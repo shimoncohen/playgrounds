@@ -11,9 +11,10 @@ const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = loadContent('harbor-quest', {
 });
 
 const plain = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
-const cardText = m => plain([m.t, m.i, m.g, m.h, (m.a || []).map(x => x[0]).join(' '), ...(m.steps || []).map(s => [s.g, s.h, (s.a || []).map(x => x[0]).join(' ')].join('\n')), m.after].filter(Boolean).join('\n'));
+/* a hint counts as use of a term but not as teaching it */
+const cardText = (m, hint) => plain([m.t, m.i, m.g, hint && m.h, (m.a || []).map(x => x[0]).join(' '), ...(m.steps || []).map(s => [s.g, hint && s.h, (s.a || []).map(x => x[0]).join(' ')].join('\n')), m.after].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m) })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: cardText(m, true), taught: cardText(m, false) })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 
 // term -> [regex that uses it, chapter, mission (0-based) that first teaches or defines it in place (its own card may use it)]
@@ -57,10 +58,42 @@ for (const [term, [re, ci, mi, soft]] of Object.entries(FIRST)) {
   if (soft) continue;
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci + 1} (which teaches it) is done`, () => {
     for (const q of QF) if (re.test(q[0])) assert.ok(q[2] >= ci, `"${q[0]}" needs chapter ${ci}`);
+  });
+}
+
+// item -> [regex for a use, chapter, mission (0-based) that explains it, regex for the explanation]. The explanation must sit in
+// what the learner reads before solving (intro and goal); the after text, hints and chips do not count.
+const pre = m => plain([m.t, m.i, m.g, ...(m.steps || []).map(s => s.g)].filter(Boolean).join('\n'));
+const EXPLAINED = {
+  '&&': [/&&/, 4, 2, /&& means[^.]*\bonly if\b[^.]*\bfirst\b/],
+  '-it': [/(^|\s)-(?:it|ti)\b/, 2, 3, /-i\b[^.]*\bkeyboard\b[^.]*-t\b[^.]*\bterminal\b/],
+  'kubectl run NAME': [/\bkubectl run\b/, 7, 3, /\brun hello\b[^.]*\bnames the pod\b/],
+  '--image': [/--image\b/, 7, 3, /--image=nginx\b[^.]*\bwhich image\b/],
+  '--port': [/--port\b/, 9, 1, /--port=80\b[^.]*\bdoor\b[^.]*\bsame port\b/],
+  'svc/NAME': [/\bsvc\/\w/, 9, 4, /svc\/web\b[^.]*\bservice called web\b/],
+  'LAPTOP:SERVICE ports': [/\b9090:80\b/, 9, 4, /9090:80\b[^.]*\blaptop\b[^.]*\bfirst\b/],
+  'deployment/NAME': [/\bdeployments?\/\w/, 10, 0, /deployment\/web\b[^.]*\bdeployment called web\b/],
+  'CONTAINER=IMAGE': [/(?<![-\w])\w+=nginx:/, 10, 0, /nginx=nginx:1\.27\b[^.]*\bcontainer\b[^.]*\bimage\b/],
+  'apply -f': [/\b(apply|delete|create) -f\b/, 11, 2, /-f\b[^.]*\bnames the file\b/],
+  'delete -f': [/\bdelete -f\b/, 11, 6, /-f\b[^.]*\bnames the file\b/],
+  'edit FILE': [/\bedit \w/, 5, 6, /edit FILE\b[^.]*\beditor\b[^.]*\bSave\b/],
+  FROM: [/\bFROM\b/, 5, 1, /FROM\b[^.]*\bimage to build on\b/],
+  RUN: [/\bRUN\b/, 5, 1, /RUN\b[^.]*\bonce\b[^.]*\bbuild/],
+  CMD: [/\bCMD\b/, 5, 1, /CMD\b[^.]*\beach time a container starts\b/],
+  '80/tcp': [/\b\d+\/tcp\b/, 2, 1, /80\/tcp\b[^.]*\btcp\b[^.]*\bconnection\b/],
+  ConfigMap: [/ConfigMap/, 11, 1, /ConfigMap\b[^.]*\bbundle of settings\b/],
+  layers: [/\blayers?\b/i, 1, 0, /layers?\b[^.]*\bone per step\b/],
+};
+for (const [term, [re, ci, mi, def]] of Object.entries(EXPLAINED)) {
+  test(`"${term}" is not used before ${ci}.${mi}`, () => {
+    for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is explained at ${ci}.${mi}`);
+  });
+  test(`"${term}" is explained in what ${ci}.${mi} shows before solving`, () => {
+    assert.match(pre(CH[ci].missions[mi]), def);
   });
 }
 
@@ -81,7 +114,6 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(3, 6), /ping sends a few tiny test messages/);
   assert.match(m(3, 6), /DNS is the phone book/);
   assert.match(m(4, 1), /echo prints the text you give it/);
-  assert.match(plain(CH[4].missions[2].h), /&& means "and then/);
   assert.match(m(4, 3), /docker volume ls lists your volumes/);
   assert.match(m(4, 8), /named settings handed to a program when it starts/);
   assert.match(m(6, 0), /YAML, a simple indented text format/);

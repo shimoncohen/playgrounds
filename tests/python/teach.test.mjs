@@ -32,11 +32,29 @@ const FIRST = {
   'if statement': [/\bstatement\b|\bkeyword\b/, null],
 };
 
+const SYNTAX = {
+  '# note':           [/^#/m, /ignores/],
+  'colon and indent': [/:[ \t]*\n[ \t]+\S/, /block follows/],
+  'mutable':          [/\w\[[^\]]+\]\s*=[^=]/, /change it in place/],
+  'module dot':       [/\b(random|math|datetime|time|os|sys|json|re|string|collections|itertools)\.\w/, /inside the random module/],
+  'except ValueError':[/except\b/, /only that mistake/],
+  'store it back':    [/(\w+)\s*=\s*\w+\(\1\)/, /returned value back/],
+};
+
 const noTags = t => t.replace(/<\/?[a-z][^>]*>/gi, '');
+const taught = m => noTags([m.title, m.goal, m.explain, m.note, m.starter, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n'));
 const texts = m => noTags([m.title, m.goal, m.explain, m.note, m.starter, m.answer, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n')) + '\n' + String(m.check).match(/'[^']*'/g)?.join('\n');
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
+for (const [name, [use, say]] of Object.entries(SYNTAX)) {
+  test(`syntax "${name}" is explained by the first mission that uses it`, () => {
+    const i = flat.findIndex(x => use.test(CH[x.ci].missions[x.mi].starter + '\n' + CH[x.ci].missions[x.mi].answer));
+    assert.ok(i >= 0, 'no mission code uses it');
+    assert.ok(say.test(flat.slice(0, i + 1).map(x => x.teach).join('\n')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+  });
+}
+
 const qtext = q => q.c + '\n' + q.why + '\n' + q.w.join('\n');
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
@@ -49,7 +67,7 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   }
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.teach)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of QF) if (re.test(qtext(q))) assert.ok(q.ch >= ci, `quick-fire "${q.c.slice(0, 40)}" needs chapter ${ci}`);

@@ -35,15 +35,40 @@ const FIRST = {
   subtree:     [/\bsubtree\b/i, 5, 3],
 };
 
-const texts = m => [m.goal, m.explain, m.note, m.starter, m.answer].filter(Boolean).join('\n');
+// the answer is the hint: it counts as use but not as teaching
+const taught = m => [m.title, m.goal, m.explain, m.note, m.starter, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n');
+const texts = m => taught(m) + '\n' + m.answer;
 const flat = [];
-D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
+D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
+
+const SYNTAX = {
+  ';':               [/;/, /ends an instruction/],
+  'dot':             [/\w\.\w/, /dot reaches/],
+  '===':             [/===/, /exactly equal/],
+  '!==':             [/!==/, /is it different/],
+  '||':              [/\|\|/, /"or"/],
+  'else if':         [/else if/, /next test/],
+  'lookup as test':  [/if\s*\(!?\w+\[[^\]]+\]\)/, /finds nothing/],
+  'for (let i...)':  [/for\s*\(\s*let\s/, /start i at 0/],
+  'i++':             [/\+\+/, /after each round/],
+  'count++':         [/^\s*\w+\+\+;/m, /adds 1/],
+  'return;':         [/return;/, /leaves the function/],
+  '? :':             [/\s\?\s[^\n]*\s:\s/, /if the test is true/],
+  'const contents':  [/const (\w+) = \[[^\n]*\]\s*;?[\s\S]*\1\.(push|pop)/, /not the contents/],
+};
+for (const [name, [use, say]] of Object.entries(SYNTAX)) {
+  test(`syntax "${name}" is explained by the first mission that uses it`, () => {
+    const i = flat.findIndex(x => use.test(D.CH[x.ci].missions[x.mi].starter + '\n' + D.CH[x.ci].missions[x.mi].answer));
+    assert.ok(i >= 0, 'no mission code uses it');
+    assert.ok(say.test(flat.slice(0, i + 1).map(x => x.teach).join('\n').replace(/<\/?[a-z][^>]*>/gi, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+  });
+}
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.teach)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of D.QF) if (re.test(q.c + '\n' + q.why)) assert.ok(q.ch >= ci, `QF "${q.c.slice(0, 40)}" needs chapter ${ci}`);

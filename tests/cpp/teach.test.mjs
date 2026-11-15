@@ -32,10 +32,11 @@ const FIRST = {
 };
 
 const noTags = t => t.replace(/<\/?[a-z][^>]*>/gi, '');
-const prose = m => noTags([m.title, m.goal, m.explain, m.note, m.hint, ...(m.anat || []).map(a => a[2] || '')].filter(Boolean).join('\n'));
+const taughtProse = m => noTags([m.title, m.goal, m.explain, m.note].filter(Boolean).join('\n'));
+const prose = m => taughtProse(m) + '\n' + noTags(m.hint || '');
 const code = m => [m.start, m.ans].filter(Boolean).join('\n');
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: prose(m) + '\n' + code(m) + (mi === 0 ? '\n' + noTags(ch.intro) : '') })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: prose(m) + '\n' + code(m) + (mi === 0 ? '\n' + noTags(ch.intro) : ''), taught: taughtProse(m) + '\n' + code(m) + (mi === 0 ? '\n' + noTags(ch.intro) : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 const samples = q => Array.from({ length: 25 }, () => { const t = q.gen(); return [t.body, t.pre || '', t.why].join('\n'); });
 
@@ -49,10 +50,25 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   }
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.taught)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of QT) for (const s of samples(q)) if (re.test(s)) assert.ok(q.ch >= ci, `quick-fire "${s.slice(0, 40)}" needs chapter ${ci}`);
+  });
+}
+
+// code regex (what the learner sees in a starter or answer), prose regex (the card text that explains it), chapter, mission (0-based)
+const SYNTAX = {
+  'include cstdlib/ctime': [/#include <(cstdlib|ctime)>/, /standard puts <code>rand<\/code> and <code>srand<\/code> in <code>#include &lt;cstdlib&gt;<\/code> and <code>time<\/code> in <code>#include &lt;ctime&gt;<\/code>.*this quest's compiler requires them/, 3, 5],
+  'vector {} list':        [/vector<\w+> \w+ = \{/, /\{ \}<\/code> list after a vector's name fills it/, 6, 5],
+  'int main()':            [/int main\(\)/, /<code>int<\/code> in <code>int main\(\)<\/code> says/, 0, 0],
+  'case label':            [/\bcase \d+:/, /<code>case<\/code> label ends with <code>:<\/code>/, 3, 6],
+  'begin()':               [/\.begin\(\)/, /<code>begin\(\)<\/code> is the position of the first item/, 6, 6],
+};
+for (const [item, [codeRe, proseRe, ci, mi]] of Object.entries(SYNTAX)) {
+  test(`"${item}" is explained in ${ci}.${mi} and not shown before`, () => {
+    assert.match(CH[ci].missions[mi].explain + (CH[ci].missions[mi].note || ''), proseRe, `${ci}.${mi} should explain ${item}`);
+    for (const x of before(ci, mi)) assert.doesNotMatch(code(CH[x.ci].missions[x.mi]), codeRe, `${x.ci}.${x.mi} shows ${item} before ${ci}.${mi} explains it`);
   });
 }
 

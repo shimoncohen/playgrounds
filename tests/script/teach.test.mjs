@@ -53,10 +53,39 @@ const FIRST = {
 };
 
 const noTags = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '');
-const texts = m => noTags([m.title, m.goal, m.code, m.explain, m.hint, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
+// a hint counts as use but not as teaching: it is hidden until asked for
+const taught = m => noTags([m.title, m.goal, m.code, m.explain, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
+const texts = m => noTags([taught(m), m.hint].filter(Boolean).join('\n'));
 const flat = [];
-CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : '') })));
+CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
+const SYNTAX = {
+  'dot (console.log)':   [/\w\.\w/, /\bdot\b/],
+  'call brackets':       [/\w\(/, /Round brackets/],
+  '< > <= >=':           [/\s[<>]=?\s|[\w)][<>]=?[\w(]/, /less than/],
+  'dot (.length)':       [/\.length\b/, /fact about/],
+  '+ 1 after floor':     [/Math\.floor\([^\n]*\)\s*\+\s*\d|\d\s*\+\s*Math\.floor/, /shifts it/],
+  'const in for...of':   [/for\s*\(\s*const\s/, /fresh wagon/],
+  'generic <T>':         [/\w<[A-Za-z]\w*(\[\])?>/, /introduces T/],
+  'empty () call':       [/\w\(\s*\)/, /Empty brackets/],
+  'empty () definition': [/(function\s+\w+|\w+)\(\s*\)\s*\{|\(\s*\)\s*=>/, /takes nothing/],
+  'shorthand { add }':   [/(?<=[=(,:]\s*|return\s+)\{\s*\w+\s*[,}]/, /add: add/],
+  'braces destructure':  [/(const|let)\s*\{\s*\w+/, /match property names/],
+  'event loop':          [/setTimeout\(.*, 0\)/, /waiting jobs/],
+  'terminal':            [/^(node|npm)\s/m, /terminal is where/],
+  'quotes in node -e':   [/^node\s+-e\s+["']/m, /one piece/],
+  'single in double':    [/\w\('/, /single quotes/],
+  'require without .js': [/require\(\s*["']\.\/[\w-]+["']\s*\)/, /adds \.js/],
+};
+for (const [name, [use, say]] of Object.entries(SYNTAX)) {
+  test(`syntax "${name}" is explained by the first mission that uses it`, () => {
+    const i = flat.findIndex((x, k) => use.test(CH[x.ci].missions[x.mi].code));
+    assert.ok(i >= 0, `no mission code uses it`);
+    const upto = flat.slice(0, i + 1).map(x => x.teach).join('\n');
+    assert.ok(say.test(upto), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
+  });
+}
+
 const qtext = q => q.c + '\n' + q.o.join('\n') + '\n' + q.w;
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
@@ -69,7 +98,7 @@ for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   }
   test(`"${term}" is not used before ${ci}.${mi}`, () => {
     for (const x of before(ci, mi)) assert.ok(!re.test(x.text), `${x.ci}.${x.mi} uses "${term}" before it is taught at ${ci}.${mi}`);
-    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.text)), `${ci}.${mi} should be where "${term}" is introduced`);
+    assert.ok(flat.some(x => x.ci === ci && x.mi === mi && re.test(x.teach)), `${ci}.${mi} should be where "${term}" is introduced`);
   });
   test(`quick-fire never asks about "${term}" before chapter ${ci} is done`, () => {
     for (const q of FIRE) if (re.test(qtext(q))) assert.ok(q.ch >= ci, `quick-fire "${q.c.slice(0, 40)}" needs chapter ${ci}`);

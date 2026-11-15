@@ -106,6 +106,7 @@ RQ.CH.push({
       how:[
         `The whole program keeps a counter in <code>count</code>, makes a closure <code>tick</code> that does <code>count += 1</code>, calls it three times in a loop, and prints the counter.`,
         `A closure that changes a captured variable captures it with a <code>&mut</code> borrow, and holding that borrow means the closure itself changes every time it runs. Calling it therefore needs the closure to be <code>mut</code>, just like calling <code>push</code> needs a <code>mut</code> vector.`,
+        `<code>for _ in 0..3</code> runs the loop body three times. The <code>_</code> means "I do not need the count".`,
         `The error <code>E0596</code> names <code>tick</code>: it cannot be borrowed as mutable, as it is not declared as mutable. The variable <code>count</code> is already <code>mut</code>, so the problem is on the line that declares the closure.`,
         `Write <code>let mut tick = ...</code>. The counter ends up at <code>3</code>, and because the loop is the last user of <code>tick</code>, the final <code>println!</code> may read <code>count</code> again.`
       ],

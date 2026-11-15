@@ -820,7 +820,7 @@ describe('chapter 7: resolvers and caches', () => {
 // Keys are the chapter-1 mission indexes; a term is introduced in that mission's goal itself (defined in place) or by an
 // earlier mission, and the intro of chapter 1 may not use any of them.
 describe('chapter 1: terms are not used before the mission that introduces them', () => {
-  const FIRST = { Ethernet: 1, TTL: 2, router: 2, ARP: 3, MAC: 3, frame: 3, broadcast: 3, NAT: 99, OSI: 1, 'TCP/IP': 1 };
+  const FIRST = { Ethernet: 1, IPv4: 1, ICMP: 1, TTL: 2, router: 2, ARP: 3, MAC: 3, frame: 3, broadcast: 3, NAT: 99, OSI: 1, 'TCP/IP': 1 };
   const hit = (t, w) => new RegExp(`(?<![\\w/])${w}(?![\\w/])`, w === 'router' ? 'i' : '').test(plain(t));
   NQ.CH[0].missions.forEach((m, i) => {
     it(`${i + 1} ${m.title}`, () => {
