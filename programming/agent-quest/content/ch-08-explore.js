@@ -51,7 +51,7 @@ AQ.CH.push({
     },
     {
       title:'Hand the notes to the next run',scenario:'handoff',kind:'prompt',fields:ALL,
-      goal:'Yesterday Cog left notes in <code>NOTES.md</code> about a bug in the cart. Read them in the Files panel, then start a new run that fixes the bug. The cart folder is big: a run that reads all of it holds more than 400 tokens at once. Stay under that limit, and have the agent prove the fix.',
+      goal:'Yesterday Cog left notes in <code>NOTES.md</code> about a bug in the cart. Read them in the Files panel, then start a new run that fixes the bug. The cart folder is big: a run that reads all of it holds more than 400 tokens at once. Stay under that limit, and have the agent prove the fix. When the work is done, a change usually goes to a <b>pull request</b> (PR): the page where teammates read your change before it joins the main code.',
       how:[
         'The two lines <code>Files: NOTES.md, src/cart/total.js</code> and <code>Done when: run npm test</code> give the agent the notes and the one file they point to, then check the result.',
         'The agent can change a file only if it has read it. The notes tell it where the bug is, and reading that file lets it change the file.',

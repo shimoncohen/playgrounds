@@ -10,7 +10,7 @@ const FIELDS=['goal','donewhen','constraints','files'];
 AQ.CH.push({
   name:'Context and tokens',badge:'Small Note',tier:'core',
   story:'Cog can only hold so much at once; watch the meter while he sorts the receipts and find the small note that keeps slipping out.',
-  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. Everything the agent holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real model.',
+  intro:'Cog can only hold so much at once, and one small note keeps slipping out of his hands while he sorts the receipts. Everything the agent holds is measured in <b>tokens</b>. In this chapter you will watch the meter, see what gets squeezed out when the window fills up, and learn to keep a setup light. Every size here is a teaching-scale pretend number, so you can see the effects without a real AI service.',
   learned:['Setup size','Earlier messages','Window limit','Subagent cost'],
   missions:[
     {
@@ -78,7 +78,7 @@ AQ.CH.push({
     },
     {
       title:'Pick a cheaper helper',scenario:'delegate',kind:'config',prompt:BASE+'\nDone when: run npm test',
-      goal:'Cog can call in a little helper for errands. A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. A bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
+      goal:'Cog can call in a little helper for errands. A <b>subagent</b> is a helper the main agent can hand a small job to, with its own model. The <b>model</b> is the AI that helper runs on, and a bigger model costs more every time it runs: <code>small</code> costs 1 unit, <code>standard</code> 3 and <code>large</code> 10 (relative units, not money). The <code>helper</code> subagent only does simple lookups, but it is set to <code>large</code>. Keep the helper and make it cost at most '+CEILING+' unit.',
       how:[
         'Changing <code>model: large</code> to <code>model: small</code> in <code>.claude/agents/helper.md</code> cuts the helper\'s cost from 10 units to 1, and the helper stays.',
         '<code>name: helper</code> is the helper\'s name. Leave it as it is, or the helper is gone.',

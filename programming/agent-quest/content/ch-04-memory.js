@@ -12,7 +12,7 @@ const LOAD=' A memory file in a folder only loads once the agent reads a file in
 AQ.CH.push({
   name:'Memory',badge:'Corkboard',tier:'core',
   story:'Cog forgets overnight, so pin house rules where he will see them, and find the corkboard.',
-  intro:'Cog forgets everything overnight, so the house rules must be pinned where he will see them: between runs the agent keeps only what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a folder memory file costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
+  intro:'Cog forgets everything overnight, so the house rules must be pinned where he will see them: between runs the agent keeps only what is written in its memory files. You already met the project memory file. Now you will keep it short, put a rule next to the code it protects, and see what a memory file kept inside a folder costs. This simulator reads only the project memory file and memory files inside folders, all named <code>CLAUDE.md</code>. It does not read a personal memory file or an <code>AGENTS.md</code> file.',
   learned:['Folder memory','Where a rule belongs','Memory size','When memory loads'],
   missions:[
     {
@@ -32,7 +32,7 @@ AQ.CH.push({
     },
     {
       title:'Rules where the code lives',scenario:'legacy',kind:'config',prompt:BASE,facts:['memory-files'],
-      goal:'Mr. Ledbury\'s old billing code lives in its own corner of the shop. The root <code>CLAUDE.md</code> is read on every run, in every folder, so a rule about one folder costs tokens everywhere. A memory file can also live inside the folder it is about. This is <b>folder memory</b>: the agent loads it once it reads a file there. Two such files are waiting, in <code>src/</code> and in <code>docs/</code>. Put the legacy rule where it belongs.',
+      goal:'Mr. Ledbury\'s old billing code lives in its own corner of the shop. The root <code>CLAUDE.md</code>, the one in the project\'s top folder, is read on every run, in every folder, so a rule about one folder costs tokens everywhere. A memory file can also live inside the folder it is about. This is <b>folder memory</b>: the agent loads it once it reads a file there. Two such files are waiting, in <code>src/</code> and in <code>docs/</code>. Put the legacy rule where it belongs.',
       how:[
         'The line <code>do not edit src/legacy/</code> in <code>src/CLAUDE.md</code> works like the same rule in the root file, but only costs tokens when the agent works in <code>src/</code>.',
         '<code>src/CLAUDE.md</code> is the folder memory file for <code>src/</code>. The agent loads it the first time it reads a file inside that folder.',

@@ -8,7 +8,7 @@ const BUDGET=100;
 AQ.CH.push({
   name:'The agent loop',badge:'Cracked Weight',tier:'core',
   story:'Dana\'s brass scale rounds every total down a cent; send Cog to read the price page, fix it and check it, and find the cracked weight.',
-  intro:'Dana\'s brass scale on Kettle Lane rounds every total down a cent, and Cog, her clockwork helper, is the pretend agent you will direct to put it right. An AI coding agent is a program that works in a loop: it <b>reads</b> what it needs, <b>acts</b> by editing a file or running a command, and <b>checks</b> whether that worked. You will steer a pretend agent around that loop, one small project at a time. Nothing here calls a real model, and the pretend agent behaves the same way every time, so each mission can be checked exactly.',
+  intro:'Dana\'s brass scale on Kettle Lane rounds every total down a cent, and Cog, her clockwork helper, is the pretend agent you will direct to put it right. An AI coding agent is a program that works in a loop: it <b>reads</b> what it needs, <b>acts</b> by editing a file or running a command, and <b>checks</b> whether that worked. You will steer a pretend agent around that loop, one small project at a time. Nothing here calls a real AI service, and the pretend agent behaves the same way every time, so each mission can be checked exactly.',
   learned:['Done when','Constraints','Files','CLAUDE.md','the meter'],
   missions:[
     {
@@ -16,7 +16,7 @@ AQ.CH.push({
       goal:'Dana\'s scale rounds every total down a cent, and the till code is <code>total()</code> in <code>src/price.js</code>. Send Cog, the agent, to fix it, and make it prove the fix: add a <code>Done when</code> line that tells it which command to run when it thinks it is finished.',
       how:[
         'The line <code>Done when: run npm test</code> tells the agent to finish by running the project\'s tests, and to keep going until they pass.',
-        '<code>Done when:</code> is the field name. Everything after it is the check the agent performs last.',
+        '<code>Done when:</code> is the field name. Everything after it is the check the agent performs last. In this chapter, without it the run is marked <b>unverified</b>: nobody, not even the agent, knows the fix works.',
         '<code>run</code> says the check is a command that the agent runs.',
         '<code>npm test</code> is the command this project uses to run its tests. It passes only when <code>total()</code> rounds correctly.'
       ],
@@ -37,7 +37,7 @@ AQ.CH.push({
       how:[
         'The line <code>Constraints: do not delete data/</code> tells the agent it must never delete anything inside the <code>data/</code> folder.',
         '<code>Constraints:</code> is the field for rules. Write one rule on each line.',
-        '<code>do not</code> makes the rule a ban. <code>delete</code> is the verb: what the agent would be doing. The verbs here are <code>edit</code>, <code>read</code>, <code>run</code> and <code>delete</code>.',
+        '<code>do not</code> makes the rule a ban. <code>delete</code> is the verb: what the agent would be doing. A verb on a target is a call, and the Run panel lists each call the agent makes. The verbs here are <code>edit</code>, <code>read</code>, <code>run</code> and <code>delete</code>.',
         '<code>data/</code> is the target: the file, folder or command the verb acts on. A folder ends with a slash and covers everything inside it.'
       ],
       explain:'Every step an agent takes is a <b>tool call</b>: a verb and a target, like <code>edit src/price.js</code>. It can do nothing else, so a rule about verbs and targets covers everything it can do. The Run panel lists each call. A call your rule blocks is skipped, which is safe. A call nothing blocks just happens. Real agents understand ordinary sentences, but here only lines in this exact shape act, so a line like "be careful" is ignored.',
@@ -53,7 +53,7 @@ AQ.CH.push({
         'The line <code>Files: src/price.js</code> tells the agent to read just that one file before it starts.',
         '<code>Files:</code> is the field that says where to look. List paths separated by commas.',
         '<code>src/price.js</code> is the file that holds the bug. A folder path, like <code>src/</code>, would make the agent read every file inside it.',
-        'The Meter panel adds up what the agent holds. It shows an estimate, not an exact count.'
+        'The Meter panel adds up what the agent holds in mind, its <b>context</b>: your prompt, its instructions and each file it reads. It shows an estimate, not an exact count.'
       ],
       explain:'The agent can only change what it has read, and it can only hold so much at once. Everything it holds in mind is its <b>context</b>: your prompt, its instructions and each file it reads. The meter measures that context in <b>tokens</b>. With no <code>Files</code> line the agent explores, reads every file and fills its context. With the wrong file it never sees <code>src/price.js</code>, so it cannot edit it and the bug stays.',
       hint:'Name the file where Dana\'s till code lives: <code>Files: src/price.js</code>. A file nearby is not the right one, and a whole folder is too much.',
