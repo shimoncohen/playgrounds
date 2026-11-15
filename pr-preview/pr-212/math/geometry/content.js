@@ -641,7 +641,7 @@
           hint: 'Square and add the legs, take the square root, and round the result to 1 decimal place.', scene: squares(8, 'c'), reveal: true, at: { a: 5, b: 7 },
           answer: '8.6', wrong: '74.0', lazy: 'sqrt(5^2+7^2)', check: finalRounded('sqrt(74)', 1) },
         { title: 'A whole-number triangle', kind: 'scene',
-          goal: 'Drag the two legs until the hypotenuse is a whole number other than 5.',
+          goal: 'Drag the two legs until the hypotenuse is a whole number other than 5. That needs a total that is a perfect square: a whole number you get by squaring a whole number, like 25 = 5 × 5.',
           how: [
             'The scene works out <code>c² = a² + b²</code> for you. You want a total that is a perfect square: a whole number you get by squaring a whole number, like 25 = 5 × 5 or 100 = 10 × 10.',
             'The starting triangle, 3 and 4, gives 25 and so <code>c = 5</code>. That one is already used up.',

@@ -120,7 +120,7 @@
       scene: triangle,
       missions: [
         { title: 'Find the opposite side', kind: 'number', round: 1, question: '10*sin(35)', tex: '\\text{opp} = \\text{hyp} \\times \\sin\\theta \\;\\text{ with }\\; \\text{hyp} = 10,\\ \\theta = 35^\\circ',
-          goal: 'Ilse\'s kite-launch ramp is 10 long (the hypotenuse) and rises at an angle of <code>35°</code>. How high does it climb? That is the opposite side. Work it out and round to 1 decimal place.',
+          goal: 'Ilse\'s kite-launch ramp is 10 long (the hypotenuse) and rises at an angle of <code>35°</code>. How high does it climb? That is the opposite side. Multiplying both sides of <code>sin θ = opp ÷ hyp</code> by <code>hyp</code> cancels the <code>÷ hyp</code>, which leaves <code>opp</code> alone. Work it out and round to 1 decimal place.',
           how: [
             '<code>sin θ = opp ÷ hyp</code> (SOH). Multiplying both sides by <code>hyp</code> cancels the <code>÷ hyp</code>, which leaves <code>opp</code> alone: <code>opp = hyp × sin θ</code>.',
             'Putting in <code>hyp = 10</code> and <code>θ = 35°</code> gives your first step, <code>10 × sin(35)</code> (type <code>10*sin(35)</code>).',
