@@ -48,7 +48,7 @@ const FIRST = {
   hook: [/\bhooks?\b/i, 5, 0],
   plugin: [/\bplugins?\b/i, 5, -1, /plugin is a bundle/],
   injection: [/\binjections?\b/i, 6, 1],
-  send: [/\bsend [a-z]+\.[a-z]+/, 6, 1],
+  send: [/\bsend [a-z]+\.[a-z]+/, 6, 4],
   secret: [/\bsecrets?\b/i, 6, 2],
   'max N files': [/\bmax \d+ files?\b/, 7, 1],
   // 8.3 defines it in one sentence; the chapter 8 intro and 8.1 and 8.2 must not use it

@@ -73,7 +73,7 @@ describe('the issue traces, run by hand', () => {
     assert.notEqual(go(at(2, 1), root('only read src/price.js')).result, true);
   });
   it('7.2 and 7.3 fail with the rule in CLAUDE.md and an empty prompt', () => {
-    assert.notEqual(go(at(6, 1), root('do not send mail.send')).result, true);
+    assert.notEqual(go(at(6, 1), root('do not call mail.send')).result, true);
     assert.notEqual(go(at(6, 2), root('do not read .env')).result, true);
   });
   it('10.2 and 10.3 fail when the shipped architect is rewritten to small', () => {
