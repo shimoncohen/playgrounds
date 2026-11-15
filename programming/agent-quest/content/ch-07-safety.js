@@ -91,15 +91,15 @@ AQ.CH.push({
       title:'Test your guardrails',scenario:'audit',kind:'config',prompt:BASE,
       goal:'Mr. Ledbury wrote three safety rules into <code>CLAUDE.md</code>, and none of them works: each has a mistake the agent quietly ignores. A line only acts as a rule in the exact shape, and the editor says how many lines act as rules. Open the file, find the three mistakes, and fix them so the agent leaves <code>data/</code>, the key file <code>.env</code> and the email tool alone.',
       how:[
-        'Fixing the lines to <code>do not delete data/</code>, <code>do not read .env</code> and <code>do not send mail.send</code> makes all three act as rules. In this practice the agent sends its email with the verb <code>send</code>, so the third rule says <code>send</code>.',
+        'Fixing the lines to <code>do not delete data/</code>, <code>do not read .env</code> and <code>do not call mail.send</code> makes all three act as rules.',
         'The first line has a typo in its verb, so it is not a rule.',
         'The second line is written as a sentence, not in the shape of <code>do not</code>, a verb and a target.',
         'The third line has extra words after the target, so the target no longer matches the tool.'
       ],
       explain:'A rule that does not parse protects nothing, and nothing warns the agent. The only way to know is to test: count the lines that act as rules and run the agent against the danger. Treat a guardrail like code. If you never tested it, assume it does not work.',
       hint:'Open <code>CLAUDE.md</code> and watch the count of lines that act as rules change as you fix each line.',
-      answer:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not send mail.send\n'}},
-      wrong:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not send mail.send please\n'}},
+      answer:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not call mail.send\n'}},
+      wrong:{files:{'CLAUDE.md':'# Shop notes\ndo not delete data/\ndo not read .env\ndo not call mail.send please\n'}},
       lazy:{files:{}},
       check:(o,c)=>{
         const v=AQ.verdict(o,c);
