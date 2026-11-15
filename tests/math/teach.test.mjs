@@ -18,7 +18,6 @@ const FIRST = [
   ['geometry', 'perfect square', /perfect[ -]square/i, 2, 4, /whole number you get by squaring a whole number/],
   ['algebra', 'scale letters p q r s', /<code>[pqrs]<\/code>/, 2, 0, /<code>q<\/code> 1-weights on the left, <code>r<\/code> boxes and <code>s<\/code> 1-weights on the right/],
   ['algebra', 'root', /(?<!square )\broots?\b(?! that is zero or more)/i, 4, -1, /also called a <b>root<\/b>/],
-  ['trigonometry', 'multiplying both sides', /multipl(?:y|ying) both sides by/i, 0, 0, /cancels the <code>÷ hyp<\/code>/],
 ];
 
 for (const [track, term, re, ci, mi, defined] of FIRST) {
@@ -40,3 +39,13 @@ for (const [track, term, re, ci, mi, defined] of FIRST) {
     assert.match(taught(mi, chapters[ci]), defined);
   });
 }
+
+test('trigonometry requires linear equations, which teach "do the same to both sides", before it rearranges ratios', () => {
+  const needs = new Set();
+  const walk = id => { for (const r of load('trigonometry').graph.chapter(id).requires) if (!needs.has(r)) { needs.add(r); walk(r); } };
+  walk('trigonometry.ratios');
+  assert.ok(needs.has('algebra.linear'));
+  const linear = load('algebra').content.chapters.find(c => c.id === 'algebra.linear');
+  assert.match(linear.intro, /same thing to both sides/);
+  assert.match(load('trigonometry').content.chapters[0].missions[0].how[0], /Multiply both sides by/);
+});
