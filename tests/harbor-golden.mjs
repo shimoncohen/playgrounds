@@ -20,6 +20,12 @@
 // Files written through the editor after the export (so the export stays the course's own state): Dockerfile.dot (COPY . .),
 // pod.yaml (a Pod with an env list), bad.yaml (a selector that does not match its template) and a compose.yaml with an
 // environment list. The course files never reach those build, apply and compose branches.
+// Coverage: a throwaway page.coverage run over the harbor-quest scripts (app.js, ui.js, engine/*.js, content/*.js) against this
+// golden listed every function never called. The probes above were extended until only these were left, none of which a probe
+// line can reach:
+//  - ev and fixHdr (both engine/k8s.js): dead code, never referenced.
+//  - the combined-short-flag splitter in the mission-check normaliser (content/quickfire.js, `-dp` to `-d -p`): it runs only for
+//    the current mission's check, and checkMission (ui.js) returns early for a finished mission.
 // Not run: the quick-fire score-bonus path (stopFire with a score), which would change XP and S.best.
 import assert from 'node:assert/strict';
 import http from 'node:http';
