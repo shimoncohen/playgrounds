@@ -18,7 +18,7 @@ export function cut(src, from, to) {
 
 const harborDir = path.join(ROOT, 'programming', 'harbor-quest');
 const harborScripts = () => [...fs.readFileSync(path.join(harborDir, 'index.html'), 'utf8').matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1])
-  .filter(s => s === '../../shared/tiers.js' || /^(engine|content)\//.test(s) || s === 'app.js');
+  .filter(s => s === '../../shared/tiers.js' || /^(engine|content)\//.test(s) || s === 'ui.js' || s === 'app.js');
 
 // The harbor-quest scripts of index.html, in page order, as one source, for tests that run the whole game in a vm against a DOM stub.
 export const readHarborGame = () => harborScripts().map(s => fs.readFileSync(path.join(harborDir, s), 'utf8')).join('\n');
@@ -26,7 +26,7 @@ export const readHarborGame = () => harborScripts().map(s => fs.readFileSync(pat
 // Runs the DOM-free scripts of harbor-quest/index.html (shared/tiers.js, engine/*, content/*) against one stub window and returns window.HQ.
 // There is no document, so DOM use in those files throws; while they load, reading a key of HQ that is not set yet throws too.
 export function loadHarborQuest({ localStorage = { getItem: () => null, setItem() {}, removeItem() {} } } = {}) {
-  const srcs = harborScripts().filter(s => s !== 'app.js');
+  const srcs = harborScripts().filter(s => s !== 'ui.js' && s !== 'app.js');
   assert.ok(srcs.some(s => s.startsWith('engine/')) && srcs.some(s => s.startsWith('content/')), 'harbor-quest/index.html lists no engine or content scripts');
   const hq = {};
   let strict = true;
