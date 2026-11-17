@@ -1,13 +1,11 @@
 // Harbor Quest: a mission passes only on the learner's own typed action, never on sandbox state left by another mission.
-// app.js is one DOM-bound IIFE, so run it in a vm against a do-nothing DOM stub and drive it through window.__hq.
+// The UI is DOM-bound, so run the game scripts in a vm against a do-nothing DOM stub and drive it through window.__hq.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import { readHarborGame } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'harbor-quest', 'app.js'), 'utf8');
+const src = readHarborGame();
 
 const stub = () => {
   const p = new Proxy(function () {}, {
