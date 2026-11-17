@@ -21,7 +21,7 @@ function boot(saved) {
   const dom = stub();
   const win = { __hq: null, getSelection: () => ({ toString: () => '' }), addEventListener() {}, matchMedia: () => dom };
   const ctx = vm.createContext({
-    window: win, document: dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
+    window: win, get Tiers() { return win.Tiers; }, document: dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
     localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     navigator: {}, requestAnimationFrame() {}, Image: stub(), URL, Blob, console, HowSteps: stub(), Trail: stub(), location: { hash: '' },
   });

@@ -21,7 +21,7 @@ function boot(saved, resetEl) {
   const dom = stub();
   const win = { __hq: null, getSelection: () => ({ toString: () => '' }), addEventListener() {}, matchMedia: () => dom };
   const ctx = vm.createContext({
-    window: win, document: resetEl ? new Proxy(dom, { get: (t, k) => k === 'querySelector' ? q => q === '#resetWorld' ? resetEl : dom : t[k] }) : dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
+    window: win, get Tiers() { return win.Tiers; }, document: resetEl ? new Proxy(dom, { get: (t, k) => k === 'querySelector' ? q => q === '#resetWorld' ? resetEl : dom : t[k] }) : dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
     localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     navigator: {}, requestAnimationFrame() {}, Image: stub(), URL, Blob, console, HowSteps: stub(), Trail: stub(), location: { hash: '' },
   });
