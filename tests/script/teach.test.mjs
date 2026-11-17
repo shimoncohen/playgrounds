@@ -1,14 +1,13 @@
 // Script Quest, "teach before use" (AGENTS.md rule 12): a key word must not appear in any mission text before the mission that
 // teaches it (or defines it in place), and Quick-fire only offers questions whose chapter the learner has finished.
-// The course lives in script-quest/app.js next to the DOM app, so load its DOM-free parts (CH, FIRE, qfOpen, the guide data) by slicing.
+// The course lives in script-quest/content/*.js (DOM-free), loaded in the order index.html lists them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readApp, cut, loadContent } from '../content-loader.mjs';
+import { loadScriptContent } from '../content-loader.mjs';
 
-const tagOf = 'const tagOf=v=>Object.prototype.toString.call(v).slice(8,-1);\n';
-const { CH, FIRE, qfOpen } = loadContent('script-quest', { prelude: tagOf, parts: [['const isArr=', '// ================= UI =================']], returns: ['CH', 'FIRE', 'qfOpen'], mustInclude: ['const qfOpen='] });
-const { BLOCKS, ERRS } = loadContent('script-quest', { parts: [['const BLOCKS=[', 'function renderGuide']], returns: ['BLOCKS', 'ERRS'] });
-const guideSrc = cut(readApp('script-quest'), 'function renderGuide', 'const guideRealms');
+const SCQ = loadScriptContent();
+const { CH, FIRE, qfOpen, BLOCKS, ERRS } = SCQ;
+const guideSrc = String(SCQ.guideHTML);
 
 // term -> [regex that uses it, chapter, mission that first teaches or defines it in place (its own card may use it)]; null = never taught, so never used
 const FIRST = {
