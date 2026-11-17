@@ -51,6 +51,7 @@ export function plan(files, { all, withTests, browser = {} }) {
     jobs.push({ name: 'shell-quest full course', args: [`--test-name-pattern=${COURSE}`, 'tests/smoke.mjs'], browser: true });
     jobs.push({ name: 'shell-quest golden', args: ['tests/shell-golden.mjs'], browser: true });
   }
+  if (picked === null || picked.includes('harbor')) jobs.push({ name: 'harbor-quest golden', args: ['tests/harbor-golden.mjs'], browser: true });
   return jobs;
 }
 

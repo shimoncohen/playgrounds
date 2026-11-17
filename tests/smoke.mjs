@@ -1677,6 +1677,44 @@ test('harbor-quest: a finished mission is not celebrated again when it is revisi
   await ctx.close();
 });
 
+test('harbor-quest: the complete-save fixture shows the golden rank and XP, 12 stars and the Beginner tier', async () => {
+  const { ctx, page, errors } = await open(`${base}/programming/harbor-quest/`);
+  // open() aborts the font requests, which logs "Failed to load resource"; any other console error counts.
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
+  await page.waitForSelector('#mission');
+  await page.click('.pg-trigger');
+  await Promise.all([page.waitForNavigation(), page.setInputFiles('.pg-file', path.join(ROOT, 'tests/fixtures/harbor-progress-complete.json'))]);
+  await page.waitForSelector('#mission');
+  assert.equal((await page.textContent('#rank')).trim(), 'Fleet Captain');
+  assert.equal((await page.textContent('#xpText')).trim(), '1240 XP');
+  assert.equal(await page.locator('.chap.earned').count(), 12);
+  assert.equal(await page.locator('.chap').count(), 12);
+  assert.match((await page.textContent('.tierhead')).replace(/\s+/g, ' ').trim(), /^Beginner\s*12\/12\s*★$/);
+  assert.deepEqual(await page.$$eval('.rail-lbl', ls => ls.map(l => l.textContent)), ['Docker', 'Kubernetes']);
+  await page.click('.chap[data-ch="3"]');
+  assert.equal(await page.getAttribute('.chap[data-ch="3"]', 'aria-current'), 'true');
+  assert.equal(await page.locator('.chap[aria-current="true"]').count(), 1);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('harbor-quest artifact bundle (dist/harbor-quest.html) works as a single inlined page', async () => {
+  execFileSync('python3', ['tools/build.py', 'harbor'], { cwd: ROOT, stdio: 'pipe' });
+  const body = fs.readFileSync(path.join(ROOT, 'dist/harbor-quest.html'), 'utf8');
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${body}</body></html>`;
+  const { ctx, page, errors } = await open('about:blank');
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await page.route('http://bundle.test/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  await page.goto('http://bundle.test/harbor-quest.html');
+  await page.waitForSelector('#mission');
+  assert.equal(await page.locator('.chap').count(), 12);
+  assert.equal(await page.locator('.tierhead').count(), 1);
+  await page.fill('#cmd', 'docker ps'); await page.press('#cmd', 'Enter');
+  assert.match(await page.textContent('#screen'), /CONTAINER ID/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 // Script Quest checks need the page's own RUN/DECLS (a real iframe realm plus acorn), so solvability runs in the real page.
 // Needs the jsDelivr CDN (acorn; TypeScript for chapter 11): it fails offline instead of skipping.
 async function driveScriptChapters(chapters, lazy, winMs) {
