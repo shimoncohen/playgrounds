@@ -1,9 +1,8 @@
 (function (HQ) { 'use strict';
 const S=HQ.S;
-const {esc,insideBox,CH,fresh,D,K,age,endpoints,depStatus,depPods,appOf,ref,live,NODES,ensureFiles,execLine,tick,save,vfs,KRES,qfOpen,QF,canon,PZ_DF,PZ_Y,GUIDE,KEY,parseYaml}=HQ;
+const {esc,insideBox,CH,fresh,D,K,age,endpoints,depStatus,depPods,appOf,ref,live,NODES,ensureFiles,execLine,tick,save,vfs,KRES,qfOpen,QF,canon,PZ_DF,PZ_Y,GUIDE,KEY,parseYaml,tiers}=HQ;
 HQ.onTick=onTick;
 const $=s=>document.querySelector(s);
-const RANKS=[[0,'Deckhand'],[120,'Dockworker'],[300,'Rigger'],[520,'Shipwright'],[800,'Harbor Pilot'],[1080,'Fleet Captain']];
 /* ---------- UI ---------- */
 const screen=$('#screen'),cmdIn=$('#cmd'),termEl=$('#term');
 let histIdx=S.hist.length,pop=false,known=null;
@@ -21,10 +20,11 @@ function promptHTML(){const b=insideBox();if(b){const host=b.isPod?b.name:b.id.s
 function renderPrompt(){$('#prompt').innerHTML=promptHTML()}
 function renderWhere(){const b=insideBox();const el=$('#where');
   el.innerHTML=b?`<span class="wpill in">Inside ${b.isPod?'pod':'container'} <code>${esc(b.name)}</code></span><span class="wnote">Type <code>exit</code> to return to your laptop</span>`:`<span class="wpill">On your laptop</span><span class="wnote">in <code>~/shop</code> · cluster <code>kind-harbor</code></span>`}
-function renderXP(){let i=0;while(i+1<RANKS.length&&S.xp>=RANKS[i+1][0])i++;const lo=RANKS[i][0],hi=i+1<RANKS.length?RANKS[i+1][0]:lo;
-  $('#rank').textContent=RANKS[i][1];$('#xpText').textContent=S.xp+' XP';$('#xpFill').style.width=(hi>lo?Math.min(100,(S.xp-lo)/(hi-lo)*100):100)+'%'}
+function renderXP(){const {name,lo,hi}=tiers.rankFor(S.xp);
+  $('#rank').textContent=name;$('#xpText').textContent=S.xp+' XP';$('#xpFill').style.width=(hi>lo?Math.min(100,(S.xp-lo)/(hi-lo)*100):100)+'%'}
 const totalDone=i=>CH[i].missions.filter((m,j)=>S.done[i+'.'+j]).length;
-function renderChapters(){$('#chapters').innerHTML=CH.map((c,i)=>`${i===0?'<div class="rail-lbl">Docker</div>':i===7?'<div class="rail-lbl">Kubernetes</div>':''}<button class="chap${S.badges[i]?' earned':''}" data-ch="${i}" aria-current="${i===S.ch}"><span class="num">${S.badges[i]?'★':i+1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`).join('')}
+function renderChapters(){const rail=$('#chapters');Tiers.renderRail(rail,{status:tiers.status(S),chapters:CH,S,onPick:goChapter});
+  CH.forEach((c,i)=>{if(c.group)rail.querySelector(`[data-ch="${i}"]`).insertAdjacentHTML('beforebegin',`<div class="rail-lbl">${esc(c.group)}</div>`)})}
 const LBL={cmd:'program',sub:'action',opt:'option',arg:'target',img:'image',val:'value',op:'joins'};
 const KCL={cmd:'k-cmd',sub:'k-kw',opt:'k-opt',arg:'k-arg',img:'k-arg',val:'k-var',op:'k-op'};
 function anatomy(a){return `<div class="anat">${a.map(([t,k,l])=>`<div class="tok ${KCL[k]}"><b>${esc(t)}</b><span>${esc(l||LBL[k])}</span></div>`).join('')}</div>`}
@@ -119,11 +119,11 @@ function checkMission(c){const ch=CH[S.ch];if(S.mi>=ch.missions.length)return;co
     if(good){if(S.steps){delete S.steps[key];if(!Object.keys(S.steps).length)delete S.steps}}
     else{if(fresh){S.steps=S.steps||{};S.steps[key]=d;addLine(esc(`✓ Step done: ${m.t}. ${m.steps.length-d.length} more to go.`),'win')}return}}
   else{try{good=!!m.ok(c)}catch(e){}if(!good)return}
-  const isNew=!S.done[key];S.done[key]=1;if(isNew)S.xp+=10;hintOpen=false;
-  addLine(esc(`✓ Mission complete: ${m.t}${isNew?'   +10 XP':''}`),'win');if(m.after)addLine(HowSteps.tick(m.after,esc),'note');
+  const isNew=!S.done[key];S.done[key]=1;const mxp=tiers.missionXp(S.ch);if(isNew)S.xp+=mxp;hintOpen=false;
+  addLine(esc(`✓ Mission complete: ${m.t}${isNew?`   +${mxp} XP`:''}`),'win');if(m.after)addLine(HowSteps.tick(m.after,esc),'note');
   const next=ch.missions.findIndex((x,j)=>j>S.mi&&!S.done[S.ch+'.'+j]);
   if(next>=0)S.mi=next;else{const first=ch.missions.findIndex((x,j)=>!S.done[S.ch+'.'+j]);if(first>=0)S.mi=first;
-    else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=25;addLine(esc(`★ Chapter complete! Badge earned: ${ch.badge}   +25 XP`),'win big')}}}
+    else{S.mi=ch.missions.length;if(!S.badges[S.ch]){S.badges[S.ch]=1;S.xp+=tiers.chapterBadgeXp;addLine(esc(`★ Chapter complete! Badge earned: ${ch.badge}   +${tiers.chapterBadgeXp} XP`),'win big')}}}
   pop=true}
 function run(line){addLine(promptHTML()+esc(line));if(line.trim())S.hist.push(line);histIdx=S.hist.length;
   if(line.trim()){const r=execLine(line);let text=[];for(const o of r.out){if(o.clear){screen.innerHTML='';continue}addLine(paint(o),o.c);text.push(o.t)}
@@ -170,7 +170,6 @@ cmdIn.addEventListener('keydown',e=>{
 termEl.addEventListener('click',()=>{if(!window.getSelection().toString())cmdIn.focus()});
 $('#keys').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k;
   if(k==='TAB')complete();else if(k==='UP'){if(histIdx>0){histIdx--;cmdIn.value=S.hist[histIdx]||''}}else if(k==='ENTER'){const v=cmdIn.value;cmdIn.value='';run(v)}else{const s=cmdIn.selectionStart??cmdIn.value.length;cmdIn.value=cmdIn.value.slice(0,s)+k+cmdIn.value.slice(cmdIn.selectionEnd??s);try{cmdIn.setSelectionRange(s+k.length,s+k.length)}catch(x){}}cmdIn.focus()});
-$('#chapters').addEventListener('click',e=>{const b=e.target.closest('[data-ch]');if(b)goChapter(+b.dataset.ch)});
 $('#mission').addEventListener('click',e=>{const d=e.target.closest('[data-mi]');if(d){S.mi=+d.dataset.mi;hintOpen=false;renderAll();scrollDown();save();return}
   const a=e.target.closest('[data-act]');if(!a)return;const act=a.dataset.act;const m=CH[S.ch].missions[S.mi];
   if(act==='hint'){hintOpen=!hintOpen;renderMission()}else if(act==='show'&&m){fill(ansOf(curOf(m,S.ch+'.'+S.mi)))}else if(act==='skip'){S.mi=Math.min(S.mi+1,CH[S.ch].missions.length);hintOpen=false;renderAll();scrollDown();save()}
