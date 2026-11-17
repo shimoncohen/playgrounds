@@ -16,6 +16,21 @@ export function cut(src, from, to) {
   return src.slice(i, j);
 }
 
+// Runs the content/ scripts in the order index.html lists them, so the page stays the single source of truth.
+export function loadScriptContent() {
+  const dir = path.join(ROOT, 'programming', 'script-quest');
+  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const files = [...html.matchAll(/<script src="(content\/[^"]+)"><\/script>/g)].map(m => m[1]);
+  assert.ok(files.length > 0, 'script-quest: no content/ script tags in index.html');
+  const window = { SCQ: { engine: {
+    tagOf: v => Object.prototype.toString.call(v).slice(8, -1),
+    decl: () => { throw new Error('not available in the DOM-free loader'); },
+  } } };
+  for (const f of files) new Function('window', fs.readFileSync(path.join(dir, f), 'utf8'))(window);
+  for (const k of ['CH', 'FIRE', 'qfOpen', 'BLOCKS', 'ERRS', 'guideHTML']) assert.ok(window.SCQ[k], `script-quest: SCQ.${k} missing after loading content/`);
+  return window.SCQ;
+}
+
 // globals become extra parameters, so the sliced code sees these stubs instead of the real ones.
 export function loadContent(quest, { parts, prelude = '', returns, globals = {}, mustInclude = [] }) {
   const src = readApp(quest);

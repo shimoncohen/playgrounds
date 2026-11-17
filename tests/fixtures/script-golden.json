@@ -1,0 +1,877 @@
+{
+  "records": [
+    {
+      "chapter": 0,
+      "mission": 1,
+      "title": "Your first line of code",
+      "typed": "console.log(\"Welcome to the Starlight Circus!\")",
+      "editor": null,
+      "output": "> console.log(\"Welcome to the Starlight Circus!\")\nWelcome to the Starlight Circus!\n← undefined\n✓ Mission complete: Your first line of code   +10 XP",
+      "xpText": "10 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 2,
+      "title": "Use it as a calculator",
+      "typed": "7 * 6",
+      "editor": null,
+      "output": "> 7 * 6\n← 42\n✓ Mission complete: Use it as a calculator   +10 XP",
+      "xpText": "20 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 3,
+      "title": "Glue words together",
+      "typed": "\"Star\" + \"light\"",
+      "editor": null,
+      "output": "> \"Star\" + \"light\"\n← \"Starlight\"\n✓ Mission complete: Glue words together   +10 XP",
+      "xpText": "30 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 4,
+      "title": "Ask what type something is",
+      "typed": "typeof 42",
+      "editor": null,
+      "output": "> typeof 42\n← \"number\"\n✓ Mission complete: Ask what type something is   +10 XP",
+      "xpText": "40 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 5,
+      "title": "The famous mix-up",
+      "typed": "\"5\" + 5",
+      "editor": null,
+      "output": "> \"5\" + 5\n← \"55\"\n✓ Mission complete: The famous mix-up   +10 XP",
+      "xpText": "50 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 6,
+      "title": "Print several things at once",
+      "typed": "console.log(\"Tickets sold:\", 12)",
+      "editor": null,
+      "output": "> console.log(\"Tickets sold:\", 12)\nTickets sold: 12\n← undefined\n✓ Mission complete: Print several things at once   +10 XP",
+      "xpText": "60 XP"
+    },
+    {
+      "chapter": 0,
+      "mission": 7,
+      "title": "Leave a note for humans",
+      "typed": "console.log(\"Back at 8\") // note for the next stagehand",
+      "editor": null,
+      "output": "> console.log(\"Back at 8\") // note for the next stagehand\nBack at 8\n← undefined\n✓ Mission complete: Leave a note for humans   +10 XP",
+      "xpText": "70 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 1,
+      "title": "Make your first box",
+      "typed": "let coins = 0",
+      "editor": null,
+      "output": "> let coins = 0\n✓ Mission complete: Make your first box   +10 XP",
+      "xpText": "80 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 2,
+      "title": "Change what is inside",
+      "typed": "coins = coins + 10",
+      "editor": null,
+      "output": "> coins = coins + 10\n← 10\n✓ Mission complete: Change what is inside   +10 XP",
+      "xpText": "90 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 3,
+      "title": "The shortcut",
+      "typed": "coins += 5",
+      "editor": null,
+      "output": "> coins += 5\n← 15\n✓ Mission complete: The shortcut   +10 XP",
+      "xpText": "100 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 4,
+      "title": "Count up by one",
+      "typed": "coins++",
+      "editor": null,
+      "output": "> coins++\n← 15\n✓ Mission complete: Count up by one   +10 XP",
+      "xpText": "110 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 5,
+      "title": "A box that never changes",
+      "typed": "const performer = \"Zara\"",
+      "editor": null,
+      "output": "> const performer = \"Zara\"\n✓ Mission complete: A box that never changes   +10 XP",
+      "xpText": "120 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 6,
+      "title": "Try to break the lock",
+      "typed": "performer = \"Pepper\"",
+      "editor": null,
+      "output": "> performer = \"Pepper\"\nUncaught TypeError: Assignment to constant variable.\n✓ Mission complete: Try to break the lock   +10 XP",
+      "xpText": "130 XP"
+    },
+    {
+      "chapter": 1,
+      "mission": 7,
+      "title": "Fill in the blanks",
+      "typed": "`${performer} has ${coins} coins`",
+      "editor": null,
+      "output": "> `${performer} has ${coins} coins`\n← \"Zara has 16 coins\"\n✓ Mission complete: Fill in the blanks   +10 XP",
+      "xpText": "140 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 1,
+      "title": "Turn text into a number",
+      "typed": "Number(\"42\") + 8",
+      "editor": null,
+      "output": "> Number(\"42\") + 8\n← 50\n✓ Mission complete: Turn text into a number   +10 XP",
+      "xpText": "150 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 2,
+      "title": "Strict comparison",
+      "typed": "5 === \"5\"",
+      "editor": null,
+      "output": "> 5 === \"5\"\n← false\n✓ Mission complete: Strict comparison   +10 XP",
+      "xpText": "160 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 3,
+      "title": "The loose one",
+      "typed": "5 == \"5\"",
+      "editor": null,
+      "output": "> 5 == \"5\"\n← true\n✓ Mission complete: The loose one   +10 XP",
+      "xpText": "170 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 4,
+      "title": "An empty box",
+      "typed": "let guest",
+      "editor": null,
+      "output": "> let guest\n✓ Mission complete: An empty box   +10 XP",
+      "xpText": "180 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 5,
+      "title": "Truthy and falsy",
+      "typed": "Boolean(\"\")",
+      "editor": null,
+      "output": "> Boolean(\"\")\n← false\n✓ Mission complete: Truthy and falsy   +10 XP",
+      "xpText": "190 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 6,
+      "title": "And, or, not",
+      "typed": "let hasTicket = true\nlet gateOpen = false\nhasTicket && !gateOpen",
+      "editor": null,
+      "output": "> let hasTicket = true\n... let gateOpen = false\n... hasTicket && !gateOpen\n← true\n✓ Mission complete: And, or, not   +10 XP",
+      "xpText": "200 XP"
+    },
+    {
+      "chapter": 2,
+      "mission": 7,
+      "title": "A fallback value",
+      "typed": "null ?? \"Guest\"",
+      "editor": null,
+      "output": "> null ?? \"Guest\"\n← \"Guest\"\n✓ Mission complete: A fallback value   +10 XP",
+      "xpText": "210 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 1,
+      "title": "Set up the juggler",
+      "typed": "let energy = 30",
+      "editor": null,
+      "output": "> let energy = 30\n✓ Mission complete: Set up the juggler   +10 XP",
+      "xpText": "220 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 2,
+      "title": "Your first if",
+      "typed": "if (energy < 50) {\n  console.log(\"Rest first!\")\n}",
+      "editor": null,
+      "output": "> if (energy < 50) {\n...   console.log(\"Rest first!\")\n... }\nRest first!\n✓ Mission complete: Your first if   +10 XP",
+      "xpText": "230 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 3,
+      "title": "Otherwise…",
+      "typed": "if (energy > 50) {\n  console.log(\"Ready to juggle\")\n} else {\n  console.log(\"Needs rest\")\n}",
+      "editor": null,
+      "output": "> if (energy > 50) {\n...   console.log(\"Ready to juggle\")\n... } else {\n...   console.log(\"Needs rest\")\n... }\nNeeds rest\n✓ Mission complete: Otherwise…   +10 XP",
+      "xpText": "240 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 4,
+      "title": "More than two paths",
+      "typed": "if (energy >= 80) {\n  console.log(\"Full of energy\")\n} else if (energy >= 30) {\n  console.log(\"Fine\")\n} else {\n  console.log(\"Tired\")\n}",
+      "editor": null,
+      "output": "> if (energy >= 80) {\n...   console.log(\"Full of energy\")\n... } else if (energy >= 30) {\n...   console.log(\"Fine\")\n... } else {\n...   console.log(\"Tired\")\n... }\nFine\n✓ Mission complete: More than two paths   +10 XP",
+      "xpText": "250 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 5,
+      "title": "A one-line choice",
+      "typed": "energy > 50 ? \"ready\" : \"tired\"",
+      "editor": null,
+      "output": "> energy > 50 ? \"ready\" : \"tired\"\n← \"tired\"\n✓ Mission complete: A one-line choice   +10 XP",
+      "xpText": "260 XP"
+    },
+    {
+      "chapter": 3,
+      "mission": 6,
+      "title": "Two conditions at once",
+      "typed": "if (energy > 0 && energy < 50) console.log(\"Tired but on her feet\")",
+      "editor": null,
+      "output": "> if (energy > 0 && energy < 50) console.log(\"Tired but on her feet\")\nTired but on her feet\n✓ Mission complete: Two conditions at once   +10 XP",
+      "xpText": "270 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 1,
+      "title": "Count to five",
+      "typed": "for (let i = 1; i <= 5; i++) {\n  console.log(i)\n}",
+      "editor": null,
+      "output": "> for (let i = 1; i <= 5; i++) {\n...   console.log(i)\n... }\n1\n2\n3\n4\n5\n✓ Mission complete: Count to five   +10 XP",
+      "xpText": "280 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 2,
+      "title": "Countdown",
+      "typed": "for (let i = 3; i >= 1; i--) {\n  console.log(i)\n}\nconsole.log(\"Boom! 💥\")",
+      "editor": null,
+      "output": "> for (let i = 3; i >= 1; i--) {\n...   console.log(i)\n... }\n... console.log(\"Boom! 💥\")\n3\n2\n1\nBoom! 💥\n← undefined\n✓ Mission complete: Countdown   +10 XP",
+      "xpText": "290 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 3,
+      "title": "Loop until done",
+      "typed": "let coins = 0\nwhile (coins < 3) {\n  coins++\n  console.log(\"coins:\", coins)\n}",
+      "editor": null,
+      "output": "> let coins = 0\n... while (coins < 3) {\n...   coins++\n...   console.log(\"coins:\", coins)\n... }\ncoins: 1\ncoins: 2\ncoins: 3\n✓ Mission complete: Loop until done   +10 XP",
+      "xpText": "300 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 4,
+      "title": "Visit every item",
+      "typed": "for (const wagon of [\"prop wagon\", \"clock wagon\", \"snack wagon\"]) {\n  console.log(\"Stop at the\", wagon)\n}",
+      "editor": null,
+      "output": "> for (const wagon of [\"prop wagon\", \"clock wagon\", \"snack wagon\"]) {\n...   console.log(\"Stop at the\", wagon)\n... }\nStop at the prop wagon\nStop at the clock wagon\nStop at the snack wagon\n✓ Mission complete: Visit every item   +10 XP",
+      "xpText": "310 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 5,
+      "title": "Build something in a loop",
+      "typed": "let stars = \"\"\nfor (let i = 0; i < 5; i++) {\n  stars += \"⭐\"\n}\nstars",
+      "editor": null,
+      "output": "> let stars = \"\"\n... for (let i = 0; i < 5; i++) {\n...   stars += \"⭐\"\n... }\n... stars\n← \"⭐⭐⭐⭐⭐\"\n✓ Mission complete: Build something in a loop   +10 XP",
+      "xpText": "320 XP"
+    },
+    {
+      "chapter": 4,
+      "mission": 6,
+      "title": "Escape early",
+      "typed": "for (let i = 1; i <= 10; i++) {\n  if (i === 4) break\n  console.log(i)\n}",
+      "editor": null,
+      "output": "> for (let i = 1; i <= 10; i++) {\n...   if (i === 4) break\n...   console.log(i)\n... }\n1\n2\n3\n✓ Mission complete: Escape early   +10 XP",
+      "xpText": "330 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 1,
+      "title": "Pack a bag",
+      "typed": "const bag = [\"hoop\", \"club\", \"top hat\"]",
+      "editor": null,
+      "output": "> const bag = [\"hoop\", \"club\", \"top hat\"]\n✓ Mission complete: Pack a bag   +10 XP",
+      "xpText": "340 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 2,
+      "title": "Grab the first item",
+      "typed": "bag[0]",
+      "editor": null,
+      "output": "> bag[0]\n← \"hoop\"\n✓ Mission complete: Grab the first item   +10 XP",
+      "xpText": "350 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 3,
+      "title": "How many?",
+      "typed": "bag.length",
+      "editor": null,
+      "output": "> bag.length\n← 3\n✓ Mission complete: How many?   +10 XP",
+      "xpText": "360 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 4,
+      "title": "Swap an item",
+      "typed": "bag[1] = \"flaming club\"",
+      "editor": null,
+      "output": "> bag[1] = \"flaming club\"\n← \"flaming club\"\n✓ Mission complete: Swap an item   +10 XP",
+      "xpText": "370 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 5,
+      "title": "Add to the end",
+      "typed": "bag.push(\"unicycle\")",
+      "editor": null,
+      "output": "> bag.push(\"unicycle\")\n← 4\n✓ Mission complete: Add to the end   +10 XP",
+      "xpText": "380 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 6,
+      "title": "Take from the end",
+      "typed": "bag.pop()",
+      "editor": null,
+      "output": "> bag.pop()\n← \"unicycle\"\n✓ Mission complete: Take from the end   +10 XP",
+      "xpText": "390 XP"
+    },
+    {
+      "chapter": 5,
+      "mission": 7,
+      "title": "Is it in there?",
+      "typed": "bag.includes(\"top hat\")",
+      "editor": null,
+      "output": "> bag.includes(\"top hat\")\n← true\n✓ Mission complete: Is it in there?   +10 XP",
+      "xpText": "400 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 1,
+      "title": "Write a recipe",
+      "typed": "function greet(name) {\n  return \"Hello, \" + name + \"!\"\n}",
+      "editor": null,
+      "output": "> function greet(name) {\n...   return \"Hello, \" + name + \"!\"\n... }\n✓ Mission complete: Write a recipe   +10 XP",
+      "xpText": "410 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 2,
+      "title": "Cook it",
+      "typed": "greet(\"Pepper\")",
+      "editor": null,
+      "output": "> greet(\"Pepper\")\n← \"Hello, Pepper!\"\n✓ Mission complete: Cook it   +10 XP",
+      "xpText": "420 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 3,
+      "title": "The short way",
+      "typed": "const double = n => n * 2",
+      "editor": null,
+      "output": "> const double = n => n * 2\n✓ Mission complete: The short way   +10 XP",
+      "xpText": "430 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 4,
+      "title": "Use the arrow",
+      "typed": "double(21)",
+      "editor": null,
+      "output": "> double(21)\n← 42\n✓ Mission complete: Use the arrow   +10 XP",
+      "xpText": "440 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 5,
+      "title": "A default value",
+      "typed": "function roll(sides = 6) {\n  return Math.floor(Math.random() * sides) + 1\n}\nroll()",
+      "editor": null,
+      "output": "> function roll(sides = 6) {\n...   return Math.floor(Math.random() * sides) + 1\n... }\n... roll()\n← <die>\n✓ Mission complete: A default value   +10 XP",
+      "xpText": "450 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 6,
+      "title": "Pass a function to a function",
+      "typed": "[1, 2, 3].forEach(n => console.log(n * 10))",
+      "editor": null,
+      "output": "> [1, 2, 3].forEach(n => console.log(n * 10))\n10\n20\n30\n← undefined\n✓ Mission complete: Pass a function to a function   +10 XP",
+      "xpText": "460 XP"
+    },
+    {
+      "chapter": 6,
+      "mission": 7,
+      "title": "What happens inside, stays inside",
+      "typed": "function vault() {\n  let code = 1234\n}\ncode",
+      "editor": null,
+      "output": "> function vault() {\n...   let code = 1234\n... }\n... code\nUncaught ReferenceError: code is not defined\n✓ Mission complete: What happens inside, stays inside   +10 XP",
+      "xpText": "470 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 1,
+      "title": "Fill in a performer card",
+      "typed": "const performer = { name: \"Pepper\", energy: 100, level: 1 }",
+      "editor": null,
+      "output": "> const performer = { name: \"Pepper\", energy: 100, level: 1 }\n✓ Mission complete: Fill in a performer card   +10 XP",
+      "xpText": "480 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 2,
+      "title": "Read a property",
+      "typed": "performer.name",
+      "editor": null,
+      "output": "> performer.name\n← \"Pepper\"\n✓ Mission complete: Read a property   +10 XP",
+      "xpText": "490 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 3,
+      "title": "Level up",
+      "typed": "performer.level = 2",
+      "editor": null,
+      "output": "> performer.level = 2\n← 2\n✓ Mission complete: Level up   +10 XP",
+      "xpText": "500 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 4,
+      "title": "Add something new",
+      "typed": "performer[\"act\"] = \"tightrope\"",
+      "editor": null,
+      "output": "> performer[\"act\"] = \"tightrope\"\n← \"tightrope\"\n✓ Mission complete: Add something new   +10 XP",
+      "xpText": "510 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 5,
+      "title": "Two labels, one object",
+      "typed": "const understudy = performer",
+      "editor": null,
+      "output": "> const understudy = performer\n✓ Mission complete: Two labels, one object   +10 XP",
+      "xpText": "520 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 6,
+      "title": "Spooky action",
+      "typed": "understudy.energy = 1\nperformer.energy",
+      "editor": null,
+      "output": "> understudy.energy = 1\n... performer.energy\n← 1\n✓ Mission complete: Spooky action   +10 XP",
+      "xpText": "530 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 7,
+      "title": "A real copy",
+      "typed": "const clone = { ...performer }",
+      "editor": null,
+      "output": "> const clone = { ...performer }\n✓ Mission complete: A real copy   +10 XP",
+      "xpText": "540 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 8,
+      "title": "Unpack it",
+      "typed": "const { level, act } = performer",
+      "editor": null,
+      "output": "> const { level, act } = performer\n✓ Mission complete: Unpack it   +10 XP",
+      "xpText": "550 XP"
+    },
+    {
+      "chapter": 7,
+      "mission": 9,
+      "title": "Objects that do things",
+      "typed": "const mumbles = {\n  sound: \"Roll up, roll up\",\n  speak() { return this.sound + \"!\" }\n}\nmumbles.speak()",
+      "editor": null,
+      "output": "> const mumbles = {\n...   sound: \"Roll up, roll up\",\n...   speak() { return this.sound + \"!\" }\n... }\n... mumbles.speak()\n← \"Roll up, roll up!\"\n✓ Mission complete: Objects that do things   +10 XP",
+      "xpText": "560 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 1,
+      "title": "Load the belt",
+      "typed": "const weights = [12, 45, 7, 88, 23]",
+      "editor": null,
+      "output": "> const weights = [12, 45, 7, 88, 23]\n✓ Mission complete: Load the belt   +10 XP",
+      "xpText": "570 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 2,
+      "title": "map: change every item",
+      "typed": "weights.map(w => w * 2)",
+      "editor": null,
+      "output": "> weights.map(w => w * 2)\n← [24, 90, 14, 176, 46]\n✓ Mission complete: map: change every item   +10 XP",
+      "xpText": "580 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 3,
+      "title": "filter: keep some",
+      "typed": "weights.filter(w => w > 20)",
+      "editor": null,
+      "output": "> weights.filter(w => w > 20)\n← [45, 88, 23]\n✓ Mission complete: filter: keep some   +10 XP",
+      "xpText": "590 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 4,
+      "title": "find: get the first match",
+      "typed": "weights.find(w => w > 40)",
+      "editor": null,
+      "output": "> weights.find(w => w > 40)\n← 45\n✓ Mission complete: find: get the first match   +10 XP",
+      "xpText": "600 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 5,
+      "title": "reduce: boil it down",
+      "typed": "weights.reduce((total, w) => total + w, 0)",
+      "editor": null,
+      "output": "> weights.reduce((total, w) => total + w, 0)\n← 175\n✓ Mission complete: reduce: boil it down   +10 XP",
+      "xpText": "610 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 6,
+      "title": "Chain them",
+      "typed": "weights.filter(w => w > 20).map(w => w + 5)",
+      "editor": null,
+      "output": "> weights.filter(w => w > 20).map(w => w + 5)\n← [50, 93, 28]\n✓ Mission complete: Chain them   +10 XP",
+      "xpText": "620 XP"
+    },
+    {
+      "chapter": 8,
+      "mission": 7,
+      "title": "Sort them",
+      "typed": "[...weights].sort((a, b) => a - b)",
+      "editor": null,
+      "output": "> [...weights].sort((a, b) => a - b)\n← [7, 12, 23, 45, 88]\n✓ Mission complete: Sort them   +10 XP",
+      "xpText": "630 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 1,
+      "title": "Do it later",
+      "typed": "setTimeout(() => console.log(\"Ding! ⏰\"), 1000)",
+      "editor": null,
+      "output": "> setTimeout(() => console.log(\"Ding! ⏰\"), 1000)\n← 1\nDing! ⏰\n✓ Mission complete: Do it later   +10 XP",
+      "xpText": "640 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 2,
+      "title": "Guess the order",
+      "typed": "console.log(\"1: first\")\nsetTimeout(() => console.log(\"3: last\"), 0)\nconsole.log(\"2: second\")",
+      "editor": null,
+      "output": "> console.log(\"1: first\")\n... setTimeout(() => console.log(\"3: last\"), 0)\n... console.log(\"2: second\")\n1: first\n2: second\n← undefined\n3: last\n✓ Mission complete: Guess the order   +10 XP",
+      "xpText": "650 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 3,
+      "title": "Make a promise",
+      "typed": "const popcorn = new Promise(resolve => {\n  setTimeout(() => resolve(\"🍿 ready\"), 3000)\n})",
+      "editor": null,
+      "output": "> const popcorn = new Promise(resolve => {\n...   setTimeout(() => resolve(\"🍿 ready\"), 3000)\n... })\n✓ Mission complete: Make a promise   +10 XP",
+      "xpText": "660 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 4,
+      "title": "Then what?",
+      "typed": "popcorn.then(food => console.log(\"Munching\", food))",
+      "editor": null,
+      "output": "> popcorn.then(food => console.log(\"Munching\", food))\n← Promise {<pending>}\nMunching 🍿 ready\n✓ Mission complete: Then what?   +10 XP",
+      "xpText": "670 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 5,
+      "title": "Wait politely",
+      "typed": "async function order() {\n  console.log(\"Ordering popcorn…\")\n  const food = await popcorn\n  console.log(\"Got\", food)\n}\norder()",
+      "editor": null,
+      "output": "> async function order() {\n...   console.log(\"Ordering popcorn…\")\n...   const food = await popcorn\n...   console.log(\"Got\", food)\n... }\n... order()\nOrdering popcorn…\n← Promise {<pending>}\nGot 🍿 ready\n✓ Mission complete: Wait politely   +10 XP",
+      "xpText": "680 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 6,
+      "title": "Catch a mistake",
+      "typed": "try {\n  JSON.parse(\"{oops\")\n} catch (err) {\n  console.log(\"Caught:\", err.message)\n}",
+      "editor": null,
+      "output": "> try {\n...   JSON.parse(\"{oops\")\n... } catch (err) {\n...   console.log(\"Caught:\", err.message)\n... }\nCaught: Expected property name or '}' in JSON at position 1 (line 1 column 2)\n✓ Mission complete: Catch a mistake   +10 XP",
+      "xpText": "690 XP"
+    },
+    {
+      "chapter": 9,
+      "mission": 7,
+      "title": "A promise that breaks",
+      "typed": "const burnt = new Promise((resolve, reject) => {\n  setTimeout(() => reject(new Error(\"burnt!\")), 1000)\n})\nburnt.catch(err => console.log(\"Oops:\", err.message))",
+      "editor": null,
+      "output": "> const burnt = new Promise((resolve, reject) => {\n...   setTimeout(() => reject(new Error(\"burnt!\")), 1000)\n... })\n... burnt.catch(err => console.log(\"Oops:\", err.message))\n← Promise {<pending>}\nOops: burnt!\n✓ Mission complete: A promise that breaks   +10 XP",
+      "xpText": "700 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 1,
+      "title": "Label a box",
+      "typed": "let crew: number = 12",
+      "editor": null,
+      "output": "ts> let crew: number = 12\n✓ Mission complete: Label a box   +10 XP",
+      "xpText": "710 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 2,
+      "title": "Break the promise",
+      "typed": "crew = \"twelve\"",
+      "editor": null,
+      "output": "ts> crew = \"twelve\"\n1:1 error TS2322: Type 'string' is not assignable to type 'number'.\nNothing ran. TypeScript stopped it before it could cause trouble.\n✓ Mission complete: Break the promise   +10 XP",
+      "xpText": "720 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 3,
+      "title": "Typed recipes",
+      "typed": "function tickets(adults: number, kids: number): number {\n  return adults + kids\n}",
+      "editor": null,
+      "output": "ts> function tickets(adults: number, kids: number): number {\n...   return adults + kids\n... }\n✓ Mission complete: Typed recipes   +10 XP",
+      "xpText": "730 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 4,
+      "title": "Wrong ingredient",
+      "typed": "tickets(2, \"3\")",
+      "editor": null,
+      "output": "ts> tickets(2, \"3\")\n1:12 error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.\nNothing ran. TypeScript stopped it before it could cause trouble.\n✓ Mission complete: Wrong ingredient   +10 XP",
+      "xpText": "740 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 5,
+      "title": "Describe a shape",
+      "typed": "interface Performer {\n  name: string\n  energy: number\n  act?: string\n}",
+      "editor": null,
+      "output": "ts> interface Performer {\n...   name: string\n...   energy: number\n...   act?: string\n... }\n✓ Mission complete: Describe a shape   +10 XP",
+      "xpText": "750 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 6,
+      "title": "Follow the blueprint",
+      "typed": "const pepper: Performer = { name: \"Pepper\", energy: 100 }",
+      "editor": null,
+      "output": "ts> const pepper: Performer = { name: \"Pepper\", energy: 100 }\n✓ Mission complete: Follow the blueprint   +10 XP",
+      "xpText": "760 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 7,
+      "title": "Missing a piece",
+      "typed": "const mumbles: Performer = { name: \"Mumbles\" }",
+      "editor": null,
+      "output": "ts> const mumbles: Performer = { name: \"Mumbles\" }\n1:7 error TS2741: Property 'energy' is missing in type '{ name: string; }' but required in type 'Performer'.\nNothing ran. TypeScript stopped it before it could cause trouble.\n✓ Mission complete: Missing a piece   +10 XP",
+      "xpText": "770 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 8,
+      "title": "Only these values",
+      "typed": "type Direction = \"up\" | \"down\"\nlet move: Direction = \"left\"",
+      "editor": null,
+      "output": "ts> type Direction = \"up\" | \"down\"\n... let move: Direction = \"left\"\n2:5 error TS2322: Type '\"left\"' is not assignable to type 'Direction'.\nNothing ran. TypeScript stopped it before it could cause trouble.\n✓ Mission complete: Only these values   +10 XP",
+      "xpText": "780 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 9,
+      "title": "TypeScript can guess",
+      "typed": "let town = \"Brightwick\"\ntown = 5",
+      "editor": null,
+      "output": "ts> let town = \"Brightwick\"\n... town = 5\n2:1 error TS2322: Type 'number' is not assignable to type 'string'.\nNothing ran. TypeScript stopped it before it could cause trouble.\n✓ Mission complete: TypeScript can guess   +10 XP",
+      "xpText": "790 XP"
+    },
+    {
+      "chapter": 10,
+      "mission": 10,
+      "title": "One function, any type",
+      "typed": "function first<T>(items: T[]): T {\n  return items[0]\n}\nfirst([\"hoop\", \"club\"]).toUpperCase()",
+      "editor": null,
+      "output": "ts> function first<T>(items: T[]): T {\n...   return items[0]\n... }\n... first([\"hoop\", \"club\"]).toUpperCase()\n← \"HOOP\"\n✓ Mission complete: One function, any type   +10 XP",
+      "xpText": "800 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 1,
+      "title": "Is Node here?",
+      "typed": "node -v",
+      "editor": "console.log(\"Welcome backstage!\")\n",
+      "output": "~/my-app $ node -v\nv22.12.0\n✓ Mission complete: Is Node here?   +10 XP",
+      "xpText": "810 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 2,
+      "title": "Run a file",
+      "typed": "node hello.js",
+      "editor": "console.log(\"Welcome backstage!\")\n",
+      "output": "~/my-app $ node hello.js\nWelcome backstage!\n✓ Mission complete: Run a file   +10 XP",
+      "xpText": "820 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 3,
+      "title": "Edit and re-run",
+      "typed": "node hello.js",
+      "editor": "console.log(\"Welcome backstage!\")\nconsole.log(\"I edited this file\")\n",
+      "output": "Saved hello.js\n~/my-app $ node hello.js\nWelcome backstage!\nI edited this file\n✓ Mission complete: Edit and re-run   +10 XP",
+      "xpText": "830 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 4,
+      "title": "One-liner",
+      "typed": "node -e \"console.log(2 ** 10)\"",
+      "editor": "console.log(\"Welcome backstage!\")\nconsole.log(\"I edited this file\")\n",
+      "output": "~/my-app $ node -e \"console.log(2 ** 10)\"\n1024\n✓ Mission complete: One-liner   +10 XP",
+      "xpText": "840 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 5,
+      "title": "Read a file with fs",
+      "typed": "node read.js",
+      "editor": "const fs = require(\"fs\")\nconst text = fs.readFileSync(\"notes.txt\", \"utf8\")\nconsole.log(text)\n",
+      "output": "Saved read.js\n~/my-app $ node read.js\nSweep the ring\nFeed Mumbles\nHang the posters\n\n✓ Mission complete: Read a file with fs   +10 XP",
+      "xpText": "850 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 6,
+      "title": "Write a file",
+      "typed": "node -e \"require('fs').writeFileSync('todo.txt', 'light the lantern')\"",
+      "editor": "const fs = require(\"fs\")\nconst text = fs.readFileSync(\"notes.txt\", \"utf8\")\nconsole.log(text)\n",
+      "output": "~/my-app $ node -e \"require('fs').writeFileSync('todo.txt', 'light the lantern')\"\n✓ Mission complete: Write a file   +10 XP",
+      "xpText": "860 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 7,
+      "title": "Share code between files",
+      "typed": "",
+      "editor": "function add(a, b) {\n  return a + b\n}\nmodule.exports = { add }\n",
+      "output": "✓ Mission complete: Share code between files   +10 XP\nSaved math.js",
+      "xpText": "870 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 8,
+      "title": "Use another file",
+      "typed": "node app.js",
+      "editor": "const math = require(\"./math\")\nconsole.log(math.add(2, 3))\n",
+      "output": "Saved app.js\n~/my-app $ node app.js\n5\n✓ Mission complete: Use another file   +10 XP",
+      "xpText": "880 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 9,
+      "title": "Take input",
+      "typed": "node greet.js Pepper",
+      "editor": "const name = process.argv[2] || \"guest\"\nconsole.log(\"Hi, \" + name + \"!\")\n",
+      "output": "Saved greet.js\n~/my-app $ node greet.js Pepper\nHi, Pepper!\n✓ Mission complete: Take input   +10 XP",
+      "xpText": "890 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 10,
+      "title": "Start a real project",
+      "typed": "npm init -y",
+      "editor": "const name = process.argv[2] || \"guest\"\nconsole.log(\"Hi, \" + name + \"!\")\n",
+      "output": "~/my-app $ npm init -y\nWrote to /home/you/my-app/package.json:\n\n{\n  \"name\": \"my-app\",\n  \"version\": \"1.0.0\",\n  \"description\": \"\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"keywords\": [],\n  \"author\": \"\",\n  \"license\": \"ISC\"\n}\n\n✓ Mission complete: Start a real project   +10 XP",
+      "xpText": "900 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 11,
+      "title": "Install a package",
+      "typed": "npm install cowsay",
+      "editor": "const name = process.argv[2] || \"guest\"\nconsole.log(\"Hi, \" + name + \"!\")\n",
+      "output": "~/my-app $ npm install cowsay\n\nadded 1 package, and audited 2 packages in 1s\n\nfound 0 vulnerabilities\n✓ Mission complete: Install a package   +10 XP",
+      "xpText": "910 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 12,
+      "title": "Use the package",
+      "typed": "node cow.js",
+      "editor": "const cowsay = require(\"cowsay\")\nconsole.log(cowsay.say({ text: \"The lantern is lit!\" }))\n",
+      "output": "Saved cow.js\n~/my-app $ node cow.js\n _____________________\n< The lantern is lit! >\n ---------------------\n        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||\n✓ Mission complete: Use the package   +10 XP",
+      "xpText": "920 XP"
+    },
+    {
+      "chapter": 11,
+      "mission": 13,
+      "title": "Your own command",
+      "typed": "npm start",
+      "editor": "{\n  \"name\": \"my-app\",\n  \"version\": \"1.0.0\",\n  \"description\": \"\",\n  \"main\": \"index.js\",\n  \"scripts\": {\n    \"start\": \"node cow.js\",\n    \"test\": \"echo \\\"Error: no test specified\\\" && exit 1\"\n  },\n  \"keywords\": [],\n  \"author\": \"\",\n  \"license\": \"ISC\",\n  \"dependencies\": {\n    \"cowsay\": \"^1.6.0\"\n  }\n}\n",
+      "output": "Saved package.json\n~/my-app $ npm start\n\n> my-app@1.0.0 start\n> node cow.js\n\n _____________________\n< The lantern is lit! >\n ---------------------\n        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||\n✓ Mission complete: Your own command   +10 XP",
+      "xpText": "930 XP"
+    }
+  ],
+  "rail": {
+    "fresh": [
+      "<div class=\"chapgroup\">JavaScript basics</div>",
+      "<button class=\"chap\" data-c=\"0\" aria-current=\"true\"><span class=\"num\">1</span><span class=\"nm\">Say hello</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"1\" aria-current=\"false\"><span class=\"num\">2</span><span class=\"nm\">Named boxes</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"2\" aria-current=\"false\"><span class=\"num\">3</span><span class=\"nm\">True or false</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"3\" aria-current=\"false\"><span class=\"num\">4</span><span class=\"nm\">Decisions</span><span class=\"ct\">0/6</span></button>",
+      "<button class=\"chap\" data-c=\"4\" aria-current=\"false\"><span class=\"num\">5</span><span class=\"nm\">Loops</span><span class=\"ct\">0/6</span></button>",
+      "<div class=\"chapgroup\">Organising data</div>",
+      "<button class=\"chap\" data-c=\"5\" aria-current=\"false\"><span class=\"num\">6</span><span class=\"nm\">Lists</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"6\" aria-current=\"false\"><span class=\"num\">7</span><span class=\"nm\">Functions</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"7\" aria-current=\"false\"><span class=\"num\">8</span><span class=\"nm\">Objects</span><span class=\"ct\">0/9</span></button>",
+      "<button class=\"chap\" data-c=\"8\" aria-current=\"false\"><span class=\"num\">9</span><span class=\"nm\">Array superpowers</span><span class=\"ct\">0/7</span></button>",
+      "<button class=\"chap\" data-c=\"9\" aria-current=\"false\"><span class=\"num\">10</span><span class=\"nm\">Time travel</span><span class=\"ct\">0/7</span></button>",
+      "<div class=\"chapgroup\">Beyond the browser</div>",
+      "<button class=\"chap\" data-c=\"10\" aria-current=\"false\"><span class=\"num\">11</span><span class=\"nm\">TypeScript</span><span class=\"ct\">0/10</span></button>",
+      "<button class=\"chap\" data-c=\"11\" aria-current=\"false\"><span class=\"num\">12</span><span class=\"nm\">Node.js</span><span class=\"ct\">0/13</span></button>"
+    ],
+    "complete": [
+      "<div class=\"chapgroup\">JavaScript basics</div>",
+      "<button class=\"chap earned\" data-c=\"0\" aria-current=\"false\"><span class=\"num\">1</span><span class=\"nm\">Say hello</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"1\" aria-current=\"false\"><span class=\"num\">2</span><span class=\"nm\">Named boxes</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"2\" aria-current=\"false\"><span class=\"num\">3</span><span class=\"nm\">True or false</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"3\" aria-current=\"false\"><span class=\"num\">4</span><span class=\"nm\">Decisions</span><span class=\"ct\">6/6</span></button>",
+      "<button class=\"chap earned\" data-c=\"4\" aria-current=\"false\"><span class=\"num\">5</span><span class=\"nm\">Loops</span><span class=\"ct\">6/6</span></button>",
+      "<div class=\"chapgroup\">Organising data</div>",
+      "<button class=\"chap earned\" data-c=\"5\" aria-current=\"false\"><span class=\"num\">6</span><span class=\"nm\">Lists</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"6\" aria-current=\"false\"><span class=\"num\">7</span><span class=\"nm\">Functions</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"7\" aria-current=\"false\"><span class=\"num\">8</span><span class=\"nm\">Objects</span><span class=\"ct\">9/9</span></button>",
+      "<button class=\"chap earned\" data-c=\"8\" aria-current=\"false\"><span class=\"num\">9</span><span class=\"nm\">Array superpowers</span><span class=\"ct\">7/7</span></button>",
+      "<button class=\"chap earned\" data-c=\"9\" aria-current=\"false\"><span class=\"num\">10</span><span class=\"nm\">Time travel</span><span class=\"ct\">7/7</span></button>",
+      "<div class=\"chapgroup\">Beyond the browser</div>",
+      "<button class=\"chap earned\" data-c=\"10\" aria-current=\"false\"><span class=\"num\">11</span><span class=\"nm\">TypeScript</span><span class=\"ct\">10/10</span></button>",
+      "<button class=\"chap earned\" data-c=\"11\" aria-current=\"true\"><span class=\"num\">12</span><span class=\"nm\">Node.js</span><span class=\"ct\">13/13</span></button>"
+    ]
+  }
+}
