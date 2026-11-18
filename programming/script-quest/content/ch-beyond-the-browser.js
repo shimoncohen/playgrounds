@@ -3,7 +3,7 @@
 const SCQ=window.SCQ=window.SCQ||{};
 const {decl,tagOf,isArr,logsHave}=SCQ.help;
 SCQ.CH.push(
-{name:'TypeScript',group:'Beyond the browser',badge:'Poster Stamp',story:'The poster press needs labels; give each value a type and a Performer blueprint, watch the checker catch a wrong value, and stamp the first poster.',mode:'ts',
+{name:'TypeScript',tier:'beginner',group:'Beyond the browser',badge:'Poster Stamp',story:'The poster press needs labels; give each value a type and a Performer blueprint, watch the checker catch a wrong value, and stamp the first poster.',mode:'ts',
  intro:'The poster press needs labels, and TypeScript is JavaScript plus labels that say what type each thing is. A checker reads the labels and catches mistakes before your code runs. This console runs the real TypeScript compiler.',
  learned:[': number',': string','function types','interface','optional ?','union types','generics <T>','inference'],
  missions:[
@@ -48,7 +48,7 @@ SCQ.CH.push(
   explain:'<code>&lt;T&gt;</code> after the function name introduces <code>T</code>, a type placeholder you write once before using <code>T</code> below, and <code>T[]</code> means "a list of T". Pass strings and T becomes string, so TypeScript knows <code>toUpperCase</code> (it turns text into CAPITALS) is allowed. Pass numbers and it knows you get a number.',
   check:c=>c.has('first')&&/<\s*\w+\s*>/.test(c.src)},
  ]},
-{name:'Node.js',group:'Beyond the browser',badge:'Big-Top Lantern',story:'Backstage at the big top, run Bellamy\'s hello.js, read notes.txt, write your own files, install cowsay and add an npm start that lights the big-top lantern.',mode:'sh',
+{name:'Node.js',tier:'beginner',group:'Beyond the browser',badge:'Big-Top Lantern',story:'Backstage at the big top, run Bellamy\'s hello.js, read notes.txt, write your own files, install cowsay and add an npm start that lights the big-top lantern.',mode:'sh',
  intro:'Backstage at the big top, Bellamy left one last clue in a Node project. Node.js runs JavaScript outside the browser, straight on your computer. You write .js files and run them from a terminal. This is a simulated terminal and project folder, so nothing here touches your real files.',
  learned:['node file.js','node -e','fs','require','module.exports','process.argv','npm init','npm install','npm start'],
  missions:[

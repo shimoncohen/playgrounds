@@ -3,7 +3,7 @@
 const SCQ=window.SCQ=window.SCQ||{};
 const {decl,tagOf,isArr,logsHave}=SCQ.help;
 SCQ.CH.push(
-{name:'Lists',group:'Organising data',badge:'Top Hat',story:'Bellamy\'s prop bag (hoop, club, top hat) is half packed; read, swap, add and check what it holds, and pull out the top hat.',mode:'js',
+{name:'Lists',tier:'beginner',group:'Organising data',badge:'Top Hat',story:'Bellamy\'s prop bag (hoop, club, top hat) is half packed; read, swap, add and check what it holds, and pull out the top hat.',mode:'js',
  intro:'Bellamy\'s prop bag is half packed. An array is a list of values in order. Memory draws it as a row of numbered slots. The numbering starts at 0, which feels odd for about a week.',
  learned:['[ ]','[0]','.length','.push()','.pop()','.includes()'],
  missions:[
@@ -36,7 +36,7 @@ SCQ.CH.push(
   explain:'<code>includes</code> answers true or false. <code>indexOf("top hat")</code> tells you which slot, or -1 if it is not there.',
   check:c=>c.ok&&/\.(includes|indexOf)\s*\(/.test(c.src)},
  ]},
-{name:'Functions',group:'Organising data',badge:'Magic Wand',story:'The magician\'s trick book needs tricks you can repeat: write one greeting trick and reuse it, give the dice a default, keep the safe code hidden inside, and win the magic wand.',mode:'js',
+{name:'Functions',tier:'beginner',group:'Organising data',badge:'Magic Wand',story:'The magician\'s trick book needs tricks you can repeat: write one greeting trick and reuse it, give the dice a default, keep the safe code hidden inside, and win the magic wand.',mode:'js',
  intro:'The magician\'s trick book needs tricks you can repeat. A function is a recipe with a name. Write it once, then use it whenever you like with different ingredients. This is the most important idea in programming.',
  learned:['function','return','parameters','=>','default values','callbacks','scope'],
  missions:[
@@ -69,7 +69,7 @@ SCQ.CH.push(
   explain:'<code>ReferenceError: code is not defined</code>. Empty brackets after <code>vault</code> mean the function takes nothing. Variables made inside a function only exist inside it. This is called <b>scope</b>, and it keeps functions from messing with each other\'s boxes.',
   check:c=>c.err&&c.err.name==='ReferenceError'},
  ]},
-{name:'Objects',group:'Organising data',badge:'Sequin Cape',story:'Each performer\'s card lies in the costume trunk; read it, level it up, copy it, teach Mumbles its sound, and lift out the sequin cape.',mode:'js',
+{name:'Objects',tier:'beginner',group:'Organising data',badge:'Sequin Cape',story:'Each performer\'s card lies in the costume trunk; read it, level it up, copy it, teach Mumbles its sound, and lift out the sequin cape.',mode:'js',
  intro:'Each performer\'s card lies in the costume trunk. An object groups related values under names, like a character sheet. Objects plus arrays can describe almost anything: a performer, a song, a shopping cart.',
  learned:['{ key: value }','dot access','["key"]','references','...spread','destructuring','methods'],
  missions:[
@@ -110,7 +110,7 @@ SCQ.CH.push(
   explain:'A function inside an object is called a <b>method</b>. <code>this</code> means "the object I belong to". You have been using methods all along: <code>console.log</code>, <code>bag.push</code>.',
   check:c=>c.ok&&c.hasValue&&/\(\s*\)\s*\{/.test(c.src)},
  ]},
-{name:'Array superpowers',group:'Organising data',badge:'Strongman Belt',story:'The strongman\'s weights roll past on a belt; double them, keep the heavy ones, find the first over 40, total the lot, and he gives you his belt.',mode:'js',
+{name:'Array superpowers',tier:'beginner',group:'Organising data',badge:'Strongman Belt',story:'The strongman\'s weights roll past on a belt; double them, keep the heavy ones, find the first over 40, total the lot, and he gives you his belt.',mode:'js',
  intro:'The strongman\'s weights roll past on a belt. Arrays come with built-in tools that transform whole lists in one line. Picture that belt: items go in one end and come out changed, filtered or combined.',
  learned:['.map()','.filter()','.find()','.reduce()','.sort()','chaining'],
  missions:[
@@ -143,7 +143,7 @@ SCQ.CH.push(
   explain:'sort changes the array it is called on, so we copy first with <code>[...weights]</code>. The compare function <code>a - b</code> means low to high: a negative answer puts <code>a</code> first, a positive one puts <code>b</code> first. Without it, sort compares numbers as text, so 100 comes before 9.',
   check:c=>c.ok&&/\.sort\s*\(/.test(c.src)&&isArr(c.value)},
  ]},
-{name:'Time travel',group:'Organising data',badge:'Pocket Watch',story:'The show runs on a clock; order popcorn from the snack wagon, wait for it, handle the burnt batch without a crash, and wind up the pocket watch.',mode:'js',
+{name:'Time travel',tier:'beginner',group:'Organising data',badge:'Pocket Watch',story:'The show runs on a clock; order popcorn from the snack wagon, wait for it, handle the burnt batch without a crash, and wind up the pocket watch.',mode:'js',
  intro:'The show runs on a clock, and the snack wagon takes its time. Some things take time: loading a file, fetching from the internet, a countdown. JavaScript does not stop and wait. It schedules the work and keeps going. This chapter shows how.',
  learned:['setTimeout','event loop','Promise','.then()','async / await','try / catch','.catch()'],
  missions:[

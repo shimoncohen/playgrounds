@@ -115,7 +115,7 @@ shared/                 code every playground reuses: progress saving, tier mode
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
   python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
-  script-quest/         like those, plus content/ (chapters, quick-fire, guide); the realm, Node and TS checker live in shared/
+  script-quest/         like those, plus content/ (chapters, quick-fire, guide) and tiers.js (tier setup); the realm, Node and TS checker live in shared/
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, seven chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js

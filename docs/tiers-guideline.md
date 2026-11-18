@@ -4,13 +4,13 @@ How to add difficulty tiers (Beginner, Intermediate, ...) to a playground, and h
 
 ## 1. The tier model
 
-A tier is a named group of chapters with one XP value per mission. The tiers are Beginner (10 XP), Intermediate (15), Advanced (20) and Expert (25). A chapter badge is always +25 XP, whatever the tier.
+A tier is a named group of chapters with one XP value per mission. The tiers are Beginner (10 XP), Intermediate (15), Advanced (20) and Expert (25). A chapter badge is +25 XP unless the tier sets its own `badgeXp`; Script Quest's Beginner tier sets 0 so old saves keep their XP.
 
 Tiers are **open**: nothing is locked. A learner can click any chapter in the rail at any time. Tiers only group, label and pay out differently. A tier counts as complete when every one of its chapters has its badge, and that is **derived**, not stored: there is no tier state in the saved JSON, and a tier badge awards no XP. A tier with no chapters yet is declared but not drawn.
 
 ## 2. Declaring tiers and tagging chapters
 
-`shared/tiers.js` is a pure module (no DOM except `Tiers.renderRail`). Create the model once, before the content files load. Shell Quest does it in `programming/shell-quest/content/tiers.js`:
+`shared/tiers.js` is a pure module (no DOM except `Tiers.renderRail`). Create the model once, either before the content files load or after them: `chapters` is read by reference when a method is called, so both work. Shell Quest creates it first, in `programming/shell-quest/content/tiers.js`; Script Quest creates it after its chapters, in `programming/script-quest/tiers.js`. A tier may also set `badgeXp` (default 25) and `showHeader: false` (hides its own heading), and the config may set `doneSep` (the separator in `S.done` keys, default `.`):
 
 ```js
 SQ.tiers = window.Tiers.create({
@@ -23,13 +23,13 @@ SQ.tiers = window.Tiers.create({
 
 Each chapter carries `tier: 'intermediate'`. What you get back:
 
-- `tierOf(ch)` returns the tier **object** (`{id, name, blurb, missionXp}`) of chapter index `ch`, or the first tier if the tag is missing or unknown.
-- `missionXp(ch)` is the XP for one mission in that chapter. The app uses it when a mission completes; `chapterBadgeXp` is the 25.
+- `tierOf(ch)` returns the tier **object** (`{id, name, blurb, missionXp}`, plus the optional `badgeXp` and `showHeader`) of chapter index `ch`, or the first tier if the tag is missing or unknown.
+- `missionXp(ch)` is the XP for one mission in that chapter. The app uses it when a mission completes; `chapterBadgeXp` is the default 25 for a tier without `badgeXp`.
 - `status(S)` gives, per tier, its chapter indexes, `chaptersDone`, `missionsDone`, `missionsTotal` and `complete`. Pass the saved state `S` (`S.done`, `S.badges`).
 - `ranks()` and `rankFor(xp)` give the rank ladder and the rank (name, index, `lo`, `hi`) for an XP total.
-- `Tiers.renderRail(container, { status, chapters, S, onPick })` draws a `.tierhead` per tier that has chapters, then that tier's chapter buttons. Load `shared/tiers.css` next to your own stylesheet; it uses the host page's theme variables `--muted`, `--ink`, `--accent-text` and `--line`, so define those (or map them) in your `style.css`.
+- `Tiers.renderRail(container, { status, chapters, S, onPick })` draws a `.tierhead` per tier that has chapters, then that tier's chapter buttons. A tier hides its own heading with `showHeader:false` (its chapters are still drawn). Optional: `doneSep` (default `.`), `chAttr` (the chapter-index attribute, default `data-ch`), `earnedStar` (false shows the number on an earned chapter, default true) and `groups` (true draws a `.chapgroup` div when `chapters[i].group` changes, reset at each tier, default false). Load `shared/tiers.css` next to your own stylesheet; it uses the host page's theme variables `--muted`, `--ink`, `--accent-text` and `--line`, so define those (or map them) in your `style.css`.
 
-**Ranks derive from cumulative XP.** `ranks()` is `baseRanks` plus one entry per tier that has chapters and a name in `tierEndRanks`. That entry sits at the XP of finishing everything up to and including that tier: `sum(missions * missionXp + 25)`. Shell Quest: Beginner ends at 695, Intermediate at 1230 ("Script Smith"), Advanced at 1890 ("Automator"), and Expert at the end of its chapters ("Shell Wizard", the top rank). Add chapters to a tier and its threshold moves by itself; never type the number.
+**Ranks derive from cumulative XP.** `ranks()` is `baseRanks` plus one entry per tier that has chapters and a name in `tierEndRanks`. That entry sits at the XP of finishing everything up to and including that tier: `sum(missions * missionXp + badgeXp)` over each tier's own chapters, with `badgeXp` 25 unless the tier sets it. Shell Quest: Beginner ends at 695, Intermediate at 1230 ("Script Smith"), Advanced at 1890 ("Automator"), and Expert at the end of its chapters ("Shell Wizard", the top rank). Add chapters to a tier and its threshold moves by itself; never type the number.
 
 ## 3. Mission kinds and the check context
 
@@ -313,8 +313,8 @@ Load order in `index.html`: `shared/progress.js`, `shared/tiers.js`, `engine/*`,
 1. Put the new playground's saved-state shape on paper: where chapter, mission, `done`, `badges` and XP live, and the `localStorage` key. Keep all of it.
 2. Capture a golden: export a complete save and a transcript of every existing mission, and add a test that replays them. Do this **before** touching anything.
 3. Split code into engine / content / ui / app files with a shared namespace, keeping behaviour the same; the golden passing after every step is the proof a split is safe, not identical bytes.
-4. Add `shared/tiers.js` and `shared/tiers.css`; create `content/tiers.js` with `Tiers.create`; tag every existing chapter `tier: 'beginner'` (this changes no behaviour).
-5. Replace the hardcoded XP-per-mission, badge XP and rank table with `tiers.missionXp(ch)`, `chapterBadgeXp` and `rankFor`. Pick `baseRanks` and `tierEndRanks` so existing thresholds are unchanged.
+4. Add `shared/tiers.js` (and `shared/tiers.css` if the rail draws tier headings); create the model with `Tiers.create` in a setup file, in `content/` or beside `app.js` (Script Quest uses `tiers.js`); tag every existing chapter `tier: 'beginner'` (this changes no behaviour).
+5. Replace the hardcoded XP-per-mission, badge XP and rank table with `tiers.missionXp(ch)`, `chapterBadgeXp` and `rankFor`. Pick `baseRanks` and `tierEndRanks` so existing thresholds are unchanged. A quest with old saves sets the tier's `badgeXp: 0` (if it never paid badge XP), `doneSep` (its done-key separator) and `showHeader: false` so XP, keys and rail markup stay as saved.
 6. Draw the rail with `Tiers.renderRail` and keep the chapter button markup the same.
 7. Add a `check` context with helpers like the ones in section 3, and write the first new tier as outcome-style checks.
 8. Add solvability and wrong-command tests for every new chapter, and an import test for the old save fixture.
