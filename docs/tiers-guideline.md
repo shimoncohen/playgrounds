@@ -290,7 +290,7 @@ Anything the learner could type or that names a part of the code is shown as cod
 ## 7. Guide and quick-fire tags
 
 - **Guide.** Entries are `{c, ch, what, syn, ex}`. `ch` is the chapter index; the entry's tier is `tierOf(ch)`, so there is no separate tier tag to forget. `ch: 'extras'` puts an entry under "Handy extras", which has its own key and shows only under the All filter. The tier filter buttons are built from the tiers that have chapters.
-- **Quick-fire.** Entries are `[task, [accepted answers], tier?, {exact:true}?]`. A missing tier means `'beginner'`. A quest that opens each question once its chapter is finished (Harbor Quest) carries the chapter index as the third element instead, and the tier comes from that chapter (`tierOf(ch)`); one quest uses one of the two shapes, never both. The tier picker shows "Mixed" plus every tier that has at least one question, and a round draws only from the chosen pool.
+- **Quick-fire.** Entries are `[task, [accepted answers], tier?, {exact:true}?]`. A missing tier means `'beginner'`. A quest that opens each question once its chapter is finished (Harbor Quest) carries the chapter index as the third element instead, and the tier comes from that chapter (`tierOf(ch)`); one quest uses one of the two shapes, never both. The tier picker shows "Mixed" plus every tier that has at least one question, and a round draws only from the chosen pool. Script Quest opens questions per finished chapter, so its picker shows only when at least 2 tiers have open questions.
 
 ## 8. File layout for a playground
 

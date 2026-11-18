@@ -47,10 +47,24 @@ const FIRE=[
 {ch:5,c:'const a = [3, 1, 2]\na.push(5)\nconsole.log(a.length)',o:['4','3','5','[3, 1, 2, 5]'],a:0,w:'push adds one item. Four now.'},
 {ch:10,c:'let x: number = 5\nx = "five"  // TypeScript',o:['Type error before running','"five"','5','NaN'],a:0,w:'TypeScript refuses to compile: string is not assignable to number.'},
 {ch:11,c:'// node greet.js Ada\nconsole.log(process.argv[2])',o:['Ada','greet.js','node','undefined'],a:0,w:'argv[0] is node, [1] is the file, [2] is the first word you typed after it.'},
+{ch:12,c:'function makeCounter() {\n  let n = 0\n  return () => {\n    n += 1\n    return n\n  }\n}\nconst next = makeCounter()\nnext()\nconsole.log(next())',o:['2','1','0','undefined'],a:0,w:'The inner function remembers n between calls, so the second call adds to the first: 1, then 2.'},
+{ch:12,c:'let x = 1\nif (true) {\n  let x = 2\n}\nconsole.log(x)',o:['1','2','undefined','Error'],a:0,w:'The let inside the braces is a different variable that exists only in there. The outer x never changed.'},
+{ch:13,c:'const { name: stageName } = { name: "Pepper" }\nconsole.log(stageName)',o:['Pepper','name','undefined','Error'],a:0,w:'The word before the colon is the property to read. The word after it is the new variable.'},
+{ch:13,c:'const [first, ...rest] = [1, 2, 3]\nconsole.log(rest)',o:['[2, 3]','[1]','[3]','2'],a:0,w:'first takes the first item, and ...rest gathers everything that is left into a new list.'},
+{ch:14,c:'class Dog {\n  constructor(name) {\n    this.name = name\n  }\n  speak() {\n    return this.name + " barks"\n  }\n}\nconsole.log(new Dog("Rex").speak())',o:['Rex barks','undefined barks','speak','Error'],a:0,w:'new runs the constructor, which saves the name on the new object. speak reads it back with this.name.'},
+{ch:14,c:'class Animal {\n  sound() {\n    return "..."\n  }\n}\nclass Cat extends Animal {}\nconsole.log(new Cat().sound())',o:['...','undefined','Cat','Error'],a:0,w:'Cat extends Animal, so it inherits sound() without writing its own.'},
+{ch:15,c:'function f() {\n  try {\n    return "try"\n  } finally {\n    console.log("finally")\n  }\n}\nconsole.log(f())',o:['finally, then try','try, then finally','try','finally'],a:0,w:'finally runs before the function hands back its value, so "finally" prints first.'},
+{ch:15,c:'class SoldOutError extends Error {}\ntry {\n  throw new SoldOutError("full")\n} catch (err) {\n  console.log(err instanceof Error)\n}',o:['true','false','SoldOutError','full'],a:0,w:'A class that extends Error makes errors that are still Errors, so instanceof answers true.'},
+{ch:16,c:'// math.js\nmodule.exports = { double: n => n * 2 }\n// main.js\nconst math = require("./math")\nconsole.log(math.double(4))',o:['8','double','undefined','Error'],a:0,w:'require gives back whatever the other file put on module.exports, here an object with a double function.'},
+{ch:16,c:'// counter.js\nconsole.log("loaded")\n// main.js\nrequire("./counter")\nrequire("./counter")',o:['loaded, once','loaded, twice','nothing','Error'],a:0,w:'Node runs a file the first time it is required and keeps the result in its cache. The second require reuses it.'},
+{ch:17,c:'console.log(new Set([1, 2, 2, 3, 3, 3]).size)',o:['3','6','2','1'],a:0,w:'A Set keeps each value once, so only 1, 2 and 3 are left.'},
+{ch:17,c:'const m = new Map()\nm.set("a", 1)\nm.set("a", 2)\nconsole.log(m.get("a"), m.size)',o:['2 1','1 2','2 2','1 1'],a:0,w:'Setting a key that already exists replaces its value, so the Map still has one pair.'},
+{ch:18,c:'console.log(JSON.stringify({ a: 1, b: undefined }))',o:['{"a":1}','{"a":1,"b":undefined}','{"a":1,"b":null}','Error'],a:0,w:'JSON has no undefined, so stringify leaves that key out.'},
+{ch:18,c:'console.log(typeof JSON.stringify({ a: 1 }))',o:['string','object','undefined','number'],a:0,w:'stringify turns data into text, so what comes back is a string.'},
 ];
 
-/* The quick-fire questions a learner may see: only those whose chapter has every mission done in `done` (the saved S.done, keyed '<chapter>-<mission>'). */
-const qfOpen=done=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'-'+j]));
+/* The quick-fire questions a learner may see: only those whose chapter has every mission done in `done` (the saved S.done, keyed '<chapter>-<mission>'); `tier` keeps one tier's questions. */
+const qfOpen=(done,tier)=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'-'+j])&&(!tier||CH[q.ch].tier===tier));
 SCQ.FIRE=FIRE;
 SCQ.qfOpen=qfOpen;
 })();

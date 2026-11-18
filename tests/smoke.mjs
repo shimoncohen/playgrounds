@@ -4290,3 +4290,236 @@ test('shell-quest: a long command in the explanation wraps on a phone (chapter 1
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+// One near-miss wrong answer per Intermediate mission, by chapter index then mission index. Chapter 17 entries are the
+// editor text (or the terminal command, for the one mission that has no file).
+const SCRIPT_NEAR = {
+  12: [
+    `const show = "Starlight Circus"\nfunction announce() {\n  return "Tonight at the Starlight Circus"\n}\nannounce()`,
+    `const price = 10\nfunction discount() {\n  return price\n}\ndiscount()`,
+    `function makeCounter() {\n  let count = 0\n  return function () {\n    return count\n  }\n}\nconst tickets = makeCounter()\ntickets()`,
+    `const door = makeCounter()\nconst gate = door\ndoor()\ndoor()\ngate()`,
+    `function makeTill() {\n  return {\n    takings: 0,\n    add(amount) { this.takings += amount },\n    total() { return this.takings }\n  }\n}\nconst till = makeTill()\ntill.add(5)\ntill.total()`,
+    `const bells = []\nfor (var i = 1; i <= 3; i++) {\n  bells.push(() => i)\n}\nbells.map(ring => ring())`,
+  ],
+  13: [
+    `const { stageName } = performer`,
+    `const mood = performer.mood || "cheerful"`,
+    `const { skill } = troupe`,
+    `const [opening, finale] = acts`,
+    `const { name, details } = performer`,
+    `function introduce(performer) {\n  return performer.name + " performs the " + (performer.act || "mystery act")\n}\nintroduce({ name: "Mumbles" })`,
+    `const copy = { ...troupe }\ntroupe.lead.skill`,
+  ],
+  14: [
+    `class Performer {\n  constructor(name, act) {\n    this.name = name\n  }\n}\nconst pepper = new Performer("Pepper", "tightrope")`,
+    `class Performer {\n  constructor(name, act) {\n    this.name = name\n    this.act = act\n  }\n}\nnew Performer("Pepper", "tightrope")`,
+    `class Juggler extends Performer {\n  constructor(name) {\n    super(name)\n  }\n}\nconst mia = new Juggler("Mia")\nmia.introduce()`,
+    `class Booth {\n  constructor(price) {\n    this.price = price\n    this.sold = 0\n  }\n  sell() {\n    this.sold++\n  }\n  takings() {\n    return this.price * this.sold\n  }\n}\nconst booth = new Booth(5)\nbooth.sell()\nbooth.sell()\nbooth.takings`,
+    `class Ticket {\n  constructor(seat) {\n    this.seat = seat\n  }\n  vip() {\n    return new Ticket("front row")\n  }\n}\nnew Ticket("A1").vip().seat`,
+    `class Safe {\n  code = 1234\n  open(guess) {\n    return guess === this.code ? "click" : "stuck"\n  }\n}\nconst safe = new Safe()\nsafe.open(1234)`,
+  ],
+  15: [
+    `try {\n  JSON.parse("{oops")\n} catch (err) {\n  console.log("Caught:", err.message)\n}\nconsole.log("Lights off")`,
+    `function ticket() {\n  try {\n    return "sold"\n  } catch (err) {\n    console.log("Booth closed")\n  }\n}\nticket()`,
+    `function seat(n) {\n  if (n > 40) throw new Error("No seat " + n)\n  return "Seat " + n\n}\ntry {\n  seat(99)\n} catch (err) {\n  console.log(err.name + ": " + err.message)\n}`,
+    `function safeParse(text) {\n  try {\n    return JSON.parse(text)\n  } catch (err) {\n    return null\n  }\n}\nsafeParse("{oops")`,
+    `class SoldOutError extends Error {\n  constructor(show) {\n    super(show + " is sold out")\n  }\n}\ntry {\n  throw new SoldOutError("Fire night")\n} catch (err) {\n  console.log(err.name + ": " + err.message)\n}`,
+    `try {\n  try {\n    JSON.parse("{oops")\n  } catch (err) {\n    throw new Error("Order slip unreadable")\n  }\n} catch (outer) {\n  console.log(outer.message)\n}`,
+    `async function serve() {\n  try {\n    await Promise.reject(new Error("burnt popcorn"))\n  } catch (err) {\n    console.log("Caught:", err.message)\n  }\n  console.log("Counter wiped")\n}\nserve()`,
+  ],
+  16: [
+    `function total(a, b, c) {\n  return a + b + c\n}`,
+    `exports.size = 12`,
+    `module.exports = {\n  welcome: function (name) {\n    return "Welcome, " + name + "!"\n  }\n}`,
+    `module.exports = function () {\n  let n = 0\n  n = n + 1\n  return n\n}`,
+    `{\n  "ring": 5\n}`,
+    `node -e "try { require('./ghost') } catch (err) { console.log(err.message) }"`,
+    `export function pair(a, b) {\n  return a + " & " + b\n}`,
+  ],
+  17: [
+    `const unique = tickets`,
+    `guests.add("Cy")\nconsole.log(guests.has("Dee"))`,
+    `const uniqueTags = new Set(tags)`,
+    `const seats = new Map()\nseats.set("A1", "Ada")\nconsole.log(seats.get("A1"))`,
+    `const counts = new Map()\nfor (const w of words) {\n  counts.set(w, 1)\n}`,
+    `let total = 0\nfor (const [item, price] of prices) {\n  console.log(item + " costs " + price)\n}`,
+    `queue.set("wagon", 12)`,
+  ],
+  18: [
+    `const text = ticket`,
+    `const copy = ticket\ncopy.seat = "B3"\nconsole.log(ticket.seat)`,
+    `const pretty = JSON.stringify(ticket)`,
+    `const label = JSON.stringify(ticket, ["show"])`,
+    `const stamp = new Date("2026-12-24T19:00:00Z")`,
+    `const show = JSON.parse(saved)`,
+    `function readOrder(text) {\n  return JSON.parse(text)\n}\nreadOrder("{'seats': 2}")`,
+  ],
+};
+
+// Drives chapters 13 to 19 on one page: a lazy line and a near-miss do not complete a mission, its own code does and adds one win line.
+async function driveScriptIntermediate() {
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`);
+  await page.waitForSelector('#cmd');
+  assert.ok(await page.evaluate(() => typeof window.acorn !== 'undefined'), 'acorn did not load from the CDN');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  let solved = 0;
+  for (const ci of [12, 13, 14, 15, 16, 17, 18]) {
+    await page.click(`#chapters .chap[data-c="${ci}"]`);
+    for (let j = 0; ; j++) {
+      const at = /Mission (\d+) of (\d+)/.exec(await page.textContent('#mission .eyebrow'));
+      if (!at) break;
+      const where = `chapter ${ci + 1}, mission ${at[1]} (${(await page.textContent('#mission h2')).trim()})`;
+      const editor = /edit /.test(await page.textContent('#mission .goal .label'));
+      const before = await wins();
+      await page.fill('#cmd', ci === 16 ? 'echo lazy' : 'void 0');
+      await page.press('#cmd', 'Enter');
+      await page.waitForTimeout(200);
+      assert.equal(await wins(), before, `${where}: a lazy line completed the mission`);
+      const near = SCRIPT_NEAR[ci][j];
+      assert.ok(near, `${where}: no near-miss written`);
+      if (editor) {
+        await page.click('#fill');
+        await page.fill('#ed', near);
+        await page.click('#edSave');
+        if ((await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+      } else {
+        await page.fill('#cmd', near);
+        await page.press('#cmd', 'Enter');
+      }
+      await page.waitForTimeout(300);
+      assert.equal(await wins(), before, `${where}: the near-miss completed the mission`);
+      // Fresh console clears the screen, and with it the earlier win lines, so count from here.
+      if (ci !== 16) await page.click('#fresh'); // the near-miss may have declared a const the reference declares again
+      const base = await wins();
+      await page.click('#fill');
+      if (editor) await page.click('#edSave');
+      if ((await wins()) === base && (await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+      try { await until(async () => (await wins()) > base, 8000); } catch { assert.fail(`${where}: the reference code did not complete the mission`); }
+      assert.equal(await wins(), base + 1, `${where}: exactly one win line per mission`);
+      solved++;
+    }
+  }
+  assert.equal(await page.textContent('#xpText'), `${15 * solved + 25 * 7} XP`);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  return solved;
+}
+
+test('script-quest: every Intermediate mission (chapters 13 to 19) is solved by its own code, a lazy line or near-miss does not pass, and XP is 15 per mission plus 25 per chapter', async () => {
+  assert.equal(await driveScriptIntermediate(), 47);
+});
+
+test('script-quest: each Modules mission (chapter 17) completes on a fresh project, without the earlier missions', async () => {
+  const hook = 'window.__t={CH,S,setChapter,goMission,runShell,submit,cmd,mk,INITIAL_FILES,openFile,saveFile,ed,get MODE(){return MODE},clearRun(){RUN=null}};})();';
+  const prep = ctx => ctx.route('**/script-quest/app.js', async r => {
+    const body = (await r.fetch()).text();
+    await r.fulfill({ contentType: 'text/javascript', body: (await body).replace(/\}\)\(\);\s*$/, hook) });
+  });
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, {}, prep);
+  await page.waitForSelector('#cmd');
+  const bad = await page.evaluate(async () => {
+    const { CH, S, setChapter, goMission, runShell, mk, INITIAL_FILES, openFile, saveFile, ed } = window.__t;
+    const c = CH.findIndex(x => x.name === 'Modules');
+    const tick = () => new Promise(r => setTimeout(r, 50));
+    const bad = [];
+    for (let j = 0; j < CH[c].missions.length; j++) {
+      const m = CH[c].missions[j];
+      S.done = {}; S.cur = {}; S.files = { ...INITIAL_FILES }; S.pkgs = [];
+      setChapter(c); S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+      if (!m.editFile) runShell(m.code);
+      else { openFile(m.editFile); ed.value = m.code; saveFile(); if (m.run) runShell(m.run); }
+      for (let w = 0; w < 80 && !S.done[mk(c, j)]; w++) await tick();
+      if (!S.done[mk(c, j)]) bad.push(`${j + 1} ${m.title}: did not complete on a fresh project`);
+    }
+    return bad;
+  });
+  assert.deepEqual(bad, []);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+const BEGINNER = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['390 px', { width: 390, height: 844 }]]) {
+  test(`script-quest: the Intermediate rail, the Field guide filter and the quick-fire picker work at ${label}`, async () => {
+    const seed = async (page, chapters) => {
+      await page.evaluate(chapters => {
+        const { CH } = window.SCQ, done = {};
+        CH.forEach((c, i) => c.missions.forEach((_, j) => { if (chapters.includes(i)) done[i + '-' + j] = 1; }));
+        const xp = Object.keys(done).length;
+        localStorage.setItem('script-quest-v1', JSON.stringify({ xp, done, chap: 0, cur: {}, best: 0, files: null, pkgs: [] }));
+      }, chapters);
+      await page.reload();
+      await page.waitForSelector('#cmd');
+    };
+    const bg = (page, sel) => page.$eval(sel, e => getComputedStyle(e).backgroundColor);
+    const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, { viewport });
+    await page.waitForSelector('#cmd');
+    assert.equal(await page.$$eval('#chapters .tierhead[data-tier="intermediate"]', e => e.length), 1);
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 19);
+    assert.equal(await overflow(page), false);
+
+    await seed(page, [0]);
+    await page.click('#t-fire');
+    await page.waitForSelector('#fGo');
+    assert.equal(await page.$$eval('.qpick', e => e.length), 0, 'a Beginner-only learner sees no picker');
+
+    await seed(page, [0, 12]);
+    await page.click('#t-fire');
+    await page.waitForSelector('.qpick');
+    assert.deepEqual(await page.$$eval('.qpick button', b => b.map(x => x.textContent)), ['Mixed', 'Beginner', 'Intermediate']);
+    assert.equal(await page.getAttribute('.qpick button[data-qt=""]', 'aria-pressed'), 'true');
+    await page.click('.qpick button[data-qt="intermediate"]');
+    assert.equal(await page.getAttribute('.qpick button[data-qt="intermediate"]', 'aria-pressed'), 'true');
+    assert.equal(await page.getAttribute('.qpick button[data-qt=""]', 'aria-pressed'), 'false');
+    const pressed = await bg(page, '.qpick button[aria-pressed="true"]');
+    assert.notEqual(pressed, await bg(page, '.qpick button[aria-pressed="false"]'), 'the chosen pool must look pressed');
+    assert.notEqual(pressed, 'rgba(0, 0, 0, 0)');
+    assert.equal(await overflow(page), false);
+    await page.click('#fGo');
+    for (let n = 0; n < 3; n++) {
+      await page.waitForSelector('#fStage .snip');
+      const code = await page.textContent('#fStage .snip');
+      assert.ok(await page.evaluate(c => window.SCQ.FIRE.some(q => q.ch === 12 && q.c === c), code), 'a round draws only from the chosen tier');
+      await page.press('body', '1');
+      await page.waitForTimeout(900);
+      if (await page.$('#fNext')) await page.click('#fNext');
+    }
+
+    await seed(page, BEGINNER);
+    await page.click('#t-guide');
+    await page.waitForSelector('.gfilter');
+    assert.deepEqual(await page.$$eval('.gfilter button', b => b.map(x => x.textContent)), ['All', 'Beginner', 'Intermediate']);
+    const visible = () => page.$$eval('#guide .gsec', s => s.filter(x => !x.hidden).map(x => x.dataset.tier || (x.hasAttribute('data-extras') ? 'extras' : 'beginner')));
+    assert.ok((await visible()).includes('intermediate') && (await visible()).includes('extras'), 'All shows every section');
+    await page.click('.gfilter button[data-tier="beginner"]');
+    const beg = await visible();
+    assert.ok(beg.length && beg.every(t => t === 'beginner'), 'Beginner shows no Intermediate card and no extras');
+    const pressedBg = await bg(page, '.gfilter button[aria-pressed="true"]');
+    assert.notEqual(pressedBg, await bg(page, '.gfilter button[aria-pressed="false"]'), 'the chosen filter must look pressed');
+    await page.hover('.gfilter button[aria-pressed="true"]');
+    assert.equal(await bg(page, '.gfilter button[aria-pressed="true"]'), pressedBg, 'hover must not undo the pressed look');
+    await page.click('.gfilter button[data-tier="intermediate"]');
+    assert.deepEqual(await visible(), ['intermediate']);
+    assert.ok(await page.$$eval('#guide .gsec[data-tier="intermediate"] .card', c => c.length) >= 7);
+    await page.click('.gfilter button[data-tier="all"]');
+    assert.ok((await visible()).length > 3);
+    await page.focus('.gfilter button[data-tier="all"]');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.tier), 'beginner');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.tier), 'intermediate');
+    assert.equal(await overflow(page), false);
+
+    await seed(page, BEGINNER);
+    await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('script-quest-v1')); s.xp = 930; s.chap = 11; localStorage.setItem('script-quest-v1', JSON.stringify(s)); });
+    await page.reload();
+    await page.waitForSelector('#nextChap');
+    assert.match(await page.textContent('#nextChap'), /Next: Scope and closures/);
+    assert.match(await page.$eval('#xpFill', e => e.parentElement.title), /^\d+ XP to Sorcerer$/);
+    assert.equal(await page.textContent('#rank'), 'Wizard');
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
