@@ -1,0 +1,76 @@
+(()=>{
+'use strict';
+const SCQ=window.SCQ=window.SCQ||{};
+SCQ.CH.push(
+{name:'Errors and try/catch',tier:'intermediate',group:'JavaScript in depth',badge:'Safety Net',story:'A rope frays, a ticket tears, a show sells out. Learn to clean up after trouble, throw your own warnings, pass on what you cannot fix, name your own kinds of error, and win the safety net.',mode:'js',
+ intro:'Things go wrong backstage: a rope frays, a ticket tears, a show sells out. You already know <code>try</code> and <code>catch</code> from the snack wagon. This chapter goes deeper: tidying up with <code>finally</code>, raising your own errors, passing on the ones you cannot fix, giving errors names of your own, and handling the same trouble inside <code>async</code> code.',
+ learned:['finally','throw','rethrow with instanceof','custom error classes','error cause','async errors'],
+ missions:[
+ {title:'Always lower the curtain',goal:'Add a `finally` block to a `try`/`catch` so "Lights off" prints whether or not the smudged order slip breaks the code.',code:'try {\n  JSON.parse("{oops")\n} catch (err) {\n  console.log("Caught:", err.message)\n} finally {\n  console.log("Lights off")\n}',
+  how:['The whole code: the <code>finally</code> block runs after <code>try</code> and <code>catch</code>, so the lights go off however the show went.',
+   'The <code>try</code> and <code>catch</code> parts are the ones you already know: break the order slip, then print the message.',
+   '<code>finally { … }</code> goes last, after the closing brace of <code>catch</code>.',
+   'Check the console: you should see two lines, the caught message first and "Lights off" second.'],
+  anat:[['try','kw'],['catch (err)','kw'],['finally','kw','runs last'],['console.log("Lights off")','fn']],
+  explain:'<code>finally</code> holds the code that must run whatever happens: no error, a caught error, even an error nobody catches. It is the place for cleaning up, like putting the lights out or closing a file. Change the broken text to <code>"{}"</code> and run it again: <code>finally</code> still runs.',
+  check:c=>c.ok&&/\btry\b/.test(c.src)&&/\bcatch\b/.test(c.src)&&/\bfinally\s*\{/.test(c.src)&&c.logs.length>=2},
+ {title:'Finally beats return',goal:'Write a function `ticket()` that returns "sold" from inside `try`, with a `finally` that prints "Booth closed". Call it.',code:'function ticket() {\n  try {\n    return "sold"\n  } finally {\n    console.log("Booth closed")\n  }\n}\nticket()',
+  how:['The whole code: a function returns from inside <code>try</code>, and the <code>finally</code> block still gets its turn before the value leaves.',
+   '<code>function ticket() { … }</code> holds a <code>try</code> with <code>return "sold"</code> and no <code>catch</code> at all: a <code>try</code> may have only a <code>finally</code>.',
+   'The <code>finally</code> prints "Booth closed".',
+   '<code>ticket()</code> at the end calls it. You see "Booth closed" first, then <code>← "sold"</code>.'],
+  anat:[['return "sold"','kw','value waits'],['finally','kw','still runs'],['console.log("Booth closed")','fn'],['ticket()','fn','call it']],
+  explain:'A <code>return</code> does not skip <code>finally</code>: the value waits while the <code>finally</code> code runs, then it is handed back. That is why cleanup code goes in <code>finally</code> and not after the <code>return</code>, where it would never be reached.',
+  check:c=>c.ok&&typeof c.val('ticket')==='function'&&/try\s*\{[^}]*\breturn\b/.test(c.src)&&/\bfinally\s*\{/.test(c.src)&&typeof c.value==='string'&&c.value.length>0&&c.logs.length>=1},
+ {title:'Throw your own warning',goal:'Write `seat(n)` that throws a `RangeError` when `n` is above 40 and otherwise returns a "Seat" sentence. Call it with 99 inside `try`/`catch` and print `err.name` and `err.message`.',code:'function seat(n) {\n  if (n > 40) throw new RangeError("No seat " + n)\n  return "Seat " + n\n}\ntry {\n  seat(99)\n} catch (err) {\n  console.log(err.name + ": " + err.message)\n}',
+  how:['The whole code: <code>seat</code> checks the number itself and raises an error when it is out of range, so the caller has to deal with it.',
+   '<code>throw new RangeError("No seat " + n)</code> stops the function on the spot and sends the error up to the nearest <code>catch</code>.',
+   'The <code>if</code> guards the unlucky case, and the <code>return</code> after it is the normal path.',
+   'The <code>try</code> block calls <code>seat(99)</code>, and <code>catch</code> prints <code>err.name</code> (RangeError) and the message.'],
+  anat:[['throw','kw','raise an error'],['new RangeError(…)','fn','a kind of error'],['seat(99)','fn'],['err.name','name']],
+  explain:'<code>throw</code> stops the function right there and hands an error to whoever called it. JavaScript has several kinds of error. A <b>RangeError</b> says "this number is outside what is allowed", the way a <code>TypeError</code> says "this is the wrong kind of value". The kind shows up in <code>err.name</code>, so a <code>catch</code> can tell them apart.',
+  check:c=>{const f=c.val('seat');if(!c.ok||typeof f!=='function'||!/\bthrow\s+new\s+RangeError\s*\(/.test(c.src))return false;
+   try{f(99);return false}catch(e){if(!e||e.name!=='RangeError')return false}
+   try{if(typeof f(1)!=='string')return false}catch(e){return false}
+   return c.logs.some(l=>/RangeError/.test(l))}},
+ {title:'Pass on what you cannot fix',goal:'Write `safeParse(text)` that returns `null` for broken JSON text, but throws any other error again.',code:'function safeParse(text) {\n  try {\n    return JSON.parse(text)\n  } catch (err) {\n    if (err instanceof SyntaxError) return null\n    throw err\n  }\n}\nsafeParse("{oops")',
+  how:['The whole code: <code>safeParse</code> handles the one error it understands and passes every other one on.',
+   '<code>return JSON.parse(text)</code> inside <code>try</code> is the normal path: good text becomes data.',
+   '<code>err instanceof SyntaxError</code> asks "is this error that kind?", and only then does it <code>return null</code>.',
+   '<code>throw err</code> on the next line sends any other error on, as if you had never caught it.',
+   'The last line calls <code>safeParse("{oops")</code> and the console shows <code>← null</code>.'],
+  anat:[['err instanceof SyntaxError','op','is it this kind?'],['return null','kw','the case you handle'],['throw err','kw','pass it on']],
+  explain:'A <code>catch</code> catches everything, including mistakes you never expected, like a typo that hides a real bug. The careful habit is to <b>rethrow</b>: check what kind of error you got with <code>instanceof</code> (it answers true or false), handle the ones you understand, and <code>throw err</code> again for the rest.',
+  check:c=>{const f=c.val('safeParse');if(!c.ok||typeof f!=='function'||!/\binstanceof\b/.test(c.src)||!/\bthrow\s+\w+/.test(c.src))return false;
+   try{const good=f('{"a":1}');if(!good||good.a!==1||f('{oops')!==null)return false}catch(e){return false}
+   try{f(Symbol('x'));return false}catch(e){return !!e&&e.name==='TypeError'}}},
+ {title:'Name your own error',goal:'Write `class SoldOutError extends Error` whose constructor takes a `show`, passes a message that contains it up with `super`, and sets `this.name`. Throw one and print the name and message.',code:'class SoldOutError extends Error {\n  constructor(show) {\n    super(show + " is sold out")\n    this.name = "SoldOutError"\n  }\n}\ntry {\n  throw new SoldOutError("Fire night")\n} catch (err) {\n  console.log(err.name + ": " + err.message)\n}',
+  how:['The whole code: your own kind of error is a class that <code>extends Error</code>, so a <code>catch</code> can recognise it by name.',
+   '<code>extends Error</code> makes <code>SoldOutError</code> an error with everything <code>Error</code> has.',
+   '<code>super(show + " is sold out")</code> passes the message up, as you did with <code>Performer</code>.',
+   '<code>this.name = "SoldOutError"</code> sets the name that <code>err.name</code> will report.',
+   'Throw one inside <code>try</code> and print <code>err.name</code> and <code>err.message</code> in <code>catch</code>.'],
+  anat:[['class SoldOutError','kw'],['extends Error','kw','an error kind'],['super(…)','fn','the message'],['this.name','name']],
+  explain:'A class that <code>extends Error</code> gives you error kinds that fit your own world. Callers can use <code>err instanceof SoldOutError</code> to react to this exact problem, and the message can carry the details. Without <code>this.name</code> the name would say only "Error".',
+  check:c=>{const C=c.val('SoldOutError');if(!c.ok||typeof C!=='function'||c.kind('SoldOutError')!=='class'||!/\bextends\s+Error\b/.test(c.src)||!/\bsuper\s*\(/.test(c.src))return false;
+   try{const e=new C('Fire night');if(!(e instanceof C)||e.name!=='SoldOutError'||!/Fire night/.test(e.message))return false}catch(er){return false}
+   return c.logs.some(l=>/SoldOutError/.test(l))}},
+ {title:'Keep the original cause',goal:'Catch the broken order slip, then throw a new `Error` that keeps the old one as its `cause`. In an outer `catch`, print the new message and `err.cause.name`.',code:'try {\n  try {\n    JSON.parse("{oops")\n  } catch (err) {\n    throw new Error("Order slip unreadable", { cause: err })\n  }\n} catch (outer) {\n  console.log(outer.message + " <- " + outer.cause.name)\n}',
+  how:['The whole code: the inner <code>catch</code> raises a clearer error and keeps the original one inside it, so nothing is lost.',
+   'The inner <code>try</code> breaks the order slip with <code>JSON.parse("{oops")</code>.',
+   '<code>new Error("Order slip unreadable", { cause: err })</code> adds the original error as the <code>cause</code>, and <code>throw</code> sends it on.',
+   'The outer <code>catch</code> prints the new message and <code>outer.cause.name</code>, so you see both.'],
+  anat:[['new Error(…, { cause: err })','fn','keeps the original error'],['throw','kw'],['outer.cause.name','name','the original name']],
+  explain:'A low-level error like "bad JSON" says little about what you were doing. Wrap it in an error that does, and pass the original error along as <code>cause</code>: the story reads well at the top, and the detail is still there to dig out.',
+  check:c=>c.ok&&/\bcause\s*:/.test(c.src)&&/\.cause\b/.test(c.src)&&/\bthrow\b/.test(c.src)&&c.logs.some(l=>/SyntaxError/.test(l))},
+ {title:'Errors in async code',goal:'Write an `async` function `serve()` that `await`s a rejected promise inside `try`, prints the error in `catch` and "Counter wiped" in `finally`. Call it.',code:'async function serve() {\n  try {\n    await Promise.reject(new Error("burnt popcorn"))\n  } catch (err) {\n    console.log("Caught:", err.message)\n  } finally {\n    console.log("Counter wiped")\n  }\n}\nserve()',
+  how:['The whole code: <code>await</code> turns a rejected promise back into a thrown error, so the same <code>try</code>, <code>catch</code> and <code>finally</code> work.',
+   '<code>Promise.reject(new Error("burnt popcorn"))</code> makes a promise that has already failed.',
+   '<code>await</code> inside <code>try</code> throws that error where you wait for it, and <code>catch</code> prints the message.',
+   '<code>finally</code> runs after that, so "Counter wiped" comes last. Call <code>serve()</code> to start it.'],
+  anat:[['async function serve()','kw'],['Promise.reject(…)','fn','already failed'],['await','kw','throws here'],['finally','kw']],
+  explain:'<code>Promise.reject(error)</code> gives you a promise that has already failed. Inside an <code>async</code> function, <code>await</code> turns that failure into a normal thrown error, so everything from this chapter works again: <code>catch</code> it, tidy up in <code>finally</code>, or let it travel up. Without a <code>catch</code>, the async function\'s own promise is rejected instead.',
+  check:c=>c.ok&&/\basync\b/.test(c.src)&&/\bawait\b/.test(c.src)&&/\bcatch\b/.test(c.src)&&/\bfinally\s*\{/.test(c.src)&&/Promise\.reject\s*\(|\bthrow\b|\breject\s*\(/.test(c.src)&&c.logs.length>=2},
+ ]},
+);
+})();
