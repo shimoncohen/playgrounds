@@ -10,110 +10,12 @@ const SCQ=window.SCQ;
 SCQ.engine={decl,tagOf};
 const {CH,FIRE,qfOpen,BLOCKS}=SCQ;
 const realmsHost=$('#realms');
+const {init:initRealm,makeRealm,killRealm,runScript,prepare,isIncomplete,method}=window.JSRealm;
+const {NODE_VERSION,FakeBuffer,make:makeNodeEnv}=window.NodeEnv;
+const {init:initTS,check:tsCheck,load:loadTS}=window.TSCheck;
+initRealm({host:realmsHost});
+initTS({document});
 
-/* ---------- realm: a hidden same-origin iframe where code really runs ---------- */
-let METHOD=null; // 'insert' (script tags; let/const persist like a real console) or 'eval' (fallback)
-function makeRealm(hooks){
-  const f=document.createElement('iframe');f.className='realm';f.setAttribute('aria-hidden','true');f.tabIndex=-1;
-  realmsHost.appendChild(f);
-  const w=f.contentWindow,d=w.document;
-  if(!d.body){d.open();d.write('<!doctype html><html><body></body></html>');d.close()}
-  const R={f,w,d,err:null,capturing:false,silent:false,hooks,peek:{}};
-  const say=(lvl)=>(...a)=>{if(!R.silent)hooks.out(lvl,a)};
-  w.console.log=say('log');w.console.info=say('log');w.console.debug=say('log');
-  w.console.warn=say('warn');w.console.error=say('error');
-  w.console.table=(v)=>{if(!R.silent)hooks.out('table',[v])};
-  w.console.clear=()=>hooks.clear&&hooks.clear();
-  w.__out=v=>{R.last=v;R.hasLast=true};
-  w.__p=(n,v,bad)=>{R.peek[n]=bad?{tdz:true}:{v}};
-  w.addEventListener('error',e=>{
-    const er=e.error!==undefined&&e.error!==null?e.error:{name:'Error',message:e.message};
-    if(R.capturing){R.err=er}else if(!R.silent){hooks.asyncErr(er)}
-    e.preventDefault();
-  });
-  w.addEventListener('unhandledrejection',e=>{if(!R.silent)hooks.asyncErr(e.reason,true);e.preventDefault()});
-  if(!METHOD){
-    w.__ok=0;const s=d.createElement('script');s.textContent='__ok=1';d.body.appendChild(s);s.remove();
-    if(w.__ok===1)METHOD='insert';
-    else{try{if(w.eval('1+1')===2)METHOD='eval'}catch(e){} if(!METHOD)METHOD='none'}
-  }
-  return R;
-}
-function killRealm(R){if(R&&R.f){try{R.silent=true;R.f.remove()}catch(e){}}}
-function runScript(R,code){
-  R.err=null;R.hasLast=false;R.last=undefined;
-  if(METHOD==='insert'){
-    R.capturing=true;const s=R.d.createElement('script');s.textContent=code;
-    try{R.d.body.appendChild(s)}finally{R.capturing=false;s.remove()}
-    return R.err;
-  }
-  if(METHOD==='eval'){try{R.w.eval(code);return null}catch(e){return e}}
-  return {name:'Error',message:'This browser blocked running code inside the page.'};
-}
-
-/* ---------- parsing helpers (acorn) ---------- */
-const HAS_ACORN=()=>typeof acorn!=='undefined';
-function parse(src){return acorn.parse(src,{ecmaVersion:'latest',sourceType:'script',allowAwaitOutsideFunction:true,allowReturnOutsideFunction:false})}
-function isIncomplete(src){
-  if(!HAS_ACORN()){let d=0,q=null;for(let i=0;i<src.length;i++){const c=src[i];if(q){if(c==='\\')i++;else if(c===q)q=null}else if(c==='"'||c==="'"||c==='`')q=c;else if('([{'.includes(c))d++;else if(')]}'.includes(c))d--}return d>0||!!q}
-  try{parse(src);return false}catch(e){return e.pos>=src.trimEnd().length&&/Unexpected token|Unterminated/.test(e.message)}
-}
-function patNames(p,out){if(!p)return;switch(p.type){case'Identifier':out.push(p.name);break;case'ObjectPattern':p.properties.forEach(q=>patNames(q.type==='RestElement'?q.argument:q.value,out));break;case'ArrayPattern':p.elements.forEach(e=>patNames(e,out));break;case'RestElement':patNames(p.argument,out);break;case'AssignmentPattern':patNames(p.left,out);break}}
-function topDecls(ast){
-  const out=[];
-  for(const n of ast.body){
-    if(n.type==='VariableDeclaration'){for(const d of n.declarations){const ns=[];patNames(d.id,ns);ns.forEach(x=>out.push({name:x,kind:n.kind}))}}
-    else if(n.type==='FunctionDeclaration'&&n.id)out.push({name:n.id.name,kind:'function'});
-    else if(n.type==='ClassDeclaration'&&n.id)out.push({name:n.id.name,kind:'class'});
-  }
-  return out;
-}
-function hasTopAwait(ast){
-  let found=false;
-  (function walk(n,inFn){
-    if(!n||found||typeof n.type!=='string')return;
-    if(n.type==='AwaitExpression'&&!inFn){found=true;return}
-    const fn=/Function/.test(n.type);
-    for(const k in n){const v=n[k];if(k==='type'||k==='start'||k==='end')continue;
-      if(Array.isArray(v))v.forEach(c=>c&&typeof c.type==='string'&&walk(c,inFn||fn));
-      else if(v&&typeof v.type==='string')walk(v,inFn||fn)}
-  })(ast,false);
-  return found;
-}
-// prepare: returns {code, decls, echo, error}
-function prepare(src){
-  if(!HAS_ACORN()){
-    const t=src.trim();const decls=[];
-    t.replace(/^\s*(let|const|var|function|class)\s+([A-Za-z_$][\w$]*)/gm,(m,k,n)=>{decls.push({name:n,kind:k})});
-    const stmt=/^(let|const|var|function|class|if|for|while|do|switch|try|throw|return|import|export|\/\/|\{)/.test(t)||/[;\n]/.test(t.replace(/;\s*$/,''));
-    return {code:stmt?src:'__out(('+t.replace(/;\s*$/,'')+'\n))',decls,echo:!stmt};
-  }
-  let ast;try{ast=parse(src)}catch(e){const er=new SyntaxError(e.message.replace(/\s*\(\d+:\d+\)$/,''));er.loc=e.loc;return {error:er}}
-  const decls=topDecls(ast);
-  if(hasTopAwait(ast)){
-    // top-level await: run inside an async wrapper (declarations stay local to this run)
-    const last=ast.body[ast.body.length-1];let body=src;
-    if(last&&last.type==='ExpressionStatement')body=src.slice(0,last.start)+'return ('+src.slice(last.expression.start,last.expression.end)+');'+src.slice(last.end);
-    return {code:'(async()=>{\n'+body+'\n})().then(v=>{if(v!==undefined)__asyncOut(v)})',decls:[],echo:false,async:true};
-  }
-  let code=src,echo=false;const last=ast.body[ast.body.length-1];
-  if(last&&last.type==='ExpressionStatement'){
-    code=src.slice(0,last.expression.start)+'__out(('+src.slice(last.expression.start,last.expression.end)+'\n));'+src.slice(last.end);echo=true;
-  }
-  if(METHOD==='eval'){
-    // fallback: indirect eval forgets let/const, so turn them into globals
-    const edits=[];
-    for(const n of ast.body){
-      if(n.type==='VariableDeclaration'&&n.kind!=='var')edits.push([n.start,n.start+n.kind.length,'var']);
-      if(n.type==='ClassDeclaration'&&n.id)edits.push([n.start,n.start,'var '+n.id.name+' = ']);
-    }
-    edits.sort((a,b)=>b[0]-a[0]);
-    let off=0;const shift=(echo&&last)?last.expression.start:Infinity;
-    for(const [a,b,t] of edits){code=code.slice(0,a)+t+code.slice(b)}
-    void off;void shift;
-  }
-  return {code,decls,echo,ast};
-}
 
 /* ---------- value formatting ---------- */
 let refIds=new WeakMap(),refN=0;
@@ -125,7 +27,6 @@ function pstate(p){
     try{p.then(v=>{st.s='fulfilled';st.v=v;onPromSettle()},e=>{st.s='rejected';st.v=e;onPromSettle()})}catch(e){}}
   return promState.get(p);
 }
-class FakeBuffer{constructor(s){this._s=String(s)}toString(){return this._s}get length(){return this._s.length}}
 function fnSig(f){
   let s='';try{s=Function.prototype.toString.call(f)}catch(e){}
   if(/^class\b/.test(s))return {cls:true,txt:'class '+(f.name||'')};
@@ -181,176 +82,7 @@ function tableHTML(v){
   return h+'</table></div>';
 }
 
-/* ---------- TypeScript (loaded on demand) ---------- */
-const TS_URL='https://cdn.jsdelivr.net/npm/typescript@5.9.3/lib/typescript.min.js';
-const TS_URL2='https://cdn.jsdelivr.net/npm/typescript@5.9.3/lib/typescript.js';
-let tsState='idle',tsWaiters=[];
-function loadTS(){
-  if(tsState==='ready')return Promise.resolve(true);
-  if(tsState==='failed')return Promise.resolve(false);
-  return new Promise(res=>{tsWaiters.push(res);if(tsState==='loading')return;tsState='loading';
-    const done=ok=>{tsState=ok?'ready':'failed';tsWaiters.splice(0).forEach(f=>f(ok))};
-    const add=(url,next)=>{const s=document.createElement('script');s.src=url;s.onload=()=>done(typeof ts!=='undefined');s.onerror=next;document.head.appendChild(s)};
-    add(TS_URL,()=>add(TS_URL2,()=>done(false)));
-  });
-}
-const TS_LIB=`interface Object { toString(): string; hasOwnProperty(k: PropertyKey): boolean; }
-interface Function { apply(t: any, a?: any): any; call(t: any, ...a: any[]): any; bind(t: any, ...a: any[]): any; readonly name: string; readonly length: number; }
-interface CallableFunction extends Function {}
-interface NewableFunction extends Function {}
-interface IArguments { [i: number]: any; length: number; }
-interface RegExp { test(s: string): boolean; }
-interface Boolean {}
-interface Symbol {}
-type PropertyKey = string | number | symbol;
-interface Number { toFixed(d?: number): string; toString(radix?: number): string; }
-interface String {
-  readonly length: number; [i: number]: string;
-  toUpperCase(): string; toLowerCase(): string; trim(): string;
-  includes(s: string): boolean; startsWith(s: string): boolean; endsWith(s: string): boolean;
-  split(sep: string): string[]; slice(a?: number, b?: number): string; repeat(n: number): string;
-  padStart(n: number, f?: string): string; padEnd(n: number, f?: string): string;
-  charAt(i: number): string; indexOf(s: string): number; replace(a: string | RegExp, b: string): string;
-  at(i: number): string | undefined;
-}
-interface TemplateStringsArray extends ReadonlyArray<string> { readonly raw: readonly string[]; }
-interface ReadonlyArray<T> {
-  readonly length: number; readonly [n: number]: T;
-  map<U>(f: (v: T, i: number, a: readonly T[]) => U): U[];
-  filter(f: (v: T, i: number, a: readonly T[]) => unknown): T[];
-  forEach(f: (v: T, i: number, a: readonly T[]) => void): void;
-  includes(v: T): boolean; indexOf(v: T): number; join(s?: string): string; slice(a?: number, b?: number): T[];
-  find(f: (v: T, i: number) => unknown): T | undefined;
-}
-interface Array<T> {
-  length: number; [n: number]: T;
-  push(...items: T[]): number; pop(): T | undefined; shift(): T | undefined; unshift(...items: T[]): number;
-  map<U>(f: (v: T, i: number, a: T[]) => U): U[];
-  filter<S extends T>(f: (v: T, i: number, a: T[]) => v is S): S[];
-  filter(f: (v: T, i: number, a: T[]) => unknown): T[];
-  reduce(f: (acc: T, v: T, i: number, a: T[]) => T): T;
-  reduce<U>(f: (acc: U, v: T, i: number, a: T[]) => U, init: U): U;
-  forEach(f: (v: T, i: number, a: T[]) => void): void;
-  find(f: (v: T, i: number, a: T[]) => unknown): T | undefined;
-  findIndex(f: (v: T, i: number, a: T[]) => unknown): number;
-  some(f: (v: T, i: number, a: T[]) => unknown): boolean;
-  every(f: (v: T, i: number, a: T[]) => unknown): boolean;
-  includes(v: T): boolean; indexOf(v: T): number; join(s?: string): string;
-  slice(a?: number, b?: number): T[]; splice(a: number, n?: number, ...items: T[]): T[];
-  concat(...items: (T | T[])[]): T[]; reverse(): T[]; sort(f?: (a: T, b: T) => number): this;
-  at(i: number): T | undefined;
-}
-interface ArrayConstructor { isArray(a: any): a is any[]; from<T>(a: ArrayLike<T>): T[]; }
-interface ArrayLike<T> { readonly length: number; readonly [n: number]: T; }
-declare var Array: ArrayConstructor;
-interface PromiseLike<T> { then<R = T>(ok?: (v: T) => R | PromiseLike<R>): PromiseLike<R>; }
-interface Promise<T> {
-  then<R = T>(ok?: (v: T) => R | PromiseLike<R>, bad?: (e: any) => any): Promise<R>;
-  catch(bad: (e: any) => any): Promise<T>;
-  finally(f: () => void): Promise<T>;
-}
-interface PromiseConstructor {
-  new <T>(fn: (resolve: (v: T) => void, reject: (e?: any) => void) => void): Promise<T>;
-  resolve<T>(v: T): Promise<T>; all<T>(ps: Promise<T>[]): Promise<T[]>;
-}
-declare var Promise: PromiseConstructor;
-type Awaited<T> = T extends PromiseLike<infer U> ? Awaited<U> : T;
-interface Error { name: string; message: string; }
-interface ErrorConstructor { new (message?: string): Error; (message?: string): Error; }
-declare var Error: ErrorConstructor;
-declare var TypeError: ErrorConstructor;
-interface Math { random(): number; floor(x: number): number; ceil(x: number): number; round(x: number): number; max(...v: number[]): number; min(...v: number[]): number; abs(x: number): number; sqrt(x: number): number; readonly PI: number; }
-declare var Math: Math;
-interface JSON { stringify(v: any, r?: any, s?: number | string): string; parse(s: string): any; }
-declare var JSON: JSON;
-declare function Number(v?: any): number;
-declare function String(v?: any): string;
-declare function Boolean(v?: any): boolean;
-declare function parseInt(s: string, radix?: number): number;
-declare function setTimeout(f: () => void, ms?: number): number;
-interface Console { log(...a: any[]): void; error(...a: any[]): void; warn(...a: any[]): void; table(v: any): void; }
-declare var console: Console;
-type Partial<T> = { [P in keyof T]?: T[P] };
-type Required<T> = { [P in keyof T]-?: T[P] };
-type Readonly<T> = { readonly [P in keyof T]: T[P] };
-type Pick<T, K extends keyof T> = { [P in K]: T[P] };
-type Record<K extends keyof any, T> = { [P in K]: T };
-type Exclude<T, U> = T extends U ? never : T;
-type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;
-type ReturnType<T extends (...a: any) => any> = T extends (...a: any) => infer R ? R : any;`;
-function tsCheck(prev,src){
-  const opts={noLib:true,strict:true,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.None,noEmit:true,types:[]};
-  const head=prev.join('\n;\n')+(prev.length?'\n;\n':'');
-  const files={'lib.d.ts':TS_LIB,'main.ts':head+src};
-  const host={getSourceFile:(n,v)=>files[n]!=null?ts.createSourceFile(n,files[n],v):undefined,getDefaultLibFileName:()=>'lib.d.ts',writeFile(){},getCurrentDirectory:()=>'/',getDirectories:()=>[],fileExists:n=>n in files,readFile:n=>files[n],getCanonicalFileName:n=>n,useCaseSensitiveFileNames:()=>true,getNewLine:()=>'\n'};
-  const prog=ts.createProgram(['lib.d.ts','main.ts'],opts,host);
-  const diags=[...prog.getSyntacticDiagnostics(),...prog.getSemanticDiagnostics()];
-  const headLines=head.split('\n').length-1;const out=[];
-  for(const d of diags){
-    if(!d.file||d.file.fileName!=='main.ts'||d.start<head.length)continue;
-    const p=d.file.getLineAndCharacterOfPosition(d.start);
-    out.push({line:p.line-headLines+1,col:p.character+1,code:d.code,msg:ts.flattenDiagnosticMessageText(d.messageText,'\n')});
-  }
-  const js=ts.transpileModule(src,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.None},reportDiagnostics:false}).outputText.replace(/^export \{\};\s*$/m,'');
-  const types=[];
-  const sf=ts.createSourceFile('x.ts',src,ts.ScriptTarget.ES2020,true);
-  sf.statements.forEach(st=>{
-    if(ts.isInterfaceDeclaration(st))types.push({name:st.name.text,kind:'interface',text:st.getText(sf)});
-    else if(ts.isTypeAliasDeclaration(st))types.push({name:st.name.text,kind:'type',text:st.getText(sf)});
-  });
-  return {diags:out,js,types};
-}
 
-/* ---------- virtual Node.js ---------- */
-const NODE_VERSION='v22.12.0';
-const COWSAY=(text)=>{const t=String(text);const bar='_'.repeat(t.length+2),low='-'.repeat(t.length+2);
-  return ' '+bar+'\n< '+t+' >\n '+low+'\n        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||'};
-function makeNodeEnv(R,vfs,file,args,io){
-  const cwd='/home/you/my-app';
-  const cache={};
-  const norm=p=>String(p).replace(/^\.\//,'').replace(/^\/home\/you\/my-app\//,'');
-  const enoent=(p,op)=>{const e=new Error("ENOENT: no such file or directory, "+op+" '"+p+"'");e.code='ENOENT';return e};
-  const fs={
-    readFileSync(p,enc){const k=norm(p);if(!(k in vfs.files))throw enoent(p,'open');const enc2=typeof enc==='object'&&enc?enc.encoding:enc;return enc2?vfs.files[k]:new FakeBuffer(vfs.files[k])},
-    writeFileSync(p,data){const k=norm(p);if(k.includes('/'))throw enoent(p,'open');vfs.write(k,String(data))},
-    appendFileSync(p,data){const k=norm(p);vfs.write(k,(vfs.files[k]||'')+String(data))},
-    existsSync(p){return norm(p) in vfs.files||norm(p)==='node_modules'&&vfs.hasModules()},
-    readdirSync(){return vfs.list()},
-    unlinkSync(p){const k=norm(p);if(!(k in vfs.files))throw enoent(p,'unlink');vfs.remove(k)},
-  };
-  fs.promises={readFile:async(p,e)=>fs.readFileSync(p,e||'utf8'),writeFile:async(p,d)=>fs.writeFileSync(p,d)};
-  fs.readFile=(p,e,cb)=>{if(typeof e==='function'){cb=e;e=null}setTimeout(()=>{try{cb(null,fs.readFileSync(p,e))}catch(er){cb(er)}},5)};
-  const path={join:(...a)=>a.join('/').replace(/\/+/g,'/').replace(/\/\.\//g,'/'),basename:(p,ext)=>{let b=String(p).split('/').pop();if(ext&&b.endsWith(ext))b=b.slice(0,-ext.length);return b},extname:p=>{const m=String(p).match(/\.[^./]+$/);return m?m[0]:''},dirname:p=>String(p).split('/').slice(0,-1).join('/')||'.',resolve:(...a)=>cwd+'/'+a.join('/'),sep:'/'};
-  const os={platform:()=>'linux',homedir:()=>'/home/you',userInfo:()=>({username:'you'}),EOL:'\n',cpus:()=>[{model:'Playground CPU'}]};
-  const process={argv:['/usr/local/bin/node',cwd+'/'+file,...args],env:{HOME:'/home/you',USER:'you',NODE_ENV:'development'},platform:'linux',version:NODE_VERSION,versions:{node:NODE_VERSION.slice(1)},cwd:()=>cwd,exit:(c=0)=>{const e=new Error('__exit__');e.__exit=c;throw e},pid:4242,
-    stdout:{write:s=>{io.out('raw',[String(s).replace(/\n$/,'')]);return true}}};
-  const builtins={fs,path,os,process};
-  function require(spec){
-    spec=String(spec).replace(/^node:/,'');
-    if(spec in builtins)return builtins[spec];
-    if(/^\.\.?\//.test(spec)){
-      let k=norm(spec);if(!(k in vfs.files)&&(k+'.js') in vfs.files)k+='.js';
-      if(!(k in vfs.files)&&(k+'.json') in vfs.files)k+='.json';
-      if(!(k in vfs.files)){const e=new Error("Cannot find module '"+spec+"'");e.code='MODULE_NOT_FOUND';throw e}
-      if(k.endsWith('.json'))return JSON.parse(vfs.files[k]);
-      return loadModule(k);
-    }
-    if(spec==='cowsay'&&vfs.installed('cowsay'))return {say:o=>COWSAY(o&&o.text!==undefined?o.text:o),think:o=>COWSAY(o&&o.text!==undefined?o.text:o).replace(/\\/g,'o')};
-    const e=new Error("Cannot find module '"+spec+"'"+(spec==='cowsay'?'\n(Install it first: npm install cowsay)':''));e.code='MODULE_NOT_FOUND';throw e;
-  }
-  function loadModule(k,code){
-    if(cache[k])return cache[k].exports;
-    const module={exports:{}};cache[k]=module;
-    R.w.__defs=R.w.__defs||{};
-    const src=code!==undefined?code:vfs.files[k];
-    if(k.endsWith('.json')){module.exports=JSON.parse(src);return module.exports}
-    const er=runScript(R,'__defs['+JSON.stringify(k)+']=function(require,module,exports,__filename,__dirname,process){'+src+'\n}');
-    if(er){delete cache[k];er.__file=k;throw er}
-    R.w.__defs[k](require,module,module.exports,cwd+'/'+k,cwd,process);
-    return module.exports;
-  }
-  return {require,loadModule,process};
-}
 
 const RANKS=[[0,'Newbie'],[60,'Tinkerer'],[180,'Coder'],[340,'Builder'],[520,'Engineer'],[700,'Wizard']];
 
@@ -427,21 +159,21 @@ function execJS(src,meta={}){
   if(p.error)return {err:p.error};
   const names=p.decls.map(d=>d.name).concat((meta.types||[]).map(t=>t.name));
   const clash=names.filter(n=>DECLS.has(n)||TYPES.has(n));
-  if(clash.length&&METHOD==='insert')rebuild(HIST.filter(h=>!h.decls.some(d=>clash.includes(d.name))&&!(h.types||[]).some(t=>clash.includes(t.name))));
-  if(METHOD==='eval'){
+  if(clash.length&&method()==='insert')rebuild(HIST.filter(h=>!h.decls.some(d=>clash.includes(d.name))&&!(h.types||[]).some(t=>clash.includes(t.name))));
+  if(method()==='eval'){
     clash.forEach(n=>{try{Object.defineProperty(REALM.w,n,{writable:true})}catch(e){}});
     if(p.ast){const b=constAssign(p.ast);if(b&&!clash.includes(b)){const e=new TypeError('Assignment to constant variable.');return {err:e}}}
   }
   SYNC=true;let er;
   try{er=runScript(REALM,p.code)}finally{SYNC=false}
   if(er){
-    if(METHOD==='insert'&&p.decls.some(d=>d.kind==='let'||d.kind==='const'||d.kind==='class'))rebuild(HIST.slice());
+    if(method()==='insert'&&p.decls.some(d=>d.kind==='let'||d.kind==='const'||d.kind==='class'))rebuild(HIST.slice());
     return {err:er};
   }
   const value=REALM.last,hasValue=REALM.hasLast&&p.echo;
   p.decls.forEach(d=>DECLS.set(d.name,d.kind));
   (meta.types||[]).forEach(t=>TYPES.set(t.name,t));
-  if(METHOD==='eval')p.decls.filter(d=>d.kind==='const').forEach(d=>{try{Object.defineProperty(REALM.w,d.name,{writable:false})}catch(e){}});
+  if(method()==='eval')p.decls.filter(d=>d.kind==='const').forEach(d=>{try{Object.defineProperty(REALM.w,d.name,{writable:false})}catch(e){}});
   HIST.push({code:p.code,decls:p.decls,ts:meta.ts,types:meta.types||[],replay:!REPLAY_BAD.test(src)&&!p.async});
   return {ok:true,value,hasValue};
 }
@@ -457,7 +189,7 @@ function execTS(src){
 }
 function peek(n){
   if(!/^[A-Za-z_$][\w$]*$/.test(n)||!REALM)return undefined;
-  if(METHOD==='eval')return REALM.w[n];
+  if(method()==='eval')return REALM.w[n];
   REALM.peek={};const keepErr=REALM.err,last=REALM.last,hl=REALM.hasLast;
   runScript(REALM,'try{__p('+JSON.stringify(n)+','+n+')}catch(e){__p('+JSON.stringify(n)+',undefined,true)}');
   REALM.err=keepErr;REALM.last=last;REALM.hasLast=hl;
@@ -822,7 +554,7 @@ function setChapter(i){
   }
   renderChapters();renderMission();
   const m=curMission();if(m&&MODE==='js')ensureNeeds(m);
-  if(METHOD==='none')line('This browser blocked running code inside the page, so the console cannot run anything here. Try a different browser.','err');
+  if(method()==='none')line('This browser blocked running code inside the page, so the console cannot run anything here. Try a different browser.','err');
 }
 $('#fresh').onclick=e=>{
   const b=e.currentTarget;
