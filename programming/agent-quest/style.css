@@ -88,7 +88,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:transparent;padding:0;font-size:10px;font-family:var(--font-mono);color:var(--muted);display:grid;place-items:center}
 .dot.done{background:var(--ok);border-color:var(--ok);color:var(--surface)}
 .dot.cur{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
-.mission.pop{animation:pop .5s ease}
+/* scale from the top edge: toTop measures the card while it pops, so its top must not move */
+.mission.pop{animation:pop .5s ease;transform-origin:50% 0}
 @keyframes pop{0%{transform:scale(.98);box-shadow:0 0 0 0 var(--ok)}40%{box-shadow:0 0 0 5px color-mix(in srgb,var(--ok) 35%,transparent)}100%{transform:none;box-shadow:0 0 0 0 transparent}}
 .badge-art{width:84px;height:94px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:var(--accent);display:grid;place-items:center;font-family:var(--font-display);font-weight:800;font-size:34px;color:var(--accent-ink)}
 .badge-art.dim{background:var(--surface-2);color:var(--muted)}
