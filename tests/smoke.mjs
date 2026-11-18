@@ -4456,7 +4456,7 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['39
     const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, { viewport });
     await page.waitForSelector('#cmd');
     assert.equal(await page.$$eval('#chapters .tierhead[data-tier="intermediate"]', e => e.length), 1);
-    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 19);
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 20);
     assert.equal(await overflow(page), false);
 
     await seed(page, [0]);
@@ -4518,6 +4518,160 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['39
     assert.match(await page.textContent('#nextChap'), /Next: Scope and closures/);
     assert.match(await page.$eval('#xpFill', e => e.parentElement.title), /^\d+ XP to Sorcerer$/);
     assert.equal(await page.textContent('#rank'), 'Wizard');
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+const HEART20 = 'const fs = require("fs")\nconst start = Date.now()\nlet count = 0\nconst id = setInterval(() => {\n  count++\n  console.log("beat " + (Date.now() - start))\n  if (count === 7) clearInterval(id)\n}, 100)\n';
+const EVENT_NEAR = [
+  [`console.log("sync")\nPromise.resolve().then(() => console.log("promise"))\nsetTimeout(() => console.log("timer"), 0)`,
+    `console.log("sync")\nconsole.log("promise")\nconsole.log("timer")`],
+  [`console.log("sync")\nsetTimeout(() => console.log("timer"), 0)\nqueueMicrotask(() => console.log("queued"))\nPromise.resolve().then(() => console.log("then"))`],
+  [`console.log("sync")\nsetTimeout(() => console.log("timer"), 0)\nprocess.nextTick(() => console.log("tick"))\nPromise.resolve().then(() => console.log("promise"))`],
+  [`const fs = require("fs")\nfs.readFile("notes.txt", "utf8", onRead)\nfunction onRead(err, data) {\n  console.log("read")\n  setTimeout(() => console.log("timer"), 0)\n  setImmediate(() => console.log("immediate"))\n}`,
+    `const fs = require("fs")\nfs.readFile("notes.txt", "utf8", (err, data) => {\n  console.log("read")\n})\nsetTimeout(() => console.log("timer"), 0)\nsetImmediate(() => console.log("immediate"))`],
+  [`const fs = require("fs")\nfs.readFile("notes.txt", "utf8", (err, data) => {\n  console.log("poll")\n  setImmediate(() => console.log("immediate"))\n  Promise.resolve().then(() => console.log("promise"))\n  process.nextTick(() => console.log("tick"))\n})`],
+  [`console.log("beat 100")\nconsole.log("beat 200")\nconsole.log("beat 500")`,
+    `${HEART20}setTimeout(() => {\n  const t = Date.now()\n  while (Date.now() - t < 300) {}\n}, 250)`,
+    HEART20.replace('  if (count === 7) clearInterval(id)\n', '') + 'setTimeout(() => {\n  fs.readFileSync("notes.txt", "utf8")\n}, 250)'],
+  [`console.log("beat 100")\nconsole.log("beat 200")\nconsole.log("beat 300")\nconsole.log("read done")\nconsole.log("beat 400")`],
+];
+const EVENT_ALT = { 0: `setTimeout(() => console.log("timer"), 0)\nPromise.resolve().then(() => console.log("promise"))\nconsole.log("sync")` };
+
+async function driveScriptEventLoop() {
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`);
+  await page.waitForSelector('#cmd');
+  assert.ok(await page.evaluate(() => typeof window.acorn !== 'undefined'), 'acorn did not load from the CDN');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  const eci = await page.evaluate(() => window.SCQ.CH.findIndex(c => c.name === 'The event loop'));
+  assert.equal(eci, (await page.evaluate(() => window.SCQ.CH.length)) - 1, 'the event loop chapter is the last one');
+  const doneCount = () => page.evaluate(c => Object.keys(JSON.parse(localStorage.getItem('script-quest-v1')).done).filter(k => k.startsWith(c + '-')).length, eci);
+  await page.click(`#chapters .chap[data-c="${eci}"]`);
+  const put = async text => {
+    await page.click('#fill');
+    await page.fill('#ed', text);
+    await page.click('#edSave');
+    if ((await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+  };
+  let solved = 0;
+  for (let j = 0; ; j++) {
+    const at = /Mission (\d+) of (\d+)/.exec(await page.textContent('#mission .eyebrow'));
+    if (!at) break;
+    const where = `event loop, mission ${at[1]} (${(await page.textContent('#mission h2')).trim()})`;
+    const before = await wins();
+    await page.fill('#cmd', 'echo lazy');
+    await page.press('#cmd', 'Enter');
+    await page.waitForTimeout(200);
+    assert.equal(await wins(), before, `${where}: a lazy line completed the mission`);
+    assert.ok(EVENT_NEAR[j], `${where}: no near-miss written`);
+    const doneBefore = await doneCount();
+    for (const near of EVENT_NEAR[j]) {
+      await page.fill('#cmd', 'clear');
+      await page.press('#cmd', 'Enter');
+      await put(near);
+      // A program with no stop prints until the engine limit, so wait for its Stopped line: the run must be over before the next file is saved.
+      if (near.includes('setInterval(') && !near.includes('clearInterval(')) await until(async () => /Stopped:/.test(await page.textContent('#screen')), 15000);
+      else await page.waitForTimeout(400);
+      // Saved progress, not win lines: the terminal keeps 600 lines, so a long run pushes an earlier win line off the screen.
+      assert.equal(await doneCount(), doneBefore, `${where}: a near-miss completed the mission: ${near}. Terminal tail: ${(await page.textContent('#screen')).slice(-500)}`);
+    }
+    // Reset project in a shell chapter does not clear the screen; `clear` does, so the Stopped check below sees only the solving run.
+    await page.fill('#cmd', 'clear');
+    await page.press('#cmd', 'Enter');
+    const base = await wins();
+    if (EVENT_ALT[j]) await put(EVENT_ALT[j]);
+    else {
+      await page.click('#fill');
+      await page.click('#edSave');
+      if ((await wins()) === base && (await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+    }
+    try { await until(async () => (await wins()) > base, 8000); } catch { assert.fail(`${where}: the solving code did not complete the mission. Terminal tail: ${(await page.textContent('#screen')).slice(-500)}`); }
+    assert.equal(await wins(), base + 1, `${where}: exactly one win line per mission`);
+    if (j >= 5) {
+      await page.waitForTimeout(500);
+      assert.doesNotMatch(await page.textContent('#screen'), /Stopped:/, `${where}: the program ran until the engine stopped it`);
+    }
+    solved++;
+  }
+  assert.equal(solved, await page.evaluate(i => window.SCQ.CH[i].missions.length, eci));
+  assert.equal(await page.textContent('#xpText'), `${15 * solved + 25} XP`);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  return solved;
+}
+
+test('script-quest: every event loop mission (chapter 20) is solved by its own code, a lazy line or near-miss does not pass, and XP is 15 per mission plus 25 for the badge', async () => {
+  assert.equal(await driveScriptEventLoop(), 7);
+});
+
+test('script-quest: each event loop mission (chapter 20) completes on a fresh project, without the earlier missions', async () => {
+  const hook = 'window.__t={CH,S,setChapter,goMission,runShell,submit,cmd,mk,INITIAL_FILES,openFile,saveFile,ed,get MODE(){return MODE},clearRun(){RUN=null}};})();';
+  const prep = ctx => ctx.route('**/script-quest/app.js', async r => {
+    const body = (await r.fetch()).text();
+    await r.fulfill({ contentType: 'text/javascript', body: (await body).replace(/\}\)\(\);\s*$/, hook) });
+  });
+  const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, {}, prep);
+  await page.waitForSelector('#cmd');
+  const bad = await page.evaluate(async () => {
+    const { CH, S, setChapter, goMission, runShell, mk, INITIAL_FILES, openFile, saveFile, ed } = window.__t;
+    const c = CH.findIndex(x => x.name === 'The event loop');
+    const tick = () => new Promise(r => setTimeout(r, 50));
+    const bad = [];
+    for (let j = 0; j < CH[c].missions.length; j++) {
+      const m = CH[c].missions[j];
+      S.done = {}; S.cur = {}; S.files = { ...INITIAL_FILES }; S.pkgs = [];
+      setChapter(c); S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+      openFile(m.editFile); ed.value = m.code; saveFile(); if (m.run) runShell(m.run);
+      for (let w = 0; w < 80 && !S.done[mk(c, j)]; w++) await tick();
+      if (!S.done[mk(c, j)]) bad.push(`${j + 1} ${m.title}: did not complete on a fresh project`);
+    }
+    return bad;
+  });
+  assert.deepEqual(bad, []);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['390 px', { width: 390, height: 844 }]]) {
+  test(`script-quest: the event loop Field guide card and picture show in the Intermediate section and fit at ${label}`, async () => {
+    const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, { viewport });
+    await page.waitForSelector('#cmd');
+    await page.evaluate(chapters => {
+      const { CH } = window.SCQ, done = {};
+      CH.forEach((c, i) => c.missions.forEach((_, j) => { if (chapters.includes(i)) done[i + '-' + j] = 1; }));
+      localStorage.setItem('script-quest-v1', JSON.stringify({ xp: Object.keys(done).length, done, chap: 0, cur: {}, best: 0, files: null, pkgs: [] }));
+    }, BEGINNER);
+    await page.reload();
+    await page.waitForSelector('#cmd');
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), await page.evaluate(() => window.SCQ.CH.length));
+    assert.equal(await overflow(page), false);
+
+    await page.click('#t-guide');
+    await page.waitForSelector('.gfilter');
+    const sec = '#guide .gsec[data-tier="intermediate"]';
+    const pic = `${sec} .loop`;
+    assert.equal(await page.$$eval(pic, e => e.length), 1, 'one picture inside the Intermediate section');
+    assert.equal(await page.$$eval(`${sec} .cards .loop`, e => e.length), 0, 'the picture sits after the cards, not among them');
+    assert.equal(await page.$$eval(`${sec} .loop .card, ${sec} .loop [data-run]`, e => e.length), 0);
+    assert.equal(await page.isVisible(pic), true);
+    assert.equal(await overflow(page), false);
+
+    const card = await page.evaluateHandle(() => [...document.querySelectorAll('#guide .gsec[data-tier="intermediate"] .card')].find(c => c.querySelector('h4').textContent === 'Event loop order'));
+    assert.ok(await card.asElement(), 'the event loop card is in the Intermediate section');
+    await card.asElement().scrollIntoViewIfNeeded();
+    await (await card.asElement().$('[data-run]')).click();
+    await until(async () => (await (await card.asElement().$('.runout')).textContent()).includes('timer'));
+    const printed = await (await card.asElement().$('.runout')).textContent();
+    const at = ['sync', 'promise', 'queued', 'timer'].map(w => printed.indexOf(w));
+    assert.ok(at.every(i => i >= 0) && at.every((i, k) => !k || i > at[k - 1]), `the card prints the browser order, got: ${printed}`);
+    assert.equal(await overflow(page), false);
+
+    await page.click('.gfilter button[data-tier="beginner"]');
+    assert.equal(await page.isVisible(pic), false, 'the picture is hidden under the Beginner filter');
+    await page.click('.gfilter button[data-tier="intermediate"]');
+    assert.equal(await page.isVisible(pic), true);
     assert.equal(await overflow(page), false);
     assert.deepEqual(errors, []);
     await ctx.close();

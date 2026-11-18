@@ -24,7 +24,16 @@ const BLOCKS=[
 ['module.exports','A file puts what it shares on module.exports, and require hands it back.','const module = { exports: {} }\nmodule.exports.double = n => n * 2\nconsole.log(module.exports.double(4))',16],
 ['Map and Set in depth','Loop over a Map in the order you added things.','const seats = new Map([["A1", "Ada"], ["A2", "Bo"]])\nfor (const [seat, who] of seats) {\n  console.log(seat, who)\n}\nconsole.log(new Set([1, 2, 2]).has(2))',17],
 ['JSON.stringify options','Pretty-print, or pick only the keys you want.','const ticket = { id: 7, seat: "A1", paid: true }\nconsole.log(JSON.stringify(ticket, ["id", "seat"], 2))',18],
+['Event loop order','Plain code first, then the microtask line (promises and queueMicrotask), then timers. Node adds nextTick and setImmediate, shown in the picture below.','setTimeout(() => console.log("timer"), 0)\nPromise.resolve().then(() => console.log("promise"))\nqueueMicrotask(() => console.log("queued"))\nconsole.log("sync")',19],
 ];
+const PICS={intermediate:`<h4>One turn of the loop in Node</h4><p>After every callback, Node empties the <code>nextTick</code> queue and then the <b>microtask</b> line (small jobs left by promises and <code>queueMicrotask</code>). Each turn then visits three phases in order.</p>
+    <div class="loop">
+      <div class="lbox panel"><span class="eyebrow">1 · Code box</span><h4>Your code</h4><div class="stack"><span>console.log("sync")</span><span>your file</span></div><p>Runs first, to the end.</p></div>
+      <div class="lbox panel"><span class="eyebrow">2 · After every callback</span><h4>Ticks, then microtasks</h4><div class="q"><span>process.nextTick</span><span>.then · queueMicrotask</span></div><p>The tick lane drains first, then the microtask lane.</p></div>
+      <div class="lbox panel"><span class="eyebrow">3 · Timers phase</span><h4>Due timers</h4><div class="q"><span>⏱ setTimeout</span></div><p>Runs the timers that are due.</p></div>
+      <div class="lbox panel"><span class="eyebrow">4 · Poll phase</span><h4>Finished reads</h4><div class="q"><span>fs.readFile callback</span></div><p>Runs callbacks of work that has finished.</p></div>
+      <div class="lbox panel"><span class="eyebrow">5 · Check phase</span><h4>Immediates</h4><div class="q"><span>setImmediate</span></div><p>Runs right after poll, then the loop turns again.</p></div>
+    </div>`};
 const ERRS=[
 ['ReferenceError: x is not defined','You used a name that does not exist. Usually a typo or a capital letter: <code>Score</code> and <code>score</code> are different names.'],
 ['TypeError: x is not a function','You put brackets after something that is not a function. Check the method name, for example <code>.lenght()</code> or <code>.Push()</code>.'],
@@ -40,7 +49,7 @@ const tierId=b=>b[3]==null?'beginner':tierOf(b[3]).id;
 const card=(b,i)=>`<div class="card panel"><h4>${esc(b[0])}</h4><p>${b[1]}</p><pre>${hl(b[2])}</pre><div class="runrow"><button class="btn small" data-run="${i}">▶ Run</button></div><div class="runout" id="ro${i}"></div></div>`;
 const cards=id=>BLOCKS.map((b,i)=>tierId(b)===id?card(b,i):'').join('');
 const filter=tiers.length>1?`<div class="gfilter" role="group" aria-label="Filter by tier"><button class="btn ghost" data-tier="all" aria-pressed="true">All</button>${tiers.map(t=>`<button class="btn ghost" data-tier="${t.id}" aria-pressed="false">${esc(t.name)}</button>`).join('')}</div>`:'';
-const extra=tiers.filter(t=>t.id!=='beginner').map(t=>cards(t.id)?`<section class="gsec gtier" data-tier="${t.id}"><h3>${esc(t.name)}: going deeper</h3><div class="cards">${cards(t.id)}</div></section>`:'').join('');
+const extra=tiers.filter(t=>t.id!=='beginner').map(t=>cards(t.id)?`<section class="gsec gtier" data-tier="${t.id}"><h3>${esc(t.name)}: going deeper</h3><div class="cards">${cards(t.id)}</div>${PICS[t.id]||''}</section>`:'').join('');
 return `
   <div><h2>Field guide</h2><p class="lede">Most of the quest on one page, plus a few extras (classes, Map and Set, <code>.some()</code>), with pictures. Every code card has a Run button, so you can try it right here.</p></div>
   ${filter}

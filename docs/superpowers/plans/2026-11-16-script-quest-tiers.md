@@ -227,11 +227,11 @@ Each task is one PR. Branch from the updated `feat/222-ts-quest` after the paren
 
 **Files:**
 - Create: the chapter 20 content file
-- Modify: `programming/script-quest/content/` (guide), `shared/catalog.js`, the landing card, `programming/script-quest/app.js` (the Field guide picture)
+- Modify: `programming/script-quest/content/guide.js` (the Field guide card and picture), `shared/catalog.js`, the landing card
 
 - [ ] **Step 1:** Write chapter 20, with `how` steps and about 6 missions covering all three outcomes of #63: predict-the-order puzzle missions, `setImmediate` versus `setTimeout(0)` inside an I/O callback only, and a heartbeat `setInterval` that stalls on a sync read but not on async `fs.readFile`.
 - [ ] **Step 2:** No mission depends on the main-module `setImmediate` versus `setTimeout(0)` order, which is not deterministic in real Node. A busy-wait on the virtual `Date.now` stalls the heartbeat too.
-- [ ] **Step 3:** Add the Field guide picture with a microtask lane plus the three Node phases. Add `FIRST` entries for the new terms.
+- [ ] **Step 3:** Add the Field guide card and a separate Intermediate picture with a microtask lane plus the three Node phases, in `guide.js` (not `app.js`); the Beginner picture stays unchanged. Add `FIRST` entries for the new terms.
 - [ ] **Step 4:** Update catalog and landing-card counts. Solvability, teach-before-use and own-input tests pass, and the chapter is checked at phone width.
 - [ ] **Step 5:** `npm run test:engine` and `npm run check` exit 0. The chapter needs only PRs 6, 7 and 8, so the PR body says it meets the Done-when of #63 without PR 9.
 
