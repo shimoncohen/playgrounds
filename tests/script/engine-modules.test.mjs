@@ -12,10 +12,14 @@ const KEYS = {
   TSCheck: ['init', 'check', 'load'],
 };
 
+// app.js does not rebind Scheduler, so it stays out of KEYS (the loop below demands a rebinding line).
+const SCHEDULER_KEYS = ['create', 'guardSource', 'COST', 'LOOP_LIMIT', 'MAX_VIRTUAL_MS', 'MAX_CALLBACKS', 'GUARD_NAME'];
+
 describe('engine modules load in a bare context', () => {
   it('expose exactly their key lists', () => {
     const ctx = loadEngine();
     for (const [name, list] of Object.entries(KEYS)) assert.deepEqual(keys(ctx[name]), [...list].sort(), name);
+    assert.deepEqual(keys(ctx.Scheduler), [...SCHEDULER_KEYS].sort(), 'Scheduler');
   });
 });
 

@@ -120,6 +120,23 @@ describe('script-quest intermediate chapters', () => {
   });
 });
 
+describe('virtual Node.js without the Scheduler global', () => {
+  it('sync fs and process.exit still work', () => {
+    const files = {};
+    const out = [];
+    const R = { w: vm.createContext({ console: { log: (...a) => out.push(a.join(' ')) } }) };
+    const vfs = { files, write: (k, v) => { files[k] = v; }, list: () => Object.keys(files), remove: k => { delete files[k]; }, hasModules: () => false, installed: () => false };
+    const env = globalThis.NodeEnv.make(R, vfs, 'a.js', [], { out: () => {} });
+    let exit;
+    try {
+      env.loadModule('a.js', "const fs=require('fs');fs.writeFileSync('a.txt','x');console.log(fs.readFileSync('a.txt','utf8'));process.exit(3)");
+    } catch (e) { exit = e.__exit; }
+    assert.equal(globalThis.Scheduler, undefined);
+    assert.deepEqual(out, ['x']);
+    assert.equal(exit, 3);
+  });
+});
+
 describe('script-quest Field guide tier filter', () => {
   const { BLOCKS, guideHTML } = SCQ;
   const esc = s => String(s), hl = s => s;

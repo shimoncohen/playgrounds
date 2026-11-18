@@ -384,10 +384,11 @@ const VFS={
   installed:p=>S.pkgs.includes(p),hasModules:()=>S.pkgs.length>0,
 };
 let NODE=null;
-function nodeHooks(){return {
+function nodeHooks(){const hk={
   out(level,args){const html=level==='table'?tableHTML(args[0]):level==='raw'?esc(args[0]):fmtArgs(args);const text=level==='raw'?args[0]:toText(html);
     line(html,level==='warn'?'warn':level==='error'?'err':'');if(RUN&&RUN.out)RUN.out.push(text);if(!SYNC&&RUN&&Date.now()-RUN.t<20000)tryComplete()},
-  asyncErr(e){printNodeErr(e);if(RUN)RUN.ok=false},clear(){clearScreen()}}}
+  asyncErr(e){printNodeErr(e);if(RUN)RUN.ok=false;if(hk.env)hk.env.stop()},clear(){clearScreen()},
+  exit(c){if(RUN)RUN.ok=c===0},sys(t){line(esc(t),'sys')}};return hk}
 function printNodeErr(e,file){
   if(e&&e.__exit!==undefined)return;
   if(e&&(e.__file||file))line('/home/you/my-app/'+esc(e.__file||file),'sys');
@@ -397,10 +398,10 @@ function printNodeErr(e,file){
   const tip=errTip(e);if(tip)line('Tip: '+tip.replace(/<\/?b>/g,''),'tip');
 }
 function runNode(file,args,code){
-  killRealm(NODE);NODE=makeRealm(nodeHooks());
-  const env=makeNodeEnv(NODE,VFS,file,args,nodeHooks());
+  killRealm(NODE);const hk=nodeHooks();NODE=makeRealm(hk);
+  const env=hk.env=makeNodeEnv(NODE,VFS,file,args,hk);
   SYNC=true;
-  try{env.loadModule(file,code)}catch(e){if(e&&e.__exit!==undefined){RUN.ok=e.__exit===0}else{printNodeErr(e,file);RUN.ok=false}}
+  try{env.runMain(file,code)}catch(e){if(e&&e.__exit!==undefined){RUN.ok=e.__exit===0}else{printNodeErr(e,file);RUN.ok=false}}
   finally{SYNC=false}
 }
 function tokenize(s){const out=[];let cur='',q=null,has=false;

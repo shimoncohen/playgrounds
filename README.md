@@ -111,7 +111,7 @@ The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math
 
 ```
 index.html              landing page (a card per section)
-shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, the Settings panel with Theme and Story (settings.js, settings.css), "The trail" strip (trail.js, trail.css), landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements), jsrealm.js + nodeenv.js + tscheck.js (Script Quest's JS realm, virtual Node and TypeScript checker)
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, the Settings panel with Theme and Story (settings.js, settings.css), "The trail" strip (trail.js, trail.css), landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements), jsrealm.js + scheduler.js + nodeenv.js + tscheck.js (Script Quest's JS realm, virtual event loop, virtual Node and TypeScript checker)
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
   python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
