@@ -1,0 +1,7 @@
+/* Tier headers in the chapter rail. Uses the host page's theme variables. */
+.tierhead{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:6px 10px 2px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tierhead .tc{font-variant-numeric:tabular-nums;font-weight:400;letter-spacing:0}
+.tierhead .tb{color:var(--accent-text)}
+.tierhead.complete .tn{color:var(--ink)}
+@media (min-width:780px){.tierhead:not(:first-child){margin-top:8px}}
+@media (max-width:779px){.tierhead{padding:0 4px 0 10px;border-left:1px solid var(--line)}.tierhead:first-child{border-left:0;padding-left:4px}}
