@@ -167,10 +167,11 @@ flowchart TD
 How it works:
 
 - The learner's `setTimeout`, `setInterval`, `setImmediate` and `process.nextTick` are shadowed by the scheduler. The real promise machinery is left alone.
-- The virtual loop runs one macrotask per real hop, so native promise jobs drain between steps. `nextTick` drains after the script and after each callback, before microtasks. A phase works on the queue as it was when the phase started, so the file completions queued before poll run in poll and the immediates queued before check run in check, with that drain between callbacks. An immediate or file completion queued during a phase runs on the next loop turn. Timers are checked again only on the next loop turn, after the check phase.
-- `fs.readFile` (callback) and `fs.promises` completions go in the poll phase. They replace the real 5 ms timer in the current environment (`programming/script-quest/app.js:318-319`).
-- Sync `fs` calls charge virtual time, for example by file size, so a stall is visible to a heartbeat timer.
-- A virtual `Date.now` advances per call, so a busy-wait ends. An acorn-inserted iteration count is the loop guard for runaway loops.
+- The virtual loop runs one macrotask per real hop, so native promise jobs drain between steps. `nextTick` drains after the script and after each callback, before microtasks. A phase works on the queue as it was when the phase started, so the file completions queued before poll run in poll and the immediates queued before check run in check, with that drain between callbacks. An immediate or file completion queued during a phase runs on the next loop turn. Each loop turn starts by advancing the clock 1 ms, so in the main module a `setTimeout(0)` runs before a `setImmediate` (a model choice; real Node races them). The timers phase reads the clock once, at its start, and runs only the timers due by then. Timers are checked again only on the next loop turn, after the check phase. A stalled `setInterval` runs once, not once per missed beat.
+- `fs.readFile` (callback) and `fs.promises` completions go in the poll phase. They replace the real 5 ms timer the Node environment used before.
+- Sync `fs` calls charge virtual time (`Scheduler.COST`: 250 ms plus 1 ms per 4 bytes for read, write and append; 1 ms for `readdirSync`, `unlinkSync` and `existsSync`), so a stall is visible to a heartbeat timer. Async reads cost the same but do not advance the clock.
+- A virtual `Date.now` advances 1 ms per call, so a busy-wait ends. An acorn-inserted counter in every loop body is the loop guard: it stops a loop after 5,000,000 iterations in one go (`ERR_LOOP_GUARD`). A run also stops after 60,000 ms of virtual time or 5,000 callbacks.
+- Timers fire without waiting in real time. All of this applies to the Node environment only; the JS REPL is unchanged and has no loop guard.
 - The rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`), `EventEmitter`, `process`, `http`, `curl` and a running-process model arrive in PR 9.
 
 ## Engine move and content split
@@ -187,7 +188,7 @@ shared/
   jsrealm.js        DOM-free JS realm (moved from app.js)
   nodeenv.js        virtual fs, path, process, http (moved, then grown)
   tscheck.js        TypeScript checker (moved from app.js)
-  (scheduler)       virtual event loop, file name set in PR 7
+  scheduler.js      virtual event loop (PR 7)
 programming/script-quest/
   app.js            UI, terminal interpreter, project panel
   content/          curriculum, guide, quick-fire (moved in PR 3)

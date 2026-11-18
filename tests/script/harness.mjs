@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const dir = new URL('../../programming/script-quest/', import.meta.url);
-const SHARED = /<script src="\.\.\/\.\.\/shared\/(jsrealm|nodeenv|tscheck)\.js"><\/script>/g;
+const SHARED = /<script src="\.\.\/\.\.\/shared\/(jsrealm|scheduler|nodeenv|tscheck)\.js"><\/script>/g;
 
 // A fresh bare context per call: the engine files hold module state (realm host, TS loader state).
 export function loadEngine() {
