@@ -3,7 +3,7 @@
 const SCQ=window.SCQ=window.SCQ||{};
 const {decl,tagOf,isArr,logsHave}=SCQ.help;
 SCQ.CH.push(
-{name:'Say hello',group:'JavaScript basics',badge:'First Bulb',story:'A dark ticket booth at the circus gate waits for words; greet it, do a sum, join two words and leave a note, and its first bulb flickers on.',mode:'js',
+{name:'Say hello',tier:'beginner',group:'JavaScript basics',badge:'First Bulb',story:'A dark ticket booth at the circus gate waits for words; greet it, do a sum, join two words and leave a note, and its first bulb flickers on.',mode:'js',
  intro:'The ticket booth at the Starlight Circus gate is dark, and Ringmaster Bellamy left a trail of tickets that ends at the big-top lantern. This dark box is a JavaScript console: you type code, press Enter, and it runs right away. Every program you will ever write starts with a few lines like these.',
  learned:['console.log()','numbers','strings','+ - * /','typeof','// comments'],
  missions:[
@@ -37,7 +37,7 @@ SCQ.CH.push(
   explain:'Everything after <code>//</code> on a line is a <b>comment</b>. JavaScript ignores it completely. Comments are notes for the people reading your code, including future you.',
   check:c=>c.ok&&/\/\//.test(c.src)},
  ]},
-{name:'Named boxes',group:'JavaScript basics',badge:'Coin Pouch',story:'Pepper hands you prop crates to label: count the coins, fix the performer\'s name so it never changes, write a poster line from them, and keep Pepper\'s coin pouch.',mode:'js',
+{name:'Named boxes',tier:'beginner',group:'JavaScript basics',badge:'Coin Pouch',story:'Pepper hands you prop crates to label: count the coins, fix the performer\'s name so it never changes, write a poster line from them, and keep Pepper\'s coin pouch.',mode:'js',
  intro:'Pepper, the tightrope kid who tags along, hands you prop crates to label. A variable is a labelled box that holds a value. Watch the Memory panel: every box you create appears there, and it updates live as the values change.',
  learned:['let','const','=','+=','++','template strings'],
  missions:[
@@ -71,7 +71,7 @@ SCQ.CH.push(
   hint:'The backtick key <kbd>`</kbd> is usually top-left, under Esc. On a phone, use the <b>`</b> button above the keyboard.',
   check:c=>c.ok&&typeof c.value==='string'&&/\$\{/.test(c.src)},
  ]},
-{name:'True or false',group:'JavaScript basics',badge:'Gate Key',story:'The gate guard asks yes-or-no questions about every ticket; compare each ticket with the guard\'s sheet, greet a guest by a fallback name when none is given, and earn the gate key.',mode:'js',
+{name:'True or false',tier:'beginner',group:'JavaScript basics',badge:'Gate Key',story:'The gate guard asks yes-or-no questions about every ticket; compare each ticket with the guard\'s sheet, greet a guest by a fallback name when none is given, and earn the gate key.',mode:'js',
  intro:'At the ticket gate, the guard asks yes-or-no questions about every ticket. Programs make decisions the same way, so before deciding you need to know how JavaScript compares things and what it counts as true.',
  learned:['Number()','===','==','undefined','null','Boolean()','&& || !','??'],
  missions:[
@@ -104,7 +104,7 @@ SCQ.CH.push(
   explain:'<code>a ?? b</code> gives <code>a</code>, unless <code>a</code> is <code>null</code> or <code>undefined</code>. Then it gives <code>b</code>. Perfect for "use their name, or Guest if they did not give one". The older <code>||</code> works as a fallback too: it hands back the right side whenever the left side is falsy. So <code>0 || "x"</code> gives <code>"x"</code>, but <code>0 ?? "x"</code> keeps the <code>0</code>.',
   check:c=>c.ok&&/\?\?/.test(c.src)},
  ]},
-{name:'Decisions',group:'JavaScript basics',badge:'Juggling Club',story:'The juggler can only go on when she is rested; choose what she does when she is tired, fine or full of energy, and she hands you her juggling club.',mode:'js',
+{name:'Decisions',tier:'beginner',group:'JavaScript basics',badge:'Juggling Club',story:'The juggler can only go on when she is rested; choose what she does when she is tired, fine or full of energy, and she hands you her juggling club.',mode:'js',
  intro:'The juggler can only go on when she is rested. Now your code can choose. An `if` runs a block of code (the lines between curly braces) only when its condition is true. A condition is a yes-or-no question, like `energy < 50`: `<` means less than, `>` greater than, `<=` less than or equal, and `>=` greater than or equal. This is where programs start feeling alive.',
  learned:['if','else','else if','>= <=','? :'],
  missions:[
@@ -133,7 +133,7 @@ SCQ.CH.push(
   explain:'When the block is just one line, you can skip the braces. Many people keep them anyway for clarity.',
   check:c=>c.ok&&/\bif\b/.test(c.src)&&/&&/.test(c.src)},
  ]},
-{name:'Loops',group:'JavaScript basics',badge:'Drumsticks',story:'The drumroll must sound five times, so count to five, count down to the cannon launch, gather three coins and stop at the right wagon to find the drumsticks.',mode:'js',
+{name:'Loops',tier:'beginner',group:'JavaScript basics',badge:'Drumsticks',story:'The drumroll must sound five times, so count to five, count down to the cannon launch, gather three coins and stop at the right wagon to find the drumsticks.',mode:'js',
  intro:'The drumroll must sound five times before the show starts. Computers never get bored. A loop repeats a block of code as many times as you need, from five times to five million.',
  learned:['for','while','for…of','break','i++ / i--'],
  missions:[

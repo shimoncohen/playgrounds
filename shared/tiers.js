@@ -5,6 +5,7 @@
 
   function create(cfg) {
     const tiers = cfg.tiers;
+    const sep = cfg.doneSep || '.';
     const byId = (id) => tiers.find((t) => t.id === id);
     const chaptersOf = (id) => {
       const out = [];
@@ -20,7 +21,8 @@
     function cumulativeXp(tierId) {
       let sum = 0;
       for (const t of tiers) {
-        for (const i of chaptersOf(t.id)) sum += cfg.chapters[i].missions.length * t.missionXp + BADGE_XP;
+        const badge = typeof t.badgeXp === 'number' ? t.badgeXp : BADGE_XP;
+        for (const i of chaptersOf(t.id)) sum += cfg.chapters[i].missions.length * t.missionXp + badge;
         if (t.id === tierId) break;
       }
       return sum;
@@ -33,7 +35,7 @@
         for (const i of chapters) {
           const n = cfg.chapters[i].missions.length;
           missionsTotal += n;
-          for (let j = 0; j < n; j++) if (S.done && S.done[i + '.' + j]) missionsDone++;
+          for (let j = 0; j < n; j++) if (S.done && S.done[i + sep + j]) missionsDone++;
           if (S.badges && S.badges[i]) chaptersDone++;
         }
         return { tier, chapters, chaptersDone, missionsDone, missionsTotal,
@@ -63,22 +65,28 @@
 
   const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  /* DOM helper: draws a header per tier that has chapters, then that tier's chapter buttons.
+  /* DOM helper: draws a header per tier that has chapters (unless the tier sets showHeader:false), then that tier's chapter buttons.
      Chapter button markup is the original flat-list markup (golden test depends on it). */
   function renderRail(container, o) {
-    const { status, chapters, S, onPick } = o;
+    const { status, chapters, S, onPick, doneSep = '.', chAttr = 'data-ch', earnedStar = true, groups = false } = o;
     const doneIn = (i) => {
       let n = 0;
-      for (let j = 0; j < chapters[i].missions.length; j++) if (S.done[i + '.' + j]) n++;
+      for (let j = 0; j < chapters[i].missions.length; j++) if (S.done[i + doneSep + j]) n++;
       return n;
     };
-    const btn = (c, i) => `<button class="chap${S.badges[i] ? ' earned' : ''}" data-ch="${i}" aria-current="${i === S.ch}"><span class="num">${S.badges[i] ? '★' : i + 1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${doneIn(i)}/${c.missions.length}</span></button>`;
-    container.innerHTML = status.filter((st) => st.chapters.length).map((st) =>
-      `<div class="tierhead${st.complete ? ' complete' : ''}" data-tier="${esc(st.tier.id)}"><span class="tn">${esc(st.tier.name)}</span><span class="tc">${st.chaptersDone}/${st.chapters.length}</span>${st.complete ? '<span class="tb" aria-label="Tier complete">★</span>' : ''}</div>`
-      + st.chapters.map((i) => btn(chapters[i], i)).join('')).join('');
+    const btn = (c, i) => `<button class="chap${S.badges[i] ? ' earned' : ''}" ${chAttr}="${i}" aria-current="${i === S.ch}"><span class="num">${S.badges[i] && earnedStar ? '★' : i + 1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${doneIn(i)}/${c.missions.length}</span></button>`;
+    container.innerHTML = status.filter((st) => st.chapters.length).map((st) => {
+      let g = '';
+      const head = st.tier.showHeader === false ? ''
+        : `<div class="tierhead${st.complete ? ' complete' : ''}" data-tier="${esc(st.tier.id)}"><span class="tn">${esc(st.tier.name)}</span><span class="tc">${st.chaptersDone}/${st.chapters.length}</span>${st.complete ? '<span class="tb" aria-label="Tier complete">★</span>' : ''}</div>`;
+      return head + st.chapters.map((i) => {
+        const grp = groups && chapters[i].group !== g ? (g = chapters[i].group, `<div class="chapgroup">${esc(g)}</div>`) : '';
+        return grp + btn(chapters[i], i);
+      }).join('');
+    }).join('');
     if (onPick) container.onclick = (e) => {
-      const b = e.target.closest && e.target.closest('[data-ch]');
-      if (b) onPick(+b.dataset.ch);
+      const b = e.target.closest && e.target.closest(`[${chAttr}]`);
+      if (b) onPick(+b.getAttribute(chAttr));
     };
   }
 

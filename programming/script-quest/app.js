@@ -8,7 +8,7 @@ const tagOf=v=>Object.prototype.toString.call(v).slice(8,-1);
 const decl=(src,n)=>new RegExp('\\b(?:let|const|var)\\b[^;\\n]*\\b'+n+'\\b|\\b(?:function|class)\\s+'+n+'\\b').test(src||'');
 const SCQ=window.SCQ;
 SCQ.engine={decl,tagOf};
-const {CH,FIRE,qfOpen,BLOCKS}=SCQ;
+const {CH,FIRE,qfOpen,BLOCKS,tiers}=SCQ;
 const realmsHost=$('#realms');
 const {init:initRealm,makeRealm,killRealm,runScript,prepare,isIncomplete,method}=window.JSRealm;
 const {NODE_VERSION,FakeBuffer,make:makeNodeEnv}=window.NodeEnv;
@@ -84,7 +84,6 @@ function tableHTML(v){
 
 
 
-const RANKS=[[0,'Newbie'],[60,'Tinkerer'],[180,'Coder'],[340,'Builder'],[520,'Engineer'],[700,'Wizard']];
 
 // ================= UI =================
 const KEY='script-quest-v1';
@@ -97,7 +96,6 @@ try{const raw=localStorage.getItem(KEY);if(raw)S=Object.assign(S,JSON.parse(raw)
 if(!S.files)S.files={...INITIAL_FILES};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const mk=(i,j)=>i+'-'+j;
-const chapDone=i=>CH[i].missions.filter((_,j)=>S.done[mk(i,j)]).length;
 
 /* ---------- console screen ---------- */
 const screen=$('#screen'),term=$('#term'),cmd=$('#cmd'),promptEl=$('#prompt');
@@ -255,9 +253,9 @@ function tryComplete(){
   let ok=false;try{ok=!!m.check(ctx())}catch(e){ok=false}
   if(!ok)return;
   const k=mk(c,j),first=!S.done[k];
-  S.done[k]=1;if(first)S.xp+=10;
+  S.done[k]=1;if(first)S.xp+=tiers.missionXp(c);
   delete S.cur[c];save();RUN=null;
-  line('✓ Mission complete: '+esc(m.title)+(first?'   +10 XP':''),'win');
+  line('✓ Mission complete: '+esc(m.title)+(first?'   +'+tiers.missionXp(c)+' XP':''),'win');
   renderTop();renderChapters();renderMission(true);
   const nj=curIdx();if(nj>=0)ensureNeeds(CH[c].missions[nj]);
 }
@@ -321,20 +319,12 @@ missionEl.addEventListener('click',e=>{
 });
 
 /* ---------- chapters rail, header ---------- */
-function renderChapters(){
-  let h='',g='';
-  CH.forEach((ch,i)=>{
-    if(ch.group!==g){g=ch.group;h+=`<div class="chapgroup">${esc(g)}</div>`}
-    const d=chapDone(i),n=ch.missions.length;
-    h+=`<button class="chap${d===n?' earned':''}" data-c="${i}" aria-current="${i===S.chap}"><span class="num">${i+1}</span><span class="nm">${esc(ch.name)}</span><span class="ct">${d}/${n}</span></button>`;
-  });
-  $('#chapters').innerHTML=h;
-}
+function renderChapters(){SCQ.renderRail($('#chapters'),S)}
 $('#chapters').addEventListener('click',e=>{const b=e.target.closest('.chap');if(b)setChapter(+b.dataset.c)});
 function renderTop(){
-  let r=RANKS[0],nx=null;for(let i=0;i<RANKS.length;i++){if(S.xp>=RANKS[i][0]){r=RANKS[i];nx=RANKS[i+1]||null}}
-  $('#rank').textContent=r[1];$('#xpText').textContent=S.xp+' XP';
-  $('#xpFill').style.width=(nx?Math.min(100,(S.xp-r[0])/(nx[0]-r[0])*100):100)+'%';
+  const r=tiers.rankFor(S.xp),nx=tiers.ranks()[r.index+1];
+  $('#rank').textContent=r.name;$('#xpText').textContent=S.xp+' XP';
+  $('#xpFill').style.width=(nx?Math.min(100,(S.xp-r.lo)/(nx[0]-r.lo)*100):100)+'%';
   $('#xpFill').parentElement.title=nx?(nx[0]-S.xp)+' XP to '+nx[1]:'Top rank';
 }
 
