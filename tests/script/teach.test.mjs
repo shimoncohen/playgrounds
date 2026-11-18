@@ -69,6 +69,17 @@ const FIRST = {
   Map:             [/\bnew Map\b|\bMaps?\b/, 17, 0],
   stringify:       [/stringify/, 18, 0],
   reviver:         [/\brevivers?\b/i, 18, 5],
+  microtask:       [/microtask/i, 19, 0],
+  queueMicrotask:  [/queueMicrotask/, 19, 1],
+  nextTick:        [/nextTick/, 19, 2],
+  setImmediate:    [/setImmediate/, 19, 3],
+  'readFile callback': [/\breadFile\b/, 19, 3],
+  'poll phase':    [/\bpoll\b/i, 19, 3],
+  'check phase':   [/\bcheck phase\b/i, 19, 3],
+  'timers phase':  [/\btimers phase\b/i, 19, 3],
+  setInterval:     [/setInterval/, 19, 5],
+  clearInterval:   [/clearInterval/, 19, 5],
+  'Date.now':      [/Date\.now/, 19, 5],
   parseInt:        [/parseInt/, null],
   'Array.isArray': [/Array\.isArray/, null],
   statement:       [/\bstatements?\b/i, null],
@@ -109,6 +120,7 @@ const SYNTAX = {
   'instanceof':          [/\binstanceof\b/, /it answers true or false/],
   'error cause':         [/\bcause\s*:/, /as cause/],
   'Promise.reject':      [/Promise\.reject/, /already failed/],
+  'Promise.resolve':     [/Promise\.resolve/, /already finished/],
 };
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
@@ -179,6 +191,16 @@ test('quick-fire: every question has a chapter, 4 distinct options and a valid r
     assert.equal(q.o.length, 4, q.c);
     assert.equal(new Set(q.o).size, 4, `${q.c}: duplicate options`);
     assert.ok(q.a >= 0 && q.a < 4, q.c);
+  }
+});
+
+test('quick-fire: chapter 20 has at least 4 questions, and an immediate against a timer only inside a readFile callback', () => {
+  const mine = FIRE.filter(q => q.ch === 19);
+  assert.ok(mine.length >= 4, `only ${mine.length}`);
+  for (const q of FIRE) {
+    if (!/setTimeout/.test(q.c) || !/setImmediate/.test(q.c)) continue;
+    const calls = SCQ.evScan(q.c).calls.filter(x => x.name === 'setTimeout' || x.name === 'setImmediate');
+    assert.ok(calls.length > 0 && calls.every(x => x.parent === 'readFile'), `quick-fire "${q.c.slice(0, 40)}" races a timer and an immediate outside a readFile callback`);
   }
 });
 

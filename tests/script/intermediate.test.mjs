@@ -17,7 +17,7 @@ const first = CH.findIndex(c => c.tier === 'intermediate');
 describe('script-quest intermediate chapters', () => {
   it('they come right after the 12 beginner chapters, in one block', () => {
     assert.equal(first, 12);
-    assert.equal(INTERMEDIATE.length, 7);
+    assert.equal(INTERMEDIATE.length, 8);
     CH.slice(first).forEach(c => assert.equal(c.tier, 'intermediate'));
     CH.slice(0, first).forEach(c => assert.equal(c.tier, 'beginner'));
   });
@@ -25,7 +25,7 @@ describe('script-quest intermediate chapters', () => {
   INTERMEDIATE.forEach(ch => {
     describe(ch.name, () => {
       it('has the chapter fields', () => {
-        assert.equal(ch.group, 'JavaScript in depth');
+        assert.ok(['JavaScript in depth', 'Node in depth'].includes(ch.group), ch.group);
         for (const k of ['name', 'badge', 'story', 'intro']) assert.ok(typeof ch[k] === 'string' && ch[k].trim(), `${ch.name}: ${k}`);
         assert.ok(['js', 'sh'].includes(ch.mode));
         assert.ok(Array.isArray(ch.learned) && ch.learned.length >= 3);
@@ -154,6 +154,37 @@ describe('script-quest Field guide tier filter', () => {
     assert.match(html, /<div class="gfilter"[^>]*><button[^>]*data-tier="all"[^>]*aria-pressed="true">All<\/button><button[^>]*data-tier="beginner"[^>]*>Beginner<\/button><button[^>]*data-tier="intermediate"[^>]*>Intermediate<\/button>/);
     const sec = html.match(/<section class="gsec gtier" data-tier="intermediate">([^]*?)<\/section>/)[1];
     assert.equal(sec.match(/data-run="/g).length, BLOCKS.filter(b => b[3] != null).length);
+  });
+
+  it('the event loop block has chapter index 19, and its card runs in the browser realm', () => {
+    const b = BLOCKS.find(x => x[3] === 19);
+    assert.ok(b, 'no block with chapter index 19');
+    assert.match(b[2], /queueMicrotask/);
+    assert.match(b[2], /\.then/);
+    assert.match(b[2], /setTimeout/);
+    assert.doesNotMatch(b[2], /nextTick|setImmediate/);
+  });
+
+  it('the Intermediate event loop picture sits after the cards inside the section, with no section, card or data-run of its own', () => {
+    const sec = html.match(/<section class="gsec gtier" data-tier="intermediate">([^]*?)<\/section>/)[1];
+    const pic = sec.slice(sec.indexOf('<div class="loop"'));
+    assert.ok(pic.length < sec.length, 'no picture in the Intermediate section');
+    assert.match(pic, /class="loop"/);
+    assert.match(pic, /lbox panel/);
+    assert.match(pic, /microtask/);
+    assert.match(pic, /nextTick/);
+    assert.match(pic, /timers phase/i);
+    assert.match(pic, /poll phase/i);
+    assert.match(pic, /check phase/i);
+    assert.doesNotMatch(pic, /<section|class="card|data-run/);
+    assert.equal((sec.match(/<section/g) || []).length, 0);
+    assert.ok(sec.indexOf('class="cards"') < sec.indexOf('class="loop"'));
+  });
+
+  it('the Beginner event loop section has no Node-only terms, and the Intermediate picture is not repeated under it', () => {
+    const beg = html.match(/<h3>The event loop<\/h3>([^]*?)<\/section>/)[1];
+    assert.doesNotMatch(beg, /nextTick|microtask|setImmediate|poll/);
+    assert.equal((html.match(/class="loop"/g) || []).length, 2);
   });
 
   it('the Beginner blocks keep their indexes, and the error glossary is an extra', () => {

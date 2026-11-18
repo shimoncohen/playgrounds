@@ -61,7 +61,7 @@ describe('script-quest tiers', () => {
     assert.ok(at('../../shared/tiers.js') < at('content/helpers.js'));
     assert.ok(at('content/guide.js') < at('tiers.js'));
     assert.ok(at('tiers.js') < at('app.js'));
-    const inter = ['scope-and-closures', 'destructuring-and-spread', 'classes', 'errors', 'modules', 'map-and-set', 'json'].map(n => at(`content/ch-${n}.js`));
+    const inter = ['scope-and-closures', 'destructuring-and-spread', 'classes', 'errors', 'modules', 'map-and-set', 'json', 'event-loop'].map(n => at(`content/ch-${n}.js`));
     assert.deepEqual(inter, [...inter].sort((a, b) => a - b));
     assert.ok(at('content/ch-beyond-the-browser.js') < inter[0]);
     assert.ok(inter[inter.length - 1] < at('content/quickfire.js'));
@@ -98,7 +98,7 @@ describe('script-quest tiers', () => {
     const t = tiers.tierOf(12);
     assert.equal(t.id, 'intermediate');
     assert.equal(t.missionXp, 15);
-    CH.slice(12).forEach((c, i) => { assert.equal(c.group, 'JavaScript in depth'); assert.equal(tiers.missionXp(12 + i), 15); });
+    CH.slice(12).forEach((c, i) => { assert.equal(c.group, i < 7 ? 'JavaScript in depth' : 'Node in depth'); assert.equal(tiers.missionXp(12 + i), 15); });
     assert.equal(tiers.missionXp(0), 10);
     const r = tiers.ranks();
     assert.deepEqual(r.slice(0, 6), OLD_RANKS);
@@ -109,12 +109,12 @@ describe('script-quest tiers', () => {
     assert.equal(tiers.rankFor(930).name, 'Wizard');
   });
 
-  it('the pinned counts: 19 chapters, 47 Intermediate missions in 7 chapters, Sorcerer at 1810 XP', () => {
-    assert.equal(CH.length, 19);
-    assert.equal(IC, 7);
-    assert.equal(IM, 47);
-    assert.deepEqual(INTER.map(c => c.missions.length), [6, 7, 6, 7, 7, 7, 7]);
-    assert.deepEqual(tiers.ranks()[6], [1810, 'Sorcerer']);
+  it('the pinned counts: 20 chapters, 54 Intermediate missions in 8 chapters, Sorcerer at 1940 XP', () => {
+    assert.equal(CH.length, 20);
+    assert.equal(IC, 8);
+    assert.equal(IM, 54);
+    assert.deepEqual(INTER.map(c => c.missions.length), [6, 7, 6, 7, 7, 7, 7, 7]);
+    assert.deepEqual(tiers.ranks()[6], [1940, 'Sorcerer']);
     CH.forEach(c => assert.ok(c.badge && c.badge.trim(), `${c.name} has a badge name`));
   });
 
@@ -154,7 +154,7 @@ describe('script-quest tiers', () => {
     assert.equal(cutAt12(rendered(complete)), g.complete.join(''));
   });
 
-  it('the Intermediate rail part: one header, one group, buttons numbered 13 and up', () => {
+  it('the Intermediate rail part: one header, two groups, buttons numbered 13 and up', () => {
     const complete = json('tests/fixtures/script-progress-complete.json').data;
     const partial = { ...saveWith(12, -1), done: { ...complete.done, '12-0': 1 } };
     const full = { ...complete, done: { ...complete.done } };
@@ -167,8 +167,7 @@ describe('script-quest tiers', () => {
       assert.equal((tail.match(/class="tierhead/g) || []).length, 1);
       assert.match(tail, /data-tier="intermediate"/);
       assert.match(tail, /Intermediate/);
-      assert.equal((tail.match(/class="chapgroup"/g) || []).length, 1);
-      assert.match(tail, /chapgroup">JavaScript in depth</);
+      assert.deepEqual([...tail.matchAll(/class="chapgroup">([^<]*)</g)].map(m => m[1]), ['JavaScript in depth', 'Node in depth']);
       assert.deepEqual([...tail.matchAll(/data-c="(\d+)"/g)].map(m => +m[1]), INTER.map((_, k) => 12 + k));
       assert.deepEqual([...tail.matchAll(/class="num">(\d+)</g)].map(m => +m[1]), INTER.map((_, k) => 13 + k));
       assert.match(tail, new RegExp(`<span class="tc">${count}/${IC}</span>`));
@@ -199,6 +198,17 @@ describe('script-quest tiers', () => {
     assert.equal(badgePay(S, 12, undefined), 0);
     BEGINNER.forEach((c, i) => c.missions.forEach((_, j) => mark(i, j)));
     assert.equal(badgePay(S, 0, true), 0, 'beginner badgeXp is 0');
+  });
+
+  it('badgePay pays the chapter 20 badge once, on its last mission', () => {
+    const { badgePay } = SCQ;
+    const S = { done: {} };
+    const n = CH[19].missions.length;
+    assert.equal(n, 7);
+    for (let j = 0; j < n - 1; j++) { S.done[`19-${j}`] = 1; assert.equal(badgePay(S, 19, true), 0, `mission ${j + 1}`); }
+    S.done[`19-${n - 1}`] = 1;
+    assert.equal(badgePay(S, 19, true), 25);
+    assert.equal(badgePay(S, 19, false), 0, 'replay');
   });
 
   it('app.js has no RANKS or badges, keeps the saved-state line and pays the badge through badgePay', () => {
