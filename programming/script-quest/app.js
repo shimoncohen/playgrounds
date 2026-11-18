@@ -253,9 +253,9 @@ function tryComplete(){
   let ok=false;try{ok=!!m.check(ctx())}catch(e){ok=false}
   if(!ok)return;
   const k=mk(c,j),first=!S.done[k];
-  S.done[k]=1;if(first)S.xp+=tiers.missionXp(c);
+  S.done[k]=1;const bonus=SCQ.badgePay(S,c,first);if(first)S.xp+=tiers.missionXp(c)+bonus;
   delete S.cur[c];save();RUN=null;
-  line('✓ Mission complete: '+esc(m.title)+(first?'   +'+tiers.missionXp(c)+' XP':''),'win');
+  line('✓ Mission complete: '+esc(m.title)+(first?'   +'+tiers.missionXp(c)+' XP':'')+(bonus?' · badge "'+esc(CH[c].badge)+'" +'+bonus+' XP':''),'win');
   renderTop();renderChapters();renderMission(true);
   const nj=curIdx();if(nj>=0)ensureNeeds(CH[c].missions[nj]);
 }
@@ -591,7 +591,10 @@ const fStage=$('#fStage');
 function fStats(){$('#fScore').textContent=F.score;$('#fStreak').textContent=F.streak;$('#fBest').textContent=S.best||0;$('#fTime').textContent=Math.ceil(F.time);$('#fTimer').style.width=(F.time/75*100)+'%'}
 function fireIdle(){
   if(F.on)return;fStats();
-  const open=qfOpen(S.done);
+  const all=qfOpen(S.done),openTiers=[];all.forEach(q=>{const t=tiers.tierOf(q.ch);if(!openTiers.includes(t))openTiers.push(t)});
+  if(!openTiers.some(t=>t.id===F.tier))F.tier=undefined;
+  const open=qfOpen(S.done,F.tier);
+  const picker=openTiers.length>1?`<div class="gfilter qpick" role="group" aria-label="Question pool"><button class="btn ghost" data-qt="" aria-pressed="${!F.tier}">Mixed</button>${openTiers.map(t=>`<button class="btn ghost" data-qt="${t.id}" aria-pressed="${F.tier===t.id}">${esc(t.name)}</button>`).join('')}</div>`:'';
   if(!open.length){
     fStage.innerHTML=`<div class="example"><div class="eyebrow">Locked for now</div><p class="note" style="margin-top:8px">Quick-fire only asks about things the quest has already taught. Finish all of <b>Chapter 1: ${esc(CH[0].name)}</b> first, and the first questions open up. Each later chapter you finish adds more.</p></div>
     <div class="actions" style="margin-top:12px"><button class="btn" id="fGo">Go to the quest</button></div>`;
@@ -599,21 +602,23 @@ function fireIdle(){
   }
   const ex=FIRE[0];
   fStage.innerHTML=`<div class="example"><div class="eyebrow">Example</div><pre class="snip">${hl(ex.c)}</pre><p class="note" style="margin-top:8px">Answer: <code>22</code>. ${esc(ex.w)}</p></div>
-    ${open.length<FIRE.length?`<p class="note">${open.length} of ${FIRE.length} questions are open. Finish more chapters to unlock the rest.</p>`:''}
+    ${picker}
+    ${all.length<FIRE.length?`<p class="note">${all.length} of ${FIRE.length} questions are open. Finish more chapters to unlock the rest.</p>`:''}
     <div class="actions"><button class="btn" id="fGo">Start the clock</button></div>`;
   $('#fGo').onclick=fireStart;
+  const pk=fStage.querySelector('.qpick');if(pk)pk.onclick=e=>{const b=e.target.closest('button[data-qt]');if(!b)return;F.tier=b.dataset.qt||undefined;fireIdle()};
 }
 function fireStart(){
-  if(!qfOpen(S.done).length){fireIdle();return}
+  if(!qfOpen(S.done,F.tier).length){fireIdle();return}
   Object.assign(F,{on:true,score:0,streak:0,time:75,misses:[],locked:false,paused:false});
-  F.order=qfOpen(S.done).sort(()=>Math.random()-.5);
+  F.order=qfOpen(S.done,F.tier).sort(()=>Math.random()-.5);
   clearInterval(F.tick);let last=performance.now();
   F.tick=setInterval(()=>{const now=performance.now();if(!F.paused)F.time-=(now-last)/1000;last=now;if(F.time<=0){F.time=0;fireEnd()}fStats()},100);
   fireNext();
 }
 function fireStop(){clearInterval(F.tick);F.on=false}
 function fireNext(){
-  if(!F.order.length)F.order=qfOpen(S.done).sort(()=>Math.random()-.5);
+  if(!F.order.length)F.order=qfOpen(S.done,F.tier).sort(()=>Math.random()-.5);
   const q=F.order.pop();
   const opts=q.o.map((t,i)=>({t,right:i===q.a})).sort(()=>Math.random()-.5);
   F.q={...q,opts};F.locked=false;F.paused=false;
@@ -641,7 +646,12 @@ function fireEnd(){
 
 function renderGuide(){
   const g=$('#guide');
-  g.innerHTML=SCQ.guideHTML({esc,hl});
+  const present=[];CH.forEach((_,i)=>{const t=tiers.tierOf(i);if(!present.includes(t))present.push(t)});
+  g.innerHTML=SCQ.guideHTML({esc,hl,tiers:present,tierOf:i=>tiers.tierOf(i)});
+  const f=g.querySelector('.gfilter');if(!f)return;
+  f.addEventListener('click',e=>{const b=e.target.closest('button[data-tier]');if(!b)return;const t=b.dataset.tier;
+    f.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    g.querySelectorAll('.gsec').forEach(s=>{s.hidden=t!=='all'&&('extras' in s.dataset||(s.dataset.tier||'beginner')!==t)})});
 }
 const guideRealms={};
 $('#guide').addEventListener('click',e=>{

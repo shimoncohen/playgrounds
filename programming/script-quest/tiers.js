@@ -2,12 +2,17 @@
 (()=>{'use strict';
 const SCQ=window.SCQ;
 SCQ.tiers=window.Tiers.create({
-  tiers:[{id:'beginner',name:'Beginner',missionXp:10,badgeXp:0,showHeader:false}],
+  tiers:[{id:'beginner',name:'Beginner',missionXp:10,badgeXp:0,showHeader:false},{id:'intermediate',name:'Intermediate',missionXp:15}],
   chapters:SCQ.CH,
   baseRanks:[[0,'Newbie'],[60,'Tinkerer'],[180,'Coder'],[340,'Builder'],[520,'Engineer'],[700,'Wizard']],
-  tierEndRanks:{},
+  tierEndRanks:{intermediate:'Sorcerer'},
   doneSep:'-'
 });
+SCQ.badgePay=(S,c,first)=>{
+  if(!first||!SCQ.CH[c].missions.every((_,j)=>S.done[c+'-'+j]))return 0;
+  const b=SCQ.tiers.tierOf(c).badgeXp;
+  return typeof b==='number'?b:SCQ.tiers.chapterBadgeXp;
+};
 SCQ.tierView=S=>{
   const badges=SCQ.CH.map((c,i)=>c.missions.every((_,j)=>S.done[i+'-'+j])?1:0);
   return {done:S.done,badges,ch:S.chap};

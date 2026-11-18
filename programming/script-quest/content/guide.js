@@ -17,6 +17,13 @@ const BLOCKS=[
 ['async / await','Wait for slow things without freezing everything.','const wait = ms => new Promise(r => setTimeout(r, ms))\nasync function go() {\n  console.log("loading…")\n  await wait(800)\n  console.log("done ✅")\n}\ngo()'],
 ['try / catch','Handle errors instead of crashing.','try {\n  null.length\n} catch (err) {\n  console.log("Handled:", err.name)\n}'],
 ['Map and Set','A Map is a dictionary with any keys. A Set holds unique values.','const tags = new Set(["js", "ts", "js"])\nconst ages = new Map([["Ada", 36]])\nconsole.log(tags.size, ages.get("Ada"))'],
+['Closures','A function remembers the variables around where it was made.','function makeCounter() {\n  let n = 0\n  return () => ++n\n}\nconst next = makeCounter()\nnext()\nconsole.log(next())',12],
+['Nested destructuring','Reach into an object inside an object, and gather the rest.','const act = { name: "Pepper", stunt: { prop: "rope", height: 4 } }\nconst { stunt: { prop } } = act\nconst [first, ...others] = ["a", "b", "c"]\nconsole.log(prop, others)',13],
+['Class inheritance','A class can extend another and reuse its methods.','class Animal {\n  sound() { return "..." }\n}\nclass Parrot extends Animal {\n  sound() { return "squawk" }\n}\nconsole.log(new Parrot().sound())',14],
+['finally and error types','finally always runs. The error name tells you what went wrong.','try {\n  JSON.parse("{oops")\n} catch (err) {\n  console.log(err.name)\n} finally {\n  console.log("cleaned up")\n}',15],
+['module.exports','A file puts what it shares on module.exports, and require hands it back.','const module = { exports: {} }\nmodule.exports.double = n => n * 2\nconsole.log(module.exports.double(4))',16],
+['Map and Set in depth','Loop over a Map in the order you added things.','const seats = new Map([["A1", "Ada"], ["A2", "Bo"]])\nfor (const [seat, who] of seats) {\n  console.log(seat, who)\n}\nconsole.log(new Set([1, 2, 2]).has(2))',17],
+['JSON.stringify options','Pretty-print, or pick only the keys you want.','const ticket = { id: 7, seat: "A1", paid: true }\nconsole.log(JSON.stringify(ticket, ["id", "seat"], 2))',18],
 ];
 const ERRS=[
 ['ReferenceError: x is not defined','You used a name that does not exist. Usually a typo or a capital letter: <code>Score</code> and <code>score</code> are different names.'],
@@ -28,8 +35,15 @@ const ERRS=[
 ["Error: Cannot find module './math'",'Node could not find the file. Check the path, the spelling, and that you are in the right folder.'],
 ["error TS2322: Type 'string' is not assignable to type 'number'",'TypeScript caught a value of the wrong type. Fix the value, or the type if the type was wrong.'],
 ];
-SCQ.guideHTML=({esc,hl})=>`
+SCQ.guideHTML=({esc,hl,tiers=[],tierOf=()=>({id:'beginner'})})=>{
+const tierId=b=>b[3]==null?'beginner':tierOf(b[3]).id;
+const card=(b,i)=>`<div class="card panel"><h4>${esc(b[0])}</h4><p>${b[1]}</p><pre>${hl(b[2])}</pre><div class="runrow"><button class="btn small" data-run="${i}">▶ Run</button></div><div class="runout" id="ro${i}"></div></div>`;
+const cards=id=>BLOCKS.map((b,i)=>tierId(b)===id?card(b,i):'').join('');
+const filter=tiers.length>1?`<div class="gfilter" role="group" aria-label="Filter by tier"><button class="btn ghost" data-tier="all" aria-pressed="true">All</button>${tiers.map(t=>`<button class="btn ghost" data-tier="${t.id}" aria-pressed="false">${esc(t.name)}</button>`).join('')}</div>`:'';
+const extra=tiers.filter(t=>t.id!=='beginner').map(t=>cards(t.id)?`<section class="gsec gtier" data-tier="${t.id}"><h3>${esc(t.name)}: going deeper</h3><div class="cards">${cards(t.id)}</div></section>`:'').join('');
+return `
   <div><h2>Field guide</h2><p class="lede">Most of the quest on one page, plus a few extras (classes, Map and Set, <code>.some()</code>), with pictures. Every code card has a Run button, so you can try it right here.</p></div>
+  ${filter}
 
   <section class="gsec"><h3>Who's who</h3><p>Three names, one language. Here is how they fit together.</p>
     <div class="flow">
@@ -41,7 +55,7 @@ SCQ.guideHTML=({esc,hl})=>`
     </div></section>
 
   <section class="gsec"><h3>Building blocks</h3><p>The core pieces of the language. Press Run to see each one work.</p>
-    <div class="cards">${BLOCKS.map((b,i)=>`<div class="card panel"><h4>${esc(b[0])}</h4><p>${b[1]}</p><pre>${hl(b[2])}</pre><div class="runrow"><button class="btn small" data-run="${i}">▶ Run</button></div><div class="runout" id="ro${i}"></div></div>`).join('')}</div></section>
+    <div class="cards">${cards('beginner')}</div></section>
 
   <section class="gsec"><h3>Types at a glance</h3><p>The same colours as the Memory panel.</p>
     <div class="panel tblwrap" style="padding:6px 8px"><table class="cmp"><tr><th>Type</th><th>Examples</th><th><code>typeof</code> says</th></tr>
@@ -81,7 +95,7 @@ SCQ.guideHTML=({esc,hl})=>`
       <div class="lbox panel"><span class="eyebrow">3 · Queue</span><h4>Callbacks ready to run</h4><div class="q"><span>() =&gt; log("3: last")</span></div><p>When the stack is empty, the next callback in line moves onto it.</p></div>
     </div></section>
 
-  <section class="gsec"><h3>Error decoder</h3><p>Errors are messages, not failures. Learn these and you can fix most bugs yourself.</p>
+  <section class="gsec" data-extras><h3>Error decoder</h3><p>Errors are messages, not failures. Learn these and you can fix most bugs yourself.</p>
     <div class="errs">${ERRS.map(e=>`<div class="card panel"><code class="e">${esc(e[0])}</code><p>${e[1]}</p></div>`).join('')}</div></section>
 
   <section class="gsec"><h3>Set up your own computer</h3><p>When you are ready to leave the playground, this is the path every professional setup starts with.</p>
@@ -92,7 +106,9 @@ SCQ.guideHTML=({esc,hl})=>`
       <li class="panel"><div><b>Write and run a file</b><p>Create index.js in VS Code with a console.log in it, then:</p><pre>node index.js</pre></div></li>
       <li class="panel"><div><b>Add TypeScript</b><p>Install the compiler into the project, create its settings file, then check and compile your .ts files. Recent Node versions can also run a .ts file directly by stripping the types, but only tsc checks them.</p><pre>npm install -D typescript\nnpx tsc --init\nnpx tsc</pre></div></li>
       <li class="panel"><div><b>Keep going</b><p>Good next steps: the browser DOM (make web pages react to clicks), Git for saving versions of your work, a web server with Express, and later a UI library like React.</p></div></li>
-    </ol></section>`;
+    </ol></section>
+  ${extra}`;
+};
 SCQ.BLOCKS=BLOCKS;
 SCQ.ERRS=ERRS;
 })();

@@ -45,6 +45,30 @@ const FIRST = {
   cat:             [/\bcat\b/, 11, 5],
   package:         [/\bpackages?\b(?!\.json)/i, 11, 7],
   'package.json':  [/package\.json/, 11, 9],
+  shadow:          [/\bshadow(s|ed|ing)?\b/i, 12, 1],
+  closure:         [/\bclosures?\b/i, 12, 2],
+  'rest syntax':   [/\.\.\.rest\b|\brest (syntax|operator|parameter|element|property)/i, 13, 4],
+  class:           [/\bclass(es)?\b/i, 14, 0],
+  constructor:     [/\bconstructor\b/i, 14, 0],
+  instance:        [/\binstances?\b/i, 14, 0],
+  extends:         [/\bextends\b/i, 14, 2],
+  super:           [/\bsuper\b/i, 14, 2],
+  inherit:         [/\binherit/i, 14, 2],
+  getter:          [/\bgetters?\b/i, 14, 3],
+  static:          [/\bstatic\b/i, 14, 4],
+  'private field': [/#code\b|\bprivate field/i, 14, 5],
+  finally:         [/\bfinally\b/i, 15, 0],
+  RangeError:      [/RangeError/, 15, 2],
+  rethrow:         [/\brethrow/i, 15, 3],
+  instanceof:      [/\binstanceof\b/, 15, 3],
+  CommonJS:        [/CommonJS/, 16, 0],
+  cache:           [/\bcache\b/i, 16, 3],
+  MODULE_NOT_FOUND:[/MODULE_NOT_FOUND/, 16, 5],
+  ESM:             [/\bESM\b|\bES modules?\b/, 16, 6],
+  Set:             [/\bnew Set\b|\bSets?\b(?! up)/, 17, 0],
+  Map:             [/\bnew Map\b|\bMaps?\b/, 17, 0],
+  stringify:       [/stringify/, 18, 0],
+  reviver:         [/\brevivers?\b/i, 18, 5],
   parseInt:        [/parseInt/, null],
   'Array.isArray': [/Array\.isArray/, null],
   statement:       [/\bstatements?\b/i, null],
@@ -75,6 +99,16 @@ const SYNTAX = {
   'quotes in node -e':   [/^node\s+-e\s+["']/m, /one piece/],
   'single in double':    [/\w\('/, /single quotes/],
   'require without .js': [/require\(\s*["']\.\/[\w-]+["']\s*\)/, /adds \.js/],
+  'class block':         [/\bclass\s+\w+/, /blueprint/],
+  'rest in a pattern':   [/\{[^}]*\.\.\.\w+\s*\}\s*=/, /gathers/],
+  'getter':              [/\bget\s+\w+\s*\(/, /read like a property/],
+  'static method':       [/\bstatic\s+\w+/, /called on the class/],
+  '#private field':      [/#\w+\s*=/, /exists only inside the class/],
+  'finally block':       [/\bfinally\s*\{/, /whatever happens/],
+  'throw':               [/\bthrow\s+(new|err)/, /stops the function right there/],
+  'instanceof':          [/\binstanceof\b/, /it answers true or false/],
+  'error cause':         [/\bcause\s*:/, /as cause/],
+  'Promise.reject':      [/Promise\.reject/, /already failed/],
 };
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
@@ -121,6 +155,13 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(11, 4).explain, /a <b>module<\/b> is a bundle of ready-made tools/);
   assert.match(m(11, 5).explain, /<code>cat<\/code> is a terminal command/);
   assert.match(m(11, 9).explain, /<b>JSON<\/b>, a plain-text data format/);
+  assert.match(m(12, 1).explain, /<b>shadows<\/b>/);
+  assert.match(m(12, 2).explain, /called a <b>closure<\/b>/);
+  assert.match(m(13, 4).explain, /<b>rest syntax<\/b>/);
+  assert.match(CH[14].intro, /Each stamped object is called an instance/);
+  assert.match(m(14, 2).explain, /<b>extends<\/b>[^]*<b>inherits<\/b>/);
+  assert.match(m(14, 3).explain, /<b>getter<\/b> is a method/);
+  assert.match(m(14, 4).explain, /<b>static<\/b> method/);
 });
 
 test('guide: no string method the quest never taught, NaN and Array.isArray are glossed, the lede does not over-claim', () => {
