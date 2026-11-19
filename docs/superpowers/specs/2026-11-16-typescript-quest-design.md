@@ -133,12 +133,12 @@ Mode: REPL. Mission XP 10.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
-| 1 | Text or number | A union parameter used with a method only one member has, then a `typeof` check | TS2339 first, then no diagnostics after the check |
+| 1 | Text or number | A union parameter used with a method only one member has, then a `typeof` check | No diagnostics after the check (try it first without the check: TS2339) |
 | 2 | Open the parrot | Narrow the `unknown` from chapter 1 with `typeof` | No diagnostics |
-| 3 | Is it there? | A value that may be `null` or `undefined`, guarded by truthiness or `===` | TS18048 first, then none |
-| 4 | Look inside | Two object shapes told apart with `in` | TS2339 first, then none |
+| 3 | Is it there? | A value typed `T \| undefined`, guarded by truthiness or `===` | No diagnostics after the guard (try it first without it: TS18048) |
+| 4 | Look inside | Two object shapes told apart with `in` | No diagnostics after the check (try it first without it: TS2339) |
 | 5 | Tagged tickets | A discriminated union with a `kind` tag and a `switch` | No diagnostics and each branch uses its own fields |
-| 6 | Nothing missed | A `never` check in the `default` branch, then a new union member added | TS2322 reported until the new case is handled |
+| 6 | Nothing missed | A `never` check in the `default` branch, with one union member left unhandled | TS2322 reported for the unhandled member (once the case is added it compiles clean) |
 
 **3. Aliases and interfaces.** Leg: every wagon needs a booking card; write the card once and reuse it. Badge: Ticket Blank. New terms: type alias, interface, optional property, `readonly` property, extending, intersection, excess property check, structural typing.
 
@@ -148,29 +148,31 @@ Mode: REPL. Mission XP 10.
 | 2 | Booking card | An `interface` with required and optional properties | The memory panel lists the blueprint and a matching value passes |
 | 3 | Stuck stamp | A `readonly` property assigned to later | TS2540 reported |
 | 4 | Stowaway field | An object literal with an extra property | TS2353 reported |
-| 5 | Grow the card | A second `interface` that `extends` the first | A value with both sets of properties passes; one missing property reports TS2741 |
-| 6 | Same shape, other name | Two differently named shapes assigned to each other | No diagnostics (structural typing) |
+| 5 | Grow the card | A second `interface` that `extends` the first | A value with both sets of properties passes (try it first with one property missing: TS2741) |
+| 6 | Card plus stamp | A type that joins the first interface and an inline shape with `&` | A value with both sets of properties passes (try it first with one missing: TS2322) |
+| 7 | Same shape, other name | Two differently named shapes assigned to each other | No diagnostics (structural typing) |
 
-**4. Typed functions.** Leg: the depot clerk's rules for taking a booking: what goes in, what comes out. Badge: Brass Whistle. New terms: return type, optional parameter, default parameter, rest parameter, callback type, `void`, type predicate (`x is T`). `never` was taught in chapter 2; here it is reused as a function's return type.
+**4. Typed functions.** Leg: the depot clerk's rules for taking a booking: what goes in, what comes out. Badge: Brass Whistle. New terms: return type, optional parameter, default parameter, rest parameter, `T[]` (glossed in place with the rest parameter), callback type, `void`, type predicate (`x is T`). `never` was taught in chapter 2; here it is reused as a function's return type.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
-| 1 | In and out | A function with typed parameters and an explicit return type | No diagnostics; a wrong return value reports TS2322 |
-| 2 | Maybe a seat | An optional and a defaulted parameter | A call with fewer arguments passes; one with too many reports TS2554 |
-| 3 | Call me back | A parameter typed as a function, given a callback | A callback with the wrong parameter type reports TS2345 |
-| 4 | Returns nothing | A `void` function whose result is not used, then used | No diagnostics, then the mission shows why using a `void` result is a smell |
-| 5 | Never returns | A function that always throws, typed `never` | No diagnostics; a reachable return reports TS2322 |
-| 6 | Vouch for it | A function returning `x is Ticket` and its use in an `if` | The narrowed branch compiles without a cast |
+| 1 | In and out | A function with typed parameters and an explicit return type | No diagnostics (try it first with a wrong return value: TS2322) |
+| 2 | Maybe a seat | An optional and a defaulted parameter | A call with fewer arguments passes (try it first with too many: TS2554) |
+| 3 | A whole party | A function with a rest parameter `...seats: number[]`, called with several arguments | The call compiles (try it first with a text among the numbers: TS2345) |
+| 4 | Call me back | A parameter typed as a function, given a callback | A callback with the right parameter type passes (try it first with the wrong one: TS2345) |
+| 5 | Returns nothing | A `void` function called as a statement | No diagnostics (try it first using its result as text: TS2322) |
+| 6 | Never returns | A function that always throws, typed `never` | No diagnostics (try it first with a reachable return: TS2322) |
+| 7 | Vouch for it | A function returning `x is Ticket` and its use in an `if` | The narrowed branch compiles without a cast |
 
-**5. Arrays and tuples.** Leg: the wagon roster is a list in a fixed order. Badge: Wagon Roster. New terms: `T[]`, `readonly` array, tuple, labelled tuple element, optional tuple element. The `Array<T>` spelling waits for chapter 6, which teaches generics.
+**5. Arrays and tuples.** Leg: the wagon roster is a list in a fixed order. Badge: Wagon Roster. `T[]` was first met in chapter 4 with the rest parameter, and chapter 5 builds on it. New terms: `readonly` array, tuple, labelled tuple element, optional tuple element. The `Array<T>` spelling waits for chapter 6, which teaches generics.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
 | 1 | One kind per list | A `string[]` and a wrong push | TS2345 reported |
 | 2 | Look but do not touch | A `readonly` array and a `push` on it | TS2339 reported |
-| 3 | Fixed slots | A tuple of wagon number and performer name | The tuple compiles; a swapped order reports TS2322 |
-| 4 | Name the slots | A labelled tuple and reading its slots by index | No diagnostics and the labels show in the memory panel |
-| 5 | Maybe a third slot | An optional tuple element | A short tuple passes; a too long one reports TS2322 |
+| 3 | Fixed slots | A tuple of wagon number and performer name | The tuple compiles (try it first with a swapped order: TS2322) |
+| 4 | Name the slots | A labelled tuple and reading its slots by index | No diagnostics |
+| 5 | Maybe a third slot | An optional tuple element | A short tuple passes (try it first with a too long one: TS2322) |
 | 6 | Stay in range | Index past the end of a tuple | TS2493 reported |
 
 ### Intermediate: rail yard (chapters 6 to 10)
@@ -340,10 +342,10 @@ Mission XP 25. Project mode with files and a terminal. The terminal in these cha
 
 | Tier | Chapters | Missions (estimate) | XP per mission | Badges | Cumulative XP at tier end (estimate) |
 |---|---|---|---|---|---|
-| Beginner | 5 | 31 | 10 | 5 × 25 | about 435 |
-| Intermediate | 5 | 30 | 15 | 5 × 25 | about 1010 |
-| Advanced | 4 | 25 | 20 | 4 × 25 | about 1610 |
-| TypeScript with Node | 4 | 26 | 25 | 4 × 25 | about 2360 |
+| Beginner | 5 | 33 | 10 | 5 × 25 | 455 |
+| Intermediate | 5 | 30 | 15 | 5 × 25 | about 1030 |
+| Advanced | 4 | 25 | 20 | 4 × 25 | about 1630 |
+| TypeScript with Node | 4 | 26 | 25 | 4 × 25 | about 2380 |
 
 - **Save.** Key `typescript-quest-v1`, folder `programming/typescript-quest/`, commit scope `typescript` (`commitlint.config.mjs:5`), tests in `tests/typescript/`. The catalog entry uses `sep: '.'`, so done-keys are `<chapter>.<mission>`.
 

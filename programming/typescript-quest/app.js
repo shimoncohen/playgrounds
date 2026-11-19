@@ -252,6 +252,7 @@ function renderMission(pop){
   }else{
     const m=ch.missions[j];
     missionEl.innerHTML=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${c+1} · Mission ${j+1} of ${ch.missions.length}${S.done[mk(c,j)]?' · replay':''}</div>
+      ${ch.first?`<p class="note">Suggested first, in <a href="../script-quest/">Script Quest</a>: ${ch.first.map(([n,t])=>esc(t)+' (chapter '+n+')').join(' and ')}. Nothing is locked.</p>`:''}
       <h2>${esc(m.title)}</h2>
       ${j===0?'<p class="intro">'+HowSteps.tick(ch.intro,esc)+'</p>':''}
       <div class="goal"><div class="label">Your mission</div><p>${HowSteps.tick(m.goal,esc)}</p><pre>${hl(m.code)}</pre></div>

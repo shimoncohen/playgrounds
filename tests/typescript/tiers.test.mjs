@@ -55,19 +55,18 @@ describe('typescript-quest tiers', () => {
     assert.deepEqual(tierCfg.tierEndRanks, { intermediate: 'Chief Engineer', advanced: 'Tour Architect', node: 'Timetable Master' });
   });
 
-  it('chapter 1 is Beginner at 10 XP a mission, so a chapter is worth 95 XP', () => {
-    assert.equal(tiers.tierOf(0).id, 'beginner');
-    assert.equal(tiers.missionXp(0), 10);
-    assert.equal(tiers.cumulativeXp('beginner'), CH[0].missions.length * 10 + 25);
-    assert.equal(tiers.cumulativeXp('beginner'), 95);
+  it('every chapter is Beginner at 10 XP a mission, and the tier is worth the missions at 10 plus 25 badge XP a chapter', () => {
+    CH.forEach((_, i) => { assert.equal(tiers.tierOf(i).id, 'beginner'); assert.equal(tiers.missionXp(i), 10); });
+    assert.equal(tiers.cumulativeXp('beginner'), CH.reduce((sum, c) => sum + c.missions.length * 10 + 25, 0));
   });
 
   it('ranks() is the base ladder while only Beginner has chapters', () => {
+    const total = tiers.cumulativeXp('beginner');
     assert.deepEqual(tiers.ranks(), BASE);
     assert.equal(tiers.rankFor(0).name, 'Stowaway');
     assert.equal(tiers.rankFor(49).name, 'Stowaway');
     assert.equal(tiers.rankFor(50).name, 'Ticket Clerk');
-    assert.equal(tiers.rankFor(95).name, 'Ticket Clerk');
+    assert.equal(tiers.rankFor(total).name, BASE.filter(r => r[0] <= total).pop()[1]);
   });
 
   it('with chapters in every tier, each tier-end threshold is that tier\'s cumulative XP', () => {
@@ -101,8 +100,8 @@ describe('typescript-quest tiers', () => {
     assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 1);
     assert.match(el.innerHTML, /data-tier="beginner"/);
     assert.match(el.innerHTML, /Beginner/);
-    assert.deepEqual([...el.innerHTML.matchAll(/data-c="(\d+)"/g)].map(m => +m[1]), [0]);
-    assert.deepEqual([...el.innerHTML.matchAll(/class="num">([^<]+)</g)].map(m => m[1]), ['1']);
+    assert.deepEqual([...el.innerHTML.matchAll(/data-c="(\d+)"/g)].map(m => +m[1]), CH.map((_, i) => i));
+    assert.deepEqual([...el.innerHTML.matchAll(/class="num">([^<]+)</g)].map(m => m[1]), CH.map((_, i) => String(i + 1)));
     assert.match(el.innerHTML, new RegExp(`<span class="ct">2/${n}</span>`));
     assert.doesNotMatch(el.innerHTML, /class="chapgroup"/);
   });
@@ -141,9 +140,18 @@ describe('typescript-quest tiers', () => {
     const S = { xp: 0, done: {}, chap: 0, cur: {}, best: 0 };
     CH[0].missions.forEach((_, j) => { S.done[`0.${j}`] = 1; });
     const before = JSON.stringify(S);
-    assert.deepEqual(tierView(S).badges, [1]);
+    assert.deepEqual(tierView(S).badges, CH.map((_, i) => (i === 0 ? 1 : 0)));
     assert.equal(JSON.stringify(S), before);
     assert.deepEqual(Object.keys(S), ['xp', 'done', 'chap', 'cur', 'best']);
-    assert.deepEqual(tierView({ ...S, done: { '0.0': 1 } }).badges, [0]);
+    assert.deepEqual(tierView({ ...S, done: { '0.0': 1 } }).badges, CH.map(() => 0));
+  });
+
+  it('app.js shows the Suggested first line on every mission, not only the first', () => {
+    const app = read('programming/typescript-quest/app.js');
+    const view = app.slice(app.indexOf('const m=ch.missions[j];'));
+    assert.match(view, /Suggested first, in <a href="\.\.\/script-quest\/">Script Quest<\/a>/);
+    assert.ok(view.indexOf('Suggested first') < view.indexOf("j===0?'<p class=\"intro\">'"), 'the line sits above the first-mission intro');
+    assert.ok(view.indexOf('Suggested first') > view.indexOf('class="eyebrow">Chapter'), 'the line sits under the label');
+    assert.doesNotMatch(app.slice(0, app.indexOf('const m=ch.missions[j];')), /Suggested first/, 'not on the chapter-complete card');
   });
 });
