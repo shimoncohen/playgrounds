@@ -11,7 +11,7 @@ SCQ.engine={decl,tagOf};
 const {CH,FIRE,qfOpen,BLOCKS,tiers}=SCQ;
 const realmsHost=$('#realms');
 const {init:initRealm,makeRealm,killRealm,runScript,prepare,isIncomplete,method}=window.JSRealm;
-const {NODE_VERSION,FakeBuffer,make:makeNodeEnv}=window.NodeEnv;
+const {NODE_VERSION,FakeBuffer,make:makeNodeEnv,curl:nodeCurl}=window.NodeEnv;
 const {init:initTS,check:tsCheck,load:loadTS}=window.TSCheck;
 initRealm({host:realmsHost});
 initTS({document});
@@ -96,6 +96,7 @@ try{const raw=localStorage.getItem(KEY);if(raw)S=Object.assign(S,JSON.parse(raw)
 if(!S.files)S.files={...INITIAL_FILES};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const mk=(i,j)=>i+'-'+j;
+const hasF=k=>Object.prototype.hasOwnProperty.call(S.files,k);
 
 /* ---------- console screen ---------- */
 const screen=$('#screen'),term=$('#term'),cmd=$('#cmd'),promptEl=$('#prompt');
@@ -256,11 +257,16 @@ function tryComplete(){
   S.done[k]=1;const bonus=SCQ.badgePay(S,c,first);if(first)S.xp+=tiers.missionXp(c)+bonus;
   delete S.cur[c];save();RUN=null;
   line('✓ Mission complete: '+esc(m.title)+(first?'   +'+tiers.missionXp(c)+' XP':'')+(bonus?' · badge "'+esc(CH[c].badge)+'" +'+bonus+' XP':''),'win');
+  stopProc();
   renderTop();renderChapters();renderMission(true);
   const nj=curIdx();if(nj>=0)ensureNeeds(CH[c].missions[nj]);
 }
 async function ensureNeeds(m){
-  if(!m||!m.need||!m.pre||MODE==='sh')return;
+  if(m&&MODE==='sh'){
+    const add=Object.keys(m.seed||{}).filter(k=>!hasF(k));
+    if(add.length){for(const k of add)S.files[k]=m.seed[k];save();renderProject();line('Set up for this mission: '+esc(add.join(', ')),'sys')}
+    return}
+  if(!m||!m.need||!m.pre)return;
   const missing=m.need.some(n=>n[0]==='@'?!TYPES.has(n.slice(1)):!DECLS.has(n));
   if(!missing)return;
   if(MODE==='ts'&&!(await loadTS()))return;
@@ -268,7 +274,7 @@ async function ensureNeeds(m){
   const R=MODE==='ts'?execTS(m.pre):execJS(m.pre);
   if(R&&R.ok){line('Set up for this mission: '+esc(m.pre.split('\n').join('  ')),'sys');renderMem()}
 }
-function goMission(j){S.cur[S.chap]=j;save();renderMission();renderChapters();ensureNeeds(CH[S.chap].missions[j]);cmd.focus({preventScroll:true})}
+function goMission(j){stopProc();S.cur[S.chap]=j;save();renderMission();renderChapters();ensureNeeds(CH[S.chap].missions[j]);cmd.focus({preventScroll:true})}
 
 const missionEl=$('#mission');
 function anatHTML(a){return '<div class="anat">'+a.map(([t,k,l])=>`<div class="tok k-${k}"><b>${esc(t)}</b><span>${l?esc(l):({kw:'keyword',name:'name',op:'symbol',val:'value',fn:'function',type:'type',cmd:'command',arg:'argument',opt:'option'})[k]}</span></div>`).join('')+'</div>'}
@@ -292,7 +298,7 @@ function renderMission(pop){
       ${HowSteps.html(m.how)}
       <p class="explain">${m.explain}</p>
       <div class="actions"><button class="btn" id="fill">${m.editFile?'Put it in the editor':'Type it for me'}</button><button class="btn ghost" id="hintBtn">Hint</button><button class="btn ghost" id="skip">Skip</button></div>
-      <p class="hint" id="hint" hidden>${m.hint||(m.editFile?'Click <b>'+esc(m.editFile)+'</b> in the Project panel (or press the button above), type the code, press Save, then run it in the terminal'+(m.run?' with <code>'+esc(m.run)+'</code>':'')+'.':MODE==='sh'?'Type the command exactly as shown, then press Enter.':'Type the code exactly as shown, then press Enter. For several lines, use Shift+Enter between them.')}</p>
+      <p class="hint" id="hint" hidden>${m.hint||(m.editFile?'Click <b>'+esc(m.editFile)+'</b> in the Project panel (or press the button above), type the code, press Save, then run it in the terminal'+(m.run?' with <code>'+esc(m.run)+'</code>'+(m.then?', then <code>'+esc(m.then)+'</code>':''):'')+'.':MODE==='sh'?'Type the command exactly as shown, then press Enter.':'Type the code exactly as shown, then press Enter. For several lines, use Shift+Enter between them.')}</p>
       ${dotsHTML(c,j)}`;
   }
   if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop')}
@@ -304,7 +310,7 @@ missionEl.addEventListener('click',e=>{
   if(b.id==='toFire')return showTab('fire');
   if(b.id==='toGuide')return showTab('guide');
   if(b.id==='hintBtn'){$('#hint').hidden=!$('#hint').hidden;return}
-  if(b.id==='skip'){const n=CH[S.chap].missions.length,j=curIdx();if(j+1<n)goMission(j+1);else{delete S.cur[S.chap];save();renderMission()}return}
+  if(b.id==='skip'){stopProc();const n=CH[S.chap].missions.length,j=curIdx();if(j+1<n)goMission(j+1);else{delete S.cur[S.chap];save();renderMission()}return}
   if(b.id==='fill'){const m=curMission();if(!m)return;
     if(m.editFile){
       let code=m.code;
@@ -378,16 +384,26 @@ function renderMem(){
 /* ---------- Node: virtual project + terminal ---------- */
 const VFS={
   get files(){return S.files},
-  write(k,v){const isNew=!(k in S.files);S.files[k]=v;save();renderProject(k);if(ED.file===k&&!ED.dirty){$('#ed').value=v;edSync()}void isNew},
+  write(k,v){const isNew=!hasF(k);S.files[k]=v;save();renderProject(k);if(ED.file===k&&!ED.dirty){$('#ed').value=v;edSync()}void isNew},
   remove(k){delete S.files[k];save();if(ED.file===k)openFile(null);renderProject()},
   list(){return Object.keys(S.files).concat(S.pkgs.length?['node_modules']:[]).sort()},
   installed:p=>S.pkgs.includes(p),hasModules:()=>S.pkgs.length>0,
 };
-let NODE=null;
+let NODE=null,PROC=null;
+const procOn=()=>!!PROC&&PROC.env.servers.size>0;
+function syncBar(){
+  const on=procOn();$('#procbar').hidden=!on;
+  if(on)$('#procTxt').textContent='● '+PROC.label+' is running on port '+[...PROC.env.servers.keys()].join(', ');
+}
+function stopProc(ctrlC){
+  if(!procOn())return false;
+  const p=PROC;PROC=null;p.env.stop();syncBar();
+  if(ctrlC)line('^C','sys');
+  line('Stopped '+esc(p.label),'sys');return true}
 function nodeHooks(){const hk={
   out(level,args){const html=level==='table'?tableHTML(args[0]):level==='raw'?esc(args[0]):fmtArgs(args);const text=level==='raw'?args[0]:toText(html);
     line(html,level==='warn'?'warn':level==='error'?'err':'');if(RUN&&RUN.out)RUN.out.push(text);if(!SYNC&&RUN&&Date.now()-RUN.t<20000)tryComplete()},
-  asyncErr(e){printNodeErr(e);if(RUN)RUN.ok=false;if(hk.env)hk.env.stop()},clear(){clearScreen()},
+  asyncErr(e){printNodeErr(e);if(RUN)RUN.ok=false;if(hk.env)hk.env.stop();syncBar()},clear(){clearScreen()},idle:syncBar,done:syncBar,
   exit(c){if(RUN)RUN.ok=c===0},sys(t){line(esc(t),'sys')}};return hk}
 function printNodeErr(e,file){
   if(e&&e.__exit!==undefined)return;
@@ -400,9 +416,11 @@ function printNodeErr(e,file){
 function runNode(file,args,code){
   killRealm(NODE);const hk=nodeHooks();NODE=makeRealm(hk);
   const env=hk.env=makeNodeEnv(NODE,VFS,file,args,hk);
+  PROC={env,label:RUN.src,ran:{file,code:code!==undefined?code:S.files[file]}};RUN.ran=PROC.ran;
   SYNC=true;
   try{env.runMain(file,code)}catch(e){if(e&&e.__exit!==undefined){RUN.ok=e.__exit===0}else{printNodeErr(e,file);RUN.ok=false}}
   finally{SYNC=false}
+  RUN.server=[...env.servers.keys()];syncBar();
 }
 function tokenize(s){const out=[];let cur='',q=null,has=false;
   for(let i=0;i<s.length;i++){const c=s[i];
@@ -412,26 +430,59 @@ function tokenize(s){const out=[];let cur='',q=null,has=false;
     else cur+=c}
   if(cur||has)out.push(cur);return out}
 const NPM_INIT=()=>JSON.stringify({name:'my-app',version:'1.0.0',description:'',main:'index.js',scripts:{test:'echo "Error: no test specified" && exit 1'},keywords:[],author:'',license:'ISC'},null,2)+'\n';
+// A folder is a marker key "name/" or any key under "name/"; root is always one.
+function isDir(k){return k===''||hasF(k+'/')||Object.keys(S.files).some(f=>f.startsWith(k+'/'))}
+function parentOf(k){const i=k.replace(/\/$/,'').lastIndexOf('/');return i<0?'':k.slice(0,i)}
+function lsNames(dir){
+  const pre=dir?dir+'/':'',set=new Set();
+  for(const f of VFS.list()){if(!f.startsWith(pre)||f===pre)continue;const r=f.slice(pre.length),i=r.indexOf('/');set.add(i<0?r:r.slice(0,i+1))}
+  return [...set].sort()}
 function runShell(src){
   const a=tokenize(src),c=a[0]||'',args=a.slice(1);
   RUN={src,mode:'sh',t:Date.now(),cmd:c,args,ok:true,out:[],logs:[]};
   const out=(t,cls='')=>{line(esc(t),cls);RUN.out.push(t)};
   const fail=(t)=>{out(t,'err');RUN.ok=false};
+  if(procOn()&&(c==='node'||(c==='npm'&&/^(start|test|t|run|run-script)$/.test(args[0]||'')))){
+    fail('A program is still running. Press Stop (or Ctrl+C) first. In a real terminal you would open a second tab for curl.');return}
   switch(c){
-    case 'help':out('Commands here: ls, cat <file>, pwd, touch <file>, rm <file>, clear,\nnode <file> [words…], node -e "code", node -v,\nnpm init -y, npm install <package>, npm start, npm run <script>, npm test','sys');break;
+    case 'help':out('Commands here: ls [dir], cat <file>, pwd, touch <file>, rm <file>, mkdir [-p] <dir>, clear,\nnode <file> [words…], node -e "code", node -v,\nnpm init -y, npm install <package>, npm start, npm run <script>, npm test,\ncurl [-i] [-s] [-X METHOD] [-Z] <url>…','sys');break;
     case 'clear':clearScreen();break;
     case 'pwd':out('/home/you/my-app');break;
-    case 'ls':{const l=VFS.list();line(l.map(f=>f==='node_modules'?'<span class="c-d" style="color:var(--term-dir);font-weight:600">node_modules/</span>':/\.js$/.test(f)?'<span style="color:var(--term-prompt)">'+esc(f)+'</span>':esc(f)).join('  ')||'<span class="v-u">(empty folder)</span>');RUN.out.push(l.join('  '));break}
-    case 'cat':if(!args[0])fail('cat: which file? Try: cat notes.txt');else if(args[0] in S.files)out(S.files[args[0]].replace(/\n$/,''));else fail('cat: '+args[0]+': No such file or directory');break;
-    case 'touch':if(!args[0])fail('touch: missing file name');else{if(!(args[0] in S.files))VFS.write(args[0],'')}break;
-    case 'rm':if(!(args[0] in S.files))fail('rm: cannot remove \''+(args[0]||'')+'\': No such file or directory');else VFS.remove(args[0]);break;
+    case 'ls':{const d=(args.find(x=>x[0]!=='-')||'').replace(/^\.\/?$/,'').replace(/\/$/,'');
+      if(d&&hasF(d)){out(d);break}
+      if(d&&!isDir(d)){fail('ls: cannot access \''+d+'\': No such file or directory');break}
+      const l=lsNames(d);line(l.map(f=>f==='node_modules'||f.endsWith('/')?'<span class="c-d" style="color:var(--term-dir);font-weight:600">'+esc(f==='node_modules'?'node_modules/':f)+'</span>':/\.js$/.test(f)?'<span style="color:var(--term-prompt)">'+esc(f)+'</span>':esc(f)).join('  ')||'<span class="v-u">(empty folder)</span>');RUN.out.push(l.join('  '));break}
+    case 'cat':if(!args[0])fail('cat: which file? Try: cat notes.txt');else if(isDir(args[0].replace(/\/$/,'')))fail('cat: '+args[0]+': Is a directory');else if(hasF(args[0]))out(S.files[args[0]].replace(/\n$/,''));else fail('cat: '+args[0]+': No such file or directory');break;
+    case 'touch':if(!args[0])fail('touch: missing file name');else if(!isDir(parentOf(args[0])))fail('touch: cannot touch \''+args[0]+'\': No such file or directory');else{if(!hasF(args[0])&&!isDir(args[0]))VFS.write(args[0],'')}break;
+    case 'rm':{const a=args[0]||'';
+      if(isDir(a.replace(/\/$/,''))&&a)fail('rm: cannot remove \''+a+'\': Is a directory');
+      else if(!hasF(a))fail('rm: cannot remove \''+a+'\': No such file or directory');
+      else{VFS.remove(a);const p=parentOf(a);if(p&&!isDir(p))VFS.write(p+'/','')}break}
+    case 'mkdir':{
+      const rec=args.some(x=>x==='-p'||x==='--parents'),a=(args.find(x=>x[0]!=='-')||'').replace(/\/+$/,'');
+      const bad=m=>fail('mkdir: cannot create directory \''+a+'\': '+m);
+      if(!a){fail('mkdir: missing operand');break}
+      if(!rec){if(isDir(a)||hasF(a))bad('File exists');else if(!isDir(parentOf(a)))bad('No such file or directory');else VFS.write(a+'/','');break}
+      const parts=a.split('/');let p='';
+      for(const [i,s] of parts.entries()){p+=(p?'/':'')+s;
+        if(hasF(p)){bad('File exists');break}
+        if(i===parts.length-1||!isDir(p))VFS.write(p+'/','')}
+      break}
+    case 'curl':{
+      const run=RUN;run.reqs=[];if(PROC){run.ran=PROC.ran;run.server=[...PROC.env.servers.keys()]}
+      nodeCurl(procOn()?PROC.env:null,args,{
+        out(t){if(RUN===run)out(t)},
+        err(t){if(RUN===run)out(t,'err')},
+        req(r){run.reqs.push(r);if(RUN===run)line('(took '+r.ms+' ms, virtual)','sys')},
+        done(){if(!run.reqs.length)run.ok=false;if(RUN===run)tryComplete()}});
+      break}
     case 'node':
       if(!args.length){out('This would open Node\'s interactive console (the REPL). You already know it: it is the > console from chapters 1–10.\nHere, run a file instead: node hello.js','tip');break}
       if(args[0]==='-v'||args[0]==='--version'){out(NODE_VERSION);break}
       if(args[0]==='-e'||args[0]==='--eval'||args[0]==='-p'){if(!args[1]){fail('node: '+args[0]+' requires an argument');break}
         runNode('[eval]',args.slice(2),args[0]==='-p'?'console.log('+args[1]+')':args[1]);break}
-      if(!(args[0] in S.files)){
-        if(args[0]+'.js' in S.files){runNode(args[0]+'.js',args.slice(1));break}
+      if(!hasF(args[0])){
+        if(hasF(args[0]+'.js')){runNode(args[0]+'.js',args.slice(1));break}
         out('node:internal/modules/cjs/loader','sys');fail("Error: Cannot find module '/home/you/my-app/"+args[0]+"'");line('Tip: check the file name with ls. Names are case-sensitive.','tip');break}
       if(!/\.(c?js|json)$/.test(args[0])){fail('That is not a JavaScript file. Node runs .js files.');break}
       if(ED.file===args[0]&&ED.dirty)line('Heads up: '+esc(args[0])+' has unsaved changes in the editor, so Node runs the last saved version. Press Save (Ctrl+S) first.','tip');
@@ -439,7 +490,7 @@ function runShell(src){
     case 'npm':runNpm(args,out,fail);break;
     case 'npx':out('npx runs a package\'s command without installing it globally. You will use it for things like npx tsc. Not available in this playground.','tip');break;
     case 'tsc':out('tsc is the TypeScript compiler. On your computer: npm install -D typescript, then npx tsc. See the Field guide.','tip');break;
-    case 'cd':out('This playground keeps you in ~/my-app. For folders and cd, play Shell Quest.','tip');break;
+    case 'cd':out('This playground keeps you in ~/my-app. To move between folders, play Shell Quest.','tip');break;
     default:
       if(/[=(){};"'`]|^(let|const|var|console|function)\b/.test(src)){fail('bash: syntax error');line('That looks like JavaScript, but this is the terminal. Put the code in a file and run node file.js, or try: node -e "your code"','tip')}
       else{fail('bash: '+c+': command not found');line('Type help to see the commands this terminal knows.','tip')}
@@ -480,11 +531,11 @@ function runNpm(args,out,fail){
 
 /* project panel + editor */
 const ED={file:null,dirty:false};
-function fileKind(f){return f==='node_modules'?'dir':/\.json$/.test(f)?'json':/\.js$/.test(f)?'js':'txt'}
+function fileKind(f){return f==='node_modules'||f.endsWith('/')?'dir':/\.json$/.test(f)?'json':/\.js$/.test(f)?'js':'txt'}
 function renderProject(flash){
   if(MODE!=='sh')return;
-  const rows=VFS.list().map(f=>{const k=fileKind(f);const size=f in S.files?S.files[f].split('\n').filter((l,i,a)=>i<a.length-1||l).length:0;
-    return `<button class="frow${ED.file===f?' open':''}${flash===f?' flash':''}" data-f="${esc(f)}"${k==='dir'?' disabled':''}><span class="fi ${k}">${k==='dir'?'DIR':k.toUpperCase()}</span>${esc(f)}${k==='dir'?'/':''}<span class="sz">${k==='dir'?S.pkgs.join(', '):size+' line'+(size===1?'':'s')}</span></button>`}).join('');
+  const rows=VFS.list().map(f=>{const k=fileKind(f);const size=k!=='dir'&&hasF(f)?S.files[f].split('\n').filter((l,i,a)=>i<a.length-1||l).length:0;
+    return `<button class="frow${ED.file===f?' open':''}${flash===f?' flash':''}" data-f="${esc(f)}"${k==='dir'?' disabled':''}><span class="fi ${k}">${k==='dir'?'DIR':k.toUpperCase()}</span>${esc(f)}${k==='dir'&&!f.endsWith('/')?'/':''}<span class="sz">${k==='dir'?f==='node_modules'?S.pkgs.join(', '):'':size+' line'+(size===1?'':'s')}</span></button>`}).join('');
   mapPanel.innerHTML=`<h3>Project</h3><p class="mapsub"><code>~/my-app</code>. Click a file to open it in the editor below the terminal.</p>
     <div class="files">${rows}</div>
     <form class="newfile" id="newfile"><input id="nfName" placeholder="new-file.js" aria-label="New file name" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" type="submit">New file</button></form>
@@ -493,18 +544,18 @@ function renderProject(flash){
 mapPanel.addEventListener('click',e=>{const b=e.target.closest('.frow');if(b&&!b.disabled)openFile(b.dataset.f)});
 mapPanel.addEventListener('submit',e=>{e.preventDefault();const inp=$('#nfName');let n=(inp.value||'').trim();
   if(!/^[\w.-]+$/.test(n)){inp.setCustomValidity('Use letters, numbers, dots, dashes or underscores. No folders.');inp.reportValidity();return}
-  inp.setCustomValidity('');if(!(n in S.files))VFS.write(n,'');openFile(n);$('#ed').focus()});
+  inp.setCustomValidity('');if(!hasF(n))VFS.write(n,'');openFile(n);$('#ed').focus()});
 mapPanel.addEventListener('input',e=>{if(e.target.id==='nfName')e.target.setCustomValidity('')});
 const ed=$('#ed'),gutter=$('#gutter');
 function edSync(){const n=ed.value.split('\n').length;gutter.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');ed.style.height='auto';ed.style.height=ed.scrollHeight+'px';
   $('#edtab').innerHTML=ED.file?esc(ED.file)+(ED.dirty?' <span class="dirty" title="Unsaved changes">●</span>':''):'no file open'}
 function openFile(f,content){
   ED.file=f;ED.dirty=false;
-  const has=f&&f in S.files;
+  const has=f&&hasF(f);
   if(f&&!has&&content===undefined){S.files[f]='';save()}
   ed.disabled=!f;ed.value=f?(content!==undefined?content:S.files[f]||''):'';
   if(f&&content!==undefined&&content!==S.files[f])ED.dirty=true;
-  if(f&&!(f in S.files)){S.files[f]='';save()}
+  if(f&&!hasF(f)){S.files[f]='';save()}
   $('#edRun').hidden=!(f&&/\.js$/.test(f)||f==='package.json');
   $('#edRun').textContent=f==='package.json'?'▶ npm start':'▶ Run';
   edSync();renderProject();
@@ -526,7 +577,7 @@ $('#edRun').onclick=()=>{if(!ED.file)return;saveFile();const c=ED.file==='packag
 function setChapter(i){
   S.chap=i;save();
   const ch=CH[i];MODE=ch.mode;
-  clearScreen();RUN=null;killRealm(NODE);NODE=null;
+  clearScreen();RUN=null;stopProc();killRealm(NODE);NODE=null;
   const termEl=$('#term');termEl.classList.toggle('short',MODE==='sh');$('#editor').hidden=MODE!=='sh';
   promptEl.textContent=MODE==='sh'?'~/my-app $ ':MODE==='ts'?'ts> ':'> ';
   cmd.setAttribute('aria-label',MODE==='sh'?'Type a terminal command':'Type '+(MODE==='ts'?'TypeScript':'JavaScript')+' and press Enter');
@@ -536,7 +587,7 @@ function setChapter(i){
   line('Chapter '+(i+1)+': '+esc(ch.name),'tip');
   if(MODE==='sh'){
     line('Type <b>ls</b> to see the files, or help for the command list.','sys');
-    if(!ED.file||!(ED.file in S.files))openFile('hello.js' in S.files?'hello.js':null);else edSync();
+    if(!ED.file||!hasF(ED.file))openFile(hasF('hello.js')?'hello.js':null);else edSync();
     renderProject();
   }else{
     line(MODE==='ts'?'Type TypeScript and press Enter. Loading the compiler…':'Type JavaScript and press Enter. Shift+Enter adds a new line.','sys');
@@ -544,14 +595,15 @@ function setChapter(i){
     if(MODE==='ts')loadTS().then(ok=>{if(MODE!=='ts')return;line(ok?'TypeScript compiler ready.':'Could not load the TypeScript compiler. Check your connection and try Fresh console.',ok?'sys':'err');const m=curMission();if(ok&&m)ensureNeeds(m)});
   }
   renderChapters();renderMission();
-  const m=curMission();if(m&&MODE==='js')ensureNeeds(m);
+  const m=curMission();if(m&&MODE!=='ts')ensureNeeds(m);
   if(method()==='none')line('This browser blocked running code inside the page, so the console cannot run anything here. Try a different browser.','err');
 }
+$('#procStop').onclick=()=>{stopProc(true);cmd.focus()};
 $('#fresh').onclick=e=>{
   const b=e.currentTarget;
   if(MODE==='sh'){
     if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to reset all files';setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset project'},3500);return}
-    b.classList.remove('armed');b.textContent='Reset project';S.files={...INITIAL_FILES};S.pkgs=[];save();openFile('hello.js');line('Project reset to its starting files.','sys');renderProject();return}
+    b.classList.remove('armed');b.textContent='Reset project';stopProc();S.files={...INITIAL_FILES};S.pkgs=[];save();openFile('hello.js');line('Project reset to its starting files.','sys');renderProject();ensureNeeds(curMission());return}
   freshConsole();clearScreen();line('Fresh console: all variables cleared.','sys');renderMem();const m=curMission();if(m)ensureNeeds(m);cmd.focus();
 };
 
@@ -568,6 +620,7 @@ cmd.addEventListener('keydown',e=>{
     cmd.setRangeText('  ',cmd.selectionStart,cmd.selectionEnd,'end');sizeCmd();return}
   if(e.key==='ArrowUp'&&!cmd.value.slice(0,cmd.selectionStart).includes('\n')){if(H.i>0){e.preventDefault();H.i--;cmd.value=H.list[H.i];sizeCmd()}return}
   if(e.key==='ArrowDown'&&!cmd.value.slice(cmd.selectionEnd).includes('\n')){if(H.i<H.list.length){e.preventDefault();H.i++;cmd.value=H.list[H.i]||'';sizeCmd()}return}
+  if(e.key.toLowerCase()==='c'&&e.ctrlKey&&cmd.selectionStart===cmd.selectionEnd&&procOn()){e.preventDefault();stopProc(true);return}
   if(e.key.toLowerCase()==='l'&&e.ctrlKey){e.preventDefault();clearScreen()}
 });
 term.addEventListener('click',()=>{if(!getSelection().toString())cmd.focus({preventScroll:true})});

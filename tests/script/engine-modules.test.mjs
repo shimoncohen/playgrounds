@@ -8,7 +8,7 @@ const read = p => fs.readFileSync(new URL(`../../programming/script-quest/${p}`,
 const keys = o => Object.keys(o).sort();
 const KEYS = {
   JSRealm: ['init', 'makeRealm', 'killRealm', 'runScript', 'prepare', 'isIncomplete', 'method'],
-  NodeEnv: ['NODE_VERSION', 'FakeBuffer', 'make'],
+  NodeEnv: ['NODE_VERSION', 'FakeBuffer', 'make', 'curl'],
   TSCheck: ['init', 'check', 'load'],
 };
 
@@ -43,6 +43,25 @@ describe('script-quest wiring', () => {
     assert.match(app, /^initTS\(/m);
     assert.doesNotMatch(app, /^(async )?function (makeRealm|killRealm|runScript|prepare|isIncomplete|tsCheck|loadTS|makeNodeEnv)\(|^class FakeBuffer|^const (TS_LIB|NODE_VERSION|COWSAY)=/m);
   });
+
+  it('app.js wires mkdir, curl, the running-process model and the mission fields', () => {
+    const app = read('app.js');
+    assert.match(app, /case 'mkdir':/);
+    assert.match(app, /case 'curl':/);
+    assert.match(app, /^const \{[^}]*curl:nodeCurl[^}]*\}=window\.NodeEnv;/m);
+    assert.match(app, /nodeCurl\(/);
+    const fn = name => app.match(new RegExp(`function ${name}\\([^\\n]*`))?.[0] ?? '';
+    assert.match(app.match(/function setChapter[\s\S]*?\n\}/)[0], /stopProc\(/);
+    assert.match(app.match(/\$\('#fresh'\)\.onclick[\s\S]*?\n\};/)[0], /stopProc\(\)[\s\S]*ensureNeeds\(curMission\(\)\)/);
+    assert.match(fn('goMission'), /stopProc\(/);
+    assert.match(app, /m\.seed/);
+    assert.match(app, /m\.then/);
+    assert.match(app, /case 'help':out\('[^']*mkdir \[-p\] <dir>[^']*curl /);
+    assert.doesNotMatch(app, /For folders and cd/);
+    assert.match(app, /\}\)\(\);\s*$/);
+    assert.doesNotMatch(app, /\bfetch\(/);
+    assert.doesNotThrow(() => new vm.Script(app), 'app.js parses');
+  });
 });
 
 describe('JSRealm without acorn', () => {
@@ -76,6 +95,12 @@ describe('NodeEnv.make', () => {
 
   it('fs.readFileSync on a missing file is ENOENT', () => {
     try { mk().require('fs').readFileSync('nope.txt'); assert.fail('should throw'); } catch (e) { assert.equal(e.code, 'ENOENT'); }
+  });
+  it('Object.prototype names are not files: ENOENT, and not modules', () => {
+    for (const name of ['toString', 'constructor', '__proto__']) {
+      assert.throws(() => mk().require('fs').readFileSync(name), { code: 'ENOENT' }, name);
+      assert.throws(() => mk().require('./' + name), { code: 'MODULE_NOT_FOUND' }, name);
+    }
   });
   it('a missing relative module is MODULE_NOT_FOUND', () => {
     try { mk().require('./nope'); assert.fail('should throw'); } catch (e) { assert.equal(e.code, 'MODULE_NOT_FOUND'); }
