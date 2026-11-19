@@ -8,7 +8,7 @@ const TS_URL2='https://cdn.jsdelivr.net/npm/typescript@5.9.3/lib/typescript.js';
 let tsState='idle',tsWaiters=[];
 function loadTS(){
   if(tsState==='ready')return Promise.resolve(true);
-  if(tsState==='failed')return Promise.resolve(false);
+  if(tsState==='failed')tsState='idle';
   return new Promise(res=>{tsWaiters.push(res);if(tsState==='loading')return;tsState='loading';
     const done=ok=>{tsState=ok?'ready':'failed';tsWaiters.splice(0).forEach(f=>f(ok))};
     const add=(url,next)=>{const s=tsDoc.createElement('script');s.src=url;s.onload=()=>done(typeof ts!=='undefined');s.onerror=next;tsDoc.head.appendChild(s)};

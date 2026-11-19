@@ -42,6 +42,7 @@ describe('per-playground rule from each page config', () => {
   const scriptFiles = { 'hello.js': 'console.log("Welcome backstage!")\n', 'notes.txt': 'Sweep the ring\nFeed Mumbles\nHang the posters\n' };
   const cases = [
     ['programming/script-quest', { chap: 0, cur: { 0: 2 }, files: scriptFiles, pkgs: [] }, [{ files: { ...scriptFiles, 'a.js': '' } }, { files: { ...scriptFiles, 'hello.js': 'x' } }, { files: { 'notes.txt': scriptFiles['notes.txt'] } }, { pkgs: ['cowsay'] }]],
+    ['programming/typescript-quest', { chap: 0, cur: { 0: 2 }, best: 0 }, [{ xp: 10, done: { '0.0': 1 } }]],
     ['programming/harbor-quest', { v: 1, hist: [], files: { 'README.md': '# The harbor shop' }, puz: {}, flag: {}, inside: null }, [{ hist: ['docker ps'] }]],
     ['programming/shell-quest', { fs: {}, cwd: '/home', vars: {}, hist: [], seen: false }, [{ hist: ['ls'] }]],
     ['programming/python-quest', { code: {}, tray: {}, free: null }, [{ tray: { '0.0': '5' } }, { free: { code: 'x' } }]],

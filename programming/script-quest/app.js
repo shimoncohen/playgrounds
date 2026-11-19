@@ -286,7 +286,7 @@ function renderMission(pop){
       <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="badge-art">${c+1}</div><div><h2>${esc(ch.badge)}</h2><p class="intro">Badge earned for finishing <b>${esc(ch.name)}</b>.</p></div></div>
       <div><div class="goal"><div class="label">You can now use</div><div class="learned" style="margin-top:6px">${ch.learned.map(x=>'<code>'+esc(x)+'</code>').join('')}</div></div></div>
       <div class="actions">${c<CH.length-1?`<button class="btn" id="nextChap">Next: ${esc(CH[c+1].name)} →</button>`:'<button class="btn" id="toFire">Play Quick-fire</button>'}<button class="btn ghost" id="toGuide">Field guide</button></div>
-      <p class="note">Click any numbered dot to replay a mission. Replays do not add XP, but the practice counts.</p>${dotsHTML(c,-1)}`;
+      ${ch.pointer?`<p class="note">${ch.pointer}</p>`:''}<p class="note">Click any numbered dot to replay a mission. Replays do not add XP, but the practice counts.</p>${dotsHTML(c,-1)}`;
   }else{
     const m=ch.missions[j];
     missionEl.innerHTML=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${c+1} · Mission ${j+1} of ${ch.missions.length}${S.done[mk(c,j)]?' · replay':''}</div>

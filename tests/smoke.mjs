@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 import { CHAPTERS } from './trophy/chapters.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const NAMES = ['script', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
+const NAMES = ['script', 'typescript', 'python', 'cpp', 'shell', 'harbor', 'ds', 'net', 'agent', 'rust'];
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
 
 let server, base, browser, tmp;

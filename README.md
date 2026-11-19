@@ -9,6 +9,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | | Playground | You will learn | Folder |
 |---|---|---|---|
 | 📜 | **Script Quest** | JavaScript, TypeScript and Node, in a real console | [`programming/script-quest/`](programming/script-quest/) |
+| 🟦 | **TypeScript Quest** | Types and inference, checked by the real TypeScript compiler | [`programming/typescript-quest/`](programming/typescript-quest/) |
 | 🐍 | **Python Quest** | Python, with a memory map and step-by-step replay | [`programming/python-quest/`](programming/python-quest/) |
 | ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`programming/cpp-quest/`](programming/cpp-quest/) |
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`programming/shell-quest/`](programming/shell-quest/) |
@@ -116,6 +117,7 @@ programming/            the Programming section: index.html (hub with a card per
   python-quest/ cpp-quest/ harbor-quest/
                         index.html + style.css + app.js each
   script-quest/         like those, plus content/ (chapters, quick-fire, guide) and tiers.js (tier setup); the realm, Node and TS checker live in shared/
+  typescript-quest/     the same shape as script-quest/, on the shared engine and tier model; tests in tests/typescript/
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, seven chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
@@ -144,7 +146,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 
 ### Tests, in one breath
 
-`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. Script Quest's course lives in `programming/script-quest/content/`, and its Node tests load it with `loadScriptContent`; Python, C++ and Harbor Quest keep theirs inside `app.js`, and `loadContent` in `tests/content-loader.mjs` slices it out. Their tests include solvability tests (Python, C++ and Harbor in Node, Script in `tests/smoke.mjs` because its checks need a real browser realm). `tests/tools/publish_site.test.mjs` checks that a preview whose push loses a race with another is rebased and published. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
+`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. Script Quest's course lives in `programming/script-quest/content/`, and its Node tests load it with `loadScriptContent`; TypeScript Quest's tests (`tests/typescript/`) load theirs with `loadTypescriptContent` and compile every mission answer with the pinned `typescript` devDependency; Python, C++ and Harbor Quest keep theirs inside `app.js`, and `loadContent` in `tests/content-loader.mjs` slices it out. Their tests include solvability tests (Python, C++ and Harbor in Node, Script in `tests/smoke.mjs` because its checks need a real browser realm). `tests/tools/publish_site.test.mjs` checks that a preview whose push loses a race with another is rebased and published. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
 
 ### Publishing to claude.ai artifacts
 
