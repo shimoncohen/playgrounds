@@ -1,0 +1,509 @@
+# TypeScript Quest: design
+
+Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). One decision is still open: how the tests run the TypeScript compiler in Node (see [Compiler in Node tests](#compiler-in-node-tests)). Three proposals wait for the user's sign-off: the rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)), and the Suggested-first corrections for chapters 6 and 14 ([Suggested first](#suggested-first)).
+
+**Contents:** [TLDR](#tldr) · [Goal](#goal) · [Non-goals](#non-goals) · [Current state](#current-state) · [Story](#story) · [Chapters](#chapters) ([Beginner](#beginner-booking-depot-chapters-1-to-5) · [Intermediate](#intermediate-rail-yard-chapters-6-to-10) · [Advanced](#advanced-signal-tower-chapters-11-to-14) · [TypeScript with Node](#typescript-with-node-engine-wagon-chapters-15-to-18)) · [Tier XP and ranks](#tier-xp-and-ranks) · [Suggested first](#suggested-first) · [Engine plan](#engine-plan) · [Decisions](#decisions) · [Trophy Room](#trophy-room) · [Alternatives](#alternatives) · [Risks](#risks) · [Test plan](#test-plan) · [Observability](#observability) · [Performance](#performance) · [PR chain](#pr-chain) · [Touchpoints](#touchpoints)
+
+## TLDR
+
+- TypeScript Quest is a new playground with 18 chapters in four tiers: Beginner (1 to 5), Intermediate (6 to 10), Advanced (11 to 14) and TypeScript with Node (15 to 18). It is set on the Starlight Circus touring by rail, and its treasure is the Golden Timetable.
+- Chapters 1 to 9 and 11 to 14 use the TypeScript REPL that Script chapter 11 already has. Chapters 10 and 15 to 18 use project mode with files and a terminal.
+- It loads the shared engine that PRs 4, 7 and 9 shipped (`shared/tscheck.js`, `shared/nodeenv.js`, `shared/scheduler.js`). PR 13 adds multi-file projects, a `tsconfig` and a larger lib. PR 16 adds `.ts` in the virtual terminal, `node --test` and typings for Node.
+- Tier XP per mission is 10, 15, 20 and 25. Every tier pays the default 25 XP per chapter badge (`badgeXp`), as there are no old saves.
+- Badges are derived from `done` at render time (D14, proposed), so the save has no new stored field. The save key is `typescript-quest-v1`.
+- Adding the quest to the catalog (PR 11) costs everyone the "Wanderer" trophy until they start it.
+
+Options for where the TypeScript lib comes from (D2 and D4 weighed them):
+
+| Option | Needs | Gives | Main limit |
+|---|---|---|---|
+| **Hand-grown lib in `TS_LIB` (chosen), plus hand-written Node typings** | New declarations written and tested per chapter | A small lib that loads fast on a phone, and exactly the surface the chapters teach | Every need must be added by hand; a missing global shows as a confusing error until PR 13 adds it |
+| Real `lib.d.ts` from the CDN | Several files fetched at run time, wiring into the compiler host | Every standard global, always correct | Size and load time are unmeasured; PR 13 measures it before any switch |
+| `@types/node` | The full package fetched | The real Node typings | Far too large for a phone, so Node typings stay hand-written either way |
+
+## Goal
+
+Give a learner who knows basic JavaScript a path to typed JavaScript: from reading inferred types, through generics and type-level programming, to a typed command-line tool with tests. Do it as a treasure hunt in its own folder, with its own save, loading the same engine Script Quest uses.
+
+## Non-goals
+
+- Any code, test or fixture. PRs 11 to 18 write them.
+- Changes to the Script Quest spec or plan. They keep their "PRs 10 to 18 are summary rows" text; this spec and its plan are the real re-plan.
+- Learner-facing text for the chapters. The outlines here are descriptions; PRs 11, 12, 14, 15 and 17 write the wording.
+- Real ESM execution. Chapter 10 teaches TypeScript `import` and `export` and runs through the virtual Node's CommonJS.
+- A full `lib.d.ts` or `@types/node`.
+- Edits to `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `shared/catalog.js` or the landing card. PR 11 makes them.
+
+## Current state
+
+All of this was read from the tree at the base of this branch.
+
+**The TypeScript checker (`shared/tscheck.js:1-125`).**
+
+- `TSCheck.{init, check, load}` (`:124`). `load` fetches TypeScript 5.9.3 from jsDelivr, with a second URL as a fallback (`:6-7`).
+- One hand-written `TS_LIB` string (`:18-101`). `interface Object` is at `:18` and an empty `interface Symbol` at `:25`.
+- `check(prev, src)` (`:102`) builds a `lib.d.ts` plus a `main.ts` made of the previous REPL snippets joined with `;`, with `noLib`, `strict`, ES2020, `module: None` and `noEmit`. It reports only the diagnostics that fall on the new lines, emits JavaScript with `transpileModule`, and extracts interface and type declarations for the memory panel.
+- There is no multi-file support, no `import` and no tsconfig.
+- `TS_LIB` has no `Object` or `Symbol` constructor values (so no `Object.keys`), no `Map`, `Set`, `Date` or `setInterval`. `console` has only `log`, `error`, `warn` and `table`. There is no `Extract`, `NonNullable`, `Parameters` or `InstanceType`, and no `Uppercase`, `Lowercase`, `Capitalize` or `Uncapitalize`.
+- It does have `Partial`, `Required`, `Readonly`, `Pick`, `Record`, `Exclude`, `Omit`, `ReturnType` and `Awaited` (`:78`, `:94-101`), and `Promise<T>` with `then`, `catch` and `finally` (`:68-77`).
+
+**The virtual Node (`shared/nodeenv.js`).**
+
+- `NODE_VERSION` is `v22.12.0` (`:8`), while the repo requires Node 24 (`package.json:8`).
+- `require` (`:207-219`) knows exactly `fs`, `path`, `os`, `process`, `events` and `http` (`:206`), and resolves `./x`, `.js` and `.json` only. Module code is parsed as `sourceType: 'script'` (`:226`), so only CommonJS runs. There is no `node:test` and no `assert`.
+- `fs` has sync, callback and promise forms of `readFile`, `writeFile`, `appendFile`, `readdir`, `stat`, `unlink` and `mkdir`, plus `existsSync` (`:81-93`).
+- `http` has `createServer` and `STATUS_CODES` but no `get` or `request` (`:176`; #246, the issue for `http.get`).
+- `process` has `argv`, `env`, `exitCode`, `on`, `once`, `off('exit')`, `exit`, `nextTick` and `stdout.write`, and no `stderr` or `stdin` (`:191-197`).
+
+**The scheduler (`shared/scheduler.js:1-150`).** A virtual event loop with a cost table (`COST`, `:3`), a loop guard (`:11-16`, `:69`) and run limits (`:149`).
+
+**The REPL in Script Quest (`programming/script-quest/app.js`).** TypeScript Quest's REPL needs all of this, which is why #229 (the issue to move the value formatter to `shared/`) is bigger than the formatter alone.
+
+- The value formatter block is `:20-84`: `refId` (`:22`), `fnSig` (`:30`), `fmt` (`:40`), `toText` (`:73`), `fmtArgs` (`:74`) and `tableHTML` (`:75`). It emits HTML, so it cannot move into `shared/` unchanged.
+- The REPL state `HIST`, `DECLS` and `TYPES` is declared at `:116`, and `freshConsole` resets it at `:135`. `execJS` is at `:156`, `execTS` at `:179` and the memory panel `renderMem` at `:363`.
+- A mission check receives `{...RUN, has, kind, val, types}`, which includes `diags` (`:222-249`).
+- A visible message and a retry appear when the compiler fails to load (`:225`).
+- `runShell` is at `:440`. `cd` only prints a tip (#247, the issue for `cd` and `rm -r` in the virtual terminal).
+- The `execJS` path has no loop guard (#241, the issue for a loop guard in the Script console), so TypeScript Quest's REPL chapters would freeze the tab on `while (true) {}` unless PR 11 folds the fix in.
+
+**Script chapter 11 ("TypeScript").** It is the only TypeScript teaching today (`programming/script-quest/content/ch-beyond-the-browser.js:6-50`). It has variable annotations, typed functions, an interface with an optional property, a missing property, a literal union, inference, and one generic function (ending at `:49`). It does not teach `Promise<T>`: the word `Promise` does not appear in that file.
+
+**Tier model.** `shared/tiers.js:6-64` is `Tiers.create`: `badgeXp` per tier (default 25 at `:4`), `ranks` and `rankFor` that derive the tier-end ranks, and `doneSep`. `docs/tiers-guideline.md:7` states the model, `:19-20` shows a five-entry base ladder with tier-end ranks, and `:317` is the adoption step that sets `baseRanks` and `tierEndRanks`. Script's own setup is `programming/script-quest/tiers.js:4-23` (`baseRanks`, `tierEndRanks`, `tierView`, `badgePay`).
+
+**Other facts.**
+
+- The catalog lists Script Quest with 23 chapters (`shared/catalog.js:9`).
+- The `typescript` commit scope is already accepted (`commitlint.config.mjs:5`), and the syntax loop in `AGENTS.md:17` already lists the new folders.
+- `AGENTS.md:97` requires plans and specs before code. `AGENTS.md:79` is the "Add a whole playground" row, and `.claude/skills/new-playground/SKILL.md` lists every place a new quest is wired in.
+- `docs/story-guideline.md:19-21` defines cast and legs, and `:39,41` define the `story.js` shape and the catalog test that checks it.
+- The `test:engine` script (`package.json:13`) has no `tests/typescript/` glob yet; PR 11 adds it with the first test.
+- No test runs the TypeScript compiler in Node: `package.json` has no `typescript` dependency (`devDependencies` at `package.json:19-24`), and the only TS test checks the loader's failure path (`tests/script/engine-modules.test.mjs:127-143`).
+- The teach-before-use table is `FIRST` in `tests/script/teach.test.mjs:13-111`. Its indexes are 0-based chapter indexes, so index 12 is rail number 13.
+- CI ignores `docs/` and `*.md` (`tools/ci-plan.mjs:18`), so this change runs no quest tests.
+
+## Story
+
+Written with the story guideline in mind (`docs/story-guideline.md`). The outline goes in `programming/typescript-quest/story.js` (PR 11).
+
+- **World:** the Starlight Circus goes on tour. The learner is now the tour's engineer.
+- **Cast** (each with a one-line reintroduction, so Script Quest is not required):
+  - **Ringmaster Bellamy:** retired, and sends bookings by telegram from each town.
+  - **Pepper:** the tightrope kid who asks "why?".
+  - **Mumbles:** the parrot that repeats whatever it hears, the living `any`.
+- **Places and tiers:**
+
+| Place | Tier | Chapters |
+|---|---|---|
+| the booking depot | Beginner | 1 to 5 |
+| the rail yard | Intermediate | 6 to 10 |
+| the signal tower | Advanced | 11 to 14 |
+| the engine wagon | TypeScript with Node | 15 to 18 |
+
+- **Treasure:** the Golden Timetable, a tour timetable that can never double-book a wagon, finished by the typed CLI in chapter 18. Chapter 1 sets it up with a smudged paper timetable that books Mumbles twice. Script's lantern is already spent, so this is a new treasure.
+- **`story.js` shape** (`docs/story-guideline.md` §3): `world`, `places`, `cast` (name and role) and `treasure`. Each chapter object also carries a one-sentence `story` line (the clue, the puzzle and the find), an `intro` and a `badge`. The `story` line is shown above every mission, so it is written to be read alone and never uses a term the learner has not met.
+- World values come from the circus: wagons, towns, performers, tickets and timetable slots, not `foo` and `bar`.
+
+## Chapters
+
+Rules for every chapter:
+
+- **Mode.** "REPL" is the `ts` console. "Project" is project mode with files and a terminal, as design D3 says. Chapter 10 is the one difference: its missions pass on the compiler's diagnostics and on the program's output, so it needs no terminal command beyond running the files, and PR 14 may hide the terminal there.
+- **Missions.** About 6 per chapter (chapter 1 about 7, chapter 18 about 8). An outline gives the title, what the learner writes, and the diagnostic or output that passes it. Diagnostic codes are the expected ones; each is confirmed against the compiler when its chapter is written.
+- **Passing.** A mission passes when the learner's own code produces the diagnostic or output asked for, and a check never counts work from an earlier mission.
+- **Teach before use.** Every new term appears in the chapter's term list and is taught before any later mission uses it. The `FIRST` table gets an entry per term.
+- **`Promise<T>`.** It is taught first in chapter 6 (Generics), as the familiar generic type. Chapters 1 to 5 do not mention it, and chapter 4's callbacks are synchronous. `Awaited` is taught in chapter 13. Chapters 16 and 17 then use `fs.promises` and async tests with both already taught.
+
+### Beginner: booking depot (chapters 1 to 5)
+
+Mode: REPL. Mission XP 10.
+
+**1. Types and inference.** Leg: a smudged paper timetable books Mumbles twice; learn to read what the compiler already knows and to label what it cannot. Badge: Booking Stamp. Starts from what Script chapter 11 does not cover: it has annotations, typed functions, a shape, a missing property, a literal union, inference and one generic function. Chapter 1 adds how inference widens and narrows, and `unknown` against `any`. New terms: widening, literal type, `const` vs `let` inference, `any`, `unknown`, implicit `any`, type assertion `as`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Read the guess | `const` and `let` variables from the same value, then an assignment to each that only one of them rejects | TS2322 on the `let` or `const` line asked for |
+| 2 | Empty crate | A variable declared with no value, annotated so later assignments type-check | The declaration has an annotation and a later assignment of the wrong type is rejected with TS2322 |
+| 3 | The parrot problem | A value typed `any`, used wrongly with no error | No diagnostics, then the mission shows what a typed version reports |
+| 4 | Parrot on a leash | The same value typed `unknown`, then used without a check | TS18046 reported |
+| 5 | Hand the parrot a type | A parameter with no annotation | TS7006 reported (implicit `any`) |
+| 6 | Say it again, with `as` | A value read as a narrower type with `as` | No diagnostics; a following mismatch with a non-overlapping `as` reports TS2352 |
+| 7 | Smudge cleaned | Two variables whose inferred types differ, fixed with one annotation | No diagnostics and the declared type is the one asked for |
+
+**2. Unions and narrowing.** Leg: the telegrams arrive as text or as numbers; sort them at the depot door. Badge: Switch Lever. Narrowing `unknown` from chapter 1 lands here. New terms: narrowing, `typeof` guard, `in` guard, truthiness narrowing, equality narrowing, discriminated union, tag property, `never` (the type with no values, first met as the leftover in the `default` branch), exhaustive check.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Text or number | A union parameter used with a method only one member has, then a `typeof` check | TS2339 first, then no diagnostics after the check |
+| 2 | Open the parrot | Narrow the `unknown` from chapter 1 with `typeof` | No diagnostics |
+| 3 | Is it there? | A value that may be `null` or `undefined`, guarded by truthiness or `===` | TS18048 first, then none |
+| 4 | Look inside | Two object shapes told apart with `in` | TS2339 first, then none |
+| 5 | Tagged tickets | A discriminated union with a `kind` tag and a `switch` | No diagnostics and each branch uses its own fields |
+| 6 | Nothing missed | A `never` check in the `default` branch, then a new union member added | TS2322 reported until the new case is handled |
+
+**3. Aliases and interfaces.** Leg: every wagon needs a booking card; write the card once and reuse it. Badge: Ticket Blank. New terms: type alias, interface, optional property, `readonly` property, extending, intersection, excess property check, structural typing.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Name it once | A `type` alias for a union or object shape | The alias is used in two declarations with no diagnostics |
+| 2 | Booking card | An `interface` with required and optional properties | The memory panel lists the blueprint and a matching value passes |
+| 3 | Stuck stamp | A `readonly` property assigned to later | TS2540 reported |
+| 4 | Stowaway field | An object literal with an extra property | TS2353 reported |
+| 5 | Grow the card | A second `interface` that `extends` the first | A value with both sets of properties passes; one missing property reports TS2741 |
+| 6 | Same shape, other name | Two differently named shapes assigned to each other | No diagnostics (structural typing) |
+
+**4. Typed functions.** Leg: the depot clerk's rules for taking a booking: what goes in, what comes out. Badge: Brass Whistle. New terms: return type, optional parameter, default parameter, rest parameter, callback type, `void`, type predicate (`x is T`). `never` was taught in chapter 2; here it is reused as a function's return type.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | In and out | A function with typed parameters and an explicit return type | No diagnostics; a wrong return value reports TS2322 |
+| 2 | Maybe a seat | An optional and a defaulted parameter | A call with fewer arguments passes; one with too many reports TS2554 |
+| 3 | Call me back | A parameter typed as a function, given a callback | A callback with the wrong parameter type reports TS2345 |
+| 4 | Returns nothing | A `void` function whose result is not used, then used | No diagnostics, then the mission shows why using a `void` result is a smell |
+| 5 | Never returns | A function that always throws, typed `never` | No diagnostics; a reachable return reports TS2322 |
+| 6 | Vouch for it | A function returning `x is Ticket` and its use in an `if` | The narrowed branch compiles without a cast |
+
+**5. Arrays and tuples.** Leg: the wagon roster is a list in a fixed order. Badge: Wagon Roster. New terms: `T[]`, `readonly` array, tuple, labelled tuple element, optional tuple element. The `Array<T>` spelling waits for chapter 6, which teaches generics.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | One kind per list | A `string[]` and a wrong push | TS2345 reported |
+| 2 | Look but do not touch | A `readonly` array and a `push` on it | TS2339 reported |
+| 3 | Fixed slots | A tuple of wagon number and performer name | The tuple compiles; a swapped order reports TS2322 |
+| 4 | Name the slots | A labelled tuple and reading its slots by index | No diagnostics and the labels show in the memory panel |
+| 5 | Maybe a third slot | An optional tuple element | A short tuple passes; a too long one reports TS2322 |
+| 6 | Stay in range | Index past the end of a tuple | TS2493 reported |
+
+### Intermediate: rail yard (chapters 6 to 10)
+
+Mission XP 15. Chapters 6 to 9 use the REPL, chapter 10 uses project mode.
+
+**6. Generics.** Leg: the rail yard moves every kind of cargo with the same coupling; write it once for any cargo. Badge: Coupling Pin. This is where `Promise<T>` is first taught. New terms: type parameter, generic function, generic interface, generic constraint (`extends`), default type argument, `Promise<T>`, `async` return type.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | One coupling, any cargo | A generic `<T>` function that returns what it is given | A string and a number call each infer their own result type |
+| 2 | Pair them up | A generic interface with two type parameters | A matching value passes; a mismatch reports TS2322 |
+| 3 | Only things with a number | A constraint `T extends { wagon: number }` | A call with a wrong shape reports TS2345 |
+| 4 | A default cargo | A default type argument | A use with no argument compiles to the default |
+| 5 | A promise of cargo | A `Promise<string>` created and used with `then` | No diagnostics, and a wrong `then` callback type reports TS2345 |
+| 6 | Async needs a promise | An `async` function whose return annotation is not a `Promise` | TS1064 reported, then fixed with `Promise<number>` |
+
+**7. Classes and access modifiers.** Leg: each wagon is a class with parts the crew may and may not touch. Badge: Brakeman's Padlock. Uses the compiler's own emit for parameter properties and enums, which `transpileModule` supports. New terms: `class` field types, `private`, `protected`, `public`, `readonly` field, parameter property, `abstract`, `instanceof` narrowing, `implements`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Typed fields | A class with typed fields and a constructor | TS2564 reported when a field is never set, then fixed |
+| 2 | Hands off | A `private` field read from outside | TS2341 reported |
+| 3 | Family only | A `protected` member used from a subclass and from outside | TS2445 reported for the outside use only |
+| 4 | Shortcut | Parameter properties in a constructor | The class compiles with no field declarations written out |
+| 5 | Blueprint only | An `abstract` class and `new` on it | TS2511 reported; a subclass missing the abstract method reports TS2515 |
+| 6 | Whose wagon is it | `instanceof` to narrow a union of two classes; `implements` an interface | No diagnostics in each branch |
+
+**8. Literal types and enums.** Leg: the destination board shows only towns on the route. Badge: Destination Dial. It does not repeat chapter 2's literal unions: the chapter 2 union is a few string literals typed by hand, and chapter 8 is about building the allowed values once. New terms: `as const`, `readonly` literal object, `enum`, string enum, enum member type, `satisfies`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Freeze the board | An object with `as const` and a write to one of its fields | TS2540 reported |
+| 2 | Numbered stops | A numeric `enum` and a wrong member | TS2339 reported |
+| 3 | Named stops | A string `enum` assigned from a plain string | TS2322 reported |
+| 4 | What it becomes | The same enum compiled, with the emitted JavaScript read in the panel | The mission checks the emitted object has the members |
+| 5 | Check without widening | `satisfies` on a lookup table | No diagnostics, and a key typo reports TS1360 |
+| 6 | Enum or constants | One table written both ways | Both forms compile and the mission asks which is erased from the output |
+
+**9. Utility types.** Leg: the yard keeps ready-made forms for every kind of booking change. Badge: Toolbelt Roll. They are used as ready-made tools; chapters 12 and 13 rebuild some. `Pick` and `Omit` take literal keys here, so they need no `keyof`. New terms: `Partial`, `Required`, `Readonly`, `Record`, `Pick`, `Omit`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Change only some | `Partial` of a booking card for an update | An update with one field passes; the original type rejects it |
+| 2 | Nothing optional | `Required` of a card with optional fields | A missing field reports TS2741 |
+| 3 | Lock the card | `Readonly` of a card and a write to it | TS2540 reported |
+| 4 | One entry per wagon | `Record` of wagon names to a type | A missing wagon reports TS2741 |
+| 5 | Just the name and wagon | `Pick` with literal keys | A value with extra fields reports TS2353 |
+| 6 | Everything but the price | `Omit` with literal keys | The omitted property is rejected, with TS2353 |
+
+**10. Modules.** Leg: the crew splits the tour book across files, one per wagon. Badge: Manifest Folder. Project mode: several `.ts` files, run through the virtual Node's CommonJS (PR 13's project checker, and the virtual Node's `require`). New terms: `export`, `import`, default export, `import type`, `export type`, relative import path.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Share a type | An exported interface in one file, imported in another | The second file compiles with no TS2304 |
+| 2 | Share a value | An exported function used from another file | The program prints the expected line |
+| 3 | The wrong name | An import of a name that is not exported | TS2305 reported |
+| 4 | Just the shape | `import type` for an interface | No diagnostics, and the emitted JavaScript has no `require` for it |
+| 5 | A missing file | An import path that does not exist | TS2307 reported, then fixed |
+| 6 | Run the tour | Three files run together from the terminal | The output matches the expected text |
+
+### Advanced: signal tower (chapters 11 to 14)
+
+Mission XP 20. REPL.
+
+**11. `keyof` and indexed access.** Leg: the signal tower names every lamp; learn to ask a type for its own keys. Badge: Lookup Lens. New terms: `keyof`, `typeof` in a type position, indexed access `T[K]`, `T[number]` on an array type, key constraint `K extends keyof T`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Ask for the keys | `keyof` of an interface | A key outside the union reports TS2322 |
+| 2 | The type of a value | `typeof` in a type for a constant object | A matching alias compiles |
+| 3 | Look one up | `T[K]` for a named key | A wrong key reports TS2339 |
+| 4 | A safe getter | A generic `get<T, K extends keyof T>` | A call with a bad key reports TS2345 |
+| 5 | Every value type | `T[keyof T]` | The result accepts a value of each member type |
+| 6 | Index with a number | `T[number]` on an array type | The element type is the one asked for |
+
+**12. Mapped types.** Leg: stencil plates stamp the same change onto every lamp. Badge: Stencil Plate. Rebuilds `Partial` and `Readonly`. New terms: mapped type `[K in keyof T]`, `?` and `readonly` modifiers, `-?` and `-readonly`, a mapped type that changes each value type. Key remapping with `as` waits for chapter 13, because filtering keys needs a conditional type.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Stamp every lamp | A mapped type over an interface | A value of the mapped type needs every key |
+| 2 | Rebuild `Partial` | `[K in keyof T]?: T[K]` | The result behaves like chapter 9's `Partial` |
+| 3 | Rebuild `Readonly` | A `readonly` modifier in a mapped type | A write reports TS2540 |
+| 4 | Take the lock off | `-readonly` and `-?` | The writes and the missing keys both pass |
+| 5 | Wrap every value | `[K in keyof T]: T[K][]` | Each property of the result is an array of the original type |
+| 6 | Maybe nothing | `[K in keyof T]: T[K] \| null` | A `null` value passes for every key; a number for a string key reports TS2322 |
+
+**13. Conditional types.** Leg: the points lever sends each wagon down one track or the other depending on what it carries. Badge: Points Lever. Rebuilds `ReturnType`, and is where `Awaited` is taught. New terms: conditional type `T extends U ? X : Y`, `infer`, distribution over a union, `ReturnType`, `Exclude`, `NonNullable`, `Awaited`, key remapping with `as` in a mapped type.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Pick a track | A conditional type with two outcomes | Each test type resolves to the expected result |
+| 2 | One per member | A conditional type applied to a union | The union distributes to the expected members |
+| 3 | Pull out the cargo | `infer` to unwrap an array element | The element type is the one asked for |
+| 4 | Rebuild `ReturnType` | `infer R` in a function type | It matches the built-in on a test function |
+| 5 | Drop what you do not want | `Exclude` and `NonNullable` | The remaining members are the ones asked for |
+| 6 | Unwrap a promise | A type that peels `Promise<T>` with `infer`, then `Awaited` | It gives the same type as `Awaited` for a nested promise |
+| 7 | Pick by value type | A mapped type whose `as` clause drops keys of one type (`T[K] extends X ? K : never`) | The result keeps only the matching keys |
+
+**14. Template literal types.** Leg: the code wheel makes every telegram address from a town and a wagon. Badge: Code Wheel. Its Suggested-first link is Named boxes (2), which teaches template strings, as the [Suggested first](#suggested-first) section explains. New terms: template literal type, `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize`, typed event names.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Build an address | A template literal type from two unions | The expected combinations compile and a wrong one reports TS2322 |
+| 2 | Shout it | `Uppercase` and `Capitalize` on a literal type | The resulting type is the one asked for |
+| 3 | Event names | A type of `on${Capitalize<...>}` handler names | A typo reports TS2353 |
+| 4 | Pull a piece out | `infer` inside a template to read a prefix | The result is the part asked for |
+| 5 | Typed event table | A mapped type whose `as` clause builds the handler keys from the event names | The new key names exist, the old ones do not, and every key needs its own handler |
+| 6 | Strict spelling | A function that only takes generated names | A bad name reports TS2345 |
+
+### TypeScript with Node: engine wagon (chapters 15 to 18)
+
+Mission XP 25. Project mode with files and a terminal. The terminal in these chapters runs `tsc` and `node` over `.ts` files (PR 16).
+
+**15. `tsconfig` and strict mode.** Leg: the engine wagon has a control panel of switches; learn what each one catches. Badge: Engine Gauge. New terms: `tsconfig.json`, `compilerOptions`, `strict`, `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess`, `noImplicitReturns`, `noUnusedLocals`, `tsc`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Read the panel | A `tsconfig.json` with `strict` on, then `tsc` | The terminal prints the expected diagnostics for a sample file |
+| 2 | No guessing | `noImplicitAny` off, then on | TS7006 appears only when it is on |
+| 3 | No surprise nothing | `strictNullChecks` off, then on | TS18048 appears only when it is on |
+| 4 | Index with care | `noUncheckedIndexedAccess` on | An array read is typed `T \| undefined` and TS18048 follows |
+| 5 | Every path returns | `noImplicitReturns` on | TS7030 reported |
+| 6 | No dead parts | `noUnusedLocals` on | TS6133 reported |
+
+**16. Typing `fs` and `http`.** Leg: telegrams come in from the world as plain text; check them before the tour trusts them. Badge: Telegraph Key. Uses the mini typings for `fs`, `path` and `http` that PR 16 supplies. New terms: `fs.readFileSync` result type, `fs.promises` returning `Promise<T>`, `JSON.parse` result, type guard on `unknown` data, request and response types, typed handler.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Read a file | A typed read of a timetable file | The program prints the file's text and `tsc` is clean |
+| 2 | Trust nothing | `JSON.parse` result held as `unknown` and used without a check | TS18046 reported |
+| 3 | Check the telegram | A type guard that validates parsed data | The program accepts good data and rejects bad data with a clear message |
+| 4 | Read without waiting | `fs.promises.readFile` in an `async` function | The program prints the text and `tsc` is clean |
+| 5 | Typed handler | An `http.createServer` handler with typed request and response | `curl` in the terminal gets the expected reply |
+| 6 | Wrong status | A handler returning the wrong type | TS2345 reported, then fixed |
+
+**17. `node:test`.** Leg: the inspector checks every wagon before the train leaves. Badge: Inspector's Clipboard. New terms: `node:test`, `test`, `describe`, `assert`, `assert.equal`, `assert.deepEqual`, `assert.rejects`, `assert.throws`, async test, `node --test`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | First check | A `test` that passes, run with `node --test` | The terminal prints the pass summary |
+| 2 | A failing check | A test that fails on purpose, then fixed | The failure message shows, then a pass |
+| 3 | Group them | `describe` around two tests | The output groups both under the name |
+| 4 | Compare shapes | `assert.deepEqual` on two objects | A real difference fails with the difference shown |
+| 5 | Test a promise | An async test using an `async` function | The test awaits and passes; forgetting `await` fails |
+| 6 | Test the error | `assert.rejects` or `assert.throws` | The thrown error is matched |
+
+**18. Final project: a typed CLI.** Leg: the tour's last job is `tour`, a command that reads a timetable and refuses to book a wagon twice. It finishes the Golden Timetable. Badge: Golden Timetable. New terms: `process.argv`, subcommand, exit code, `process.exitCode`, `process.stderr`, project layout with `src` and `test`.
+
+| # | Mission | You write | Passes when |
+|---|---|---|---|
+| 1 | Read the command | Parse `process.argv` into a typed command union | `tsc` is clean and each sample command parses |
+| 2 | Load the book | Read and validate a timetable file | Bad files give an error message and a non-zero exit code |
+| 3 | Typed model | `Timetable`, `Booking` and `Wagon` types | A booking without a wagon reports TS2741 |
+| 4 | No double booking | A check that two bookings never share a wagon and slot | The smudged timetable from chapter 1 is rejected with the clashing names |
+| 5 | The commands | `list` and `add` subcommands | The terminal output matches for each |
+| 6 | Exit codes | Success is 0 and a clash is 1, set through `process.exitCode` | A check of the exit code shows the right one (reading the code with `echo $?` in the virtual terminal is unverified until PR 16; the check may read `process.exitCode` from the run instead) |
+| 7 | Test it | A `node:test` file covering a clash and a clean timetable | `node --test` passes |
+| 8 | Golden Timetable | A run of `tour` over the full tour book | The output lists every wagon once and the clean exit code is 0 |
+
+## Tier XP and ranks
+
+- **Mission XP:** Beginner 10, Intermediate 15, Advanced 20, TypeScript with Node 25 (the guideline's fourth slot, `docs/tiers-guideline.md:7`).
+- **Badge XP:** `badgeXp` is 25 for all four tiers, the default in `shared/tiers.js:4`. There are no old saves, so no tier sets 0.
+- **Ranks (proposal, awaiting sign-off).** The base ladder, which stays below the Beginner end, is Stowaway 0, Ticket Clerk 50, Wagon Hand 130, Signalman 240 and Rail Engineer 360. The tier-end ranks are "Chief Engineer" for Intermediate, "Tour Architect" for Advanced and "Timetable Master" for TypeScript with Node, which is the top rank. The shape follows Shell's (`docs/tiers-guideline.md:19-20`) and Script's setup (`programming/script-quest/tiers.js:4-9`).
+- **Thresholds.** The tier-end thresholds are derived by `Tiers.create` (`shared/tiers.js:46-53`) and never typed. The figures below are estimates, to be fixed when the chapters exist. The base thresholds may be adjusted to fit the final counts, but they stay below the Beginner end and the names do not change.
+
+| Tier | Chapters | Missions (estimate) | XP per mission | Badges | Cumulative XP at tier end (estimate) |
+|---|---|---|---|---|---|
+| Beginner | 5 | 31 | 10 | 5 × 25 | about 435 |
+| Intermediate | 5 | 30 | 15 | 5 × 25 | about 1010 |
+| Advanced | 4 | 25 | 20 | 4 × 25 | about 1610 |
+| TypeScript with Node | 4 | 26 | 25 | 4 × 25 | about 2360 |
+
+- **Save.** Key `typescript-quest-v1`, folder `programming/typescript-quest/`, commit scope `typescript` (`commitlint.config.mjs:5`), tests in `tests/typescript/`. The catalog entry uses `sep: '.'`, so done-keys are `<chapter>.<mission>`.
+
+## Suggested first
+
+Each chapter has a soft "Suggested first" line under its title (D9) that names Script Quest chapters. Numbers are rail numbers in Script Quest, read from the chapter order in `programming/script-quest/index.html:90-103`. Note that `FIRST` in `tests/script/teach.test.mjs:13-111` uses 0-based chapter indexes, not rail numbers.
+
+Re-check of every link against the real chapter names on the base. All 17 rows name a real chapter with the right rail number, except two that need a correction (rows 6 and 14):
+
+| TS chapter | Suggested first | Result |
+|---|---|---|
+| 1 | TypeScript (11), Named boxes (2) | Correct |
+| 2 | True or false (3), Decisions (4) | Correct |
+| 3, 11 | Objects (8) | Correct |
+| 4 | Functions (7) | Correct |
+| 5 | Lists (6), Array superpowers (9) | Correct; mission 4 reads the tuple's slots by index, so no destructuring is needed |
+| 6 | Functions (7), Array superpowers (9), ~~none~~ **Time travel (10)** | Corrected: missions 5 and 6 use `Promise<string>`, `then` and `async`, which Time travel (10) teaches |
+| 7 | Classes (15) | Correct; an Intermediate chapter |
+| 8 | Objects (8), True or false (3) | Correct |
+| 9 | Destructuring and spread (14), Objects (8) | Correct; the first is Intermediate, the second Beginner |
+| 10 | Modules (17), Node.js (12) | Correct; Modules (17) teaches ESM as reading only, which matches TypeScript `import` and `export` |
+| 12 | Array superpowers (9) | Correct |
+| 13 | Decisions (4) | Correct; the ternary `? :` is taught at `programming/script-quest/content/ch-javascript-basics.js:127` |
+| 14 | ~~Say hello (1)~~ **Named boxes (2)** | Corrected: template strings are taught in Named boxes, in "Fill in the blanks" (`programming/script-quest/content/ch-javascript-basics.js:68`). Say hello does not teach them |
+| 15 | Node.js (12) | Correct |
+| 16 | Async fs and path (21), A small HTTP server (23) | Correct; both are Intermediate |
+| 17 | Errors and try/catch (16), Node.js (12) | Correct; the first is Intermediate |
+| 18 | Node.js (12), Async fs and path (21) | Correct; the second is Intermediate |
+
+The approved design said that chapters 6, 7, 9, 14, 17 and 18 point at Script Intermediate chapters that do not exist yet. That sentence was wrong twice over: those chapters now exist (Script has 23), and rows 6 and 14 point at Beginner chapters. The rows that point at Intermediate chapters are 7, 9, 10, 16, 17 and 18, and all of those chapters exist and read as the design intends.
+
+**Chapters 6 and 14 are changes to the approved design** (chapter 6 gains a Script chapter, Time travel (10); Say hello (1) becomes Named boxes (2) for chapter 14). They are proposals, awaiting the user's sign-off; the design table itself stays as approved.
+
+## Engine plan
+
+What each chapter needs, and which PR supplies it ("ok" means the base already supports it):
+
+| Chapters | Need | Supplied by |
+|---|---|---|
+| 1 to 5 | REPL `ts`, unions, narrowing, arrays, tuples, `unknown` | ok (`check` as is). `Object.keys` and `Map` are absent from `TS_LIB`; if a mission uses them, PR 13 adds them |
+| 6, 9, 12, 13 | Generics, utility and mapped types, `infer`, `Promise<T>` | ok, except `Extract`, `NonNullable`, `Parameters` and `InstanceType` (PR 13). `Promise<T>` is first taught in chapter 6 |
+| 7, 8 | `abstract`, parameter properties, enums, `satisfies` | ok (`transpileModule` emits them) |
+| 10 | Several files, `import` and `export` | PR 13's project checker, run through the Node env's CommonJS |
+| 11 | `keyof`, `typeof`, `T[K]` | ok |
+| 14 | `Uppercase` and the like | PR 15's spike on `intrinsic` |
+| 15 | `tsconfig` strict flags | PR 13 (compiler flags read from the tsconfig) |
+| 16 | Typed `fs` and `http` | PR 16's mini typings; `http.get` is #246 |
+| 17 | `node:test`, `assert`, `node --test` | PR 16 |
+| 18 | Typed CLI, `process.argv`, files in folders, exit codes | PR 16, plus #247 for `cd` and `rm -r` |
+
+What the two engine PRs add:
+
+- **PR 13, `feat(engine): multi-file TypeScript projects with tsconfig and a larger lib`.** A project checker (multi-file `check`, reading a `tsconfig` through `ts.parseJsonConfigFileContent`, and the cost of re-parsing per run), `import` between files, a grown `TS_LIB`, and flags from the tsconfig. It starts by measuring the real `lib.d.ts` against the grown lib. It updates this spec if the measurement changes the plan.
+- **PR 16, `feat(engine): TypeScript in the virtual terminal, node:test and typings for Node`.** `.ts` files accepted in the terminal, a `tsc` that really checks, `node file.ts` by transpiling, `node --test`, mini typings for `fs`, `path`, `http`, `events`, `node:test` and `assert`, and more of `process` (`stderr`, and `stdin` if the CLI needs it). The terminal interpreter moves to `shared/`, and `app.js` rebinds `runShell`.
+
+PRs 13 and 15 may revise this spec. The `intrinsic` approach for the case-changing types in chapter 14 is unverified: it is plausible only because `lib.d.ts` is passed to the compiler as the default lib name, and PR 15's spike settles it.
+
+## Decisions
+
+D1, D8 and D10 are defined in the Script spec and are linked, not copied: [D1](2026-11-16-script-quest-tiers-design.md#decisions) (engine in `shared/`), [D8](2026-11-16-script-quest-tiers-design.md#decisions) (scheduler) and [D10](2026-11-16-script-quest-tiers-design.md#decisions) (folder keys and `curl`). D2, D3, D4, D5 and D9 belong to the TypeScript half and are defined here. D14 is new.
+
+| Id | Decision | Alternatives and why they lost |
+|---|---|---|
+| D2 | **Grow the hand-written TS lib** (`Map`, `Set`, `Date`, `Extract`, `NonNullable`, `Parameters`, `InstanceType`, `Uppercase` and the like). A test compiles every mission solution cleanly. PR 13 first measures the real `lib.d.ts` on a phone-class connection. | Real lib from the CDN: many files, unmeasured size. `@types/node` is too big for a phone, so Node typings stay hand-written either way. |
+| D3 | **REPL for the type-level chapters, project mode with files and a terminal for modules and Node.** Chapters 1 to 9 and 11 to 14 use the REPL; chapters 10 and 15 to 18 use project mode. | One editor-first mode for everything: more scaffold work, and it throws away the REPL Script already has. |
+| D4 | **Mini Node typings:** `fs` (including promises), `path`, `http`, `events`, `node:test`, `assert` and `process`. | Full `@types/node`: too large. None: chapters 16 and 17 cannot be taught. |
+| D5 | **Keep Script chapter 11 unchanged**, add one pointer to TypeScript Quest on its completion screen (PR 11), and start TypeScript chapter 1 from what Script chapter 11 does not cover. | No pointer: learners miss the next step. Repeat chapter 11: wasted time. |
+| D9 | **Static "Suggested first" link** naming the chapter. | A `?c=` deep link: changes which chapter Script's saved state opens. Reading Script's save for "x/y done" like `shared/trophies.js`: nicer, a follow-up. |
+| D14 (proposed, awaiting sign-off) | **Badges are derived from `done` at render time**, as Script's `tierView` does (`programming/script-quest/tiers.js:16-19`). The save has no new stored field, and the badge XP is paid once when a chapter's last mission completes. | Stored `badges` and `ch` as Shell does: a new stored field to keep in step with `done`, and the `pristine` rule (`AGENTS.md:80`) needs to know about it. |
+
+### Compiler in Node tests
+
+Design D2 promises "a test compiles every mission solution cleanly", but no test in the repo runs the compiler in Node today (see [Current state](#current-state)). This is the one open decision, and it must be settled before PR 11 writes its first test.
+
+- **Recommended:** add `typescript` pinned to 5.9.3 (the version the page loads, `shared/tscheck.js:6`) as a dev dependency, so the checks run under `npm run test:engine` with no network. `AGENTS.md:40` allows dev tooling. The cost is a large install in CI and `npm ci`, a version to keep in step with the CDN pin, and a user decision under the new-dependency rule.
+- **Alternative:** check only in the browser smoke test. It needs no dependency, but it is slow, depends on the CDN, and gives no per-mission Node test.
+
+## Trophy Room
+
+The user accepted these effects. The lines cited are in `shared/trophies.js`.
+
+- **PR 6 (already merged)** appended Script chapters, so anyone who had finished all 93 original missions no longer has Script counted as complete until they finish the new chapters.
+- **PR 11 adds TypeScript Quest to the catalog.** Everyone loses "Wanderer" (`:69`, start every playground) until they start TypeScript Quest. "Playground Master: Programming" (`:75`) and "Grand Master" (`:80`) then also need TypeScript Quest finished. "Finisher" (`:72`) is unchanged.
+
+## Alternatives
+
+Alternatives to each decision are in the [Decisions](#decisions) table and the lib options are in the [TLDR](#tldr). Two more were weighed:
+
+| Option | Needs | Gives | Main limit |
+|---|---|---|---|
+| **A typed-chapters-only quest, 18 chapters (chosen)** | The shared engine and two new engine PRs | One path from first annotation to a tested CLI | Two engine PRs and four content PRs in the stack |
+| Stop at 14 chapters, no TypeScript with Node tier | No terminal or Node typings work | Smaller and sooner | The final project and `node:test` are the point of the quest's treasure, so it would have no ending |
+| Reuse Script chapter 11 and add only new chapters after it | Nothing | No overlap to manage | Chapter 11 has no `unknown`, narrowing or generics teaching, so the later chapters would need terms taught first |
+
+## Risks
+
+1. Mission counts, XP totals and thresholds are estimates. Script's own estimate was about 2200 XP and shipped as 2300 (`tests/script/tiers.test.mjs:112`).
+2. The rank names, base thresholds, D14 and the chapter 14 correction are proposals. Until the user signs them off, PR 11 uses them as written and a change is a rename or a small edit.
+3. The diagnostic codes in the outlines are expected values, not measured. The compiler is not run by any test in the repo yet, so each code is confirmed when its chapter is written.
+4. `intrinsic` in a hand lib and Node's type-stripping behaviour are unverified. They are checked in PR 15 and PR 16, and this spec does not assert them.
+5. The virtual Node reports `v22.12.0` while the repo requires Node 24 (`package.json:8`). PR 16 decides whether to bump it before it teaches `node file.ts`.
+6. The project panel UI may not separate from `app.js` cleanly. TypeScript Quest would then carry a thin copy (D1 in the Script spec).
+7. The TypeScript compiler's first load from jsDelivr on a phone is unmeasured.
+8. The REPL block in `programming/script-quest/app.js` is larger than the formatter #229 names, so PR 11's description must decide the whole block (formatter, `execJS`, `execTS`, state and the memory panel).
+9. This spec may drift from the tree: PRs 13 and 15 may revise it, and until then the mission counts and the engine table are as measured at the base of this branch.
+10. A broken anchor in a Contents list is caught only by a reader; the repo has no doc link check.
+
+## Test plan
+
+Tests per PR. All are CI signals, as there is no backend.
+
+- **Solvability and the compiler** (PR 11 onward): every mission answer passes its own check, and every solution compiles cleanly. How the compiler runs in Node is the open decision above.
+- **Teach-before-use:** a test over `FIRST`-style entries for every new term, in the same shape as `tests/script/teach.test.mjs`.
+- **Own-input checks:** a mission passes only on the learner's own action (`AGENTS.md:45`).
+- **A tier test** that pins the chapter and mission counts and the derived ranks, like `tests/script/tiers.test.mjs`.
+- **The catalog-count test** (`tests/trophy/catalog.test.mjs`) and the story outline check it already runs.
+- **Project-checker and terminal tests in `vm`** (PRs 13 and 16), with differential checks against real `node` where output order matters.
+- **The smoke hook, unedited,** and phone-width checks on every content PR.
+- **A visible message and a retry** when the compiler fails to load, copying Script's message (`programming/script-quest/app.js:225`).
+
+This spec's own change is docs only. CI ignores `docs/` (`tools/ci-plan.mjs:18`), so no quest tests run for it, and the evidence is a re-read of every cited line against the tree.
+
+## Observability
+
+There is no backend, so no dashboards, alerts or BI insights. The signals are the CI results above, the unedited smoke test, and the on-page message when the compiler fails to load. A running-process indicator in the Node chapters tells the learner when a program is still running.
+
+## Performance
+
+- PR 13 measures the real `lib.d.ts` against the grown lib, and compares per-run check time on a throttled phone profile for the REPL today, multi-file with the grown lib, and the real-lib option. It reports the numbers.
+- The first-load time of `typescript@5.9.3` from jsDelivr is unmeasured.
+- The `createProgram` re-parse per run is measured in PR 13.
+- A scheduler-driven `node --test` run finishes well under a second.
+- Quest page load is no more than 10% slower than the Script Quest baseline, the same limit the Script spec sets.
+
+## PR chain
+
+All PRs target `feat/222-ts-quest`. Sizes are changed lines: S under 150, M up to 500, L up to 1000, XL above. The plan holds the stacking rules and the sync with `main`.
+
+| PR | Title | Contains | Needs |
+|---|---|---|---|
+| 10 | `docs(typescript): add the TypeScript Quest spec and plan` | This spec and the plan | PRs 2 and 9 |
+| 11 | `feat(typescript): scaffold TypeScript Quest with tiers and chapter 1` | Folder, save key, `story.js`, landing card, catalog entry, tiers, chapter 1, the `test:engine` glob with the first test | 2, 3, 5, 10 |
+| 12 | `feat(typescript): Beginner chapters` | Chapters 2 to 5 in REPL mode | 11 |
+| 13 | `feat(engine): multi-file TypeScript projects with tsconfig and a larger lib` | Project checker, tsconfig flags, grown lib | 4 |
+| 14 | `feat(typescript): Intermediate chapters` | Chapters 6 to 10 | 12, 13 |
+| 15 | `feat(typescript): Advanced chapters` | Chapters 11 to 14, after the `intrinsic` spike | 14 |
+| 16 | `feat(engine): TypeScript in the virtual terminal, node:test and typings for Node` | `.ts` in the terminal, `tsc`, `node --test`, typings | 9, 13 |
+| 17 | `feat(typescript): TypeScript with Node tier and final project` | Chapters 15 to 18 | 15, 16 |
+| 18 | `feat(typescript): add TypeScript Quest and deepen Script Quest` | `feat/222-ts-quest` to `main` | all |
+
+## Touchpoints
+
+| Touchpoint | PR | Status |
+|---|---|---|
+| This spec and `docs/superpowers/plans/2026-11-16-typescript-quest-phase1.md` | 10 | new |
+| `programming/typescript-quest/` (`index.html`, `app.js`, `style.css`, `story.js`, `tiers.js`, `content/` with `quickfire.js` and `guide.js`) | 11 | new |
+| `shared/catalog.js`, landing card in `programming/index.html`, `tests/trophy/chapters.mjs`, `NAMES` in `tests/smoke.mjs` | 11 | updated |
+| `package.json` (`test:engine` glob) and `tests/typescript/` | 11 | updated, new |
+| `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, and a pointer on Script chapter 11's completion screen | 11 | updated |
+| `programming/typescript-quest/content/` chapter files, plus each chapter's quick-fire and Field guide entries in `quickfire.js` and `guide.js` (with the tier filter) | 12, 14, 15, 17 | new, updated |
+| `shared/tscheck.js` (project mode, tsconfig, larger lib) | 13 | updated |
+| `shared/nodeenv.js`, the terminal interpreter, typings for Node | 16 | updated, moved |
+| `shared/trophies.js` | none | unchanged; effects come from the catalog |
