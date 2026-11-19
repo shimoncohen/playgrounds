@@ -49,23 +49,28 @@ function create(opts){
   let hop=(opts&&opts.hop)||null,closeHop=null;
   let now=0,seq=0,running=false,stopped=false,phase=0,clockT=0,batch=[],guard=0,callbacks=0;
   let ticks=[],timers=[],immediates=[],ios=[];
+  let holds=0,idle=false;
 
   const live=()=>!stopped&&alive();
+  // A held loop with nothing queued parks (no hop) until new work arrives.
+  function wake(){if(idle&&running&&!stopped){idle=false;if(io.idle)io.idle(false);next()}}
   function timerOf(fn,delay,args,every){
     let d=Number(delay);if(!(d>=1&&d<=2147483647))d=1;
     const t={id:++seq,seq,fn,args,due:now+d,every:every?d:0,dead:false};
-    timers.push(t);return t;
+    timers.push(t);wake();return t;
   }
   function clearTimer(t){if(t&&typeof t==='object'){t.dead=true;timers=timers.filter(x=>x!==t)}}
-  function setImmediate(fn,...args){const j={seq:++seq,fn,args,dead:false};immediates.push(j);return j}
+  function setImmediate(fn,...args){const j={seq:++seq,fn,args,dead:false};immediates.push(j);wake();return j}
   function clearImmediate(j){if(j){j.dead=true;immediates=immediates.filter(x=>x!==j)}}
-  function nextTick(fn,...args){ticks.push({fn,args})}
-  function queueIO(costMs,fn){ios.push({seq:++seq,due:now+Math.max(0,costMs),fn,args:[],dead:false})}
+  function nextTick(fn,...args){ticks.push({fn,args});wake()}
+  function queueIO(costMs,fn){ios.push({seq:++seq,due:now+Math.max(0,costMs),fn,args:[],dead:false});wake()}
+  function ref(){holds++}
+  function unref(){if(holds>0)holds--;if(!holds&&idle)end()}
   function guardTick(){if(++guard>LOOP_LIMIT)throw guardError()}
   function drainTicks(){while(ticks.length&&live()){guardTick();const t=ticks.shift();t.fn(...t.args)}}
 
   function end(){
-    stopped=true;running=false;ticks=[];timers=[];immediates=[];ios=[];batch=[];
+    stopped=true;running=false;idle=false;ticks=[];timers=[];immediates=[];ios=[];batch=[];
     if(closeHop){closeHop();closeHop=null}
     if(io.done)io.done();
   }
@@ -73,6 +78,7 @@ function create(opts){
   function exit(code){
     stopped=true;ticks=[];timers=[];immediates=[];ios=[];batch=[];
     if(io.exit)io.exit(code);
+    if(idle)end();
   }
 
   function nextJob(){
@@ -98,7 +104,10 @@ function create(opts){
       if(ticks.length){drainTicks()}
       else{
         const j=nextJob();
-        if(!j){end();return}
+        if(!j){
+          if(holds>0){idle=true;if(io.idle)io.idle(true);return}
+          end();return;
+        }
         if(now>MAX_VIRTUAL_MS||callbacks>=MAX_CALLBACKS){
           if(io.sys)io.sys(now>MAX_VIRTUAL_MS
             ?'Stopped: this program ran for more than '+fmt(MAX_VIRTUAL_MS)+' ms of virtual time. Does a timer or interval ever end?'
@@ -131,9 +140,9 @@ function create(opts){
     setTimeout:(fn,delay,...args)=>timerOf(fn,delay,args,false),
     setInterval:(fn,delay,...args)=>timerOf(fn,delay,args,true),
     clearTimeout:clearTimer,clearInterval:clearTimer,
-    setImmediate,clearImmediate,nextTick,queueIO,drainTicks,start,exit,stop,guardTick,
+    setImmediate,clearImmediate,nextTick,queueIO,drainTicks,start,exit,stop,guardTick,ref,unref,wake,
     resetGuard:()=>{guard=0},
-    charge:ms=>{now+=ms},
+    charge:ms=>{now+=ms},now:()=>now,
     dateNow:()=>{now+=1;return START_EPOCH+now},
   };
 }
