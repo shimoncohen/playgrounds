@@ -6,6 +6,7 @@ SCQ.CH.push(
 {name:'TypeScript',tier:'beginner',group:'Beyond the browser',badge:'Poster Stamp',story:'The poster press needs labels; give each value a type and a Performer blueprint, watch the checker catch a wrong value, and stamp the first poster.',mode:'ts',
  intro:'The poster press needs labels, and TypeScript is JavaScript plus labels that say what type each thing is. A checker reads the labels and catches mistakes before your code runs. This console runs the real TypeScript compiler.',
  learned:[': number',': string','function types','interface','optional ?','union types','generics <T>','inference'],
+ pointer:'Want more? <a href="../typescript-quest/">TypeScript Quest</a> goes deeper on types.',
  missions:[
  {title:'Label a box',goal:'The poster press needs a label: create a variable called `crew` with a type annotation.',code:'let crew: number = 12',
   anat:[['let','kw'],['crew','name'],[': number','type'],['=','op'],['12','val']],
