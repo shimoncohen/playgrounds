@@ -1,0 +1,146 @@
+/* Mission 8's reference answer leaves out the lookup that times out: a failed dig exits 9, and the UI checks a mission
+   only after a command that exits 0. */
+(()=>{
+'use strict';
+const NQ=globalThis.NQ=globalThis.NQ||{};
+const WWW='www.example.test.',SHOP='shop.example.test.',ZONE='example.test.';
+const dnsOf=e=>{const l=e.packet.layers.find(x=>x.name==='DNS');return l&&l.fields;};
+const sent=e=>{const f=e.dev==='laptop'&&e.dir==='tx'&&dnsOf(e);return f&&f.qr===0?f:null;};
+const got=e=>{const f=e.dev==='laptop'&&e.dir==='rx'&&dnsOf(e);return f&&f.qr===1?f:null;};
+const asked=(es,name,type)=>es.some(e=>{const f=sent(e);return f&&f.qname===name&&f.qtype===type;});
+const reply=(c,name,type)=>{const e=c.last(x=>{const f=got(x);return f&&f.qname===name&&f.qtype===type;});return e?dnsOf(e):null;};
+const rec=(c,name,type,kind)=>{const f=reply(c,name,type);return (f&&NQ.dns.recs(f,'an').find(r=>r.type===(kind||type)))||null;};
+const fullGot=(c,pred)=>{
+  for(const h of [...c.history].reverse()){
+    if(h.code!==0||!/^\s*dig\s/.test(h.line)||/\+short(\s|$)/.test(h.line))continue;
+    const e=h.entries.find(x=>{const f=got(x);return f&&pred(f);});
+    if(e)return dnsOf(e);
+  }
+  return null;
+};
+const fullReply=(c,name,type)=>fullGot(c,f=>f.qname===name&&f.qtype===type);
+const nx=c=>fullGot(c,f=>f.rcode==='NXDOMAIN');
+const ranDig=(c,re,name,type)=>c.history.some(h=>h.code===0&&re.test(h.line)&&asked(h.entries,name,type));
+const DIG=[['dig','cmd','look a name up']];
+const WWW_ANAT=[...DIG,['www.example.test','arg','the name to look up']];
+
+NQ.CH.push({name:'Names and DNS',badge:'Name Board',
+ story:'Wren\'s next note names the chart room instead of giving its address, so you look the name up, read the answer and find the lost name finder, to earn the Name Board.',
+ intro:'The next note from Wren names the chart room in words, and a packet cannot travel to a word: it needs an address. So far you have typed addresses, but people remember names, and a system called <b>DNS</b> turns one into the other. This chapter is about asking it. You will look a name up with <code>dig</code>, read the answer line by line, open the question as a packet, ask for other kinds of answer, read the reply to a name that does not exist, and mend a laptop that has lost the server it asks.',
+ learned:['DNS','resolver','dig','record','A record','UDP port','dig +short','MX','NS','CNAME','NXDOMAIN','resolvectl'],
+ missions:[
+ {title:'A name instead of a number',scenario:'dns',
+  goal:'Skerry runs in with a new note from Wren: the chart room is at <code>www.example.test</code>. That is a name, not an address, and a packet cannot travel to a name. <b>DNS</b>, the Domain Name System, is the internet\'s phone book: it turns a name into the address behind it. Your laptop does not keep the book. It asks a <b>resolver</b>, a server whose job is to look names up for other devices, and this network has one at <code>192.168.1.53</code>. Run <code>dig www.example.test</code> to ask it for the address behind the name, then read the answer and type the address.',
+  anat:WWW_ANAT,
+  how:['<code>dig www.example.test</code> asks the resolver for the address behind <code>www.example.test</code> and prints what it answers.',
+   '<code>dig</code> is the command, a lookup tool for DNS in the way <code>ping</code> is a test tool for reaching a device. <code>www.example.test</code> is its one argument: the name to look up. The laptop sends the question to the resolver because that is the server it is set to ask.',
+   'The question and the answer are real packets, so they land in the packet panel like any other. The resolver may ask other servers before it answers; you will meet them in a later chapter.',
+   'Under <code>ANSWER SECTION</code> is the answer, and its last column is the address. Type it as your answer.'],
+  explain:'Names are for people and addresses are for packets. DNS joins them: you ask once, in words, and get back the number that every router on the way understands. That is why you can type a name in a browser and never see an address. The laptop did not know the answer itself; it asked a server that did.',
+  hint:'Type <code>dig www.example.test</code> and read the address on the line under <code>ANSWER SECTION</code>.',
+  answer:['dig www.example.test'],
+  check:c=>reply(c,WWW,'A')?true:'Run <code>dig www.example.test</code> first and wait for the answer.',
+  question:{ask:'Which address does <code>www.example.test</code> have?',expect:c=>{const r=rec(c,WWW,'A');return r?r.data:'';}}},
+ {title:'Reading the answer line',scenario:'dns',
+  goal:'Look closer at the line under <code>ANSWER SECTION</code>. It is one <b>record</b>: a single fact the phone book keeps about a name. Run <code>dig www.example.test</code> again and read the record from left to right: the name, a number of seconds, <code>IN</code> (short for Internet, the class every record here has), the type of the record and its data. This one is an <b>A record</b>: it joins a name to an IPv4 address, the data you read last time. The number of seconds says how long the answer may be kept before anyone has to ask again. Type that number.',
+  anat:WWW_ANAT,
+  how:['<code>dig www.example.test</code> prints the record that joins the name to its address, so you can read it part by part.',
+   'You know the command and its one argument. What is new is the answer line: five columns separated by gaps.',
+   'In order, they are the name the record is about, the number of seconds, <code>IN</code>, the type (<code>A</code> here) and the data (the address).',
+   'Type the number from the second column as your answer.'],
+  explain:'Each column has a job. The name says whom the record is about, the type says what kind of fact it is and the data is the fact itself. The number of seconds is a time limit set by whoever owns the name: a short one lets them change an address quickly, and a long one saves everybody from asking again and again.',
+  hint:'Run <code>dig www.example.test</code> and read the number between the name and <code>IN</code>.',
+  answer:['dig www.example.test'],
+  check:c=>fullReply(c,WWW,'A')?true:'Run <code>dig www.example.test</code> without <code>+short</code> and look for the record under <code>ANSWER SECTION</code>.',
+  question:{ask:'How many seconds does the answer line say it may be kept?',expect:c=>{const f=fullReply(c,WWW,'A'),r=f&&NQ.dns.recs(f,'an').find(x=>x.type==='A');return r?String(r.ttl):'';}}},
+ {title:'The question is a packet too',scenario:'dns',
+  goal:'A question to a resolver is a packet like any other. Run <code>dig www.example.test</code>, then open the entry on <code>laptop</code> marked sent (<code>tx</code>) whose note starts <code>DNS query</code>. Its layers are Ethernet and IPv4, which you know, then two new ones. <b>UDP</b> sends one short message and gets one short reply back, with no set-up first. <b>DNS</b> holds the question itself: its <code>qname</code> field is the name being asked about. Under UDP are two port numbers. A <b>UDP port</b> is a number that tells the receiving device which program should get the message; it has nothing to do with the ports on a switch. Type the receiver\'s port (<code>dport</code>) of the question.',
+  anat:WWW_ANAT,
+  how:['<code>dig www.example.test</code> sends the question to the resolver as a packet, and the packet panel lets you open that packet and read its layers.',
+   'The command is the one you know. What is new is where you look: find the entry on <code>laptop</code> marked sent (<code>tx</code>) whose note starts <code>DNS query</code>, and open it. The first entries are ARP, which you know: the laptop has to learn the resolver\'s MAC before it can send the question.',
+   'Read from the outside in: Ethernet carries the packet across the wire, IPv4 carries it to the resolver, UDP names the program on the resolver that should get it and DNS holds the question. <code>sport</code> is the sender\'s port and <code>dport</code> is the receiver\'s.',
+   'Type the <code>dport</code> number as your answer.'],
+  explain:'Many programs can run on one device at the same time, and an address only names the device. The port number says which program the message is for. The laptop picks its own sender port for each question, so it can tell the answers apart, but the receiver\'s port is fixed: every DNS server listens on the same one, which is how the laptop can ask a server it has never met.',
+  hint:'Run <code>dig www.example.test</code>, open the <code>DNS query</code> entry sent by <code>laptop</code> and read <code>dport</code> under UDP.',
+  answer:['dig www.example.test'],
+  check:c=>reply(c,WWW,'A')?true:'Run <code>dig www.example.test</code> first, then open the <code>DNS query</code> entry that <code>laptop</code> sent.',
+  question:{ask:'What is the <code>dport</code> of the question the laptop sent?',
+   expect:c=>{const e=c.last(x=>{const f=sent(x);return f&&f.qname===WWW&&f.qtype==='A';});return e?e.packet.layers.find(l=>l.name==='UDP').fields.dport+'':'';}}},
+ {title:'Only the address, please',scenario:'dns',
+  goal:'The full <code>dig</code> output is long when all you want is the address, and Skerry only needs it to chalk onto the ferry gate. Add the option <code>+short</code> and <code>dig</code> prints only the data of the answer: <code>dig +short www.example.test</code>. Options of <code>dig</code> start with a plus sign, not with a dash like <code>ping -c</code>. Run it and read the one line it prints.',
+  anat:[...DIG,['+short','opt','print only the answer data'],['www.example.test','arg','the name to look up']],
+  how:['<code>dig +short www.example.test</code> looks up the same name as before but prints only the data of the answer: one line, the address.',
+   'You know <code>dig</code> and the name. <code>+short</code> is the option that asks for the terse form, and <code>dig</code> options start with a plus sign.',
+   'The question travels exactly as before, so the same packets appear in the packet panel. Only what <code>dig</code> prints has changed.',
+   'One line holding an address means it worked.'],
+  explain:'Nothing about the lookup changed: the same question went out and the same answer came back. The terse form is what people use for quick checks and in scripts, because there is nothing to cut away. When something looks wrong, drop <code>+short</code> and read the whole output again.',
+  hint:'Type <code>dig +short www.example.test</code>.',
+  answer:['dig +short www.example.test'],
+  check:c=>ranDig(c,/^\s*dig\s(.*\s)?\+short(\s|$)/,WWW,'A')?true:'Run <code>dig +short www.example.test</code>: the option goes right after <code>dig</code>.'},
+ {title:'The mail server',scenario:'dns',
+  goal:'A name can have more than one kind of record, and <code>dig</code> asks for the address (<code>A</code>) unless you say otherwise. Put a type after the name to ask for another kind. Mail for <code>example.test</code> goes to a server found through its own kind of record: an <b>MX</b> record names the server that takes in mail for a name. Run <code>dig example.test MX</code>, find the record in the answer and type the mail server\'s name. The number before the name is a preference: when there are several mail servers, the lowest number is tried first.',
+  anat:[...DIG,['example.test','arg','the name to look up'],['MX','arg','the kind of record to ask for']],
+  how:['<code>dig example.test MX</code> asks the resolver for the mail server of <code>example.test</code> instead of an address, and prints the MX record it gets back.',
+   'The command and the name are as before. <code>MX</code> after the name is the type of record to ask for; without it <code>dig</code> asks for <code>A</code>.',
+   'The MX record holds a preference number and then the name of the mail server. A name that ends in a dot is written out in full.',
+   'Below the answer, an extra section holds the mail server\'s address, because the resolver adds it to save you a second question. Type the mail server\'s name as your answer.'],
+  explain:'A name is not one thing. The same name can have an address, a mail server and more, each its own record, and the type says which one you want. Asking for the wrong type is a common slip: <code>dig example.test</code> with no type asks for an address, and this name has none, so the answer comes back empty.',
+  hint:'Run <code>dig example.test MX</code> and read the name after the preference number.',
+  answer:['dig example.test MX'],
+  check:c=>rec(c,ZONE,'MX')?true:'Run <code>dig example.test MX</code> and look for the MX record under <code>ANSWER SECTION</code>.',
+  question:{ask:'What is the name of the mail server for <code>example.test</code>?',expect:c=>{const r=rec(c,ZONE,'MX');return r?r.data.split(' ')[1]:'';}}},
+ {title:'Who looks after a name?',scenario:'dns',
+  goal:'Wren keeps her notes among the records of <code>example.test</code>, and someone has to look after them. An <b>NS</b> record names a <b>name server</b>: a server that holds the records of a name and answers questions about it. Run <code>dig example.test NS</code> and type the name it gives.',
+  anat:[...DIG,['example.test','arg','the name to look up'],['NS','arg','the kind of record to ask for']],
+  how:['<code>dig example.test NS</code> asks the resolver which server looks after <code>example.test</code> and prints the NS record it gets back.',
+   'It is the same shape as the last mission: <code>NS</code> is the type of record to ask for, where last time it was <code>MX</code>.',
+   'The data of an NS record is one name: the name of the name server itself.',
+   'Type that name as your answer.'],
+  explain:'A name server is where the facts about a name are kept. A resolver does not store every name in the world: when it has to find out, it asks the name server of that name. Names usually have more than one, each holding the same records, so one can break without losing the name.',
+  hint:'Run <code>dig example.test NS</code> and read the data of the record.',
+  answer:['dig example.test NS'],
+  check:c=>rec(c,ZONE,'NS')?true:'Run <code>dig example.test NS</code> and look for the NS record under <code>ANSWER SECTION</code>.',
+  question:{ask:'What is the name of the name server for <code>example.test</code>?',expect:c=>{const r=rec(c,ZONE,'NS');return r?r.data:'';}}},
+ {title:'Two names for one thing',scenario:'dns',
+  goal:'The ferry post answers to <code>shop.example.test</code> as well, but nobody wants two addresses to keep up to date. A <b>CNAME</b> record makes a name an <b>alias</b>: another name for something that already has a name. Run <code>dig shop.example.test</code>. The answer holds two records: the CNAME first, then the A record of the name it points to, which the resolver looked up for you. Type the name that <code>shop.example.test</code> is an alias of.',
+  anat:[...DIG,['shop.example.test','arg','the alias to look up']],
+  how:['<code>dig shop.example.test</code> asks for the address of an alias and prints both the CNAME that points it elsewhere and the A record at the end of the trail.',
+   'The command is the same and no type is given, so <code>dig</code> asks for <code>A</code>. The resolver finds a CNAME instead and follows it for you.',
+   'The first line of the answer is the CNAME record: its data is the name this one is an alias of. The second line is the A record of that name.',
+   'Type the name from the CNAME record as your answer.'],
+  explain:'An alias lets many names share one address. When the address changes, one A record is edited and every alias follows it. The price is one more lookup: the resolver has to find the second name as well before it can answer.',
+  hint:'Run <code>dig shop.example.test</code> and read the data of the first record in the answer.',
+  answer:['dig shop.example.test'],
+  check:c=>rec(c,SHOP,'A','CNAME')?true:'Run <code>dig shop.example.test</code> and look for the CNAME record under <code>ANSWER SECTION</code>.',
+  question:{ask:'Which name is <code>shop.example.test</code> an alias of?',expect:c=>{const r=rec(c,SHOP,'A','CNAME');return r?r.data:'';}}},
+ {title:'A name that does not exist',scenario:'dns',
+  goal:'Everyone makes typos. Run <code>dig wwww.example.test</code>, with one <code>w</code> too many, and read the header at the top of the reply. The reply\'s <b>status</b> is the word after <code>status:</code> and tells you how the lookup went. <b>NXDOMAIN</b> means the name does not exist: a clear no, not a failure. Two other statuses look alike but mean something else: <b>SERVFAIL</b> means the server tried and could not find out, and <b>REFUSED</b> means the server would not answer at all. Then read the flags line below it, which counts the records in each part of the reply, and type the number after <code>ANSWER:</code>.',
+  anat:[...DIG,['wwww.example.test','arg','a name with a typo']],
+  how:['<code>dig wwww.example.test</code> asks for a name that has a typo in it, so you can see what DNS says when a name does not exist.',
+   'It is the same command and the same kind of argument. Only the name is wrong, on purpose: it has four <code>w</code> where the real one has three.',
+   'On the header line, <code>status: NXDOMAIN</code> is the status. There is no answer section, only a short note from the name server, which you can ignore here.',
+   'The flags line counts the records in each part of the reply. Type the number after <code>ANSWER:</code> as your answer.'],
+  explain:'NXDOMAIN is the DNS way of saying "no such name", and it is a complete, correct reply: the lookup worked and the name is wrong. SERVFAIL is different: the server could not find the answer at all, perhaps because a server it needed never replied. REFUSED means a server would not answer that question. When a lookup fails, the status tells you whether to fix the name or to look at the servers.',
+  hint:'Run <code>dig wwww.example.test</code> and read the number after <code>ANSWER:</code> on the flags line.',
+  answer:['dig wwww.example.test'],
+  check:c=>nx(c)?true:'Run <code>dig wwww.example.test</code>, with four <code>w</code>, and look for <code>status: NXDOMAIN</code>.',
+  question:{ask:'What number follows <code>ANSWER:</code> in the reply?',
+   expect:c=>{const f=nx(c);return f?String(f.ancount):'';},
+   accept:()=>['zero']}},
+ {title:'The lost name finder',scenario:'dns',setup:[{dev:'laptop',cmd:'resolvectl dns eth0 192.168.1.99'}],
+  goal:'Tally knocked the laptop\'s setting loose: it now asks a server that is not there, so every lookup waits and then gives up. Run <code>dig www.example.test</code> to see it fail with <code>communications error</code> and <code>no servers could be reached</code>. Then point the laptop back at the resolver with <code>resolvectl dns eth0 192.168.1.53</code> and run <code>dig www.example.test</code> again. <code>resolvectl</code> shows and sets which server this laptop asks. This laptop asks the resolver directly, so the resolver\'s address is the setting you change. Many real computers put a small helper on themselves, at <code>127.0.0.53</code>, that passes each question on to the resolver; this practice network leaves the helper out.',
+  anat:[['resolvectl','cmd','choose which server to ask'],['dns','arg','the DNS server setting'],['eth0','arg','the card the setting belongs to'],['192.168.1.53','arg','the resolver']],
+  how:['<code>resolvectl dns eth0 192.168.1.53</code> tells the laptop to send its DNS questions for <code>eth0</code> to the resolver at <code>192.168.1.53</code>.',
+   '<code>resolvectl</code> is the command, <code>dns</code> says you are setting the DNS server, <code>eth0</code> is the card the setting belongs to and the address is the resolver to ask. It prints nothing when it works.',
+   'Before the fix, <code>dig www.example.test</code> sends its question to an address nobody has, so nothing answers and it gives up with a message. After the fix, the same line gets its answer.',
+   'Run <code>dig www.example.test</code> after <code>resolvectl</code> to prove it.'],
+  explain:'A device with no working resolver cannot turn names into addresses, even though its network is fine: a <code>ping</code> to an address still works. When names fail and addresses work, check where the laptop sends its DNS questions before you look anywhere else.',
+  hint:'Type <code>resolvectl dns eth0 192.168.1.53</code>, then <code>dig www.example.test</code>.',
+  answer:['resolvectl dns eth0 192.168.1.53','dig www.example.test'],
+  check:c=>{
+    const r=c.dig('laptop','www.example.test','A');
+    if(r.status!=='ok')return 'The laptop still asks a server that is not there. Point it at the resolver with <code>resolvectl dns eth0 192.168.1.53</code>.';
+    if(!r.msg.ra||!r.msg.ancount)return 'A server answers, but it is not the resolver. The resolver\'s address is <code>192.168.1.53</code>.';
+    return c.inOrder(/^\s*resolvectl\s+dns\s/,/^\s*dig(\s|$)/)?true:'The laptop reaches the resolver again. Now run <code>dig www.example.test</code> to prove it.';}}
+ ]});
+})();
