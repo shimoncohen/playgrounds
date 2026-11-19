@@ -7,7 +7,7 @@
   ];
   const QUESTS = [
     { key: 'script-quest-v1', name: 'Script Quest', subject: 'programming', href: 'programming/script-quest/', sep: '-', missions: [7, 7, 7, 6, 6, 7, 7, 9, 7, 7, 10, 13, 6, 7, 6, 7, 7, 7, 7, 7, 6, 7, 6] },
-    { key: 'typescript-quest-v1', name: 'TypeScript Quest', subject: 'programming', href: 'programming/typescript-quest/', sep: '.', missions: [7] },
+    { key: 'typescript-quest-v1', name: 'TypeScript Quest', subject: 'programming', href: 'programming/typescript-quest/', sep: '.', missions: [7, 6, 7, 7, 6] },
     { key: 'python-quest-v1', name: 'Python Quest', subject: 'programming', href: 'programming/python-quest/', sep: '.', missions: [6, 7, 8, 6, 6, 7, 6, 5, 6] },
     { key: 'cpp-quest-v1', name: 'C++ Quest', subject: 'programming', href: 'programming/cpp-quest/', sep: '-', missions: [7, 9, 6, 8, 9, 9, 8, 6, 6] },
     { key: 'shell-quest-v1', name: 'Shell Quest', subject: 'programming', href: 'programming/shell-quest/', sep: '.', missions: [8, 7, 7, 7, 7, 7, 9, 7, 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7] },

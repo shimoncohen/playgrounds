@@ -6,6 +6,7 @@ TSQ.CH.push(
  story:'The depot\'s smudged paper timetable books Mumbles twice; learn to read the labels TypeScript guesses for you and to write the ones it cannot guess, then stamp the first booking.',
  intro:'Bellamy\'s paper timetable is smudged, and it books Mumbles onto two wagons at once. TypeScript is JavaScript plus types, labels that say what kind of value goes where, and the checker is the part that reads them and stops a mistake before anything runs. In this chapter you learn what the checker already works out by itself (inference), and where you have to tell it.',
  learned:['inference','widening','literal type','any','unknown','implicit any','as'],
+ first:[[11,'TypeScript'],[2,'Named boxes']],
  missions:[
  {title:'Read the guess',goal:'Bellamy\'s telegram names a town. Make a `const` and a `let` from the same text, then give the `let` a number to see what the checker guessed.',
   code:'const stop = "Ashford"\nlet town = "Ashford"\ntown = 42',

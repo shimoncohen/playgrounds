@@ -27,12 +27,56 @@ const FIRST = {
   as:              [/`as`|\bwith as\b|\bas (string|number)\b/, 0, 5],
   TS2352:          [/\bTS2352\b/, 0, 5],
   '|':             [/\s\|\s/, 0, 6],
-  union:           [/\bunions?\b/i, null],
-  narrowing:       [/\bnarrow(ing|ed|s)?\b/i, null],
-  interface:       [/\binterfaces?\b/i, null],
+  union:           [/\bunions?\b/i, 1, 0],
+  narrowing:       [/\bnarrow(ing|ed|s)?\b/i, 1, 0],
+  typeof:          [/\btypeof\b/, 1, 0],
+  TS2339:          [/\bTS2339\b/, 1, 0],
+  undefined:       [/\bundefined\b|\bnull\b/, 1, 2],
+  truthiness:      [/\btruthy\b|\btruthiness\b/i, 1, 2],
+  TS18048:         [/\bTS18048\b/, 1, 2],
+  in:              [/`in`|["']\w+["']\s+in\s+\w/, 1, 3],
+  switch:          [/\bswitch\b/i, 1, 4],
+  'default branch': [/`default`|\bdefault:|default branch/i, 1, 4],
+  'discriminated union': [/\bdiscriminated\b|\btags?\b|\btagged\b/i, 1, 4],
+  never:           [/`never`|:\s*never\b|=>\s*never|the type never/, 1, 5],
+  'exhaustive check': [/exhaustive/i, 1, 5],
+  'type alias':    [/\btype alias(es)?\b|\btype\s+[A-Z]\w*\s*=/, 2, 0],
+  interface:       [/\binterfaces?\b/i, 2, 1],
+  'optional property': [/optional propert(y|ies)|\b\w+\?\s*:/i, 2, 1],
+  readonly:        [/\breadonly\b/, 2, 2],
+  TS2540:          [/\bTS2540\b/, 2, 2],
+  'excess property': [/excess propert|object literal may only/i, 2, 3],
+  TS2353:          [/\bTS2353\b/, 2, 3],
+  extends:         [/\bextends\b/, 2, 4],
+  TS2741:          [/\bTS2741\b/, 2, 4],
+  // a single & between two types; never && and never an HTML entity such as &amp; (the test strips tags, not entities)
+  intersection:    [/\bintersection\b|(?<!&)&(?![&\w#])/i, 2, 5],
+  'structural typing': [/\bstructur(al|e)\b/i, 2, 6],
+  'return type':   [/return types?\b/i, 3, 0],
+  TS2554:          [/\bTS2554\b/, 3, 1],
+  'optional parameter': [/optional parameter/i, 3, 1],
+  'default parameter': [/default (parameter|value)|\([^)]*:\s*\w+\s*=\s*\w/i, 3, 1],
+  'rest parameter': [/rest parameter|\.\.\.\w+\s*:/i, 3, 2],
+  'array type':    [/\b\w+\[\]/, 3, 2],
+  TS2345:          [/\bTS2345\b/, 3, 2],
+  'callback type': [/callback/i, 3, 3],
+  void:            [/\bvoid\b/i, 3, 4],
+  throw:           [/\bthrow\b/, 3, 5],
+  'new Error':     [/new Error/, 3, 5],
+  'type predicate': [/type predicate|\b[a-z]\w*\s+is\s+[A-Z]\w*/, 3, 6],
+  push:            [/\bpush\b/, 4, 0],
+  'readonly list': [/readonly (list|array)|\breadonly\s+\w+\[\]/i, 4, 1],
+  tuple:           [/\btuples?\b/i, 4, 2],
+  'labelled element': [/\blabell?ed (tuple|element|slot)|\[\s*\w+\s*:\s*\w+\s*,\s*\w+\s*:\s*\w+\s*\]/i, 4, 3],
+  'optional tuple element': [/optional tuple|\w\?\]/i, 4, 4],
+  TS2493:          [/\bTS2493\b/, 4, 5],
+  'Array<':        [/\bArray</, null],
+  Promise:         [/\bPromise\b/, null],
+  class:           [/\bclass(es)?\b/i, null],
   generic:         [/\bgenerics?\b/i, null],
-  typeof:          [/\btypeof\b/, null],
   tsconfig:        [/tsconfig/i, null],
+  // the quest teaches no loops; a loop in a mission would freeze the tab until the loop guard exists
+  loop:            [/\bloops?\b|\b(while|for)\s*\(|\bdo\s*\{/i, null],
 };
 
 const noTags = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '');
@@ -75,6 +119,16 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(6).how.join(' '), /joined by <code>\|<\/code> \(or\)/);
 });
 
+const measuredCodes = () => {
+  const codes = new Set();
+  for (const ch of CH) for (const m of ch.missions.filter(x => x.expectError)) {
+    const s = createSession();
+    if (m.pre) s.run(m.pre);
+    s.run(m.code).diags.forEach(d => codes.add('TS' + d.code));
+  }
+  return codes;
+};
+
 test('guide: each term it uses is glossed in place, the error decoder covers the chapter codes, and the lede does not over-claim', () => {
   const g = noTags(guideText);
   assert.match(g, /Guessing a type from the value is inference/);
@@ -85,8 +139,9 @@ test('guide: each term it uses is glossed in place, the error decoder covers the
   assert.match(g, /\bunknown\b[^.]*prove/);
   assert.match(g, /implicit any/);
   assert.match(g, /a promise from you, not a conversion/);
-  assert.match(guideSrc, /Chapter 1 of the quest on one page/);
-  assert.deepEqual(ERRS.map(e => e[0].match(/TS\d+/)[0]).sort(), ['TS18046', 'TS2322', 'TS2352', 'TS7006']);
+  assert.match(guideSrc, /The quest on one page/);
+  assert.doesNotMatch(guideSrc, /Chapter \d+ of the quest|Learn these (four|five|six)/);
+  assert.deepEqual(ERRS.map(e => e[0].match(/TS\d+/)[0]).sort(), [...measuredCodes()].sort());
 });
 
 test('guide: no card uses `as` before the card that glosses it', () => {
@@ -102,11 +157,7 @@ test('guide: each code card compiles clean, and each decoder code is one the mis
     const rec = createSession().run(b[2]);
     assert.deepEqual(rec.diags, [], `${b[0]}: ${b[2]}`);
   }
-  const measured = new Set();
-  for (const m of CH[0].missions.filter(x => x.expectError)) {
-    const rec = createSession().run(m.code);
-    rec.diags.forEach(d => measured.add('TS' + d.code));
-  }
+  const measured = measuredCodes();
   for (const e of ERRS) assert.ok(measured.has(e[0].match(/TS\d+/)[0]), `${e[0]} is not produced by any mission answer`);
 });
 
@@ -123,10 +174,10 @@ test('quick-fire: every question has chapter 0, 4 distinct options, a valid righ
   }
 });
 
-test('quick-fire: the answers do not sit in one slot, and every error code of the chapter is asked about', () => {
+test('quick-fire: the answers do not sit in one slot, and every error code of an expectError mission is asked about', () => {
   assert.ok(new Set(FIRE.map(q => q.a)).size >= 3);
   const asked = new Set(FIRE.map(q => q.o[q.a]));
-  for (const code of ['TS2322', 'TS18046', 'TS7006', 'TS2352', 'No error']) assert.ok(asked.has(code), code);
+  for (const code of [...measuredCodes(), 'No error']) assert.ok(asked.has(code), code);
 });
 
 test('quick-fire: the example question (FIRE[0]) is open after Chapter 1 alone', () => {
@@ -141,10 +192,14 @@ test('quick-fire gating: nothing is open on a fresh save', () => {
   assert.equal(qfOpen(undefined).length, 0);
 });
 
-test('quick-fire gating: the whole bank opens with chapter 1, and one missing mission keeps it locked', () => {
-  assert.equal(qfOpen(doneThrough(1)).length, FIRE.length);
-  const d = doneThrough(1); delete d['0.2'];
-  assert.equal(qfOpen(d).length, 0);
-  assert.equal(qfOpen(doneThrough(1), 'beginner').length, FIRE.length);
-  assert.equal(qfOpen(doneThrough(1), 'advanced').length, 0);
+test('quick-fire gating: a chapter\'s questions open with that chapter, and one missing mission keeps them locked', () => {
+  CH.forEach((_, c) => {
+    const upTo = n => FIRE.filter(q => q.ch < n).length;
+    assert.equal(qfOpen(doneThrough(c + 1)).length, upTo(c + 1), `chapters 1 to ${c + 1} done`);
+    const d = doneThrough(c + 1); delete d[`${c}.0`];
+    assert.equal(qfOpen(d).length, upTo(c), `chapter ${c + 1} one mission short`);
+  });
+  assert.equal(qfOpen(doneThrough(CH.length)).length, FIRE.length);
+  assert.equal(qfOpen(doneThrough(CH.length), 'beginner').length, FIRE.length);
+  assert.equal(qfOpen(doneThrough(CH.length), 'advanced').length, 0);
 });
