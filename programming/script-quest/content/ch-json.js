@@ -4,7 +4,7 @@ const SCQ=window.SCQ=window.SCQ||{};
 const TICKET='const ticket = { show: "Fire night", seat: "A12", paid: true }';
 SCQ.CH.push(
 {name:'JSON',tier:'intermediate',group:'JavaScript in depth',badge:'Sealed Envelope',story:'The box office mails its ticket data in sealed envelopes. Seal them, copy them, tidy them, mind the dates, catch the torn ones, and win the sealed envelope.',mode:'js',
- intro:'The box office sends its ticket data to other towns in text envelopes. You have already opened one with <code>JSON.parse</code> and caught a torn one. This chapter seals the envelope too, with <code>JSON.stringify</code>, and goes deeper: pretty printing, choosing what goes in, dates, which do not survive the trip, and torn envelopes of every kind.',
+ intro:'The box office sends its ticket data to other towns in text envelopes. You have already opened one with `JSON.parse` and caught a torn one. This chapter seals the envelope too, with `JSON.stringify`, and goes deeper: pretty printing, choosing what goes in, dates, which do not survive the trip, and torn envelopes of every kind.',
  learned:['stringify','copy with parse','pretty printing','picking keys','dates in JSON','reviver','bad JSON'],
  missions:[
  {title:'Seal the envelope',goal:'Turn the `ticket` object into JSON text with `JSON.stringify`, and keep it in `text`.',code:'const text = JSON.stringify(ticket)',need:['ticket'],pre:TICKET,

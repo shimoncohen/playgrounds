@@ -17,7 +17,7 @@ const first = CH.findIndex(c => c.tier === 'intermediate');
 describe('script-quest intermediate chapters', () => {
   it('they come right after the 12 beginner chapters, in one block', () => {
     assert.equal(first, 12);
-    assert.equal(INTERMEDIATE.length, 8);
+    assert.equal(INTERMEDIATE.length, 11);
     CH.slice(first).forEach(c => assert.equal(c.tier, 'intermediate'));
     CH.slice(0, first).forEach(c => assert.equal(c.tier, 'beginner'));
   });
@@ -148,6 +148,15 @@ describe('script-quest Field guide tier filter', () => {
     const tagged = BLOCKS.filter(b => b[3] != null);
     assert.ok(tagged.every(b => CH[b[3]].tier === 'intermediate'));
     for (let c = first; c < CH.length; c++) assert.ok(tagged.some(b => b[3] === c), `chapter ${c + 1} has no guide block`);
+  });
+
+  it('the cards for chapters 21 to 23 run in the browser realm: no require, and each prints something', () => {
+    for (const c of [20, 21, 22]) {
+      const b = BLOCKS.find(x => x[3] === c);
+      assert.ok(b, `chapter ${c + 1} has a block`);
+      assert.doesNotMatch(b[2], /\brequire\b/, b[0]);
+      assert.match(b[2], /console\.log/, b[0]);
+    }
   });
 
   it('the filter lists All plus each tier, and the Intermediate section holds exactly the tagged blocks', () => {

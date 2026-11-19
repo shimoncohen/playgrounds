@@ -3,7 +3,7 @@
 const SCQ=window.SCQ=window.SCQ||{};
 SCQ.CH.push(
 {name:'Errors and try/catch',tier:'intermediate',group:'JavaScript in depth',badge:'Safety Net',story:'A rope frays, a ticket tears, a show sells out. Learn to clean up after trouble, throw your own warnings, pass on what you cannot fix, name your own kinds of error, and win the safety net.',mode:'js',
- intro:'Things go wrong backstage: a rope frays, a ticket tears, a show sells out. You already know <code>try</code> and <code>catch</code> from the snack wagon. This chapter goes deeper: tidying up with <code>finally</code>, raising your own errors, passing on the ones you cannot fix, giving errors names of your own, and handling the same trouble inside <code>async</code> code.',
+ intro:'Things go wrong backstage: a rope frays, a ticket tears, a show sells out. You already know `try` and `catch` from the snack wagon. This chapter goes deeper: tidying up with `finally`, raising your own errors, passing on the ones you cannot fix, giving errors names of your own, and handling the same trouble inside `async` code.',
  learned:['finally','throw','rethrow with instanceof','custom error classes','error cause','async errors'],
  missions:[
  {title:'Always lower the curtain',goal:'Add a `finally` block to a `try`/`catch` so "Lights off" prints whether or not the smudged order slip breaks the code.',code:'try {\n  JSON.parse("{oops")\n} catch (err) {\n  console.log("Caught:", err.message)\n} finally {\n  console.log("Lights off")\n}',

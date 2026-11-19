@@ -80,6 +80,30 @@ const FIRST = {
   setInterval:     [/setInterval/, 19, 5],
   clearInterval:   [/clearInterval/, 19, 5],
   'Date.now':      [/Date\.now/, 19, 5],
+  'path.join':     [/path\.join/, 20, 0],
+  basename:        [/\bbasename\b/, 20, 0],
+  extname:         [/\bextname\b/, 20, 0],
+  mkdir:           [/\bmkdir\b/, 20, 1],
+  'mkdir -p':      [/mkdir -p/, 20, 1],
+  writeFile:       [/\bwriteFile\b/, 20, 2],
+  appendFile:      [/\bappendFile\b/, 20, 3],
+  readdir:         [/\breaddir\b/, 20, 4],
+  stat:            [/\bstat\b/, 20, 4],
+  unlink:          [/\bunlink\b/, 20, 5],
+  EventEmitter:    [/\bEventEmitter\b/, 21, 0],
+  emit:            [/\bemit\b/, 21, 0],
+  once:            [/\.once\(|\bonce\b.*\blistener/i, 21, 2],
+  listenerCount:   [/listenerCount/, 21, 2],
+  off:             [/\.off\(/, 21, 3],
+  'error event':   [/\.on\("error"|emit\("error"/, 21, 5],
+  'process.on':    [/process\.on\(/, 21, 6],
+  createServer:    [/createServer/, 22, 0],
+  listen:          [/\.listen\(/, 22, 0],
+  curl:            [/\bcurl\b/, 22, 0],
+  writeHead:       [/writeHead/, 22, 1],
+  'req.url':       [/req\.url/, 22, 2],
+  'res.end':       [/res\.end/, 22, 0],
+  '--parallel':    [/--parallel/, 22, 4],
   parseInt:        [/parseInt/, null],
   'Array.isArray': [/Array\.isArray/, null],
   statement:       [/\bstatements?\b/i, null],
@@ -192,6 +216,10 @@ test('quick-fire: every question has a chapter, 4 distinct options and a valid r
     assert.equal(new Set(q.o).size, 4, `${q.c}: duplicate options`);
     assert.ok(q.a >= 0 && q.a < 4, q.c);
   }
+});
+
+test('quick-fire: chapters 21 to 23 have at least 3 questions each', () => {
+  for (const ci of [20, 21, 22]) assert.ok(FIRE.filter(q => q.ch === ci).length >= 3, `chapter ${ci + 1}: ${FIRE.filter(q => q.ch === ci).length}`);
 });
 
 test('quick-fire: chapter 20 has at least 4 questions, and an immediate against a timer only inside a readFile callback', () => {

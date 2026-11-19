@@ -53,7 +53,7 @@ Sizes are changed lines: S under 150, M up to 500, L up to 1000, XL above. "Need
 | 6 | `feat(script): Intermediate JavaScript tier` | Chapters 13 to 19, the tier filter for guide and quick-fire, a `FIRST` entry for every new term, catalog and landing-card counts, and the `story.js` edit. | 5 | XL |
 | 7 | `feat(engine): virtual Node scheduler with nextTick, microtasks, timers and poll-phase fs` | Browser spike first. Then a DOM-free scheduler with timers, poll (I/O completions) and check phases, a virtual clock and a loop guard. `fs.readFile` (callback) and `fs.promises` completions move to the poll phase. Sync `fs` calls charge virtual time. `vm` tests include a differential test against real `node`. | 4 | L |
 | 8 | `feat(script): event loop chapter` | Chapter 20 with `how` steps, and the Field guide picture with a microtask lane and the Node phases. Covers all three outcomes of #63. | 6, 7 | M |
-| 9 | `feat(script): async fs, path, events and HTTP server chapters` | Engine: folder keys, `path`, the rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`), `EventEmitter`, `process`, `http`, a `curl` command and a running-process model. Then chapters 21 to 23, ending the Script treasure arc. | 7, 8 | XL |
+| 9 | `feat(script): async fs, path, events and HTTP server chapters` | Engine: folder keys, `path`, the rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`), `EventEmitter`, `process`, `http`, a `curl` command and a running-process model. Then chapters 21 to 23, ending the Script treasure arc. Shipped as 9a (engine) and 9b (chapters), with `mkdir [-p]` and `curl --parallel` added. | 7, 8 | XL |
 | 10 | `docs(typescript): add the TypeScript Quest spec and plan` | `docs/superpowers/specs/2026-11-16-typescript-quest-design.md` and `docs/superpowers/plans/2026-11-16-typescript-quest-phase1.md`: chapter list, story, mission outline per chapter, engine plan, tier XP and ranks. Re-plans PRs 11 to 18. | 2, 9 | M |
 | 11 | `feat(typescript): scaffold TypeScript Quest with tiers and chapter 1` | Folder `programming/typescript-quest/`, key `typescript-quest-v1`, `story.js`, landing card, catalog entry, tiers, chapter 1, the `test:engine` glob in `package.json` added together with the first `tests/typescript/` test, the smoke-test list, README, `AGENTS.md`, `CONTRIBUTING.md` scopes, and a pointer on Script chapter 11's completion screen. | 2, 3, 5, 10 | L |
 | 12 | `feat(typescript): Beginner chapters` | 4 chapters (2 to 5) in REPL mode. | 11 | L |
@@ -64,7 +64,7 @@ Sizes are changed lines: S under 150, M up to 500, L up to 1000, XL above. "Need
 | 17 | `feat(typescript): TypeScript with Node tier and final project` | 4 chapters (15 to 18), ending with the typed CLI. | 15, 16 | XL |
 | 18 | `feat(typescript): add TypeScript Quest and deepen Script Quest` | `feat/222-ts-quest` to `main`. | all | S |
 
-Count: 18. Done-when PRs: 5, 6, 8, 9, 10, 11, 12, 14, 15, 17, 18. Prep PRs: 1, 2, 3, 4, 7, 13, 16.
+Count: 18 rows. Row 9 shipped as two PRs, 9a (engine) and 9b (chapters), so the row count stays 18. Done-when PRs: 5, 6, 8, 9, 10, 11, 12, 14, 15, 17, 18. Prep PRs: 1, 2, 3, 4, 7, 13, 16.
 
 ## Stack diagram
 
@@ -76,7 +76,7 @@ flowchart TD
     P1["1 docs: Script spec and plan"] --> P2["2 ci: scope and syntax loop"] --> P3["3 golden and content split"] --> P4["4 engine to shared"]
   end
   subgraph S["Script Quest"]
-    P5["5 adopt tiers"] --> P6["6 Intermediate JS"] --> P7["7 Node scheduler and poll fs"] --> P8["8 event loop #63"] --> P9["9 fs, path, events, HTTP"]
+    P5["5 adopt tiers"] --> P6["6 Intermediate JS"] --> P7["7 Node scheduler and poll fs"] --> P8["8 event loop #63"] --> P9["9 fs, path, events, HTTP (9a engine, 9b chapters)"]
   end
   subgraph T["TypeScript Quest"]
     P10["10 docs: TS spec and plan"] --> P11["11 scaffold and chapter 1"] --> P12["12 Beginner"] --> P13["13 project checker"] --> P14["14 Intermediate"] --> P15["15 Advanced"] --> P16["16 Node engine"] --> P17["17 TS with Node and CLI"]
@@ -110,7 +110,7 @@ flowchart TD
 
 ## Smoke-hook rule
 
-`tests/smoke.mjs:4229-4232` rewrites the end of `programming/script-quest/app.js` with a regex on the closing `})();` and appends a hook that exposes `CH`, `S`, `setChapter`, `goMission`, `runShell`, `submit`, `cmd`, `mk`, `INITIAL_FILES`, `openFile`, `saveFile`, `ed` and `MODE` from inside the closure. The hook also assigns `RUN` (in `clearRun`), so `RUN` must stay declared. It keeps working only while those names stay declared in `app.js` and the file still ends with `})();`. So:
+`tests/smoke.mjs:4229-4232` rewrites the end of `programming/script-quest/app.js` with a regex on the closing `})();` and appends a hook that exposes `CH`, `S`, `setChapter`, `goMission`, `runShell`, `submit`, `cmd`, `mk`, `INITIAL_FILES`, `openFile`, `saveFile`, `ed` and `MODE` from inside the closure. The hook also assigns `RUN` (in `clearRun`), so `RUN` must stay declared. It keeps working only while those names stay declared in `app.js` and the file still ends with `})();`. PR 9b edits `tests/smoke.mjs` (two lines changed for the new chapter count, one line added so the own-input `play()` runs a mission's `then` command) and leaves this hook line as it is. So:
 
 - PR 3 loads the content files before `app.js` and binds `CH` once at the top of `app.js` from the content namespace.
 - `INITIAL_FILES` stays in `app.js` (`programming/script-quest/app.js:856`), and the UI names stay put.
@@ -235,17 +235,17 @@ Each task is one PR. Branch from the updated `feat/222-ts-quest` after the paren
 - [ ] **Step 4:** Update catalog and landing-card counts. Solvability, teach-before-use and own-input tests pass, and the chapter is checked at phone width.
 - [ ] **Step 5:** `npm run test:engine` and `npm run check` exit 0. The chapter needs only PRs 6, 7 and 8, so the PR body says it meets the Done-when of #63 without PR 9.
 
-### Task 9: Async `fs`, `path`, events and HTTP server chapters (PR 9)
+### Task 9: Async `fs`, `path`, events and HTTP server chapters (PR 9, shipped as 9a and 9b)
 
 **Files:**
-- Modify: `shared/nodeenv.js`, the terminal interpreter and project panel in `programming/script-quest/app.js`, `programming/script-quest/story.js`, `shared/catalog.js`, the landing card
+- Modify: `shared/nodeenv.js`, `shared/scheduler.js`, the terminal interpreter and project panel in `programming/script-quest/app.js`, `programming/script-quest/index.html`, `programming/script-quest/style.css`, `programming/script-quest/story.js`, `shared/catalog.js`, the landing card, `tests/smoke.mjs`
 - Create: chapter files for chapters 21 to 23 and their tests
 
 - [ ] **Step 1: Tests first** for each engine feature below, under `tests/script/`, with a differential check against real `node` where output order matters.
 - [ ] **Step 2:** Engine, part one: `/` folder keys in the existing flat file map (additive), `path`, and the rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`) in the poll phase.
-- [ ] **Step 3:** Engine, part two: `EventEmitter`, `process`, `http` with a server table, a `curl` terminal command over that table, and a running-process model with a Stop button for `node server.js`.
-- [ ] **Step 4:** Write chapters 21 to 23 (async `fs` and `path`, Events, A small HTTP server) with `how` steps. Chapter 23 repeats the heartbeat stall on a virtual server with `curl`. The final Script treasure arc ends here, in `story.js`, with the circus ready to tour.
-- [ ] **Step 5:** Update catalog and landing-card counts, and check phone width including the Stop button. `npm run test:engine` and `npm run check` exit 0. The smoke test passes unchanged in CI.
+- [ ] **Step 3:** Engine, part two: `EventEmitter`, `process`, `http` with a server table, a `curl` terminal command (with `--parallel`) over that table, `mkdir [-p]`, and a running-process model with a Stop button for `node server.js`. Steps 1 to 3 shipped as 9a.
+- [ ] **Step 4:** Write chapters 21 to 23 (async `fs` and `path`, Events, A small HTTP server) with `how` steps. Chapter 23 shows the stall on a virtual server with `curl --parallel`. The final Script treasure arc ends here, in `story.js`, with the circus ready to tour. Steps 4 and 5 shipped as 9b.
+- [ ] **Step 5:** Update catalog and landing-card counts, and check phone width including the Stop button. `npm run test:engine` and `npm run check` exit 0. The smoke test gains the chapter drives, the Stop bar and the folder rows at 390 px, and its hook line is unchanged.
 
 ## PRs 10 to 18
 

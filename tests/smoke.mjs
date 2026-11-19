@@ -4242,6 +4242,7 @@ test('script-quest: after the whole chapter is built, an unrelated input complet
       if (m.editFile === 'package.json') return;
       openFile(m.editFile); ed.value = m.code; saveFile();
       if (m.run) runShell(m.run);
+      if (m.then) { const n0 = Object.keys(S.done).length; runShell(m.then); for (let w = 0; w < 20 && Object.keys(S.done).length === n0; w++) await tick(); }
     };
     for (let c = 0; c < CH.length; c++) {
       S.done = {}; S.cur = {}; setChapter(c);
@@ -4456,7 +4457,7 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['39
     const { ctx, page, errors } = await open(`${base}/programming/script-quest/`, { viewport });
     await page.waitForSelector('#cmd');
     assert.equal(await page.$$eval('#chapters .tierhead[data-tier="intermediate"]', e => e.length), 1);
-    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 20);
+    assert.equal(await page.$$eval('#chapters .chap', e => e.length), 23);
     assert.equal(await overflow(page), false);
 
     await seed(page, [0]);
@@ -4546,7 +4547,7 @@ async function driveScriptEventLoop() {
   assert.ok(await page.evaluate(() => typeof window.acorn !== 'undefined'), 'acorn did not load from the CDN');
   const wins = () => page.$$eval('#screen .line.win', els => els.length);
   const eci = await page.evaluate(() => window.SCQ.CH.findIndex(c => c.name === 'The event loop'));
-  assert.equal(eci, (await page.evaluate(() => window.SCQ.CH.length)) - 1, 'the event loop chapter is the last one');
+  assert.equal(eci, 19, 'the event loop chapter is still chapter 20');
   const doneCount = () => page.evaluate(c => Object.keys(JSON.parse(localStorage.getItem('script-quest-v1')).done).filter(k => k.startsWith(c + '-')).length, eci);
   await page.click(`#chapters .chap[data-c="${eci}"]`);
   const put = async text => {
@@ -4677,3 +4678,360 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['39
     await ctx.close();
   });
 }
+
+// Chapters 21 to 23 (chapter index 20 to 22): one near-miss per mission. A near-miss that starts a server leaves it
+// running, so the drive stops it before the next run.
+const NODE_NEAR = {
+  20: [
+    `const path = require("path")\nconsole.log("ledger/day1.txt")\nconsole.log("day1.txt")\nconsole.log(".txt")`,
+    `mkdir archive`,
+    `const fs = require("fs")\nfs.writeFile("ledger/day1.txt", "Day 1: 120 tickets sold\\n", (err) => {\n})`,
+    `const fs = require("fs")\nfs.appendFile("ledger/day1.txt", "Day 2: 95 tickets sold\\n", (err) => {\n})`,
+    `const fs = require("fs")\nfor (const name of fs.readdirSync("ledger")) {\n  console.log(name, fs.statSync("ledger/" + name).size)\n}`,
+    `const fs = require("fs")\nfs.promises.unlink("ledger/day1.txt").then(() => console.log("removed"))`,
+  ],
+  21: [
+    `const EventEmitter = require("events")\nconst bell = new EventEmitter()\nbell.emit("ring")\nbell.on("ring", () => {\n  console.log("Ding!")\n})`,
+    `const EventEmitter = require("events")\nconst box = new EventEmitter()\nbox.on("sale", (name, count) => {\n  console.log("Sign: " + name + " x" + count)\n})\nbox.on("sale", (name, count) => {\n  console.log("Till: " + name + " " + count)\n})\nconsole.log("before")\nbox.emit("sale", "popcorn", 3)\nconsole.log("after")`,
+    `const EventEmitter = require("events")\nconst gate = new EventEmitter()\ngate.on("open", () => {\n  console.log("Gates open!")\n})\ngate.emit("open")\ngate.emit("open")\nconsole.log(gate.listenerCount("open"))`,
+    `const EventEmitter = require("events")\nconst bell = new EventEmitter()\nfunction ding() {\n  console.log("Ding!")\n}\nbell.on("ring", ding)\nbell.emit("ring")\nbell.emit("ring")\nconsole.log("quiet")`,
+    `const EventEmitter = require("events")\nconst bus = new EventEmitter()\nbus.on("sold", (name) => {\n  console.log("Sold a ticket to " + name)\n})\nbus.emit("sold", "Mira")`,
+    `const EventEmitter = require("events")\nconst till = new EventEmitter()\ntill.emit("error", new Error("drawer jammed"))\nconsole.log("still running")`,
+    `setTimeout(() => {\n  console.log("Last act")\n}, 100)\nconsole.log("Show starts")`,
+  ],
+  22: [
+    `const http = require("http")\nhttp.createServer((req, res) => {\n  res.end("Hello")\n}).listen(3000)`,
+    `const http = require("http")\nhttp.createServer((req, res) => {\n  res.setHeader("X-Show", "closed")\n  res.end("No such tent")\n}).listen(3000)`,
+    `const http = require("http")\nhttp.createServer((req, res) => {\n  res.end("Welcome to the circus!")\n}).listen(3000)`,
+    `const http = require("http")\nconst fs = require("fs")\nhttp.createServer((req, res) => {\n  res.end(fs.readFileSync("notes.txt", "utf8"))\n}).listen(3000)`,
+    `const http = require("http")\nconst fs = require("fs")\nhttp.createServer((req, res) => {\n  fs.readFile("notes.txt", "utf8", (err, text) => {\n    res.end(text)\n  })\n}).listen(3000)`,
+    `const http = require("http")\nconst fs = require("fs")\nhttp.createServer((req, res) => {\n  const text = fs.readFileSync("notes.txt", "utf8")\n  res.end(text)\n}).listen(3000)`,
+  ],
+};
+const SERVER_HELLO = 'const http = require("http")\nhttp.createServer((req, res) => {\n  res.end("Hello")\n}).listen(3000)\n';
+const SCRIPT_URL = () => `${base}/programming/script-quest/`;
+
+async function driveNodeChapters() {
+  const { ctx, page, errors } = await open(SCRIPT_URL());
+  await page.waitForSelector('#cmd');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  const doneCount = ci => page.evaluate(c => Object.keys(JSON.parse(localStorage.getItem('script-quest-v1')).done).filter(k => k.startsWith(c + '-')).length, ci);
+  const type = async text => { await page.fill('#cmd', text); await page.press('#cmd', 'Enter'); };
+  const stopIfRunning = async () => { if (await page.isVisible('#procbar')) await page.click('#procStop'); };
+  const play = async (m, text) => {
+    await stopIfRunning();
+    await page.click('#fill');
+    if (text !== null) {
+      if (m.editFile) { await page.fill('#ed', text); await page.click('#edSave'); } else await page.fill('#cmd', text);
+    } else if (m.editFile) await page.click('#edSave');
+    if ((await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+    if (m.then) {
+      await until(() => page.isVisible('#procbar'), 4000).catch(() => {});
+      await type(m.then);
+    }
+    await page.waitForTimeout(500);
+  };
+  let solved = 0;
+  for (const ci of [20, 21, 22]) {
+    await page.click(`#chapters .chap[data-c="${ci}"]`);
+    const info = await page.evaluate(c => window.SCQ.CH[c].missions.map(m => ({ title: m.title, editFile: m.editFile, then: m.then })), ci);
+    for (let j = 0; j < info.length; j++) {
+      const m = info[j];
+      const where = `chapter ${ci + 1}, mission ${j + 1} (${m.title})`;
+      const at = /Mission (\d+) of (\d+)/.exec(await page.textContent('#mission .eyebrow'));
+      assert.ok(at && +at[1] === j + 1, `${where}: the page is on another mission`);
+      const doneBefore = await doneCount(ci);
+      await stopIfRunning();
+      await type('echo lazy');
+      await page.waitForTimeout(200);
+      assert.equal(await doneCount(ci), doneBefore, `${where}: a lazy line completed the mission`);
+      assert.ok(NODE_NEAR[ci][j], `${where}: no near-miss written`);
+      await play(m, NODE_NEAR[ci][j]);
+      assert.equal(await doneCount(ci), doneBefore, `${where}: the near-miss completed the mission. Terminal tail: ${(await page.textContent('#screen')).slice(-400)}`);
+      // The dot stops any server and puts back a seed the near-miss may have removed.
+      await stopIfRunning();
+      await page.click(`#mission .dot[data-m="${j}"]`);
+      await type('clear');
+      const base = await wins();
+      await play(m, null);
+      try { await until(async () => (await wins()) > base, 10000); } catch { assert.fail(`${where}: the reference code did not complete the mission. Terminal tail: ${(await page.textContent('#screen')).slice(-500)}`); }
+      assert.equal(await wins(), base + 1, `${where}: exactly one win line per mission`);
+      assert.equal(await doneCount(ci), doneBefore + 1, `${where}: the mission was not saved as done`);
+      assert.equal(await page.isVisible('#procbar'), false, `${where}: the server is still listed as running after the mission completed`);
+      solved++;
+    }
+  }
+  assert.equal(await page.textContent('#xpText'), `${15 * solved + 25 * 3} XP`);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  return solved;
+}
+
+test('script-quest: every mission of chapters 21 to 23 is solved by its own code, a lazy line or near-miss does not pass, and XP is 15 per mission plus 25 per chapter', async () => {
+  assert.equal(await driveNodeChapters(), 19);
+});
+
+test('script-quest: each mission of chapters 21 to 23 completes on a fresh project, seeded where it needs a file and followed by its curl command', async () => {
+  const hook = 'window.__t={CH,S,setChapter,goMission,runShell,submit,cmd,mk,INITIAL_FILES,openFile,saveFile,ed,get MODE(){return MODE},clearRun(){RUN=null}};})();';
+  const prep = ctx => ctx.route('**/script-quest/app.js', async r => {
+    const body = (await r.fetch()).text();
+    await r.fulfill({ contentType: 'text/javascript', body: (await body).replace(/\}\)\(\);\s*$/, hook) });
+  });
+  const { ctx, page, errors } = await open(SCRIPT_URL(), {}, prep);
+  await page.waitForSelector('#cmd');
+  const bad = await page.evaluate(async () => {
+    const { CH, S, setChapter, goMission, runShell, mk, INITIAL_FILES, openFile, saveFile, ed } = window.__t;
+    const tick = () => new Promise(r => setTimeout(r, 50));
+    const screen = () => document.querySelector('#screen').textContent;
+    const bad = [];
+    for (const c of [20, 21, 22]) {
+      for (let j = 0; j < CH[c].missions.length; j++) {
+        const m = CH[c].missions[j], where = `${c + 1}.${j + 1} ${m.title}`;
+        S.done = {}; S.cur = {}; S.files = { ...INITIAL_FILES }; S.pkgs = [];
+        setChapter(c); S.cur[c] = j; window.__t.clearRun(); goMission(j); await tick();
+        if (m.seed) {
+          const keys = Object.keys(m.seed);
+          for (const k of keys) if (!(k in S.files)) bad.push(`${where}: seed ${k} was not written`);
+          if (!screen().includes('Set up for this mission: ' + keys.join(', '))) bad.push(`${where}: no "Set up for this mission" line`);
+        } else if (screen().includes('Set up for this mission')) bad.push(`${where}: a setup line for a mission with no seed`);
+        if (!m.editFile) runShell(m.code);
+        else {
+          openFile(m.editFile); ed.value = m.code; saveFile();
+          if (m.run) runShell(m.run);
+          if (m.then) {
+            for (let w = 0; w < 40 && document.querySelector('#procbar').hidden; w++) await tick();
+            runShell(m.then);
+          }
+        }
+        for (let w = 0; w < 80 && !S.done[mk(c, j)]; w++) await tick();
+        if (!S.done[mk(c, j)]) bad.push(`${where}: did not complete on a fresh project`);
+      }
+    }
+    return bad;
+  });
+  assert.deepEqual(bad, []);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('script-quest: chapter 21 seeds again after Reset project, mission 4 accepts the learner\'s own mission 3 file, and replays of mission 2 and mission 6 behave', async () => {
+  const { ctx, page, errors } = await open(SCRIPT_URL());
+  await page.waitForSelector('#cmd');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  const screen = () => page.textContent('#screen');
+  const type = async text => { await page.fill('#cmd', text); await page.press('#cmd', 'Enter'); };
+  // Replays a mission with its reference code: the dot re-seeds, and a replay adds a win line but no XP.
+  const ref = async j => {
+    await page.click(`#mission .dot[data-m="${j}"]`);
+    await type('clear');
+    const base = await wins();
+    const editor = /edit /.test(await page.textContent('#mission .goal .label'));
+    await page.click('#fill');
+    if (editor) await page.click('#edSave');
+    if ((await page.inputValue('#cmd')).trim()) await page.press('#cmd', 'Enter');
+    try { await until(async () => (await wins()) > base, 10000); } catch { assert.fail(`mission ${j + 1}: the reference did not complete it. Terminal tail: ${(await screen()).slice(-500)}`); }
+    assert.equal(await wins(), base + 1, `mission ${j + 1}: exactly one win line`);
+  };
+  await page.click('#chapters .chap[data-c="20"]');
+
+  await page.click('#mission .dot[data-m="3"]');
+  assert.match(await screen(), /Set up for this mission: ledger\/day1\.txt/);
+  await type('clear');
+  await page.click('#fresh');
+  await page.click('#fresh');
+  assert.match(await screen(), /Project reset to its starting files\./);
+  assert.match(await screen(), /Set up for this mission: ledger\/day1\.txt/, 'Reset project seeds the mission again');
+  await ref(3);
+
+  // Mission 4 judged against the file mission 3's own program wrote, not the seed.
+  await ref(2);
+  await type('clear');
+  await type('cat ledger/day1.txt');
+  assert.match(await screen(), /Day 1: 120 tickets sold/);
+  await ref(3);
+
+  await page.click('#mission .dot[data-m="1"]');
+  await type('clear');
+  const base = await wins();
+  await type('mkdir ledger');
+  assert.match(await screen(), /File exists/);
+  assert.equal(await wins(), base, 'plain mkdir on an existing folder completed the mission');
+  await type('mkdir -p ledger');
+  await until(async () => (await wins()) > base);
+
+  await ref(5);
+  await type('clear');
+  await type('ls');
+  assert.match(await screen(), /ledger\//, 'the folder is gone after the unlink');
+  await page.click('#mission .dot[data-m="5"]');
+  assert.match(await screen(), /Set up for this mission: ledger\/day1\.txt/);
+  await type('ls ledger');
+  assert.match(await screen(), /day1\.txt/);
+  await ref(5);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['390 px', { width: 390, height: 844 }]]) {
+  test(`script-quest: the Project panel shows an empty folder and a file inside a folder, with no overflow at ${label}`, async () => {
+    const { ctx, page, errors } = await open(SCRIPT_URL(), { viewport });
+    await page.waitForSelector('#cmd');
+    await page.click('#chapters .chap[data-c="20"]');
+    await page.fill('#cmd', 'mkdir ledger');
+    await page.press('#cmd', 'Enter');
+    assert.equal(await page.$$eval('.frow[data-f="ledger/"]', e => e.length), 1, 'the empty folder has one row');
+    assert.equal(await page.$eval('.frow[data-f="ledger/"]', e => e.disabled), true);
+    assert.equal(await overflow(page), false);
+    await page.click('#mission .dot[data-m="3"]');
+    assert.equal(await page.$$eval('.frow[data-f="ledger/day1.txt"]', e => e.length), 1, 'the seeded file shows under its full path');
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
+  test(`script-quest: a running server shows the Stop bar, refuses a second program, and every way out stops it at ${label}`, async () => {
+    const { ctx, page, errors } = await open(SCRIPT_URL(), { viewport });
+    await page.waitForSelector('#cmd');
+    const screen = () => page.textContent('#screen');
+    const wins = () => page.$$eval('#screen .line.win', els => els.length);
+    const type = async text => { await page.fill('#cmd', text); await page.press('#cmd', 'Enter'); };
+    const barOn = () => page.isVisible('#procbar');
+    const start = async () => { await type('node server.js'); await until(barOn); };
+    const gone = () => until(async () => !(await barOn()));
+    await page.click('#chapters .chap[data-c="22"]');
+    assert.equal(await barOn(), false);
+    await page.click('#fill');
+    await page.fill('#ed', SERVER_HELLO);
+    await page.click('#edSave');
+    await start();
+    assert.equal(await page.getAttribute('#procbar', 'role'), 'status');
+    assert.match(await page.textContent('#procTxt'), /node server\.js is running on port 3000/);
+    assert.equal(await page.getByRole('button', { name: 'Stop the running program (Ctrl+C)' }).count(), 1);
+    await page.focus('#procStop');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'procStop');
+    assert.equal(await overflow(page), false);
+
+    await type('node server.js');
+    await type('npm start');
+    assert.equal((await screen()).split('A program is still running').length - 1, 2, 'node and npm start are refused');
+    assert.equal(await barOn(), true);
+    const notes = await page.evaluate(() => window.PROGRESS.defaults.files['notes.txt'].split('\n')[0]);
+    await type('clear');
+    await type('ls');
+    assert.match(await screen(), /notes\.txt/);
+    await type('cat notes.txt');
+    assert.ok((await screen()).includes(notes), 'cat works while the server runs');
+    await type('curl localhost:3000');
+    await until(async () => (await screen()).includes('Hello'));
+    assert.equal(await barOn(), true, 'a curl that does not finish the mission leaves the server running');
+
+    await page.focus('#cmd');
+    await page.keyboard.press('Control+c');
+    assert.match(await screen(), /\^C[\s\S]*Stopped node server\.js/);
+    await gone();
+
+    await type('clear');
+    await start();
+    await page.click('#procStop');
+    assert.match(await screen(), /Stopped node server\.js/);
+    await gone();
+
+    await start();
+    await page.click('#mission .dot[data-m="1"]');
+    await gone();
+    await start();
+    await page.click('#skip');
+    await gone();
+    await start();
+    await page.click('#chapters .chap[data-c="21"]');
+    await gone();
+    await page.click('#chapters .chap[data-c="22"]');
+    await start();
+    await page.click('#fresh');
+    await page.click('#fresh');
+    await gone();
+    assert.equal(await overflow(page), false);
+
+    await page.click('#mission .dot[data-m="0"]');
+    await page.click('#fill');
+    await page.click('#edSave');
+    await start();
+    const base = await wins();
+    await type('curl localhost:3000');
+    await until(async () => (await wins()) > base);
+    await gone();
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+
+  test(`script-quest: the three Node chapter Field guide cards run in the Intermediate section and fit at ${label}`, async () => {
+    const { ctx, page, errors } = await open(SCRIPT_URL(), { viewport });
+    await page.waitForSelector('#cmd');
+    await page.evaluate(chapters => {
+      const { CH } = window.SCQ, done = {};
+      CH.forEach((c, i) => c.missions.forEach((_, j) => { if (chapters.includes(i)) done[i + '-' + j] = 1; }));
+      localStorage.setItem('script-quest-v1', JSON.stringify({ xp: Object.keys(done).length, done, chap: 0, cur: {}, best: 0, files: null, pkgs: [] }));
+    }, BEGINNER);
+    await page.reload();
+    await page.waitForSelector('#cmd');
+    await page.click('#t-guide');
+    await page.waitForSelector('.gfilter');
+    const cases = [['Callback to promise', 'promise kept'], ['A tiny emitter', 'Second listener'], ['A handler by hand', 'answer: 120 tickets']];
+    const find = title => page.evaluateHandle(t => [...document.querySelectorAll('#guide .gsec[data-tier="intermediate"] .card')].find(c => c.querySelector('h4').textContent === t), title);
+    for (const [title, shown] of cases) {
+      const card = (await find(title)).asElement();
+      assert.ok(card, `${title}: the card is in the Intermediate section`);
+      await card.scrollIntoViewIfNeeded();
+      await (await card.$('[data-run]')).click();
+      await until(async () => (await (await card.$('.runout')).textContent()).includes(shown));
+      assert.equal(await overflow(page), false);
+    }
+    await page.click('.gfilter button[data-tier="beginner"]');
+    for (const [title] of cases) assert.equal(await (await find(title)).asElement().isVisible(), false, `${title}: hidden under the Beginner filter`);
+    await page.click('.gfilter button[data-tier="intermediate"]');
+    for (const [title] of cases) assert.equal(await (await find(title)).asElement().isVisible(), true, `${title}: shown under the Intermediate filter`);
+    assert.equal(await overflow(page), false);
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('script-quest: the curl check judges the code that ran, not the file as edited after the server started', async () => {
+  const { ctx, page, errors } = await open(SCRIPT_URL());
+  await page.waitForSelector('#cmd');
+  const wins = () => page.$$eval('#screen .line.win', els => els.length);
+  const screen = () => page.textContent('#screen');
+  const type = async text => { await page.fill('#cmd', text); await page.press('#cmd', 'Enter'); };
+  const start = async () => { await type('node office.js'); await until(() => page.isVisible('#procbar')); };
+  await page.click('#chapters .chap[data-c="22"]');
+
+  // Mission 4 (office.js): the answer is right but the running code reads the file with readFileSync.
+  await page.click('#mission .dot[data-m="3"]');
+  await page.click('#fill');
+  await page.fill('#ed', NODE_NEAR[22][3]);
+  await page.click('#edSave');
+  await start();
+  await page.click('#fill'); // puts the reference into the file, not into the running server
+  await page.click('#edSave');
+  await page.fill('#cmd', '');
+  await type('clear');
+  const base = await wins();
+  await type('curl localhost:3000');
+  await page.waitForTimeout(600);
+  assert.equal(await wins(), base, 'the later edit made the curl check pass');
+  await page.click('#procStop');
+
+  // Mission 1 (server.js): the running code is right, the file is then emptied of its tokens.
+  await page.click('#mission .dot[data-m="0"]');
+  await page.click('#fill');
+  await page.click('#edSave');
+  await type('node server.js');
+  await until(() => page.isVisible('#procbar'));
+  await page.fill('#ed', 'console.log("nothing here")\n');
+  await page.click('#edSave');
+  const base2 = await wins();
+  await type('curl localhost:3000');
+  try { await until(async () => (await wins()) > base2, 8000); } catch { assert.fail(`the check read the edited file. Terminal tail: ${(await screen()).slice(-400)}`); }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
