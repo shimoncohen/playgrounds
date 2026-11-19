@@ -115,7 +115,7 @@ One **Intermediate** tier, with rail group labels "JavaScript in depth" and "Nod
 | 20 | The event loop (#63) | All three #63 outcomes, see below |
 | 21 | Async `fs` and `path` | Callback and promise forms, folders |
 | 22 | Events | `EventEmitter`, `once`, the `error` event |
-| 23 | A small HTTP server | `createServer`, `curl`, why sync work freezes it |
+| 23 | A small HTTP server | `createServer`, `curl`, why sync work freezes it (`curl --parallel`) |
 
 ### Chapter 20 and #63
 
@@ -123,10 +123,19 @@ Chapter 20 needs only PRs 6, 7 and 8, because PR 7 puts file completions in the 
 
 - **Predict the order** of sync code, timers, `setImmediate`, promises and `process.nextTick`: puzzle missions of the kind "write the program that prints this order". A new predict-and-choose card kind would be new UI, so it lost.
 - **`setImmediate` versus `setTimeout(0)` inside an I/O callback:** deterministic in real Node, and it works with `fs.readFile` through the poll phase. The main-module version is non-deterministic in real Node, so no mission depends on it.
-- **A sync read freezes a server, and the async fix:** a heartbeat `setInterval` ("the ticket line") stands in for the server. PR 7 charges a sync `readFileSync` virtual time (for example by file size), so the heartbeat visibly stalls. The async `fs.readFile` does the same work in the poll phase and the heartbeat keeps ticking. A busy-wait on the virtual `Date.now` also stalls it. Chapter 23 repeats it on a virtual server with `curl`. The Done-when of #63 asks for the chapter and the env ordering with tests, so closing #63 does not depend on PR 9, though the final PR closes it anyway.
+- **A sync read freezes a server, and the async fix:** a heartbeat `setInterval` ("the ticket line") stands in for the server. PR 7 charges a sync `readFileSync` virtual time (for example by file size), so the heartbeat visibly stalls. The async `fs.readFile` does the same work in the poll phase and the heartbeat keeps ticking. A busy-wait on the virtual `Date.now` also stalls it. Chapter 23 repeats it on a virtual server with `curl --parallel` (a heartbeat beside a live server would run through the 60 s virtual limit before `curl` could be typed). The Done-when of #63 asks for the chapter and the env ordering with tests, so closing #63 does not depend on PR 9, though the final PR closes it anyway.
 - **Name the phases:** the Field guide gets a microtask lane and the three Node phases in a new picture inside the Intermediate section. The Beginner "The event loop" picture is unchanged on purpose: Beginner learners never see terms no Beginner chapter has taught (`nextTick`, microtask, phase). This departs from #63's sketch and from this design, which said to extend the Beginner picture.
 
 **As built (PR 8).** Chapter 20 "The event loop" is `mode:'sh'`, the last Intermediate chapter so far, and opens a new rail group, "Node in depth". It has 7 missions: five order puzzles (promise against timer, microtask first in first out, `nextTick`, `setImmediate` against timer inside a `readFile` callback, one full turn naming the phases), then the freeze (a `setInterval` heartbeat stalled by `readFileSync`) and its async fix (`fs.readFile`). The heartbeat stops itself after 7 beats. The Sorcerer rank moves to 1940 XP (930 + 15 × 54 + 25 × 8).
+
+**As built (PR 9, shipped as 9a and 9b).**
+- **Engine (9a).** `shared/nodeenv.js` and `shared/scheduler.js` gain folder keys, `path`, the rest of async `fs` (`readdir`, `stat`, `appendFile`, `unlink`, `mkdir`), `EventEmitter`, `process` events, `http` with a server table and a running-process model. `app.js` gains the `curl` command and the Stop bar.
+- **Additions the plan row did not list:** `mkdir [-p]` in the terminal and `curl --parallel`. The terminal also keeps one running server: while it listens, `node` and `npm start` are refused, `curl`, `ls` and `cat` work, and Stop, Ctrl+C, a mission or chapter change, a completion and Reset project all end it.
+- **Folder marker rules.** A folder is a key `name/` or is implied by any key `name/…`. A marker keeps a folder alive when its last file goes (`unlink` and `rm` write it). Plain `mkdir` on an existing folder prints `File exists`, `mkdir -p` completes.
+- **Stall variant.** Chapter 23 shows the freeze with `curl --parallel` against a handler that uses `readFileSync`: the second request finishes at 525 ms, against 263 ms for both with async `readFile`. The checks use 500 and 350 ms.
+- **F29 decision.** Chapters 21 to 23 judge the source from `c.ran.code` (the snapshot taken when `node` starts), response bodies from `c.reqs` and written data from `c.files`, never a live file. Older checks keep their rule (ticket #245).
+- **Mission fields.** `then` is a second terminal command typed after `run` (chapter 23 only). `seed` is a set of files written only where the key is absent whenever the mission becomes current, also after Reset project. A seed never counts toward a check, and a check also passes on the learner's own earlier text.
+- **Content (9b).** Chapter 21 "Async `fs` and `path`" (6 missions), chapter 22 "Events" (7), chapter 23 "A small HTTP server" (6). The Sorcerer rank moves to 2300 XP (930 + 15 × 73 + 25 × 11). The final treasure is Bellamy's tour sign at the box office window, with the lantern as the mid-way prize and the circus ready to tour; it names no TypeScript Quest feature.
 
 ### Modules chapter
 
@@ -174,7 +183,7 @@ How it works:
 - Sync `fs` calls charge virtual time (`Scheduler.COST`: 250 ms plus 1 ms per 4 bytes for read, write and append; 1 ms for `readdirSync`, `unlinkSync` and `existsSync`), so a stall is visible to a heartbeat timer. Async reads cost the same but do not advance the clock.
 - A virtual `Date.now` advances 1 ms per call, so a busy-wait ends. An acorn-inserted counter in every loop body is the loop guard: it stops a loop after 5,000,000 iterations in one go (`ERR_LOOP_GUARD`). A run also stops after 60,000 ms of virtual time or 5,000 callbacks.
 - Timers fire without waiting in real time. All of this applies to the Node environment only; the JS REPL is unchanged and has no loop guard.
-- The rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`), `EventEmitter`, `process`, `http`, `curl` and a running-process model arrive in PR 9.
+- The rest of async `fs` (`readdir`, `appendFile`, `unlink`, `stat`), `EventEmitter`, `process`, `http`, `curl` and a running-process model arrived in PR 9 (9a and 9b).
 
 ## Engine move and content split
 
@@ -232,7 +241,7 @@ The two spec PRs are there because the Script half is larger work with its own d
 1. The microtask and `nextTick` ordering is reasoning, not measured. PR 7 starts with a spike and stops if it is wrong, which could force a redesign of PRs 7 to 9.
 2. The smoke hook works only while the listed names stay in `app.js`. It was read but not run. It needs the jsDelivr CDN, so only CI proves it.
 3. The project panel UI may not separate from `app.js` cleanly. TypeScript Quest would then carry a thin copy.
-4. Mission counts, the XP estimates (about 68 missions, about 2200 XP, the Sorcerer threshold) and the 18-PR count are estimates.
+4. Mission counts, the XP estimates (about 68 missions, about 2200 XP, the Sorcerer threshold; built as 73 Intermediate missions and 2300 XP) and the 18-PR count are estimates.
 5. The Trophy Room effects above are accepted, and some learners will see trophies disappear and return.
 6. Every content PR must be checked at phone width.
 7. The squash merge of the whole feature branch (PR 18) becomes one commit on `main`, so per-part history lives only in the PRs.
@@ -271,7 +280,7 @@ All PRs target `feat/222-ts-quest`. Sizes are changed lines: S under 150, M up t
 | 6 | `feat(script): Intermediate JavaScript tier` | Chapters 13 to 19, the tier filter for guide and quick-fire, a `FIRST` entry for every new term, catalog and landing-card counts, and the `story.js` edit | 5 | XL |
 | 7 | `feat(engine): virtual Node scheduler with nextTick, microtasks, timers and poll-phase fs` | Browser spike first, then the scheduler, poll-phase `fs`, charged sync `fs`, the `vm` and differential tests | 4 | L |
 | 8 | `feat(script): event loop chapter` | Chapter 20 with `how` steps, and the Field guide picture with the microtask lane and Node phases | 6, 7 | M |
-| 9 | `feat(script): async fs, path, events and HTTP server chapters` | Engine: folder keys, `path`, the rest of async `fs`, `EventEmitter`, `process`, `http`, `curl` and a running-process model. Then chapters 21 to 23, ending the Script treasure arc. | 7, 8 | XL |
+| 9 | `feat(script): async fs, path, events and HTTP server chapters` | Engine: folder keys, `path`, the rest of async `fs`, `EventEmitter`, `process`, `http`, `curl` and a running-process model. Then chapters 21 to 23, ending the Script treasure arc. Shipped as 9a (engine) and 9b (chapters), with `mkdir [-p]` and `curl --parallel` added. | 7, 8 | XL |
 
 PRs 10 to 18 are the TypeScript half. PR 10 adds the TypeScript Quest spec and plan, and re-plans PRs 11 to 18 once PR 9 has merged.
 

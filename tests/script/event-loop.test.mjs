@@ -99,8 +99,8 @@ const PUZZLES = [
 ];
 
 describe('chapter 20 shape', () => {
-  it('is the last chapter: Intermediate, Node in depth, a shell chapter with its own files', () => {
-    assert.equal(CH[CH.length - 1], ch);
+  it('is chapter 20: Intermediate, Node in depth, a shell chapter with its own files', () => {
+    assert.equal(CH.indexOf(ch), 19);
     assert.equal(ch.tier, 'intermediate');
     assert.equal(ch.group, 'Node in depth');
     assert.equal(ch.mode, 'sh');

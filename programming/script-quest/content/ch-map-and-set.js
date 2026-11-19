@@ -4,7 +4,7 @@ const SCQ=window.SCQ=window.SCQ||{};
 const kind=v=>Object.prototype.toString.call(v);
 SCQ.CH.push(
 {name:'Map and Set',tier:'intermediate',group:'JavaScript in depth',badge:'Ticket Drawer',story:'The ticket drawer is a mess of repeats and half-lost stubs. Sort out the duplicates, keep a register of who sits where, tally the crowd, and win the ticket drawer.',mode:'js',
- intro:'The ticket drawer holds the same stub three times, and nobody knows who sits where. Two built-in tools fix that. A <code>Set</code> is a bag that never keeps a repeat. A <code>Map</code> is a register of pairs, a key and a value, where a key can be anything, not only text. This chapter goes from the first <code>new Set</code> to counting the crowd with a <code>Map</code>.',
+ intro:'The ticket drawer holds the same stub three times, and nobody knows who sits where. Two built-in tools fix that. A `Set` is a bag that never keeps a repeat. A `Map` is a register of pairs, a key and a value, where a key can be anything, not only text. This chapter goes from the first `new Set` to counting the crowd with a `Map`.',
  learned:['Set','add and has','Set to array','Map','get and set','counting with a Map','loop over a Map','any value as a key'],
  missions:[
  {title:'A bag with no repeats',goal:'Turn the `tickets` list into a `Set` called `unique`.',code:'const unique = new Set(tickets)',need:['tickets'],pre:'const tickets = ["A12", "B7", "A12", "C3", "B7"]',

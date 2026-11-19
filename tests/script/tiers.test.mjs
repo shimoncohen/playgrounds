@@ -109,12 +109,12 @@ describe('script-quest tiers', () => {
     assert.equal(tiers.rankFor(930).name, 'Wizard');
   });
 
-  it('the pinned counts: 20 chapters, 54 Intermediate missions in 8 chapters, Sorcerer at 1940 XP', () => {
-    assert.equal(CH.length, 20);
-    assert.equal(IC, 8);
-    assert.equal(IM, 54);
-    assert.deepEqual(INTER.map(c => c.missions.length), [6, 7, 6, 7, 7, 7, 7, 7]);
-    assert.deepEqual(tiers.ranks()[6], [1940, 'Sorcerer']);
+  it('the pinned counts: 23 chapters, 73 Intermediate missions in 11 chapters, Sorcerer at 2300 XP', () => {
+    assert.equal(CH.length, 23);
+    assert.equal(IC, 11);
+    assert.equal(IM, 73);
+    assert.deepEqual(INTER.map(c => c.missions.length), [6, 7, 6, 7, 7, 7, 7, 7, 6, 7, 6]);
+    assert.deepEqual(tiers.ranks()[6], [2300, 'Sorcerer']);
     CH.forEach(c => assert.ok(c.badge && c.badge.trim(), `${c.name} has a badge name`));
   });
 
@@ -200,16 +200,18 @@ describe('script-quest tiers', () => {
     assert.equal(badgePay(S, 0, true), 0, 'beginner badgeXp is 0');
   });
 
-  it('badgePay pays the chapter 20 badge once, on its last mission', () => {
-    const { badgePay } = SCQ;
-    const S = { done: {} };
-    const n = CH[19].missions.length;
-    assert.equal(n, 7);
-    for (let j = 0; j < n - 1; j++) { S.done[`19-${j}`] = 1; assert.equal(badgePay(S, 19, true), 0, `mission ${j + 1}`); }
-    S.done[`19-${n - 1}`] = 1;
-    assert.equal(badgePay(S, 19, true), 25);
-    assert.equal(badgePay(S, 19, false), 0, 'replay');
-  });
+  for (const [ci, count] of [[19, 7], [20, 6], [21, 7], [22, 6]]) {
+    it(`badgePay pays the chapter ${ci + 1} badge once, on its last mission`, () => {
+      const { badgePay } = SCQ;
+      const S = { done: {} };
+      const n = CH[ci].missions.length;
+      assert.equal(n, count);
+      for (let j = 0; j < n - 1; j++) { S.done[`${ci}-${j}`] = 1; assert.equal(badgePay(S, ci, true), 0, `mission ${j + 1}`); }
+      S.done[`${ci}-${n - 1}`] = 1;
+      assert.equal(badgePay(S, ci, true), 25);
+      assert.equal(badgePay(S, ci, false), 0, 'replay');
+    });
+  }
 
   it('app.js has no RANKS or badges, keeps the saved-state line and pays the badge through badgePay', () => {
     const app = read('programming/script-quest/app.js');
