@@ -80,7 +80,7 @@ const screen=$('#screen'),term=$('#term'),cmd=$('#cmd'),promptEl=$('#prompt');
 function line(html,cls=''){const d=document.createElement('div');d.className='line '+cls;d.innerHTML=html;screen.appendChild(d);
   while(screen.childNodes.length>600)screen.firstChild.remove();term.scrollTop=term.scrollHeight;return d}
 function clearScreen(){screen.innerHTML=''}
-const KW=/^(const|let|var|function|return|if|else|for|while|of|in|new|class|async|await|try|catch|throw|typeof|interface|type|true|false|null|undefined|break|continue|this|export|import|require|switch|case|default)$/;
+const KW=/^(const|let|var|function|return|if|else|for|while|of|in|new|class|async|await|try|catch|throw|typeof|interface|type|keyof|infer|extends|readonly|as|true|false|null|undefined|break|continue|this|export|import|require|switch|case|default)$/;
 function hl(src){
   return src.replace(/(\/\/[^\n]*)|(`(?:\\.|[^`\\])*`?|"(?:\\.|[^"\\\n])*"?|'(?:\\.|[^'\\\n])*'?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)|([^])/g,(m,c,s,n,id,o)=>{
     if(c)return '<span class="v-u">'+esc(c)+'</span>';if(s)return '<span class="v-s">'+esc(s)+'</span>';if(n)return '<span class="v-n">'+esc(n)+'</span>';
@@ -556,7 +556,15 @@ function fireEnd(){
   $('#fGo').onclick=fireStart;
 }
 
-function renderGuide(){$('#guide').innerHTML=TSQ.guideHTML({esc,hl})}
+function renderGuide(){
+  const g=$('#guide');
+  const present=[];CH.forEach((_,i)=>{const t=tiers.tierOf(i);if(!present.includes(t))present.push(t)});
+  g.innerHTML=TSQ.guideHTML({esc,hl,tiers:present,tierOf:i=>tiers.tierOf(i)});
+  const f=g.querySelector('.gfilter');if(!f)return;
+  f.addEventListener('click',e=>{const b=e.target.closest('button[data-tier]');if(!b)return;const t=b.dataset.tier;
+    f.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    g.querySelectorAll('.gsec').forEach(s=>{s.hidden=t!=='all'&&('extras' in s.dataset||(s.dataset.tier||'beginner')!==t)})});
+}
 
 renderTop();
 setChapter(Math.min(S.chap||0,CH.length-1));

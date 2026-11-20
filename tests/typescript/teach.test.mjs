@@ -3,6 +3,7 @@
 // Field guide, which is open from the start, defines each term where it uses it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { loadTypescriptContent } from '../content-loader.mjs';
 import { createSession } from './harness.mjs';
 import { projectRun, flatFiles as flatten } from './project-harness.mjs';
@@ -117,14 +118,31 @@ const FIRST = {
   'import type':   [/\bimport type\b/i, 9, 3],
   'export type':   [/\bexport type\b/i, 9, 3],
   TS2307:          [/\bTS2307\b/, 9, 4],
+  keyof:           [/\bkeyof\b/, 10, 0],
+  'typeof in a type': [/type\s+\w+(<[^>]*>)?\s*=\s*\(?\s*typeof\b|\(typeof\s+\w+\)\s*\[/, 10, 1],
+  'indexed access': [/indexed access|\b[A-Z]\w*\[\s*"\w+"\s*\]/, 10, 2],
+  'key constraint': [/key constraint|extends keyof/i, 10, 3],
+  'T[keyof T]':    [/\[\s*keyof\s+\w+\s*\]/, 10, 4],
+  'T[number]':     [/\[number\]/, 10, 5],
+  'mapped type':   [/mapped types?/i, 11, 0],
+  'K in keyof':    [/\[\s*K\s+in\s/, 11, 0],
+  'optional modifier': [/\]\s*\?\s*:/, 11, 1],
+  TS2300:          [/\bTS2300\b/, 11, 1],
+  'readonly modifier': [/readonly\s+\[\s*K\b/, 11, 2],
+  '-readonly and -?': [/-readonly|\]\s*-\?/, 11, 3],
   'Array<':        [/\bArray</, null],
-  keyof:           [/\bkeyof\b/, null],
-  Awaited:         [/\bAwaited\b/, null],
-  infer:           [/\binfer\s+[A-Z]\b/, null],
-  'mapped type':   [/mapped types?/i, null],
-  'conditional type': [/conditional types?/i, null],
-  'template literal type': [/template literal/i, null],
-  Uppercase:       [/\bUppercase\b/, null],
+  'conditional type': [/conditional types?/i, 12, 0],
+  distribution:    [/distribut/i, 12, 1],
+  infer:           [/\binfer\s+[A-Z]\b/, 12, 2],
+  ReturnType:      [/\bReturnType\b/, 12, 3],
+  Exclude:         [/\bExclude\b|\bNonNullable\b/, 12, 4],
+  Awaited:         [/\bAwaited\b/, 12, 5],
+  'key remapping': [/key remapping|\bkeyof\s+\w+\s+as\b/i, 12, 6],
+  'template literal type': [/template literal/i, 13, 0],
+  Uppercase:       [/\b(Uppercase|Lowercase|Capitalize|Uncapitalize)\b/, 13, 1],
+  'typed event names': [/typed event names?/i, 13, 2],
+  TS2820:          [/\bTS2820\b/, 13, 1],
+  TS2561:          [/\bTS2561\b/, 13, 2],
   tsconfig:        [/tsconfig/i, null],
   // the quest still teaches no loops, so no chapter claims a loop concept
   loop:            [/\bloops?\b|\b(while|for)\s*\(|\bdo\s*\{/i, null],
@@ -218,6 +236,30 @@ test('guide: no card uses `as` before the card that glosses it', () => {
   BLOCKS.slice(0, at).forEach(b => assert.ok(!inCode.test(b[2]) && !inText.test(b[1]), `"${b[0]}" uses as before its card`));
 });
 
+test('guide: no card uses a chapter 11 or later term before its chapter, and each such term is glossed where the guide uses it', () => {
+  const cardText = b => noTags(b.slice(0, 3).join('\n'));
+  for (const [term, [re, ci]] of Object.entries(FIRST)) {
+    if (ci === null || ci < 10) continue;
+    for (const b of BLOCKS.filter(x => x[3] < ci)) assert.ok(!re.test(cardText(b)), `"${b[0]}" uses "${term}" before chapter ${ci + 1}`);
+  }
+  const g = noTags(guideText);
+  assert.match(g, /keyof[^.]*union of the names/);
+  assert.match(g, /typeof[^.]*type position[^.]*type of a value/);
+  assert.match(g, /indexed access[^.]*type of that one property/);
+  assert.match(g, /key constraint[^.]*names the type has/);
+  assert.match(g, /mapped type[^.]*walks the keys/);
+  assert.match(g, /readonly[^.]*locks each/);
+  assert.match(g, /-readonly[^.]*take them away/);
+  assert.match(g, /conditional type[^.]*fits[^.]*does not/);
+  assert.match(g, /infer[^.]*names a piece/);
+  assert.match(g, /Awaited[^.]*peels every promise/);
+  assert.match(g, /key remapping[^.]*renames each key/);
+  assert.match(g, /template literal type builds a text type from pieces/);
+  assert.match(g, /Uppercase[^.]*Uncapitalize change the case/);
+  assert.match(g, /infer[^.]*inside a template literal type catches a piece/);
+  assert.match(g, /close to one the type allows[^.]*often in its case\. The checker suggests the spelling/);
+});
+
 test('guide: each code card compiles clean, and each decoder code is one the missions measure', async () => {
   for (const b of BLOCKS) {
     const rec = createSession().run(b[2]);
@@ -225,6 +267,52 @@ test('guide: each code card compiles clean, and each decoder code is one the mis
   }
   const measured = await allCodes();
   for (const e of ERRS) assert.ok(measured.has(e[0].match(/TS\d+/)[0]), `${e[0]} is not produced by any mission answer`);
+});
+
+const guideWith = () => {
+  if (!TSQ.tiers) {
+    const win = { TSQ };
+    for (const f of ['shared/tiers.js', 'programming/typescript-quest/tiers.js']) new Function('window', readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8'))(win);
+  }
+  const tiers = TSQ.tiers, present = [];
+  CH.forEach((_, i) => { const t = tiers.tierOf(i); if (!present.includes(t)) present.push(t); });
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  return { present, tierOf: i => tiers.tierOf(i), html: TSQ.guideHTML({ esc, hl: esc, tiers: present, tierOf: i => tiers.tierOf(i) }), esc };
+};
+const sectionOf = (html, tierId) => {
+  const re = tierId === 'beginner' ? /<section class="gsec"><h3>Building blocks<\/h3>[\s\S]*?<\/section>/ : new RegExp(`<section class="gsec gtier" data-tier="${tierId}">[\\s\\S]*?</section>`);
+  return (html.match(re) || [''])[0];
+};
+
+test('guide filter: a button per present tier with aria-pressed, and the label for the group', () => {
+  const { present, html } = guideWith();
+  assert.ok(present.length > 1);
+  assert.match(html, /<div class="gfilter" role="group" aria-label="Filter by tier">/);
+  assert.match(html, /<button class="btn ghost" data-tier="all" aria-pressed="true">All<\/button>/);
+  for (const t of present) assert.match(html, new RegExp(`<button class="btn ghost" data-tier="${t.id}" aria-pressed="false">${t.name}</button>`));
+});
+
+test('guide filter: every card sits in the section of its chapter tier, and the split-files section and decoder are tagged', () => {
+  const { html, esc } = guideWith();
+  for (const b of BLOCKS) {
+    const own = CH[b[3]].tier, sec = sectionOf(html, own);
+    assert.ok(sec.includes(`<h4>${esc(b[0])}</h4>`), `${b[0]} is not in the ${own} section`);
+    for (const other of ['beginner', 'intermediate', 'advanced'].filter(x => x !== own))
+      assert.ok(!sectionOf(html, other).includes(`<h4>${esc(b[0])}</h4>`), `${b[0]} also sits in ${other}`);
+  }
+  assert.match(html, /data-tier="intermediate"><h3>Intermediate: going deeper<\/h3>/);
+  assert.match(html, /<section class="gsec" data-tier="intermediate"><h3>Split a program across files<\/h3>/);
+  assert.match(html, /<section class="gsec" data-extras><h3>Error decoder<\/h3>/);
+});
+
+test('guide filter: a single tier shows no filter, and the old call shape still renders every card', () => {
+  const { present, html, esc } = guideWith();
+  const one = TSQ.guideHTML({ esc, hl: esc, tiers: [present[0]], tierOf: () => present[0] });
+  assert.doesNotMatch(one, /gfilter/);
+  const old = TSQ.guideHTML({ esc, hl: esc });
+  assert.doesNotMatch(old, /gfilter/);
+  for (const b of BLOCKS) assert.ok(old.includes(`<h4>${esc(b[0])}</h4>`), `${b[0]} missing from the old call`);
+  assert.ok(html.includes('Error decoder'));
 });
 
 test('quick-fire: every question has chapter 0, 4 distinct options, a valid right answer, and the answer the real compiler gives', () => {
@@ -268,5 +356,6 @@ test('quick-fire gating: a chapter\'s questions open with that chapter, and one 
   assert.equal(qfOpen(doneThrough(CH.length)).length, FIRE.length);
   assert.equal(qfOpen(doneThrough(CH.length), 'beginner').length, FIRE.filter(q => CH[q.ch].tier === 'beginner').length);
   assert.equal(qfOpen(doneThrough(CH.length), 'intermediate').length, FIRE.filter(q => CH[q.ch].tier === 'intermediate').length);
-  assert.equal(qfOpen(doneThrough(CH.length), 'advanced').length, 0);
+  assert.equal(qfOpen(doneThrough(CH.length), 'advanced').length, FIRE.filter(q => CH[q.ch].tier === 'advanced').length);
+  assert.ok(FIRE.some(q => CH[q.ch].tier === 'advanced'), 'chapters 11 and on have quick-fire questions');
 });

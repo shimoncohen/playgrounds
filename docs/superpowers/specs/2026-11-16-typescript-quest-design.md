@@ -1,6 +1,6 @@
 # TypeScript Quest: design
 
-Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). The tests run the TypeScript compiler in Node from a pinned dev dependency (see [Compiler in Node tests](#compiler-in-node-tests)). The rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)) and the chapter 6 Suggested-first correction are signed off (PRs 11 to 14 shipped on them). The chapter 14 Suggested-first correction ([Suggested first](#suggested-first)) still waits for PR 15.
+Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). The tests run the TypeScript compiler in Node from a pinned dev dependency (see [Compiler in Node tests](#compiler-in-node-tests)). The rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)) and the chapter 6 and chapter 14 Suggested-first corrections ([Suggested first](#suggested-first)) are signed off (PRs 11 to 14 shipped on the first set, and the user signed off chapter 14 in PR #249). PR 15's `intrinsic` spike passed ([Engine plan](#engine-plan)).
 
 **Contents:** [TLDR](#tldr) · [Goal](#goal) · [Non-goals](#non-goals) · [Current state](#current-state) · [Story](#story) · [Chapters](#chapters) ([Beginner](#beginner-booking-depot-chapters-1-to-5) · [Intermediate](#intermediate-rail-yard-chapters-6-to-10) · [Advanced](#advanced-signal-tower-chapters-11-to-14) · [TypeScript with Node](#typescript-with-node-engine-wagon-chapters-15-to-18)) · [Tier XP and ranks](#tier-xp-and-ranks) · [Suggested first](#suggested-first) · [Engine plan](#engine-plan) · [Decisions](#decisions) · [Trophy Room](#trophy-room) · [Alternatives](#alternatives) · [Risks](#risks) · [Test plan](#test-plan) · [Observability](#observability) · [Performance](#performance) · [PR chain](#pr-chain) · [Touchpoints](#touchpoints)
 
@@ -243,44 +243,44 @@ Mission XP 20. REPL.
 | # | Mission | You write | Passes when |
 |---|---|---|---|
 | 1 | Ask for the keys | `keyof` of an interface | A key outside the union reports TS2322 |
-| 2 | The type of a value | `typeof` in a type for a constant object | A matching alias compiles |
+| 2 | The type of a value | `typeof` in a type for a constant object | A value that leaves out a key of the aliased type reports TS2741 |
 | 3 | Look one up | `T[K]` for a named key | A wrong key reports TS2339 |
 | 4 | A safe getter | A generic `get<T, K extends keyof T>` | A call with a bad key reports TS2345 |
-| 5 | Every value type | `T[keyof T]` | The result accepts a value of each member type |
-| 6 | Index with a number | `T[number]` on an array type | The element type is the one asked for |
+| 5 | Every value type | `T[keyof T]` | A value of a member type compiles and one of another type reports TS2322 |
+| 6 | Index with a number | `T[number]` on an array type | An item that is not the element type reports TS2322 |
 
 **12. Mapped types.** Leg: stencil plates stamp the same change onto every lamp. Badge: Stencil Plate. Rebuilds `Partial` and `Readonly`. New terms: mapped type `[K in keyof T]`, `?` and `readonly` modifiers, `-?` and `-readonly`, a mapped type that changes each value type. Key remapping with `as` waits for chapter 13, because filtering keys needs a conditional type.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
-| 1 | Stamp every lamp | A mapped type over an interface | A value of the mapped type needs every key |
-| 2 | Rebuild `Partial` | `[K in keyof T]?: T[K]` | The result behaves like chapter 9's `Partial` |
+| 1 | Stamp every lamp | A mapped type over an interface | A value of the mapped type needs every key: a missing one reports TS2741 |
+| 2 | Rebuild `Partial` | `[K in keyof T]?: T[K]` | A short value passes and a wrong type for a key reports TS2322 (the learner's alias is `Loose`, because redeclaring `Partial` is TS2300) |
 | 3 | Rebuild `Readonly` | A `readonly` modifier in a mapped type | A write reports TS2540 |
-| 4 | Take the lock off | `-readonly` and `-?` | The writes and the missing keys both pass |
-| 5 | Wrap every value | `[K in keyof T]: T[K][]` | Each property of the result is an array of the original type |
+| 4 | Take the lock off | `-readonly` and `-?` | The write passes, and a value that leaves out a key that is needed again reports TS2741 |
+| 5 | Wrap every value | `[K in keyof T]: T[K][]` | Each property is an array of the original type, and a plain value reports TS2322 |
 | 6 | Maybe nothing | `[K in keyof T]: T[K] \| null` | A `null` value passes for every key; a number for a string key reports TS2322 |
 
 **13. Conditional types.** Leg: the points lever sends each wagon down one track or the other depending on what it carries. Badge: Points Lever. Rebuilds `ReturnType`, and is where `Awaited` is taught. New terms: conditional type `T extends U ? X : Y`, `infer`, distribution over a union, `ReturnType`, `Exclude`, `NonNullable`, `Awaited`, key remapping with `as` in a mapped type.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
-| 1 | Pick a track | A conditional type with two outcomes | Each test type resolves to the expected result |
-| 2 | One per member | A conditional type applied to a union | The union distributes to the expected members |
-| 3 | Pull out the cargo | `infer` to unwrap an array element | The element type is the one asked for |
-| 4 | Rebuild `ReturnType` | `infer R` in a function type | It matches the built-in on a test function |
-| 5 | Drop what you do not want | `Exclude` and `NonNullable` | The remaining members are the ones asked for |
-| 6 | Unwrap a promise | A type that peels `Promise<T>` with `infer`, then `Awaited` | It gives the same type as `Awaited` for a nested promise |
-| 7 | Pick by value type | A mapped type whose `as` clause drops keys of one type (`T[K] extends X ? K : never`) | The result keeps only the matching keys |
+| 1 | Pick a track | A conditional type with two outcomes | Each test type resolves to the expected track, and the wrong track reports TS2322 |
+| 2 | One per member | A conditional type applied to a union | The union distributes: a list of both kinds reports TS2322 |
+| 3 | Pull out the cargo | `infer` to unwrap an array element | A value that is not the element type reports TS2322 |
+| 4 | Rebuild `ReturnType` | `infer R` in a function type | It matches the return type of a test function, and a wrong value reports TS2322 (the learner's alias is `Ret`; redeclaring `ReturnType` is TS2300) |
+| 5 | Drop what you do not want | `Exclude` and `NonNullable` | A dropped member reports TS2322, once for each filter (two diagnostics) |
+| 6 | Unwrap a promise | A type that peels `Promise<T>` with `infer`, then `Awaited` | It gives the same type as `Awaited` for a nested promise, and a wrong value reports TS2322 |
+| 7 | Pick by value type | A mapped type whose `as` clause drops keys of one type (`T[K] extends X ? K : never`) | The result keeps only the matching keys: a dropped key reports TS2322 |
 
 **14. Template literal types.** Leg: the code wheel makes every telegram address from a town and a wagon. Badge: Code Wheel. Its Suggested-first link is Named boxes (2), which teaches template strings, as the [Suggested first](#suggested-first) section explains. New terms: template literal type, `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize`, typed event names.
 
 | # | Mission | You write | Passes when |
 |---|---|---|---|
 | 1 | Build an address | A template literal type from two unions | The expected combinations compile and a wrong one reports TS2322 |
-| 2 | Shout it | `Uppercase` and `Capitalize` on a literal type | The resulting type is the one asked for |
-| 3 | Event names | A type of `on${Capitalize<...>}` handler names | A typo reports TS2353 |
-| 4 | Pull a piece out | `infer` inside a template to read a prefix | The result is the part asked for |
-| 5 | Typed event table | A mapped type whose `as` clause builds the handler keys from the event names | The new key names exist, the old ones do not, and every key needs its own handler |
+| 2 | Shout it | `Uppercase` and `Capitalize` on a literal type | A lowercase literal where capitals belong reports TS2820, a near miss that carries a "did you mean" |
+| 3 | Event names | A type of `on${Capitalize<...>}` handler names | A name that is not in the table reports TS2353 (a close misspelling such as `onClse` reports TS2561 instead) |
+| 4 | Pull a piece out | `infer` inside a template to read a prefix | The part after the dash is refused: TS2322 |
+| 5 | Typed event table | `type Handlers<E extends string> = { [K in E as …]: … }`, a mapped type over a union of event names whose `as` clause builds the handler keys | The new key names exist, and every key needs its own handler: a missing one reports TS2741 |
 | 6 | Strict spelling | A function that only takes generated names | A bad name reports TS2345 |
 
 ### TypeScript with Node: engine wagon (chapters 15 to 18)
@@ -344,7 +344,7 @@ Mission XP 25. Project mode with files and a terminal. The terminal in these cha
 |---|---|---|---|---|---|
 | Beginner | 5 | 33 | 10 | 5 × 25 | 455 |
 | Intermediate | 5 | 30 | 15 | 5 × 25 | 1030 (measured, pinned in `tests/typescript/tiers.test.mjs`) |
-| Advanced | 4 | 25 | 20 | 4 × 25 | about 1630 |
+| Advanced | 4 | 25 (6, 6, 7, 6) | 20 | 4 × 25 | 1630 (measured, pinned in `tests/typescript/tiers.test.mjs`) |
 | TypeScript with Node | 4 | 26 | 25 | 4 × 25 | about 2380 |
 
 - **Save.** Key `typescript-quest-v1`, folder `programming/typescript-quest/`, commit scope `typescript` (`commitlint.config.mjs:5`), tests in `tests/typescript/`. The catalog entry uses `sep: '.'`, so done-keys are `<chapter>.<mission>`.
@@ -353,7 +353,7 @@ Mission XP 25. Project mode with files and a terminal. The terminal in these cha
 
 Each chapter has a soft "Suggested first" line under its title (D9) that names Script Quest chapters. Numbers are rail numbers in Script Quest, read from the chapter order in `programming/script-quest/index.html:90-103`. Note that `FIRST` in `tests/script/teach.test.mjs:13-111` uses 0-based chapter indexes, not rail numbers.
 
-Re-check of every link against the real chapter names on the base. All 17 rows name a real chapter with the right rail number, except two that need a correction (rows 6 and 14):
+Re-check of every link against the real chapter names on the base. All 17 rows name a real chapter with the right rail number, except two that were corrected (rows 6 and 14, both signed off):
 
 | TS chapter | Suggested first | Result |
 |---|---|---|
@@ -377,7 +377,7 @@ Re-check of every link against the real chapter names on the base. All 17 rows n
 
 The approved design said that chapters 6, 7, 9, 14, 17 and 18 point at Script Intermediate chapters that do not exist yet. That sentence was wrong twice over: those chapters now exist (Script has 23), and rows 6 and 14 point at Beginner chapters. The rows that point at Intermediate chapters are 7, 9, 10, 16, 17 and 18, and all of those chapters exist and read as the design intends.
 
-**Chapters 6 and 14 are changes to the approved design** (chapter 6 gains a Script chapter, Time travel (10); Say hello (1) becomes Named boxes (2) for chapter 14). The chapter 6 correction is signed off. The chapter 14 correction stays awaiting sign-off until PR 15; the design table itself stays as approved.
+**Chapters 6 and 14 are changes to the approved design** (chapter 6 gains a Script chapter, Time travel (10); Say hello (1) becomes Named boxes (2) for chapter 14). Both corrections are signed off (the chapter 14 one by the user in PR #249); the design table itself stays as approved.
 
 ## Engine plan
 
@@ -390,7 +390,7 @@ What each chapter needs, and which PR supplies it ("ok" means the base already s
 | 7, 8 | `abstract`, parameter properties, enums, `satisfies` | ok (`transpileModule` emits them) |
 | 10 | Several files, `import` and `export` | `TSCheck.checkProject` (PR 13): `import` between files, diagnostics per file, and emitted CommonJS that runs in the Node env. The editor panel was built in PR 14 (`project.js` and the `app.js` project branch); a run is one `checkProject`, then `main.js` through the virtual Node until the scheduler is done |
 | 11 | `keyof`, `typeof`, `T[K]` | ok |
-| 14 | `Uppercase` and the like | PR 15's spike on `intrinsic` |
+| 14 | `Uppercase`, `Lowercase`, `Capitalize`, `Uncapitalize` | ok: four `type X<S extends string> = intrinsic` lines in `TS_LIB` (PR 15's spike passed: the hand lib and the real `lib.es2020.d.ts` give the same codes, `tests/typescript/lib.test.mjs`) |
 | 15 | `tsconfig` strict flags | `checkProject` (PR 13) reads `tsconfig.json` with `ts.parseJsonConfigFileContent`; `noLib`, `types`, `typeRoots`, `lib` and `noEmit` are forced |
 | 16 | Typed `fs` and `http` | PR 16's mini typings; `http.get` is #246 |
 | 17 | `node:test`, `assert`, `node --test` | PR 16 |
@@ -401,7 +401,7 @@ What the two engine PRs add:
 - **PR 13, `feat(engine): multi-file TypeScript projects with tsconfig and a larger lib`.** `TSCheck.checkProject(files)` (several files, `import` between them, a `tsconfig.json` read through `ts.parseJsonConfigFileContent`, diagnostics per file, emitted CommonJS), a grown `TS_LIB` (`Extract`, `NonNullable`, `Parameters`, `InstanceType`, `Object.keys`/`values`/`entries`, `Map`, `Set`, `Date`), and the REPL loop guard. It measured the real `lib.d.ts` first; the measured numbers and the verdict are under [Lib measurement](#lib-measurement), and D2 stands. The project panel is built in PR 14 with chapter 10, as a thin copy in TypeScript Quest.
 - **PR 16, `feat(engine): TypeScript in the virtual terminal, node:test and typings for Node`.** `.ts` files accepted in the terminal, a `tsc` that really checks, `node file.ts` by transpiling, `node --test`, mini typings for `fs`, `path`, `http`, `events`, `node:test` and `assert`, and more of `process` (`stderr`, and `stdin` if the CLI needs it). The terminal interpreter moves to `shared/`, and `app.js` rebinds `runShell`.
 
-PRs 13 and 15 may revise this spec. The `intrinsic` approach for the case-changing types in chapter 14 is unverified: it is plausible only because `lib.d.ts` is passed to the compiler as the default lib name, and PR 15's spike settles it.
+PR 15's spike passed: `intrinsic` works in the hand lib because `lib.d.ts` is passed to the compiler as the default lib name. `lib.test.mjs` runs each snippet under both libs and they agree: a wrong assignment is refused, the types distribute over a union, and ``on${Capitalize<…>}`` handler names work. A literal that is a near miss of a member is refused with TS2820 ("did you mean") instead of TS2322 where the compiler finds a close spelling (`"a"` for `"A"`, `"onclick"` for `"onClick"`), so chapter 14 measures and pins each code. Redeclaring a lib name (`type Partial<T> = …`) is TS2300 in both, and `Awaited<Promise<Promise<string>>>` is `string` in both.
 
 ## Decisions
 
@@ -409,7 +409,7 @@ D1, D8 and D10 are defined in the Script spec and are linked, not copied: [D1](2
 
 | Id | Decision | Alternatives and why they lost |
 |---|---|---|
-| D2 | **Grow the hand-written TS lib** (`Map`, `Set`, `Date`, `Object.keys`/`values`/`entries`, `Extract`, `NonNullable`, `Parameters`, `InstanceType` in PR 13; `Uppercase` and the like in PR 15). A test compiles every mission solution cleanly. PR 13 measured the real lib: the grown hand lib is 6.8 KB raw and checks in 1.13x the old lib's time, while the real `lib.es2020.d.ts` closure is 436 KB raw in 46 files and 9.3x slower per check, so **D2 stands** ([Lib measurement](#lib-measurement)). | Real lib from the CDN: 46 files and 31 KB brotli for ES2020 with no DOM (227 KB brotli with the DOM), and a warm check of about 80 ms against about 8 ms on the measuring machine. `@types/node` is too big for a phone, so Node typings stay hand-written either way. |
+| D2 | **Grow the hand-written TS lib** (`Map`, `Set`, `Date`, `Object.keys`/`values`/`entries`, `Extract`, `NonNullable`, `Parameters`, `InstanceType` in PR 13; `Uppercase` and the like in PR 15, as `intrinsic` aliases, spike passed). A test compiles every mission solution cleanly. PR 13 measured the real lib: the grown hand lib is 6.8 KB raw and checks in 1.13x the old lib's time, while the real `lib.es2020.d.ts` closure is 436 KB raw in 46 files and 9.3x slower per check, so **D2 stands** ([Lib measurement](#lib-measurement)). | Real lib from the CDN: 46 files and 31 KB brotli for ES2020 with no DOM (227 KB brotli with the DOM), and a warm check of about 80 ms against about 8 ms on the measuring machine. `@types/node` is too big for a phone, so Node typings stay hand-written either way. |
 | D3 | **REPL for the type-level chapters, project mode with files and a terminal for modules and Node.** Chapters 1 to 9 and 11 to 14 use the REPL; chapters 10 and 15 to 18 use project mode. | One editor-first mode for everything: more scaffold work, and it throws away the REPL Script already has. |
 | D4 | **Mini Node typings:** `fs` (including promises), `path`, `http`, `events`, `node:test`, `assert` and `process`. | Full `@types/node`: too large. None: chapters 16 and 17 cannot be taught. |
 | D5 | **Keep Script chapter 11 unchanged**, add one pointer to TypeScript Quest on its completion screen (PR 11), and start TypeScript chapter 1 from what Script chapter 11 does not cover. | No pointer: learners miss the next step. Repeat chapter 11: wasted time. |
@@ -442,9 +442,9 @@ Alternatives to each decision are in the [Decisions](#decisions) table and the l
 ## Risks
 
 1. Mission counts, XP totals and thresholds are estimates. Script's own estimate was about 2200 XP and shipped as 2300 (`tests/script/tiers.test.mjs:112`).
-2. The rank names, base thresholds, D14 and the chapter 6 correction are signed off. The chapter 14 correction is still a proposal until PR 15; a change is a rename or a small edit.
-3. The diagnostic codes in the outlines are expected values, not measured. The compiler is not run by any test in the repo yet, so each code is confirmed when its chapter is written.
-4. `intrinsic` in a hand lib and Node's type-stripping behaviour are unverified. They are checked in PR 15 and PR 16, and this spec does not assert them.
+2. The rank names, base thresholds, D14 and the chapter 6 and chapter 14 corrections are signed off.
+3. The diagnostic codes in the chapter 1 to 14 outlines are measured against `typescript@5.9.3` and pinned in `tests/typescript/content.test.mjs`. Those of chapters 15 to 18 are still expected values, confirmed when each chapter is written.
+4. `intrinsic` in a hand lib is verified (PR 15's spike passed: [Engine plan](#engine-plan)). Node's type-stripping behaviour is unverified until PR 16, and this spec does not assert it.
 5. The virtual Node reports `v22.12.0` while the repo requires Node 24 (`package.json:8`). PR 16 decides whether to bump it before it teaches `node file.ts`.
 6. The project panel UI may not separate from `app.js` cleanly. TypeScript Quest would then carry a thin copy (D1 in the Script spec).
 7. The TypeScript compiler's first load from jsDelivr on a phone is unmeasured. PR 13 measured the lib alternatives in Node only; its phone figures are estimates (see [Lib measurement](#lib-measurement)).
@@ -532,6 +532,7 @@ All PRs target `feat/222-ts-quest`. Sizes are changed lines: S under 150, M up t
 | `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, and a pointer on Script chapter 11's completion screen | 11 | updated |
 | `programming/typescript-quest/content/` chapter files, plus each chapter's quick-fire and Field guide entries in `quickfire.js` and `guide.js` (with the tier filter) | 12, 14, 15, 17 | new, updated |
 | `shared/tscheck.js` (project mode, tsconfig, larger lib) | 13 | updated |
+| `shared/tscheck.js` (four `intrinsic` case-changing types), `lib.test.mjs`, the Field guide tier filter in `guide.js` and `app.js` `renderGuide`, `shared/catalog.js`, the hub card in `programming/index.html`, `index.html` chapter tags, `README.md` and this spec's measured codes | 15 | updated |
 | `programming/typescript-quest/project.js`, the project panel in `app.js` and `index.html` (with `shared/nodeenv.js` loaded), `tests/typescript/project-harness.mjs` and `project-mode.test.mjs` | 14 | new, updated |
 | `shared/nodeenv.js`, the terminal interpreter, typings for Node | 16 | updated, moved |
 | `shared/trophies.js` | none | unchanged; effects come from the catalog |

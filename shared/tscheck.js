@@ -101,6 +101,10 @@ type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;
 type ReturnType<T extends (...a: any) => any> = T extends (...a: any) => infer R ? R : any;
 type Extract<T, U> = T extends U ? T : never;
 type NonNullable<T> = T & {};
+type Uppercase<S extends string> = intrinsic;
+type Lowercase<S extends string> = intrinsic;
+type Capitalize<S extends string> = intrinsic;
+type Uncapitalize<S extends string> = intrinsic;
 type Parameters<T extends (...a: any) => any> = T extends (...a: infer P) => any ? P : never;
 type InstanceType<T extends abstract new (...a: any) => any> = T extends abstract new (...a: any) => infer R ? R : any;
 interface ObjectConstructor {

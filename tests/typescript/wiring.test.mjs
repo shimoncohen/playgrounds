@@ -41,6 +41,14 @@ describe('TypeScript Quest wiring', () => {
     assert.ok(sch < at('app.js'), 'scheduler.js must load before app.js');
   });
 
+  it('loads the advanced chapters after ch-modules.js and before quickfire.js, in chapter order', () => {
+    const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const order = ['content/ch-modules.js', 'content/ch-keyof-and-indexed-access.js', 'content/ch-mapped-types.js', 'content/ch-conditional-types.js', 'content/ch-template-literal-types.js', 'content/quickfire.js'];
+    const at = order.map(s => tags.indexOf(s));
+    assert.ok(at.every(i => i >= 0), `a tag is missing: ${at}`);
+    assert.deepEqual(at, [...at].sort((a, b) => a - b));
+  });
+
   it('Script chapter 11 points to TypeScript Quest', () => {
     const ch = loadScriptContent().CH[10];
     assert.equal(ch.name, 'TypeScript');
