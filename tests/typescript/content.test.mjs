@@ -23,6 +23,10 @@ const META = [
   { name: 'Literal types and enums', badge: 'Destination Dial', tier: 'intermediate', missions: 6, outcomes: [[2540], [2339], [2322], 'clean', 'clean', 'clean'] },
   { name: 'Utility types', badge: 'Toolbelt Roll', tier: 'intermediate', missions: 6, outcomes: ['clean', [2741], [2540], [2741], [2353], [2353]] },
   { name: 'Modules', badge: 'Manifest Folder', tier: 'intermediate', mode: 'project', missions: 6, outcomes: ['clean', 'clean', [2305], 'clean', [2307], 'clean'] },
+  { name: 'keyof and indexed access', badge: 'Lookup Lens', tier: 'advanced', missions: 6, outcomes: [[2322], [2741], [2339], [2345], [2322], [2322]] },
+  { name: 'Mapped types', badge: 'Stencil Plate', tier: 'advanced', missions: 6, outcomes: [[2741], [2322], [2540], [2741], [2322], [2322]] },
+  { name: 'Conditional types', badge: 'Points Lever', tier: 'advanced', missions: 7, outcomes: [[2322], [2322], [2322], [2322], [2322, 2322], [2322], [2322]] },
+  { name: 'Template literal types', badge: 'Code Wheel', tier: 'advanced', missions: 6, outcomes: [[2322], [2820], [2353], [2322], [2741], [2345]] },
 ];
 
 // A "try it first" line in a how step names a code; each is measured here: [chapter, mission, source, codes].
@@ -41,6 +45,9 @@ const TRIES = [
   [6, 5, 'const ready: Promise<string> = Promise.resolve("Ashford")\nready.then((stop: number) => console.log(stop))', [2345]],
   [8, 5, 'type Fares = { Ashford: string | number; Barlow: string | number }\nconst fares = { Ashford: 4 } satisfies Fares', [1360]],
   [9, 1, 'interface Booking {\n  stop: string\n  wagon: number\n}\nconst change: Booking = { wagon: 5 }', [2741]],
+  [12, 2, 'type Partial<T> = { [K in keyof T]?: T[K] }', [2300]],
+  [13, 4, 'type ReturnType<F> = F extends (...args: any[]) => infer R ? R : never', [2300]],
+  [14, 3, 'type Event = "click" | "close"\ntype Handler = `on${Capitalize<Event>}`\ntype Table = { [K in Handler]: number }\nconst typo: Table = { onClick: 1, onClose: 2, onClse: 3 }', [2561]],
 ];
 // logs is read only by the chapter 8 missions that print an enum or a table: their patterns hold under the harness and the page rendering (tested below)
 const ALLOWED_C = ['src', 'diags', 'ok', 'err', 'has', 'types', 'logs'];
@@ -103,6 +110,22 @@ describe('typescript-quest chapters', () => {
     assert.equal(play(m, head + 'console.log(Stop, Route)').passed, false, 'one call');
   });
 
+  it('"Stamp every lamp" needs boolean and "Typed event table" needs () => void in the stencil, and "Pick a track" needs string, "left" and "right" in that order', () => {
+    const lamps = byTitle('Stamp every lamp');
+    const flags = t => `interface Lamps {\n  red: number\n  green: number\n}\ntype Flags<T> = { [K in keyof T]: ${t} }\nconst on: Flags<Lamps> = { red: true, green: false }\nconst half: Flags<Lamps> = { red: true }`;
+    assert.equal(play(lamps, flags('boolean')).passed, true);
+    assert.equal(play(lamps, flags('any')).passed, false, 'any value type');
+    const handlers = byTitle('Typed event table');
+    const h = v => `type Handlers<E extends string> = { [K in E as \`on\${Capitalize<K>}\`]: ${v} }\ntype Table = Handlers<"click" | "close">\nconst full: Table = { onClick: () => {}, onClose: () => {} }\nconst half: Table = { onClick: () => {} }`;
+    assert.equal(play(handlers, h('() => void')).passed, true);
+    assert.equal(play(handlers, h('any')).passed, false, 'any value type');
+    const track = byTitle('Pick a track');
+    const t = d => `type Track<T> = ${d}\nconst wagon: Track<string> = "left"\nconst crate: Track<number> = "left"`;
+    assert.equal(play(track, t('T extends string ? "left" : "right"')).passed, true);
+    assert.equal(play(track, t('T extends number ? "left" : "right"')).passed, false, 'other extends type');
+    assert.equal(play(track, t('T extends string ? "right" : "left"')).passed, false, 'swapped branches');
+  });
+
   it('"One coupling, any cargo" needs the generic function itself called with a text and a number', () => {
     const m = byTitle('One coupling, any cargo');
     const fn = 'function carry<T>(cargo: T): T {\n  return cargo\n}\n';
@@ -143,6 +166,16 @@ describe('typescript-quest chapters', () => {
         for (const m of ch.missions) assert.doesNotMatch(m.goal, GOAL_TAG, `goal of "${m.title}" is escaped by the page: backticks, no HTML tags`);
         // hints are raw HTML: from chapter 6 on a generic's angle brackets are written as &lt; and &gt;
         if (ci >= 5) for (const m of ch.missions) assert.doesNotMatch(m.hint, /<[a-z/]/i, `hint of "${m.title}": raw HTML, write < as &lt;`);
+      });
+
+      if (ci === 13) it('goals and intro hold no ${, because a template literal type cannot sit inside a backtick code span', () => {
+        assert.doesNotMatch(ch.intro, /\$\{/);
+        for (const m of ch.missions) assert.doesNotMatch(m.goal, /\$\{/, m.title);
+      });
+
+      if (ci >= 10) it('how and explain are raw HTML: a generic is written with &lt;, so no < is left once the real tags are taken out', () => {
+        for (const m of ch.missions) for (const t of [...m.how, m.explain])
+          assert.doesNotMatch(t.replace(/<\/?(b|i|em|strong|code|kbd|pre|br|span)\b[^>]*>/g, ''), /</, `"${m.title}": ${t}`);
       });
 
       it('suggests Script Quest chapters by their rail number and name', () => {
@@ -246,6 +279,18 @@ describe('typescript-quest chapters', () => {
           it('is not solved by its near-miss or by a lazy line', () => {
             assert.equal(play(m, m.wrong).passed, false, 'wrong');
             assert.equal(play(m, 'void 0').passed, false, 'void 0');
+          });
+
+          if (ci >= 10) it('reads the run on a positive and a negative probe: the answer with its type swapped for any, or without its refused line, does not pass', () => {
+            const typeLine = /(\btype\s+\w+(?:<[^>]*>)?\s*=)[^\n]*/g;
+            for (let n = 0; n < (m.code.match(typeLine) || []).length; n++) {
+              let k = 0;
+              const anyed = m.code.replace(typeLine, (all, head) => (k++ === n ? head + ' any' : all));
+              assert.equal(play(m, anyed).passed, false, `type line ${n + 1} = any`);
+            }
+            const lines = m.code.split('\n');
+            const refused = createSession().run(m.code).diags[0].line - 1;
+            assert.equal(play(m, lines.filter((_, k) => k !== refused).join('\n')).passed, false, 'without the refused probe');
           });
 
           it('uses world values, not foo or bar, and no loop (the quest does not teach loops)', () => {

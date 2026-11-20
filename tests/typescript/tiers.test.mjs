@@ -55,32 +55,44 @@ describe('typescript-quest tiers', () => {
     assert.deepEqual(tierCfg.tierEndRanks, { intermediate: 'Chief Engineer', advanced: 'Tour Architect', node: 'Timetable Master' });
   });
 
-  it('chapters 1 to 5 are Beginner at 10 XP a mission, the rest Intermediate at 15, and each tier is worth its missions plus 25 badge XP a chapter', () => {
+  it('chapters 1 to 5 are Beginner at 10 XP a mission, 6 to 10 Intermediate at 15, the rest Advanced at 20, and each tier is worth its missions plus 25 badge XP a chapter', () => {
+    const tierAt = i => (i < 5 ? 'beginner' : i < 10 ? 'intermediate' : 'advanced');
+    const xpAt = i => (i < 5 ? 10 : i < 10 ? 15 : 20);
     CH.forEach((_, i) => {
-      assert.equal(tiers.tierOf(i).id, i < 5 ? 'beginner' : 'intermediate', `chapter ${i + 1}`);
-      assert.equal(tiers.missionXp(i), i < 5 ? 10 : 15, `chapter ${i + 1}`);
+      assert.equal(tiers.tierOf(i).id, tierAt(i), `chapter ${i + 1}`);
+      assert.equal(tiers.missionXp(i), xpAt(i), `chapter ${i + 1}`);
     });
+    assert.ok(CH.length > 10, 'chapters 11 and on exist');
     const worth = (from, to, per) => CH.slice(from, to).reduce((sum, c) => sum + c.missions.length * per + 25, 0);
     assert.equal(tiers.cumulativeXp('beginner'), worth(0, 5, 10));
-    assert.equal(tiers.cumulativeXp('intermediate'), worth(0, 5, 10) + worth(5, CH.length, 15));
+    assert.equal(tiers.cumulativeXp('intermediate'), worth(0, 5, 10) + worth(5, 10, 15));
+    assert.equal(tiers.cumulativeXp('advanced'), worth(0, 5, 10) + worth(5, 10, 15) + worth(10, CH.length, 20));
   });
 
   it('the real Intermediate tier-end threshold is 1030 XP: 455 for Beginner, then five chapters of six missions at 15 XP plus 25 badge XP each', () => {
-    assert.deepEqual(CH.slice(5).map(c => c.missions.length), [6, 6, 6, 6, 6]);
+    assert.deepEqual(CH.slice(5, 10).map(c => c.missions.length), [6, 6, 6, 6, 6]);
     assert.equal(tiers.cumulativeXp('beginner'), 455);
     assert.equal(tiers.cumulativeXp('intermediate'), 455 + 30 * 15 + 5 * 25);
     assert.equal(tiers.cumulativeXp('intermediate'), 1030);
-    assert.deepEqual(tiers.ranks().pop(), [1030, 'Chief Engineer']);
+    assert.deepEqual(tiers.ranks().find(r => r[1] === 'Chief Engineer'), [1030, 'Chief Engineer']);
   });
 
-  it('ranks() is the base ladder plus the Intermediate tier-end name once that tier has chapters', () => {
+  it('the real Advanced tier-end threshold is 1630 XP: 1030 for the two tiers below, then 25 missions at 20 XP plus 25 badge XP for each of four chapters', () => {
+    assert.deepEqual(CH.slice(10).map(c => c.missions.length), [6, 6, 7, 6]);
+    assert.equal(tiers.cumulativeXp('advanced'), 1030 + 25 * 20 + 4 * 25);
+    assert.equal(tiers.cumulativeXp('advanced'), 1630);
+    assert.deepEqual(tiers.ranks().pop(), [1630, 'Tour Architect']);
+  });
+
+  it('ranks() is the base ladder plus the Intermediate and Advanced tier-end names once those tiers have chapters', () => {
     const total = tiers.cumulativeXp('beginner');
-    assert.deepEqual(tiers.ranks(), [...BASE, [tiers.cumulativeXp('intermediate'), 'Chief Engineer']]);
+    assert.deepEqual(tiers.ranks(), [...BASE, [tiers.cumulativeXp('intermediate'), 'Chief Engineer'], [tiers.cumulativeXp('advanced'), 'Tour Architect']]);
     assert.equal(tiers.rankFor(0).name, 'Stowaway');
     assert.equal(tiers.rankFor(49).name, 'Stowaway');
     assert.equal(tiers.rankFor(50).name, 'Ticket Clerk');
     assert.equal(tiers.rankFor(total).name, BASE.filter(r => r[0] <= total).pop()[1]);
     assert.equal(tiers.rankFor(tiers.cumulativeXp('intermediate')).name, 'Chief Engineer');
+    assert.equal(tiers.rankFor(tiers.cumulativeXp('advanced')).name, 'Tour Architect');
   });
 
   it('with chapters in every tier, each tier-end threshold is that tier\'s cumulative XP', () => {
@@ -106,16 +118,18 @@ describe('typescript-quest tiers', () => {
     assert.equal(badgePay(S, 0, undefined), 0);
   });
 
-  it('renderRail draws a Beginner and an Intermediate header and data-c buttons numbered from 1 with n/m counts', () => {
+  it('renderRail draws a Beginner, an Intermediate and an Advanced header and data-c buttons numbered from 1 with n/m counts', () => {
     const n = CH[0].missions.length;
     const S = { xp: 0, done: { '0.0': 1, '0.1': 1 }, chap: 0, cur: {}, best: 0 };
     const el = {};
     renderRail(el, S);
-    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 2);
+    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 3);
     assert.match(el.innerHTML, /data-tier="beginner"/);
     assert.match(el.innerHTML, /data-tier="intermediate"/);
+    assert.match(el.innerHTML, /data-tier="advanced"/);
     assert.match(el.innerHTML, /Beginner/);
     assert.match(el.innerHTML, /Intermediate/);
+    assert.match(el.innerHTML, /Advanced/);
     assert.deepEqual([...el.innerHTML.matchAll(/data-c="(\d+)"/g)].map(m => +m[1]), CH.map((_, i) => i));
     assert.deepEqual([...el.innerHTML.matchAll(/class="num">([^<]+)</g)].map(m => m[1]), CH.map((_, i) => String(i + 1)));
     assert.match(el.innerHTML, new RegExp(`<span class="ct">2/${n}</span>`));

@@ -47,6 +47,14 @@ const SNIPPETS = [
   ['Date from a string and a number', 'const a = new Date("2026-01-01")\nconst b = new Date(0)\nconst diff: number = a.getTime() - b.getTime()', []],
   ['Date getTime is a number', 'const d = new Date()\nconst s: string = d.getTime()', [2322]],
   ['Date has no such member', 'new Date().nope', [2339]],
+  ['Uppercase', 'type U = Uppercase<"ab">\nconst a: U = "AB"\nconst b: U = "ab"', [2322]],
+  ['Lowercase', 'type L = Lowercase<"AB">\nconst a: L = "ab"\nconst b: L = "AB"', [2322]],
+  ['Capitalize', 'type C = Capitalize<"ab">\nconst a: C = "Ab"\nconst b: C = "ab"', [2322]],
+  ['Uncapitalize', 'type C = Uncapitalize<"AB">\nconst a: C = "aB"\nconst b: C = "AB"', [2322]],
+  ['Capitalize distributes over a union', 'type C = Capitalize<"a" | "b">\nconst a: C = "A"\nconst b: C = "B"\nconst c: C = "a"', [2820]],
+  ['on-handler names from Capitalize', 'type H = `on${Capitalize<"click" | "hover">}`\nconst a: H = "onClick"\nconst b: H = "onHover"\nconst c: H = "onclick"', [2820]],
+  ['redeclaring a lib type', 'type Partial<T> = { [P in keyof T]: T[P] }', [2300]],
+  ['Awaited unwraps nested promises', 'type A = Awaited<Promise<Promise<string>>>\nconst a: A = "x"\nconst b: A = 1', [2322]],
 ];
 
 describe('hand lib additions', () => {

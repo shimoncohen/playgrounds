@@ -44,6 +44,14 @@ const FIRE=[
 {ch:7,c:'type Fares = { Ashford: number; Barlow: number }\nconst fares = { Ashford: 4 } satisfies Fares',o:['TS2741','TS1360','TS2322','No error'],a:1,w:'satisfies checks the value against the type, and Barlow is missing, so it does not satisfy it: TS1360.'},
 {ch:8,c:'type Wagon = "red" | "blue"\nconst seats: Record<Wagon, number> = { red: 40 }',o:['TS2353','TS2322','TS2741','No error'],a:2,w:'Record wants a number for every wagon name, and blue is missing: TS2741.'},
 {ch:8,c:'interface Booking {\n  name: string\n  wagon: number\n  price: number\n}\nconst stub: Omit<Booking, "price"> = { name: "Mumbles", wagon: 4 }',o:['TS2741','No error','TS2353','TS2322'],a:1,w:'Omit drops the price, so a stub with just the name and the wagon is complete. No error.'},
+{ch:10,c:'interface Lamps {\n  red: number\n  green: number\n}\ntype Lamp = keyof Lamps\nconst pick: Lamp = "amber"',o:['TS2339','TS2322','TS2741','No error'],a:1,w:'keyof Lamps is "red" | "green", and "amber" is not one of those names: TS2322.'},
+{ch:10,c:'function pick<T, K extends keyof T>(thing: T, key: K): T[K] {\n  return thing[key]\n}\nconsole.log(pick({ red: 1 }, "red"))',o:['TS2345','TS2339','No error','TS2322'],a:2,w:'"red" is a name the object has, so the key constraint is met. No error.'},
+{ch:11,c:'type Flags<T> = { [K in keyof T]: boolean }\nconst on: Flags<{ red: number; green: number }> = { red: true }',o:['TS2322','No error','TS2353','TS2741'],a:3,w:'The stencil keeps every key needed, so a value without green is refused: TS2741.'},
+{ch:11,c:'type Frozen<T> = { readonly [K in keyof T]: T[K] }\nconst lamp: Frozen<{ red: number }> = { red: 1 }\nlamp.red = 2',o:['TS2540','TS2322','TS2741','No error'],a:0,w:'readonly in the stencil locks every key, so the write is refused: TS2540.'},
+{ch:12,c:'type Track<T> = T extends string ? "left" : "right"\nconst crate: Track<number> = "left"',o:['TS2345','TS2322','No error','TS2741'],a:1,w:'A number does not extend string, so Track<number> is "right", and "left" is refused: TS2322.'},
+{ch:12,c:'type Cargo<T> = T extends (infer E)[] ? E : never\nconst crate: Cargo<string[]> = "Ashford"',o:['TS2322','TS2339','TS2345','No error'],a:3,w:'infer E catches string as the item type, so a text fits. No error.'},
+{ch:13,c:'type Town = "ashford" | "barlow"\ntype Loud = Uppercase<Town>\nconst c: Loud = "ashford"',o:['TS2322','TS2820','TS2353','No error'],a:1,w:'Loud is "ASHFORD" | "BARLOW". "ashford" is a near miss, so the checker adds a "did you mean": TS2820.'},
+{ch:13,c:'type Address = `${"Ashford" | "Barlow"}-A1`\nconst a: Address = "Cobham-A1"',o:['TS2353','TS2345','No error','TS2322'],a:3,w:'Address is "Ashford-A1" | "Barlow-A1", and "Cobham-A1" is not one of them: TS2322.'},
 ];
 const qfOpen=(done,tier)=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'.'+j])&&(!tier||CH[q.ch].tier===tier));
 TSQ.FIRE=FIRE;

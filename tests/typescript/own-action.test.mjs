@@ -11,6 +11,8 @@ const { CH } = loadTypescriptContent();
 // 'C<chapter>M<mission>:C<chapter>M<mission>' (1-based) -> why the second answer may also complete the first. Empty: none do.
 const ALLOWED = {
   'C8M4:C8M6': 'the answer of mission 6 prints the enum too, and printing the enum is all mission 4 asks',
+  'C3M4:C14M3': 'chapter 3 mission 4 asks only for TS2353, and a name that is not in the handler table is an unknown property, which is always TS2353',
+  'C3M3:C12M3': 'chapter 3 mission 3 asks only for TS2540 and the word readonly, and a Readonly rebuild can show its lock only by a write to a readonly property',
   'C3M4:C9M5': 'chapter 3 mission 4 asks only for TS2353, and the Pick answer is an excess property in an object written in place',
   'C3M4:C9M6': 'chapter 3 mission 4 asks only for TS2353, and the Omit answer is an excess property in an object written in place',
 };
@@ -37,6 +39,12 @@ const BASE_BATTERY = [
   'enum Stop { Ashford }',
   'const board = { stop: "Ashford" } as const',
   'let part: Partial<{ seat: string }>',
+  'type Lamp = keyof { red: number }',
+  'type Flags<T> = { [K in keyof T]: boolean }',
+  'type Track<T> = T extends string ? "left" : "right"',
+  'type Cargo<T> = T extends (infer E)[] ? E : never',
+  'type Loud = Uppercase<"ashford">',
+  'type Address = `${"Ashford" | "Barlow"}-A1`',
 ];
 
 // A check that reads c.has('N') or c.types.includes('N') must not pass on a bare declaration of N.
