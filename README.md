@@ -9,7 +9,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | | Playground | You will learn | Folder |
 |---|---|---|---|
 | 📜 | **Script Quest** | JavaScript, TypeScript and Node, in a real console | [`programming/script-quest/`](programming/script-quest/) |
-| 🟦 | **TypeScript Quest** | Types and inference, unions and narrowing, aliases and interfaces, typed functions, arrays and tuples, checked by the real TypeScript compiler | [`programming/typescript-quest/`](programming/typescript-quest/) |
+| 🟦 | **TypeScript Quest** | Types and inference, unions and narrowing, aliases and interfaces, typed functions, arrays and tuples, generics, classes and access modifiers, literal types and enums, utility types, modules across several files, checked by the real TypeScript compiler | [`programming/typescript-quest/`](programming/typescript-quest/) |
 | 🐍 | **Python Quest** | Python, with a memory map and step-by-step replay | [`programming/python-quest/`](programming/python-quest/) |
 | ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`programming/cpp-quest/`](programming/cpp-quest/) |
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`programming/shell-quest/`](programming/shell-quest/) |

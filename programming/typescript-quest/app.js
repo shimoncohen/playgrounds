@@ -89,7 +89,7 @@ function hl(src){
 function echoInput(src,pr){const ls=src.split('\n');const pad=' '.repeat(Math.max(0,pr.length-4))+'... ';
   line(ls.map((l,i)=>'<span class="pr">'+esc(i?pad:pr)+'</span>'+hl(l)).join('\n'),'in')}
 
-const MODE='ts';
+let MODE='ts';
 let REALM=null,HIST=[],DECLS=new Map(),TYPES=new Map(),RUN=null,SYNC=false;
 const hooks={
   out(level,args){
@@ -215,7 +215,7 @@ async function submit(){
 
 function curIdx(){const c=S.chap;if(S.cur[c]!==undefined)return S.cur[c];const j=CH[c].missions.findIndex((_,j)=>!S.done[mk(c,j)]);return j}
 function curMission(){const j=curIdx();return j>=0?CH[S.chap].missions[j]:null}
-function ctx(){return {...RUN,has:n=>DECLS.has(n),types:[...TYPES.keys()]}}
+function ctx(){return MODE==='project'?{...RUN}:{...RUN,has:n=>DECLS.has(n),types:[...TYPES.keys()]}}
 function tryComplete(){
   if(!RUN||RUN.mode!==MODE)return;
   const c=S.chap,j=curIdx();if(j<0)return;const m=CH[c].missions[j];
@@ -255,15 +255,16 @@ function renderMission(pop){
       ${ch.first?`<p class="note">Suggested first, in <a href="../script-quest/">Script Quest</a>: ${ch.first.map(([n,t])=>esc(t)+' (chapter '+n+')').join(' and ')}. Nothing is locked.</p>`:''}
       <h2>${esc(m.title)}</h2>
       ${j===0?'<p class="intro">'+HowSteps.tick(ch.intro,esc)+'</p>':''}
-      <div class="goal"><div class="label">Your mission</div><p>${HowSteps.tick(m.goal,esc)}</p><pre>${hl(m.code)}</pre></div>
+      <div class="goal"><div class="label">Your mission</div><p>${HowSteps.tick(m.goal,esc)}</p>${typeof m.code==='string'?'<pre>'+hl(m.code)+'</pre>':''}</div>
       ${m.expectError?'<span class="errgoal">Goal: get an error</span>':''}
       ${anatHTML(m.anat)}
       ${HowSteps.html(m.how)}
       <p class="explain">${m.explain}</p>
       <div class="actions"><button class="btn" id="fill">Type it for me</button><button class="btn ghost" id="hintBtn">Hint</button><button class="btn ghost" id="skip">Skip</button></div>
-      <p class="hint" id="hint" hidden>${m.hint||'Type the code exactly as shown, then press Enter. For several lines, use Shift+Enter between them.'}</p>
+      <p class="hint" id="hint" hidden>${m.hint||(MODE==='project'?'Change the files as the goal says, then press Run.':'Type the code exactly as shown, then press Enter. For several lines, use Shift+Enter between them.')}</p>
       ${dotsHTML(c,j)}`;
   }
+  if(MODE==='project')projEnter();
   if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop')}
 }
 missionEl.addEventListener('click',e=>{
@@ -275,6 +276,7 @@ missionEl.addEventListener('click',e=>{
   if(b.id==='hintBtn'){$('#hint').hidden=!$('#hint').hidden;return}
   if(b.id==='skip'){const n=CH[S.chap].missions.length,j=curIdx();if(j+1<n)goMission(j+1);else{delete S.cur[S.chap];save();renderMission()}return}
   if(b.id==='fill'){const m=curMission();if(!m)return;
+    if(MODE==='project')return fillFile(m);
     cmd.value=m.code;sizeCmd();cmd.focus({preventScroll:true});cmd.setSelectionRange(cmd.value.length,cmd.value.length)
   }
 });
@@ -314,6 +316,7 @@ function boxBody(v,owners){
   return '<div class="boxval">'+shortV(v,owners)+'</div>';
 }
 function renderMem(){
+  if(MODE==='project')return;
   const names=[...DECLS.keys()];const vals={};names.forEach(n=>vals[n]=peek(n));
   const owners={};names.forEach(n=>{const v=vals[n];if(v&&typeof v==='object'){const id=refId(v);(owners[id]=owners[id]||[]).push(n)}});
   const snap={};let boxes='';
@@ -337,16 +340,129 @@ function renderMem(){
 function bootCompiler(){
   loadTS().then(ok=>{line(ok?'TypeScript compiler ready.':COMPILER_FAILED,ok?'sys':'err');const m=curMission();if(ok&&m)ensureNeeds(m)});
 }
+const ED={file:null,dirty:false};
+const ed=$('#ed'),gutter=$('#gutter'),edRun=$('#edRun');
+/* project files are never saved, so a reload loses them */
+let PKEY=null,PFILES={},RUNID=0,PR=null,PEND=false,NODE=null,tabFree=false;
+const pfiles=()=>PFILES[PKEY];
+function projCancel(){
+  RUNID++;if(PR)PR.stop();PR=null;PEND=false;edRun.disabled=false;killRealm(NODE);NODE=null;
+}
+function projEnter(){
+  const j=curIdx();
+  if(j<0){
+    if(!PKEY){$('#editor').hidden=$('#edbar').hidden=true;mapPanel.innerHTML='<h3>Files</h3><p class="mapsub">Chapter complete. Pick a mission dot to replay it and get its files back.</p>'}
+    return;
+  }
+  $('#editor').hidden=$('#edbar').hidden=false;
+  const key=S.chap+'.'+j,m=CH[S.chap].missions[j];
+  if(key===PKEY)return renderFiles();
+  if(ED.dirty)saveFile();
+  projCancel();PKEY=key;ED.file=null;ED.dirty=false;
+  if(!PFILES[key])PFILES[key]={...m.start};
+  openFile(m.open in PFILES[key]?m.open:Object.keys(PFILES[key])[0]||null);
+}
+function renderFiles(flash){
+  const f=pfiles(),rows=Object.keys(f).sort().map(n=>{const json=/\.json$/.test(n);const size=f[n].split('\n').filter((l,i,a)=>i<a.length-1||l).length;
+    return `<button class="frow${ED.file===n?' open':''}${flash===n?' flash':''}" data-f="${esc(n)}"><span class="fi ${json?'json':'js'}">${json?'JSON':'TS'}</span>${esc(n)}<span class="sz">${size} line${size===1?'':'s'}</span></button>`}).join('');
+  mapPanel.innerHTML=`<h3>Files</h3><p class="mapsub">The project for this mission. Click a file to open it, change it, then press <b>Run</b>: that compiles every file and runs <code>main.ts</code>. The files stay in this tab until you reload.</p>
+    <div class="files">${rows}</div>
+    <form class="newfile" id="newfile"><input id="nfName" placeholder="new-file.ts" aria-label="New file name" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" type="submit">New file</button></form>
+    <div class="legend"><button class="linkbtn" id="resetFiles" type="button">Reset files</button></div>`;
+}
+function edSync(){
+  const n=ed.value.split('\n').length;gutter.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
+  ed.style.height='auto';ed.style.height=ed.scrollHeight+'px';
+  $('#edtab').innerHTML=ED.file?esc(ED.file)+(ED.dirty?' <span class="dirty" title="Unsaved changes">●</span>':''):'no file open';
+}
+function openFile(f){
+  if(ED.file&&ED.dirty)saveFile();
+  ED.file=f;ED.dirty=false;ed.disabled=!f;ed.value=f?pfiles()[f]:'';
+  edSync();renderFiles();
+}
+function saveFile(){
+  if(!ED.file)return false;
+  pfiles()[ED.file]=ed.value;ED.dirty=false;edSync();renderFiles(ED.file);return true;
+}
+function fillFile(m){
+  const f=ED.file||m.open;
+  if(m.code[f]===undefined){line('There is no example text for '+esc(f||'this file')+'. Open another file.','sys');return}
+  if(f!==ED.file)openFile(f);
+  ed.value=m.code[f];ED.dirty=true;edSync();ed.focus();
+}
+async function runProject(){
+  if(MODE!=='project'||PEND||!pfiles())return;
+  saveFile();
+  const my=++RUNID,files={...pfiles()};
+  PEND=true;edRun.disabled=true;clearScreen();
+  const live=fn=>(...a)=>{if(my===RUNID)fn(...a)};
+  try{
+    if(!(await loadTS())){if(my===RUNID)line(COMPILER_FAILED,'err');return}
+    if(my!==RUNID)return;
+    const t=Date.now();
+    PR=TSQ.projectRun(files,{
+      makeRealm:hk=>{killRealm(NODE);NODE=makeRealm(hk);return NODE},
+      fmt:a=>toText(fmtArgs(a)),
+      onOut:live((level,args)=>line(level==='raw'?esc(args[0]):level==='table'?tableHTML(args[0]):fmtArgs(args),level==='warn'?'warn':level==='error'?'err':'')),
+      onErr:live((e,prom)=>line('Uncaught'+(prom?' (in promise)':'')+' '+esc(errName(e)),'err')),
+      onSys:live(s=>line(esc(s),'sys')),
+      onClear:live(clearScreen),
+    });
+    const res=await PR;
+    if(my!==RUNID)return;
+    RUN={...res,src:'main.ts',mode:'project',t,logs:res.out};
+    res.diags.forEach(d=>line('<span class="loc">'+esc(d.file)+':'+d.line+':'+d.col+' </span>error TS'+d.code+': '+esc(d.msg),'diag'));
+    if(res.diags.length)line('Nothing ran. TypeScript stopped it before it could cause trouble.','sys');
+    else if(res.msg)line(esc(res.msg),'tip');
+    else if(res.ok&&!res.out.length)line('main.ts ran and printed nothing.','sys');
+    tryComplete();
+  }finally{if(my===RUNID){PEND=false;PR=null;edRun.disabled=false}}
+}
+mapPanel.addEventListener('click',e=>{
+  if(MODE!=='project')return;
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.f!==undefined)openFile(b.dataset.f);
+  else if(b.id==='resetFiles'){
+    const[c,j]=PKEY.split('.'),m=CH[c].missions[j];
+    projCancel();PFILES[PKEY]={...m.start};ED.dirty=false;
+    openFile(m.open in PFILES[PKEY]?m.open:Object.keys(PFILES[PKEY])[0]||null);
+    line('Files reset to the starting files.','sys');
+  }
+});
+mapPanel.addEventListener('submit',e=>{
+  e.preventDefault();const inp=$('#nfName'),n=(inp.value||'').trim();
+  if(!/^[\w-]+(?:\/[\w-]+)*\.ts$/.test(n)){inp.setCustomValidity('Use a name that ends in .ts, with letters, numbers, dashes or underscores. A folder is fine: util/shout.ts');inp.reportValidity();return}
+  inp.setCustomValidity('');const f=pfiles();if(!(n in f))f[n]='';openFile(n);ed.focus();
+});
+mapPanel.addEventListener('input',e=>{if(e.target.id==='nfName')e.target.setCustomValidity('')});
+ed.addEventListener('input',()=>{ED.dirty=true;edSync()});
+ed.addEventListener('blur',()=>{tabFree=false});
+ed.addEventListener('keydown',e=>{
+  const mod=e.ctrlKey||e.metaKey;
+  if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();if(saveFile())line('Saved '+esc(ED.file),'sys');return}
+  if(mod&&e.key==='Enter'){e.preventDefault();runProject();return}
+  if(e.key==='Escape'){tabFree=true;return}
+  if(e.key==='Tab'&&!e.shiftKey&&!tabFree){e.preventDefault();ed.setRangeText('  ',ed.selectionStart,ed.selectionEnd,'end');ED.dirty=true;edSync();return}
+  if(e.key==='Enter'){const s=ed.selectionStart,ln=ed.value.slice(0,s).split('\n').pop();const ind=ln.match(/^\s*/)[0]+(/[{(\[]\s*$/.test(ln)?'  ':'');if(ind){e.preventDefault();ed.setRangeText('\n'+ind,s,ed.selectionEnd,'end');ED.dirty=true;edSync()}}
+});
+$('#edSave').onclick=()=>{if(saveFile())line('Saved '+esc(ED.file),'sys')};
+edRun.onclick=runProject;
+
 function setChapter(i){
+  if(PKEY&&ED.dirty)saveFile();
+  projCancel();PKEY=null;ED.file=null;ED.dirty=false;ed.value='';ed.disabled=true;edSync();
   S.chap=i;save();
-  const ch=CH[i];
+  const ch=CH[i];MODE=ch.mode;
+  const pj=MODE==='project';
+  $('#editor').hidden=!pj;$('#edbar').hidden=!pj;
+  $('.inputline').hidden=pj;$('#keys').hidden=pj;$('#termbar').hidden=pj;
   clearScreen();RUN=null;
   promptEl.textContent='ts> ';
-  $('#crumbs').innerHTML='<span class="modepill">TypeScript</span><span>Real TypeScript type-checking, then the code runs.</span>';
+  $('#crumbs').innerHTML='<span class="modepill">TypeScript</span><span>'+(pj?'Edit the files, then press Run. Real TypeScript type-checking, then <code>main.ts</code> runs.':'Real TypeScript type-checking, then the code runs.')+'</span>';
   $('#fresh').textContent='Fresh console';
   freshConsole();
   line('Chapter '+(i+1)+': '+esc(ch.name),'tip');
-  line('Type TypeScript and press Enter. Loading the compiler…','sys');
+  line(pj?'Edit the files and press Run. Loading the compiler…':'Type TypeScript and press Enter. Loading the compiler…','sys');
   renderMem();
   bootCompiler();
   renderChapters();renderMission();

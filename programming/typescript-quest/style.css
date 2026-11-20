@@ -134,6 +134,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 @media (pointer:coarse){#cmd{font-size:16px}}
 .termbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12.5px;color:var(--muted)}
 .termbar .sp{flex:1}
+.inputline[hidden],.keys[hidden],.termbar[hidden]{display:none}
 .procbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:6px 10px;border-radius:9px;background:var(--surface-2);font-size:13px;font-family:var(--font-mono);overflow-wrap:anywhere}
 .procbar[hidden]{display:none}
 .procbar #procTxt{flex:1 1 200px;min-width:0}
@@ -154,7 +155,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .edbtn.go{background:var(--term-prompt);color:var(--accent-ink)}
 .edbody{display:flex;min-height:220px;max-height:340px;overflow:auto}
 .gutter{font-family:var(--font-mono);font-size:13px;line-height:1.6;color:var(--term-dim);text-align:right;padding:10px 8px 10px 12px;user-select:none;white-space:pre;flex:none}
-#ed{flex:1;min-width:0;background:transparent;border:0;outline:0;resize:none;color:var(--term-fg);font-family:var(--font-mono);font-size:13px;line-height:1.6;padding:10px 12px 10px 4px;white-space:pre;overflow:hidden;caret-color:var(--term-prompt);tab-size:2}
+#ed{flex:1;min-width:0;background:transparent;border:0;outline:0;resize:none;color:var(--term-fg);font-family:var(--font-mono);font-size:13px;line-height:1.6;padding:10px 12px 18px 4px;white-space:pre;overflow-x:auto;overflow-y:hidden;caret-color:var(--term-prompt);tab-size:2}
 @media (pointer:coarse){#ed{font-size:16px}.gutter{font-size:16px}}
 .edempty{color:var(--term-dim);font-size:13px;padding:14px 16px;font-family:var(--font-body)}
 
