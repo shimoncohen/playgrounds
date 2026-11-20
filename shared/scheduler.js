@@ -33,6 +33,17 @@ function guardSource(src,parse){
   return out+src.slice(at);
 }
 
+// The first tick after a reset asks `defer` to reset again, so the count restarts when control returns to the event loop.
+function makeGuard(defer){
+  let n=0,armed=false;
+  function reset(){n=0;armed=false}
+  function tick(){
+    if(!armed){armed=true;defer(reset)}
+    if(++n>LOOP_LIMIT)throw guardError();
+  }
+  return {tick,reset};
+}
+
 function defaultHop(){
   if(typeof root.MessageChannel==='function'){
     const ch=new root.MessageChannel();let f=null;
@@ -146,5 +157,5 @@ function create(opts){
     dateNow:()=>{now+=1;return START_EPOCH+now},
   };
 }
-root.Scheduler={create,guardSource,COST,LOOP_LIMIT,MAX_VIRTUAL_MS,MAX_CALLBACKS,GUARD_NAME};
+root.Scheduler={create,guardSource,makeGuard,COST,LOOP_LIMIT,MAX_VIRTUAL_MS,MAX_CALLBACKS,GUARD_NAME};
 })(typeof window !== 'undefined' ? window : globalThis);

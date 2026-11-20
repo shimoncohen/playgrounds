@@ -75,7 +75,7 @@ const FIRST = {
   class:           [/\bclass(es)?\b/i, null],
   generic:         [/\bgenerics?\b/i, null],
   tsconfig:        [/tsconfig/i, null],
-  // the quest teaches no loops; a loop in a mission would freeze the tab until the loop guard exists
+  // the quest still teaches no loops, so no chapter claims a loop concept
   loop:            [/\bloops?\b|\b(while|for)\s*\(|\bdo\s*\{/i, null],
 };
 

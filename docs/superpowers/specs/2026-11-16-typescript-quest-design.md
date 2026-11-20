@@ -1,6 +1,6 @@
 # TypeScript Quest: design
 
-Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). One decision is still open: how the tests run the TypeScript compiler in Node (see [Compiler in Node tests](#compiler-in-node-tests)). Three proposals wait for the user's sign-off: the rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)), and the Suggested-first corrections for chapters 6 and 14 ([Suggested first](#suggested-first)).
+Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). The tests run the TypeScript compiler in Node from a pinned dev dependency (see [Compiler in Node tests](#compiler-in-node-tests)). Three proposals wait for the user's sign-off: the rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)), and the Suggested-first corrections for chapters 6 and 14 ([Suggested first](#suggested-first)).
 
 **Contents:** [TLDR](#tldr) · [Goal](#goal) · [Non-goals](#non-goals) · [Current state](#current-state) · [Story](#story) · [Chapters](#chapters) ([Beginner](#beginner-booking-depot-chapters-1-to-5) · [Intermediate](#intermediate-rail-yard-chapters-6-to-10) · [Advanced](#advanced-signal-tower-chapters-11-to-14) · [TypeScript with Node](#typescript-with-node-engine-wagon-chapters-15-to-18)) · [Tier XP and ranks](#tier-xp-and-ranks) · [Suggested first](#suggested-first) · [Engine plan](#engine-plan) · [Decisions](#decisions) · [Trophy Room](#trophy-room) · [Alternatives](#alternatives) · [Risks](#risks) · [Test plan](#test-plan) · [Observability](#observability) · [Performance](#performance) · [PR chain](#pr-chain) · [Touchpoints](#touchpoints)
 
@@ -43,8 +43,8 @@ All of this was read from the tree at the base of this branch.
 - `TSCheck.{init, check, load}` (`:124`). `load` fetches TypeScript 5.9.3 from jsDelivr, with a second URL as a fallback (`:6-7`).
 - One hand-written `TS_LIB` string (`:18-101`). `interface Object` is at `:18` and an empty `interface Symbol` at `:25`.
 - `check(prev, src)` (`:102`) builds a `lib.d.ts` plus a `main.ts` made of the previous REPL snippets joined with `;`, with `noLib`, `strict`, ES2020, `module: None` and `noEmit`. It reports only the diagnostics that fall on the new lines, emits JavaScript with `transpileModule`, and extracts interface and type declarations for the memory panel.
-- There is no multi-file support, no `import` and no tsconfig.
-- `TS_LIB` has no `Object` or `Symbol` constructor values (so no `Object.keys`), no `Map`, `Set`, `Date` or `setInterval`. `console` has only `log`, `error`, `warn` and `table`. There is no `Extract`, `NonNullable`, `Parameters` or `InstanceType`, and no `Uppercase`, `Lowercase`, `Capitalize` or `Uncapitalize`.
+- Before PR 13 there was no multi-file support, no `import` and no tsconfig; PR 13 added `checkProject`.
+- Before PR 13, `TS_LIB` had no `Object` or `Symbol` constructor values (so no `Object.keys`), no `Map`, `Set`, `Date` or `setInterval`. PR 13 added `Object` (`keys`, `values`, `entries`), `Map`, `Set` and `Date`, but not `Symbol` or `setInterval`, and no iterators, so `for...of` over a `Map`, a `Set` or an array still reports an error (TS2488). `console` has only `log`, `error`, `warn` and `table`. `Extract`, `NonNullable`, `Parameters` and `InstanceType` were missing and PR 13 added them; there is still no `Uppercase`, `Lowercase`, `Capitalize` or `Uncapitalize`.
 - It does have `Partial`, `Required`, `Readonly`, `Pick`, `Record`, `Exclude`, `Omit`, `ReturnType` and `Awaited` (`:78`, `:94-101`), and `Promise<T>` with `then`, `catch` and `finally` (`:68-77`).
 
 **The virtual Node (`shared/nodeenv.js`).**
@@ -64,7 +64,7 @@ All of this was read from the tree at the base of this branch.
 - A mission check receives `{...RUN, has, kind, val, types}`, which includes `diags` (`:222-249`).
 - A visible message and a retry appear when the compiler fails to load (`:225`).
 - `runShell` is at `:440`. `cd` only prints a tip (#247, the issue for `cd` and `rm -r` in the virtual terminal).
-- The `execJS` path has no loop guard (#241, the issue for a loop guard in the Script console), so TypeScript Quest's REPL chapters would freeze the tab on `while (true) {}` unless PR 11 folds the fix in.
+- The `execJS` path had no loop guard (#241, the issue for a loop guard in the Script console). PR 13 fixes it for both consoles: `prepare` in `shared/jsrealm.js` guards the code it returns with `Scheduler.guardSource`, and each realm owns a guard from `Scheduler.makeGuard`.
 
 **Script chapter 11 ("TypeScript").** It is the only TypeScript teaching today (`programming/script-quest/content/ch-beyond-the-browser.js:6-50`). It has variable annotations, typed functions, an interface with an optional property, a missing property, a literal union, inference, and one generic function (ending at `:49`). It does not teach `Promise<T>`: the word `Promise` does not appear in that file.
 
@@ -385,20 +385,20 @@ What each chapter needs, and which PR supplies it ("ok" means the base already s
 
 | Chapters | Need | Supplied by |
 |---|---|---|
-| 1 to 5 | REPL `ts`, unions, narrowing, arrays, tuples, `unknown` | ok (`check` as is). `Object.keys` and `Map` are absent from `TS_LIB`; if a mission uses them, PR 13 adds them |
-| 6, 9, 12, 13 | Generics, utility and mapped types, `infer`, `Promise<T>` | ok, except `Extract`, `NonNullable`, `Parameters` and `InstanceType` (PR 13). `Promise<T>` is first taught in chapter 6 |
+| 1 to 5 | REPL `ts`, unions, narrowing, arrays, tuples, `unknown` | ok (`check` as is; every answer's outcome is unchanged by the lib growth). `Object.keys`, `Object.values`, `Object.entries`, `Map`, `Set` and `Date` are in `TS_LIB` since PR 13, but there are no iterators, so `for...of` over them reports TS2488 |
+| 6, 9, 12, 13 | Generics, utility and mapped types, `infer`, `Promise<T>` | ok: `Extract`, `NonNullable`, `Parameters` and `InstanceType` are in `TS_LIB` since PR 13. `Promise<T>` is first taught in chapter 6 |
 | 7, 8 | `abstract`, parameter properties, enums, `satisfies` | ok (`transpileModule` emits them) |
-| 10 | Several files, `import` and `export` | PR 13's project checker, run through the Node env's CommonJS |
+| 10 | Several files, `import` and `export` | `TSCheck.checkProject` (PR 13): `import` between files, diagnostics per file, and emitted CommonJS that runs in the Node env. The editor panel is built in PR 14 |
 | 11 | `keyof`, `typeof`, `T[K]` | ok |
 | 14 | `Uppercase` and the like | PR 15's spike on `intrinsic` |
-| 15 | `tsconfig` strict flags | PR 13 (compiler flags read from the tsconfig) |
+| 15 | `tsconfig` strict flags | `checkProject` (PR 13) reads `tsconfig.json` with `ts.parseJsonConfigFileContent`; `noLib`, `types`, `typeRoots`, `lib` and `noEmit` are forced |
 | 16 | Typed `fs` and `http` | PR 16's mini typings; `http.get` is #246 |
 | 17 | `node:test`, `assert`, `node --test` | PR 16 |
 | 18 | Typed CLI, `process.argv`, files in folders, exit codes | PR 16, plus #247 for `cd` and `rm -r` |
 
 What the two engine PRs add:
 
-- **PR 13, `feat(engine): multi-file TypeScript projects with tsconfig and a larger lib`.** A project checker (multi-file `check`, reading a `tsconfig` through `ts.parseJsonConfigFileContent`, and the cost of re-parsing per run), `import` between files, a grown `TS_LIB`, and flags from the tsconfig. It starts by measuring the real `lib.d.ts` against the grown lib. It updates this spec if the measurement changes the plan.
+- **PR 13, `feat(engine): multi-file TypeScript projects with tsconfig and a larger lib`.** `TSCheck.checkProject(files)` (several files, `import` between them, a `tsconfig.json` read through `ts.parseJsonConfigFileContent`, diagnostics per file, emitted CommonJS), a grown `TS_LIB` (`Extract`, `NonNullable`, `Parameters`, `InstanceType`, `Object.keys`/`values`/`entries`, `Map`, `Set`, `Date`), and the REPL loop guard. It measured the real `lib.d.ts` first; the measured numbers and the verdict are under [Lib measurement](#lib-measurement), and D2 stands. The project panel is built in PR 14 with chapter 10, as a thin copy in TypeScript Quest.
 - **PR 16, `feat(engine): TypeScript in the virtual terminal, node:test and typings for Node`.** `.ts` files accepted in the terminal, a `tsc` that really checks, `node file.ts` by transpiling, `node --test`, mini typings for `fs`, `path`, `http`, `events`, `node:test` and `assert`, and more of `process` (`stderr`, and `stdin` if the CLI needs it). The terminal interpreter moves to `shared/`, and `app.js` rebinds `runShell`.
 
 PRs 13 and 15 may revise this spec. The `intrinsic` approach for the case-changing types in chapter 14 is unverified: it is plausible only because `lib.d.ts` is passed to the compiler as the default lib name, and PR 15's spike settles it.
@@ -409,7 +409,7 @@ D1, D8 and D10 are defined in the Script spec and are linked, not copied: [D1](2
 
 | Id | Decision | Alternatives and why they lost |
 |---|---|---|
-| D2 | **Grow the hand-written TS lib** (`Map`, `Set`, `Date`, `Extract`, `NonNullable`, `Parameters`, `InstanceType`, `Uppercase` and the like). A test compiles every mission solution cleanly. PR 13 first measures the real `lib.d.ts` on a phone-class connection. | Real lib from the CDN: many files, unmeasured size. `@types/node` is too big for a phone, so Node typings stay hand-written either way. |
+| D2 | **Grow the hand-written TS lib** (`Map`, `Set`, `Date`, `Object.keys`/`values`/`entries`, `Extract`, `NonNullable`, `Parameters`, `InstanceType` in PR 13; `Uppercase` and the like in PR 15). A test compiles every mission solution cleanly. PR 13 measured the real lib: the grown hand lib is 6.8 KB raw and checks in 1.13x the old lib's time, while the real `lib.es2020.d.ts` closure is 436 KB raw in 46 files and 9.3x slower per check, so **D2 stands** ([Lib measurement](#lib-measurement)). | Real lib from the CDN: 46 files and 31 KB brotli for ES2020 with no DOM (227 KB brotli with the DOM), and a warm check of about 80 ms against about 8 ms on the measuring machine. `@types/node` is too big for a phone, so Node typings stay hand-written either way. |
 | D3 | **REPL for the type-level chapters, project mode with files and a terminal for modules and Node.** Chapters 1 to 9 and 11 to 14 use the REPL; chapters 10 and 15 to 18 use project mode. | One editor-first mode for everything: more scaffold work, and it throws away the REPL Script already has. |
 | D4 | **Mini Node typings:** `fs` (including promises), `path`, `http`, `events`, `node:test`, `assert` and `process`. | Full `@types/node`: too large. None: chapters 16 and 17 cannot be taught. |
 | D5 | **Keep Script chapter 11 unchanged**, add one pointer to TypeScript Quest on its completion screen (PR 11), and start TypeScript chapter 1 from what Script chapter 11 does not cover. | No pointer: learners miss the next step. Repeat chapter 11: wasted time. |
@@ -418,10 +418,9 @@ D1, D8 and D10 are defined in the Script spec and are linked, not copied: [D1](2
 
 ### Compiler in Node tests
 
-Design D2 promises "a test compiles every mission solution cleanly", but no test in the repo runs the compiler in Node today (see [Current state](#current-state)). This is the one open decision, and it must be settled before PR 11 writes its first test.
+Design D2 promises "a test compiles every mission solution cleanly". This was settled in PR 11: `typescript` is a dev dependency pinned to 5.9.3, the version the page loads (`shared/tscheck.js:6`), so the checks run under `npm run test:engine` with no network. A test (`tests/typescript/compiler.test.mjs`) keeps the pin in step with the CDN URL. The cost is a large install in CI and `npm ci`.
 
-- **Recommended:** add `typescript` pinned to 5.9.3 (the version the page loads, `shared/tscheck.js:6`) as a dev dependency, so the checks run under `npm run test:engine` with no network. `AGENTS.md:40` allows dev tooling. The cost is a large install in CI and `npm ci`, a version to keep in step with the CDN pin, and a user decision under the new-dependency rule.
-- **Alternative:** check only in the browser smoke test. It needs no dependency, but it is slow, depends on the CDN, and gives no per-mission Node test.
+The alternative was to check only in the browser smoke test. It needs no dependency, but it is slow, depends on the CDN, and gives no per-mission Node test.
 
 ## Trophy Room
 
@@ -448,7 +447,7 @@ Alternatives to each decision are in the [Decisions](#decisions) table and the l
 4. `intrinsic` in a hand lib and Node's type-stripping behaviour are unverified. They are checked in PR 15 and PR 16, and this spec does not assert them.
 5. The virtual Node reports `v22.12.0` while the repo requires Node 24 (`package.json:8`). PR 16 decides whether to bump it before it teaches `node file.ts`.
 6. The project panel UI may not separate from `app.js` cleanly. TypeScript Quest would then carry a thin copy (D1 in the Script spec).
-7. The TypeScript compiler's first load from jsDelivr on a phone is unmeasured.
+7. The TypeScript compiler's first load from jsDelivr on a phone is unmeasured. PR 13 measured the lib alternatives in Node only; its phone figures are estimates (see [Lib measurement](#lib-measurement)).
 8. The REPL block in `programming/script-quest/app.js` is larger than the formatter #229 names, so PR 11's description must decide the whole block (formatter, `execJS`, `execTS`, state and the memory panel).
 9. This spec may drift from the tree: PRs 13 and 15 may revise it, and until then the mission counts and the engine table are as measured at the base of this branch.
 10. A broken anchor in a Contents list is caught only by a reader; the repo has no doc link check.
@@ -474,11 +473,37 @@ There is no backend, so no dashboards, alerts or BI insights. The signals are th
 
 ## Performance
 
-- PR 13 measures the real `lib.d.ts` against the grown lib, and compares per-run check time on a throttled phone profile for the REPL today, multi-file with the grown lib, and the real-lib option. It reports the numbers.
+- PR 13 measured the real `lib.d.ts` against the grown lib in Node (see [Lib measurement](#lib-measurement)). No throttled-phone timing was taken.
 - The first-load time of `typescript@5.9.3` from jsDelivr is unmeasured.
-- The `createProgram` re-parse per run is measured in PR 13.
+- The `createProgram` re-parse per run was measured in PR 13: parsing the grown lib is 12% of a warm REPL check, below the 25% line, so no lib cache was added.
 - A scheduler-driven `node --test` run finishes well under a second.
-- Quest page load is no more than 10% slower than the Script Quest baseline, the same limit the Script spec sets.
+- Quest page load is no more than 10% slower than the Script Quest baseline, the same limit the Script spec sets. PR 13 replaces the timing check, which is noisy, with byte limits: at most 12 KB more first-party JS on the Script page and 20 KB on the TypeScript page.
+
+### Lib measurement
+
+Measured in Node by a throwaway script (not in the repo). Machine: Intel Core i7-9700 at 3.0 GHz, 8 cores, Node v24.13.0, `typescript@5.9.3`. Each cell is one fresh process. Cold is the first program in the process, and warm is the median of 20 runs after 3 warm-ups. Run-to-run noise is about 10%: V0's warm REPL check read 7.2 ms in the first run (taken before the lib edit, with V2 at 84.5 ms and V3 at 477.7 ms) and 7.5 ms in the last.
+
+- V0: the hand lib before PR 13.
+- V1: the grown hand lib that PR 13 ships.
+- V2: the real `lib.es2020.d.ts` closure with no DOM, plus a `console` shim.
+- V3: the real default `lib.es2020.full.d.ts` closure, with the DOM.
+
+| Variant | Files | Raw (B) | Gzip (B) | Brotli (B) | REPL cold (ms) | REPL warm (ms) | Project cold (ms) | Project warm (ms) | Lib parse alone (ms) |
+|---|---|---|---|---|---|---|---|---|---|
+| V0 | 1 | 5,013 | 1,434 | 1,274 | 77.7 | 7.5 | 80.6 | 7.6 | 0.61 |
+| V1 | 1 | 6,807 | 1,909 | 1,716 | 82.7 | 8.5 | 87.5 | 9.9 | 1.01 |
+| V2 | 46 | 435,844 | 46,354 | 31,144 | 292.0 | 79.1 | 319.1 | 81.2 | 20.49 |
+| V3 | 51 | 2,353,858 | 316,604 | 226,971 | 838.8 | 498.8 | 826.3 | 489.9 | 95.94 |
+
+The REPL scenario is `check` with 6 previous snippets. The project scenario is 3 files and a `tsconfig.json`. Both timings are `createProgram` plus diagnostics, with the lib parsed on every run, as `check` does.
+
+Verdicts:
+
+- **Size limit.** V1 is 6.8 KB raw, under the 16 KB limit.
+- **Time limit.** V1's warm REPL check is 1.13x V0's (8.5 ms against 7.5 ms), under 1.5x.
+- **Real-lib rule.** V2's warm REPL check is 9.3x V1's, over the 2x limit, so the rule does not trigger and **D2 stands**. V2's brotli size (31 KB) is under the 100 KB limit. V3 is 59x V1's warm check.
+- **Re-parse cost.** Parsing the lib is 12% of V1's warm REPL check and 10% of its project check, under the 25% line, so no lib cache was added. V2 would sit at 26% and 25.2%, both above the 25% line.
+- **Phone estimate (not measured).** On Lighthouse "Slow 4G" (1.6 Mbps, 150 ms round trip per file), V2 gzipped is 46 KB, about 0.23 s of transfer plus 46 round trips, about 7 s if the files load one after another and about 0.4 s if bundled into one. V3 is about 9 s and 1.7 s. With a x4 CPU factor on the Node time, a warm check is about 34 ms for V1, 316 ms for V2 and 2 s for V3. V1 adds no file: it is inside `tscheck.js`, 1.8 KB more raw and 0.5 KB more gzipped than V0.
 
 ## PR chain
 

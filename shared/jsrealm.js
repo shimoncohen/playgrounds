@@ -23,6 +23,12 @@ function makeRealm(hooks){
     e.preventDefault();
   });
   w.addEventListener('unhandledrejection',e=>{if(!R.silent)hooks.asyncErr(e.reason,true);e.preventDefault()});
+  if(root.Scheduler){
+    // The app swaps w.setTimeout for a no-op on history replay, so keep the real one.
+    const st=w.setTimeout.bind(w);
+    R.guard=root.Scheduler.makeGuard(fn=>st(fn,0));
+    w[root.Scheduler.GUARD_NAME]=()=>R.guard.tick();
+  }
   if(!METHOD){
     w.__ok=0;const s=d.createElement('script');s.textContent='__ok=1';d.body.appendChild(s);s.remove();
     if(w.__ok===1)METHOD='insert';
@@ -33,6 +39,7 @@ function makeRealm(hooks){
 function killRealm(R){if(R&&R.f){try{R.silent=true;R.f.remove()}catch(e){}}}
 function runScript(R,code){
   R.err=null;R.hasLast=false;R.last=undefined;
+  if(R.guard)R.guard.reset();
   if(METHOD==='insert'){
     R.capturing=true;const s=R.d.createElement('script');s.textContent=code;
     try{R.d.body.appendChild(s)}finally{R.capturing=false;s.remove()}
@@ -71,6 +78,7 @@ function hasTopAwait(ast){
   })(ast,false);
   return found;
 }
+const guarded=code=>root.Scheduler?root.Scheduler.guardSource(code,parse):code;
 // prepare: returns {code, decls, echo, error}
 function prepare(src){
   if(!HAS_ACORN()){
@@ -85,7 +93,7 @@ function prepare(src){
     // top-level await: run inside an async wrapper (declarations stay local to this run)
     const last=ast.body[ast.body.length-1];let body=src;
     if(last&&last.type==='ExpressionStatement')body=src.slice(0,last.start)+'return ('+src.slice(last.expression.start,last.expression.end)+');'+src.slice(last.end);
-    return {code:'(async()=>{\n'+body+'\n})().then(v=>{if(v!==undefined)__asyncOut(v)})',decls:[],echo:false,async:true};
+    return {code:guarded('(async()=>{\n'+body+'\n})().then(v=>{if(v!==undefined)__asyncOut(v)})'),decls:[],echo:false,async:true};
   }
   let code=src,echo=false;const last=ast.body[ast.body.length-1];
   if(last&&last.type==='ExpressionStatement'){
@@ -103,7 +111,7 @@ function prepare(src){
     for(const [a,b,t] of edits){code=code.slice(0,a)+t+code.slice(b)}
     void off;void shift;
   }
-  return {code,decls,echo,ast};
+  return {code:guarded(code),decls,echo,ast};
 }
 root.JSRealm={init,makeRealm,killRealm,runScript,prepare,isIncomplete,method:()=>METHOD};
 })(typeof window !== 'undefined' ? window : globalThis);

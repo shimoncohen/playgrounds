@@ -9,11 +9,11 @@ const keys = o => Object.keys(o).sort();
 const KEYS = {
   JSRealm: ['init', 'makeRealm', 'killRealm', 'runScript', 'prepare', 'isIncomplete', 'method'],
   NodeEnv: ['NODE_VERSION', 'FakeBuffer', 'make', 'curl'],
-  TSCheck: ['init', 'check', 'load'],
+  TSCheck: ['init', 'check', 'checkProject', 'load'],
 };
 
 // app.js does not rebind Scheduler, so it stays out of KEYS (the loop below demands a rebinding line).
-const SCHEDULER_KEYS = ['create', 'guardSource', 'COST', 'LOOP_LIMIT', 'MAX_VIRTUAL_MS', 'MAX_CALLBACKS', 'GUARD_NAME'];
+const SCHEDULER_KEYS = ['create', 'guardSource', 'makeGuard', 'COST', 'LOOP_LIMIT', 'MAX_VIRTUAL_MS', 'MAX_CALLBACKS', 'GUARD_NAME'];
 
 describe('engine modules load in a bare context', () => {
   it('expose exactly their key lists', () => {
