@@ -186,6 +186,75 @@ check('heartbeat: fs.readFile leaves none', gapAsync < 150, `max gap ${gapAsync}
 
 check('no pageerror', qErrors.length === 0, qErrors.join('; '));
 
+// REPL loop guard: the JS console of each quest (JSRealm.prepare guards the code it runs).
+const tp = await ctx.newPage();
+const tErrors = [];
+tp.on('pageerror', e => tErrors.push(e.message));
+await tp.goto(`http://localhost:${server.address().port}/programming/typescript-quest/`);
+await tp.waitForSelector('#cmd');
+if (!(await tp.evaluate(() => typeof window.acorn !== 'undefined'))) bail('acorn did not load from the CDN (TypeScript page)');
+// the first run on this page would otherwise wait for the CDN compiler while the screen looks idle
+await tp.waitForFunction(() => /TypeScript compiler ready\./.test(document.querySelector('#screen').innerText), null, { timeout: 60000 })
+  .catch(() => bail('the TypeScript compiler did not load'));
+const consoleRun = async (page, cmd) => {
+  await page.fill('#cmd', cmd);
+  await page.press('#cmd', 'Enter');
+  let prev = null, same = 0;
+  for (let i = 0; i < 300 && same < 3; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    const t = await page.evaluate(() => document.querySelector('#screen').innerText);
+    same = t === prev ? same + 1 : 0;
+    prev = t;
+  }
+  if (same < 3) bail('console output kept changing for 30 s');
+  return page.evaluate(() => [...document.querySelectorAll('#screen .line:not(.in)')].map(l => l.innerText.trim()));
+};
+const REPL_LOOPS = {
+  'while(true){}': 'while(true){}',
+  'for(;;){}': 'for(;;){}',
+  'braceless loop': 'let i=0;while(true)i++',
+  'do...while': 'do{}while(true)',
+  'loop in a setTimeout callback': 'setTimeout(()=>{while(true){}},0)',
+};
+await qp.evaluate(() => window.__t.setChapter(window.__t.CH.findIndex(c => c.name === 'Say hello')));
+for (const [label, page] of [['Script console', qp], ['TypeScript console', tp]]) {
+  let n = 0;
+  for (const [name, body] of Object.entries(REPL_LOOPS)) {
+    // let/const in the body would clash across runs in one console, so each run uses its own name
+    const src = body.replace(/\bi\b/g, `i${++n}`);
+    const out = await consoleRun(page, src);
+    check(`${label}: guard stops ${name}`, out.some(l => l.includes('Loop guard')), out.join(' | '));
+    const next = await consoleRun(page, `console.log('next-ok-${n}')`);
+    check(`${label}: next line works after ${name}`, next.includes(`next-ok-${n}`), next.join(' | '));
+  }
+}
+check('no pageerror on the TypeScript page', tErrors.length === 0, tErrors.join('; '));
+
+// No await between the runs, so only runScript's reset (not the deferred one) can clear the count: 2 x 3M would pass 5M.
+const resetErr = await qp.evaluate(() => {
+  const R = JSRealm.makeRealm({ out() {}, asyncErr() {} });
+  const p = JSRealm.prepare('for(let i=0;i<3000000;i++){}');
+  const errs = [JSRealm.runScript(R, p.code), JSRealm.runScript(R, p.code)].map(e => e && String(e.message));
+  JSRealm.killRealm(R);
+  return errs;
+});
+check('runScript resets the loop count: two 3,000,000-iteration scripts in a row both finish', resetErr.every(e => !e), resetErr.join(' | '));
+
+const replPerf = await qp.evaluate(() => {
+  let best = Infinity, err = null;
+  for (let k = 0; k < 3; k++) {
+    const R = JSRealm.makeRealm({ out() {}, asyncErr() {} });
+    const p = JSRealm.prepare('for(let i=0;i<1000000;i++){}');
+    const t = performance.now();
+    err = JSRealm.runScript(R, p.code) || err;
+    best = Math.min(best, performance.now() - t);
+    JSRealm.killRealm(R);
+  }
+  return { best, err: err && String(err.message) };
+});
+console.log(`PERF console loop 1,000,000 iterations (guarded): ${replPerf.best.toFixed(1)} ms (limit: <= 150 ms)`);
+check('perf: a 1,000,000-iteration console loop is not stopped and takes <= 150 ms', !replPerf.err && replPerf.best <= 150, `${replPerf.best.toFixed(1)} ms ${replPerf.err || ''}`);
+
 const perf = await qp.evaluate(async () => {
   const { runShell, CH, setChapter, S } = window.__t;
   setChapter(CH.findIndex(c => c.name === 'Node.js'));

@@ -33,6 +33,14 @@ describe('TypeScript Quest wiring', () => {
     assert.match(read('CONTRIBUTING.md'), /`typescript`/);
   });
 
+  it('loads scheduler.js after jsrealm.js and before app.js (the REPL loop guard)', () => {
+    const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const at = s => tags.indexOf(s);
+    const [js, sch] = ['jsrealm', 'scheduler'].map(n => at(`../../shared/${n}.js`));
+    assert.ok(js >= 0 && sch > js, 'scheduler.js must follow jsrealm.js');
+    assert.ok(sch < at('app.js'), 'scheduler.js must load before app.js');
+  });
+
   it('Script chapter 11 points to TypeScript Quest', () => {
     const ch = loadScriptContent().CH[10];
     assert.equal(ch.name, 'TypeScript');
