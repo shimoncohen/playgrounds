@@ -1,6 +1,6 @@
 # TypeScript Quest: design
 
-Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). The tests run the TypeScript compiler in Node from a pinned dev dependency (see [Compiler in Node tests](#compiler-in-node-tests)). Three proposals wait for the user's sign-off: the rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)), and the Suggested-first corrections for chapters 6 and 14 ([Suggested first](#suggested-first)).
+Date: 2026-11-16. Status: the design is approved, with Q7 (the TypeScript Quest world, 18 chapters and tier XP) approved as proposed. The plan is [2026-11-16-typescript-quest-phase1.md](../plans/2026-11-16-typescript-quest-phase1.md). Epic: #222 (TypeScript Quest, and deeper JavaScript and Node in Script Quest). The tests run the TypeScript compiler in Node from a pinned dev dependency (see [Compiler in Node tests](#compiler-in-node-tests)). The rank names and base thresholds ([Tier XP and ranks](#tier-xp-and-ranks)), D14 ([Decisions](#decisions)) and the chapter 6 Suggested-first correction are signed off (PRs 11 to 14 shipped on them). The chapter 14 Suggested-first correction ([Suggested first](#suggested-first)) still waits for PR 15.
 
 **Contents:** [TLDR](#tldr) · [Goal](#goal) · [Non-goals](#non-goals) · [Current state](#current-state) · [Story](#story) · [Chapters](#chapters) ([Beginner](#beginner-booking-depot-chapters-1-to-5) · [Intermediate](#intermediate-rail-yard-chapters-6-to-10) · [Advanced](#advanced-signal-tower-chapters-11-to-14) · [TypeScript with Node](#typescript-with-node-engine-wagon-chapters-15-to-18)) · [Tier XP and ranks](#tier-xp-and-ranks) · [Suggested first](#suggested-first) · [Engine plan](#engine-plan) · [Decisions](#decisions) · [Trophy Room](#trophy-room) · [Alternatives](#alternatives) · [Risks](#risks) · [Test plan](#test-plan) · [Observability](#observability) · [Performance](#performance) · [PR chain](#pr-chain) · [Touchpoints](#touchpoints)
 
@@ -107,7 +107,7 @@ Written with the story guideline in mind (`docs/story-guideline.md`). The outlin
 
 Rules for every chapter:
 
-- **Mode.** "REPL" is the `ts` console. "Project" is project mode with files and a terminal, as design D3 says. Chapter 10 is the one difference: its missions pass on the compiler's diagnostics and on the program's output, so it needs no terminal command beyond running the files, and PR 14 may hide the terminal there.
+- **Mode.** "REPL" is the `ts` console. "Project" is project mode with files and a terminal, as design D3 says. Chapter 10 is the one difference: its missions pass on the compiler's diagnostics and on the program's output, so it needs no terminal command beyond running the files. PR 14 hides the terminal there: the Run button runs `main.ts`, so mission 6 says "press Run". Its project files live in memory, are seeded per mission and are not saved, and it has no quick-fire questions; its two diagnostic codes (TS2305, TS2307) are in the Error decoder, with one text section in the Field guide.
 - **Missions.** About 6 per chapter (chapter 1 about 7, chapter 18 about 8). An outline gives the title, what the learner writes, and the diagnostic or output that passes it. Diagnostic codes are the expected ones; each is confirmed against the compiler when its chapter is written.
 - **Passing.** A mission passes when the learner's own code produces the diagnostic or output asked for, and a check never counts work from an earlier mission.
 - **Teach before use.** Every new term appears in the chapter's term list and is taught before any later mission uses it. The `FIRST` table gets an entry per term.
@@ -231,8 +231,8 @@ Mission XP 15. Chapters 6 to 9 use the REPL, chapter 10 uses project mode.
 | 2 | Share a value | An exported function used from another file | The program prints the expected line |
 | 3 | The wrong name | An import of a name that is not exported | TS2305 reported |
 | 4 | Just the shape | `import type` for an interface | No diagnostics, and the emitted JavaScript has no `require` for it |
-| 5 | A missing file | An import path that does not exist | TS2307 reported, then fixed |
-| 6 | Run the tour | Three files run together from the terminal | The output matches the expected text |
+| 5 | A missing file | An import path that does not exist | TS2307 reported on one run |
+| 6 | Run the tour | Three files run together (press Run on `main.ts`; the terminal is hidden here) | The output matches the expected text |
 
 ### Advanced: signal tower (chapters 11 to 14)
 
@@ -337,13 +337,13 @@ Mission XP 25. Project mode with files and a terminal. The terminal in these cha
 
 - **Mission XP:** Beginner 10, Intermediate 15, Advanced 20, TypeScript with Node 25 (the guideline's fourth slot, `docs/tiers-guideline.md:7`).
 - **Badge XP:** `badgeXp` is 25 for all four tiers, the default in `shared/tiers.js:4`. There are no old saves, so no tier sets 0.
-- **Ranks (proposal, awaiting sign-off).** The base ladder, which stays below the Beginner end, is Stowaway 0, Ticket Clerk 50, Wagon Hand 130, Signalman 240 and Rail Engineer 360. The tier-end ranks are "Chief Engineer" for Intermediate, "Tour Architect" for Advanced and "Timetable Master" for TypeScript with Node, which is the top rank. The shape follows Shell's (`docs/tiers-guideline.md:19-20`) and Script's setup (`programming/script-quest/tiers.js:4-9`).
+- **Ranks (signed off).** The base ladder, which stays below the Beginner end, is Stowaway 0, Ticket Clerk 50, Wagon Hand 130, Signalman 240 and Rail Engineer 360. The tier-end ranks are "Chief Engineer" for Intermediate, "Tour Architect" for Advanced and "Timetable Master" for TypeScript with Node, which is the top rank. The shape follows Shell's (`docs/tiers-guideline.md:19-20`) and Script's setup (`programming/script-quest/tiers.js:4-9`).
 - **Thresholds.** The tier-end thresholds are derived by `Tiers.create` (`shared/tiers.js:46-53`) and never typed. The figures below are estimates, to be fixed when the chapters exist. The base thresholds may be adjusted to fit the final counts, but they stay below the Beginner end and the names do not change.
 
 | Tier | Chapters | Missions (estimate) | XP per mission | Badges | Cumulative XP at tier end (estimate) |
 |---|---|---|---|---|---|
 | Beginner | 5 | 33 | 10 | 5 × 25 | 455 |
-| Intermediate | 5 | 30 | 15 | 5 × 25 | about 1030 |
+| Intermediate | 5 | 30 | 15 | 5 × 25 | 1030 (measured, pinned in `tests/typescript/tiers.test.mjs`) |
 | Advanced | 4 | 25 | 20 | 4 × 25 | about 1630 |
 | TypeScript with Node | 4 | 26 | 25 | 4 × 25 | about 2380 |
 
@@ -377,7 +377,7 @@ Re-check of every link against the real chapter names on the base. All 17 rows n
 
 The approved design said that chapters 6, 7, 9, 14, 17 and 18 point at Script Intermediate chapters that do not exist yet. That sentence was wrong twice over: those chapters now exist (Script has 23), and rows 6 and 14 point at Beginner chapters. The rows that point at Intermediate chapters are 7, 9, 10, 16, 17 and 18, and all of those chapters exist and read as the design intends.
 
-**Chapters 6 and 14 are changes to the approved design** (chapter 6 gains a Script chapter, Time travel (10); Say hello (1) becomes Named boxes (2) for chapter 14). They are proposals, awaiting the user's sign-off; the design table itself stays as approved.
+**Chapters 6 and 14 are changes to the approved design** (chapter 6 gains a Script chapter, Time travel (10); Say hello (1) becomes Named boxes (2) for chapter 14). The chapter 6 correction is signed off. The chapter 14 correction stays awaiting sign-off until PR 15; the design table itself stays as approved.
 
 ## Engine plan
 
@@ -388,7 +388,7 @@ What each chapter needs, and which PR supplies it ("ok" means the base already s
 | 1 to 5 | REPL `ts`, unions, narrowing, arrays, tuples, `unknown` | ok (`check` as is; every answer's outcome is unchanged by the lib growth). `Object.keys`, `Object.values`, `Object.entries`, `Map`, `Set` and `Date` are in `TS_LIB` since PR 13, but there are no iterators, so `for...of` over them reports TS2488 |
 | 6, 9, 12, 13 | Generics, utility and mapped types, `infer`, `Promise<T>` | ok: `Extract`, `NonNullable`, `Parameters` and `InstanceType` are in `TS_LIB` since PR 13. `Promise<T>` is first taught in chapter 6 |
 | 7, 8 | `abstract`, parameter properties, enums, `satisfies` | ok (`transpileModule` emits them) |
-| 10 | Several files, `import` and `export` | `TSCheck.checkProject` (PR 13): `import` between files, diagnostics per file, and emitted CommonJS that runs in the Node env. The editor panel is built in PR 14 |
+| 10 | Several files, `import` and `export` | `TSCheck.checkProject` (PR 13): `import` between files, diagnostics per file, and emitted CommonJS that runs in the Node env. The editor panel was built in PR 14 (`project.js` and the `app.js` project branch); a run is one `checkProject`, then `main.js` through the virtual Node until the scheduler is done |
 | 11 | `keyof`, `typeof`, `T[K]` | ok |
 | 14 | `Uppercase` and the like | PR 15's spike on `intrinsic` |
 | 15 | `tsconfig` strict flags | `checkProject` (PR 13) reads `tsconfig.json` with `ts.parseJsonConfigFileContent`; `noLib`, `types`, `typeRoots`, `lib` and `noEmit` are forced |
@@ -414,7 +414,7 @@ D1, D8 and D10 are defined in the Script spec and are linked, not copied: [D1](2
 | D4 | **Mini Node typings:** `fs` (including promises), `path`, `http`, `events`, `node:test`, `assert` and `process`. | Full `@types/node`: too large. None: chapters 16 and 17 cannot be taught. |
 | D5 | **Keep Script chapter 11 unchanged**, add one pointer to TypeScript Quest on its completion screen (PR 11), and start TypeScript chapter 1 from what Script chapter 11 does not cover. | No pointer: learners miss the next step. Repeat chapter 11: wasted time. |
 | D9 | **Static "Suggested first" link** naming the chapter. | A `?c=` deep link: changes which chapter Script's saved state opens. Reading Script's save for "x/y done" like `shared/trophies.js`: nicer, a follow-up. |
-| D14 (proposed, awaiting sign-off) | **Badges are derived from `done` at render time**, as Script's `tierView` does (`programming/script-quest/tiers.js:16-19`). The save has no new stored field, and the badge XP is paid once when a chapter's last mission completes. | Stored `badges` and `ch` as Shell does: a new stored field to keep in step with `done`, and the `pristine` rule (`AGENTS.md:80`) needs to know about it. |
+| D14 (signed off) | **Badges are derived from `done` at render time**, as Script's `tierView` does (`programming/script-quest/tiers.js:16-19`). The save has no new stored field, and the badge XP is paid once when a chapter's last mission completes. | Stored `badges` and `ch` as Shell does: a new stored field to keep in step with `done`, and the `pristine` rule (`AGENTS.md:80`) needs to know about it. |
 
 ### Compiler in Node tests
 
@@ -442,7 +442,7 @@ Alternatives to each decision are in the [Decisions](#decisions) table and the l
 ## Risks
 
 1. Mission counts, XP totals and thresholds are estimates. Script's own estimate was about 2200 XP and shipped as 2300 (`tests/script/tiers.test.mjs:112`).
-2. The rank names, base thresholds, D14 and the chapter 14 correction are proposals. Until the user signs them off, PR 11 uses them as written and a change is a rename or a small edit.
+2. The rank names, base thresholds, D14 and the chapter 6 correction are signed off. The chapter 14 correction is still a proposal until PR 15; a change is a rename or a small edit.
 3. The diagnostic codes in the outlines are expected values, not measured. The compiler is not run by any test in the repo yet, so each code is confirmed when its chapter is written.
 4. `intrinsic` in a hand lib and Node's type-stripping behaviour are unverified. They are checked in PR 15 and PR 16, and this spec does not assert them.
 5. The virtual Node reports `v22.12.0` while the repo requires Node 24 (`package.json:8`). PR 16 decides whether to bump it before it teaches `node file.ts`.
@@ -532,5 +532,6 @@ All PRs target `feat/222-ts-quest`. Sizes are changed lines: S under 150, M up t
 | `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, and a pointer on Script chapter 11's completion screen | 11 | updated |
 | `programming/typescript-quest/content/` chapter files, plus each chapter's quick-fire and Field guide entries in `quickfire.js` and `guide.js` (with the tier filter) | 12, 14, 15, 17 | new, updated |
 | `shared/tscheck.js` (project mode, tsconfig, larger lib) | 13 | updated |
+| `programming/typescript-quest/project.js`, the project panel in `app.js` and `index.html` (with `shared/nodeenv.js` loaded), `tests/typescript/project-harness.mjs` and `project-mode.test.mjs` | 14 | new, updated |
 | `shared/nodeenv.js`, the terminal interpreter, typings for Node | 16 | updated, moved |
 | `shared/trophies.js` | none | unchanged; effects come from the catalog |

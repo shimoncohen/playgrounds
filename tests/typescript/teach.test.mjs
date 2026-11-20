@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTypescriptContent } from '../content-loader.mjs';
 import { createSession } from './harness.mjs';
+import { projectRun, flatFiles as flatten } from './project-harness.mjs';
 
 const TSQ = loadTypescriptContent();
 const { CH, FIRE, qfOpen, BLOCKS, ERRS } = TSQ;
@@ -70,23 +71,80 @@ const FIRST = {
   'labelled element': [/\blabell?ed (tuple|element|slot)|\[\s*\w+\s*:\s*\w+\s*,\s*\w+\s*:\s*\w+\s*\]/i, 4, 3],
   'optional tuple element': [/optional tuple|\w\?\]/i, 4, 4],
   TS2493:          [/\bTS2493\b/, 4, 5],
+  generic:         [/\bgenerics?\b/i, 5, 0],
+  'type parameter': [/type parameters?/i, 5, 0],
+  'generic function': [/generic function/i, 5, 0],
+  'generic interface': [/generic interface/i, 5, 1],
+  'generic constraint': [/\bconstraints?\b/i, 5, 2],
+  'default type argument': [/default type argument/i, 5, 3],
+  Promise:         [/\bPromise\b/, 5, 4],
+  async:           [/\basync\b/, 5, 5],
+  TS1064:          [/\bTS1064\b/, 5, 5],
+  class:           [/\bclass(es)?\b/i, 6, 0],
+  'class field':   [/\b(typed|class) fields?\b/i, 6, 0],
+  TS2564:          [/\bTS2564\b/, 6, 0],
+  private:         [/\bprivate\b/, 6, 1],
+  public:          [/\bpublic\b/, 6, 1],
+  TS2341:          [/\bTS2341\b/, 6, 1],
+  protected:       [/\bprotected\b/, 6, 2],
+  TS2445:          [/\bTS2445\b/, 6, 2],
+  'parameter property': [/parameter propert(y|ies)/i, 6, 3],
+  'readonly field': [/readonly fields?/i, 6, 3],
+  abstract:        [/\babstract\b/, 6, 4],
+  TS2511:          [/\bTS2511\b/, 6, 4],
+  TS2515:          [/\bTS2515\b/, 6, 4],
+  instanceof:      [/\binstanceof\b/, 6, 5],
+  implements:      [/\bimplements\b/, 6, 5],
+  'as const':      [/\bas const\b/, 7, 0],
+  'readonly literal object': [/readonly literal object/i, 7, 0],
+  enum:            [/\benums?\b/i, 7, 1],
+  'string enum':   [/string enums?/i, 7, 2],
+  'enum member type': [/enum member type/i, 7, 2],
+  satisfies:       [/\bsatisfies\b/, 7, 4],
+  TS1360:          [/\bTS1360\b/, 7, 4],
+  'utility type':  [/utility types?/i, 8, 0],
+  Partial:         [/\bPartial\b/, 8, 0],
+  Required:        [/\bRequired\b/, 8, 1],
+  Readonly:        [/\bReadonly\b/, 8, 2],
+  Record:          [/\bRecord\b/, 8, 3],
+  Pick:            [/\bPick\b/, 8, 4],
+  Omit:            [/\bOmit\b/, 8, 5],
+  export:          [/\bexport\b/i, 9, 0],
+  import:          [/\bimport\b/i, 9, 0],
+  'relative path': [/relative (import )?paths?/i, 9, 0],
+  'default export': [/default export/i, 9, 1],
+  TS2305:          [/\bTS2305\b/, 9, 2],
+  'import type':   [/\bimport type\b/i, 9, 3],
+  'export type':   [/\bexport type\b/i, 9, 3],
+  TS2307:          [/\bTS2307\b/, 9, 4],
   'Array<':        [/\bArray</, null],
-  Promise:         [/\bPromise\b/, null],
-  class:           [/\bclass(es)?\b/i, null],
-  generic:         [/\bgenerics?\b/i, null],
+  keyof:           [/\bkeyof\b/, null],
+  Awaited:         [/\bAwaited\b/, null],
+  infer:           [/\binfer\s+[A-Z]\b/, null],
+  'mapped type':   [/mapped types?/i, null],
+  'conditional type': [/conditional types?/i, null],
+  'template literal type': [/template literal/i, null],
+  Uppercase:       [/\bUppercase\b/, null],
   tsconfig:        [/tsconfig/i, null],
   // the quest still teaches no loops, so no chapter claims a loop concept
   loop:            [/\bloops?\b|\b(while|for)\s*\(|\bdo\s*\{/i, null],
 };
 
 const noTags = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '');
+// a project mission's code and start are path-to-text objects: one text, each file after its path, so no word test skips them
 // a hint counts as use but not as teaching: it is hidden until asked for
-const taught = m => noTags([m.title, m.goal, m.code, m.explain, ...(m.how || []), ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
+const taught = m => noTags([m.title, m.goal, flatten(m.code), flatten(m.start), m.explain, ...(m.how || []), ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n'));
 const texts = m => noTags([taught(m), m.hint].filter(Boolean).join('\n'));
 const flat = [];
 CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + noTags(ch.intro) : ''), teach: taught(m) + (mi === 0 ? '\n' + noTags(ch.intro) : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
 const qtext = q => q.c + '\n' + q.o.join('\n') + '\n' + q.w;
+
+test('the flattened chapter 10 text is not empty and names its files, so project missions are read by the word tests', () => {
+  const text = flat.filter(x => x.ci === 9).map(x => x.teach).join('\n');
+  assert.match(text, /wagon\.ts/);
+  assert.match(text, /main\.ts/);
+});
 
 for (const [term, [re, ci, mi]] of Object.entries(FIRST)) {
   if (ci === null) {
@@ -119,17 +177,25 @@ test('terms are defined in place the first time they appear', () => {
   assert.match(m(6).how.join(' '), /joined by <code>\|<\/code> \(or\)/);
 });
 
-const measuredCodes = () => {
+// REPL missions only: a quick-fire question is one REPL snippet, and no snippet produces a project-only code
+const replCodes = () => {
   const codes = new Set();
-  for (const ch of CH) for (const m of ch.missions.filter(x => x.expectError)) {
+  for (const ch of CH.filter(c => c.mode !== 'project')) for (const m of ch.missions.filter(x => x.expectError)) {
     const s = createSession();
     if (m.pre) s.run(m.pre);
     s.run(m.code).diags.forEach(d => codes.add('TS' + d.code));
   }
   return codes;
 };
+// REPL plus project missions, the project ones measured through the project harness
+const allCodes = async () => {
+  const codes = replCodes();
+  for (const ch of CH.filter(c => c.mode === 'project')) for (const m of ch.missions.filter(x => x.expectError))
+    (await projectRun({ ...m.start, ...m.code })).diags.forEach(d => codes.add('TS' + d.code));
+  return codes;
+};
 
-test('guide: each term it uses is glossed in place, the error decoder covers the chapter codes, and the lede does not over-claim', () => {
+test('guide: each term it uses is glossed in place, the error decoder covers the chapter codes, and the lede does not over-claim', async () => {
   const g = noTags(guideText);
   assert.match(g, /Guessing a type from the value is inference/);
   assert.match(g, /literal type/);
@@ -141,7 +207,7 @@ test('guide: each term it uses is glossed in place, the error decoder covers the
   assert.match(g, /a promise from you, not a conversion/);
   assert.match(guideSrc, /The quest on one page/);
   assert.doesNotMatch(guideSrc, /Chapter \d+ of the quest|Learn these (four|five|six)/);
-  assert.deepEqual(ERRS.map(e => e[0].match(/TS\d+/)[0]).sort(), [...measuredCodes()].sort());
+  assert.deepEqual(ERRS.map(e => e[0].match(/TS\d+/)[0]).sort(), [...await allCodes()].sort());
 });
 
 test('guide: no card uses `as` before the card that glosses it', () => {
@@ -152,12 +218,12 @@ test('guide: no card uses `as` before the card that glosses it', () => {
   BLOCKS.slice(0, at).forEach(b => assert.ok(!inCode.test(b[2]) && !inText.test(b[1]), `"${b[0]}" uses as before its card`));
 });
 
-test('guide: each code card compiles clean, and each decoder code is one the missions measure', () => {
+test('guide: each code card compiles clean, and each decoder code is one the missions measure', async () => {
   for (const b of BLOCKS) {
     const rec = createSession().run(b[2]);
     assert.deepEqual(rec.diags, [], `${b[0]}: ${b[2]}`);
   }
-  const measured = measuredCodes();
+  const measured = await allCodes();
   for (const e of ERRS) assert.ok(measured.has(e[0].match(/TS\d+/)[0]), `${e[0]} is not produced by any mission answer`);
 });
 
@@ -177,7 +243,7 @@ test('quick-fire: every question has chapter 0, 4 distinct options, a valid righ
 test('quick-fire: the answers do not sit in one slot, and every error code of an expectError mission is asked about', () => {
   assert.ok(new Set(FIRE.map(q => q.a)).size >= 3);
   const asked = new Set(FIRE.map(q => q.o[q.a]));
-  for (const code of [...measuredCodes(), 'No error']) assert.ok(asked.has(code), code);
+  for (const code of [...replCodes(), 'No error']) assert.ok(asked.has(code), code);
 });
 
 test('quick-fire: the example question (FIRE[0]) is open after Chapter 1 alone', () => {
@@ -200,6 +266,7 @@ test('quick-fire gating: a chapter\'s questions open with that chapter, and one 
     assert.equal(qfOpen(d).length, upTo(c), `chapter ${c + 1} one mission short`);
   });
   assert.equal(qfOpen(doneThrough(CH.length)).length, FIRE.length);
-  assert.equal(qfOpen(doneThrough(CH.length), 'beginner').length, FIRE.length);
+  assert.equal(qfOpen(doneThrough(CH.length), 'beginner').length, FIRE.filter(q => CH[q.ch].tier === 'beginner').length);
+  assert.equal(qfOpen(doneThrough(CH.length), 'intermediate').length, FIRE.filter(q => CH[q.ch].tier === 'intermediate').length);
   assert.equal(qfOpen(doneThrough(CH.length), 'advanced').length, 0);
 });

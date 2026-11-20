@@ -55,18 +55,32 @@ describe('typescript-quest tiers', () => {
     assert.deepEqual(tierCfg.tierEndRanks, { intermediate: 'Chief Engineer', advanced: 'Tour Architect', node: 'Timetable Master' });
   });
 
-  it('every chapter is Beginner at 10 XP a mission, and the tier is worth the missions at 10 plus 25 badge XP a chapter', () => {
-    CH.forEach((_, i) => { assert.equal(tiers.tierOf(i).id, 'beginner'); assert.equal(tiers.missionXp(i), 10); });
-    assert.equal(tiers.cumulativeXp('beginner'), CH.reduce((sum, c) => sum + c.missions.length * 10 + 25, 0));
+  it('chapters 1 to 5 are Beginner at 10 XP a mission, the rest Intermediate at 15, and each tier is worth its missions plus 25 badge XP a chapter', () => {
+    CH.forEach((_, i) => {
+      assert.equal(tiers.tierOf(i).id, i < 5 ? 'beginner' : 'intermediate', `chapter ${i + 1}`);
+      assert.equal(tiers.missionXp(i), i < 5 ? 10 : 15, `chapter ${i + 1}`);
+    });
+    const worth = (from, to, per) => CH.slice(from, to).reduce((sum, c) => sum + c.missions.length * per + 25, 0);
+    assert.equal(tiers.cumulativeXp('beginner'), worth(0, 5, 10));
+    assert.equal(tiers.cumulativeXp('intermediate'), worth(0, 5, 10) + worth(5, CH.length, 15));
   });
 
-  it('ranks() is the base ladder while only Beginner has chapters', () => {
+  it('the real Intermediate tier-end threshold is 1030 XP: 455 for Beginner, then five chapters of six missions at 15 XP plus 25 badge XP each', () => {
+    assert.deepEqual(CH.slice(5).map(c => c.missions.length), [6, 6, 6, 6, 6]);
+    assert.equal(tiers.cumulativeXp('beginner'), 455);
+    assert.equal(tiers.cumulativeXp('intermediate'), 455 + 30 * 15 + 5 * 25);
+    assert.equal(tiers.cumulativeXp('intermediate'), 1030);
+    assert.deepEqual(tiers.ranks().pop(), [1030, 'Chief Engineer']);
+  });
+
+  it('ranks() is the base ladder plus the Intermediate tier-end name once that tier has chapters', () => {
     const total = tiers.cumulativeXp('beginner');
-    assert.deepEqual(tiers.ranks(), BASE);
+    assert.deepEqual(tiers.ranks(), [...BASE, [tiers.cumulativeXp('intermediate'), 'Chief Engineer']]);
     assert.equal(tiers.rankFor(0).name, 'Stowaway');
     assert.equal(tiers.rankFor(49).name, 'Stowaway');
     assert.equal(tiers.rankFor(50).name, 'Ticket Clerk');
     assert.equal(tiers.rankFor(total).name, BASE.filter(r => r[0] <= total).pop()[1]);
+    assert.equal(tiers.rankFor(tiers.cumulativeXp('intermediate')).name, 'Chief Engineer');
   });
 
   it('with chapters in every tier, each tier-end threshold is that tier\'s cumulative XP', () => {
@@ -92,14 +106,16 @@ describe('typescript-quest tiers', () => {
     assert.equal(badgePay(S, 0, undefined), 0);
   });
 
-  it('renderRail draws one Beginner header and data-c buttons numbered from 1 with n/m counts', () => {
+  it('renderRail draws a Beginner and an Intermediate header and data-c buttons numbered from 1 with n/m counts', () => {
     const n = CH[0].missions.length;
     const S = { xp: 0, done: { '0.0': 1, '0.1': 1 }, chap: 0, cur: {}, best: 0 };
     const el = {};
     renderRail(el, S);
-    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 1);
+    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 2);
     assert.match(el.innerHTML, /data-tier="beginner"/);
+    assert.match(el.innerHTML, /data-tier="intermediate"/);
     assert.match(el.innerHTML, /Beginner/);
+    assert.match(el.innerHTML, /Intermediate/);
     assert.deepEqual([...el.innerHTML.matchAll(/data-c="(\d+)"/g)].map(m => +m[1]), CH.map((_, i) => i));
     assert.deepEqual([...el.innerHTML.matchAll(/class="num">([^<]+)</g)].map(m => m[1]), CH.map((_, i) => String(i + 1)));
     assert.match(el.innerHTML, new RegExp(`<span class="ct">2/${n}</span>`));
@@ -116,9 +132,26 @@ describe('typescript-quest tiers', () => {
     assert.ok(!app.includes('</script'));
   });
 
-  it('app.js carries no Script-only text: the SCQ namespace, project panel, editor, VFS or shell', () => {
+  it('app.js carries no Script-only text: the SCQ namespace, the shell, stored project files or the virtual Node', () => {
     const app = read('programming/typescript-quest/app.js');
-    assert.doesNotMatch(app, /SCQ|VFS|runShell|runNpm|procbar|INITIAL_FILES|NodeEnv|FakeBuffer|#editor|#ed\b|renderProject|MODE===.sh./);
+    assert.doesNotMatch(app, /SCQ|runShell|runNpm|procbar|INITIAL_FILES|NodeEnv|FakeBuffer|MODE===.sh./);
+  });
+
+  it('index.html loads nodeenv.js after scheduler.js and before tscheck.js, and project.js after tiers.js and before app.js', () => {
+    const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const at = s => { const i = tags.indexOf(s); assert.ok(i >= 0, s); return i; };
+    assert.ok(at('../../shared/scheduler.js') < at('../../shared/nodeenv.js'));
+    assert.ok(at('../../shared/nodeenv.js') < at('../../shared/tscheck.js'));
+    assert.ok(at('tiers.js') < at('project.js'));
+    assert.ok(at('project.js') < at('app.js'));
+    assert.ok(!read('programming/typescript-quest/project.js').includes('</script'));
+  });
+
+  it('the page has the editor markup, hidden until a project chapter shows it', () => {
+    const html = read('programming/typescript-quest/index.html');
+    assert.match(html, /<div class="editor" id="editor" hidden>/);
+    assert.match(html, /<textarea id="ed"[^>]*aria-label="File editor"/);
+    for (const id of ['gutter', 'edtab', 'edSave', 'edRun']) assert.ok(html.includes(`id="${id}"`), id);
   });
 
   it('a failed compiler load says to run the line again, and submit, Fresh console and boot each retry it', () => {

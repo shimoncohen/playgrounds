@@ -31,6 +31,19 @@ const FIRE=[
 {ch:4,c:'const crew: readonly string[] = ["Mumbles", "Pip"]\ncrew.push("Bellamy")',o:['TS2345','TS2339','TS2540','No error'],a:1,w:'A readonly list has no push, so the property does not exist: TS2339.'},
 {ch:4,c:'let seat: [number, string] = [4, "Mumbles"]\nconsole.log(seat[2])',o:['TS2493','TS2339','No error','TS2322'],a:0,w:'The tuple has two slots, so there is no element at place 2: TS2493.'},
 {ch:4,c:'let seat: [number, string, string?] = [4, "Mumbles"]',o:['TS2322','TS2493','TS2741','No error'],a:3,w:'The third slot is optional, so a line with two values is allowed. No error.'},
+{ch:5,c:'async function count(): number {\n  return 3\n}',o:['TS1064','TS2322','TS2345','No error'],a:0,w:'async makes a function hand back a promise, so a plain number as the return type is refused: TS1064.'},
+{ch:5,c:'function weigh<T extends { wagon: number }>(load: T): number {\n  return load.wagon\n}\nconst fine = { wagon: 4 }\nweigh(fine)',o:['TS2345','No error','TS2322','TS2339'],a:1,w:'fine has a wagon number, so it passes the constraint. No error.'},
+{ch:5,c:'function weigh<T extends { wagon: number }>(load: T): number {\n  return load.wagon\n}\nconst stray = { name: "Mumbles" }\nweigh(stray)',o:['TS2322','TS2339','TS2345','No error'],a:2,w:'stray has no wagon number, so it is not a type T may be. A wrong argument is TS2345.'},
+{ch:6,c:'class Wagon {\n  seats: number\n  driver: string\n  constructor(seats: number) {\n    this.seats = seats\n  }\n}',o:['TS2564','TS2322','TS2741','No error'],a:0,w:'The constructor never sets driver, so the field may stay empty: TS2564.'},
+{ch:6,c:'class Wagon {\n  private brake: string = "on"\n}\nconst car = new Wagon()\nconsole.log(car.brake)',o:['TS2339','TS2445','No error','TS2341'],a:3,w:'A private field is only for code inside the class. Reading it from outside is TS2341.'},
+{ch:6,c:'class Wagon {\n  protected load: number = 4\n}\nconst car = new Wagon()\nconsole.log(car.load)',o:['TS2341','TS2445','TS2339','No error'],a:1,w:'A protected field is for the class and its subclasses only. Reading it from outside is TS2445.'},
+{ch:6,c:'abstract class Wagon {\n  abstract couple(): string\n}\nconst car = new Wagon()',o:['TS2515','TS2511','TS2564','No error'],a:1,w:'An abstract class is a blueprint only, so building it with new is refused: TS2511.'},
+{ch:6,c:'abstract class Wagon {\n  abstract couple(): string\n}\nclass Tanker extends Wagon {}',o:['TS2511','TS2564','No error','TS2515'],a:3,w:'Tanker does not write the abstract method couple, so it is refused: TS2515.'},
+{ch:6,c:'class Wagon {\n  constructor(public seats: number) {}\n}\nconst car = new Wagon(40)\nconsole.log(car.seats)',o:['TS2564','TS2341','No error','TS2445'],a:2,w:'A parameter property declares and sets the field for you, and public means anyone may read it. No error.'},
+{ch:7,c:'enum Stop {\n  Ashford = "ASH",\n  Barlow = "BAR"\n}\nconst here: Stop = "ASH"',o:['TS2345','TS2339','No error','TS2322'],a:3,w:'A string enum only takes its own members, and the plain text is not one: TS2322.'},
+{ch:7,c:'type Fares = { Ashford: number; Barlow: number }\nconst fares = { Ashford: 4 } satisfies Fares',o:['TS2741','TS1360','TS2322','No error'],a:1,w:'satisfies checks the value against the type, and Barlow is missing, so it does not satisfy it: TS1360.'},
+{ch:8,c:'type Wagon = "red" | "blue"\nconst seats: Record<Wagon, number> = { red: 40 }',o:['TS2353','TS2322','TS2741','No error'],a:2,w:'Record wants a number for every wagon name, and blue is missing: TS2741.'},
+{ch:8,c:'interface Booking {\n  name: string\n  wagon: number\n  price: number\n}\nconst stub: Omit<Booking, "price"> = { name: "Mumbles", wagon: 4 }',o:['TS2741','No error','TS2353','TS2322'],a:1,w:'Omit drops the price, so a stub with just the name and the wagon is complete. No error.'},
 ];
 const qfOpen=(done,tier)=>FIRE.filter(q=>CH[q.ch].missions.every((_,j)=>done&&done[q.ch+'.'+j])&&(!tier||CH[q.ch].tier===tier));
 TSQ.FIRE=FIRE;
