@@ -8,16 +8,16 @@ import { createRequire } from 'node:module';
 const ts = createRequire(import.meta.url)('typescript');
 const load = (ctx, f) => vm.runInContext(fs.readFileSync(new URL(f, import.meta.url), 'utf8'), ctx, { filename: f });
 
-const engine = vm.createContext({ ts });
+export const engine = vm.createContext({ ts });
 load(engine, '../../shared/tscheck.js');
 
-const host = vm.createContext({});
+export const host = vm.createContext({});
 ['../../shared/scheduler.js', '../../shared/nodeenv.js', '../../programming/typescript-quest/project.js'].forEach(f => load(host, f));
 host.JSRealm = { runScript: (R, code) => { try { vm.runInContext(code, R.w); return null; } catch (e) { return e; } } };
 
 // The page's realm reports a rejection nobody handled through hooks.asyncErr; the process event is its Node twin.
 // The test runner fails a test on any unhandledRejection, so its listeners are set aside while a run is going.
-function makeRealm(hk) {
+export function makeRealm(hk) {
   const say = level => (...a) => hk.out(level, a);
   const w = vm.createContext({ console: { log: say('log'), info: say('log'), warn: say('warn'), error: say('error'), table: say('table') } });
   const R = { w, saved: process.listeners('unhandledRejection') };
@@ -26,7 +26,7 @@ function makeRealm(hk) {
   process.on('unhandledRejection', R.onRejection);
   return R;
 }
-const release = R => {
+export const release = R => {
   process.off('unhandledRejection', R.onRejection);
   R.saved.forEach(f => process.on('unhandledRejection', f));
 };

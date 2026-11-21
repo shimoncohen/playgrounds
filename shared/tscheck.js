@@ -160,17 +160,24 @@ function tsCheck(prev,src){
 }
 const PROJECT_LIB='/.lib/lib.d.ts',CONFIG='tsconfig.json';
 // The host sees only the map: no disk, so a config's paths, typeRoots and extends cannot reach outside it.
-function tsCheckProject(input){
+const NODE_LIBS=['/.lib/node.d.ts','/.lib/iterators.d.ts'];
+function tsCheckProject(input,o){
+  const node=!!(o&&o.node);
   const files={};
   for(const k of Object.keys(input))files['/'+k.replace(/^\.?\//,'')]=String(input[k]);
   files[PROJECT_LIB]=TS_LIB;
+  const hidden=new Set([PROJECT_LIB]);
+  if(node){
+    files[NODE_LIBS[0]]=root.NodeTypes.modules;files[NODE_LIBS[1]]=root.NodeTypes.iterators;
+    NODE_LIBS.forEach(n=>hidden.add(n));
+  }
   const rel=n=>n.slice(1);
   const dirs=new Set(['/']);
   for(const k of Object.keys(files))for(let d=k.slice(0,k.lastIndexOf('/'));d;d=d.slice(0,d.lastIndexOf('/')))dirs.add(d);
   const entries=dir=>{
     const base=dir==='/'?'/':dir+'/',fl=[],dl=new Set();
     for(const k of Object.keys(files)){
-      if(k===PROJECT_LIB||!k.startsWith(base))continue;
+      if(hidden.has(k)||!k.startsWith(base))continue;
       const rest=k.slice(base.length),i=rest.indexOf('/');
       if(i<0)fl.push(rest);else dl.add(rest.slice(0,i));
     }
@@ -189,15 +196,17 @@ function tsCheckProject(input){
     const p=d.file?d.file.getLineAndCharacterOfPosition(d.start):{line:0,character:0};
     out.push({file:d.file?rel(d.file.fileName):file,line:p.line+1,col:p.character+1,code:d.code,msg:ts.flattenDiagnosticMessageText(d.messageText,'\n')});
   };
-  let opts={strict:true,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS},roots;
+  let opts={strict:true,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS},roots,noEmit=false;
+  if(node)opts.esModuleInterop=true;
   if('/'+CONFIG in files){
     const parsed=ts.parseConfigFileTextToJson('/'+CONFIG,files['/'+CONFIG]);
     if(parsed.error)push(parsed.error,CONFIG);
     const cfg=ts.parseJsonConfigFileContent(parsed.config||{},sys,'/',undefined,'/'+CONFIG);
     cfg.errors.forEach(d=>push(d,CONFIG));
-    opts={target:opts.target,module:opts.module,...cfg.options};
+    opts={target:opts.target,module:opts.module,esModuleInterop:opts.esModuleInterop,...cfg.options};
     roots=cfg.fileNames;
-  }else roots=Object.keys(files).filter(k=>/\.ts$/.test(k)&&k!==PROJECT_LIB);
+    noEmit=!!cfg.options.noEmit;
+  }else roots=Object.keys(files).filter(k=>/\.ts$/.test(k)&&!hidden.has(k));
   delete opts.lib;delete opts.typeRoots;
   Object.assign(opts,{noLib:true,types:[],noEmit:true,configFilePath:undefined});
   const host={
@@ -206,14 +215,16 @@ function tsCheckProject(input){
     fileExists:sys.fileExists,readFile:sys.readFile,directoryExists:sys.directoryExists,realpath:p=>p,
     getCanonicalFileName:n=>n,useCaseSensitiveFileNames:()=>true,getNewLine:()=>'\n',
   };
-  const prog=ts.createProgram([PROJECT_LIB,...roots],opts,host);
-  [...prog.getOptionsDiagnostics(),...prog.getSyntacticDiagnostics(),...prog.getSemanticDiagnostics()].forEach(d=>{if(!d.file||d.file.fileName!==PROJECT_LIB)push(d,CONFIG)});
+  const prog=ts.createProgram([...hidden,...roots],opts,host);
+  [...prog.getOptionsDiagnostics(),...prog.getSyntacticDiagnostics(),...prog.getSemanticDiagnostics()].forEach(d=>{if(!d.file||!hidden.has(d.file.fileName))push(d,CONFIG)});
+  // The virtual Node runs CommonJS only, whatever module kind the config checks under.
+  const emitOpts=node?{...opts,module:ts.ModuleKind.CommonJS}:opts;
   const js={};
   for(const sf of prog.getSourceFiles()){
     if(sf.isDeclarationFile)continue;
-    js[rel(sf.fileName).replace(/\.ts$/,'.js')]=ts.transpileModule(sf.text,{compilerOptions:opts,fileName:sf.fileName}).outputText;
+    js[rel(sf.fileName).replace(/\.ts$/,'.js')]=ts.transpileModule(sf.text,{compilerOptions:emitOpts,fileName:sf.fileName}).outputText;
   }
-  return {diags:out,js,ok:!out.length};
+  return o?{diags:out,js,ok:!out.length,emit:!noEmit}:{diags:out,js,ok:!out.length};
 }
 root.TSCheck={init,check:tsCheck,checkProject:tsCheckProject,load:loadTS};
 })(typeof window !== 'undefined' ? window : globalThis);
