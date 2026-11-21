@@ -10,7 +10,7 @@ const COWSAY=(text)=>{const t=String(text);const bar='_'.repeat(t.length+2),low=
   return ' '+bar+'\n< '+t+' >\n '+low+'\n        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||'};
 function makeNodeEnv(R,vfs,file,args,io){
   const cwd='/home/you/my-app';
-  const cache={};
+  const cache=Object.create(null);
   const norm=p=>String(p).replace(/^\.\//,'').replace(/^\/home\/you\/my-app\//,'');
   const ioErr=(code,text,op,p)=>{const e=new Error(code+': '+text+', '+op+(p===undefined?'':" '"+p+"'"));e.code=code;return e};
   const enoent=(p,op)=>ioErr('ENOENT','no such file or directory',op,p);
@@ -23,8 +23,9 @@ function makeNodeEnv(R,vfs,file,args,io){
   const sio={...io,
     asyncErr(e){bad=true;if(io.asyncErr)io.asyncErr(e)},
     sys(t){bad=true;if(io.sys)io.sys(t)},
-    idle(b){if(b)failPend(28);if(io.idle)io.idle(b)},
-    done(){if(!bad&&!exited&&!R.silent)runExit(process.exitCode||0);teardown();if(io.done)io.done()}};
+    idle(b){if(b){failPend(28);idleFns.forEach(f=>f())}if(io.idle)io.idle(b)},
+    done(){if(!bad&&!exited&&!R.silent){runExit(process.exitCode||0);if(io.exit&&process.exitCode)io.exit(process.exitCode)}teardown();if(io.done)io.done()}};
+  const idleFns=[];
   const sch=()=>S||(S=root.Scheduler.create({hop:io.hop,alive:()=>!R.silent,io:sio}));
   const charge=ms=>{if(root.Scheduler)sch().charge(ms)};
   const COST=()=>root.Scheduler?root.Scheduler.COST:{FS_BASE_MS:0,BYTES_PER_MS:1,META_MS:0};
@@ -194,7 +195,8 @@ function makeNodeEnv(R,vfs,file,args,io){
     // the scheduler records the exit and drops its queues; silencing the realm drops promise jobs already queued
     exit:(c)=>{if(c===undefined)c=process.exitCode||0;runExit(c);if(root.Scheduler)sch().exit(c);R.silent=true;const e=new Error('__exit__');e.__exit=c;throw e},
     nextTick:(f,...a)=>sch().nextTick(f,...a),
-    stdout:{write:s=>{if(!R.silent)io.out('raw',[String(s).replace(/\n$/,'')]);return true}}};
+    stdout:{write:s=>{if(!R.silent)io.out('raw',[String(s).replace(/\n$/,'')]);return true}},
+    stderr:{write:s=>{if(!R.silent)io.out('raw',[String(s).replace(/\n$/,''),'stderr']);return true}}};
   const fw=n=>(...a)=>sch()[n](...a);
   const RDate=R.w.Date||Date;
   const VDate=new Proxy(RDate,{
@@ -204,12 +206,23 @@ function makeNodeEnv(R,vfs,file,args,io){
   const vnow=()=>root.Scheduler?sch().dateNow():RDate.now();
   const shadows=[fw('setTimeout'),fw('setInterval'),fw('setImmediate'),fw('clearTimeout'),fw('clearInterval'),fw('clearImmediate'),VDate,process,fw('guardTick')];
   const builtins={fs,path,os,process,events:EventEmitter,http};
+  // io.builtins(api) adds modules: keys with their own 'node:' prefix resolve only with it, the rest with or without.
+  let extra=null;
+  const hasOwn=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
   function require(spec){
-    spec=String(spec).replace(/^node:/,'');
-    if(spec in builtins)return builtins[spec];
+    spec=String(spec);
+    const bare=spec.replace(/^node:/,'');
+    if(hasOwn(builtins,bare))return builtins[bare];
+    if(io.builtins){
+      if(!extra)extra=io.builtins({R,sch,process,file,out:t=>{if(!R.silent)io.out('raw',[t])},idle:f=>idleFns.push(f)});
+      if(hasOwn(extra,spec))return extra[spec];
+      if(hasOwn(extra,bare))return extra[bare];
+    }
+    spec=bare;
     if(/^\.\.?\//.test(spec)){
       let k=norm(spec);if(!has(k)&&has(k+'.js'))k+='.js';
       if(!has(k)&&has(k+'.json'))k+='.json';
+      if(!has(k)&&io.transform&&has(k+'.ts'))k+='.ts';
       if(!has(k)){const e=new Error("Cannot find module '"+spec+"'");e.code='MODULE_NOT_FOUND';throw e}
       if(k.endsWith('.json'))return JSON.parse(vfs.files[k]);
       return loadModule(k);
@@ -221,7 +234,8 @@ function makeNodeEnv(R,vfs,file,args,io){
     if(cache[k])return cache[k].exports;
     const module={exports:{}};cache[k]=module;
     R.w.__defs=R.w.__defs||{};
-    const src=code!==undefined?code:vfs.files[k];
+    let src=code!==undefined?code:vfs.files[k];
+    if(io.transform&&k.endsWith('.ts'))src=io.transform(k,src);
     if(k.endsWith('.json')){module.exports=JSON.parse(src);return module.exports}
     const parse=root.acorn&&root.Scheduler?s=>root.acorn.parse(s,{ecmaVersion:'latest',sourceType:'script',allowReturnOutsideFunction:true}):null;
     const body=root.Scheduler?root.Scheduler.guardSource(src,parse):src;
