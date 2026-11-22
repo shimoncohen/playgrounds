@@ -1,0 +1,63 @@
+(()=>{
+'use strict';
+const SCQ=window.SCQ=window.SCQ||{};
+// source with every string literal blanked, so a name only counts when the code itself uses it
+const bare=s=>String(s).replace(/(["'`])(?:\\.|(?!\1)[^\\])*\1/g,'""');
+const uses=(s,n,k)=>(bare(s).match(new RegExp('\\b'+n+'\\b','g'))||[]).length>=k;
+const MAKE_COUNTER='function makeCounter() {\n  let count = 0\n  return function () {\n    count++\n    return count\n  }\n}';
+SCQ.CH.push(
+{name:'Scope and closures',tier:'intermediate',group:'JavaScript in depth',badge:'Brass Key',story:'Past the dark big top the ticket booth till is locked: read what lies outside a function, hide a price, build a counter that remembers and a till nobody can reach into, and win the brass key.',mode:'js',
+ intro:'The ticket booth till is locked, and Bellamy\'s note says the key goes to whoever understands where a variable lives. In chapter 7 you saw that a function\'s own boxes stay inside it. Now look the other way: what can a function see around it, and how can it keep a box alive?',
+ learned:['outer variables','shadowing','closures','private state','let in a for loop'],
+ missions:[
+ {title:'See outside',goal:'Write a function `announce` that reads the `show` box from outside it, then call it.',code:'const show = "Starlight Circus"\nfunction announce() {\n  return "Tonight at the " + show\n}\nannounce()',
+  how:['The whole code: <code>show</code> is made outside the function, and <code>announce</code> reads it anyway, because a function can see the boxes around the place where it was written.',
+   '<code>const show = "Starlight Circus"</code> makes the outer box first.',
+   '<code>function announce() { … }</code> never makes its own <code>show</code>, so the name is looked up outside the function.',
+   '<code>announce()</code> calls it, and the sentence appears after the <code>←</code>.'],
+  anat:[['const show','name','outer box'],['function announce','kw'],['show','val','read from outside'],['announce()','fn']],
+  explain:'The function looks for <code>show</code> inside itself first, finds nothing, then looks in the place around it. In Memory, <code>show</code> sits outside and the function box uses it.',
+  check:c=>c.ok&&typeof c.val('announce')==='function'&&typeof c.val('show')==='string'&&typeof c.value==='string'&&c.value.includes(c.val('show'))&&uses(c.src,'show',2)},
+ {title:'Two boxes, one name',goal:'Make a function `discount` with its own `price` box that hides the outer `price`, then call it.',code:'const price = 10\nfunction discount() {\n  const price = 8\n  return price\n}\ndiscount()',
+  how:['The whole code: two boxes are both called <code>price</code>, and inside <code>discount</code> the nearer one wins.',
+   '<code>const price = 10</code> is the outer box.',
+   '<code>const price = 8</code> inside the function makes a second box with the same name.',
+   '<code>return price</code> hands back the nearer box, so <code>discount()</code> gives 8 and the outer <code>price</code> stays 10.'],
+  anat:[['const price = 10','name','outer'],['const price = 8','name','inner'],['return price','kw'],['discount()','fn']],
+  explain:'The inner <code>price</code> <b>shadows</b> the outer one: inside the function, the name points at the nearer box. Look at Memory: the outer <code>price</code> is still 10.',
+  check:c=>c.ok&&typeof c.val('discount')==='function'&&typeof c.val('price')==='number'&&typeof c.value==='number'&&c.value!==c.val('price')&&uses(c.src,'price',3)},
+ {title:'A counter that remembers',goal:'Write `makeCounter`, which makes a `count` box and returns a function that adds 1 to it every time. Make one called `tickets`, then call it.',code:MAKE_COUNTER+'\nconst tickets = makeCounter()\ntickets()',
+  how:['The whole code: <code>makeCounter</code> builds a box, then returns a function that keeps using that box after <code>makeCounter</code> has finished.',
+   '<code>let count = 0</code> is the box, made once for each call of <code>makeCounter</code>.',
+   '<code>return function () { … }</code> hands back a new function that adds 1 to <code>count</code> and returns it.',
+   '<code>const tickets = makeCounter()</code> keeps that returned function, and <code>tickets()</code> runs it.'],
+  anat:[['let count = 0','name','the remembered box'],['return function','kw'],['count++','op'],['tickets()','fn']],
+  explain:'When <code>makeCounter()</code> finishes, you would expect <code>count</code> to vanish. It does not: the returned function holds on to the box it was made next to. A function that keeps the boxes around its birthplace alive is called a <b>closure</b>. Every <code>tickets()</code> call adds to the same remembered box.',
+  check:c=>{if(!(c.ok&&typeof c.val('makeCounter')==='function'&&typeof c.val('tickets')==='function'&&typeof c.value==='number'&&/\breturn\s+(function\b|\(?[\w\s,]*\)?\s*=>)/.test(c.src)))return false;const f=c.val('makeCounter')(),a=f(),b=f();return typeof a==='number'&&b===a+1}},
+ {title:'Each counter has its own box',goal:'Make two counters, `door` and `gate`, with `makeCounter`. Call `door` twice, then `gate` once.',code:'const door = makeCounter()\nconst gate = makeCounter()\ndoor()\ndoor()\ngate()',need:['makeCounter'],pre:MAKE_COUNTER,
+  how:['The whole code: every call to <code>makeCounter()</code> builds a fresh <code>count</code> box, so two counters never share a count.',
+   '<code>door</code> and <code>gate</code> each hold their own returned function and their own remembered box.',
+   'Calling <code>door()</code> twice takes the door\'s count to 2.',
+   'Calling <code>gate()</code> last still answers 1, because the gate\'s box was never touched.'],
+  anat:[['const door','name'],['const gate','name'],['door()','fn','door: 1, then 2'],['gate()','fn','gate: 1']],
+  explain:'The remembered box belongs to one call of <code>makeCounter</code>, not to the function itself. That is why the gate starts at 1 even after the door counted to 2.',
+  check:c=>c.ok&&typeof c.val('door')==='function'&&typeof c.val('gate')==='function'&&c.val('door')!==c.val('gate')&&c.value===1&&/\bdoor\s*\(\s*\)[^]*\bdoor\s*\(\s*\)/.test(bare(c.src))&&/\bgate\s*\(\s*\)/.test(bare(c.src))},
+ {title:'A till nobody can reach into',goal:'Write `makeTill`, which keeps `takings` hidden and returns an object with `add(amount)` and `total()`. Make a `till`, add 5, then read the total.',code:'function makeTill() {\n  let takings = 0\n  return {\n    add(amount) { takings += amount },\n    total() { return takings }\n  }\n}\nconst till = makeTill()\ntill.add(5)\ntill.total()',
+  how:['The whole code: the money lives in a box that only two functions can reach, so nothing else can change it by accident.',
+   '<code>let takings = 0</code> is the hidden box, made inside <code>makeTill</code>.',
+   'The returned object holds two methods, <code>add</code> and <code>total</code>. Both were written next to <code>takings</code>, so both can use it.',
+   '<code>till.add(5)</code> changes the box and <code>till.total()</code> reads it. Outside, <code>till.takings</code> is <code>undefined</code>.'],
+  anat:[['let takings','name','hidden box'],['add(amount)','fn'],['total()','fn'],['till.total()','fn']],
+  explain:'Only <code>add</code> and <code>total</code> can touch <code>takings</code>. Try <code>till.takings</code> in the console: you get <code>undefined</code>, not the money.',
+  check:c=>{const t=c.val('till'),m=c.val('makeTill');if(!(c.ok&&typeof m==='function'&&/makeTill\s*\(/.test(c.src)&&t&&typeof t.add==='function'&&typeof t.total==='function'&&t.takings===undefined&&typeof c.value==='number'&&c.value>0))return false;const f=m();f.add(3);f.add(4);return f.total()===7}},
+ {title:'A box for every turn',goal:'Hang three bells in a loop: push a function that returns `i` into `bells` on each turn of `for (let i = 1; i <= 3; i++)`, then ring each one.',code:'const bells = []\nfor (let i = 1; i <= 3; i++) {\n  bells.push(() => i)\n}\nbells.map(ring => ring())',
+  how:['The whole code: the loop makes three small functions, and each one remembers the <code>i</code> of its own turn.',
+   '<code>for (let i = 1; i <= 3; i++)</code> gives every turn a fresh <code>i</code> box (1, then 2, then 3).',
+   '<code>bells.push(() => i)</code> stores a function that has closed over that turn\'s box.',
+   '<code>bells.map(ring => ring())</code> rings every bell and collects the answers.'],
+  anat:[['let i','kw','new box each turn'],['bells.push','fn'],['() => i','val','remembers its i'],['bells.map','fn']],
+  explain:'Because <code>i</code> is made with <code>let</code> in the <code>for</code> line, each turn gets its own box, so the bells answer 1, 2 and 3. If all three shared one box, they would all see its final value.',
+  check:c=>c.ok&&/for\s*\(\s*let\b/.test(c.src)&&Array.isArray(c.value)&&Array.from(c.value).join(',')==='1,2,3'&&Array.isArray(c.val('bells'))},
+ ]},
+);
+})();
