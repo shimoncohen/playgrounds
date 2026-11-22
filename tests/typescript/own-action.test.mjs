@@ -70,6 +70,7 @@ const PROJECT_BATTERY = {
 const reference = m => ({ ...m.start, ...m.code });
 
 CH.forEach((ch, ci) => {
+  if (ch.terminal) return;
   if (ch.mode === 'project') {
     describe(`typescript-quest own action, chapter ${ci + 1}: ${ch.name} (project)`, () => {
       ch.missions.forEach((m, i) => {

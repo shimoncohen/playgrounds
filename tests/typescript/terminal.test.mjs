@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { host, projectRun } from './project-harness.mjs';
-import { makeTerminal, makeTs, ts } from './terminal-harness.mjs';
+import { makeTerminal, makeTs, playTerminal, ts } from './terminal-harness.mjs';
 
 const wait = (ms = 30) => new Promise(r => setTimeout(r, ms));
 // Waits (at most 1 s) until the output has not grown for 10 ms: timers and tests finish on later hops.
@@ -342,7 +342,7 @@ describe('node file.ts (ts on)', () => {
   it('sets the RUN fields of the ts shape', async () => {
     const { T, st } = makeTs({ files: { 'x.ts': 'console.log(1)\n' } });
     await exec(T, 'node x.ts');
-    assert.deepEqual(Object.keys(st.run).sort(), ['args', 'cmd', 'diags', 'exitCode', 'logs', 'mode', 'ok', 'out', 'ran', 'server', 'src', 't', 'tests']);
+    assert.deepEqual(Object.keys(st.run).sort(), ['args', 'cmd', 'diags', 'exitCode', 'files', 'logs', 'mode', 'ok', 'out', 'ran', 'server', 'src', 't', 'tests']);
     assert.equal(st.run.logs, st.run.out);
     assert.deepEqual(clean(st.run.out), ['1']);
     assert.equal(st.run.tests, null);
@@ -822,6 +822,54 @@ describe('hostile names (ts on)', () => {
     assert.equal(({}).polluted, undefined);
     assert.equal(vm.runInContext('({}).polluted', host), undefined);
     assert.ok(st.lines.every(l => typeof l[0] === 'string'));
+    T.reset();
+  });
+});
+
+describe('RUN.files (TypeScript terminal)', () => {
+  const files = { ['__proto__']: 'p', constructor: 'c', 'a.ts': 'export const a = 1\n' };
+  it('is a copy of the map taken when the command starts', () => {
+    const { T, st } = makeTs({ files });
+    T.run('pwd');
+    const f = st.run.files;
+    assert.notEqual(f, st.files);
+    assert.deepEqual(Object.keys(f).sort(), ['__proto__', 'a.ts', 'constructor']);
+    assert.equal(Object.getOwnPropertyDescriptor(f, '__proto__').value, 'p');
+    st.files['a.ts'] = 'changed';
+    assert.equal(f['a.ts'], 'export const a = 1\n');
+    T.reset();
+  });
+  it('is absent with ts off, so the Script run is unchanged', () => {
+    const { T, st } = makeTerminal({ files });
+    T.run('pwd');
+    assert.equal('files' in st.run, false);
+    T.reset();
+  });
+});
+
+describe('the exit hook judges a TypeScript run again (process.exitCode)', () => {
+  const exits = r => r.snaps.map(s => s.run.exitCode);
+  it('a sync program that sets process.exitCode is judged twice, the last time with the code', async () => {
+    const r = await playTerminal({ 'a.ts': 'console.error("bad file")\nprocess.exitCode = 1\n' }, ['node a.ts']);
+    assert.deepEqual(exits(r), [0, 1]);
+    assert.equal(r.run.exitCode, 1);
+  });
+  it('a sync program with no exit code is judged once', async () => {
+    const r = await playTerminal({ 'a.ts': 'console.log("fine")\n' }, ['node a.ts']);
+    assert.deepEqual(exits(r), [0]);
+  });
+  it('process.exit(1) in the sync phase is judged once, already with the code', async () => {
+    const r = await playTerminal({ 'a.ts': 'process.exit(1)\n' }, ['node a.ts']);
+    assert.deepEqual(exits(r), [1]);
+  });
+  it('Script (ts off) is judged once and its run keeps its fields', async () => {
+    const { T, st } = makeTerminal({ files: { 'a.js': 'process.exitCode = 1\n' } });
+    T.run('node a.js');
+    await settle(T);
+    await wait(50);
+    assert.equal(st.completes, 1);
+    assert.equal(st.run.exitCode, undefined);
+    assert.equal(st.run.ok, false);
     T.reset();
   });
 });

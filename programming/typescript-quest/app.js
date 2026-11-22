@@ -356,8 +356,10 @@ const PSTORE={
   installed:p=>PSTORE.pkgs.includes(p),hasModules:()=>PSTORE.pkgs.length>0,
 };
 const T=window.Terminal.create({line,esc,tableHTML,fmtArgs,toText,errName,errTip,clearScreen,tryComplete,ts:true,
-  getRun:()=>RUN,setRun:r=>{RUN=r},isSync:()=>SYNC,setSync:v=>{SYNC=v},syncBar:()=>{},store:PSTORE,editor:{file:()=>ED.file,dirty:()=>ED.dirty},
+  getRun:()=>RUN,setRun:r=>{RUN=r},isSync:()=>SYNC,setSync:v=>{SYNC=v},syncBar,store:PSTORE,editor:{file:()=>ED.file,dirty:()=>ED.dirty},
   makeRealm,killRealm,renderProject:()=>renderFiles()});
+function syncBar(s){$('#procbar').hidden=!s.on;if(s.on)$('#procTxt').textContent='● '+s.label+' is running on port '+s.ports.join(', ')}
+$('#procStop').onclick=()=>{T.stop(true);cmd.focus()};
 function runShell(src){const r=T.run(src);if(r&&r.catch)r.catch(e=>line('Uncaught '+esc(errName(e)),'err'));return r}
 function projCancel(){
   RUNID++;if(PR)PR.stop();PR=null;PEND=false;edRun.disabled=false;killRealm(NODE);NODE=null;T.reset();
@@ -409,7 +411,7 @@ async function runProject(){
   saveFile();
   if(TERM()){
     if(!ED.file)return;
-    const src=(/\.test\.ts$/.test(ED.file)?'node --test ':'node ')+ED.file;
+    const src=ED.file==='tsconfig.json'?'tsc':(/\.test\.ts$/.test(ED.file)?'node --test ':'node ')+ED.file;
     H.list.push(src);H.i=H.list.length;echoInput(src,promptEl.textContent);runShell(src);return;
   }
   const my=++RUNID,files={...pfiles()};
@@ -491,7 +493,7 @@ function setChapter(i){
   if(method()==='none')line('This browser blocked running code inside the page, so the console cannot run anything here. Try a different browser.','err');
 }
 $('#fresh').onclick=()=>{
-  T.reset();freshConsole();clearScreen();line('Fresh console: all variables cleared.','sys');renderMem();bootCompiler();cmd.focus();
+  T.reset();freshConsole();clearScreen();line(TERM()?'Fresh console: the screen is cleared and any running program stopped. Your files are kept.':'Fresh console: all variables cleared.','sys');renderMem();bootCompiler();cmd.focus();
 };
 
 function sizeCmd(){cmd.rows=Math.max(1,cmd.value.split('\n').length)}

@@ -172,6 +172,48 @@ await page.click('#resetFiles');
 lines = await type('node -e "console.log(\'after-reset\')"');
 check('Reset files stops the run', lines.includes('after-reset') && !(await SERVING()), lines.join(' | '));
 
+check('the bar is hidden with no server', !(await visible('#procbar')));
+await setFiles({ 's.ts': SERVER });
+await type('node s.ts');
+check('a running server shows the bar with its label and port', (await visible('#procbar')) && (await page.textContent('#procTxt')) === '● node s.ts is running on port 3000', await page.textContent('#procTxt'));
+await page.click('#procStop');
+await stable();
+check('Stop hides the bar and stops the server', !(await visible('#procbar')) && (await outLines()).some(l => l.startsWith('Stopped node s.ts')), (await outLines()).join(' | '));
+await type('node s.ts');
+await page.click('#fresh');
+check('Fresh console hides the bar', !(await visible('#procbar')));
+await type('node s.ts');
+await page.focus('#cmd');
+await page.keyboard.press('Control+c');
+await stable();
+check('Ctrl+C hides the bar', !(await visible('#procbar')));
+await type('node s.ts');
+await enter('Modules', true);
+check('a chapter switch hides the bar', !(await visible('#procbar')));
+await setFiles({ 's.ts': SERVER });
+await type('node s.ts');
+await page.click('#resetFiles');
+await stable();
+check('Reset files hides the bar', !(await visible('#procbar')));
+
+const echoLast = () => page.evaluate(() => [...document.querySelectorAll('#screen .line.in')].map(l => l.innerText.trim()).pop());
+await setFiles({ 'tsconfig.json': TSCONFIG, 'main.ts': 'const n: number = "a"\n', 'timetable.json': '{"a":1}\n' });
+await page.click('.frow[data-f="tsconfig.json"]');
+await page.click('#edRun');
+await stable();
+let echo = await echoLast();
+check('Run on tsconfig.json echoes tsc and prints the diagnostic', /tsc$/.test(echo || '') && !/node/.test(echo || '') && (await outLines()).some(l => l.includes('error TS2322')), `${echo} | ${(await outLines()).join(' | ')}`);
+await page.click('.frow[data-f="timetable.json"]');
+await page.click('#edRun');
+await stable();
+echo = await echoLast();
+check('Run on timetable.json still runs node timetable.json', /node timetable\.json$/.test(echo || ''), echo);
+
+await page.evaluate(() => { document.querySelector('#screen').innerHTML = ''; });
+await page.click('#fresh');
+await stable();
+check('Fresh console in a terminal chapter says the files are kept, not that variables are cleared', (await outLines()).some(l => /^Fresh console: the screen is cleared and any running program stopped\. Your files are kept\.$/.test(l)) && !(await screenText()).includes('all variables cleared'), (await outLines()).join(' | '));
+
 // Tab completes file names.
 await setFiles({ 'main.ts': 'console.log(1)\n', 'notes.txt': 'x\n' });
 await page.evaluate(() => { document.querySelector('#screen').innerHTML = ''; });
@@ -194,7 +236,18 @@ const nf = async name => {
 };
 check('New file accepts a.test.ts, util/x.json and notes.txt', (await nf('a2.test.ts')) && (await nf('util/x.json')) && (await nf('notes.txt')));
 check('New file rejects .., an empty segment and a bad ending', !(await nf('../x.ts')) && !(await nf('a//b.ts')) && !(await nf('x.js')));
+const deep = await nf('util/deep/y.ts');
+check('New file accepts util/deep/y.ts, lists it in the panel and opens it', deep && (await page.evaluate(() => !!document.querySelector('.frow[data-f="util/deep/y.ts"]'))) && await (async () => { await page.click('.frow[data-f="util/deep/y.ts"]'); return (await page.textContent('#edtab')).includes('util/deep/y.ts'); })(), await page.textContent('#edtab'));
 check('the file panel badges .json, .txt and .ts files', await page.evaluate(() => ['x.json', 'notes.txt', 'a2.test.ts'].every((n, i) => { const row = [...document.querySelectorAll('.frow')].find(b => b.textContent.includes(n)); return row && row.querySelector('.fi').textContent === ['JSON', 'TXT', 'TS'][i]; })));
+
+await page.evaluate(() => { document.querySelector('#screen').innerHTML = ''; });
+await page.click('#chapters .chap[data-c="14"]');
+await stable();
+await page.evaluate(() => { const m = window.__t.CH[14].missions[0]; window.__t.pfiles()['tsconfig.json'] = m.code['tsconfig.json']; });
+await page.click('.frow[data-f="tsconfig.json"]');
+await page.click('#edRun');
+await stable();
+check('chapter 15 mission 1 completes through the page with +25 XP', (await outLines()).some(l => /^✓ Mission complete: Read the panel\s+\+25 XP$/.test(l)) && (await page.textContent('#xpText')) === '25 XP', `${(await outLines()).join(' | ')} | ${await page.textContent('#xpText')}`);
 
 // Back to the flagless chapter.
 await enter('Modules', false);

@@ -56,6 +56,28 @@ export function makeTerminal(opts = {}, over = {}) {
 // The TypeScript page's terminal: ts on, the real compiler, tscheck.js and nodetest.js.
 export const makeTs = (opts = {}, over = {}) => makeTerminal(opts, { ts: true, compiler: ts, TSCheck: engine.TSCheck, NodeTest: host.NodeTest, ...over });
 
+// Plays commands as the page does and returns the final RUN plus a copy of RUN at every tryComplete call (`at` is the command index).
+// A command is a string, or { write: [name, text] } to save a file between two commands.
+export async function playTerminal(files, cmds) {
+  const snaps = [];
+  let cur = -1;
+  const { T, st } = makeTs({ files }, { tryComplete() { snaps.push({ at: cur, run: JSON.parse(JSON.stringify(st.run)) }); } });
+  for (const [i, c] of cmds.entries()) {
+    cur = i;
+    if (typeof c !== 'string') { st.files[c.write[0]] = c.write[1]; continue; }
+    await T.run(c);
+    // The program has ended (or a server listens) once the output stops growing.
+    const until = Date.now() + 20000;
+    for (let n = -1, quiet = 0; quiet < 5;) {
+      if (Date.now() > until) throw new Error(`playTerminal: "${c}" kept printing for 20 s`);
+      await new Promise(r => setTimeout(r, 10)); quiet = n === st.lines.length ? quiet + 1 : 0; n = st.lines.length;
+    }
+  }
+  const run = JSON.parse(JSON.stringify(st.run));
+  T.reset();
+  return { run, snaps, st };
+}
+
 export const transform =(key, src) => ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
 
 export function runNode(files, { file = 'main.js', node = true, ts: tsOn = false, args = [], deadline = 10000 } = {}) {

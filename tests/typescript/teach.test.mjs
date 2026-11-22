@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { loadTypescriptContent } from '../content-loader.mjs';
 import { createSession } from './harness.mjs';
-import { projectRun, flatFiles as flatten } from './project-harness.mjs';
+import { projectRun, flatFiles as flatten, engine } from './project-harness.mjs';
+import { playTerminal } from './terminal-harness.mjs';
 
 const TSQ = loadTypescriptContent();
 const { CH, FIRE, qfOpen, BLOCKS, ERRS } = TSQ;
@@ -143,7 +144,33 @@ const FIRST = {
   'typed event names': [/typed event names?/i, 13, 2],
   TS2820:          [/\bTS2820\b/, 13, 1],
   TS2561:          [/\bTS2561\b/, 13, 2],
-  tsconfig:        [/tsconfig/i, null],
+  tsconfig:        [/tsconfig/i, 14, 0],
+  'strict mode':   [/strict mode|`strict`|"strict"/i, 14, 0],
+  noImplicitAny:   [/noImplicitAny/, 14, 1],
+  strictNullChecks: [/strictNullChecks/, 14, 2],
+  noUncheckedIndexedAccess: [/noUncheckedIndexedAccess/, 14, 3],
+  noImplicitReturns: [/noImplicitReturns/, 14, 4],
+  TS7030:          [/\bTS7030\b/, 14, 4],
+  noUnusedLocals:  [/noUnusedLocals/, 14, 5],
+  TS6133:          [/\bTS6133\b/, 14, 5],
+  readFileSync:    [/readFileSync/, 15, 0],
+  'JSON.parse':    [/JSON\.parse/, 15, 1],
+  'fs.promises':   [/fs\.promises/, 15, 3],
+  createServer:    [/createServer/, 15, 4],
+  IncomingMessage: [/IncomingMessage|ServerResponse/, 15, 4],
+  curl:            [/\bcurl\b/, 15, 4],
+  writeHead:       [/writeHead/, 15, 4],
+  'node:test':     [/node:test|node --test/, 16, 0],
+  assert:          [/\bassert\b/, 16, 0],
+  suite:           [/\bsuites?\b|\bdescribe\(/, 16, 2],
+  deepEqual:       [/deepEqual/, 16, 3],
+  rejects:         [/\brejects\b/, 16, 5],
+  'exit code':     [/exit codes?/i, 16, 1],
+  'process.argv':  [/process\.argv/, 17, 0],
+  subcommand:      [/subcommands?/i, 17, 0],
+  'process.exitCode': [/process\.exitCode/, 17, 1],
+  'console.error': [/console\.error/, 17, 1],
+  writeFileSync:   [/writeFileSync/, 17, 4],
   // the quest still teaches no loops, so no chapter claims a loop concept
   loop:            [/\bloops?\b|\b(while|for)\s*\(|\bdo\s*\{/i, null],
 };
@@ -205,11 +232,11 @@ const replCodes = () => {
   }
   return codes;
 };
-// REPL plus project missions, the project ones measured through the project harness
+// REPL plus project missions: the project ones measured through the project harness, the terminal ones through the terminal
 const allCodes = async () => {
   const codes = replCodes();
   for (const ch of CH.filter(c => c.mode === 'project')) for (const m of ch.missions.filter(x => x.expectError))
-    (await projectRun({ ...m.start, ...m.code })).diags.forEach(d => codes.add('TS' + d.code));
+    (ch.terminal ? (await playTerminal({ ...m.start, ...m.code }, m.cmds)).run : await projectRun({ ...m.start, ...m.code })).diags.forEach(d => codes.add('TS' + d.code));
   return codes;
 };
 
@@ -258,12 +285,17 @@ test('guide: no card uses a chapter 11 or later term before its chapter, and eac
   assert.match(g, /Uppercase[^.]*Uncapitalize change the case/);
   assert.match(g, /infer[^.]*inside a template literal type catches a piece/);
   assert.match(g, /close to one the type allows[^.]*often in its case\. The checker suggests the spelling/);
+  assert.match(g, /tsconfig\.json tells tsc how strict to be, and a flag left out is off\. "strict": true turns on the whole family at once/);
 });
 
 test('guide: each code card compiles clean, and each decoder code is one the missions measure', async () => {
+  const strictConfig = '{\n  "compilerOptions": { "strict": true }\n}\n';
   for (const b of BLOCKS) {
-    const rec = createSession().run(b[2]);
-    assert.deepEqual(rec.diags, [], `${b[0]}: ${b[2]}`);
+    // a node-tier card shows real Node code, so it compiles through the terminal's checker with the Node typings
+    const diags = CH[b[3]].tier === 'node'
+      ? JSON.parse(JSON.stringify(engine.TSCheck.checkProject({ 'tsconfig.json': strictConfig, 'main.ts': b[2] }, { node: true }).diags))
+      : createSession().run(b[2]).diags;
+    assert.deepEqual(diags, [], `${b[0]}: ${b[2]}`);
   }
   const measured = await allCodes();
   for (const e of ERRS) assert.ok(measured.has(e[0].match(/TS\d+/)[0]), `${e[0]} is not produced by any mission answer`);
@@ -297,7 +329,7 @@ test('guide filter: every card sits in the section of its chapter tier, and the 
   for (const b of BLOCKS) {
     const own = CH[b[3]].tier, sec = sectionOf(html, own);
     assert.ok(sec.includes(`<h4>${esc(b[0])}</h4>`), `${b[0]} is not in the ${own} section`);
-    for (const other of ['beginner', 'intermediate', 'advanced'].filter(x => x !== own))
+    for (const other of ['beginner', 'intermediate', 'advanced', 'node'].filter(x => x !== own))
       assert.ok(!sectionOf(html, other).includes(`<h4>${esc(b[0])}</h4>`), `${b[0]} also sits in ${other}`);
   }
   assert.match(html, /data-tier="intermediate"><h3>Intermediate: going deeper<\/h3>/);
@@ -357,5 +389,7 @@ test('quick-fire gating: a chapter\'s questions open with that chapter, and one 
   assert.equal(qfOpen(doneThrough(CH.length), 'beginner').length, FIRE.filter(q => CH[q.ch].tier === 'beginner').length);
   assert.equal(qfOpen(doneThrough(CH.length), 'intermediate').length, FIRE.filter(q => CH[q.ch].tier === 'intermediate').length);
   assert.equal(qfOpen(doneThrough(CH.length), 'advanced').length, FIRE.filter(q => CH[q.ch].tier === 'advanced').length);
+  assert.equal(qfOpen(doneThrough(CH.length), 'node').length, FIRE.filter(q => CH[q.ch].tier === 'node').length);
   assert.ok(FIRE.some(q => CH[q.ch].tier === 'advanced'), 'chapters 11 and on have quick-fire questions');
+  assert.ok(FIRE.some(q => CH[q.ch].tier === 'node'), 'the node tier has quick-fire questions');
 });
