@@ -27,6 +27,11 @@ const META = [
   { name: 'Mapped types', badge: 'Stencil Plate', tier: 'advanced', missions: 6, outcomes: [[2741], [2322], [2540], [2741], [2322], [2322]] },
   { name: 'Conditional types', badge: 'Points Lever', tier: 'advanced', missions: 7, outcomes: [[2322], [2322], [2322], [2322], [2322, 2322], [2322], [2322]] },
   { name: 'Template literal types', badge: 'Code Wheel', tier: 'advanced', missions: 6, outcomes: [[2322], [2820], [2353], [2322], [2741], [2345]] },
+  // Terminal chapters carry their outcomes in node-chapters.test.mjs.
+  { name: '`tsconfig` and strict mode', badge: 'Engine Gauge', tier: 'node', mode: 'project', terminal: true, missions: 6 },
+  { name: 'Typing `fs` and `http`', badge: 'Telegraph Key', tier: 'node', mode: 'project', terminal: true, missions: 6 },
+  { name: '`node:test`', badge: 'Inspector\'s Clipboard', tier: 'node', mode: 'project', terminal: true, missions: 6 },
+  { name: 'Final project: a typed CLI', badge: 'Golden Timetable', tier: 'node', mode: 'project', terminal: true, missions: 8 },
 ];
 
 // A "try it first" line in a how step names a code; each is measured here: [chapter, mission, source, codes].
@@ -157,7 +162,8 @@ describe('typescript-quest chapters', () => {
         assert.equal(ch.tier, meta.tier || 'beginner');
         assert.equal(ch.mode, meta.mode || 'ts');
         assert.equal(ch.missions.length, meta.missions);
-        assert.equal(meta.outcomes.length, meta.missions);
+        if (!meta.terminal) assert.equal(meta.outcomes.length, meta.missions);
+        assert.equal(!!ch.terminal, !!meta.terminal);
         for (const k of ['story', 'intro']) assert.ok(ch[k].trim(), k);
         assert.doesNotMatch(ch.intro, /<[a-z/]/i, 'intro is escaped by the page: use backticks for code, no HTML tags');
         assert.ok(ch.learned.length > 0);
@@ -184,6 +190,7 @@ describe('typescript-quest chapters', () => {
       });
 
       ch.missions.forEach((m, i) => {
+        if (meta.terminal) return;
         const outcome = meta.outcomes[i];
         if (meta.mode === 'project') {
           const ref = { ...m.start, ...m.code };

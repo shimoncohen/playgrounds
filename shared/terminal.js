@@ -35,7 +35,7 @@ function nodeHooks(){const hk={
     line(html,level==='warn'?'warn':level==='error'||(level==='raw'&&args[1]==='stderr')?'err':'');if(RUN&&RUN.out)RUN.out.push(text);if(!isSync()&&RUN&&Date.now()-RUN.t<20000)tryComplete();
     const m=TS&&RUN&&level==='raw'&&!args[1]&&/^ℹ (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) ([\d.]+)$/.exec(text);if(m)(RUN.tests=RUN.tests||{})[m[1]]=+m[2]},
   asyncErr(e){printNodeErr(e);const RUN=getRun();if(RUN){RUN.ok=false;if(TS)RUN.exitCode=1}if(hk.env)hk.env.stop();syncBar()},clear(){clearScreen()},idle:()=>syncBar(),done:()=>syncBar(),
-  exit(c){const RUN=getRun();if(RUN){RUN.ok=c===0;if(TS)RUN.exitCode=c}},sys(t){line(esc(t),'sys')}};
+  exit(c){const RUN=getRun();if(RUN){RUN.ok=c===0;if(TS){RUN.exitCode=c;if(!isSync()&&Date.now()-RUN.t<20000)tryComplete()}}},sys(t){line(esc(t),'sys')}};
   if(deps.hop)hk.hop=deps.hop;
   if(TS){hk.builtins=api=>NT().make(api);
     hk.transform=(k,s)=>{const c=tsLib();if(!c)throw new Error('The TypeScript compiler is not loaded yet. Run tsc once, then try again.');
@@ -74,7 +74,7 @@ function lsNames(dir){
 function run(src){
   const a=tokenize(src),c=a[0]||'',args=a.slice(1);
   const RUN={src,mode:'sh',t:Date.now(),cmd:c,args,ok:true,out:[],logs:[]};
-  if(TS)Object.assign(RUN,{logs:RUN.out,diags:[],exitCode:0,tests:null,ran:null});
+  if(TS)Object.assign(RUN,{logs:RUN.out,diags:[],exitCode:0,tests:null,ran:null,files:{...store.files}});
   setRun(RUN);
   const out=(t,cls='')=>{line(esc(t),cls);getRun().out.push(t)};
   const fail=(t)=>{out(t,'err');getRun().ok=false;if(TS)getRun().exitCode=1};

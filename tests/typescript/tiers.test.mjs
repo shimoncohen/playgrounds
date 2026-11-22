@@ -56,8 +56,8 @@ describe('typescript-quest tiers', () => {
   });
 
   it('chapters 1 to 5 are Beginner at 10 XP a mission, 6 to 10 Intermediate at 15, the rest Advanced at 20, and each tier is worth its missions plus 25 badge XP a chapter', () => {
-    const tierAt = i => (i < 5 ? 'beginner' : i < 10 ? 'intermediate' : 'advanced');
-    const xpAt = i => (i < 5 ? 10 : i < 10 ? 15 : 20);
+    const tierAt = i => (i < 5 ? 'beginner' : i < 10 ? 'intermediate' : i < 14 ? 'advanced' : 'node');
+    const xpAt = i => (i < 5 ? 10 : i < 10 ? 15 : i < 14 ? 20 : 25);
     CH.forEach((_, i) => {
       assert.equal(tiers.tierOf(i).id, tierAt(i), `chapter ${i + 1}`);
       assert.equal(tiers.missionXp(i), xpAt(i), `chapter ${i + 1}`);
@@ -66,7 +66,8 @@ describe('typescript-quest tiers', () => {
     const worth = (from, to, per) => CH.slice(from, to).reduce((sum, c) => sum + c.missions.length * per + 25, 0);
     assert.equal(tiers.cumulativeXp('beginner'), worth(0, 5, 10));
     assert.equal(tiers.cumulativeXp('intermediate'), worth(0, 5, 10) + worth(5, 10, 15));
-    assert.equal(tiers.cumulativeXp('advanced'), worth(0, 5, 10) + worth(5, 10, 15) + worth(10, CH.length, 20));
+    assert.equal(tiers.cumulativeXp('advanced'), worth(0, 5, 10) + worth(5, 10, 15) + worth(10, 14, 20));
+    assert.equal(tiers.cumulativeXp('node'), worth(0, 5, 10) + worth(5, 10, 15) + worth(10, 14, 20) + worth(14, CH.length, 25));
   });
 
   it('the real Intermediate tier-end threshold is 1030 XP: 455 for Beginner, then five chapters of six missions at 15 XP plus 25 badge XP each', () => {
@@ -78,15 +79,23 @@ describe('typescript-quest tiers', () => {
   });
 
   it('the real Advanced tier-end threshold is 1630 XP: 1030 for the two tiers below, then 25 missions at 20 XP plus 25 badge XP for each of four chapters', () => {
-    assert.deepEqual(CH.slice(10).map(c => c.missions.length), [6, 6, 7, 6]);
+    assert.deepEqual(CH.slice(10, 14).map(c => c.missions.length), [6, 6, 7, 6]);
     assert.equal(tiers.cumulativeXp('advanced'), 1030 + 25 * 20 + 4 * 25);
     assert.equal(tiers.cumulativeXp('advanced'), 1630);
-    assert.deepEqual(tiers.ranks().pop(), [1630, 'Tour Architect']);
+    assert.deepEqual(tiers.ranks().find(r => r[1] === 'Tour Architect'), [1630, 'Tour Architect']);
   });
 
-  it('ranks() is the base ladder plus the Intermediate and Advanced tier-end names once those tiers have chapters', () => {
+  it('the Node tier pays 25 XP a mission and 25 badge XP a chapter on top of 1630, and Timetable Master is the top rank', () => {
+    const node = CH.slice(14);
+    assert.deepEqual(node.map(c => c.missions.length), [6, 6, 6, 8]);
+    assert.equal(tiers.cumulativeXp('node'), 1630 + 26 * 25 + 4 * 25);
+    assert.equal(tiers.cumulativeXp('node'), 2380);
+    assert.deepEqual(tiers.ranks().pop(), [tiers.cumulativeXp('node'), 'Timetable Master']);
+  });
+
+  it('ranks() is the base ladder plus the three tier-end names once those tiers have chapters', () => {
     const total = tiers.cumulativeXp('beginner');
-    assert.deepEqual(tiers.ranks(), [...BASE, [tiers.cumulativeXp('intermediate'), 'Chief Engineer'], [tiers.cumulativeXp('advanced'), 'Tour Architect']]);
+    assert.deepEqual(tiers.ranks(), [...BASE, [tiers.cumulativeXp('intermediate'), 'Chief Engineer'], [tiers.cumulativeXp('advanced'), 'Tour Architect'], [tiers.cumulativeXp('node'), 'Timetable Master']]);
     assert.equal(tiers.rankFor(0).name, 'Stowaway');
     assert.equal(tiers.rankFor(49).name, 'Stowaway');
     assert.equal(tiers.rankFor(50).name, 'Ticket Clerk');
@@ -118,12 +127,14 @@ describe('typescript-quest tiers', () => {
     assert.equal(badgePay(S, 0, undefined), 0);
   });
 
-  it('renderRail draws a Beginner, an Intermediate and an Advanced header and data-c buttons numbered from 1 with n/m counts', () => {
+  it('renderRail draws a Beginner, an Intermediate, an Advanced and a TypeScript with Node header and data-c buttons numbered from 1 with n/m counts', () => {
     const n = CH[0].missions.length;
     const S = { xp: 0, done: { '0.0': 1, '0.1': 1 }, chap: 0, cur: {}, best: 0 };
     const el = {};
     renderRail(el, S);
-    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 3);
+    assert.equal((el.innerHTML.match(/class="tierhead/g) || []).length, 4);
+    assert.match(el.innerHTML, /data-tier="node"/);
+    assert.match(el.innerHTML, /TypeScript with Node/);
     assert.match(el.innerHTML, /data-tier="beginner"/);
     assert.match(el.innerHTML, /data-tier="intermediate"/);
     assert.match(el.innerHTML, /data-tier="advanced"/);
@@ -148,7 +159,7 @@ describe('typescript-quest tiers', () => {
 
   it('app.js carries no Script-only text: the SCQ namespace, the shell, stored project files or the virtual Node', () => {
     const app = read('programming/typescript-quest/app.js');
-    assert.doesNotMatch(app, /SCQ|runNpm|procbar|INITIAL_FILES|NodeEnv|FakeBuffer|MODE===.sh./);
+    assert.doesNotMatch(app, /SCQ|runNpm|INITIAL_FILES|NodeEnv|FakeBuffer|MODE===.sh./);
   });
 
   it('index.html loads nodeenv.js after scheduler.js and before tscheck.js, and project.js after tiers.js and before app.js', () => {

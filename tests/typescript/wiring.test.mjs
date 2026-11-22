@@ -51,6 +51,24 @@ describe('TypeScript Quest wiring', () => {
     }
   });
 
+  it('loads the node-tier chapters in order after chapter 14 and before quickfire.js', () => {
+    const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const order = ['content/ch-template-literal-types.js', 'content/ch-tsconfig-and-strict-mode.js', 'content/ch-typing-fs-and-http.js', 'content/ch-node-test.js', 'content/ch-final-project-typed-cli.js', 'content/quickfire.js'];
+    const present = order.filter(s => tags.includes(s));
+    assert.ok(present.includes('content/ch-tsconfig-and-strict-mode.js'), 'chapter 15 is loaded');
+    assert.deepEqual(tags.filter(s => order.includes(s)), present, 'the tags are in chapter order');
+    assert.equal(present[0], order[0]);
+    assert.equal(present.at(-1), 'content/quickfire.js');
+  });
+
+  it('has the running-process bar between the terminal and the key bar, with a Stop button', () => {
+    const html = read('programming/typescript-quest/index.html');
+    const at = s => { const i = html.indexOf(s); assert.ok(i >= 0, s); return i; };
+    assert.ok(at('id="term"') < at('id="procbar"') && at('id="procbar"') < at('id="keys"'));
+    assert.match(html, /id="procbar"[^>]*\shidden/);
+    assert.ok(at('id="procTxt"') > at('id="procbar"') && at('id="procStop"') < at('id="keys"'));
+  });
+
   it('loads the advanced chapters after ch-modules.js and before quickfire.js, in chapter order', () => {
     const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const order = ['content/ch-modules.js', 'content/ch-keyof-and-indexed-access.js', 'content/ch-mapped-types.js', 'content/ch-conditional-types.js', 'content/ch-template-literal-types.js', 'content/quickfire.js'];
