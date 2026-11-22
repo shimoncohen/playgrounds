@@ -30,6 +30,7 @@ describe('script-quest wiring', () => {
     const order = ['jsrealm', 'nodeenv', 'tscheck'].map(n => at(`../../shared/${n}.js`));
     assert.ok(order[0] > at('../../shared/how.js') && order[0] < order[1] && order[1] < order[2]);
     assert.ok(order[2] < at('content/helpers.js') && order[2] < at('app.js'));
+    assert.ok(at('../../shared/terminal.js') > order[2] && at('../../shared/terminal.js') < at('content/helpers.js') && at('../../shared/terminal.js') < at('app.js'));
   });
 
   it('app.js rebinds only exposed keys, calls both inits, and declares no moved name', () => {
@@ -46,18 +47,20 @@ describe('script-quest wiring', () => {
 
   it('app.js wires mkdir, curl, the running-process model and the mission fields', () => {
     const app = read('app.js');
-    assert.match(app, /case 'mkdir':/);
-    assert.match(app, /case 'curl':/);
+    const term = fs.readFileSync(new URL('../../shared/terminal.js', import.meta.url), 'utf8');
+    assert.match(term, /case 'mkdir':/);
+    assert.match(term, /case 'curl':/);
     assert.match(app, /^const \{[^}]*curl:nodeCurl[^}]*\}=window\.NodeEnv;/m);
-    assert.match(app, /nodeCurl\(/);
+    assert.match(app, /window\.Terminal\.create\([\s\S]*?\bnodeCurl\b[\s\S]*?\}\);/);
+    assert.match(term, /nodeCurl\(/);
     const fn = name => app.match(new RegExp(`function ${name}\\([^\\n]*`))?.[0] ?? '';
     assert.match(app.match(/function setChapter[\s\S]*?\n\}/)[0], /stopProc\(/);
     assert.match(app.match(/\$\('#fresh'\)\.onclick[\s\S]*?\n\};/)[0], /stopProc\(\)[\s\S]*ensureNeeds\(curMission\(\)\)/);
     assert.match(fn('goMission'), /stopProc\(/);
     assert.match(app, /m\.seed/);
     assert.match(app, /m\.then/);
-    assert.match(app, /case 'help':out\('[^']*mkdir \[-p\] <dir>[^']*curl /);
-    assert.doesNotMatch(app, /For folders and cd/);
+    assert.match(term, /case 'help':out\('[^']*mkdir \[-p\] <dir>[^']*curl /);
+    assert.doesNotMatch(term, /For folders and cd/);
     assert.match(app, /\}\)\(\);\s*$/);
     assert.doesNotMatch(app, /\bfetch\(/);
     assert.doesNotThrow(() => new vm.Script(app), 'app.js parses');
