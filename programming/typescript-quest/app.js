@@ -90,6 +90,7 @@ function echoInput(src,pr){const ls=src.split('\n');const pad=' '.repeat(Math.ma
   line(ls.map((l,i)=>'<span class="pr">'+esc(i?pad:pr)+'</span>'+hl(l)).join('\n'),'in')}
 
 let MODE='ts';
+const TERM=()=>MODE==='project'&&!!CH[S.chap].terminal;
 let REALM=null,HIST=[],DECLS=new Map(),TYPES=new Map(),RUN=null,SYNC=false;
 const hooks={
   out(level,args){
@@ -189,6 +190,7 @@ async function submit(){
   if(!src.trim()){echoInput('',promptEl.textContent);return}
   H.list.push(src);H.i=H.list.length;
   echoInput(src,promptEl.textContent);
+  if(TERM()){runShell(src.trim());return}
   const t=src.trim();
   if(t==='clear'||t==='.clear'||t==='cls'){clearScreen();return}
   if(t==='help'||t==='.help'){line('Type any TypeScript and press Enter. Shift+Enter adds a new line.\nThe console shows the value of the last expression after ←.\nclear empties the screen. The Memory panel shows every variable you make.','sys');return}
@@ -217,7 +219,7 @@ function curIdx(){const c=S.chap;if(S.cur[c]!==undefined)return S.cur[c];const j
 function curMission(){const j=curIdx();return j>=0?CH[S.chap].missions[j]:null}
 function ctx(){return MODE==='project'?{...RUN}:{...RUN,has:n=>DECLS.has(n),types:[...TYPES.keys()]}}
 function tryComplete(){
-  if(!RUN||RUN.mode!==MODE)return;
+  if(!RUN||(RUN.mode!==MODE&&!(TERM()&&RUN.mode==='sh')))return;
   const c=S.chap,j=curIdx();if(j<0)return;const m=CH[c].missions[j];
   let ok=false;try{ok=!!m.check(ctx())}catch(e){ok=false}
   if(!ok)return;
@@ -345,8 +347,20 @@ const ed=$('#ed'),gutter=$('#gutter'),edRun=$('#edRun');
 /* project files are never saved, so a reload loses them */
 let PKEY=null,PFILES={},RUNID=0,PR=null,PEND=false,NODE=null,tabFree=false;
 const pfiles=()=>PFILES[PKEY];
+const PPK={};
+const PSTORE={
+  get files(){return pfiles()},get pkgs(){return PPK[PKEY]||(PPK[PKEY]=[])},
+  write(k,v){pfiles()[k]=v;if(ED.file===k&&!ED.dirty){ed.value=v;edSync()}renderFiles(k)},
+  remove(k){delete pfiles()[k];if(ED.file===k)openFile(null);renderFiles()},
+  list(){return Object.keys(pfiles()).concat(PSTORE.pkgs.length?['node_modules']:[]).sort()},
+  installed:p=>PSTORE.pkgs.includes(p),hasModules:()=>PSTORE.pkgs.length>0,
+};
+const T=window.Terminal.create({line,esc,tableHTML,fmtArgs,toText,errName,errTip,clearScreen,tryComplete,ts:true,
+  getRun:()=>RUN,setRun:r=>{RUN=r},isSync:()=>SYNC,setSync:v=>{SYNC=v},syncBar:()=>{},store:PSTORE,editor:{file:()=>ED.file,dirty:()=>ED.dirty},
+  makeRealm,killRealm,renderProject:()=>renderFiles()});
+function runShell(src){const r=T.run(src);if(r&&r.catch)r.catch(e=>line('Uncaught '+esc(errName(e)),'err'));return r}
 function projCancel(){
-  RUNID++;if(PR)PR.stop();PR=null;PEND=false;edRun.disabled=false;killRealm(NODE);NODE=null;
+  RUNID++;if(PR)PR.stop();PR=null;PEND=false;edRun.disabled=false;killRealm(NODE);NODE=null;T.reset();
 }
 function projEnter(){
   const j=curIdx();
@@ -363,9 +377,9 @@ function projEnter(){
   openFile(m.open in PFILES[key]?m.open:Object.keys(PFILES[key])[0]||null);
 }
 function renderFiles(flash){
-  const f=pfiles(),rows=Object.keys(f).sort().map(n=>{const json=/\.json$/.test(n);const size=f[n].split('\n').filter((l,i,a)=>i<a.length-1||l).length;
-    return `<button class="frow${ED.file===n?' open':''}${flash===n?' flash':''}" data-f="${esc(n)}"><span class="fi ${json?'json':'js'}">${json?'JSON':'TS'}</span>${esc(n)}<span class="sz">${size} line${size===1?'':'s'}</span></button>`}).join('');
-  mapPanel.innerHTML=`<h3>Files</h3><p class="mapsub">The project for this mission. Click a file to open it, change it, then press <b>Run</b>: that compiles every file and runs <code>main.ts</code>. The files stay in this tab until you reload.</p>
+  const f=pfiles(),rows=Object.keys(f).sort().map(n=>{const dir=n.endsWith('/'),k=dir?'dir':/\.json$/.test(n)?'json':/\.txt$/.test(n)?'txt':'js',tag=dir?'DIR':k==='js'?/\.js$/.test(n)?'JS':'TS':k.toUpperCase();const size=f[n].split('\n').filter((l,i,a)=>i<a.length-1||l).length;
+    return `<button class="frow${ED.file===n?' open':''}${flash===n?' flash':''}" data-f="${esc(n)}"${dir?' disabled':''}><span class="fi ${k}">${tag}</span>${esc(n)}<span class="sz">${dir?'':size+' line'+(size===1?'':'s')}</span></button>`}).join('');
+  mapPanel.innerHTML=`<h3>Files</h3><p class="mapsub">The project for this mission. Click a file to open it, change it, then press <b>Run</b>: ${TERM()?'that runs <code>node</code> on the open file, or <code>node --test</code> on a <code>.test.ts</code> file':'that compiles every file and runs <code>main.ts</code>'}. The files stay in this tab until you reload.</p>
     <div class="files">${rows}</div>
     <form class="newfile" id="newfile"><input id="nfName" placeholder="new-file.ts" aria-label="New file name" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn small" type="submit">New file</button></form>
     <div class="legend"><button class="linkbtn" id="resetFiles" type="button">Reset files</button></div>`;
@@ -393,6 +407,11 @@ function fillFile(m){
 async function runProject(){
   if(MODE!=='project'||PEND||!pfiles())return;
   saveFile();
+  if(TERM()){
+    if(!ED.file)return;
+    const src=(/\.test\.ts$/.test(ED.file)?'node --test ':'node ')+ED.file;
+    H.list.push(src);H.i=H.list.length;echoInput(src,promptEl.textContent);runShell(src);return;
+  }
   const my=++RUNID,files={...pfiles()};
   PEND=true;edRun.disabled=true;clearScreen();
   const live=fn=>(...a)=>{if(my===RUNID)fn(...a)};
@@ -424,14 +443,14 @@ mapPanel.addEventListener('click',e=>{
   if(b.dataset.f!==undefined)openFile(b.dataset.f);
   else if(b.id==='resetFiles'){
     const[c,j]=PKEY.split('.'),m=CH[c].missions[j];
-    projCancel();PFILES[PKEY]={...m.start};ED.dirty=false;
+    projCancel();PFILES[PKEY]={...m.start};delete PPK[PKEY];ED.dirty=false;
     openFile(m.open in PFILES[PKEY]?m.open:Object.keys(PFILES[PKEY])[0]||null);
     line('Files reset to the starting files.','sys');
   }
 });
 mapPanel.addEventListener('submit',e=>{
   e.preventDefault();const inp=$('#nfName'),n=(inp.value||'').trim();
-  if(!/^[\w-]+(?:\/[\w-]+)*\.ts$/.test(n)){inp.setCustomValidity('Use a name that ends in .ts, with letters, numbers, dashes or underscores. A folder is fine: util/shout.ts');inp.reportValidity();return}
+  if(TERM()?!/^(?:[\w-]+\/)*[\w-]+(?:\.[\w-]+)*\.(?:ts|json|txt)$/.test(n):!/^[\w-]+(?:\/[\w-]+)*\.ts$/.test(n)){inp.setCustomValidity(TERM()?'Use a name that ends in .ts, .json or .txt, with letters, numbers, dashes or underscores. A folder is fine: util/shout.ts, and so is a dot in the name: a.test.ts':'Use a name that ends in .ts, with letters, numbers, dashes or underscores. A folder is fine: util/shout.ts');inp.reportValidity();return}
   inp.setCustomValidity('');const f=pfiles();if(!(n in f))f[n]='';openFile(n);ed.focus();
 });
 mapPanel.addEventListener('input',e=>{if(e.target.id==='nfName')e.target.setCustomValidity('')});
@@ -455,10 +474,13 @@ function setChapter(i){
   const ch=CH[i];MODE=ch.mode;
   const pj=MODE==='project';
   $('#editor').hidden=!pj;$('#edbar').hidden=!pj;
-  $('.inputline').hidden=pj;$('#keys').hidden=pj;$('#termbar').hidden=pj;
+  const tm=TERM();
+  $('.inputline').hidden=pj&&!tm;$('#keys').hidden=pj&&!tm;$('#termbar').hidden=pj&&!tm;
+  $('#term').classList.toggle('short',tm);
   clearScreen();RUN=null;
-  promptEl.textContent='ts> ';
-  $('#crumbs').innerHTML='<span class="modepill">TypeScript</span><span>'+(pj?'Edit the files, then press Run. Real TypeScript type-checking, then <code>main.ts</code> runs.':'Real TypeScript type-checking, then the code runs.')+'</span>';
+  promptEl.textContent=tm?'~/my-app $ ':'ts> ';
+  cmd.setAttribute('aria-label',tm?'Type a terminal command':'Type TypeScript and press Enter');
+  $('#crumbs').innerHTML='<span class="modepill">TypeScript</span><span>'+(tm?'Edit the files, then press Run or type commands. <code>tsc</code> checks, <code>node file.ts</code> runs.':pj?'Edit the files, then press Run. Real TypeScript type-checking, then <code>main.ts</code> runs.':'Real TypeScript type-checking, then the code runs.')+'</span>';
   $('#fresh').textContent='Fresh console';
   freshConsole();
   line('Chapter '+(i+1)+': '+esc(ch.name),'tip');
@@ -469,18 +491,21 @@ function setChapter(i){
   if(method()==='none')line('This browser blocked running code inside the page, so the console cannot run anything here. Try a different browser.','err');
 }
 $('#fresh').onclick=()=>{
-  freshConsole();clearScreen();line('Fresh console: all variables cleared.','sys');renderMem();bootCompiler();cmd.focus();
+  T.reset();freshConsole();clearScreen();line('Fresh console: all variables cleared.','sys');renderMem();bootCompiler();cmd.focus();
 };
 
 function sizeCmd(){cmd.rows=Math.max(1,cmd.value.split('\n').length)}
 cmd.addEventListener('input',sizeCmd);
 cmd.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey){
-    if(isIncomplete(cmd.value)){e.preventDefault();const s=cmd.selectionStart;const ln=cmd.value.slice(0,s).split('\n').pop();const ind=ln.match(/^\s*/)[0]+(/[{(\[]\s*$/.test(ln)?'  ':'');cmd.setRangeText('\n'+ind,s,cmd.selectionEnd,'end');sizeCmd();return}
+    if(!TERM()&&isIncomplete(cmd.value)){e.preventDefault();const s=cmd.selectionStart;const ln=cmd.value.slice(0,s).split('\n').pop();const ind=ln.match(/^\s*/)[0]+(/[{(\[]\s*$/.test(ln)?'  ':'');cmd.setRangeText('\n'+ind,s,cmd.selectionEnd,'end');sizeCmd();return}
     e.preventDefault();submit();return}
+  if(e.key==='Tab'&&TERM()){e.preventDefault();const s=cmd.selectionStart,pre=cmd.value.slice(0,s).split(/\s/).pop(),hits=PSTORE.list().filter(f=>f.startsWith(pre)&&f!==pre);
+    if(hits.length===1)cmd.setRangeText(hits[0].slice(pre.length)+' ',s,s,'end');else if(hits.length>1)line(esc(hits.join('  ')),'sys');return}
   if(e.key==='Tab'){e.preventDefault();cmd.setRangeText('  ',cmd.selectionStart,cmd.selectionEnd,'end');sizeCmd();return}
   if(e.key==='ArrowUp'&&!cmd.value.slice(0,cmd.selectionStart).includes('\n')){if(H.i>0){e.preventDefault();H.i--;cmd.value=H.list[H.i];sizeCmd()}return}
   if(e.key==='ArrowDown'&&!cmd.value.slice(cmd.selectionEnd).includes('\n')){if(H.i<H.list.length){e.preventDefault();H.i++;cmd.value=H.list[H.i]||'';sizeCmd()}return}
+  if(e.key.toLowerCase()==='c'&&e.ctrlKey&&cmd.selectionStart===cmd.selectionEnd&&TERM()&&T.procOn()){e.preventDefault();T.stop(true);return}
   if(e.key.toLowerCase()==='l'&&e.ctrlKey){e.preventDefault();clearScreen()}
 });
 term.addEventListener('click',()=>{if(!getSelection().toString())cmd.focus({preventScroll:true})});

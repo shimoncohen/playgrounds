@@ -44,7 +44,7 @@ function runFile(file, files, code = files[file]) {
 const passes = (m, run) => m.check(run.final) && [...run.snaps, run.final].some(c => m.check(c));
 const failsAlways = (m, run) => [...run.snaps, run.final].every(c => !m.check(c));
 
-// the terminal's mkdir on a copy of the files, with the page's folder rules (app.js case 'mkdir')
+// the terminal's mkdir on a copy of the files, with the page's folder rules (shared/terminal.js case 'mkdir')
 function mkdir(argv, files0) {
   const files = { ...files0 }, has = k => k in files;
   const isDir = k => k === '' || has(k + '/') || Object.keys(files).some(f => f.startsWith(k + '/'));
@@ -527,7 +527,7 @@ const THEN = ['curl localhost:3000', 'curl -i localhost:3000', 'curl localhost:3
 const HTTP = 'const http = require("http")\n';
 
 // `node file`, then right after runMain the mission's `then` through NodeEnv.curl. It builds the ctx the page builds
-// for the node run (a server stays up) and for the curl run (app.js case 'curl'). `ranCode` is the snapshot taken when node starts.
+// for the node run (a server stays up) and for the curl run (shared/terminal.js case 'curl'). `ranCode` is the snapshot taken when node starts.
 function serveRun(file, code, then, files = START, ranCode = code) {
   const vfs = { files: { ...files, [file]: code }, write: (k, v) => { vfs.files[k] = v; }, list: () => Object.keys(vfs.files), remove: k => { delete vfs.files[k]; }, hasModules: () => false, installed: () => false };
   const out = [];

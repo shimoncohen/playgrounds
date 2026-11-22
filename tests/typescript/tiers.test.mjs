@@ -148,7 +148,7 @@ describe('typescript-quest tiers', () => {
 
   it('app.js carries no Script-only text: the SCQ namespace, the shell, stored project files or the virtual Node', () => {
     const app = read('programming/typescript-quest/app.js');
-    assert.doesNotMatch(app, /SCQ|runShell|runNpm|procbar|INITIAL_FILES|NodeEnv|FakeBuffer|MODE===.sh./);
+    assert.doesNotMatch(app, /SCQ|runNpm|procbar|INITIAL_FILES|NodeEnv|FakeBuffer|MODE===.sh./);
   });
 
   it('index.html loads nodeenv.js after scheduler.js and before tscheck.js, and project.js after tiers.js and before app.js', () => {

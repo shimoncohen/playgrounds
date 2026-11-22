@@ -41,6 +41,16 @@ describe('TypeScript Quest wiring', () => {
     assert.ok(sch < at('app.js'), 'scheduler.js must load before app.js');
   });
 
+  it('loads nodetest.js, nodetypes.js and terminal.js after tscheck.js and before the content and app.js', () => {
+    const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const at = s => { const i = tags.indexOf(s); assert.ok(i >= 0, s); return i; };
+    for (const n of ['nodetest', 'nodetypes', 'terminal']) {
+      assert.ok(at('../../shared/tscheck.js') < at(`../../shared/${n}.js`), `${n}.js after tscheck.js`);
+      assert.ok(at(`../../shared/${n}.js`) < at('content/helpers.js'), `${n}.js before content/helpers.js`);
+      assert.ok(at(`../../shared/${n}.js`) < at('app.js'), `${n}.js before app.js`);
+    }
+  });
+
   it('loads the advanced chapters after ch-modules.js and before quickfire.js, in chapter order', () => {
     const tags = [...read('programming/typescript-quest/index.html').matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const order = ['content/ch-modules.js', 'content/ch-keyof-and-indexed-access.js', 'content/ch-mapped-types.js', 'content/ch-conditional-types.js', 'content/ch-template-literal-types.js', 'content/quickfire.js'];
