@@ -2,18 +2,12 @@
 // and a lazy line does not. A mission with steps is solved one step at a time, in order.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from '../content-loader.mjs';
+import { loadHarborQuest } from '../content-loader.mjs';
 
-// tick() calls the UI's onTick(), so a no-op stands in. skip() is a copy of window.__hq.skip in app.js.
-const prelude = 'const onTick=()=>{};const skip=ms=>{skew+=ms;tick();lastRec=0;tick()};\n';
-const storage = { getItem: () => null, setItem() {}, removeItem() {} };
-const { S, execLine, ensureFiles, CH, skip } = loadContent('harbor-quest', {
-  prelude,
-  parts: [['const KEY=', '/* ---------- pictures'], ['/* ---------- missions', '\nCH.forEach']],
-  returns: ['S', 'execLine', 'ensureFiles', 'CH', 'skip'],
-  globals: { localStorage: storage },
-  mustInclude: ['function execLine(', 'function tick(', 'function ensureFiles(', 'let lastRec=0'],
-});
+const HQ = loadHarborQuest();
+// tick() calls the UI's onTick(), so a no-op stands in.
+HQ.onTick = () => {};
+const { S, execLine, ensureFiles, CH, skip } = HQ;
 
 // The UI ticks every 250 ms while the learner reads, so pods advance Pending -> Running between lines.
 const wait = ms => { for (let t = 0; t < ms; t += 250) skip(250); };

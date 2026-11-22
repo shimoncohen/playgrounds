@@ -1,13 +1,11 @@
 // Harbor Quest ordered multi-step missions: every step must be done, in the order given, and a step done early does not count.
-// app.js is one DOM-bound IIFE, so run it in a vm against a do-nothing DOM stub and drive it through window.__hq.
+// The UI is DOM-bound, so run the game scripts in a vm against a do-nothing DOM stub and drive it through window.__hq.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import { readHarborGame } from '../content-loader.mjs';
 
-const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'harbor-quest', 'app.js'), 'utf8');
+const src = readHarborGame();
 
 const stub = () => {
   const p = new Proxy(function () {}, {
@@ -23,7 +21,7 @@ function boot(saved) {
   const dom = stub();
   const win = { __hq: null, getSelection: () => ({ toString: () => '' }), addEventListener() {}, matchMedia: () => dom };
   const ctx = vm.createContext({
-    window: win, document: dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
+    window: win, get Tiers() { return win.Tiers; }, document: dom, setInterval() {}, clearInterval() {}, setTimeout() {}, clearTimeout() {},
     localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     navigator: {}, requestAnimationFrame() {}, Image: stub(), URL, Blob, console, HowSteps: stub(), Trail: stub(), location: { hash: '' },
   });

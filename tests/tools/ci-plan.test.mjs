@@ -39,9 +39,16 @@ test('shell changes add the full course and golden jobs, and the smoke job leave
   assert.deepEqual(jobs[2].args, ['--test-name-pattern=^shell-quest full course', 'tests/smoke.mjs']);
 });
 
+test('harbor changes add the harbor golden job', () => {
+  const jobs = plan(['programming/harbor-quest/app.js'], { all: ['harbor', 'net'], withTests: ['harbor'] });
+  assert.deepEqual(names(jobs).at(-1), 'harbor-quest golden');
+  assert.deepEqual(jobs.at(-1).args, ['tests/harbor-golden.mjs']);
+  assert.ok(!names(plan(['programming/net-quest/app.js'], repo)).includes('harbor-quest golden'));
+});
+
 test('--all runs every suite, split so the course runs once', () => {
   const jobs = plan(null, repo);
-  assert.deepEqual(names(jobs), ['engine tests', 'browser smoke tests', 'shell-quest full course', 'shell-quest golden']);
+  assert.deepEqual(names(jobs), ['engine tests', 'browser smoke tests', 'shell-quest full course', 'shell-quest golden', 'harbor-quest golden']);
   assert.deepEqual(jobs[0].args, ['--run', 'test:engine']);
   assert.deepEqual(jobs[1].args, ['--test-skip-pattern=^shell-quest full course', 'tests/smoke.mjs']);
 });
