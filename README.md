@@ -113,8 +113,9 @@ The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math
 index.html              landing page (a card per section)
 shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, the Settings panel with Theme and Story (settings.js, settings.css), "The trail" strip (trail.js, trail.css), landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements)
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
-  script-quest/ python-quest/ cpp-quest/ harbor-quest/
+  script-quest/ python-quest/ cpp-quest/
                         index.html + style.css + app.js each
+  harbor-quest/         like those, plus engine/ (DOM-free Docker, Kubernetes and shell simulator), content/ (tiers, chapters, quick-fire, guide), ui.js
   ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, seven chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
@@ -143,7 +144,7 @@ Shell Quest is plain scripts sharing one `SQ` namespace, loaded in order from `i
 
 ### Tests, in one breath
 
-`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. Script, Python, C++ and Harbor Quest keep their course inside `app.js`; `tests/content-loader.mjs` slices it out for their tests, which include solvability tests (Python, C++ and Harbor in Node, Script in `tests/smoke.mjs` because its checks need a real browser realm). `tests/tools/publish_site.test.mjs` checks that a preview whose push loses a race with another is rebased and published. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
+`tests/shell/*.test.mjs` run the engine and content in Node, including **a solvability test for every mission** (each mission's reference `answer` must pass its own `check`) and two differential corpora that compare thousands of recorded outputs. `tests/shell-golden.mjs` replays every Beginner mission in a real browser against recorded fixtures. `tests/smoke.mjs` loads every playground, exercises progress export/import and the Shell Quest UI, and plays the whole course through. Harbor Quest has its own engine and content files, tested in `tests/harbor/` (solvability, teaching and tier tests). Script, Python and C++ Quest keep their course inside `app.js`; `tests/content-loader.mjs` slices it out for their tests, which include solvability tests (Python and C++ in Node, Script in `tests/smoke.mjs` because its checks need a real browser realm). `tests/tools/publish_site.test.mjs` checks that a preview whose push loses a race with another is rebased and published. **Never regenerate golden or corpus fixtures to make a test pass**; the [guideline](docs/tiers-guideline.md) explains why and what to do instead.
 
 ### Publishing to claude.ai artifacts
 

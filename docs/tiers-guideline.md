@@ -321,3 +321,5 @@ Load order in `index.html`: `shared/progress.js`, `shared/tiers.js`, `engine/*`,
 9. Tag guide entries by chapter and quick-fire by tier (or by chapter index, as in section 7, when the quest already opens questions by chapter); add the tier filter and picker.
 10. Add the bundle smoke test, run `python3 tools/build.py --check`, and wire the Node tests into CI before the browser tests.
 11. Play every new chapter by hand at desktop width and 390 px, in light and dark.
+
+Harbor Quest has done steps 1 to 6 and 10 (its first new tier is a later issue). Its split files share one `HQ` namespace. `HQ.S` is the save state, and the cross-file flags live there too: `HQ.HIT` (`engine/docker.js`, the box that answered last), `HQ.insideLost` (`engine/k8s.js`) and `HQ.pendingEdit` (`engine/shell.js`). Step 3 says "byte-identical"; for Harbor the golden (`tests/fixtures/harbor-golden.json`) is the proof, so a golden failure means the split changed behaviour.

@@ -1,14 +1,10 @@
 // Harbor Quest, "teach before use" (AGENTS.md rule 12): a key term must not appear in any mission text before the mission that
 // teaches it (or defines it in place), and Quick-fire only offers tasks whose chapter the learner has finished.
-// harbor-quest/app.js is one DOM-bound IIFE, so load the data blocks (CH, QF + qfOpen, puzzles, GUIDE) by their markers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadContent } from '../content-loader.mjs';
+import { loadHarborQuest } from '../content-loader.mjs';
 
-const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = loadContent('harbor-quest', {
-  parts: [['const CH=[', '\nCH.forEach'], ['const QF=[', 'const VALUED_D'], ['const PZ_DF=[', 'const RANKS'], ['const GUIDE=[', '/* ---------- UI']],
-  returns: ['CH', 'QF', 'PZ_DF', 'PZ_Y', 'GUIDE', 'qfOpen'],
-});
+const { CH, QF, PZ_DF, PZ_Y, GUIDE, qfOpen } = loadHarborQuest();
 
 const plain = t => String(t).replace(/<\/?[a-z][^>]*>/gi, '').replace(/`/g, '').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 /* a hint counts as use of a term but not as teaching it */

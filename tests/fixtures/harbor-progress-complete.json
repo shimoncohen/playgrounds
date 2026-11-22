@@ -1,0 +1,2932 @@
+{
+  "format": "playgrounds-progress",
+  "app": "harbor-quest",
+  "version": 1,
+  "data": {
+    "v": 1,
+    "xp": 1240,
+    "ch": 11,
+    "mi": 7,
+    "done": {
+      "0.0": 1,
+      "0.1": 1,
+      "0.2": 1,
+      "0.3": 1,
+      "0.4": 1,
+      "0.5": 1,
+      "1.0": 1,
+      "1.1": 1,
+      "1.2": 1,
+      "1.3": 1,
+      "1.4": 1,
+      "1.5": 1,
+      "2.0": 1,
+      "2.1": 1,
+      "2.2": 1,
+      "2.3": 1,
+      "2.4": 1,
+      "2.5": 1,
+      "2.6": 1,
+      "2.7": 1,
+      "2.8": 1,
+      "3.0": 1,
+      "3.1": 1,
+      "3.2": 1,
+      "3.3": 1,
+      "3.4": 1,
+      "3.5": 1,
+      "3.6": 1,
+      "3.7": 1,
+      "4.0": 1,
+      "4.1": 1,
+      "4.2": 1,
+      "4.3": 1,
+      "4.4": 1,
+      "4.5": 1,
+      "4.6": 1,
+      "4.7": 1,
+      "4.8": 1,
+      "4.9": 1,
+      "5.0": 1,
+      "5.1": 1,
+      "5.2": 1,
+      "5.3": 1,
+      "5.4": 1,
+      "5.5": 1,
+      "5.6": 1,
+      "5.7": 1,
+      "5.8": 1,
+      "6.0": 1,
+      "6.1": 1,
+      "6.2": 1,
+      "6.3": 1,
+      "6.4": 1,
+      "6.5": 1,
+      "6.6": 1,
+      "7.0": 1,
+      "7.1": 1,
+      "7.2": 1,
+      "7.3": 1,
+      "7.4": 1,
+      "7.5": 1,
+      "7.6": 1,
+      "8.0": 1,
+      "8.1": 1,
+      "8.2": 1,
+      "8.3": 1,
+      "8.4": 1,
+      "8.5": 1,
+      "8.6": 1,
+      "8.7": 1,
+      "9.0": 1,
+      "9.1": 1,
+      "9.2": 1,
+      "9.3": 1,
+      "9.4": 1,
+      "9.5": 1,
+      "9.6": 1,
+      "10.0": 1,
+      "10.1": 1,
+      "10.2": 1,
+      "10.3": 1,
+      "10.4": 1,
+      "10.5": 1,
+      "10.6": 1,
+      "11.0": 1,
+      "11.1": 1,
+      "11.2": 1,
+      "11.3": 1,
+      "11.4": 1,
+      "11.5": 1,
+      "11.6": 1
+    },
+    "badges": {
+      "0": 1,
+      "1": 1,
+      "2": 1,
+      "3": 1,
+      "4": 1,
+      "5": 1,
+      "6": 1,
+      "7": 1,
+      "8": 1,
+      "9": 1,
+      "10": 1,
+      "11": 1
+    },
+    "hist": [
+      "docker logs ghost",
+      "docker exec probe1 ls /",
+      "docker exec ghost ls",
+      "docker inspect probe1",
+      "docker inspect ghost",
+      "docker stop probe1",
+      "docker start probe1",
+      "docker restart probe1",
+      "docker kill probe1",
+      "docker rm probe1",
+      "docker rm ghost",
+      "docker network create probenet",
+      "docker network create probenet",
+      "docker network inspect probenet",
+      "docker network rm probenet",
+      "docker network rm ghost",
+      "docker volume create probevol",
+      "docker volume inspect probevol",
+      "docker volume rm probevol",
+      "docker volume rm ghost",
+      "docker build -t probe:1 .",
+      "docker build",
+      "docker tag probe:1 probe:2",
+      "docker tag ghost:1 x:1",
+      "docker push probe:2",
+      "docker push ghost",
+      "docker login",
+      "docker logout",
+      "docker history probe:1",
+      "docker history ghost",
+      "docker rmi probe:2",
+      "docker rmi ghost",
+      "docker network create probenet2",
+      "docker run -d --name probe2 --network probenet2 nginx:alpine",
+      "docker network inspect probenet2",
+      "docker network ls",
+      "docker volume create probevol2",
+      "docker volume ls",
+      "docker volume prune",
+      "docker container ls",
+      "docker image ls",
+      "docker system df",
+      "docker system prune",
+      "docker container prune",
+      "docker run -d --name probe4 -e A=b -v probevol2:/data nginx:alpine",
+      "docker inspect probe4",
+      "docker inspect nginx:alpine",
+      "docker logs 16bee7",
+      "docker tag probe:1 me/probe:3",
+      "docker login",
+      "docker push me/probe:3",
+      "docker logout",
+      "docker exec -it probe4 sh",
+      "pwd",
+      "ls /etc/nginx",
+      "ls -l /etc/nginx",
+      "touch /data/a.txt",
+      "ls /data",
+      "cat /data/a.txt",
+      "rm /data/a.txt",
+      "ls /data",
+      "cd /tmp",
+      "touch a.txt",
+      "mkdir d",
+      "ls",
+      "cat a.txt",
+      "cat nofile",
+      "rm a.txt",
+      "rm nofile",
+      "echo hi",
+      "env",
+      "ps",
+      "whoami",
+      "hostname",
+      "curl localhost",
+      "ping -c 1 localhost",
+      "apt-get update",
+      "sleep 1",
+      "date",
+      "nginx",
+      "node",
+      "redis-cli ping",
+      "frobnicate",
+      "help",
+      "exit",
+      "docker compose",
+      "docker compose ps",
+      "docker compose logs",
+      "docker compose config",
+      "docker compose bogus",
+      "docker compose build",
+      "docker compose stop",
+      "docker compose down -v",
+      "docker compose up -d",
+      "docker stop shop-web-1",
+      "docker compose up -d",
+      "kubectl",
+      "kubectl version",
+      "kubectl cluster-info",
+      "kubectl config current-context",
+      "kubectl bogus",
+      "kubectl top",
+      "kubectl edit",
+      "kubectl get pods -o wide",
+      "kubectl get pods -o name",
+      "kubectl get pods ghost",
+      "kubectl get deploy ghost",
+      "kubectl get svc ghost",
+      "kubectl get cm ghost",
+      "kubectl get deploy web -o yaml",
+      "kubectl get svc web -o yaml",
+      "kubectl get pod web-mmlc8sqvkf-vdrwf -o yaml",
+      "kubectl get pods -n kube-system",
+      "kubectl get pods -l app=web",
+      "kubectl get nodes",
+      "kubectl get ns",
+      "kubectl get cm",
+      "kubectl get endpoints",
+      "kubectl get events",
+      "kubectl get all",
+      "kubectl get rs",
+      "kubectl get svc -A",
+      "kubectl get nope",
+      "kubectl describe pod web-mmlc8sqvkf-vdrwf",
+      "kubectl describe deploy web",
+      "kubectl describe svc web",
+      "kubectl describe node harbor-worker",
+      "kubectl describe pod ghost",
+      "kubectl create deployment probe --image=nginx",
+      "kubectl create deployment probe --image=nginx",
+      "kubectl create namespace probens",
+      "kubectl create configmap pcm --from-literal=a=b",
+      "kubectl get pods -n probens",
+      "kubectl get cm",
+      "kubectl describe cm pcm",
+      "kubectl describe ns probens",
+      "kubectl create deployment inner --image=nginx -n probens",
+      "kubectl get all -n probens",
+      "kubectl run probepod --image=nginx",
+      "kubectl run probepod --image=nginx",
+      "kubectl scale deployment probe --replicas=2",
+      "kubectl scale deployment ghost --replicas=2",
+      "kubectl expose deployment probe --port=80",
+      "kubectl expose deployment ghost --port=80",
+      "curl probe",
+      "kubectl get svc -o wide",
+      "kubectl set image deployment/probe nginx=nginx:1.26",
+      "kubectl set image deployment/ghost nginx=nginx:1.26",
+      "kubectl set image deployment/probe nginx=nginx:1.99",
+      "kubectl describe deploy probe",
+      "kubectl rollout status deployment/probe",
+      "kubectl rollout history deployment/probe",
+      "kubectl rollout history deployment/probe --revision=1",
+      "kubectl rollout undo deployment/probe --to-revision=1",
+      "kubectl rollout undo deployment/ghost",
+      "kubectl rollout restart deployment/probe",
+      "kubectl rollout status deployment/ghost",
+      "kubectl describe deploy probe",
+      "kubectl logs web-mmlc8sqvkf-vdrwf",
+      "kubectl logs ghost",
+      "kubectl logs -l app=web",
+      "kubectl logs deployment/web",
+      "kubectl exec web-mmlc8sqvkf-vdrwf -- ls",
+      "kubectl exec ghost -- ls",
+      "kubectl port-forward svc/web 9292:80",
+      "kubectl port-forward svc/ghost 9292:80",
+      "kubectl port-forward pod/web-mmlc8sqvkf-vdrwf 9393:80",
+      "curl localhost:9292",
+      "curl localhost:9393",
+      "kubectl apply -f missing.yaml",
+      "kubectl apply -f shop.yaml",
+      "kubectl delete pod ghost",
+      "kubectl delete pod web-mmlc8sqvkf-4gd9r",
+      "kubectl delete deployment probe",
+      "kubectl delete deployment ghost",
+      "kubectl delete svc probe",
+      "kubectl delete pods -l app=nothing",
+      "kubectl expose pod probepod --port=80",
+      "kubectl expose pod ghost --port=80",
+      "kubectl delete pod probepod",
+      "kubectl create configmap nscm --from-literal=a=b -n probens",
+      "kubectl create namespace probens2",
+      "kubectl create deployment inner2 --image=nginx -n probens2",
+      "kubectl delete deployment --all -n probens2",
+      "kubectl delete pods --all -n probens2",
+      "kubectl expose deployment inner --port=80 -n probens",
+      "kubectl delete namespace probens",
+      "kubectl get cm pcm -o yaml",
+      "k get pods",
+      "kubectl exec -it web-mmlc8sqvkf-vdrwf -- sh",
+      "hostname",
+      "curl web",
+      "curl web:80",
+      "curl 10.244.2.7",
+      "curl nosuch",
+      "ping -c 2 web",
+      "ping -c 2 10.244.2.7",
+      "ping nosuch",
+      "exit",
+      "kubectl exec -it web-mmlc8sqvkf-vdrwf -- sh"
+    ],
+    "best": 0,
+    "puz": {
+      "df0": 1,
+      "y0": 1
+    },
+    "flag": {
+      "composeDown": 1,
+      "lastDeleted": {
+        "name": "probepod",
+        "dep": null,
+        "t": 1767226252000
+      },
+      "fwdHits": 5,
+      "fwdPods": {
+        "web-g9fg96nzsz-gxgtl": 1,
+        "web-g9fg96nzsz-8mxbw": 1,
+        "web-g9fg96nzsz-sgc2j": 1,
+        "web-mmlc8sqvkf-vdrwf": 1
+      }
+    },
+    "view": "auto",
+    "files": {
+      "README.md": "# The harbor shop\n\nThis folder is your workspace. Over the quest you will:\n  1. run other people's images (nginx, redis, alpine)\n  2. package this shop app into your own image\n  3. start the shop and its database together with Compose\n  4. ship it all to a Kubernetes cluster\n\nType help to see the commands this playground understands.",
+      "Dockerfile": "# Start from a small official Node.js image\nFROM node:20-alpine\n\n# Work inside /app in the image\nWORKDIR /app\n\n# Copy the dependency list first. It changes rarely, so this layer caches well.\nCOPY package.json .\nRUN npm install\n\n# Now copy the app code and the message\nCOPY app.js message.txt ./\n\n# Document the port the app listens on, and say how to start it\nEXPOSE 3000\nCMD [\"node\", \"app.js\"]",
+      "app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+      "package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+      "message.txt": "Now with fresh pastries!",
+      "compose.yaml": "# Two services that start together with one command\nservices:\n  web:\n    build: .              # build the image from the Dockerfile here\n    image: shop:compose\n    ports:\n      - \"4000:3000\"       # laptop port : container port\n    environment:\n      REDIS_HOST: cache   # reach the other service by its name\n    depends_on:\n      - cache\n  cache:\n    image: redis:7\n    volumes:\n      - cache-data:/data  # keep the visit counter on a volume\n\nvolumes:\n  cache-data:",
+      "shop.yaml": "# Three Kubernetes objects in one file, separated by ---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: shop-config\n  namespace: shop\ndata:\n  GREETING: \"Welcome to the harbor shop\"\n  CURRENCY: \"EUR\"\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: shop\n  namespace: shop\nspec:\n  replicas: 4\n  selector:\n    matchLabels:\n      app: shop\n  template:\n    metadata:\n      labels:\n        app: shop\n    spec:\n      containers:\n        - name: web\n          image: nginx:1.27\n          ports:\n            - containerPort: 80\n          envFrom:\n            - configMapRef:\n                name: shop-config\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: shop\n  namespace: shop\nspec:\n  type: ClusterIP\n  selector:\n    app: shop\n  ports:\n    - port: 80\n      targetPort: 80"
+    },
+    "inside": null,
+    "d": {
+      "images": {
+        "hello-world:latest": {
+          "name": "hello-world",
+          "tag": "latest",
+          "key": "hello-world:latest",
+          "id": "93ebacdfbd95",
+          "size": "13.3kB",
+          "created": 1766361604000,
+          "kind": "hello",
+          "layers": [
+            [
+              "CMD [\"/hello\"]",
+              "0B"
+            ],
+            [
+              "COPY hello / # buildkit",
+              "13.3kB"
+            ]
+          ],
+          "ver": "latest",
+          "fs": {}
+        },
+        "nginx:latest": {
+          "name": "nginx",
+          "tag": "latest",
+          "key": "nginx:latest",
+          "id": "724198a989f7",
+          "size": "192MB",
+          "created": 1766534416000,
+          "kind": "web",
+          "port": 80,
+          "layers": [
+            [
+              "CMD [\"nginx\" \"-g\" \"daemon off;\"]",
+              "0B"
+            ],
+            [
+              "STOPSIGNAL SIGQUIT",
+              "0B"
+            ],
+            [
+              "EXPOSE map[80/tcp:{}]",
+              "0B"
+            ],
+            [
+              "ENTRYPOINT [\"/docker-entrypoint.sh\"]",
+              "0B"
+            ],
+            [
+              "COPY docker-entrypoint.sh / # buildkit",
+              "1.62kB"
+            ],
+            [
+              "RUN /bin/sh -c set -x && apt-get install nginx … # buildkit",
+              "118MB"
+            ],
+            [
+              "ENV NGINX_VERSION=1.27.2",
+              "0B"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "1.27.2",
+          "fs": {}
+        },
+        "alpine:latest": {
+          "name": "alpine",
+          "tag": "latest",
+          "key": "alpine:latest",
+          "id": "db36f1998ea4",
+          "size": "7.8MB",
+          "created": 1765929624000,
+          "kind": "os",
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "layers": [
+            [
+              "CMD [\"/bin/sh\"]",
+              "0B"
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB"
+            ]
+          ],
+          "ver": "latest",
+          "fs": {}
+        },
+        "httpd:latest": {
+          "name": "httpd",
+          "tag": "latest",
+          "key": "httpd:latest",
+          "id": "db59e58e10b7",
+          "size": "148MB",
+          "created": 1766534450000,
+          "kind": "httpd",
+          "port": 80,
+          "layers": [
+            [
+              "CMD [\"httpd-foreground\"]",
+              "0B"
+            ],
+            [
+              "EXPOSE map[80/tcp:{}]",
+              "0B"
+            ],
+            [
+              "RUN /bin/sh -c set -eux; apt-get install … # buildkit",
+              "66.1MB"
+            ],
+            [
+              "ENV HTTPD_VERSION=2.4.62",
+              "0B"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "latest",
+          "fs": {}
+        },
+        "redis:latest": {
+          "name": "redis",
+          "tag": "latest",
+          "key": "redis:latest",
+          "id": "789b4080ce4f",
+          "size": "117MB",
+          "created": 1766534458000,
+          "kind": "redis",
+          "port": 6379,
+          "layers": [
+            [
+              "CMD [\"redis-server\"]",
+              "0B"
+            ],
+            [
+              "EXPOSE map[6379/tcp:{}]",
+              "0B"
+            ],
+            [
+              "WORKDIR /data",
+              "0B"
+            ],
+            [
+              "VOLUME [/data]",
+              "0B"
+            ],
+            [
+              "RUN /bin/sh -c set -eux; make install … # buildkit",
+              "42.2MB"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "latest",
+          "fs": {}
+        },
+        "postgres:latest": {
+          "name": "postgres",
+          "tag": "latest",
+          "key": "postgres:latest",
+          "id": "c8aa2943b8c4",
+          "size": "435MB",
+          "created": 1764720084000,
+          "kind": "pg",
+          "port": 5432,
+          "layers": [
+            [
+              "CMD [\"postgres\"]",
+              "0B"
+            ],
+            [
+              "EXPOSE map[5432/tcp:{}]",
+              "0B"
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B"
+            ],
+            [
+              "VOLUME [/var/lib/postgresql/data]",
+              "0B"
+            ],
+            [
+              "RUN /bin/sh -c set -ex; apt-get install postgresql … # buildkit",
+              "360MB"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "latest",
+          "fs": {}
+        },
+        "shop:1.0": {
+          "name": "shop",
+          "tag": "1.0",
+          "key": "shop:1.0",
+          "id": "971405d992c5",
+          "size": "136.3MB",
+          "created": 1767225696000,
+          "kind": "app",
+          "port": 3000,
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "layers": [
+            [
+              "CMD [\"node\", \"app.js\"]",
+              "0B",
+              0,
+              1767225696000
+            ],
+            [
+              "EXPOSE 3000",
+              "0B",
+              0,
+              1767225696000
+            ],
+            [
+              "COPY app.js message.txt ./ # buildkit",
+              "400B",
+              0,
+              1767225696000
+            ],
+            [
+              "RUN npm install # buildkit",
+              "1.31MB",
+              0,
+              1767225696000
+            ],
+            [
+              "COPY package.json . # buildkit",
+              "123B",
+              0,
+              1767225696000
+            ],
+            [
+              "WORKDIR /app # buildkit",
+              "0B",
+              0,
+              1767225696000
+            ],
+            [
+              "CMD [\"node\"]",
+              "0B",
+              0,
+              1765497696000
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B",
+              0,
+              1765497696000
+            ],
+            [
+              "RUN /bin/sh -c addgroup -g 1000 node && … # buildkit",
+              "127MB",
+              0,
+              1765497696000
+            ],
+            [
+              "ENV NODE_VERSION=20.18.0",
+              "0B",
+              0,
+              1765497696000
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB",
+              0,
+              1765497696000
+            ]
+          ],
+          "ver": "1.0",
+          "fs": {
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Fresh coffee beans, roasted daily."
+          },
+          "built": 1,
+          "cmd": [
+            "node",
+            "app.js"
+          ]
+        },
+        "shop:2.0": {
+          "name": "shop",
+          "tag": "2.0",
+          "key": "shop:2.0",
+          "id": "2120b38c1eac",
+          "size": "136.3MB",
+          "created": 1767225706000,
+          "kind": "app",
+          "port": 3000,
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "layers": [
+            [
+              "CMD [\"node\", \"app.js\"]",
+              "0B",
+              0,
+              1767225706000
+            ],
+            [
+              "EXPOSE 3000",
+              "0B",
+              0,
+              1767225706000
+            ],
+            [
+              "COPY app.js message.txt ./ # buildkit",
+              "390B",
+              0,
+              1767225706000
+            ],
+            [
+              "RUN npm install # buildkit",
+              "1.31MB",
+              0,
+              1767225706000
+            ],
+            [
+              "COPY package.json . # buildkit",
+              "123B",
+              0,
+              1767225706000
+            ],
+            [
+              "WORKDIR /app # buildkit",
+              "0B",
+              0,
+              1767225706000
+            ],
+            [
+              "CMD [\"node\"]",
+              "0B",
+              0,
+              1765497706000
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B",
+              0,
+              1765497706000
+            ],
+            [
+              "RUN /bin/sh -c addgroup -g 1000 node && … # buildkit",
+              "127MB",
+              0,
+              1765497706000
+            ],
+            [
+              "ENV NODE_VERSION=20.18.0",
+              "0B",
+              0,
+              1765497706000
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB",
+              0,
+              1765497706000
+            ]
+          ],
+          "ver": "2.0",
+          "fs": {
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "built": 1,
+          "cmd": [
+            "node",
+            "app.js"
+          ]
+        },
+        "redis:7": {
+          "name": "redis",
+          "tag": "7",
+          "key": "redis:7",
+          "id": "15a73cb7fcc9",
+          "size": "117MB",
+          "created": 1766102514000,
+          "kind": "redis",
+          "port": 6379,
+          "layers": [
+            [
+              "CMD [\"redis-server\"]",
+              "0B"
+            ],
+            [
+              "EXPOSE map[6379/tcp:{}]",
+              "0B"
+            ],
+            [
+              "WORKDIR /data",
+              "0B"
+            ],
+            [
+              "VOLUME [/data]",
+              "0B"
+            ],
+            [
+              "RUN /bin/sh -c set -eux; make install … # buildkit",
+              "42.2MB"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "7",
+          "fs": {}
+        },
+        "shop:compose": {
+          "name": "shop",
+          "tag": "compose",
+          "key": "shop:compose",
+          "id": "5292f3a76a77",
+          "size": "136.3MB",
+          "created": 1767226074000,
+          "kind": "app",
+          "port": 3000,
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "layers": [
+            [
+              "CMD [\"node\", \"app.js\"]",
+              "0B",
+              0,
+              1767226074000
+            ],
+            [
+              "EXPOSE 3000",
+              "0B",
+              0,
+              1767226074000
+            ],
+            [
+              "COPY app.js message.txt ./ # buildkit",
+              "390B",
+              0,
+              1767226074000
+            ],
+            [
+              "RUN npm install # buildkit",
+              "1.31MB",
+              0,
+              1767226074000
+            ],
+            [
+              "COPY package.json . # buildkit",
+              "123B",
+              0,
+              1767226074000
+            ],
+            [
+              "WORKDIR /app # buildkit",
+              "0B",
+              0,
+              1767226074000
+            ],
+            [
+              "CMD [\"node\"]",
+              "0B",
+              0,
+              1765498074000
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B",
+              0,
+              1765498074000
+            ],
+            [
+              "RUN /bin/sh -c addgroup -g 1000 node && … # buildkit",
+              "127MB",
+              0,
+              1765498074000
+            ],
+            [
+              "ENV NODE_VERSION=20.18.0",
+              "0B",
+              0,
+              1765498074000
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB",
+              0,
+              1765498074000
+            ]
+          ],
+          "ver": "compose",
+          "fs": {
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "built": 1,
+          "cmd": [
+            "node",
+            "app.js"
+          ]
+        },
+        "nginx:alpine": {
+          "name": "nginx",
+          "tag": "alpine",
+          "key": "nginx:alpine",
+          "id": "99cfac3bc1f9",
+          "size": "192MB",
+          "created": 1766534664000,
+          "kind": "web",
+          "port": 80,
+          "layers": [
+            [
+              "CMD [\"nginx\" \"-g\" \"daemon off;\"]",
+              "0B"
+            ],
+            [
+              "STOPSIGNAL SIGQUIT",
+              "0B"
+            ],
+            [
+              "EXPOSE map[80/tcp:{}]",
+              "0B"
+            ],
+            [
+              "ENTRYPOINT [\"/docker-entrypoint.sh\"]",
+              "0B"
+            ],
+            [
+              "COPY docker-entrypoint.sh / # buildkit",
+              "1.62kB"
+            ],
+            [
+              "RUN /bin/sh -c set -x && apt-get install nginx … # buildkit",
+              "118MB"
+            ],
+            [
+              "ENV NGINX_VERSION=1.27.2",
+              "0B"
+            ],
+            [
+              "# debian.sh --arch amd64 bookworm",
+              "74.8MB"
+            ]
+          ],
+          "ver": "1.27.2",
+          "fs": {}
+        },
+        "probe:1": {
+          "name": "probe",
+          "tag": "1",
+          "key": "probe:1",
+          "id": "fc9f17139c5e",
+          "size": "136.3MB",
+          "created": 1767225934000,
+          "kind": "app",
+          "port": 3000,
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "layers": [
+            [
+              "CMD [\"node\", \"app.js\"]",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "EXPOSE 3000",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "COPY app.js message.txt ./ # buildkit",
+              "390B",
+              0,
+              1767225934000
+            ],
+            [
+              "RUN npm install # buildkit",
+              "1.31MB",
+              0,
+              1767225934000
+            ],
+            [
+              "COPY package.json . # buildkit",
+              "123B",
+              0,
+              1767225934000
+            ],
+            [
+              "WORKDIR /app # buildkit",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "CMD [\"node\"]",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "RUN /bin/sh -c addgroup -g 1000 node && … # buildkit",
+              "127MB",
+              0,
+              1765497934000
+            ],
+            [
+              "ENV NODE_VERSION=20.18.0",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB",
+              0,
+              1765497934000
+            ]
+          ],
+          "ver": "1",
+          "fs": {
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "built": 1,
+          "cmd": [
+            "node",
+            "app.js"
+          ]
+        },
+        "me/probe:3": {
+          "name": "me/probe",
+          "tag": "3",
+          "key": "me/probe:3",
+          "id": "fc9f17139c5e",
+          "size": "136.3MB",
+          "created": 1767225934000,
+          "kind": "app",
+          "port": 3000,
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "layers": [
+            [
+              "CMD [\"node\", \"app.js\"]",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "EXPOSE 3000",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "COPY app.js message.txt ./ # buildkit",
+              "390B",
+              0,
+              1767225934000
+            ],
+            [
+              "RUN npm install # buildkit",
+              "1.31MB",
+              0,
+              1767225934000
+            ],
+            [
+              "COPY package.json . # buildkit",
+              "123B",
+              0,
+              1767225934000
+            ],
+            [
+              "WORKDIR /app # buildkit",
+              "0B",
+              0,
+              1767225934000
+            ],
+            [
+              "CMD [\"node\"]",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "ENTRYPOINT [\"docker-entrypoint.sh\"]",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "RUN /bin/sh -c addgroup -g 1000 node && … # buildkit",
+              "127MB",
+              0,
+              1765497934000
+            ],
+            [
+              "ENV NODE_VERSION=20.18.0",
+              "0B",
+              0,
+              1765497934000
+            ],
+            [
+              "ADD alpine-minirootfs-3.20.3-x86_64.tar.gz / # buildkit",
+              "7.8MB",
+              0,
+              1765497934000
+            ]
+          ],
+          "ver": "1",
+          "fs": {
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "built": 1,
+          "cmd": [
+            "node",
+            "app.js"
+          ]
+        }
+      },
+      "containers": [
+        {
+          "id": "995817a9a9bf5c0298f7deaaf1dc0bc4765af44b3456be78bfb41e83114b2ceb",
+          "name": "web",
+          "image": "nginx",
+          "imgKey": "nginx:latest",
+          "kind": "web",
+          "ver": "1.27.2",
+          "status": "running",
+          "code": 0,
+          "ports": [
+            [
+              8080,
+              80
+            ]
+          ],
+          "env": {},
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.6",
+          "cmd": [],
+          "created": 1767225646000,
+          "started": 1767225646000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:00:46 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:00:46 [notice] 1#1: start worker processes",
+            "172.17.0.1 - - [01/Jan/2026:00:00:48 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"curl/8.5.0\" \"-\"",
+            "172.17.0.1 - - [01/Jan/2026:00:04:00 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"curl/8.5.0\" \"-\""
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "d2b4042ce6e52bd3f38d73c3aab0ec13c63a4217f35835ef33cc2d9da51900eb",
+          "name": "web2",
+          "image": "httpd",
+          "imgKey": "httpd:latest",
+          "kind": "httpd",
+          "ver": "latest",
+          "status": "running",
+          "code": 0,
+          "ports": [
+            [
+              8081,
+              80
+            ]
+          ],
+          "env": {},
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.7",
+          "cmd": [],
+          "created": 1767225650000,
+          "started": 1767225650000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/local/apache2/htdocs/index.html": "<html><body><h1>It works!</h1></body></html>"
+          },
+          "logs": [
+            "AH00558: httpd: Could not reliably determine the server's fully qualified domain name",
+            "[mpm_event:notice] AH00489: Apache/2.4.62 (Unix) configured -- resuming normal operations",
+            "172.17.0.1 - - [01/Jan/2026:00:00:52 +0000] \"GET / HTTP/1.1\" 200 615 \"curl/8.5.0\""
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "0e24b3209cc6549f249f1bcbb84e7de053c82bdb306bcee6c9fccfc890cb94b6",
+          "name": "cache",
+          "image": "redis",
+          "imgKey": "redis:latest",
+          "kind": "redis",
+          "ver": "latest",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {},
+          "mounts": [],
+          "net": "shopnet",
+          "ip": "172.18.0.2",
+          "cmd": [],
+          "created": 1767225658000,
+          "started": 1767225658000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\""
+          },
+          "logs": [
+            "1:C Redis version=7.4.1, bits=64, just started",
+            "1:M Server initialized",
+            "1:M Ready to accept connections tcp"
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "adf16f28b5df257a551d9ddbeb8ce3cf154ef572504720d73b6d5ef098a74cd7",
+          "name": "db",
+          "image": "postgres",
+          "imgKey": "postgres:latest",
+          "kind": "pg",
+          "ver": "latest",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {
+            "POSTGRES_PASSWORD": "secret"
+          },
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.13",
+          "cmd": [],
+          "created": 1767225690000,
+          "started": 1767225690000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\""
+          },
+          "logs": [
+            "PostgreSQL init process complete; ready for start up.",
+            "2026/01/01 00:01:30 UTC [1] LOG:  database system is ready to accept connections"
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "68526fd29452f9819f17e065aa4aff18a8e855d9439fa8a1ba3c3ba4024397cd",
+          "name": "shop",
+          "image": "shop:2.0",
+          "imgKey": "shop:2.0",
+          "kind": "app",
+          "ver": "2.0",
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "status": "running",
+          "code": 0,
+          "ports": [
+            [
+              3000,
+              3000
+            ]
+          ],
+          "env": {},
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.15",
+          "cmd": [],
+          "created": 1767225708000,
+          "started": 1767225708000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Alpine Linux v3.20\"\nNAME=\"Alpine\"",
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "logs": [
+            "Shop listening on port 3000",
+            "GET /"
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "43f27abc4fca3020e92e83e82729cf119b0383b0fde56b7f6485e4726b1b680c",
+          "name": "probe5",
+          "image": "alpine",
+          "imgKey": "alpine:latest",
+          "kind": "os",
+          "ver": "latest",
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {},
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.19",
+          "cmd": [],
+          "created": 1767225880000,
+          "started": 1767225880000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Alpine Linux v3.20\"\nNAME=\"Alpine\""
+          },
+          "logs": [],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "803dbab748c81ac27d31f7a938e6fc675c5c8ab0235b417cf9a2395c04a7f7e7",
+          "name": "fg",
+          "image": "nginx:alpine",
+          "imgKey": "nginx:alpine",
+          "kind": "web",
+          "ver": "1.27.2",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {},
+          "mounts": [],
+          "net": "bridge",
+          "ip": "172.17.0.22",
+          "cmd": [],
+          "created": 1767225890000,
+          "started": 1767225890000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:04:50 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:04:50 [notice] 1#1: start worker processes"
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "fa2fb50f14b654351a2648039b4234d4d5e8ba899b6a1fd11811fbba50ee602b",
+          "name": "probe2",
+          "image": "nginx:alpine",
+          "imgKey": "nginx:alpine",
+          "kind": "web",
+          "ver": "1.27.2",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {},
+          "mounts": [],
+          "net": "probenet2",
+          "ip": "172.22.0.2",
+          "cmd": [],
+          "created": 1767225960000,
+          "started": 1767225960000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:06:00 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:06:00 [notice] 1#1: start worker processes"
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "16bee7ca4cc9f439986a7b62fafe51625b128298909bcf1e2f82e9d089be908e",
+          "name": "probe4",
+          "image": "nginx:alpine",
+          "imgKey": "nginx:alpine",
+          "kind": "web",
+          "ver": "1.27.2",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {
+            "A": "b"
+          },
+          "mounts": [
+            {
+              "type": "volume",
+              "vol": "probevol2",
+              "path": "/data"
+            }
+          ],
+          "net": "bridge",
+          "ip": "172.17.0.25",
+          "cmd": [],
+          "created": 1767225982000,
+          "started": 1767225982000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }",
+            "/d": "\u0000dir"
+          },
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:06:22 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:06:22 [notice] 1#1: start worker processes",
+            "172.17.0.1 - - [01/Jan/2026:00:07:22 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"curl/8.5.0\" \"-\""
+          ],
+          "rm": false,
+          "alias": "",
+          "project": "",
+          "cwd": "/"
+        },
+        {
+          "id": "d2fb2c482efbba7fbadd0c2697c7ac8d94182429e959e5979980260a43012254",
+          "name": "shop-cache-1",
+          "image": "redis:7",
+          "imgKey": "redis:7",
+          "kind": "redis",
+          "ver": "7",
+          "status": "running",
+          "code": 0,
+          "ports": [],
+          "env": {},
+          "mounts": [
+            {
+              "type": "volume",
+              "vol": "shop_cache-data",
+              "path": "/data"
+            }
+          ],
+          "net": "shop_default",
+          "ip": "172.23.0.2",
+          "cmd": [],
+          "created": 1767226080000,
+          "started": 1767226080000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\""
+          },
+          "logs": [
+            "1:C Redis version=7.4.1, bits=64, just started",
+            "1:M Server initialized",
+            "1:M Ready to accept connections tcp"
+          ],
+          "rm": false,
+          "alias": "cache",
+          "project": "shop",
+          "cwd": "/"
+        },
+        {
+          "id": "dca935e9e522673979293333c364f5610dc1b5125d2adce0af338da2cdba1081",
+          "name": "shop-web-1",
+          "image": "shop:compose",
+          "imgKey": "shop:compose",
+          "kind": "app",
+          "ver": "compose",
+          "os": "Alpine Linux v3.20",
+          "shell": "sh",
+          "runtime": "node",
+          "status": "running",
+          "code": 0,
+          "ports": [
+            [
+              4000,
+              3000
+            ]
+          ],
+          "env": {
+            "REDIS_HOST": "cache"
+          },
+          "mounts": [],
+          "net": "shop_default",
+          "ip": "172.23.0.4",
+          "cmd": [],
+          "created": 1767226084000,
+          "started": 1767226084000,
+          "finished": 0,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Alpine Linux v3.20\"\nNAME=\"Alpine\"",
+            "/app/package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"main\": \"app.js\",\n  \"dependencies\": {\n    \"redis\": \"^4.7.0\"\n  }\n}",
+            "/app/app.js": "const http = require('http');\nconst fs = require('fs');\n\nconst message = fs.readFileSync('message.txt', 'utf8').trim();\n\nhttp.createServer((req, res) => {\n  // When REDIS_HOST is set, the real app also counts visits in Redis.\n  res.end('Hello from the shop! ' + message + '\\n');\n}).listen(3000, () => console.log('Shop listening on port 3000'));",
+            "/app/message.txt": "Now with fresh pastries!"
+          },
+          "logs": [
+            "Shop listening on port 3000"
+          ],
+          "rm": false,
+          "alias": "web",
+          "project": "shop",
+          "cwd": "/"
+        }
+      ],
+      "volumes": {
+        "probevol2": {
+          "files": {},
+          "created": 1767225982000
+        },
+        "shop_cache-data": {
+          "files": {},
+          "created": 1767226080000
+        }
+      },
+      "networks": {
+        "bridge": {
+          "id": "5ee2d75ec8b0",
+          "driver": "bridge",
+          "sub": "172.17.0",
+          "n": 25,
+          "builtin": 1
+        },
+        "host": {
+          "id": "45c725772c06",
+          "driver": "host",
+          "builtin": 1
+        },
+        "none": {
+          "id": "55de70d9e28a",
+          "driver": "null",
+          "builtin": 1
+        },
+        "shopnet": {
+          "id": "60f6d82c6887",
+          "driver": "bridge",
+          "sub": "172.18.0",
+          "n": 3,
+          "created": 1767225656000
+        },
+        "probenet2": {
+          "id": "15c318a4ca5c",
+          "driver": "bridge",
+          "sub": "172.22.0",
+          "n": 2,
+          "created": 1767225958000
+        },
+        "shop_default": {
+          "id": "a9636e2f589b",
+          "driver": "bridge",
+          "sub": "172.23.0",
+          "n": 4,
+          "created": 1767226080000
+        }
+      },
+      "cache": {
+        "70cdd253706f1699": 1,
+        "9269a717b9e930fc": 1,
+        "6321815b6ea61adf": 1,
+        "a7bf1ab4d46dd287": 1,
+        "eb3c191cd950db18": 1,
+        "8fa7bf88b2ab49b4": 1
+      },
+      "login": false,
+      "subn": 24
+    },
+    "k": {
+      "pods": [
+        {
+          "name": "coredns-zg9sgwbr2q-2t8jx",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "10.244.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/coredns-zg9sgwbr2q",
+          "logs": []
+        },
+        {
+          "name": "coredns-zg9sgwbr2q-q5rx5",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "10.244.0.3",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/coredns-zg9sgwbr2q",
+          "logs": []
+        },
+        {
+          "name": "etcd-harbor-control-plane",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/etcd-harbor",
+          "logs": []
+        },
+        {
+          "name": "kube-apiserver-harbor-control-plane",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-apiserver",
+          "logs": []
+        },
+        {
+          "name": "kube-controller-manager-harbor-control-plane",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-controller",
+          "logs": []
+        },
+        {
+          "name": "kube-scheduler-harbor-control-plane",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-scheduler",
+          "logs": []
+        },
+        {
+          "name": "kube-proxy-gq9rg",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-proxy",
+          "logs": []
+        },
+        {
+          "name": "kube-proxy-pprdp",
+          "ns": "kube-system",
+          "node": "harbor-worker",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.3",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-proxy",
+          "logs": []
+        },
+        {
+          "name": "kube-proxy-8nmqv",
+          "ns": "kube-system",
+          "node": "harbor-worker2",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.4",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kube-proxy",
+          "logs": []
+        },
+        {
+          "name": "kindnet-26rzt",
+          "ns": "kube-system",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.2",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kindnet-26rzt",
+          "logs": []
+        },
+        {
+          "name": "kindnet-5dwks",
+          "ns": "kube-system",
+          "node": "harbor-worker",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.3",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kindnet-5dwks",
+          "logs": []
+        },
+        {
+          "name": "kindnet-2bqd7",
+          "ns": "kube-system",
+          "node": "harbor-worker2",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "172.18.0.4",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/kindnet-2bqd7",
+          "logs": []
+        },
+        {
+          "name": "local-path-provisioner-dpbjvp42kj-gnckd",
+          "ns": "local-path-storage",
+          "node": "harbor-control-plane",
+          "phase": "Running",
+          "born": 1767224040000,
+          "t": 1767224040000,
+          "ip": "10.244.0.4",
+          "labels": {},
+          "sys": 1,
+          "restarts": 0,
+          "image": "registry.k8s.io/local-path",
+          "logs": []
+        },
+        {
+          "name": "web-mmlc8sqvkf-jgscq",
+          "ns": "default",
+          "labels": {
+            "app": "web",
+            "pod-template-hash": "mmlc8sqvkf"
+          },
+          "image": "nginx:1.27",
+          "cname": "nginx",
+          "owner": {
+            "dep": "web",
+            "rs": "mmlc8sqvkf"
+          },
+          "node": "harbor-worker2",
+          "ip": "10.244.2.7",
+          "phase": "Running",
+          "t": 1767225781250,
+          "born": 1767225779750,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:03:01 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:03:01 [notice] 1#1: start worker processes",
+            "172.17.0.1 - - [01/Jan/2026:00:11:16 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"curl/8.5.0\" \"-\"",
+            "172.17.0.1 - - [01/Jan/2026:00:11:20 +0000] \"GET / HTTP/1.1\" 200 615 \"-\" \"curl/8.5.0\" \"-\""
+          ],
+          "env": {},
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "web-mmlc8sqvkf-jgscq"
+        },
+        {
+          "name": "shop-d2g4rr8276-fbf9r",
+          "ns": "shop",
+          "labels": {
+            "app": "shop",
+            "pod-template-hash": "d2g4rr8276"
+          },
+          "image": "nginx:1.27",
+          "cname": "web",
+          "owner": {
+            "dep": "shop",
+            "rs": "d2g4rr8276"
+          },
+          "node": "harbor-worker",
+          "ip": "10.244.1.16",
+          "phase": "Running",
+          "t": 1767226235750,
+          "born": 1767226234250,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:10:35 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:10:35 [notice] 1#1: start worker processes"
+          ],
+          "env": {
+            "GREETING": "Welcome to the harbor shop",
+            "CURRENCY": "EUR"
+          },
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "shop-d2g4rr8276-fbf9r"
+        },
+        {
+          "name": "shop-d2g4rr8276-vd5zs",
+          "ns": "shop",
+          "labels": {
+            "app": "shop",
+            "pod-template-hash": "d2g4rr8276"
+          },
+          "image": "nginx:1.27",
+          "cname": "web",
+          "owner": {
+            "dep": "shop",
+            "rs": "d2g4rr8276"
+          },
+          "node": "harbor-worker2",
+          "ip": "10.244.2.15",
+          "phase": "Running",
+          "t": 1767226235750,
+          "born": 1767226234250,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:10:35 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:10:35 [notice] 1#1: start worker processes"
+          ],
+          "env": {
+            "GREETING": "Welcome to the harbor shop",
+            "CURRENCY": "EUR"
+          },
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "shop-d2g4rr8276-vd5zs"
+        },
+        {
+          "name": "shop-d2g4rr8276-72zs8",
+          "ns": "shop",
+          "labels": {
+            "app": "shop",
+            "pod-template-hash": "d2g4rr8276"
+          },
+          "image": "nginx:1.27",
+          "cname": "web",
+          "owner": {
+            "dep": "shop",
+            "rs": "d2g4rr8276"
+          },
+          "node": "harbor-worker",
+          "ip": "10.244.1.17",
+          "phase": "Running",
+          "t": 1767226236000,
+          "born": 1767226234500,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:10:36 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:10:36 [notice] 1#1: start worker processes"
+          ],
+          "env": {
+            "GREETING": "Welcome to the harbor shop",
+            "CURRENCY": "EUR"
+          },
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "shop-d2g4rr8276-72zs8"
+        },
+        {
+          "name": "shop-d2g4rr8276-k7gc8",
+          "ns": "shop",
+          "labels": {
+            "app": "shop",
+            "pod-template-hash": "d2g4rr8276"
+          },
+          "image": "nginx:1.27",
+          "cname": "web",
+          "owner": {
+            "dep": "shop",
+            "rs": "d2g4rr8276"
+          },
+          "node": "harbor-worker2",
+          "ip": "10.244.2.16",
+          "phase": "Running",
+          "t": 1767226236250,
+          "born": 1767226234750,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:10:36 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:10:36 [notice] 1#1: start worker processes"
+          ],
+          "env": {
+            "GREETING": "Welcome to the harbor shop",
+            "CURRENCY": "EUR"
+          },
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "shop-d2g4rr8276-k7gc8"
+        },
+        {
+          "name": "web-mmlc8sqvkf-qnln5",
+          "ns": "default",
+          "labels": {
+            "app": "web",
+            "pod-template-hash": "mmlc8sqvkf"
+          },
+          "image": "nginx:1.27",
+          "cname": "nginx",
+          "owner": {
+            "dep": "web",
+            "rs": "mmlc8sqvkf"
+          },
+          "node": "harbor-worker",
+          "ip": "10.244.1.18",
+          "phase": "Running",
+          "t": 1767226239750,
+          "born": 1767226238250,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:10:39 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:10:39 [notice] 1#1: start worker processes"
+          ],
+          "env": {},
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "web-mmlc8sqvkf-qnln5"
+        },
+        {
+          "name": "web-mmlc8sqvkf-7h5wh",
+          "ns": "default",
+          "labels": {
+            "app": "web",
+            "pod-template-hash": "mmlc8sqvkf"
+          },
+          "image": "nginx:1.27",
+          "cname": "nginx",
+          "owner": {
+            "dep": "web",
+            "rs": "mmlc8sqvkf"
+          },
+          "node": "harbor-worker2",
+          "ip": "10.244.2.17",
+          "phase": "Running",
+          "t": 1767226293750,
+          "born": 1767226292250,
+          "restarts": 0,
+          "logs": [
+            "/docker-entrypoint.sh: Configuration complete; ready for start up",
+            "2026/01/01 00:11:33 [notice] 1#1: nginx/1.27.2",
+            "2026/01/01 00:11:33 [notice] 1#1: start worker processes"
+          ],
+          "env": {},
+          "isPod": true,
+          "fs": {
+            "/etc/os-release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian\"",
+            "/usr/share/nginx/html/index.html": "<!DOCTYPE html>\n<html>\n<head><title>Welcome to nginx!</title></head>\n<body>\n<h1>Welcome to nginx!</h1>\n<p>If you see this page, the nginx web server is successfully installed and working.</p>\n</body>\n</html>",
+            "/usr/share/nginx/html/50x.html": "<h1>An error occurred.</h1>",
+            "/etc/nginx/nginx.conf": "user  nginx;\nworker_processes  auto;\nevents { worker_connections 1024; }\nhttp { include /etc/nginx/conf.d/*.conf; }"
+          },
+          "cwd": "/",
+          "kind": "web",
+          "ver": "1.27.2",
+          "id": "web-mmlc8sqvkf-7h5wh"
+        }
+      ],
+      "deps": {
+        "default/web": {
+          "name": "web",
+          "ns": "default",
+          "replicas": 3,
+          "labels": {
+            "app": "web"
+          },
+          "cname": "nginx",
+          "image": "nginx:1.27",
+          "envspec": {},
+          "rs": "mmlc8sqvkf",
+          "rev": 4,
+          "revs": [
+            {
+              "rev": 1,
+              "image": "nginx:1.26",
+              "rs": "g9fg96nzsz",
+              "envspec": {},
+              "born": 1767225742000,
+              "restartAt": ""
+            },
+            {
+              "rev": 3,
+              "image": "nginx:1.99",
+              "rs": "4nhqs54qkq",
+              "envspec": {},
+              "born": 1767225782000,
+              "restartAt": ""
+            },
+            {
+              "rev": 4,
+              "image": "nginx:1.27",
+              "rs": "mmlc8sqvkf",
+              "envspec": {},
+              "born": 1767225776000,
+              "restartAt": ""
+            }
+          ],
+          "born": 1767225742000,
+          "restartAt": ""
+        },
+        "shop/shop": {
+          "name": "shop",
+          "ns": "shop",
+          "replicas": 4,
+          "labels": {
+            "app": "shop"
+          },
+          "cname": "web",
+          "image": "nginx:1.27",
+          "envspec": {
+            "env": [],
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "shop-config"
+                }
+              }
+            ]
+          },
+          "rs": "d2g4rr8276",
+          "rev": 1,
+          "revs": [
+            {
+              "rev": 1,
+              "image": "nginx:1.27",
+              "rs": "d2g4rr8276",
+              "envspec": {
+                "env": [],
+                "envFrom": [
+                  {
+                    "configMapRef": {
+                      "name": "shop-config"
+                    }
+                  }
+                ]
+              },
+              "born": 1767226234000,
+              "restartAt": ""
+            }
+          ],
+          "born": 1767226234000,
+          "restartAt": ""
+        }
+      },
+      "svcs": {
+        "default/kubernetes": {
+          "name": "kubernetes",
+          "ns": "default",
+          "type": "ClusterIP",
+          "ip": "10.96.0.1",
+          "port": 443,
+          "tport": 6443,
+          "sys": 1,
+          "selector": null,
+          "born": 1767224040000
+        },
+        "default/web": {
+          "name": "web",
+          "ns": "default",
+          "type": "NodePort",
+          "ip": "10.96.218.245",
+          "port": 80,
+          "tport": 80,
+          "selector": {
+            "app": "web"
+          },
+          "born": 1767225760000,
+          "nodePort": 31660
+        },
+        "shop/shop": {
+          "name": "shop",
+          "ns": "shop",
+          "type": "ClusterIP",
+          "ip": "10.96.112.173",
+          "port": 80,
+          "tport": 80,
+          "selector": {
+            "app": "shop"
+          },
+          "born": 1767226234000
+        },
+        "default/probepod": {
+          "name": "probepod",
+          "ns": "default",
+          "type": "ClusterIP",
+          "ip": "10.96.90.180",
+          "port": 80,
+          "tport": 80,
+          "selector": {
+            "run": "probepod"
+          },
+          "born": 1767226248000
+        }
+      },
+      "cms": {
+        "default/pcm": {
+          "name": "pcm",
+          "ns": "default",
+          "data": {
+            "a": "b"
+          },
+          "born": 1767226156000
+        },
+        "shop/shop-config": {
+          "name": "shop-config",
+          "ns": "shop",
+          "data": {
+            "GREETING": "Welcome to the harbor shop",
+            "CURRENCY": "EUR"
+          },
+          "born": 1767226234000
+        }
+      },
+      "nss": {
+        "default": 1767224040000,
+        "kube-node-lease": 1767224040000,
+        "kube-public": 1767224040000,
+        "kube-system": 1767224040000,
+        "local-path-storage": 1767224040000,
+        "shop": 1767225790000,
+        "probens2": 1767226256000
+      },
+      "fwd": {
+        "9090": {
+          "kind": "svc",
+          "name": "web",
+          "ns": "default",
+          "port": 80
+        },
+        "9292": {
+          "kind": "svc",
+          "name": "web",
+          "ns": "default",
+          "port": 80
+        },
+        "9393": {
+          "kind": "pod",
+          "name": "web-mmlc8sqvkf-vdrwf",
+          "ns": "default",
+          "port": 80
+        }
+      },
+      "events": [
+        {
+          "t": 1767226190250,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Scaled up replica set probe-8kcfxp6ff5 to 1",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226190250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/probe-8kcfxp6ff5-9pxmp",
+          "ns": "default",
+          "msg": "Successfully assigned default/probe-8kcfxp6ff5-9pxmp to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226190250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/probe-8kcfxp6ff5",
+          "ns": "default",
+          "msg": "Created pod: probe-8kcfxp6ff5-9pxmp",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226190750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/probe-8kcfxp6ff5-9pxmp",
+          "ns": "default",
+          "msg": "Pulling image \"nginx:1.99\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226191750,
+          "type": "Warning",
+          "reason": "Failed",
+          "obj": "pod/probe-8kcfxp6ff5-9pxmp",
+          "ns": "default",
+          "msg": "Failed to pull image \"nginx:1.99\": nginx:1.99 not found",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226193750,
+          "type": "Normal",
+          "reason": "BackOff",
+          "obj": "pod/probe-8kcfxp6ff5-9pxmp",
+          "ns": "default",
+          "msg": "Back-off pulling image \"nginx:1.99\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226200000,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Rolling out new replica set probe-22mrntb5f5 with image nginx",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226200250,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-8kcfxp6ff5-9pxmp",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226200250,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Scaled up replica set probe-22mrntb5f5 to 1",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226200250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/probe-22mrntb5f5-5w52l",
+          "ns": "default",
+          "msg": "Successfully assigned default/probe-22mrntb5f5-5w52l to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226200250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/probe-22mrntb5f5",
+          "ns": "default",
+          "msg": "Created pod: probe-22mrntb5f5-5w52l",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226200750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/probe-22mrntb5f5-5w52l",
+          "ns": "default",
+          "msg": "Pulling image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226201750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/probe-22mrntb5f5-5w52l",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226201750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/probe-22mrntb5f5-5w52l",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226201750,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-cl5xqz7x5d-6q2jr",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226202000,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/probe-22mrntb5f5-fjngd",
+          "ns": "default",
+          "msg": "Successfully assigned default/probe-22mrntb5f5-fjngd to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226202000,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/probe-22mrntb5f5",
+          "ns": "default",
+          "msg": "Created pod: probe-22mrntb5f5-fjngd",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226202500,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/probe-22mrntb5f5-fjngd",
+          "ns": "default",
+          "msg": "Pulling image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226203500,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/probe-22mrntb5f5-fjngd",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226203500,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/probe-22mrntb5f5-fjngd",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226203500,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-cl5xqz7x5d-grxxs",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226203500,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Scaled down replica set probe-cl5xqz7x5d to 0",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226204000,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Rolling out new replica set probe-fwpgjfm9q8 with image nginx",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226204250,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Scaled up replica set probe-fwpgjfm9q8 to 1",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226204250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/probe-fwpgjfm9q8-6rzrj",
+          "ns": "default",
+          "msg": "Successfully assigned default/probe-fwpgjfm9q8-6rzrj to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226204250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/probe-fwpgjfm9q8",
+          "ns": "default",
+          "msg": "Created pod: probe-fwpgjfm9q8-6rzrj",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226204750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/probe-fwpgjfm9q8-6rzrj",
+          "ns": "default",
+          "msg": "Pulling image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226205750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/probe-fwpgjfm9q8-6rzrj",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226205750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/probe-fwpgjfm9q8-6rzrj",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226205750,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-22mrntb5f5-5w52l",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226206000,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/probe-fwpgjfm9q8-4phc2",
+          "ns": "default",
+          "msg": "Successfully assigned default/probe-fwpgjfm9q8-4phc2 to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226206000,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/probe-fwpgjfm9q8",
+          "ns": "default",
+          "msg": "Created pod: probe-fwpgjfm9q8-4phc2",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226206500,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/probe-fwpgjfm9q8-4phc2",
+          "ns": "default",
+          "msg": "Pulling image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226207500,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/probe-fwpgjfm9q8-4phc2",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226207500,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/probe-fwpgjfm9q8-4phc2",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226207500,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-22mrntb5f5-fjngd",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226207500,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/probe",
+          "ns": "default",
+          "msg": "Scaled down replica set probe-22mrntb5f5 to 0",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226234000,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/shop",
+          "ns": "shop",
+          "msg": "Scaled up replica set shop-d2g4rr8276 to 4",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226234250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/shop-d2g4rr8276-fbf9r",
+          "ns": "shop",
+          "msg": "Successfully assigned shop/shop-d2g4rr8276-fbf9r to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226234250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/shop-d2g4rr8276",
+          "ns": "shop",
+          "msg": "Created pod: shop-d2g4rr8276-fbf9r",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226234250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/shop-d2g4rr8276-vd5zs",
+          "ns": "shop",
+          "msg": "Successfully assigned shop/shop-d2g4rr8276-vd5zs to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226234250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/shop-d2g4rr8276",
+          "ns": "shop",
+          "msg": "Created pod: shop-d2g4rr8276-vd5zs",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226234500,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/shop-d2g4rr8276-72zs8",
+          "ns": "shop",
+          "msg": "Successfully assigned shop/shop-d2g4rr8276-72zs8 to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226234500,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/shop-d2g4rr8276",
+          "ns": "shop",
+          "msg": "Created pod: shop-d2g4rr8276-72zs8",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226234750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/shop-d2g4rr8276-fbf9r",
+          "ns": "shop",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226234750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/shop-d2g4rr8276-vd5zs",
+          "ns": "shop",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226234750,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/shop-d2g4rr8276-k7gc8",
+          "ns": "shop",
+          "msg": "Successfully assigned shop/shop-d2g4rr8276-k7gc8 to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226234750,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/shop-d2g4rr8276",
+          "ns": "shop",
+          "msg": "Created pod: shop-d2g4rr8276-k7gc8",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226235000,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/shop-d2g4rr8276-72zs8",
+          "ns": "shop",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226235250,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/shop-d2g4rr8276-k7gc8",
+          "ns": "shop",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226235750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/shop-d2g4rr8276-fbf9r",
+          "ns": "shop",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226235750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/shop-d2g4rr8276-fbf9r",
+          "ns": "shop",
+          "msg": "Started container web",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226235750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/shop-d2g4rr8276-vd5zs",
+          "ns": "shop",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226235750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/shop-d2g4rr8276-vd5zs",
+          "ns": "shop",
+          "msg": "Started container web",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226236000,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/shop-d2g4rr8276-72zs8",
+          "ns": "shop",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226236000,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/shop-d2g4rr8276-72zs8",
+          "ns": "shop",
+          "msg": "Started container web",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226236250,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/shop-d2g4rr8276-k7gc8",
+          "ns": "shop",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226236250,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/shop-d2g4rr8276-k7gc8",
+          "ns": "shop",
+          "msg": "Started container web",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226238000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/web-mmlc8sqvkf-4gd9r",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226238250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/web-mmlc8sqvkf-qnln5",
+          "ns": "default",
+          "msg": "Successfully assigned default/web-mmlc8sqvkf-qnln5 to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226238250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/web-mmlc8sqvkf",
+          "ns": "default",
+          "msg": "Created pod: web-mmlc8sqvkf-qnln5",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226238750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/web-mmlc8sqvkf-qnln5",
+          "ns": "default",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226239750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/web-mmlc8sqvkf-qnln5",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226239750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/web-mmlc8sqvkf-qnln5",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226240000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-fwpgjfm9q8-6rzrj",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226240000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probe-fwpgjfm9q8-4phc2",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226252000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/probepod",
+          "ns": "default",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226258000,
+          "type": "Normal",
+          "reason": "ScalingReplicaSet",
+          "obj": "deployment/inner2",
+          "ns": "probens2",
+          "msg": "Scaled up replica set inner2-mwrxnkvjvn to 1",
+          "from": "deployment-controller"
+        },
+        {
+          "t": 1767226258250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/inner2-mwrxnkvjvn-jhfn7",
+          "ns": "probens2",
+          "msg": "Successfully assigned probens2/inner2-mwrxnkvjvn-jhfn7 to harbor-worker",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226258250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/inner2-mwrxnkvjvn",
+          "ns": "probens2",
+          "msg": "Created pod: inner2-mwrxnkvjvn-jhfn7",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226258750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/inner2-mwrxnkvjvn-jhfn7",
+          "ns": "probens2",
+          "msg": "Pulling image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226259750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/inner2-mwrxnkvjvn-jhfn7",
+          "ns": "probens2",
+          "msg": "Successfully pulled image \"nginx\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226259750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/inner2-mwrxnkvjvn-jhfn7",
+          "ns": "probens2",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226260000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/inner2-mwrxnkvjvn-jhfn7",
+          "ns": "probens2",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226266000,
+          "type": "Normal",
+          "reason": "Killing",
+          "obj": "pod/inner-wgksj5hfbn-qfzm5",
+          "ns": "probens",
+          "msg": "Stopping container nginx",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226292250,
+          "type": "Normal",
+          "reason": "Scheduled",
+          "obj": "pod/web-mmlc8sqvkf-7h5wh",
+          "ns": "default",
+          "msg": "Successfully assigned default/web-mmlc8sqvkf-7h5wh to harbor-worker2",
+          "from": "default-scheduler"
+        },
+        {
+          "t": 1767226292250,
+          "type": "Normal",
+          "reason": "SuccessfulCreate",
+          "obj": "replicaset/web-mmlc8sqvkf",
+          "ns": "default",
+          "msg": "Created pod: web-mmlc8sqvkf-7h5wh",
+          "from": "replicaset-controller"
+        },
+        {
+          "t": 1767226292750,
+          "type": "Normal",
+          "reason": "Pulling",
+          "obj": "pod/web-mmlc8sqvkf-7h5wh",
+          "ns": "default",
+          "msg": "Pulling image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226293750,
+          "type": "Normal",
+          "reason": "Pulled",
+          "obj": "pod/web-mmlc8sqvkf-7h5wh",
+          "ns": "default",
+          "msg": "Successfully pulled image \"nginx:1.27\"",
+          "from": "kubelet"
+        },
+        {
+          "t": 1767226293750,
+          "type": "Normal",
+          "reason": "Started",
+          "obj": "pod/web-mmlc8sqvkf-7h5wh",
+          "ns": "default",
+          "msg": "Started container nginx",
+          "from": "kubelet"
+        }
+      ],
+      "ipc": {
+        "1": 19,
+        "2": 17
+      }
+    }
+  }
+}
