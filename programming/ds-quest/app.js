@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const {CH,RANKS,QF,GUIDE,DEMOS,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
+const {CH,RANKS,QF,GUIDE,DEMOS,SCENES,draw,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
 const KEY='ds-quest-v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -241,22 +241,25 @@ function renderGuide(){const groups=CH.map(c=>c.name);
 /* ---------- explainer demos ---------- */
 const DST={},DTIMER={};
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
-const sel=h=>h.i!==undefined?`[data-i="${h.i}"]`:h.v!==undefined?`[data-v="${h.v}"]`:`[data-k="${h.k}"]`;
-function demoBody(d){const st=DST[d.id];return d.render?d.render(st):`<div class="var"><span class="vname">${esc(d.name)}</span><div class="vbox">${view(st.v)}</div></div>`}
-function paintDemo(el,d,hi,cls){const box=el.querySelector('.demoView');box.querySelectorAll('.hi,.walk').forEach(x=>x.classList.remove('hi','walk'));
-  for(const h of hi||[])box.querySelectorAll(sel(h)).forEach(x=>x.classList.add(cls))}
-function renderDemo(d,msg){const el=document.getElementById('demo-'+d.id);if(!el)return;const busy=!!DTIMER[d.id];
-  el.innerHTML=`<h4>${esc(d.title)}</h4><p class="explain">${d.about}</p><div class="demoView">${demoBody(d)}</div>
-  <div class="demobar" role="group" aria-label="Operations">${d.ops.map((o,i)=>`<button class="dbtn" data-demo="${d.id}" data-op="${i}"${busy?' disabled':''}>${esc(o.label)}</button>`).join('')}<button class="linkbtn" data-demo="${d.id}" data-op="reset"${busy?' disabled':''}>Reset</button></div>
-  <pre class="democode" aria-label="Code that ran">${msg&&msg.code?highlight(msg.code):'<span class="sy-cm">// press a button to run an operation</span>'}</pre>
-  <p class="demosay" aria-live="polite">${msg?msg.say:'Pick an operation above. Try them in different orders and watch what happens.'}</p>`}
+const demoBox=el=>el.querySelector('.vbox');
+const setBusy=(el,on)=>el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=on);
+/* The buttons are built once, so a keyboard user keeps focus; only the picture, the code and the sentence change. */
+function renderDemo(d,msg){const el=document.getElementById('demo-'+d.id);if(!el)return;
+  if(!el.querySelector('.demoView'))el.innerHTML=`<h4>${esc(d.title)}</h4><p class="explain">${d.about}</p><div class="demoView"><div class="var"><span class="vname">${esc(d.name)}</span><div class="vbox"></div></div></div>
+  <div class="demobar" role="group" aria-label="Operations">${d.ops.map((o,i)=>`<button class="dbtn" data-demo="${d.id}" data-op="${i}">${esc(o.label)}</button>`).join('')}<button class="linkbtn" data-demo="${d.id}" data-op="reset">Reset</button></div>
+  <pre class="democode" aria-label="Code that ran"></pre><p class="demosay" aria-live="polite"></p>`;
+  demoBox(el).innerHTML=draw[d.shape](DST[d.id]);
+  showDemoText(el,msg)}
+function showDemoText(el,msg){el.querySelector('.democode').innerHTML=msg&&msg.code?highlight(msg.code):'<span class="sy-cm">// press a button to run an operation</span>';
+  el.querySelector('.demosay').innerHTML=msg?msg.say:'Pick an operation above. Try them in different orders and watch what happens.'}
 function runDemo(id,op){const d=DEMOS.find(x=>x.id===id);if(!d||DTIMER[id])return;
   if(op==='reset'||!DST[id]){DST[id]={v:d.init()};renderDemo(d);return}
-  const r=d.ops[+op].run(DST[id]);renderDemo(d,r);const el=document.getElementById('demo-'+id);
-  const fin=()=>{DTIMER[id]=0;paintDemo(el,d,r.hi,'hi');el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=false)};
-  if(r.walk&&r.walk.length&&!reduced()){let k=0;DTIMER[id]=1;el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=true);
-    const step=()=>{if(k>=r.walk.length){fin();return}paintDemo(el,d,r.walk[k++],'walk');DTIMER[id]=setTimeout(step,420)};step()}
-  else paintDemo(el,d,r.hi,'hi')}
+  const el=document.getElementById('demo-'+id),btn=el.contains(document.activeElement)?document.activeElement:null;
+  const before=SCENES[d.shape].clone(DST[id]),r=d.ops[+op].run(DST[id]);
+  const fin=()=>{DTIMER[id]=0;draw.mark(demoBox(el),r.hi,'hi');setBusy(el,false);if(btn)btn.focus()};
+  const walk=()=>{let k=0;const step=()=>{if(k>=r.walk.length){fin();return}draw.mark(demoBox(el),r.walk[k++],'walk');DTIMER[id]=setTimeout(step,420)};step()};
+  DTIMER[id]=1;setBusy(el,true);showDemoText(el,r);
+  draw.play(demoBox(el),d.shape,before,DST[id],r,{reduced:reduced(),onDone:()=>r.walk&&r.walk.length&&!reduced()?walk():fin()})}
 function initDemos(){for(const d of DEMOS){DST[d.id]={v:d.init()};renderDemo(d)}}
 function watchDemo(ch){showTab('guide');const d=DEMOS.find(x=>x.ch===ch);const el=d&&document.getElementById('demo-'+d.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}
 let armProg=0;$('#guide').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.demo){runDemo(b.dataset.demo,b.dataset.op);return}if(b.dataset.code!==undefined){goFree(b.dataset.code);run();return}
