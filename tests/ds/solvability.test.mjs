@@ -385,15 +385,72 @@ const runMaxBlock = (n) => ({ ...fn('runMax', [['xs', 'ints']], 'ints', [{ args:
 const pairsBlock = (n, q = n) => ({ nothing: -1, ...fn('lookup', [['keys', 'ints'], ['vals', 'ints'], ['queries', 'ints']], 'ints', [
   { args: ['keys', 'vals', 'queries'].map((part) => ({ gen: 'pairs', n, q, part })), want: { gen: 'pairs', n, q, part: 'want' } }]) });
 const wordsBlock = (n) => fn('countWords', [['text', 'str']], 'strs', [{ args: [{ gen: 'words', n, part: 'text' }], want: { gen: 'words', n, part: 'want' } }]);
-// each row: the sources, the block, and the size each runner can afford (a Rust HashMap insert costs steps by map size)
+const FULL = 2000;
+const DECISION = 'speed-case decision';
+const RS_SPLIT = 'fn count_words(text: String) -> Vec<String> { let mut out: Vec<String> = Vec::new(); for w in text.split(" ") { out.push(w.to_string()); } out }';
+const smaller = (what) => `${DECISION}: ${what}; a smaller size is used where the linear answer passes and the nested one reports limit`;
+// Each cell is a proving block, an accepted smaller block, or a gap; holds() stays true while the reason stands.
 const SPEED = [
-  ['runMax', RUNMAX, { js: runMaxBlock(2000), py: runMaxBlock(2000), rs: runMaxBlock(2000) }],
-  ['pairs', PAIRS, { js: pairsBlock(2000), py: pairsBlock(2000), rs: pairsBlock(200, 600) }],
-  ['words', WORDS, { js: wordsBlock(500), py: wordsBlock(500) }],
+  { name: 'runMax', kind: 'ramp', src: RUNMAX, cells: {
+    js: { block: runMaxBlock(FULL) }, py: { block: runMaxBlock(FULL) }, rs: { block: runMaxBlock(FULL) },
+    cpp: { gap: 310, why: 'the nested answer reports limit only from 500 elements, about 12 s' } } },
+  { name: 'pairs', kind: 'pairs', src: PAIRS, cells: {
+    js: { block: pairsBlock(FULL) }, py: { block: pairsBlock(FULL) },
+    rs: { block: pairsBlock(200, 600), accepted: smaller('200 keys and 600 queries, a 2,000-key HashMap hits the step limit'),
+      holds: () => statuses(plain(P.RUNNERS.rs.run(PAIRS.rs[0], pairsBlock(FULL)))).join() === 'limit' },
+    cpp: { gap: 310, why: 'no map' } } },
+  { name: 'words', kind: 'words', src: WORDS, cells: {
+    js: { block: wordsBlock(500), accepted: smaller('500 words') },
+    py: { block: wordsBlock(500), accepted: smaller('500 words') },
+    rs: { gap: 311, why: 'str.split is not modelled', holds: () => {
+      const [r] = plain(P.RUNNERS.rs.run(RS_SPLIT, wordsBlock(4)));
+      return r.status === 'error' && /^not supported by this quest: method call/.test(r.msg);
+    } },
+    cpp: { gap: 310, why: 'no map' } } },
 ];
-for (const [name, src, blocks] of SPEED) {
-  for (const [lang, block] of Object.entries(blocks)) {
-    test(`speed ${name}: in ${lang} a linear answer fits the step limit and a nested-loop answer reports limit`, () => {
+
+const sizeOf = (block) => {
+  const { args, want } = block.fn.tests[0];
+  const gens = [...args, want].filter((e) => e && e.gen);
+  return Math.min(...gens.flatMap((e) => (e.gen === 'pairs' ? [e.n, e.q ?? e.n] : [e.n])));
+};
+const gensOf = (block) => [...block.fn.tests[0].args, block.fn.tests[0].want].filter((e) => e && e.gen);
+const GAP_ISSUE = { cpp: 310, rs: 311 };
+
+function speedProblems(rows, kinds) {
+  const out = [];
+  const names = rows.map((r) => r.name);
+  for (const n of new Set(names.filter((x, i) => names.indexOf(x) !== i))) out.push(`${n}: duplicate row name`);
+  const have = [...new Set(rows.map((r) => r.kind))].sort().join();
+  if (have !== [...kinds].sort().join()) out.push(`kinds: the speed rows cover ${have}, the generators are ${[...kinds].sort().join()}`);
+  for (const row of rows) {
+    for (const lang of ['js', 'py', 'cpp', 'rs']) {
+      const at = `${row.name} ${lang}`;
+      const cell = row.cells[lang];
+      if (!cell) { out.push(`${at}: no cell`); continue; }
+      if (cell.block && cell.gap) { out.push(`${at}: both a block and a gap`); continue; }
+      if (!cell.block && !cell.gap) { out.push(`${at}: neither a block nor a gap`); continue; }
+      if (cell.holds !== undefined && typeof cell.holds !== 'function') out.push(`${at}: holds is not a function`);
+      if (cell.block) {
+        if (gensOf(cell.block).some((e) => e.gen !== row.kind)) out.push(`${at}: a block entry has a gen other than ${row.kind}`);
+        const size = sizeOf(cell.block);
+        if (size < FULL && !(typeof cell.accepted === 'string' && cell.accepted.startsWith(DECISION))) out.push(`${at}: size ${size} is below ${FULL} and needs an accepted text starting with ${DECISION}`);
+        if (size >= FULL && cell.accepted !== undefined) out.push(`${at}: accepted on a ${FULL}-element block is stale`);
+      } else {
+        if (cell.accepted !== undefined) out.push(`${at}: accepted on a gap cell`);
+        if (lang === 'js' || lang === 'py') out.push(`${at}: a gap is not allowed, this runner fits every case`);
+        else if (cell.gap !== GAP_ISSUE[lang]) out.push(`${at}: a ${lang} gap must name issue ${GAP_ISSUE[lang]}`);
+        if (!cell.why) out.push(`${at}: a gap needs a why`);
+      }
+    }
+  }
+  return out;
+}
+
+for (const { name, src, cells } of SPEED) {
+  for (const [lang, { block, accepted }] of Object.entries(cells)) {
+    if (!block) continue;
+    test(`speed ${name}: in ${lang} a linear answer fits the step limit and a nested-loop answer reports limit${accepted ? ` (${accepted})` : ''}`, () => {
       assert.deepEqual(plain(P.RUNNERS[lang].run(src[lang][0], block)).map((r) => r.msg || r.status), ['pass']);
       assert.deepEqual(statuses(plain(P.RUNNERS[lang].run(src[lang][1], block))), ['limit']);
     });
@@ -411,22 +468,44 @@ test('speed pairs: a walk fixture with generated cases in js and py, cpp and rs 
   assert.deepEqual(walk(missionWith({ ...pairsBlock(2000), langs: rightAsWrong }), rows), ['0.0 js: the wrong answer passes']);
 });
 
-const CPP_RUNMAX = [
-  'vector<int> runMax(vector<int> xs) { vector<int> out; int best = -1; for (int i = 0; i < xs.size(); i++) { if (xs[i] > best) { best = xs[i]; } out.push_back(best); } return out; }',
-  'vector<int> runMax(vector<int> xs) { vector<int> out; for (int i = 0; i < xs.size(); i++) { int b = xs[i]; for (int j = 0; j <= i; j++) { if (xs[j] > b) { b = xs[j]; } } out.push_back(b); } return out; }',
-];
-// Observed: the C++ engine runs runMax at 2,000 elements in 5.8 s (linear) and 49.6 s (nested, status limit), too slow for the suite.
-// The nested answer first reaches limit at 500 elements (12 s). At 200 both pass in about 1.2 s; when the engine speeds up, move this to 2,000 and join SPEED.
-test('speed runMax: C++ at 200 elements, both answers pass (limit needs 500+, too slow to run here)', () => {
-  const block = runMaxBlock(200);
-  for (const src of CPP_RUNMAX) assert.deepEqual(statuses(plain(P.RUNNERS.cpp.run(CPP_HEAD + src, block))), ['pass']);
+const speedProblemFixtures = () => {
+  const ok = { block: pairsBlock(2000) };
+  const good = { name: 'pairs', kind: 'pairs', cells: { js: ok, py: ok, cpp: { gap: 310, why: 'no map' }, rs: { gap: 311, why: 'slow map' } } };
+  const accepted = `${DECISION}: 10 queries, the linear answer passes and the nested one reports limit`;
+  const withCells = (cells, row = {}) => [{ ...good, ...row, cells: { ...good.cells, ...cells } }];
+  const problems = (rows, kinds = ['pairs']) => speedProblems(rows, kinds);
+  return { good, accepted, withCells, problems };
+};
+
+test('speed table: every pair is a proving block, an accepted smaller block or a gap, and every generator kind has a row', () => {
+  assert.deepEqual(speedProblems(SPEED, Object.keys(P.GEN_KINDS)), []);
 });
 
-// Observed on the Rust engine, kept so a change in it shows up: these are why Rust pairs stays at 200 keys and 600 queries and Rust words has no fixture.
-test('rust speed: a 2000-entry HashMap does not fit 100,000 steps and str.split is not modelled', () => {
-  assert.deepEqual(statuses(plain(P.RUNNERS.rs.run(PAIRS.rs[0], pairsBlock(2000)))), ['limit']);
-  const split = 'fn count_words(text: String) -> Vec<String> { let mut out: Vec<String> = Vec::new(); for w in text.split(" ") { out.push(w.to_string()); } out }';
-  const [r] = plain(P.RUNNERS.rs.run(split, wordsBlock(4)));
-  assert.equal(r.status, 'error');
-  assert.match(r.msg, /^not supported by this quest: method call/);
+test('speed table rules: each one fails when broken and passes when kept', () => {
+  const { good, accepted, withCells, problems } = speedProblemFixtures();
+  const small = { block: pairsBlock(2000, 10) };
+  assert.deepEqual(problems([good]), []);
+  assert.match(problems(withCells({ cpp: undefined }))[0], /^pairs cpp: no cell/);
+  assert.match(problems(withCells({ cpp: {} }))[0], /^pairs cpp: neither a block nor a gap/);
+  assert.match(problems(withCells({ cpp: { block: good.cells.js.block, gap: 310, why: 'x' } }))[0], /^pairs cpp: both a block and a gap/);
+  assert.match(problems(withCells({ js: small }))[0], /^pairs js: .*below 2000.*speed-case decision/);
+  assert.deepEqual(problems(withCells({ js: { ...small, accepted } })), []);
+  assert.match(problems(withCells({ js: { ...small, accepted: 'fine' } }))[0], /^pairs js: .*speed-case decision/);
+  assert.match(problems(withCells({ js: { ...good.cells.js, accepted } }))[0], /^pairs js: .*stale/);
+  assert.match(problems(withCells({ js: { gap: 310, why: 'x' } }))[0], /^pairs js: a gap/);
+  assert.match(problems(withCells({ cpp: { gap: 311, why: 'x' } }))[0], /^pairs cpp: .*310/);
+  assert.match(problems(withCells({ rs: { gap: 310, why: 'x' } }))[0], /^pairs rs: .*311/);
+  assert.match(problems(withCells({ cpp: { gap: 310 } }))[0], /^pairs cpp: .*why/);
+  assert.match(problems(withCells({ cpp: { gap: 310, why: 'x', accepted } }))[0], /^pairs cpp: .*accepted/);
+  assert.match(problems(withCells({ cpp: { gap: 310, why: 'x', holds: true } }))[0], /^pairs cpp: .*holds/);
+  assert.match(problems(withCells({ js: { block: runMaxBlock(2000) } }))[0], /^pairs js: .*gen/);
+  assert.match(problems([good, good])[0], /^pairs: duplicate row name/);
+  assert.match(problems([good], ['pairs', 'words'])[0], /kinds/);
+  assert.match(problems([good, { ...good, name: 'words', kind: 'words' }], ['pairs'])[0], /kinds/);
+});
+
+test('speed table: every reason a gap or smaller size stands still holds', () => {
+  for (const row of SPEED) for (const [lang, cell] of Object.entries(row.cells)) {
+    if (cell.holds) assert.ok(cell.holds(), `speed ${row.name} ${lang}: the engine changed, so update this row or size (${cell.why || cell.accepted})`);
+  }
 });
