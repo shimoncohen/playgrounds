@@ -46,7 +46,7 @@ describe('per-playground rule from each page config', () => {
     ['programming/harbor-quest', { v: 1, hist: [], files: { 'README.md': '# The harbor shop' }, puz: {}, flag: {}, inside: null }, [{ hist: ['docker ps'] }]],
     ['programming/shell-quest', { fs: {}, cwd: '/home', vars: {}, hist: [], seen: false }, [{ hist: ['ls'] }]],
     ['programming/python-quest', { code: {}, tray: {}, free: null }, [{ tray: { '0.0': '5' } }, { free: { code: 'x' } }]],
-    ['programming/ds-quest', { code: {}, free: null }, [{ code: { '0.0': 'x' } }]],
+    ['programming/ds-quest', { code: {}, codes: {}, seen: {}, lang: 'js', free: null }, [{ code: { '0.0': 'x' } }, { codes: { '0.0': 'x' } }, { seen: { '0.0': true } }, { lang: 'py' }]],
     ['programming/cpp-quest', { codes: {}, sandbox: null, inSandbox: false }, [{ sandbox: 'int x;' }]],
     ['programming/net-quest', { answers: {} }, [{ answers: { '0.0': 'tcp' } }]],
     ['programming/rust-quest', { codes: {} }, [{ codes: { '0.0': 'fn' } }]],
