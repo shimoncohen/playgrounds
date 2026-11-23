@@ -299,15 +299,52 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding-
 .walk{outline:2.5px dashed var(--accent);outline-offset:1px;border-radius:7px;background:color-mix(in srgb,var(--accent) 18%,transparent)}
 @keyframes dhi{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 70%,transparent)}60%{box-shadow:0 0 0 7px transparent}100%{box-shadow:none}}
 @media (prefers-reduced-motion:reduce){.hi{animation:none}}
-.stackviz,.queueviz{display:flex;gap:4px;align-items:center}
-.stackviz{flex-direction:column;align-items:stretch;max-width:150px;margin:0 auto}
-.queueviz{flex-wrap:wrap}
-.sbox{font-family:var(--font-mono);font-weight:600;font-size:14px;text-align:center;padding:6px 14px;border:1.5px solid var(--t-list);background:color-mix(in srgb,var(--t-list) 10%,var(--surface));border-radius:7px;min-width:44px}
-.sbase{height:5px;border-radius:3px;background:var(--line)}
-.slab{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
+.sc{width:max-content;margin-inline:auto;padding:4px 2px}
+.sc-flow{display:flex;align-items:flex-end;gap:6px}
+.sc-col{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:96px}
+.sc-item{transition:transform .3s ease,opacity .3s ease,box-shadow .3s ease}
+.sc-box,.sc-node,.sc-bucket,.sc-head{display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:14px;border-radius:7px}
+.sc-box,.sc-node,.sc-bucket{--c:var(--t-list);min-width:44px;padding:6px 12px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 10%,var(--surface))}
+.sc-box.t-int{--c:var(--t-int)}
+.sc-bucket{min-width:62px;min-height:50px}
+.sc-bucket.t-dict{--c:var(--t-dict)}
+.sc-bucket.t-bool{--c:var(--t-bool)}
+.sc-slot{border-style:dashed;border-color:var(--line);background:none}
+.sc-key{font-size:11px;color:var(--muted)}
+.sc-idx{font-size:10px;font-style:normal;color:var(--muted)}
+.sc-ptr{font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text)}
+.sc-node{flex-direction:row;gap:8px}
+.sc-head{flex-direction:row;gap:6px;border:0;padding:0 2px}
+.sc-arrow,.sc-nil{color:var(--muted);display:inline-block}
+.sc-tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);align-self:center}
+.sc-loose{margin-top:14px}
+.sc-base{height:5px;border-radius:3px;background:var(--line)}
+.sc [tabindex]:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+@keyframes sc-out{to{opacity:0;transform:translateY(-14px) scale(.8)}}
+@keyframes sc-slide-out{to{opacity:0;transform:translateX(-30px)}}
+@keyframes sc-in{from{opacity:0;transform:scale(.6)}}
+@keyframes sc-drop{from{opacity:0;transform:translateY(-34px)}}
+@keyframes sc-slide-in{from{opacity:0;transform:translateX(-30px)}}
+@keyframes sc-slide-r{from{transform:translateX(-56px)}}
+@keyframes sc-slide-l{from{transform:translateX(56px)}}
+@keyframes sc-swap{from{transform:translateX(var(--dx,0px))}}
+@keyframes sc-join{from{opacity:.4;transform:translateY(44px)}}
+@keyframes sc-flip{from{transform:scaleX(-1);color:var(--accent)}}
+@keyframes sc-shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.sc-out{animation:sc-out .3s ease forwards}
+.sc-slide-out{animation:sc-slide-out .3s ease forwards}
+.sc-in{animation:sc-in .4s ease}
+.sc-drop{animation:sc-drop .5s ease}
+.sc-slide-in{animation:sc-slide-in .5s ease}
+.sc-slide-r{animation:sc-slide-r .4s ease}
+.sc-slide-l{animation:sc-slide-l .4s ease}
+.sc-swap{animation:sc-swap .5s ease}
+.sc-join{animation:sc-join .5s ease}
+.sc-repoint .sc-arrow{animation:sc-flip .5s ease}
+.sc-shake{animation:sc-shake .4s ease}
 .exviz{display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:9px;background:var(--bg);border:1px dashed var(--line);min-width:0;overflow-x:auto}
 .exviz .frame{padding:4px;background:none}
 .exout{display:flex;gap:8px;align-items:baseline;font-size:12px}
 .exout span{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-size:10.5px}
 .exout pre{margin:0;font-family:var(--font-mono);font-size:12.5px;white-space:pre-wrap}
-.democode,.snippet,.sbox,.val{font-variant-ligatures:none}
+.democode,.snippet,.sc-item,.val{font-variant-ligatures:none}
