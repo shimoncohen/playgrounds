@@ -2,16 +2,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEngines } from './practice-engines.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DIR = path.join(ROOT, 'programming', 'ds-quest');
-const sandbox = {};
-vm.createContext(sandbox);
-for (const f of ['engine.js', 'content.js', 'practice.js']) vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), sandbox, { filename: f });
-const D = sandbox.DSQ;
+const D = loadEngines().DSQ;
 // Arrays from another vm realm fail deepStrictEqual on their prototype, so compare plain copies.
 const plain = (x) => JSON.parse(JSON.stringify(x));
 const P = { ...D.practice, stalePending: (...a) => plain(D.practice.stalePending(...a)) };
@@ -22,10 +18,43 @@ const FN_MISSION = [0, 3]; // chapter, mission where `function` is first taught
 const scriptStepsBefore = (CH, [fc, fm]) =>
   [...CH].flatMap((ch, ci) => ch.missions.flatMap((m, mi) => (m.scriptStep && (ci > fc || (ci === fc && mi >= fm)) ? [`${ci}.${mi}`] : [])));
 
+const passesIn = (CH) => (id, lang) => {
+  const [ci, mi] = id.split('.').map(Number);
+  return D.practice.refPasses(CH[ci].missions[mi].practice, lang);
+};
+
 test('PENDING is empty and every row is valid and not stale', () => {
   assert.equal(P.PENDING.length, 0);
   for (const r of P.PENDING) assert.doesNotThrow(() => P.checkPendingRow(r, ids));
-  assert.deepEqual(P.stalePending(P.PENDING, () => true, practiceIds), []);
+  assert.deepEqual(P.stalePending(P.PENDING, passesIn(D.CH), practiceIds), []);
+});
+
+const FIXTURE = [{ missions: [{ title: 'fixture', practice: {
+  fn: { name: 'addUp', sig: { args: [['a', 'int'], ['b', 'int']], ret: 'int' }, tests: [{ args: [1, 2], want: 3 }, { args: [-4, 4], want: 0 }] },
+  langs: {
+    py: { answer: 'def add_up(a, b):\n    return a + b' },
+    cpp: { answer: '#include <iostream>\nusing namespace std;\nint addUp(int a, int b) { return a - b; }' },
+    rs: { answer: 'fn add_up(a: i32, b: i32) -> i32 { a + b }' },
+  },
+} }] }];
+
+test('stale rows: a row whose pair now passes in the real runner is reported, one that still fails is not', () => {
+  const passes = passesIn(FIXTURE);
+  const rows = {
+    pyExact: { mission: '0.0', lang: 'py', issue: 309 },
+    pyStar: { mission: '*', lang: 'py', issue: 309 },
+    rsExact: { mission: '0.0', lang: 'rs', issue: 311 },
+    cppExact: { mission: '0.0', lang: 'cpp', issue: 310 },
+    cppStar: { mission: '*', lang: 'cpp', issue: 310 },
+    jsExact: { mission: '0.0', lang: 'js', issue: 309 },
+  };
+  assert.equal(passes('0.0', 'py'), true);
+  assert.equal(passes('0.0', 'cpp'), false);
+  assert.equal(passes('0.0', 'js'), false, 'no answer for a language is not a pass');
+  const stale = (...rs) => P.stalePending(rs, passes, ['0.0']);
+  assert.deepEqual(stale(rows.pyExact, rows.pyStar, rows.rsExact), [rows.pyExact, rows.pyStar, rows.rsExact]);
+  assert.deepEqual(stale(rows.cppExact, rows.cppStar, rows.jsExact), []);
+  assert.deepEqual(stale(rows.cppExact, rows.pyExact), [rows.pyExact]);
 });
 
 test('checkPendingRow rejects bad rows', () => {
