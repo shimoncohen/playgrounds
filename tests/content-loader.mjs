@@ -68,7 +68,10 @@ export function loadHarborQuest({ localStorage = { getItem: () => null, setItem(
 // globals become extra parameters, so the sliced code sees these stubs instead of the real ones.
 export function loadContent(quest, { parts, prelude = '', returns, globals = {}, mustInclude = [] }) {
   const src = readApp(quest);
-  const code = prelude + parts.map(([a, b]) => cut(src, a, b)).join('\n');
+  const enginePath = path.join(ROOT, 'programming', quest, 'engine.js');
+  // Most quests have no engine.js; those get exactly the app.js slices.
+  const engine = fs.existsSync(enginePath) ? fs.readFileSync(enginePath, 'utf8') + '\n' : '';
+  const code = prelude + engine + parts.map(([a, b]) => cut(src, a, b)).join('\n');
   assert.ok(code.trim().length > 0, `${quest}: empty slice`);
   for (const s of mustInclude) assert.ok(code.includes(s), `${quest}: content marker moved: ${JSON.stringify(s)} not in the slice`);
   return new Function(...Object.keys(globals), code + `\nreturn {${returns.join(',')}};`)(...Object.values(globals));
