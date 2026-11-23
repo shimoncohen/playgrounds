@@ -2914,9 +2914,249 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
     assert.ok((await page.textContent(`#demo-${id} .democode`)).trim().length > 0, `${id} shows the code`);
   }
   await page.click('.tabs button[data-tab="quest"]');
-  await page.click('[data-act="watch"]');
+  await page.click('.tabs button[data-tab="guide"]');
   await until(async () => !(await page.isHidden('#tab-guide')));
   assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+/* ---------- Data Structures Quest: the mission page (step 1, "See it") ---------- */
+const DS_PILOTS = [{ id: '1.0', ch: 1, mi: 0, kind: 'operate' }, { id: '0.3', ch: 0, mi: 3, kind: 'predict' }];
+const DS_CH0_DONE = { '0.0': true, '0.1': true, '0.2': true, '0.3': true, '0.4': true };
+const dsPage = (opts, seed) => open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 }, ...opts },
+  ctx => ctx.addInitScript(s => { if (!localStorage.getItem('ds-quest-v1')) localStorage.setItem('ds-quest-v1', JSON.stringify(s)); }, seed));
+const dsIdle = page => until(async () => !(await page.$('#stage button:disabled')));
+const dsSaved = page => page.evaluate(() => JSON.parse(localStorage.getItem('ds-quest-v1') || '{}'));
+const dsFocus = page => page.evaluate(() => {
+  const e = document.activeElement, d = e.dataset;
+  return d.head !== undefined ? 'head' : d.i !== undefined && e.closest('#vbox') ? 'i' + d.i : d.l !== undefined ? 'l' + d.l : d.b !== undefined ? 'b' + d.b : e.tagName;
+});
+const dsCentre = async (page, sel) => { const r = await page.locator(sel).boundingBox(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; };
+// Adds a fixture mission to chapter 1 after load, then opens it as a learner would (the chapter button lands on the first undone mission).
+async function dsInjectOpen(page, m) {
+  await page.evaluate(m => { DSQ.CH[0].missions.push({ ...m, check: () => true }); }, m);
+  await page.click('.chap[data-ch="0"]');
+}
+const DS_FIXTURE = {
+  title: 'Join the nodes', goal: 'Join a, then b.', explain: 'Fixture.', starter: '', answer: '',
+  visual: {
+    kind: 'operate', scene: 'chain', start: { chain: [], loose: ['a', 'b', 'c'] }, link: true, task: 'Join <code>a</code>, then <code>b</code> onto the chain.',
+    buttons: [{ label: 'remove first', op: 'removeFirst' }], goal: { snapshot: { chain: ['a', 'b'], loose: ['c'] } },
+    ref: [{ op: 'link', arg: { from: { head: true }, to: { l: 0 } } }, { op: 'link', arg: { from: { i: 0 }, to: { l: 0 } } }],
+    wrong: [{ op: 'link', arg: { from: { head: true }, to: { l: 1 } } }], lazy: [{ op: 'link', arg: { from: { head: true }, to: { l: 2 } } }],
+  },
+};
+const dsBrokenMission = { ...DS_FIXTURE, title: 'Broken picture', visual: { kind: 'predict', scene: 'row', start: [1, 2], task: 'Walk.', steps: [], pauses: [] } };
+
+test('ds-quest mission page: step 1 shows the trail and a centred stage over left-aligned controls, with step 2 locked', async () => {
+  for (const pilot of DS_PILOTS) {
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
+      for (const colorScheme of ['light', 'dark']) {
+        const where = `${pilot.id} at ${viewport.width}px, ${colorScheme}`;
+        const { ctx, page, errors } = await dsPage({ viewport, colorScheme }, { ch: pilot.ch, mi: pilot.mi });
+        await page.locator('#vbox .sc').waitFor();
+        assert.equal(await page.evaluate(() => document.querySelector('#mission').firstElementChild.className), 'trail', `${where}: the trail strip comes first`);
+        assert.ok(await page.locator('#mission .trail').isVisible(), where);
+        assert.equal(await trailText(page), plainText(await page.evaluate(c => DSQ.CH[c].story, pilot.ch)), where);
+        assert.equal(await page.locator('[data-act="fill"], [data-act="watch"]').count(), 0, `${where}: no Type it for me or Watch it work`);
+        assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 1, `${where}: step 2 is locked`);
+        assert.ok(await page.locator('#code').isHidden(), `${where}: the editor stays hidden until step 1 passes`);
+        const g = await page.evaluate(() => {
+          const r = s => document.querySelector(s).getBoundingClientRect(), box = document.querySelector('#vbox');
+          const b = r('#vbox'), sc = r('#vbox .sc'), btn = r('#vbar button'), panel = r('#stage');
+          return { fits: box.scrollWidth <= box.clientWidth, off: Math.abs(b.left + b.width / 2 - (sc.left + sc.width / 2)), scLeft: sc.left - b.left,
+            above: sc.bottom <= btn.top, btnLeft: btn.left - panel.left, align: getComputedStyle(document.querySelector('#vsay')).textAlign };
+        });
+        assert.ok(g.fits ? g.off < 3 : g.scLeft >= -1, `${where}: the stage is centred, or scrolls without losing its left edge (${JSON.stringify(g)})`);
+        assert.ok(g.above, `${where}: the stage sits above the controls`);
+        assert.ok(g.btnLeft < 30, `${where}: the controls start at the left (${g.btnLeft}px)`);
+        assert.ok(['start', 'left'].includes(g.align), `${where}: the sentence is left-aligned`);
+        assert.equal(await overflow(page), false, where);
+        assert.deepEqual(errors, [], where);
+        await ctx.close();
+      }
+    }
+  }
+});
+
+test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the editor, saves seen and keeps the legacy check', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 0 });
+  await page.locator('#vbox .sc').waitFor();
+  await page.click('#vbar [data-b="3"]');
+  await dsIdle(page);
+  assert.ok((await page.textContent('#vsay')).trim().length >= 10, 'popping an empty pile says why');
+  assert.match(await page.textContent('#vmoves'), /Moves 0 · fewest 3/);
+  for (const b of [0, 1, 2]) { await page.click(`#vbar [data-b="${b}"]`); await dsIdle(page); }
+  assert.match(await page.textContent('#vmoves'), /Moves 3 · fewest 3/);
+  assert.ok(await page.locator('#vend .msg.win').isVisible());
+  await until(async () => (await dsSaved(page)).seen?.['1.0'] === true);
+  assert.equal((await dsSaved(page)).done?.['1.0'], undefined, 'step 1 alone does not mark the mission done');
+  await page.click('[data-v="go2"]');
+  assert.ok(await page.locator('#code').isVisible());
+  assert.ok(await page.locator('#stage').isHidden());
+  assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 0);
+  await page.fill('#code', await page.evaluate(() => DSQ.CH[1].missions[0].answer));
+  await page.click('#run');
+  await until(async () => (await dsSaved(page)).done?.['1.0'] === true);
+  assert.equal((await dsSaved(page)).xp, 10);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 0.3 asks each question, replays the real step on a wrong answer, and opens step 2 after the last', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 3 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await page.evaluate(() => { const v = DSQ.CH[0].missions[3].visual; return v.pauses.map(p => ({ ask: p.ask, choices: p.choices, right: DSQ.visual.answerOf(v, p.step) })); });
+  await page.click('[data-v="step"]');
+  for (const [n, p] of pauses.entries()) {
+    await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
+    assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 1, 'step 2 stays locked while questions remain');
+    if (n === 0) {
+      await page.click(`#vq [data-c="${p.choices.findIndex(c => c !== p.right)}"]`);
+      await page.waitForFunction(() => document.querySelector('#vsay').textContent.includes('Not quite'));
+      await dsIdle(page);
+      await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
+    }
+    await page.click(`#vq [data-c="${p.choices.indexOf(p.right)}"]`);
+    await dsIdle(page);
+  }
+  await page.locator('#vend .msg.win').waitFor();
+  await until(async () => (await dsSaved(page)).seen?.['0.3'] === true);
+  await page.click('[data-v="go2"]');
+  assert.ok(await page.locator('#code').isVisible());
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: reduced motion zeroes every item transition and keeps the highlight', async () => {
+  const { ctx, page, errors } = await dsPage({ reducedMotion: 'reduce' }, { ch: 1, mi: 0 });
+  await page.locator('#vbox .sc').waitFor();
+  await page.click('#vbar [data-b="0"]');
+  await dsIdle(page);
+  const d = await page.evaluate(() => [...document.querySelectorAll('#stage .sc-item')].map(e => getComputedStyle(e).transitionDuration));
+  assert.ok(d.length > 0 && d.every(x => x === '0s'), `transition durations: ${d}`);
+  assert.ok(await page.locator('#vbox .hi').count() >= 1, 'the highlight remains');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 1.0 is finished with the keyboard alone and focus stays on the used button', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 0 });
+  await page.locator('#vbox .sc').waitFor();
+  await page.focus('#vbar [data-b="0"]');
+  const press = async key => { await page.keyboard.press(key); await dsIdle(page); };
+  await press('Enter');
+  assert.equal(await dsFocus(page), 'b0', 'focus stays on push red');
+  await press('Tab'); await press('Enter');
+  assert.equal(await dsFocus(page), 'b1');
+  await press('Tab'); await press('Tab');
+  assert.equal(await dsFocus(page), 'b3');
+  await press('Shift+Tab');
+  assert.equal(await dsFocus(page), 'b2');
+  await press('Enter');
+  assert.equal(await dsFocus(page), 'b2');
+  assert.ok(await page.locator('#vend .msg.win').isVisible());
+  for (let i = 0; i < 12 && !(await page.evaluate(() => document.activeElement.dataset.v === 'go2')); i++) await press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.v), 'go2', 'Tab reaches Go to step 2');
+  await press('Enter');
+  assert.ok(await page.locator('#code').isVisible());
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'code');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: a saved done mission opens on step 2, and other missions have no step bar', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: { ...DS_CH0_DONE, '1.0': true } });
+  assert.equal(await page.locator('.steps').count(), 0, 'mission 0.0 has no step bar');
+  assert.ok(await page.locator('#code').isVisible());
+  await page.locator('.dots .dot').nth(3).click();
+  assert.equal(await page.locator('[data-step="2"][aria-current="step"]').count(), 1, '0.3 opens on step 2');
+  assert.ok(await page.locator('#code').isVisible());
+  assert.ok(await page.locator('#stage').isHidden());
+  await page.locator('.chap').nth(1).click();
+  await page.locator('.dots .dot').nth(0).click();
+  assert.equal(await page.locator('[data-step="2"][aria-current="step"]').count(), 1, '1.0 opens on step 2');
+  assert.ok(await page.locator('#code').isVisible());
+  await page.click('[data-step="1"]');
+  await page.locator('#vbox .sc').waitFor();
+  assert.ok(await page.locator('#code').isHidden(), 'a seen mission can replay step 1');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: a link mission is finished by keyboard, with focus and selection kept across repaints', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE });
+  await dsInjectOpen(page, DS_FIXTURE);
+  await page.locator('#vbox [data-head]').waitFor();
+  const sel = () => page.locator('#vbox .sc-sel').count();
+  const press = async key => { await page.keyboard.press(key); await dsIdle(page); };
+  await page.focus('#vbox [data-head]');
+  await press('Enter');
+  assert.equal(await sel(), 1, 'the head is marked as picked');
+  await press('Tab');
+  assert.equal(await dsFocus(page), 'l0');
+  await press('Enter');
+  assert.equal(await page.locator('#vbox [data-i]').count(), 1, 'the first link joined a');
+  assert.equal(await dsFocus(page), 'head', 'focus returns to the source node');
+  assert.equal(await sel(), 0, 'nothing stays marked after a link');
+  await press('Enter');
+  await press('Tab'); await press('Tab');
+  assert.equal(await dsFocus(page), 'l0');
+  await press('Enter');
+  assert.match(await page.textContent('#vsay'), /head/i, 'the refusal reason shows');
+  assert.equal(await dsFocus(page), 'head', 'a refusal also returns focus to the source');
+  assert.equal(await sel(), 0, 'a refusal clears the pick');
+  assert.match(await page.textContent('#vmoves'), /Moves 1 /, 'a refusal is not a move');
+  await press('Tab');
+  assert.equal(await dsFocus(page), 'i0');
+  await press('Enter');
+  assert.equal(await sel(), 1);
+  await press('Escape');
+  assert.equal(await sel(), 0, 'Escape clears the pick');
+  assert.equal(await dsFocus(page), 'i0', 'Escape keeps focus on the source');
+  await press('Enter');
+  await press('Tab');
+  assert.equal(await dsFocus(page), 'l0');
+  await press('Enter');
+  assert.equal(await page.locator('#vbox [data-i]').count(), 2);
+  assert.equal(await dsFocus(page), 'i0');
+  await page.locator('#vend .msg.win').waitFor();
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: a link mission can be finished by dragging a node onto a loose node', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE });
+  await dsInjectOpen(page, DS_FIXTURE);
+  await page.locator('#vbox [data-head]').waitFor();
+  const drag = async (from, to) => {
+    const a = await dsCentre(page, from), b = await dsCentre(page, to);
+    await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 6 }); await page.mouse.up();
+    await dsIdle(page);
+  };
+  await drag('#vbox [data-head]', '#vbox [data-l="0"]');
+  assert.equal(await page.locator('#vbox [data-i]').count(), 1);
+  await drag('#vbox [data-i="0"]', '#vbox [data-l="0"]');
+  assert.equal(await page.locator('#vbox [data-i]').count(), 2);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: a mission whose picture fails validation shows one message, keeps step 2 locked and throws nothing', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE });
+  const logged = [];
+  page.on('console', m => { if (m.type() === 'error') logged.push(m.text()); });
+  await dsInjectOpen(page, dsBrokenMission);
+  await page.getByText('picture is broken').waitFor();
+  assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 1);
+  assert.ok(await page.locator('#stage').isHidden());
+  assert.equal(await page.locator('#vbar').count(), 0, 'no controls are built');
+  assert.ok(await page.locator('#code').isHidden(), 'the editor stays locked');
+  await page.click('.dots .dot >> nth=0');
+  assert.ok(await page.locator('#code').isVisible(), 'the other missions keep working');
+  assert.deepEqual(errors, []);
+  assert.deepEqual(logged, []);
   await ctx.close();
 });
 

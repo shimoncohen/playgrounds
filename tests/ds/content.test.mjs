@@ -79,6 +79,44 @@ test('ranks can be reached with the XP on offer', () => {
   assert.ok(10 * missions + 25 * D.CH.length >= D.RANKS.at(-1)[0]);
 });
 
+// Mirrors FIRST in teach.test.mjs (term -> [regex, chapter, mission]), plus peek (taught at 1.1).
+const FIRST = {
+  index:       [/\bindex\b/i, 0, 1],
+  undefined:   [/\bundefined\b/, 0, 1],
+  function:    [/\bfunction\b/i, 0, 3],
+  if:          [/\bif \(/, 0, 4],
+  object:      [/\bobject\b/i, 1, 3],
+  'class/this':[/\bclass\b|<code>this|\bthis\.|\bconstructor\b/, 1, 2],
+  shift:       [/\bshift\b/, 2, 0],
+  while:       [/\bwhile\b/, 2, 2],
+  spread:      [/\[\.\.\./, 2, 2],
+  null:        [/\bnull\b/, 3, 0],
+  pointer:     [/\bpointer\b/i, 3, 0],
+  Map:         [/\bMap\b/, 4, 0],
+  Set:         [/\bSet\b/, 4, 0],
+  hashing:     [/\bhashing\b/i, 4, 0],
+  split:       [/\bsplit\b|toLowerCase/, 4, 2],
+  recursion:   [/\brecurs/i, 5, 1],
+  'Math.max':  [/Math\.max/, 5, 1],
+  subtree:     [/\bsubtree\b/i, 5, 3],
+  peek:        [/\bpeek\b/i, 1, 1],
+};
+
+test('the pilots carry visual, keep their legacy fields, and teach nothing before its mission', () => {
+  for (const [ci, mi] of [[0, 3], [1, 0]]) {
+    const m = D.CH[ci].missions[mi], id = `${ci}.${mi}`;
+    assert.ok(m.visual, `${id}: no visual`);
+    assert.ok(m.starter && m.answer, `${id}: legacy starter or answer missing`);
+    assert.equal(check(m, m.answer), true, `${id}: legacy check`);
+    const v = m.visual;
+    const texts = [v.task, ...(v.pauses || []).map(p => p.ask), ...(v.buttons || []).map(b => b.label)];
+    for (const [term, [re, c, n]] of Object.entries(FIRST)) {
+      if (c < ci || (c === ci && n <= mi)) continue;
+      for (const t of texts) assert.ok(!re.test(t), `${id}: "${term}" is taught at ${c}.${n}, but appears in: ${t}`);
+    }
+  }
+});
+
 test('every chapter has a badge, an intro, and anatomy tokens use known kinds', () => {
   for (const ch of D.CH) { assert.ok(ch.badge && ch.intro && ch.learned.length); for (const m of ch.missions) for (const [, k] of m.anat || []) assert.ok(['fn', 'str', 'num', 'var', 'kw', 'op', 'br', 'cm'].includes(k)); }
 });
