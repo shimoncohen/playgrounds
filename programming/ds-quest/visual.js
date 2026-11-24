@@ -91,7 +91,7 @@ V.start=(vis,id)=>{
  const sc=scene(vis);
  if(vis.kind==='predict'){
   const rec=record(vis);
-  return {id,vis,kind:'predict',rec,pos:0,solved:new Set(),state:sc.clone(rec.states[0])};
+  return {id,vis,kind:'predict',rec,pos:0,solved:new Set(),missed:false,state:sc.clone(rec.states[0])};
  }
  return {id,vis,kind:'operate',state:sc.create(vis.start),hist:[],log:[],pending:null};
 };
@@ -169,7 +169,7 @@ V.answer=(sess,choice)=>{
  const bad=predictOnly(sess,'Answering');if(bad)return bad;
  const p=open(sess);
  if(!p)return refuse('There is no question open right now.');
- if(choice!==V.ANSWERS[p.of](sess.rec.steps,p.step))return {ok:false,step:sess.rec.steps[p.step],pause:p};
+ if(choice!==V.ANSWERS[p.of](sess.rec.steps,p.step)){sess.missed=true;return {ok:false,step:sess.rec.steps[p.step],pause:p}}
  sess.solved.add(p.step);
  return {ok:true,step:play(sess)};
 };

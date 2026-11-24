@@ -111,22 +111,27 @@ const chain={shape:'chain',
  create(st=[4,7,1]){
   const c=Array.isArray(st)?st:st&&Array.isArray(st.chain)?st.chain:null;
   const l=Array.isArray(st)?[]:st&&st.loose!==undefined?st.loose:[];
-  if(!c||!Array.isArray(l)||c.length+l.length>7||![...c,...l].every(isVal))throw new Error('chain: start must be values, or {chain, loose}, 7 nodes in all');
-  return {v:LL(c),loose:l.map(value=>({value,next:null}))};
+  const r=Array.isArray(st)||!st||st.rest===undefined?[]:st.rest;
+  if(!c||!Array.isArray(l)||!Array.isArray(r)||c.length+l.length+r.length>7||![...c,...l,...r].every(isVal))throw new Error('chain: start must be values, or {chain, loose, rest}, 7 nodes in all');
+  const s={v:LL(c),loose:l.map(value=>({value,next:null}))};
+  if(r.length)s.rest=LL(r);
+  return s;
  },
- clone:s=>({v:LL(llVals(s.v)),loose:loose(s).map(n=>({value:n.value,next:null}))}),
- snapshot:s=>({chain:llVals(s.v),loose:loose(s).map(n=>n.value)}),
+ clone(s){const c={v:LL(llVals(s.v)),loose:loose(s).map(n=>({value:n.value,next:null}))};if(s.rest)c.rest=LL(llVals(s.rest));return c},
+ snapshot:s=>({chain:llVals(s.v),loose:loose(s).map(n=>n.value),...(s.rest?{rest:llVals(s.rest)}:{})}),
  items:s=>[...idxs(llLen(s.v)),...loose(s).map((_,l)=>({l})),{head:true}],
- pointers:s=>s.v?[{name:'head',i:0}]:[],
+ pointers:s=>s.v?[{name:s.rest?'prev':'head',i:0}]:[],
  valid(s){
   if(!s||typeof s!=='object')return 'chain state needs an object';
   const seen=new Set();
-  for(let c=s.v;c;c=c.next){if(seen.has(c))return 'chain has a cycle';seen.add(c);if(!isVal(c.value))return 'chain holds a bad value'}
+  for(const h of [s.v,s.rest])for(let c=h;c;c=c.next){if(seen.has(c))return 'chain has a cycle, or a node in two places';seen.add(c);if(!isVal(c.value))return 'chain holds a bad value'}
   const l=s.loose===undefined?[]:s.loose;
   if(!Array.isArray(l))return 'loose must be a list';
   for(const n of l){if(!n||seen.has(n))return 'a node is in the chain and loose, or twice in loose';seen.add(n);if(!isVal(n.value)||n.next!==null)return 'a loose node must be single'}
   return seen.size>7?'chain holds more than 7 nodes':null;
  }};
+/* While a reversal is under way (s.rest set) every op but flip is refused, before it touches the state. */
+const lock=([n,lab,f])=>[n,lab,n==='flip'?f:(s,a)=>{if(s.rest)no('Finish flipping the arrows first: the chain is half turned around.');return f(s,a)}];
 build(chain,[
  ['addFirst','addFirst',(s,a)=>{const n=val(a);if(llLen(s.v)+loose(s).length>=7)full(7,'nodes');const had=!!s.v;s.v={value:n,next:s.v};
    return {code:`head = { value: ${fmt(n)}, next: head };`,say:`<b>addFirst</b>: a new node points at the old head, then becomes the head. Two steps, no matter how long the list is. This is where linked lists beat arrays.`,hi:[{i:0}],
@@ -157,8 +162,14 @@ build(chain,[
    const node=L.splice(to.l,1)[0];
    if(from.head)s.v=node;else lastNode(s.v).next=node;
    return {code:from.head?'head = node;':'last.next = node;',say:from.head?`<code>link</code> made the loose node ${esc(node.value)} the head: the head now points at it.`:`<code>link</code> joined the loose node ${esc(node.value)} onto the end: the last node's <code>next</code> arrow now points at it.`,
-    hi:[{i:len}],changes:[{kind:'move',from:{l:to.l},to:{i:len}},{kind:'relink',from,to:{i:len}}],result:len+1}}]
-]);
+    hi:[{i:len}],changes:[{kind:'move',from:{l:to.l},to:{i:len}},{kind:'relink',from,to:{i:len}}],result:len+1}}],
+ ['flip','flip',s=>{
+   let at;
+   if(s.rest){const cur=s.rest;s.rest=cur.next||null;cur.next=s.v;s.v=cur;at=cur.next.value}
+   else{if(!s.v||!s.v.next)no('A list of zero or one nodes is already its own reverse. Add a few more nodes first.');s.rest=s.v.next;s.v.next=null}
+   return {code:'const next = cur.next;\ncur.next = prev;\nprev = cur;\ncur = next;',say:at===undefined?'The first arrow turns to point at <b>nothing</b>, because this node is now the end of the new chain. The rest of the nodes wait for their turn.':`This node's arrow flips: it now points <b>back</b> at ${esc(at)}, the node you flipped just before. It has joined the front of the turned-around part.`,
+    hi:[{i:0}],changes:[{kind:'relink',from:{i:0},to:at===undefined?null:{i:1}}],result:at}}]
+].map(lock));
 
 const KEYS=['umbrella','hat','scarf','boot','glove'];
 const buckets={shape:'buckets',

@@ -31,13 +31,14 @@ function line(s,o){
  return root('sc-line',`Queue of ${s.v.length} items, front first: ${list(s.v,'items')}`,o,`<div class="sc-flow">${body}</div>`);
 }
 function chain(s,o){
- const sc=S().chain,vals=D.listVals(s.v),L=s.loose||[];
- const node=(attr,i,x,arrow)=>`<div class="sc-item sc-node" ${attr}="${i}"${tab(o)}><span class="sc-val">${esc(x)}</span>${arrow?'<span class="sc-arrow" aria-hidden="true">→</span>':'<span class="sc-nil" aria-hidden="true">∅</span>'}</div>`;
+ const sc=S().chain,vals=D.listVals(s.v),L=s.loose||[],R=D.listVals(s.rest||null);
+ const node=(attr,i,x,arrow)=>`<div class="${attr?'sc-item ':''}sc-node"${attr?` ${attr}="${i}"${tab(o)}`:''}><span class="sc-val">${esc(x)}</span>${arrow?'<span class="sc-arrow" aria-hidden="true">→</span>':'<span class="sc-nil" aria-hidden="true">∅</span>'}</div>`;
  const head=`<div class="sc-item sc-head" data-head="true"${tab(o)}><span class="sc-ptr">${esc((sc.pointers(s)[0]||{name:'head'}).name)}</span><span class="sc-arrow" aria-hidden="true">${vals.length?'→':'∅'}</span></div>`;
  const main=vals.map((x,i)=>node('data-i',i,x,true)).join('');
  const loose=L.length?`<div class="sc-flow sc-loose"><span class="sc-tag">loose</span>${L.map((n,l)=>node('data-l',l,n.value,false)).join('')}</div>`:'';
- const label=`Linked list of ${vals.length} nodes: ${list(vals,'nodes')}${L.length?`. ${L.length} loose nodes: ${list(L.map(n=>n.value),'nodes')}`:''}`;
- return root('sc-chain',label,o,`<div class="sc-flow">${head}${main}</div>${loose}`);
+ const rest=R.length?`<div class="sc-flow sc-loose"><span class="sc-tag">not flipped yet</span>${R.map((x,i)=>node(null,i,x,i<R.length-1)).join('')}</div>`:'';
+ const label=`Linked list of ${vals.length} nodes: ${list(vals,'nodes')}${L.length?`. ${L.length} loose nodes: ${list(L.map(n=>n.value),'nodes')}`:''}${R.length?`. ${R.length} not flipped yet: ${list(R,'nodes')}`:''}`;
+ return root('sc-chain',label,o,`<div class="sc-flow">${head}${main}</div>${loose}${rest}`);
 }
 function buckets(s,o){
  const isSet=s.v instanceof Set,max=isSet?6:5,items=isSet?[...s.v]:[...s.v];

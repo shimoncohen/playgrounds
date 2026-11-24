@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEngines } from './practice-engines.mjs';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'ds-quest');
 const sandbox = {};
@@ -34,8 +35,6 @@ test('lazy answers are caught', () => {
   // printing the expected output without using the structure
   assert.notEqual(check(m(0, 0), 'const staff = [1,2,3];\nprint(3);'), true);
   assert.notEqual(check(m(0, 1), 'print("red");print("gold");'), true);
-  assert.notEqual(check(m(2, 2), 'function hotPotato(n) { return n[0]; }'), true);
-  assert.notEqual(check(m(3, 3), 'function reverse(h) { return h; }'), true);
   assert.notEqual(check(m(4, 2), 'function countWords(t) { return new Map(t.split(" ").map(w => [w, 1])); }'), true);
   assert.notEqual(check(m(5, 2), 'function insert(r, v) { return { value: v, left: null, right: null }; }'), true);
   assert.notEqual(check(m(5, 4), 'function contains(r, v) { return true; }'), true);
@@ -99,10 +98,8 @@ const FIRST = {
   peek:        [/\bpeek\b/i, 1, 1],
 };
 
-// Missions already in their final shape; each batch of the Data Structures visual rework adds its ids.
-const CONVERTED = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3'];
+const CONVERTED = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3'];
 
-// What a converted mission is missing, as messages (empty when it is whole).
 const convertedProblems = m => {
   const out = [];
   if (!m.visual) out.push('no visual');
@@ -166,6 +163,63 @@ test('1.1 peek(items): ints to ints, the want is [top, size], and every lazy ans
   const langs = Object.keys(b.langs);
   assert.equal(langs.sort().join(), 'cpp,js,py,rs');
   for (const l of langs) assert.match(b.langs[l].lazy, /\bpop(_back)?\b/, `1.1 lazy in ${l}`);
+});
+
+test('the 1.0 and 1.1 goals name their function, and the 1.2 explain gives the -1 rule', () => {
+  for (const mi of [0, 1]) {
+    const m = D.CH[1].missions[mi];
+    assert.ok(m.goal.includes(`<code>${m.practice.fn.name}(`), `1.${mi}: goal names ${m.practice.fn.name}`);
+  }
+  assert.ok(D.CH[1].missions[1].goal.includes('<code>[-1, 0]</code>'), '1.1: goal gives [-1, 0] for an empty stack');
+  const b = D.CH[1].missions[2];
+  assert.equal(b.practice.nothing, -1);
+  assert.match(b.explain, /<code>-1<\/code>/);
+});
+
+test('the 2.0 goal names serveFirst(names) and the 2.1 explain gives -1, not undefined', () => {
+  const g = D.CH[2].missions[0];
+  assert.ok(g.goal.includes(`<code>${g.practice.fn.name}(names)</code>`));
+  assert.match(g.goal, /<code>shift<\/code>/);
+  const q = D.CH[2].missions[1];
+  assert.equal(q.practice.nothing, -1);
+  assert.match(q.explain, /should return <code>-1<\/code>/);
+  assert.doesNotMatch(q.explain, /give back <code>undefined<\/code>/);
+});
+
+test('2.0 and 2.2: each want is recomputed from the input alone', () => {
+  for (const t of D.CH[2].missions[0].practice.fn.tests) assert.deepEqual(t.want, t.args[0].slice(1));
+  const potato = (names, n) => { const q = [...names]; let i = 0; while (q.length > 1) { i = (i + n) % q.length; q.splice(i, 1); } return q[0]; };
+  for (const t of D.CH[2].missions[2].practice.fn.tests) assert.equal(t.want, potato(...t.args));
+});
+
+test('the 3.0 goal names linkThree(a, b, c), gives an example and keeps the null definition', () => {
+  const m = D.CH[3].missions[0];
+  assert.equal(m.practice.fn.name, 'linkThree');
+  assert.ok(m.goal.includes(`<code>${m.practice.fn.name}(a, b, c)</code>`));
+  assert.ok(m.goal.includes('<code>linkThree(1, 2, 3)</code>'));
+  assert.match(m.goal, /null<\/code> means/);
+});
+
+test('3.0, 3.1 and 3.3: each want is recomputed from the input alone', () => {
+  for (const t of D.CH[3].missions[0].practice.fn.tests) assert.deepEqual(t.want, t.args);
+  for (const t of D.CH[3].missions[1].practice.fn.tests) assert.equal(t.want, t.args[0].length);
+  for (const t of D.CH[3].missions[3].practice.fn.tests) assert.equal(JSON.stringify(t.want), JSON.stringify([...t.args[0]].reverse()));
+});
+
+// The learner's starter carries the page's own helpers, so a drifting copy would make the page's run and the starter disagree.
+test('3.0, 3.1 and 3.3 ship both list helpers and the do-not-edit line in every language, equal to the page helpers', () => {
+  const P = loadEngines({ content: false }).DSQ.practice;
+  for (const mi of [0, 1, 3]) {
+    const m = D.CH[3].missions[mi];
+    for (const lang of ['js', 'py', 'cpp', 'rs']) {
+      const L = m.practice.langs[lang];
+      for (const key of ['starter', 'answer', 'wrong', 'lazy']) {
+        for (const h of ['fromList', 'toList']) assert.ok(L[key].includes(P.HELPERS[lang][h]), `3.${mi} ${lang} ${key}: the ${h} helper text differs from practice.js`);
+        assert.ok(L[key].includes('leave them as they are'), `3.${mi} ${lang} ${key}: no do-not-edit line`);
+      }
+      assert.equal(/index into the nodes table/.test(L.starter), lang === 'cpp' || lang === 'rs', `3.${mi} ${lang}: the index comment belongs to C++ and Rust`);
+    }
+  }
 });
 
 test('the chapter 0 intro says missions 0.0 to 0.2 use JavaScript and that the language is picked from 0.3', () => {
