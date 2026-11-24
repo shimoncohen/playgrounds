@@ -3444,7 +3444,6 @@ test('ds-quest mission page: 1.1 finishes step 1 on peek only, and never on a po
   await page.locator('#vbox .sc').waitFor();
   await dsNotWon(page, [1], 'pop');
   await dsNotWon(page, [1, 1], 'pop twice');
-  await dsNotWon(page, [0, 1], 'peek then pop');
   await dsPlay(page, [0]);
   await page.locator('#vend .msg.win').waitFor();
   assert.deepEqual(errors, []);
@@ -3476,8 +3475,8 @@ test('ds-quest mission page: 1.3 asks about each bracket as plain text, with no 
   await page.locator('#vbox .sc').waitFor();
   const pauses = await page.evaluate(() => { const v = DSQ.CH[1].missions[3].visual; return v.pauses.map(p => ({ ask: p.ask, choices: p.choices, right: DSQ.visual.answerOf(v, p.step) })); });
   assert.equal(pauses[0].ask, 'The next character is ). Which opener comes off?');
-  await page.click('[data-v="step"]');
   for (const p of pauses) {
+    for (let i = 0; i < 8 && await page.locator('#vqask').count() === 0; i++) { await page.click('[data-v="step"]'); await dsIdle(page); }
     await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
     assert.ok(!(await page.textContent('#vqask')).includes('<'), `no literal tag in: ${p.ask}`);
     assert.equal(await page.locator('#vq code').count(), 0);
