@@ -2978,7 +2978,7 @@ test('ds-quest mission page: step 1 shows the trail and a centred stage over lef
   }
 });
 
-test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the editor, saves seen and keeps the legacy check', async () => {
+test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the editor, saves seen and runs the practice step', async () => {
   const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 0 });
   await page.locator('#vbox .sc').waitFor();
   await page.click('#vbar [data-b="3"]');
@@ -2994,7 +2994,7 @@ test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the e
   assert.ok(await page.locator('#code').isVisible());
   assert.ok(await page.locator('#stage').isHidden());
   assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 0);
-  await page.fill('#code', await page.evaluate(() => DSQ.CH[1].missions[0].answer));
+  await page.fill('#code', await page.evaluate(() => DSQ.CH[1].missions[0].practice.langs.js.answer));
   await page.click('#run');
   await until(async () => (await dsSaved(page)).done?.['1.0'] === true);
   assert.equal((await dsSaved(page)).xp, 10);
@@ -3078,7 +3078,9 @@ test('ds-quest mission page: 1.0 is finished with the keyboard alone and focus s
 
 test('ds-quest mission page: a saved done mission opens on step 2, and other missions have no step bar', async () => {
   const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: { ...DS_CH0_DONE, '1.0': true } });
-  assert.equal(await page.locator('.steps').count(), 0, 'mission 0.0 has no step bar');
+  await dsInjectOpen(page, { title: 'Plain', goal: 'Run it.', explain: 'Fixture.', starter: '// go\n', answer: '// go\n' });
+  await page.locator('#code').waitFor();
+  assert.equal(await page.locator('.steps').count(), 0, 'a plain legacy mission has no step bar');
   assert.ok(await page.locator('#code').isVisible());
   await page.locator('.dots .dot').nth(3).click();
   assert.equal(await page.locator('[data-step="2"][aria-current="step"]').count(), 1, '0.3 opens on step 2');
@@ -3191,7 +3193,7 @@ test('ds-quest practice page: Run tests passes 0.3 only on its own answer, and d
   assert.equal(rows.length, 4);
   assert.equal(rows[0], '✗ sum([1,2,3]) should give 6, but gave 5');
   assert.equal((await dsSaved(page)).done?.['0.3'], undefined, 'a wrong answer does not finish the mission');
-  const other = await dsRun(page, await page.evaluate(() => DSQ.CH[0].missions[4].answer));
+  const other = await dsRun(page, await page.evaluate(() => DSQ.CH[0].missions[4].practice.langs.js.answer));
   assert.ok(other.every(r => r.startsWith('✗')), 'the answer to another mission fails');
   assert.equal((await dsSaved(page)).done?.['0.3'], undefined);
   const good = await dsRun(page, await dsLang(page, 3, 'js', 'answer'));
@@ -3271,7 +3273,7 @@ test('ds-quest practice page: a program that fails as a whole shows its message 
 test('ds-quest practice page: the hint follows the language and Show how appears only with a how list', async () => {
   const { ctx, page, errors } = await dsPage({}, DS_03);
   await page.locator('#code').waitFor();
-  assert.equal(await page.locator('[data-act="how"]').count(), 0, '0.3 has no how list');
+  assert.equal(await page.locator('[data-act="how"]').count(), 1, '0.3 shows Show how');
   await page.click('[data-act="hint"]');
   assert.equal(await page.locator('#hintBox').isVisible(), true);
   assert.ok(await page.locator('#hintBox pre span').count() > 0, 'the JavaScript hint is highlighted');
@@ -3282,8 +3284,15 @@ test('ds-quest practice page: the hint follows the language and Show how appears
   assert.deepEqual(errors, []);
   await ctx.close();
 
+  const bare = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.5': true } });
+  await dsInjectOpen(bare.page, DS_PRACTICE);
+  await bare.page.locator('[data-act="hint"]').waitFor();
+  assert.equal(await bare.page.locator('[data-act="how"]').count(), 0, 'a mission without a how list has no Show how');
+  assert.deepEqual(bare.errors, []);
+  await bare.ctx.close();
+
   const second = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.5': true } });
-  await dsInjectOpen(second.page, { ...DS_PRACTICE, how: ['First <code>step</code>.', 'Second step.'] });
+  await dsInjectOpen(second.page, { ...DS_PRACTICE, how:['First <code>step</code>.', 'Second step.'] });
   const btn = second.page.locator('[data-act="how"]');
   await btn.waitFor();
   assert.equal(await btn.getAttribute('aria-expanded'), 'false');
@@ -3324,7 +3333,7 @@ test('ds-quest practice page: a language with a PENDING row is disabled with its
   assert.equal((await dsSaved(page)).lang, 'py');
   await page.reload();
   await page.locator('#langBar button').first().waitFor();
-  assert.equal(await page.evaluate(() => DSQ.practice.PENDING.length), 0, 'the row lived in page memory only');
+  assert.equal(await page.evaluate(() => DSQ.practice.PENDING.filter(r => r.mission === '0.3' && r.lang === 'py').length), 0, 'the row lived in page memory only');
   assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true');
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -3373,6 +3382,108 @@ test('ds-quest practice page: a script-step mission keeps the JavaScript editor 
   await until(async () => (await dsSaved(page)).done?.['0.5'] === true);
   assert.match(await page.textContent('#console .msg.win'), /Mission complete/);
   assert.equal(await page.textContent('#mapSub'), 'Nothing to draw yet.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+const dsWon = page => page.locator('#vend .msg.win').isVisible();
+async function dsPlay(page, presses) {
+  for (const b of presses) { await page.click(`#vbar [data-b="${b}"]`); await dsIdle(page); }
+}
+async function dsNotWon(page, presses, why) {
+  await dsPlay(page, presses);
+  assert.equal(await dsWon(page), false, `${why} does not finish step 1`);
+  assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 1, `${why} leaves step 2 locked`);
+  await page.click('[data-v="reset"]');
+  await dsIdle(page);
+}
+
+const DS_OPERATE = [
+  { id: '0.0', ch: 0, mi: 0, no: [[[2, 1, 0], 'push Clatter, Juno, Mo'], [[0, 0, 0], 'push Mo three times']], win: [0, 1, 2] },
+  { id: '0.1', ch: 0, mi: 1, no: [[[0], 'reading box 0'], [[1], 'reading box 1'], [[2], 'reading box 2']], win: [3] },
+  { id: '0.2', ch: 0, mi: 2, no: [[[1, 3], 'push candle then pop'], [[3], 'pop alone'], [[0], 'push lantern alone']], win: [0, 3] },
+];
+
+for (const m of DS_OPERATE) {
+  test(`ds-quest mission page: ${m.id} finishes step 1 only on its own action, and step 2 shows the how list inline`, async () => {
+    const { ctx, page, errors } = await dsPage({}, { ch: m.ch, mi: m.mi });
+    await page.locator('#vbox .sc').waitFor();
+    for (const [presses, why] of m.no) await dsNotWon(page, presses, why);
+    await dsPlay(page, m.win);
+    await page.locator('#vend .msg.win').waitFor();
+    assert.match(await page.textContent('#vend .msg.win'), /Step 1 done!/);
+    if (m.id === '0.2') assert.match(await page.textContent('#vsay'), /lantern/, 'pop hands back the lantern');
+    await page.click('[data-v="go2"]');
+    await page.locator('#code').waitFor();
+    assert.ok(await page.locator('.how').isVisible(), `${m.id} lists how it works on step 2`);
+    assert.equal(await page.locator('[data-act="how"]').count(), 0, `${m.id} has no Show how button`);
+    assert.ok(await page.locator('#langBar [data-lang="js"]').isEnabled());
+    for (const l of ['py', 'cpp', 'rs']) {
+      assert.ok(await page.locator(`#langBar [data-lang="${l}"]`).isDisabled());
+      assert.match(await page.textContent(`#langBar [data-lang="${l}"]`), /taught from mission 0\.3/);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  });
+}
+
+test('ds-quest mission page: 0.4 shows a Show how button on step 2 instead of an inline list', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 4, seen: { '0.4': true } });
+  await page.locator('#code').waitFor();
+  const btn = page.locator('[data-act="how"]');
+  assert.equal(await btn.count(), 1);
+  assert.ok(await page.locator('.how').isHidden(), 'the steps stay closed until asked for');
+  await btn.click();
+  assert.ok(await page.locator('#howBox .how').isVisible());
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 1.1 finishes step 1 on peek only, and never on a pop', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 1 });
+  await page.locator('#vbox .sc').waitFor();
+  await dsNotWon(page, [1], 'pop');
+  await dsNotWon(page, [1, 1], 'pop twice');
+  await dsPlay(page, [0]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 1.2 finishes step 1 on push 5, push 8, pop, and step 2 names the gaps for Python and C++', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 2 });
+  await page.locator('#vbox .sc').waitFor();
+  await dsNotWon(page, [1, 0, 2], 'push 8, push 5, pop');
+  await dsNotWon(page, [0, 1, 3], 'push 5, push 8, peek');
+  await dsNotWon(page, [0, 1], 'push 5, push 8');
+  await dsPlay(page, [0, 1, 2]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.match(await page.textContent('#vmoves'), /Moves 3 · fewest 3/);
+  await page.click('[data-v="go2"]');
+  await page.locator('#code').waitFor();
+  const py = page.locator('#langBar [data-lang="py"]'), cpp = page.locator('#langBar [data-lang="cpp"]');
+  assert.ok(await py.isDisabled() && await cpp.isDisabled());
+  assert.match(await py.textContent(), /not yet \(#309\)/);
+  assert.match(await cpp.textContent(), /not yet \(#310\)/);
+  assert.ok(await page.locator('#langBar [data-lang="js"]').isEnabled() && await page.locator('#langBar [data-lang="rs"]').isEnabled());
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 1.3 asks about each bracket as plain text, with no literal tag', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 3 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await page.evaluate(() => { const v = DSQ.CH[1].missions[3].visual; return v.pauses.map(p => ({ ask: p.ask, choices: p.choices, right: DSQ.visual.answerOf(v, p.step) })); });
+  assert.equal(pauses[0].ask, 'The next character is ). Which opener comes off?');
+  for (const p of pauses) {
+    for (let i = 0; i < 8 && await page.locator('#vqask').count() === 0; i++) { await page.click('[data-v="step"]'); await dsIdle(page); }
+    await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
+    assert.ok(!(await page.textContent('#vqask')).includes('<'), `no literal tag in: ${p.ask}`);
+    assert.equal(await page.locator('#vq code').count(), 0);
+    await page.click(`#vq [data-c="${p.choices.indexOf(p.right)}"]`);
+    await dsIdle(page);
+  }
+  await page.locator('#vend .msg.win').waitFor();
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -3546,14 +3657,14 @@ test('ds-quest practice page: a Python function that calls itself forever gives 
 });
 
 test('ds-quest practice page: missions without a practice block show no language picker and keep Run', async () => {
-  for (const mi of [0, 4]) {
-    const { ctx, page, errors } = await dsPage({}, { ch: 0, mi, done: DS_CH0_DONE, seen: { '0.3': true } });
-    await page.locator('#code').waitFor();
-    assert.ok(await page.locator('#langBar').isHidden(), `0.${mi}`);
-    assert.equal(await page.textContent('#runLabel'), 'Run', `0.${mi}`);
-    assert.deepEqual(errors, [], `0.${mi}`);
-    await ctx.close();
-  }
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.3': true } });
+  await dsInjectOpen(page, { title: 'Plain', goal: 'Run it.', explain: 'Fixture.', starter: '// go\n', answer: '// go\n' });
+  await page.locator('#code').waitFor();
+  await until(async () => (await dsSaved(page)).mi === 5);
+  assert.ok(await page.locator('#langBar').isHidden());
+  assert.equal(await page.textContent('#runLabel'), 'Run');
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 /* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */

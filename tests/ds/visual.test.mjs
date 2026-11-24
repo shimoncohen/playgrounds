@@ -36,6 +36,19 @@ const LK = {
   ref: [{ op: 'link', arg: { from: { head: true }, to: { l: 0 } } }], wrong: [{ op: 'link' }], lazy: [{ op: 'link' }],
 };
 
+const GR = {
+  kind: 'operate', scene: 'row', start: [1, 2, 3], task: 'Read the last box.',
+  buttons: [{ label: 'read box 0', ...read(0) }, { label: 'read box 2', ...read(2) }, { label: 'push 9', ...push(9) }, { label: 'pop', op: 'pop' }],
+  goal: { snapshot: [1, 2, 3], result: 3 },
+  ref: [read(2)], wrong: [read(0)], lazy: [{ op: 'pop' }],
+};
+const SZ = {
+  kind: 'predict', scene: 'pile', start: [], task: 'Count the boxes.',
+  steps: [push(4), push(5), { op: 'pop' }, { op: 'pop' }],
+  pauses: [{ step: 1, ask: 'How many boxes?', of: 'size', choices: [0, 1, 2] }, { step: 2, ask: 'And now?', of: 'size', choices: [0, 1, 2] }, { step: 3, ask: 'Now?', of: 'size', choices: [0, 1, 2] }],
+};
+const MX = (start, pauses) => ({ kind: 'predict', scene: 'row', start, task: 'Biggest so far.', steps: start.map((_, i) => read(i)), pauses });
+
 const errs = vis => V.validate(vis).join(' | ');
 const mutate = (base, fn) => { const v = clone(base); fn(v); return v; };
 
@@ -44,6 +57,16 @@ describe('validate', () => {
     same(V.validate(OP), []);
     same(V.validate(PR), []);
     same(V.validate(LK), []);
+    same(V.validate(GR), []);
+    same(V.validate(SZ), []);
+    same(V.validate(MX([7, 3, 12], [{ step: 1, ask: 'Biggest?', of: 'max', choices: [3, 7, 12] }])), []);
+  });
+  test('goal.result accepts a number, zero, a negative and a 12-character text', () => {
+    for (const r of [0, -3, 2.5, 'x', 'abcdefghijkl']) same(V.validate(mutate(GR, v => { v.goal.result = r; })), [], String(r));
+  });
+  test('a link mission on a scene with no link operation is rejected', () => {
+    assert.match(errs(mutate(OP, v => { v.link = true; })), /link/);
+    assert.match(errs(mutate(GR, v => { v.link = true; })), /link/);
   });
   const bad = [
     ['missing task', OP, v => delete v.task, /task/],
@@ -52,7 +75,19 @@ describe('validate', () => {
     ['button op the scene lacks', OP, v => { v.buttons[3].op = 'peekaboo'; }, /no operation peekaboo/],
     ['missing goal', OP, v => delete v.goal, /goal/],
     ['malformed goal', OP, v => { v.goal = []; }, /goal/],
-    ['missing ref', OP, v => delete v.ref, /ref/],
+    ['unknown goal key', GR, v => { v.goal.extra = 1; }, /goal.*extra/],
+    ['goal result an object', GR, v => { v.goal.result = { a: 1 }; }, /goal\.result/],
+    ['goal result an array', GR, v => { v.goal.result = [3]; }, /goal\.result/],
+    ['goal result empty text', GR, v => { v.goal.result = ''; }, /goal\.result/],
+    ['goal result 13-character text', GR, v => { v.goal.result = 'abcdefghijklm'; }, /goal\.result/],
+    ['goal result NaN', GR, v => { v.goal.result = NaN; }, /goal\.result/],
+    ['goal result Infinity', GR, v => { v.goal.result = Infinity; }, /goal\.result/],
+    ['goal result null', GR, v => { v.goal.result = null; }, /goal\.result/],
+    ['size on a row predict', MX([1, 2], [{ step: 0, ask: 'How many?', of: 'size', choices: [0, 1] }]), v => {}, /pause 0.*size/],
+    ['size on a line predict', { kind: 'predict', scene: 'line', start: [], task: 't', steps: [{ op: 'enqueue', arg: { value: 1 } }], pauses: [{ step: 0, ask: 'How many?', of: 'size', choices: [0, 1] }] }, v => {}, /pause 0.*size/],
+    ['max answer not in choices', MX([7, 3], [{ step: 1, ask: 'Biggest?', of: 'max', choices: [3, 4] }]), v => {}, /right answer is not among/],
+    ['size answer not in choices', SZ, v => { v.pauses[0].choices = [0, 1, 3]; }, /right answer is not among/],
+    ['missing ref', OP,v => delete v.ref, /ref/],
     ['empty wrong', OP, v => { v.wrong = []; }, /wrong/],
     ['missing lazy', OP, v => delete v.lazy, /lazy/],
     ['sequence entry that matches no button', OP, v => { v.ref.push(push('purple')); }, /ref has an entry/],
@@ -119,6 +154,153 @@ describe('operate model', () => {
     assert.equal(V.passed(s), false);
     same(S.pile.snapshot(s.state), []);
   });
+});
+
+describe('goal.result', () => {
+  const won = (vis, seq) => V.won(V.runSeq(vis, seq));
+  const NOR = mutate(GR, v => { delete v.goal.result; });
+  test('the right read wins; no press, a wrong read and a pop do not', () => {
+    assert.equal(won(GR, GR.ref), true);
+    assert.equal(won(GR, []), false);
+    assert.equal(won(GR, GR.wrong), false);
+    assert.equal(won(GR, GR.lazy), false);
+  });
+  test('a wrong read, a pop or a push after the right read does not win', () => {
+    assert.equal(won(GR, [read(2), read(0)]), false);
+    assert.equal(won(GR, [read(2), { op: 'pop' }]), false);
+    assert.equal(won(GR, [read(2), push(9)]), false);
+  });
+  test('a push then pop restores the snapshot but the result is not the goal result', () => {
+    assert.equal(won(GR, [read(2), push(9), { op: 'pop' }]), false);
+  });
+  test('the right read after a wrong one wins; undoing the right read does not', () => {
+    assert.equal(won(GR, [read(0), read(2)]), true);
+    const s = V.runSeq(GR, [read(2)]);
+    V.undo(s);
+    assert.equal(V.won(s), false);
+    const t = V.runSeq(GR, [read(2), read(0)]);
+    V.undo(t);
+    assert.equal(V.won(t), true);
+  });
+  test('without goal.result the rule is the snapshot alone, as before', () => {
+    assert.equal(won(NOR, []), true);
+    assert.equal(won(NOR, [read(0)]), true);
+    assert.equal(won(NOR, [{ op: 'pop' }]), false);
+  });
+});
+
+describe('goal.result on the script-step missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const unshift = v => ({ op: 'unshift', arg: { value: v } });
+  test('0.0: the ref wins; the wrong order, the lazy pushes and no press do not', () => {
+    const v = vis('0.0');
+    assert.equal(won('0.0', v.ref), true);
+    assert.equal(won('0.0', v.wrong), false);
+    assert.equal(won('0.0', v.lazy), false);
+    assert.equal(won('0.0', []), false);
+  });
+  test('0.1: only box 3 wins, and the last read counts', () => {
+    assert.equal(won('0.1', [read(3)]), true);
+    for (const i of [0, 1, 2]) assert.equal(won('0.1', [read(i)]), false, `box ${i}`);
+    assert.equal(won('0.1', [read(3), read(0)]), false);
+    assert.equal(won('0.1', []), false);
+    assert.equal(won('0.1', vis('0.1').wrong), false);
+    assert.equal(won('0.1', vis('0.1').lazy), false);
+  });
+  test('0.2: push lantern then pop wins; the other ways do not', () => {
+    assert.equal(won('0.2', [push('lantern'), { op: 'pop' }]), true);
+    assert.equal(won('0.2', [push('candle'), { op: 'pop' }]), false);
+    assert.equal(won('0.2', [{ op: 'pop' }]), false);
+    assert.equal(won('0.2', [push('lantern')]), false);
+    assert.equal(won('0.2', [unshift('lantern'), { op: 'pop' }]), false);
+    assert.equal(won('0.2', []), false);
+  });
+  test('0.2 offers an unshift button besides push and pop', () => {
+    same(vis('0.2').buttons.map(b => b.op).sort(), ['pop', 'push', 'push', 'unshift']);
+  });
+  test('the three ref sequences are among the shortest-ref walks', () => {
+    for (const id of ['0.0', '0.1', '0.2']) assert.equal(vis(id).kind, 'operate', id);
+  });
+});
+
+describe('goal.result on the chapter 1 pile missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const pop = { op: 'pop' }, peek = { op: 'peek' };
+  test('1.0: the ref wins; the wrong order, the lazy pushes and no press do not', () => {
+    assert.equal(won('1.0', vis('1.0').ref), true);
+    assert.equal(won('1.0', vis('1.0').wrong), false);
+    assert.equal(won('1.0', vis('1.0').lazy), false);
+    assert.equal(won('1.0', []), false);
+  });
+  test('1.1: only peek wins; pop, pop twice and peek then pop do not', () => {
+    assert.equal(won('1.1', [peek]), true);
+    assert.equal(won('1.1', [pop]), false);
+    assert.equal(won('1.1', [pop, pop]), false);
+    assert.equal(won('1.1', [peek, pop]), false);
+    assert.equal(won('1.1', []), false);
+    assert.equal(won('1.1', vis('1.1').wrong), false);
+    assert.equal(won('1.1', vis('1.1').lazy), false);
+  });
+  test('1.2: push 5, push 8, pop wins; the other orders and presses do not', () => {
+    const p = n => ({ op: 'push', arg: { value: n } });
+    assert.equal(won('1.2', [p(5), p(8), pop]), true);
+    assert.equal(won('1.2', [p(8), p(5), pop]), false);
+    assert.equal(won('1.2', [p(5), p(8), peek]), false);
+    assert.equal(won('1.2', [p(5), p(8)]), false);
+    assert.equal(won('1.2', []), false);
+    assert.equal(won('1.2', vis('1.2').wrong), false);
+    assert.equal(won('1.2', vis('1.2').lazy), false);
+  });
+  test('1.1 has only the peek and pop buttons', () => {
+    same(vis('1.1').buttons.map(b => b.op).sort(), ['peek', 'pop']);
+  });
+});
+
+describe('answer kinds max and size', () => {
+  const ask = (vis, of, k, choices) => ({ ...vis, pauses: [{ step: k, ask: 'q', of, choices }] });
+  test('max is the biggest number read so far, recomputed from the row', () => {
+    for (const start of [[7, 3, 12, 5], [-4, -2, -8], [0, -1], [5]]) {
+      const vis = MX(start, [0, 1, 2, 3].filter(k => k < start.length).map(k => ({ step: k, ask: 'q', of: 'max', choices: [Math.max(...start.slice(0, k + 1)), 99] })));
+      same(V.validate(vis), []);
+      for (let k = 0; k < start.length; k++) assert.equal(V.answerOf(vis, k), Math.max(...start.slice(0, k + 1)), `${start} at ${k}`);
+    }
+  });
+  test('size is the pile size after the step, recomputed by counting push and pop', () => {
+    const ops = [push(4), push(5), { op: 'pop' }, { op: 'pop' }, push(1)];
+    const plain = [];
+    ops.forEach((e, k) => {
+      if (e.op === 'push') plain.push(e.arg.value); else plain.pop();
+      const vis = { ...SZ, steps: ops, pauses: [{ step: k, ask: 'q', of: 'size', choices: [plain.length, plain.length + 1] }] };
+      same(V.validate(vis), [], `step ${k}`);
+      assert.equal(V.answerOf(vis, k), plain.length, `step ${k}`);
+    });
+  });
+  test('size on a pile that starts with boxes needs no start length', () => {
+    const vis = { ...SZ, start: [8, 9], steps: [{ op: 'pop' }, { op: 'pop' }], pauses: [{ step: 1, ask: 'q', of: 'size', choices: [0, 1] }] };
+    same(V.validate(vis), []);
+    assert.equal(V.answerOf(vis, 1), 0);
+  });
+  test('a pile predict with size is accepted and a row predict with size is rejected', () => {
+    same(V.validate(SZ), []);
+    assert.match(errs(ask(MX([1, 2], []), 'size', 0, [0, 1])), /size/);
+  });
+});
+
+describe('shortest ref', () => {
+  D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
+    const vis = m.visual;
+    if (!vis || vis.kind !== 'operate') return;
+    test(`${ci}.${mi}: no sequence shorter than ref wins`, () => {
+      const presses = vis.buttons.map(b => (b.arg === undefined ? { op: b.op } : { op: b.op, arg: b.arg }));
+      let level = [[]];
+      for (let len = 0; len < vis.ref.length; len++) {
+        for (const seq of level) assert.equal(V.won(V.runSeq(vis, seq)), false, `${ci}.${mi}: ${JSON.stringify(seq)} wins in ${seq.length} moves, ref has ${vis.ref.length}`);
+        level = level.flatMap(seq => presses.map(p => [...seq, p]));
+      }
+    });
+  }));
 });
 
 describe('predict model', () => {
@@ -271,7 +453,14 @@ describe('missions with visual', () => {
         const vis = m.visual, sc = S[vis.scene], st = sc.create(vis.start), res = [];
         for (const e of vis.steps) res.push(sc.op(st, e.op).run(st, e.arg).result);
         for (const p of vis.pauses) {
-          const want = p.of === 'total' ? res.slice(0, p.step + 1).reduce((a, b) => a + b, 0) : res[p.step];
+          let want = res[p.step];
+          if (p.of === 'total') want = res.slice(0, p.step + 1).reduce((a, b) => a + b, 0);
+          if (p.of === 'max') want = Math.max(...res.slice(0, p.step + 1).filter(r => typeof r === 'number'));
+          if (p.of === 'size') {
+            const plain = [...vis.start];
+            vis.steps.slice(0, p.step + 1).forEach(e => { if (e.op === 'push') plain.push(0); else if (e.op === 'pop') plain.pop(); });
+            want = plain.length;
+          }
           assert.equal(V.answerOf(vis, p.step), want, `${id}: pause at step ${p.step}`);
           assert.ok(p.choices.includes(want), `${id}: choices lack the answer at step ${p.step}`);
         }
@@ -286,7 +475,7 @@ describe('missions with visual', () => {
       });
     }
   }));
-  test('the pilots are among the walked missions', () => {
-    assert.ok(walked.includes('0.3') && walked.includes('1.0'), walked.join());
+  test('all nine chapter 0 and 1 missions are walked', () => {
+    assert.ok(['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3'].every(id => walked.includes(id)), walked.join());
   });
 });

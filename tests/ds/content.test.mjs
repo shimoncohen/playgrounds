@@ -16,6 +16,7 @@ const check = (m, src) => { const res = D.run(src); return res.error ? { err: re
 for (const [ci, ch] of D.CH.entries()) {
   for (const [mi, m] of ch.missions.entries()) {
     const id = `${ci}.${mi} ${m.title}`;
+    if (!m.check) continue;
     test(`${id}: the reference answer passes`, () => {
       assert.equal(check(m, m.answer), true);
     });
@@ -33,10 +34,6 @@ test('lazy answers are caught', () => {
   // printing the expected output without using the structure
   assert.notEqual(check(m(0, 0), 'const staff = [1,2,3];\nprint(3);'), true);
   assert.notEqual(check(m(0, 1), 'print("red");print("gold");'), true);
-  assert.notEqual(check(m(1, 1), 'const stack = [10, 20, 30];\nprint(stack.pop());\nprint(30);\nprint(3);'), true);
-  assert.notEqual(check(m(1, 3), 'function balanced(t) { return true; }'), true);
-  assert.notEqual(check(m(1, 3), 'function balanced(t) { return t.length % 2 === 0; }'), true);
-  assert.notEqual(check(m(0, 4), 'function largest(n) { let b = 0; for (const x of n) if (x > b) b = x; return b; }'), true);
   assert.notEqual(check(m(2, 2), 'function hotPotato(n) { return n[0]; }'), true);
   assert.notEqual(check(m(3, 3), 'function reverse(h) { return h; }'), true);
   assert.notEqual(check(m(4, 2), 'function countWords(t) { return new Map(t.split(" ").map(w => [w, 1])); }'), true);
@@ -102,19 +99,79 @@ const FIRST = {
   peek:        [/\bpeek\b/i, 1, 1],
 };
 
-test('the pilots carry visual, keep their legacy fields, and teach nothing before its mission', () => {
-  for (const [ci, mi] of [[0, 3], [1, 0]]) {
-    const m = D.CH[ci].missions[mi], id = `${ci}.${mi}`;
-    assert.ok(m.visual, `${id}: no visual`);
-    assert.ok(m.starter && m.answer, `${id}: legacy starter or answer missing`);
-    assert.equal(check(m, m.answer), true, `${id}: legacy check`);
+// Missions already in their final shape; each batch of the Data Structures visual rework adds its ids.
+const CONVERTED = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3'];
+
+// What a converted mission is missing, as messages (empty when it is whole).
+const convertedProblems = m => {
+  const out = [];
+  if (!m.visual) out.push('no visual');
+  if (!Array.isArray(m.how) || !m.how.length) out.push('how is empty');
+  if (!m.practice && !m.scriptStep) out.push('neither practice nor scriptStep');
+  if (m.practice) for (const k of ['starter', 'answer', 'check']) if (m[k] !== undefined) out.push(`practice mission still has a legacy ${k}`);
+  if (m.scriptStep) for (const k of ['starter', 'answer', 'check']) if (m[k] === undefined) out.push(`scriptStep mission lost its ${k}`);
+  return out;
+};
+
+test('the converted rule bites: no visual, an empty how and a legacy check on a practice mission are all rejected', () => {
+  const whole = { visual: {}, how: ['a'], scriptStep: true, starter: 's', answer: 'a', check: () => true };
+  assert.deepEqual(convertedProblems(whole), []);
+  assert.deepEqual(convertedProblems({ ...whole, visual: undefined }), ['no visual']);
+  assert.deepEqual(convertedProblems({ ...whole, how: [] }), ['how is empty']);
+  assert.deepEqual(convertedProblems({ visual: {}, how: ['a'], practice: {}, check: () => true }), ['practice mission still has a legacy check']);
+  assert.deepEqual(convertedProblems({ ...whole, check: undefined }), ['scriptStep mission lost its check']);
+});
+
+test('converted missions are whole and teach nothing before their mission', () => {
+  for (const cm of CONVERTED) {
+    const [ci, mi] = cm.split('.').map(Number), m = D.CH[ci].missions[mi];
+    assert.deepEqual(convertedProblems(m), [], `${cm}: ${m.title}`);
     const v = m.visual;
-    const texts = [v.task, ...(v.pauses || []).map(p => p.ask), ...(v.buttons || []).map(b => b.label)];
+    const texts = [v.task, ...(v.pauses || []).map(p => p.ask), ...(v.buttons || []).map(b => b.label), ...m.how];
     for (const [term, [re, c, n]] of Object.entries(FIRST)) {
       if (c < ci || (c === ci && n <= mi)) continue;
-      for (const t of texts) assert.ok(!re.test(t), `${id}: "${term}" is taught at ${c}.${n}, but appears in: ${t}`);
+      for (const t of texts) assert.ok(!re.test(t), `${cm}: "${term}" is taught at ${c}.${n}, but appears in: ${t}`);
     }
   }
+});
+
+// The page escapes pause asks, pause choices and button labels (app.js), so a tag or entity would show as text.
+test('converted missions hold no HTML in the visual fields the page escapes', () => {
+  for (const cm of CONVERTED) {
+    const [ci, mi] = cm.split('.').map(Number), v = D.CH[ci].missions[mi].visual;
+    const escaped = [...(v.pauses || []).flatMap(p => [p.ask, ...p.choices]), ...(v.buttons || []).map(b => b.label)].map(String);
+    for (const t of escaped) assert.ok(!/<\/?[a-z][^>]*>|&[#a-z0-9]+;/i.test(t), `${cm}: markup in an escaped field: ${t}`);
+  }
+});
+
+test('0.0 to 0.2 keep their script step: scriptStep, legacy fields, no practice block', () => {
+  for (const mi of [0, 1, 2]) {
+    const m = D.CH[0].missions[mi];
+    assert.equal(m.scriptStep, true, `0.${mi}`);
+    assert.equal(m.practice, undefined, `0.${mi}`);
+    assert.ok(m.how.length >= 3 && m.how.length <= 5, `0.${mi}: how has 3 to 5 steps`);
+  }
+});
+
+test('1.1 peek(items): ints to ints, the want is [top, size], and every lazy answer takes the top with pop', () => {
+  const b = D.CH[1].missions[1].practice;
+  assert.equal(JSON.stringify(b.fn.sig), JSON.stringify({ args: [['items', 'ints']], ret: 'ints' }));
+  assert.equal(b.nothing, -1);
+  for (const t of b.fn.tests) {
+    const items = t.args[0];
+    assert.equal(t.want.length, 2);
+    assert.equal(t.want[1], items.length);
+    assert.equal(t.want[0], items.length ? items[items.length - 1] : -1);
+  }
+  const langs = Object.keys(b.langs);
+  assert.equal(langs.sort().join(), 'cpp,js,py,rs');
+  for (const l of langs) assert.match(b.langs[l].lazy, /\bpop(_back)?\b/, `1.1 lazy in ${l}`);
+});
+
+test('the chapter 0 intro says missions 0.0 to 0.2 use JavaScript and that the language is picked from 0.3', () => {
+  assert.match(D.CH[0].intro, /first three missions/);
+  assert.match(D.CH[0].intro, /JavaScript/);
+  assert.match(D.CH[0].intro, /0\.3/);
 });
 
 test('every chapter has a badge, an intro, and anatomy tokens use known kinds', () => {

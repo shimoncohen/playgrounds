@@ -72,11 +72,15 @@ describe('V.complete', () => {
 
   it('gives 10 XP once for an ungated mission, with no seen', () => {
     const S = blank();
-    assert.ok(!V.gated(CH[0].missions[0]));
-    same(V.complete(S, 0, 0), { ok: true, first: true });
-    assert.equal(S.xp, 10);
-    same(V.complete(S, 0, 0), { ok: true, first: false });
-    assert.equal(S.xp, 10);
+    const plain = { title: 'Plain', goal: 'No picture.' };
+    const mi = CH[0].missions.push(plain) - 1;
+    try {
+      assert.ok(!V.gated(plain));
+      same(V.complete(S, 0, mi), { ok: true, first: true });
+      assert.equal(S.xp, 10);
+      same(V.complete(S, 0, mi), { ok: true, first: false });
+      assert.equal(S.xp, 10);
+    } finally { CH[0].missions.pop(); }
   });
 
   it('refuses a gated mission that is not seen, and changes nothing', () => {

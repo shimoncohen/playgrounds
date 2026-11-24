@@ -141,13 +141,17 @@ describe('step 2: own action', () => {
   });
 
   it('every practice mission passes on its own reference answer in JavaScript and Python', () => {
-    for (const { id, block } of blocks) for (const lang of ['js', 'py']) assert.ok(passed(runOwn(lang, block.langs[lang].answer, block)), `${id} ${lang}`);
+    const covered = (id, lang) => P.PENDING.some(r => (r.mission === '*' || r.mission === id) && r.lang === lang);
+    for (const { id, block } of blocks) for (const lang of ['js', 'py']) {
+      if (!block.langs[lang] || covered(id, lang)) continue;
+      assert.ok(passed(runOwn(lang, block.langs[lang].answer, block)), `${id} ${lang}`);
+    }
   });
 
   for (const a of blocks) for (const b of blocks) {
     if (a.id === b.id) continue;
     it(`${a.id}'s JavaScript and Python answers do not pass ${b.id}`, () => {
-      for (const lang of ['js', 'py']) assert.equal(passed(runOwn(lang, a.block.langs[lang].answer, b.block)), false, lang);
+      for (const lang of ['js', 'py']) if (a.block.langs[lang]) assert.equal(passed(runOwn(lang, a.block.langs[lang].answer, b.block)), false, lang);
     });
   }
 
