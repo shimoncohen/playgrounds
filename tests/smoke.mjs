@@ -3447,6 +3447,89 @@ test('ds-quest practice page: the file name and note follow each language', asyn
   await ctx.close();
 });
 
+async function dsStubCpp(page, mode) {
+  await page.locator('#langBar button').first().waitFor();
+  await page.evaluate(m => {
+    window.__calls = [];
+    const R = DSQ.practice.RUNNERS.cpp;
+    R.available = () => true;
+    R.run = (src, b) => {
+      window.__calls.push(src);
+      if (m === 'throw') throw new Error('engine fell over');
+      return b.fn.tests.map(() => ({ ok: true, status: 'pass', msg: '' }));
+    };
+  }, mode);
+  await page.click('.dots .dot[data-mi="0"]');
+  await page.click('.dots .dot[data-mi="3"]');
+  await page.locator('#langBar [data-lang="cpp"]:not(:disabled)').waitFor();
+  await page.click('#langBar [data-lang="cpp"]');
+}
+const dsAfterFrame = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => setTimeout(r, 50))));
+
+test('ds-quest practice page: a C++ run shows Running…, keeps the icon, ignores a second run, and restores Run tests', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  await dsStubCpp(page, 'pass');
+  assert.equal(await page.textContent('#runLabel'), 'Run tests');
+  const during = await page.evaluate(() => {
+    const run = document.querySelector('#run');
+    run.click();
+    run.click();
+    document.querySelector('#code').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    return { label: document.querySelector('#runLabel').textContent, disabled: run.disabled, icon: !!run.querySelector('svg') };
+  });
+  assert.deepEqual(during, { label: 'Running…', disabled: true, icon: true });
+  await until(async () => (await dsRows(page)).length === 4);
+  await dsAfterFrame(page);
+  assert.ok((await dsRows(page)).every(r => r.startsWith('✓')));
+  assert.equal(await page.textContent('#runLabel'), 'Run tests');
+  assert.equal(await page.isDisabled('#run'), false);
+  assert.equal(await page.locator('#run svg').count(), 1);
+  assert.equal(await page.evaluate(() => window.__calls.length), 1, 'a second click and Ctrl+Enter during a run are ignored');
+  assert.ok(await page.locator('#console .msg.win').count() > 0, 'a passing run finishes the mission');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a C++ runner that throws shows one error message with no rows and gives the button back', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  await dsStubCpp(page, 'throw');
+  await page.click('#run');
+  await page.locator('#console .msg.err').waitFor();
+  assert.equal(await page.locator('#console .msg.err').count(), 1);
+  assert.match(await page.textContent('#console .msg.err .h'), /engine fell over/);
+  assert.equal(await page.locator('#console .tests li').count(), 0);
+  assert.equal(await page.locator('#console .msg.win').count(), 0);
+  assert.equal(await page.textContent('#runLabel'), 'Run tests');
+  assert.equal(await page.isDisabled('#run'), false);
+  assert.equal((await dsSaved(page)).done?.['0.3'], undefined);
+  await page.evaluate(() => {
+    DSQ.practice.RUNNERS.cpp.run = (src, b) => b.fn.tests.map(() => ({ ok: true, status: 'pass', msg: '' }));
+  });
+  await page.click('#run');
+  await until(async () => (await dsRows(page)).length === 4);
+  assert.ok((await dsRows(page)).every(r => r.startsWith('✓')));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: changing mission during a C++ run drops the stale result', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  await dsStubCpp(page, 'pass');
+  await page.evaluate(() => {
+    document.querySelector('#run').click();
+    document.querySelector('.dots .dot[data-mi="0"]').click();
+  });
+  await dsAfterFrame(page);
+  assert.equal(await page.evaluate(() => window.__calls.length), 0);
+  assert.equal(await page.locator('#console .tests').count(), 0);
+  assert.equal(await page.textContent('#runLabel'), 'Run');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('ds-quest practice page: a Python function that calls itself forever gives error rows and the page stays usable', async () => {
   const { ctx, page, errors } = await dsPage({}, { ...DS_03, lang: 'py' });
   await page.locator('#code').waitFor();
