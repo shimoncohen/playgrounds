@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'ds-quest');
 const sandbox = {};
 vm.createContext(sandbox);
-for (const f of ['engine.js', 'content.js']) vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), sandbox, { filename: f });
+for (const f of ['engine.js', 'scenes.js', 'content.js', 'visual.js']) vm.runInContext(fs.readFileSync(path.join(DIR, f), 'utf8'), sandbox, { filename: f });
 const D = sandbox.DSQ;
 
 // term -> [regex that uses it, chapter, mission that first teaches or defines it in place (its own card may use it)]
@@ -35,9 +35,22 @@ const FIRST = {
   subtree:     [/\bsubtree\b/i, 5, 3],
 };
 
+// The JavaScript code a mission shows: its legacy fields, or its practice block's JavaScript entry. Python, C++ and Rust code is never read.
+const jsCode = m => (m.starter !== undefined ? m : (m.practice && m.practice.langs && m.practice.langs.js) || {});
+const strip = s => String(s).replace(/<\/?[a-z][^>]*>/gi, '');
+// The sentences the scene says for each button's operation (on the start state) or each recorded step of a predict visual.
+const sceneSay = m => {
+  const v = m.visual;
+  if (!v) return [];
+  if (v.kind === 'predict') return D.visual.start(v, 'x').rec.steps.map(s => s.say).filter(Boolean).map(strip);
+  const sc = D.SCENES[v.scene];
+  return v.buttons.map(b => { try { const st = sc.create(v.start); return strip(sc.op(st, b.op).run(st, b.arg).say || ''); } catch { return ''; } }).filter(Boolean);
+};
+const visualText = m => { const v = m.visual; return v ? [v.task, ...(v.pauses || []).map(p => p.ask), ...(v.buttons || []).map(b => b.label)] : []; };
+
 // the answer is the hint: it counts as use but not as teaching
-const taught = m => [m.title, m.goal, m.explain, m.note, m.starter, ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n');
-const texts = m => taught(m) + '\n' + m.answer;
+const taught = m => [m.title, m.goal, m.explain, m.note, jsCode(m).starter, ...(m.how || []), ...visualText(m), ...(m.anat || []).map(x => x[0] + ' ' + (x[2] || ''))].filter(Boolean).join('\n');
+const texts = m => taught(m) + '\n' + (jsCode(m).answer || '') + '\n' + sceneSay(m).join('\n');
 const flat = [];
 D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => flat.push({ ci, mi, text: texts(m) + (mi === 0 ? '\n' + ch.intro : ''), teach: taught(m) + (mi === 0 ? '\n' + ch.intro : '') })));
 const before = (ci, mi) => flat.filter(x => x.ci < ci || (x.ci === ci && x.mi < mi));
@@ -59,7 +72,7 @@ const SYNTAX = {
 };
 for (const [name, [use, say]] of Object.entries(SYNTAX)) {
   test(`syntax "${name}" is explained by the first mission that uses it`, () => {
-    const i = flat.findIndex(x => use.test(D.CH[x.ci].missions[x.mi].starter + '\n' + D.CH[x.ci].missions[x.mi].answer));
+    const i = flat.findIndex(x => { const c = jsCode(D.CH[x.ci].missions[x.mi]); return use.test((c.starter || '') + '\n' + (c.answer || '')); });
     assert.ok(i >= 0, 'no mission code uses it');
     assert.ok(say.test(flat.slice(0, i + 1).map(x => x.teach).join('\n').replace(/<\/?[a-z][^>]*>/gi, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')), `${flat[i].ci}.${flat[i].mi} uses "${name}" before any card explains it`);
   });

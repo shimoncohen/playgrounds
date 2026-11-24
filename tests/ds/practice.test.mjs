@@ -179,7 +179,7 @@ test('generators: expansion is checked against the value set', () => {
   assert.doesNotThrow(() => P.checkExpanded(a.args[0], 'ints'));
 });
 
-test('walk: real missions pass (zero practice blocks today); fixtures prove it bites', () => {
+test('walk: real missions pass (every practice block in the content); fixtures prove it bites', () => {
   const D = load('engine.js', 'content.js', 'practice.js').DSQ;
   assert.doesNotThrow(() => D.practice.checkAll(D.CH));
   const good = FN([{ args: [[1, 2], 1], want: 2 }]);

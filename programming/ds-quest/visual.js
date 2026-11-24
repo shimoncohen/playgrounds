@@ -18,7 +18,9 @@ const isPlain=s=>typeof s==='string'&&s.trim()!=='';
 
 V.ANSWERS={
  result:(steps,k)=>steps[k].result,
- total:(steps,k)=>steps.slice(0,k+1).reduce((t,s)=>typeof s.result==='number'?t+s.result:t,0)
+ total:(steps,k)=>steps.slice(0,k+1).reduce((t,s)=>typeof s.result==='number'?t+s.result:t,0),
+ max:(steps,k)=>steps.slice(0,k+1).reduce((m,s)=>typeof s.result==='number'&&s.result>m?s.result:m,-Infinity),
+ size:(steps,k)=>(steps[k].ptrs.find(p=>p.name==='top')?.i??-1)+1
 };
 
 const record=vis=>{
@@ -46,7 +48,13 @@ V.validate=vis=>{
    if(!b||!isPlain(b.label))add(`button ${i} needs a label`);
    else if(typeof b.op!=='string'||!sc.op(st,b.op))add(`button ${b.label}: the scene has no operation ${b.op}`);
   });
-  if(!vis.goal||typeof vis.goal!=='object'||!('snapshot' in vis.goal))add('goal must be {snapshot}');
+  const g=vis.goal;
+  if(!g||typeof g!=='object'||Array.isArray(g)||!('snapshot' in g))add('goal must be {snapshot}');
+  else{
+   for(const k of Object.keys(g))if(k!=='snapshot'&&k!=='result')add(`goal has an unknown key ${k}`);
+   if('result' in g&&!(Number.isFinite(g.result)||(typeof g.result==='string'&&g.result.length>=1&&g.result.length<=12)))add('goal.result must be a finite number or a text of 1 to 12 characters');
+  }
+  if(vis.link===true&&!sc.op(st,'link'))add('link is true but the scene has no link operation');
   for(const k of ['ref','wrong','lazy']){
    const seq=vis[k];
    if(!Array.isArray(seq)||!seq.length)add(`missing or empty ${k}`);
@@ -69,6 +77,7 @@ V.validate=vis=>{
     else seen.add(p.step);
     const known=typeof p.of==='string'&&Object.hasOwn(V.ANSWERS,p.of);
     if(!known)add(`pause ${i}: unknown answer kind ${p.of}`);
+    else if(p.of==='size'&&rec&&!rec.steps.some(s=>s.ptrs.some(x=>x.name==='top')))add(`pause ${i}: size needs a scene with a top pointer, like the pile`);
     const ch=p.choices;
     if(!Array.isArray(ch)||ch.length<2||ch.length>4||new Set(ch.map(c=>JSON.stringify(c))).size!==ch.length)add(`pause ${i}: choices must be 2 to 4 different values`);
     else if(known&&rec&&rec.steps.every(s=>s.ok)&&Number.isInteger(p.step)&&p.step>=0&&p.step<steps.length&&!ch.some(c=>c===V.ANSWERS[p.of](rec.steps,p.step)))add(`pause ${i}: the right answer is not among the choices`);
@@ -114,7 +123,10 @@ V.reset=sess=>{
 };
 V.moves=sess=>sess.hist?sess.hist.length:0;
 V.fewest=sess=>sess.vis.ref.length;
-V.won=sess=>sess.kind==='operate'&&deepEq(scene(sess.vis).snapshot(sess.state),sess.vis.goal.snapshot);
+V.won=sess=>{
+ if(sess.kind!=='operate'||!deepEq(scene(sess.vis).snapshot(sess.state),sess.vis.goal.snapshot))return false;
+ return !('result' in sess.vis.goal)||(sess.log.length>0&&deepEq(sess.log[sess.log.length-1].result,sess.vis.goal.result));
+};
 
 V.cancelPick=sess=>{sess.pending=null};
 V.pick=(sess,sel)=>{
