@@ -1,4 +1,4 @@
-/* Data Structures Quest practice contract: value types, sig and tree rules, generator shapes and the runner registry. DOM-free; no page loads it yet. */
+/* Data Structures Quest practice contract: value types, sig and tree rules, generator shapes and the runner registry. DOM-free. */
 (()=>{
 'use strict';
 const D=globalThis.DSQ=globalThis.DSQ||{};
@@ -170,7 +170,6 @@ function checkCase(c,sig,where='case'){
   });
   checkGenGroup(gens,where);
 }
-/* every case of a block, with the sig that governs it */
 function casesOf(block){
   const out=[];
   if(block.fn)(block.fn.tests||[]).forEach((c,i)=>out.push({c,sig:block.fn.sig,where:`fn test ${i}`}));
@@ -707,14 +706,13 @@ function runnerAvailable(lang){
 }
 
 const PENDING=[];
-/* ids: every mission id 'ch.mi' */
 function checkPendingRow(row,ids){
   if(!isObj(row))fail('pending row must be an object');
   if(row.mission!=='*'&&!ids.includes(row.mission))fail(`pending row: unknown mission ${JSON.stringify(row.mission)}`);
   if(!Object.hasOwn(RUNNERS,row.lang))fail(`pending row: lang ${JSON.stringify(row.lang)} is not a runner language`);
   if(!Number.isInteger(row.issue)||row.issue<1)fail(`pending row: issue ${JSON.stringify(row.issue)} must be a positive integer`);
 }
-/* practiceIds: ids of missions with a practice block; a '*' row is stale when it covers some and all pass */
+/* a '*' row is stale when it covers some practice missions and all pass */
 function stalePending(rows,passes,practiceIds=[]){
   return rows.filter(r=>r.mission==='*'
     ?practiceIds.length>0&&practiceIds.every(id=>passes(id,r.lang))

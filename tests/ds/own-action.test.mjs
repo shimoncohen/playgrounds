@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadEngines } from './practice-engines.mjs';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'programming', 'ds-quest');
 const sandbox = {};
@@ -118,5 +119,69 @@ describe('step 1: own action', () => {
       assert.equal(V.complete(S, ci, mi).ok, true, id);
       assert.equal(S.xp, 10);
     }
+  });
+});
+
+const E = loadEngines(), P = E.DSQ.practice;
+const plain = x => JSON.parse(JSON.stringify(x));
+const real = E.DSQ.CH.flatMap((c, ci) => c.missions.map((m, mi) => ({ id: `${ci}.${mi}`, ci, mi, m }))).filter(x => x.m.practice);
+const doubleBlock = { fn: { name: 'double', sig: { args: [['nums', 'ints']], ret: 'ints' }, tests: [{ args: [[1, 2]], want: [2, 4] }, { args: [[]], want: [] }, { args: [[5]], want: [10] }] },
+  langs: {
+    js: { starter: 'function double(nums) {\n}', answer: 'function double(nums) {\n  const out = [];\n  for (const n of nums) out.push(n * 2);\n  return out;\n}', wrong: 'function double(nums) {\n  return nums;\n}', lazy: 'function double(nums) {\n  return [2, 4];\n}' },
+    py: { starter: 'def double(nums):\n    pass', answer: 'def double(nums):\n    out = []\n    for n in nums:\n        out.append(n * 2)\n    return out', wrong: 'def double(nums):\n    return nums', lazy: 'def double(nums):\n    return [2, 4]' } } };
+const blocks = [...real.map(x => ({ id: x.id, block: x.m.practice })), { id: 'fixture', block: doubleBlock }];
+const runOwn = (lang, src, block) => plain(P.RUNNERS[lang].run(src, block));
+const passed = res => res.length > 0 && res.every(r => r.ok);
+
+describe('step 2: own action', () => {
+  const zeroThree = real.find(x => x.id === '0.3');
+
+  it('walks 0.3', () => {
+    assert.ok(zeroThree && blocks.length >= 2);
+  });
+
+  it('every practice mission passes on its own reference answer in JavaScript and Python', () => {
+    for (const { id, block } of blocks) for (const lang of ['js', 'py']) assert.ok(passed(runOwn(lang, block.langs[lang].answer, block)), `${id} ${lang}`);
+  });
+
+  for (const a of blocks) for (const b of blocks) {
+    if (a.id === b.id) continue;
+    it(`${a.id}'s JavaScript and Python answers do not pass ${b.id}`, () => {
+      for (const lang of ['js', 'py']) assert.equal(passed(runOwn(lang, a.block.langs[lang].answer, b.block)), false, lang);
+    });
+  }
+
+  it("0.3's Python answer given to the JavaScript runner fails", () => {
+    assert.equal(passed(runOwn('js', zeroThree.m.practice.langs.py.answer, zeroThree.m.practice)), false);
+  });
+
+  it('a wrong answer, a lazy answer and the starter fail 0.3 in JavaScript and Python', () => {
+    const b = zeroThree.m.practice;
+    for (const lang of ['js', 'py']) for (const key of ['wrong', 'lazy', 'starter']) assert.equal(passed(runOwn(lang, b.langs[lang][key], b)), false, `${lang} ${key}`);
+  });
+
+  it('done needs both steps: a passing step 2 alone is locked, then step 1 opens it for 10 XP once', () => {
+    for (const { id, ci, mi, m } of real.filter(x => x.m.visual)) {
+      const S = { seen: {}, done: {}, xp: 0, badges: {} };
+      assert.ok(passed(runOwn('js', m.practice.langs.js.answer, m.practice)), id);
+      same(V.complete(S, ci, mi), { ok: false, locked: true }, id);
+      assert.equal(S.xp, 0);
+      assert.equal(V.pass1(S, id, winOwn(m.visual, id)), true);
+      assert.equal(V.complete(S, ci, mi).ok, true, id);
+      assert.equal(S.xp, 10);
+      assert.equal(V.complete(S, ci, mi).first, false);
+      assert.equal(S.xp, 10, 'a second pass earns nothing');
+    }
+  });
+
+  it('Python: a function named sum that calls sum ends as an error or limit, never a hang', () => {
+    const t = Date.now(), res = runOwn('py', 'def sum(nums):\n    return sum(nums)', zeroThree.m.practice);
+    console.log(`self-recursive sum: ${Date.now() - t} ms, statuses ${[...new Set(res.map(r => r.status))].join(',')}`);
+    assert.ok(res.length > 0 && res.every(r => !r.ok && (r.status === 'error' || r.status === 'limit')), JSON.stringify(res));
+  });
+
+  it('Python: an empty program is missing on every case', () => {
+    const res = runOwn('py', '', zeroThree.m.practice);
+    assert.ok(res.length > 0 && res.every(r => r.status === 'missing'), JSON.stringify(res));
   });
 });

@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const {CH,RANKS,QF,GUIDE,DEMOS,SCENES,draw,visual:V,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
+const {CH,RANKS,QF,GUIDE,DEMOS,SCENES,draw,visual:V,practice:P,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
 const KEY='ds-quest-v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -24,13 +24,34 @@ function highlight(src){let h='';const re=/(\/\/[^\n]*)|(`(?:\\.|[^`\\])*`?|"(?:
     else h+=esc(m[5])}return h}
 
 /* ---------- editor ---------- */
-let lastRes=null,errLine=null;
+let lastRes=null,errLine=null,tests=null,curLang='js',running=false,runTok=0;
+const LANGS=[['js','JavaScript'],['py','Python'],['cpp','C++'],['rs','Rust']];
+const pr=m=>m&&m.practice&&!m.scriptStep?m.practice:null;
+const noMap=()=>!!pr(curMission())&&curLang!=='js';
+function langStates(m){const b=pr(m);
+  return LANGS.map(([id,name])=>{let why=null;
+    if(m.scriptStep)why=id==='js'?null:'taught from mission 0.3';
+    else{const row=P.PENDING.find(r=>r.lang===id&&(r.mission==='*'||r.mission===S.ch+'.'+S.mi));
+      if(row)why=`not yet (#${row.issue})`;else if(!P.runnerAvailable(id)||!(b.langs&&b.langs[id]&&typeof b.langs[id].starter==='string'))why='unavailable'}
+    return {id,name,why}})}
+function renderLang(){const m=curMission(),pk=m&&(m.scriptStep||m.practice)?m:null,b=pr(m);runTok++;running=false;
+  const st=pk?langStates(pk):[];curLang=pk?(st.find(s=>s.id===S.lang&&!s.why)||st.find(s=>!s.why)||{id:null}).id:'js';
+  const bar=$('#langBar');bar.hidden=!pk;bar.innerHTML=st.map(s=>`<button class="lbtn" data-lang="${s.id}" aria-pressed="${s.id===curLang}"${s.why?' disabled':''}>${esc(s.name)}${s.why?` <small>${esc(s.why)}</small>`:''}</button>`).join('');
+  const L=LANGS.find(x=>x[0]===curLang)||LANGS[0];
+  $('#fileName').textContent=S.free?'sandbox.js':m?`mission_${S.ch+1}_${S.mi+1}.${L[0]}`:'quest.js';
+  $('#edNote').textContent=S.free?'Free play':m?(b&&!curLang?'No language is ready for this mission yet.':b&&curLang!=='js'?'Checked by this quest\'s built-in interpreter':'Write your code here'):'Chapter complete';
+  codeEl.setAttribute('aria-label',curLang||!pk?`${L[1]} code editor`:'Code editor');codeEl.readOnly=!!b&&!curLang;setRunUI()}
+function setRunUI(){$('#run').disabled=running||!curLang;$('#runLabel').textContent=running?'Running…':pr(curMission())?'Run tests':'Run'}
+const slot=()=>!curLang?null:curLang!=='js'?[S.codes,mkey()+'.'+curLang]:[S.code,mkey()];
+const putCode=v=>{const s=slot();if(s)s[0][s[1]]=v};
+const starterOf=m=>pr(m)?(curLang?m.practice.langs[curLang].starter:''):m?m.starter:'';
+function startCode(m){if(S.free)return S.free.code;const s=slot();return s&&s[0][s[1]]!==undefined?s[0][s[1]]:starterOf(m)}
 function lh(){const d=gutEl.firstElementChild;return d?d.getBoundingClientRect().height||22:22}
-function renderEditor(){const v=codeEl.value;hlEl.innerHTML=highlight(v)+'\n ';const n=v.split('\n').length;
+function renderEditor(){const v=codeEl.value;hlEl.innerHTML=(curLang==='js'?highlight(v):esc(v))+'\n ';const n=v.split('\n').length;
   let g='';for(let i=1;i<=n;i++)g+=`<div class="${i===errLine?'bad':''}">${i}</div>`;gutEl.innerHTML=g;placeBand()}
 function placeBand(){if(!errLine){bandEl.hidden=true;return}bandEl.hidden=false;bandEl.classList.add('err');bandEl.style.top=(12+(errLine-1)*lh())+'px';bandEl.style.height=lh()+'px'}
 function scrollToLine(line){const ed=$('#editor');const y=12+(line-1)*lh();if(y<ed.scrollTop+10||y>ed.scrollTop+ed.clientHeight-40)ed.scrollTop=Math.max(0,y-ed.clientHeight/2)}
-function setCode(v){codeEl.value=v;S.code[mkey()]=v;save();clearRun();renderEditor()}
+function setCode(v){codeEl.value=v;putCode(v);save();clearRun();renderEditor()}
 function insertText(t){codeEl.focus();if(!document.execCommand||!document.execCommand('insertText',false,t)){const a=codeEl.selectionStart,b=codeEl.selectionEnd;codeEl.setRangeText(t,a,b,'end');codeEl.dispatchEvent(new Event('input'))}}
 let tabEscape=false;
 codeEl.addEventListener('keydown',e=>{
@@ -46,21 +67,38 @@ codeEl.addEventListener('keydown',e=>{
   if(e.key==='Backspace'&&codeEl.selectionStart===codeEl.selectionEnd){const v=codeEl.value,a=codeEl.selectionStart;const ls=v.lastIndexOf('\n',a-1)+1;const before=v.slice(ls,a);
     if(before.length>=2&&/^ +$/.test(before)){e.preventDefault();const k=before.length%2||2;codeEl.setSelectionRange(a-k,a);insertText('')}}
 });
-codeEl.addEventListener('input',()=>{S.code[mkey()]=codeEl.value;save();if(lastRes)clearRun(true);renderEditor()});
+codeEl.addEventListener('input',()=>{putCode(codeEl.value);save();if(lastRes||tests)clearRun(!!lastRes);renderEditor()});
+$('#langBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||running)return;S.lang=b.dataset.lang;save();
+  const m=curMission();renderLang();codeEl.value=startCode(m);clearRun();renderEditor();const hp=$('#hintBox pre');if(hp)hp.innerHTML=hintHTML(m);
+  const nb=$(`#langBar [data-lang="${S.lang}"]`);if(nb)nb.focus()});
 $('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;if(k==='TAB')insertText('  ');else insertText(k)});
 let armReset=0;$('#resetCode').addEventListener('click',e=>{const b=e.currentTarget;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to reset';clearTimeout(armReset);armReset=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset code'},3000);return}
-  b.classList.remove('armed');b.textContent='Reset code';const m=curMission();setCode(S.free?S.free.code:m?m.starter:'');codeEl.focus()});
+  b.classList.remove('armed');b.textContent='Reset code';const m=curMission();setCode(S.free?S.free.code:starterOf(m));codeEl.focus()});
 
 /* ---------- run ---------- */
 let lastCheck=null,pop=false;
-function run(){const src=codeEl.value;const res=runCode(src);
-  lastRes=res;errLine=res.error?res.error.line:null;lastCheck=null;const m=curMission();
+function grade(passed,tip){const c=passed?V.complete(S,S.ch,S.mi):null;
+  if(c&&c.ok){lastCheck={win:true,first:c.first};if(c.badge)lastCheck.badge=true;pop=true;save()}
+  else lastCheck={win:false,tip:c?'Step 1 comes first: finish "See it" above, then your code counts.':tip}}
+function run(){const m=curMission();if(pr(m)){runTests(m);return}
+  const src=codeEl.value;const res=runCode(src);
+  lastRes=res;errLine=res.error?res.error.line:null;lastCheck=null;
   if(m){let r;try{r=m.check(makeCtx(src,res))}catch(e){r=tipFor(e)}
-    const c=!res.error&&r===true?V.complete(S,S.ch,S.mi):null;
-    if(c&&c.ok){lastCheck={win:true,first:c.first};if(c.badge)lastCheck.badge=true;pop=true;save()}
-    else lastCheck={win:false,tip:c?'Step 1 comes first: finish "See it" above, then your code counts.':typeof r==='string'?r:null}}
+    grade(!res.error&&r===true,typeof r==='string'?r:null)}
   renderConsole();renderMap(res);renderEditor();if(errLine)scrollToLine(errLine);if(lastCheck&&lastCheck.win){renderChapters();renderMission();renderXP()}}
-function clearRun(keepMap){lastRes=null;errLine=null;lastCheck=null;renderConsole();if(keepMap)mapEl.classList.add('stale');else renderMap(null);placeBand()}
+const clip=s=>s.length>120?s.slice(0,117)+'...':s;
+function labelsOf(b){return b.fn?b.fn.tests.map((c,i)=>{try{return clip(`${b.fn.name}(${P.expandCase(c,undefined,b.fn.sig,b.nothing).args.map(a=>JSON.stringify(a)).join(', ')})`)}catch(e){return 'case '+(i+1)}}):b.cls.tests.map((_,i)=>'sequence '+(i+1))}
+function toTests(b,res){const ls=labelsOf(b),same=res.length>1&&!res[0].ok&&res.every(r=>r.msg===res[0].msg);
+  return {whole:same?res[0].msg:null,rows:res.map((r,i)=>{const l=ls[i]||'case '+(i+1);return {ok:r.ok,txt:r.ok||same?l:r.status==='wrong'?r.msg:l+': '+r.msg}})}}
+function runTests(m){if(!curLang||running)return;const lg=curLang,src=codeEl.value,b=m.practice,tok=runTok;
+  const go=()=>{if(tok!==runTok)return;running=false;setRunUI();
+    if(lg==='js'){lastRes=runCode(src);errLine=lastRes.error?lastRes.error.line:null}else{lastRes=null;errLine=null}
+    try{tests=toTests(b,P.RUNNERS[lg].run(src,b))}catch(e){tests={whole:String(e&&e.message||e),rows:[]}}
+    lastCheck=null;grade(tests.rows.length>0&&tests.rows.every(r=>r.ok));
+    renderConsole();renderMap(lastRes);renderEditor();if(errLine)scrollToLine(errLine);if(lastCheck.win){renderChapters();renderMission();renderXP()}};
+  if(lg!=='cpp'&&lg!=='rs'){go();return}
+  running=true;setRunUI();requestAnimationFrame(()=>setTimeout(go,0))}
+function clearRun(keepMap){lastRes=null;errLine=null;lastCheck=null;tests=null;renderConsole();if(keepMap)mapEl.classList.add('stale');else renderMap(null);placeBand()}
 $('#run').addEventListener('click',run);
 
 /* ---------- console ---------- */
@@ -71,17 +109,19 @@ const ERRS={
  RangeError:['A number went out of range. Often a function called itself so many times that it ran out of room.','Recursion needs a base case that stops it. Check what your function does for null or an empty array.'],
  EndlessLoop:['A loop kept going and never finished, or did far too much work.','Make sure something inside the loop changes so its condition becomes false, like moving on to node.next.']};
 function renderConsole(){const r=lastRes;let h='<div class="ttl">Console</div>';
-  if(!r){h+=`<pre class="sys">${S.free?'Free play. Write anything and press Run.':'Press Run to see what your code prints.'}</pre>`;consoleEl.innerHTML=h;return}
-  h+=`<pre>${r.lines.length?esc(r.out):(!r.error?'<span class="sys">(nothing was printed)</span>':'')}</pre>`;
-  if(r.error){const E=ERRS[r.error.type]||['Something went wrong while running.','Read the message and check the marked line.'];const lineTxt=r.error.line?(codeEl.value.split('\n')[r.error.line-1]||'').trim():'';
+  if(!r&&!tests){h+=`<pre class="sys">${S.free?'Free play. Write anything and press Run.':pr(curMission())?'Press Run tests to check your code.':'Press Run to see what your code prints.'}</pre>`;consoleEl.innerHTML=h;return}
+  if(r)h+=`<pre>${r.lines.length?esc(r.out):(!r.error?'<span class="sys">(nothing was printed)</span>':'')}</pre>`;
+  if(r&&r.error){const E=ERRS[r.error.type]||['Something went wrong while running.','Read the message and check the marked line.'];const lineTxt=r.error.line?(codeEl.value.split('\n')[r.error.line-1]||'').trim():'';
     const nice=r.error.type==='EndlessLoop'?'Stopped: too many steps':r.error.line?`${r.error.type} on line ${r.error.line}`:r.error.type;
     h+=`<div class="msg err"><span class="h">${esc(nice)}</span>${lineTxt?`<span class="py">line ${r.error.line}: ${esc(lineTxt)}</span>`:''}${r.error.type==='EndlessLoop'?'':`<span class="py">${esc(r.error.type)}: ${esc(r.error.msg)}</span>`}<p><b>What it means:</b> ${esc(E[0])}</p><p><b>How to fix it:</b> ${esc(E[1])}</p></div>`}
+  if(tests)h+=testHTML(tests);
   if(lastCheck){if(lastCheck.win){const last=S.mi>=CH[S.ch].missions.length-1;
       h+=`<div class="msg win"><span class="h">${lastCheck.first?'Mission complete! +10 XP':'Mission complete'}${lastCheck.badge?' · Badge earned: '+esc(CH[S.ch].badge)+' +25 XP':''}</span><p>${winLine()}</p><button class="btn" data-act="next">${last?'Finish the chapter':'Next mission'} →</button></div>`}
-    else if(lastCheck.tip)h+=`<div class="msg tip"><span class="h">${r.error?'Mission tip':'Not quite yet'}</span><p>${esc(lastCheck.tip)}</p></div>`}
+    else if(lastCheck.tip)h+=`<div class="msg tip"><span class="h">${r&&r.error?'Mission tip':'Not quite yet'}</span><p>${esc(lastCheck.tip)}</p></div>`}
   consoleEl.innerHTML=h;consoleEl.scrollTop=consoleEl.scrollHeight}
 const WINS=['Look at the Structure view: that is the shape your code just built.','That works. Try changing a value and running again to see the picture change.','Clean. Every big program is made of small structures like this one.','Solid. You now know how this structure thinks.'];
-function winLine(){return WINS[(S.ch*7+S.mi)%WINS.length]}
+function winLine(){let i=(S.ch*7+S.mi)%WINS.length;if(!i&&noMap())i=1;return WINS[i]}
+const testHTML=t=>`${t.whole?`<div class="msg err"><span class="h">${esc(t.whole)}</span></div>`:''}${t.rows.length?`<ul class="tests">${t.rows.map(r=>`<li class="${r.ok?'ok':'bad'}"><b>${r.ok?'✓':'✗'}</b> ${esc(r.txt)}</li>`).join('')}</ul>`:''}`;
 consoleEl.addEventListener('click',e=>{const b=e.target.closest('[data-act="next"]');if(b)gotoMission(S.ch,S.mi+1)});
 
 /* ---------- structure view ---------- */
@@ -128,8 +168,8 @@ function varsHTML(res){
   if(fns.length)h+=`<div class="frame fn"><div class="fh"><span>Defined</span></div><div class="defs">${fns.map(n=>`<span class="val t-function"><em>${/^class\b/.test(Function.prototype.toString.call(res.vars[n]))?'class':'fn'}</em>${esc(n)}</span>`).join('')}</div></div>`;
   return h}
 function renderMap(res){mapEl.classList.remove('stale');
-  if(!res){$('#mapSub').textContent='Whatever your code builds is drawn here: rows, chains, maps and trees.';
-    mapEl.innerHTML='<div class="mapEmpty"><p>Press Run and your variables appear here as pictures.</p><div class="demo"><div class="coll t-list"><em>array · 3</em><div class="cells"><div class="cell"><i>0</i><span class="val t-int">7</span></div><div class="cell"><i>1</i><span class="val t-int">8</span></div><div class="cell"><i>2</i><span class="val t-int">9</span></div></div></div></div></div>';return}
+  if(!res){const one=noMap();$('#mapSub').textContent=one?'The Structure view shows JavaScript programs only.':'Whatever your code builds is drawn here: rows, chains, maps and trees.';
+    mapEl.innerHTML=one?'':'<div class="mapEmpty"><p>Press Run and your variables appear here as pictures.</p><div class="demo"><div class="coll t-list"><em>array · 3</em><div class="cells"><div class="cell"><i>0</i><span class="val t-int">7</span></div><div class="cell"><i>1</i><span class="val t-int">8</span></div><div class="cell"><i>2</i><span class="val t-int">9</span></div></div></div></div></div>';return}
   const h=varsHTML(res);
   $('#mapSub').textContent=res.error?'Your code stopped early. These are the names it defines.':h?'What your program left behind when it finished.':'Nothing to draw yet.';
   mapEl.innerHTML=h||'<div class="mapEmpty"><p>No variables to draw. Make one with <code>const</code> and run again.</p></div>'}
@@ -139,6 +179,7 @@ function anatomy(t){if(!t)return '';const L={fn:'function',str:'text',num:'numbe
   return `<div class="anat" aria-label="Parts of the code">${t.map(([s,k,l])=>`<div class="tok k-${k}"><b>${esc(s)}</b><span>${esc(l||L[k]||k)}</span></div>`).join('')}</div>`}
 const totalDone=ci=>CH[ci].missions.filter((_,i)=>S.done[ci+'.'+i]).length;
 function renderChapters(){chaptersEl.innerHTML=CH.map((c,i)=>`<button class="chap${S.badges[i]?' earned':''}" data-ch="${i}" aria-current="${i===S.ch&&!S.free}"><span class="num">${S.badges[i]?'★':i+1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`).join('')}
+const hintHTML=m=>{const b=pr(m);if(!b)return highlight(m.answer);if(!curLang)return '';const a=b.langs[curLang].answer;return curLang==='js'?highlight(a):esc(a)};
 function renderMission(){
   if(S.free){missionEl.innerHTML=`<span class="freeTag">Free play</span><h2>Your sandbox</h2><p class="explain">Experiment with anything here. Nothing is checked and nothing can break. The Structure view draws whatever you build.</p>
     <p class="note">Tip: build a small structure, run it, then change one thing and run again. Predict the picture first.</p><div class="actions"><button class="btn" data-act="back">Back to Chapter ${S.ch+1}, mission ${Math.min(S.mi+1,CH[S.ch].missions.length)}</button></div>`;return}
@@ -152,7 +193,7 @@ function renderMission(){
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until you can picture the data at a glance, then check the field guide for which structure to pick and what each costs.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button><button class="btn ghost" data-act="free">Free play</button></div>`}${dots}`}
-  else{const m=ch.missions[S.mi],g=V.gated(m);
+  else{const m=ch.missions[S.mi],g=V.gated(m),how=pr(m)&&Array.isArray(m.how)&&m.how.length;
     const top=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
     ${S.mi===0?`<p class="intro">${ch.intro}</p>`:''}
     <h2>${esc(m.title)}</h2>${g?`<div id="stepbar">${stepBar()}</div>`:''}`;
@@ -160,27 +201,26 @@ function renderMission(){
     else h=`${top}
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
-    ${HowSteps.html(m.how)}
+    ${pr(m)?'':HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
-    <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button></div>
-    <div class="hint" id="hintBox" hidden><span>One way to write it:</span><pre>${highlight(m.answer)}</pre></div>${dots}`}
+    <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button>${how?'<button class="btn ghost" data-act="how" aria-expanded="false">Show how</button>':''}</div>
+    <div class="hint" id="hintBox" hidden><span>One way to write it:</span><pre>${hintHTML(m)}</pre></div>${how?`<div id="howBox" hidden>${HowSteps.html(m.how)}</div>`:''}${dots}`}
   missionEl.innerHTML=h;if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop');pop=false}}
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);return}
   if(b.dataset.step){setStep(+b.dataset.step);return}const a=b.dataset.act;
   if(a==='hint'){const hb=$('#hintBox');hb.hidden=!hb.hidden;b.setAttribute('aria-expanded',String(!hb.hidden));b.textContent=hb.hidden?'Show a hint':'Hide the hint'}
+  else if(a==='how'){const hb=$('#howBox');hb.hidden=!hb.hidden;b.setAttribute('aria-expanded',String(!hb.hidden));b.textContent=hb.hidden?'Show how':'Hide how'}
   else if(a==='nextch')gotoMission(S.ch+1,0);else if(a==='back'){S.free=null;loadMission()}
   else if(a==='free'){goFree('// Free play: try anything!\n')}else if(a&&a.startsWith('tab-'))showTab(a.slice(4))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;const ch=CH[ci];let mi=ch.missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi)});
 function gotoMission(ci,mi){S.free=null;S.ch=ci;S.mi=mi;save();loadMission();if(innerWidth<820)missionEl.scrollIntoView({behavior:'smooth',block:'start'})}
-function loadMission(){const m=curMission();const k=mkey();codeEl.value=S.free?S.free.code:S.code[k]!==undefined?S.code[k]:m?m.starter:'';
-  $('#fileName').textContent=S.free?'sandbox.js':m?`mission_${S.ch+1}_${S.mi+1}.js`:'quest.js';$('#edNote').textContent=S.free?'Free play':m?'Write your code here':'Chapter complete';
+function loadMission(){const m=curMission();const k=mkey();renderLang();codeEl.value=startCode(m);
   broken=false;step=2;
   if(m&&V.gated(m)){let errs;try{errs=V.validate(m.visual)}catch(e){errs=['unreadable']}broken=errs.length>0;step=V.stepOf(S,m,k)}
   clearRun();renderChapters();renderMission();renderEditor();layout()}
 
-/* ---------- step 1: see it ---------- */
 const stageEl=$('#stage');
 let step=2,sess=null,broken=false,gen=0,vBusy=false,playing=false,speed=1,pTimer=0;
 function stepBar(){const open=V.seen(S,mkey());

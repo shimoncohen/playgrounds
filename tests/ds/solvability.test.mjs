@@ -246,12 +246,12 @@ test('node fixtures: the type mapping and the helper shapes are what the contrac
    the answer passes every case (generated cases expanded), and wrong, lazy, the starter and an empty program each fail some case.
    A10: a scriptStep mission is taught in a JavaScript script, so py, cpp and rs are not required for it.
    It returns the problems, so a bite proof can read them. */
-function walk(CH, pending = P.PENDING) {
+function walk(CH, pending = P.PENDING, langs = LANGS) {
   const problems = [];
   CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
     if (!m.practice) return;
     const id = `${ci}.${mi}`;
-    for (const lang of LANGS) {
+    for (const lang of langs) {
       if (pending.some((r) => (r.mission === '*' || r.mission === id) && r.lang === lang)) continue;
       if (m.scriptStep && lang !== 'js') continue;
       const L = (m.practice.langs || {})[lang] || {};
@@ -268,11 +268,15 @@ function walk(CH, pending = P.PENDING) {
 }
 const missionWith = (practice, extra = {}) => [{ missions: [{ title: 'fixture', practice, ...extra }] }];
 
-test('walk: the real content has no practice block yet, so nothing is required and nothing fails', () => {
-  assert.deepEqual(walk(E.DSQ.CH), []);
-  assert.equal(E.DSQ.CH.some((ch) => ch.missions.some((m) => m.practice)), false);
-  assert.equal(P.PENDING.length, 0);
+test('walk: mission 0.3 has a practice block, so the real walk is never empty', () => {
+  assert.ok(E.DSQ.CH[0].missions[3].practice);
 });
+
+for (const lang of LANGS) {
+  test(`walk: every real practice block is solvable in ${lang}`, () => {
+    assert.deepEqual(walk(E.DSQ.CH, P.PENDING, [lang]), []);
+  });
+}
 
 // a 1.1 shape: returns [top, size after peeking], so an answer that pops gives a size one too low
 const PEEK = {
@@ -388,7 +392,7 @@ const wordsBlock = (n) => fn('countWords', [['text', 'str']], 'strs', [{ args: [
 const FULL = 2000;
 const DECISION = 'speed-case decision';
 const RS_SPLIT = 'fn count_words(text: String) -> Vec<String> { let mut out: Vec<String> = Vec::new(); for w in text.split(" ") { out.push(w.to_string()); } out }';
-const smaller = (what) => `${DECISION}: ${what}; a smaller size is used where the linear answer passes and the nested one reports limit`;
+const smaller = (what) => `${DECISION}: ${what}; a smaller size is used where the linear answer passes and the nested one reports limit, and a runner with no proving size is a gap tracked under #310 (C++) or #311 (Rust)`;
 // Each cell is a proving block, an accepted smaller block, or a gap; holds() stays true while the reason stands.
 const SPEED = [
   { name: 'runMax', kind: 'ramp', src: RUNMAX, cells: {
@@ -409,12 +413,8 @@ const SPEED = [
     cpp: { gap: 310, why: 'no map' } } },
 ];
 
-const sizeOf = (block) => {
-  const { args, want } = block.fn.tests[0];
-  const gens = [...args, want].filter((e) => e && e.gen);
-  return Math.min(...gens.flatMap((e) => (e.gen === 'pairs' ? [e.n, e.q ?? e.n] : [e.n])));
-};
 const gensOf = (block) => [...block.fn.tests[0].args, block.fn.tests[0].want].filter((e) => e && e.gen);
+const sizeOf = (block) => Math.min(...gensOf(block).flatMap((e) => (e.gen === 'pairs' ? [e.n, e.q ?? e.n] : [e.n])));
 const GAP_ISSUE = { cpp: 310, rs: 311 };
 
 function speedProblems(rows, kinds) {
@@ -432,8 +432,10 @@ function speedProblems(rows, kinds) {
       if (!cell.block && !cell.gap) { out.push(`${at}: neither a block nor a gap`); continue; }
       if (cell.holds !== undefined && typeof cell.holds !== 'function') out.push(`${at}: holds is not a function`);
       if (cell.block) {
-        if (gensOf(cell.block).some((e) => e.gen !== row.kind)) out.push(`${at}: a block entry has a gen other than ${row.kind}`);
+        const gens = gensOf(cell.block);
+        if (gens.some((e) => e.gen !== row.kind)) out.push(`${at}: a block entry has a gen other than ${row.kind}`);
         const size = sizeOf(cell.block);
+        if (!gens.some((e) => e.gen === row.kind) || !Number.isFinite(size)) { out.push(`${at}: a speed block needs a ${row.kind} generator entry with a finite size`); continue; }
         if (size < FULL && !(typeof cell.accepted === 'string' && cell.accepted.startsWith(DECISION))) out.push(`${at}: size ${size} is below ${FULL} and needs an accepted text starting with ${DECISION}`);
         if (size >= FULL && cell.accepted !== undefined) out.push(`${at}: accepted on a ${FULL}-element block is stale`);
       } else {
@@ -499,6 +501,10 @@ test('speed table rules: each one fails when broken and passes when kept', () =>
   assert.match(problems(withCells({ cpp: { gap: 310, why: 'x', accepted } }))[0], /^pairs cpp: .*accepted/);
   assert.match(problems(withCells({ cpp: { gap: 310, why: 'x', holds: true } }))[0], /^pairs cpp: .*holds/);
   assert.match(problems(withCells({ js: { block: runMaxBlock(2000) } }))[0], /^pairs js: .*gen/);
+  const noGen = { block: fn('peek', [['xs', 'ints']], 'ints', [{ args: [[1]], want: [1] }]) };
+  assert.match(problems(withCells({ js: noGen }))[0], /^pairs js: a speed block needs a pairs generator entry with a finite size/);
+  const noSize = { block: pairsBlock(undefined) };
+  assert.match(problems(withCells({ js: noSize }))[0], /^pairs js: a speed block needs a pairs generator entry with a finite size/);
   assert.match(problems([good, good])[0], /^pairs: duplicate row name/);
   assert.match(problems([good], ['pairs', 'words'])[0], /kinds/);
   assert.match(problems([good, { ...good, name: 'words', kind: 'words' }], ['pairs'])[0], /kinds/);
