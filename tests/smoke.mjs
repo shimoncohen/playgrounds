@@ -2920,7 +2920,6 @@ test('ds-quest field guide: each explainer runs its operations and examples draw
   await ctx.close();
 });
 
-/* ---------- Data Structures Quest: the mission page (step 1, "See it") ---------- */
 const DS_PILOTS = [{ id: '1.0', ch: 1, mi: 0, kind: 'operate' }, { id: '0.3', ch: 0, mi: 3, kind: 'predict' }];
 const DS_CH0_DONE = { '0.0': true, '0.1': true, '0.2': true, '0.3': true, '0.4': true };
 const dsPage = (opts, seed) => open(`${base}/programming/ds-quest/`, { viewport: { width: 1280, height: 900 }, ...opts },
@@ -3006,6 +3005,7 @@ test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the e
 test('ds-quest mission page: 0.3 asks each question, replays the real step on a wrong answer, and opens step 2 after the last', async () => {
   const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 3 });
   await page.locator('#vbox .sc').waitFor();
+  assert.ok(await page.locator('#code').isHidden() && await page.locator('#langBar').isHidden(), 'the editor and the language row stay hidden at step 1');
   const pauses = await page.evaluate(() => { const v = DSQ.CH[0].missions[3].visual; return v.pauses.map(p => ({ ask: p.ask, choices: p.choices, right: DSQ.visual.answerOf(v, p.step) })); });
   await page.click('[data-v="step"]');
   for (const [n, p] of pauses.entries()) {
@@ -3024,6 +3024,17 @@ test('ds-quest mission page: 0.3 asks each question, replays the real step on a 
   await until(async () => (await dsSaved(page)).seen?.['0.3'] === true);
   await page.click('[data-v="go2"]');
   assert.ok(await page.locator('#code').isVisible());
+  const bar = await page.$$eval('#langBar button', bs => bs.map(b => ({ lang: b.dataset.lang, text: b.textContent.trim(), pressed: b.getAttribute('aria-pressed'), disabled: b.disabled })));
+  const rows = await page.evaluate(() => DSQ.practice.PENDING.filter(r => r.mission === '0.3' || r.mission === '*').map(r => ({ lang: r.lang, issue: r.issue })));
+  assert.deepEqual(bar.map(b => b.lang), ['js', 'py', 'cpp', 'rs']);
+  assert.deepEqual(bar.map(b => b.text.split(' ')[0]), ['JavaScript', 'Python', 'C++', 'Rust']);
+  assert.deepEqual(bar.map(b => b.pressed), ['true', 'false', 'false', 'false']);
+  assert.deepEqual(bar.filter(b => b.disabled).map(b => b.lang), rows.map(r => r.lang), 'only a PENDING row disables a language');
+  for (const r of rows) assert.match(bar.find(b => b.lang === r.lang).text, new RegExp(`#${r.issue}`));
+  assert.equal(await page.inputValue('#code'), await page.evaluate(() => DSQ.CH[0].missions[3].practice.langs.js.starter));
+  assert.equal(await page.locator('#run svg').count(), 1);
+  assert.equal(await page.textContent('#runLabel'), 'Run tests');
+  assert.match(await page.textContent('#console'), /Press Run tests to check your code\./);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -3158,6 +3169,308 @@ test('ds-quest mission page: a mission whose picture fails validation shows one 
   assert.deepEqual(errors, []);
   assert.deepEqual(logged, []);
   await ctx.close();
+});
+
+const DS_03 = { ch: 0, mi: 3, seen: { '0.3': true } };
+const dsLang = (page, mission, lang, key) => page.evaluate(([m, l, k]) => DSQ.CH[0].missions[m].practice.langs[l][k], [mission, lang, key]);
+const dsRows = page => page.$$eval('#console .tests li', es => es.map(e => e.textContent.trim()));
+const dsRun = async (page, src) => { await page.fill('#code', src); await page.click('#run'); await until(async () => (await dsRows(page)).length > 0); return dsRows(page); };
+const DS_PRACTICE = {
+  ...DS_FIXTURE, title: 'Double it', goal: 'Return every number doubled.',
+  practice: { fn: { name: 'double', sig: { args: [['nums', 'ints']], ret: 'ints' }, tests: [{ args: [[1, 2]], want: [2, 4] }, { args: [[]], want: [] }] },
+    langs: {
+      js: { starter: 'function double(nums) {\n}\n', answer: 'function double(nums) {\n  return nums.map(n => n * 2);\n}\n', wrong: 'function double(nums) {\n  return nums;\n}\n', lazy: 'function double(nums) {\n  return [2, 4];\n}\n' },
+      py: { starter: 'def double(nums):\n    pass\n', answer: 'def double(nums):\n    out = []\n    for n in nums:\n        out.append(n * 2)\n    return out\n', wrong: 'def double(nums):\n    return nums\n', lazy: 'def double(nums):\n    return [2, 4]\n' },
+    } },
+};
+
+test('ds-quest practice page: Run tests passes 0.3 only on its own answer, and draws the Structure view for JavaScript', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  const rows = await dsRun(page, await dsLang(page, 3, 'js', 'wrong'));
+  assert.equal(rows.length, 4);
+  assert.equal(rows[0], '✗ sum([1,2,3]) should give 6, but gave 5');
+  assert.equal((await dsSaved(page)).done?.['0.3'], undefined, 'a wrong answer does not finish the mission');
+  const other = await dsRun(page, await page.evaluate(() => DSQ.CH[0].missions[4].answer));
+  assert.ok(other.every(r => r.startsWith('✗')), 'the answer to another mission fails');
+  assert.equal((await dsSaved(page)).done?.['0.3'], undefined);
+  const good = await dsRun(page, await dsLang(page, 3, 'js', 'answer'));
+  assert.equal(good.length, 4);
+  assert.ok(good.every(r => r.startsWith('✓ sum(')), good.join('|'));
+  assert.match(await page.textContent('#console .msg.win'), /Mission complete! \+10 XP/);
+  await until(async () => { const s = await dsSaved(page); return s.done?.['0.3'] === true && s.xp === 10; });
+  assert.match(await page.textContent('#map'), /Defined[\s\S]*sum/);
+  assert.equal(await page.textContent('#mapSub'), 'What your program left behind when it finished.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: each language keeps its own text, Python runs, and the Structure view is JavaScript only', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  const jsText = 'function sum(nums){ return 1; }';
+  await page.fill('#code', jsText);
+  await page.click('#langBar [data-lang="py"]');
+  assert.equal(await page.inputValue('#code'), await dsLang(page, 3, 'py', 'starter'));
+  assert.match(await page.textContent('#fileName'), /\.py$/);
+  assert.match(await page.textContent('#edNote'), /built-in interpreter/);
+  assert.match(await page.getAttribute('#code', 'aria-label'), /Python/);
+  await until(async () => (await dsSaved(page)).lang === 'py');
+  await page.fill('#code', 'def sum(nums):\n    return 0');
+  await until(async () => (await dsSaved(page)).codes?.['0.3.py'] === 'def sum(nums):\n    return 0');
+  assert.equal((await dsSaved(page)).code['0.3'], jsText, 'typing Python leaves the JavaScript text alone');
+  const rows = await dsRun(page, await dsLang(page, 3, 'py', 'answer'));
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every(r => r.startsWith('✓')), rows.join('|'));
+  await until(async () => (await dsSaved(page)).done?.['0.3'] === true);
+  assert.equal(await page.locator('#map > *').count(), 0);
+  assert.equal(await page.textContent('#mapSub'), 'The Structure view shows JavaScript programs only.');
+  assert.ok(await page.locator('#band').isHidden());
+  assert.equal(await page.locator('#gutter .bad').count(), 0);
+  assert.ok(await page.locator('.mapCol').isVisible());
+  await page.click('#langBar [data-lang="js"]');
+  assert.equal(await page.inputValue('#code'), jsText);
+  assert.equal(await page.locator('#console .tests').count(), 0, 'switching language clears the test list');
+  await page.click('#run');
+  await until(async () => (await page.textContent('#mapSub')) === 'What your program left behind when it finished.');
+  await page.click('#langBar [data-lang="py"]');
+  await until(async () => (await dsSaved(page)).lang === 'py');
+  await page.reload();
+  await page.locator('#langBar').waitFor();
+  assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true', 'the pick survives a reload');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: typing after a Python run clears the test list and the Structure view', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ...DS_03, lang: 'py' });
+  await page.locator('#code').waitFor();
+  await dsRun(page, await dsLang(page, 3, 'py', 'answer'));
+  assert.equal(await page.locator('#console .tests').count(), 1);
+  await page.fill('#code', 'def sum(nums):\n    return 1');
+  assert.equal(await page.locator('#console .tests').count(), 0, 'typing clears the test list');
+  assert.equal(await page.locator('#map > *').count(), 0);
+  assert.equal(await page.locator('#map.stale').count(), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a program that fails as a whole shows its message once above label-only rows', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  const rows = await dsRun(page, 'function sum(nums){ return ');
+  assert.equal(await page.locator('#console .msg.err:has(+ ul.tests)').count(), 1);
+  const msg = await page.textContent('#console .msg.err:has(+ ul.tests) .h');
+  assert.ok(msg.trim().length > 0);
+  assert.ok(await page.locator('#console .msg.err + ul.tests').count() === 1, 'the message sits above the rows');
+  assert.ok(rows.every(r => r.startsWith('✗') && !r.includes(msg.trim())), rows.join('|'));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: the hint follows the language and Show how appears only with a how list', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  assert.equal(await page.locator('[data-act="how"]').count(), 0, '0.3 has no how list');
+  await page.click('[data-act="hint"]');
+  assert.equal(await page.locator('#hintBox').isVisible(), true);
+  assert.ok(await page.locator('#hintBox pre span').count() > 0, 'the JavaScript hint is highlighted');
+  assert.equal((await page.textContent('#hintBox pre')), await dsLang(page, 3, 'js', 'answer'));
+  await page.click('#langBar [data-lang="py"]');
+  assert.equal(await page.locator('#hintBox pre span').count(), 0);
+  assert.equal(await page.textContent('#hintBox pre'), await dsLang(page, 3, 'py', 'answer'));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+
+  const second = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.5': true } });
+  await dsInjectOpen(second.page, { ...DS_PRACTICE, how: ['First <code>step</code>.', 'Second step.'] });
+  const btn = second.page.locator('[data-act="how"]');
+  await btn.waitFor();
+  assert.equal(await btn.getAttribute('aria-expanded'), 'false');
+  assert.ok(await second.page.locator('#howBox').isHidden());
+  await btn.click();
+  assert.equal(await btn.getAttribute('aria-expanded'), 'true');
+  assert.ok(await second.page.locator('#howBox').isVisible());
+  await btn.click();
+  assert.equal(await btn.getAttribute('aria-expanded'), 'false');
+  assert.ok(await second.page.locator('#howBox').isHidden());
+  assert.deepEqual(second.errors, []);
+  await second.ctx.close();
+});
+
+test('ds-quest practice page: the picked language carries to another practice mission', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.5': true }, lang: 'py' });
+  await dsInjectOpen(page, DS_PRACTICE);
+  await page.locator('#langBar button').first().waitFor();
+  assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true');
+  for (const l of ['cpp', 'rs']) assert.match(await page.textContent(`#langBar [data-lang="${l}"]`), /unavailable/);
+  const rows = await dsRun(page, DS_PRACTICE.practice.langs.py.answer);
+  assert.deepEqual(rows, ['✓ double([1,2])', '✓ double([])']);
+  await until(async () => { const s = await dsSaved(page); return s.done?.['0.5'] === true && s.codes?.['0.5.py'] === DS_PRACTICE.practice.langs.py.answer; });
+  assert.equal((await dsSaved(page)).lang, 'py');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a language with a PENDING row is disabled with its issue, and a visit does not change the saved pick', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, seen: { '0.3': true }, lang: 'py' });
+  await page.evaluate(() => DSQ.practice.PENDING.push({ mission: '0.3', lang: 'py', issue: 309 }));
+  await page.click('.dots .dot[data-mi="3"]');
+  await page.locator('#langBar button').first().waitFor();
+  assert.ok(await page.locator('#langBar [data-lang="py"]').isDisabled());
+  assert.match(await page.textContent('#langBar [data-lang="py"]'), /#309/);
+  assert.equal(await page.getAttribute('#langBar [data-lang="js"]', 'aria-pressed'), 'true', 'JavaScript is used instead');
+  await until(async () => (await dsSaved(page)).mi === 3);
+  assert.equal((await dsSaved(page)).lang, 'py');
+  await page.reload();
+  await page.locator('#langBar button').first().waitFor();
+  assert.equal(await page.evaluate(() => DSQ.practice.PENDING.length), 0, 'the row lived in page memory only');
+  assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a missing engine reads unavailable, and a mission with no usable language shows a read-only editor', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, seen: { '0.3': true, '0.5': true }, lang: 'cpp' });
+  await page.evaluate(() => { DSQ.practice.RUNNERS.rs.available = () => false; });
+  await page.click('.dots .dot[data-mi="3"]');
+  await page.locator('#langBar button').first().waitFor();
+  assert.match(await page.textContent('#langBar [data-lang="rs"]'), /unavailable/);
+  assert.ok(await page.locator('#langBar [data-lang="rs"]').isDisabled());
+  const none = { ...DS_PRACTICE, title: 'No language', practice: { ...DS_PRACTICE.practice, langs: { py: { starter: 'x' }, cpp: { starter: 'x' }, rs: { starter: 'x' } } } };
+  await page.evaluate(() => { for (const lang of ['py', 'cpp', 'rs']) DSQ.practice.PENDING.push({ mission: '0.5', lang, issue: 309 }); });
+  await dsInjectOpen(page, none);
+  await until(async () => (await dsSaved(page)).mi === 5);
+  assert.equal(await page.locator('#langBar button:not(:disabled)').count(), 0);
+  assert.equal(await page.locator('#langBar button').count(), 4);
+  assert.ok(await page.$eval('#code', e => e.readOnly));
+  assert.equal(await page.inputValue('#code'), '');
+  assert.ok(await page.isDisabled('#run'));
+  assert.equal(await page.textContent('#edNote'), 'No language is ready for this mission yet.');
+  assert.equal(await page.textContent('#mapSub'), 'The Structure view shows JavaScript programs only.');
+  assert.equal((await dsSaved(page)).lang, 'cpp', 'the saved pick is untouched');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a script-step mission keeps the JavaScript editor and its own check, and the other languages say why they are off', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 0, done: DS_CH0_DONE, lang: 'py' });
+  await dsInjectOpen(page, { title: 'Script step', goal: 'Run it.', explain: 'Fixture.', starter: '// go\n', answer: '// go\n', scriptStep: true });
+  await page.locator('#langBar button').first().waitFor();
+  assert.equal(await page.locator('#langBar button').count(), 4);
+  assert.equal(await page.getAttribute('#langBar [data-lang="js"]', 'aria-pressed'), 'true');
+  assert.ok(await page.locator('#langBar [data-lang="js"]').isEnabled());
+  for (const l of ['py', 'cpp', 'rs']) {
+    assert.ok(await page.locator(`#langBar [data-lang="${l}"]`).isDisabled());
+    const t = await page.textContent(`#langBar [data-lang="${l}"]`);
+    assert.match(t, /taught from mission 0\.3/);
+    assert.ok(!t.includes('#'), t);
+  }
+  await until(async () => (await dsSaved(page)).mi === 5);
+  assert.equal((await dsSaved(page)).lang, 'py');
+  assert.equal(await page.textContent('#runLabel'), 'Run');
+  await page.click('#run');
+  await until(async () => (await dsSaved(page)).done?.['0.5'] === true);
+  assert.match(await page.textContent('#console .msg.win'), /Mission complete/);
+  assert.equal(await page.textContent('#mapSub'), 'Nothing to draw yet.');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: an old save keeps its JavaScript text under code, and other languages go under codes', async () => {
+  const old = 'function sum(nums){ return 7; }';
+  const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 3, seen: { '0.3': true }, done: { '0.3': true }, code: { '0.3': old } });
+  await page.locator('#code').waitFor();
+  assert.equal(await page.inputValue('#code'), old);
+  assert.equal((await dsSaved(page)).code['0.3'], old);
+  const typed = 'function sum(nums){ return 8; }';
+  await page.fill('#code', typed);
+  await until(async () => (await dsSaved(page)).code['0.3'] === typed);
+  assert.ok(!('0.3.js' in ((await dsSaved(page)).codes || {})), 'JavaScript never lands in codes');
+  await page.click('#langBar [data-lang="py"]');
+  await page.fill('#code', 'def sum(nums):\n    return 9');
+  await until(async () => (await dsSaved(page)).codes?.['0.3.py'] === 'def sum(nums):\n    return 9');
+  assert.equal((await dsSaved(page)).code['0.3'], typed);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a failing run fits at 1280 and 390 px, light and dark', async () => {
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
+    for (const colorScheme of ['light', 'dark']) {
+      const where = `${viewport.width}px ${colorScheme}`;
+      const { ctx, page, errors } = await dsPage({ viewport, colorScheme }, DS_03);
+      await page.locator('#code').waitFor();
+      const rows = await dsRun(page, await dsLang(page, 3, 'js', 'wrong'));
+      assert.ok(rows.some(r => r.startsWith('✗')), where);
+      assert.equal(await overflow(page), false, where);
+      const out = await page.$$eval('#langBar button', bs => bs.filter(b => { const r = b.getBoundingClientRect(); return r.left < 0 || r.right > innerWidth; }).length);
+      assert.equal(out, 0, `${where}: the language buttons stay inside the viewport`);
+      assert.deepEqual(errors, [], where);
+      await ctx.close();
+    }
+  }
+});
+
+test('ds-quest practice page: the language buttons work by keyboard and Ctrl+Enter runs the tests', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  await page.focus('#langBar [data-lang="js"]');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.lang), 'py');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true');
+  await page.fill('#code', await dsLang(page, 3, 'py', 'answer'));
+  await page.keyboard.press('Control+Enter');
+  await until(async () => (await dsRows(page)).length === 4);
+  assert.ok((await dsRows(page)).every(r => r.startsWith('✓')));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: the file name and note follow each language', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#langBar button').first().waitFor();
+  await page.evaluate(() => { for (const l of ['cpp', 'rs']) DSQ.practice.RUNNERS[l].available = () => true; });
+  await page.click('.dots .dot[data-mi="0"]');
+  await page.click('.dots .dot[data-mi="3"]');
+  await page.locator('#langBar [data-lang="cpp"]:not(:disabled)').waitFor();
+  const seen = {};
+  for (const [lang, ext] of [['js', 'js'], ['py', 'py'], ['cpp', 'cpp'], ['rs', 'rs']]) {
+    await page.click(`#langBar [data-lang="${lang}"]`);
+    assert.equal(await page.textContent('#fileName'), `mission_1_4.${ext}`);
+    seen[lang] = await page.textContent('#edNote');
+  }
+  assert.equal(seen.js, 'Write your code here');
+  for (const l of ['py', 'cpp', 'rs']) assert.equal(seen[l], 'Checked by this quest\'s built-in interpreter', l);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: a Python function that calls itself forever gives error rows and the page stays usable', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ...DS_03, lang: 'py' });
+  await page.locator('#code').waitFor();
+  const rows = await dsRun(page, 'def sum(nums): return sum(nums)');
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every(r => r.startsWith('✗')), rows.join('|'));
+  assert.match(await page.textContent('#console'), /RecursionError/);
+  assert.equal((await dsSaved(page)).done?.['0.3'], undefined);
+  await page.fill('#code', await dsLang(page, 3, 'py', 'answer'));
+  await page.click('#run');
+  await until(async () => (await dsSaved(page)).done?.['0.3'] === true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: missions without a practice block show no language picker and keep Run', async () => {
+  for (const mi of [0, 4]) {
+    const { ctx, page, errors } = await dsPage({}, { ch: 0, mi, done: DS_CH0_DONE, seen: { '0.3': true } });
+    await page.locator('#code').waitFor();
+    assert.ok(await page.locator('#langBar').isHidden(), `0.${mi}`);
+    assert.equal(await page.textContent('#runLabel'), 'Run', `0.${mi}`);
+    assert.deepEqual(errors, [], `0.${mi}`);
+    await ctx.close();
+  }
 });
 
 /* ---------- Network Quest: terminal, packet inspector, map, progress ---------- */

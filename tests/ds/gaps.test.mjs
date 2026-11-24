@@ -15,17 +15,21 @@ const ids = D.CH.flatMap((ch, ci) => ch.missions.map((_, mi) => `${ci}.${mi}`));
 const practiceIds = D.CH.flatMap((ch, ci) => ch.missions.flatMap((m, mi) => (m.practice ? [`${ci}.${mi}`] : [])));
 
 const FN_MISSION = [0, 3]; // chapter, mission where `function` is first taught
-const scriptStepsBefore = (CH, [fc, fm]) =>
-  [...CH].flatMap((ch, ci) => ch.missions.flatMap((m, mi) => (m.scriptStep && (ci > fc || (ci === fc && mi >= fm)) ? [`${ci}.${mi}`] : [])));
+const scriptStepsFrom = (CH, [fc, fm]) =>
+  plain(CH.flatMap((ch, ci) => ch.missions.flatMap((m, mi) => (m.scriptStep && (ci > fc || (ci === fc && mi >= fm)) ? [`${ci}.${mi}`] : []))));
 
 const passesIn = (CH) => (id, lang) => {
   const [ci, mi] = id.split('.').map(Number);
   return D.practice.refPasses(CH[ci].missions[mi].practice, lang);
 };
 
-test('PENDING is empty and every row is valid and not stale', () => {
-  assert.equal(P.PENDING.length, 0);
-  for (const r of P.PENDING) assert.doesNotThrow(() => P.checkPendingRow(r, ids));
+const GAP_ISSUE = { py: 309, cpp: 310, rs: 311 };
+
+test('every real PENDING row is valid, names its language gap issue and is not stale', () => {
+  for (const r of P.PENDING) {
+    assert.doesNotThrow(() => P.checkPendingRow(r, ids));
+    assert.equal(r.issue, GAP_ISSUE[r.lang], `${r.mission} ${r.lang}`);
+  }
   assert.deepEqual(P.stalePending(P.PENDING, passesIn(D.CH), practiceIds), []);
 });
 
@@ -86,11 +90,11 @@ test('stalePending flags rows the runner now passes', () => {
 });
 
 test('no scriptStep mission sits at or after the mission that teaches function', () => {
-  assert.deepEqual(scriptStepsBefore(D.CH, FN_MISSION), []);
+  assert.deepEqual(scriptStepsFrom(D.CH, FN_MISSION), []);
   const fixture = [{ missions: [{}, {}, {}, { scriptStep: true }] }];
-  assert.deepEqual(scriptStepsBefore(fixture, FN_MISSION), ['0.3']);
-  assert.deepEqual(scriptStepsBefore([{ missions: [{}, {}, { scriptStep: true }, {}] }], FN_MISSION), []);
-  assert.deepEqual(scriptStepsBefore([{ missions: [{}] }, { missions: [{ scriptStep: true }] }], FN_MISSION), ['1.0']);
+  assert.deepEqual(scriptStepsFrom(fixture, FN_MISSION), ['0.3']);
+  assert.deepEqual(scriptStepsFrom([{ missions: [{}, {}, { scriptStep: true }, {}] }], FN_MISSION), []);
+  assert.deepEqual(scriptStepsFrom([{ missions: [{}] }, { missions: [{ scriptStep: true }] }], FN_MISSION), ['1.0']);
 });
 
 test('teach.test.mjs still teaches function at chapter 0, mission 3', () => {
