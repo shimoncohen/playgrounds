@@ -190,7 +190,7 @@ const CASES = [
   ['pile', undefined, 'push', { value: 4 }], ['pile', undefined, 'pop', {}], ['pile', undefined, 'peek', {}],
   ['line', undefined, 'enqueue', { value: 4 }], ['line', undefined, 'dequeue', {}], ['line', undefined, 'front', {}],
   ['chain', undefined, 'addFirst', { value: 6 }], ['chain', undefined, 'addLast', { value: 6 }], ['chain', undefined, 'removeFirst', {}],
-  ['chain', undefined, 'find', { value: 7 }], ['chain', undefined, 'reverse', {}], ['chain', { chain: [1, 2], loose: [3, 4] }, 'link', { from: { i: 1 }, to: { l: 1 } }],
+  ['chain', undefined, 'find', { value: 7 }], ['chain', undefined, 'reverse', {}], ['chain', undefined, 'flip', {}], ['chain', { chain: [1, 2], loose: [3, 4] }, 'link', { from: { i: 1 }, to: { l: 1 } }],
   ['buckets', undefined, 'set', { key: 'hat', value: 4 }], ['buckets', undefined, 'set', { key: 'boot', value: 4 }], ['buckets', undefined, 'get', { key: 'hat' }],
   ['buckets', undefined, 'get', { key: 'cape' }], ['buckets', undefined, 'delete', { key: 'hat' }], ['buckets', undefined, 'has', { key: 'hat' }],
   ['buckets', { set: [2, 5] }, 'add', { value: 3 }], ['buckets', { set: [2, 5] }, 'has', { value: 2 }], ['buckets', { set: [2, 5] }, 'delete', { value: 2 }],
@@ -222,7 +222,7 @@ test('refusals: ok:false, a reason, nothing highlighted or changed, state untouc
     ['pile', seven, 'push', { value: 1 }], ['pile', [], 'pop'], ['pile', [], 'peek'], ['pile', [1], 'push', { value: null }],
     ['line', seven, 'enqueue', { value: 1 }], ['line', [], 'dequeue'], ['line', [], 'front'], ['line', [1], 'enqueue', { value: {} }],
     ['chain', { chain: [1, 2, 3, 4], loose: [5, 6, 7] }, 'addFirst', { value: 1 }], ['chain', { chain: [1, 2, 3, 4], loose: [5, 6, 7] }, 'addLast', { value: 1 }],
-    ['chain', { chain: [1, 2, 3, 4, 5, 6, 7], loose: [] }, 'addLast', { value: 1 }], ['chain', [], 'removeFirst'], ['chain', [], 'find'], ['chain', [], 'reverse'], ['chain', [1], 'reverse'],
+    ['chain', { chain: [1, 2, 3, 4, 5, 6, 7], loose: [] }, 'addLast', { value: 1 }], ['chain', [], 'removeFirst'], ['chain', [], 'find'], ['chain', [], 'reverse'], ['chain', [1], 'reverse'], ['chain', [], 'flip'], ['chain', [1], 'flip'],
     ['chain', [1], 'addFirst', { value: {} }], ['chain', [1], 'find', { value: {} }],
     ['chain', { chain: [1, 2], loose: [3] }, 'link', { from: { i: 0 }, to: { l: 0 } }],
     ['chain', { chain: [1, 2], loose: [3] }, 'link', { from: { head: true }, to: { l: 0 } }],
@@ -407,6 +407,11 @@ const hook = sel => { const k = Object.keys(sel)[0]; return `data-${k}="${k === 
 const plan = (shape, step, o) => plain(D.draw.plan(shape, step, o));
 const run = (shape, start, name, arg) => { const sc = SC[shape], s = sc.create(start), before = sc.clone(s), step = sc.op(s, name).run(s, arg); return { s, before, step }; };
 
+// The reduced-motion rule and the animations find items by the sc-item class, so every hook must sit on one.
+const assertItemHooks = (html, where) => {
+  for (const tag of html.match(/<[^>]*\sdata-(?:i|l|v|k|head)="[^>]*>/g) || []) assert.match(tag, /class="[^"]*\bsc-item\b/, `${where}: a hook is not on an sc-item: ${tag}`);
+};
+
 for (const [label, shape, start] of KINDS) {
   test(`draw ${label}: every item, highlight and pointer has a hook, before and after random operations`, () => {
     const sc = SC[shape];
@@ -419,6 +424,8 @@ for (const [label, shape, start] of KINDS) {
           assert.equal(typeof html, 'string');
           assert.match(html, /^<div class="sc [^"]*" role="img" aria-label="[^"]+">/);
           for (const it of [...sc.items(st), ...hl]) assert.ok(html.includes(hook(it)), `${where}: no hook for ${JSON.stringify(it)}`);
+          assertItemHooks(html, where);
+          assert.ok((html.match(/\sdata-(?:i|l|v|k|head)="/g) || []).length >= sc.items(st).length, `${where}: fewer hooks than items`);
           for (const p of sc.pointers(st)) assert.ok(html.includes(`<span class="sc-ptr">${p.name}</span>`), `${where}: no label for ${p.name}`);
         }
       }
@@ -571,4 +578,101 @@ test('plan: drop, slide, swap, relink, loose node joins the chain, shake', () =>
   assert.equal(pop.leaveMs, 300); assert.equal(pop.enterMs, 0);
   const read = plan('row', run('row', [1], 'read', { i: 0 }).step);
   assert.equal(read.leaveMs + read.enterMs, 0); assert.deepEqual(read.hi, [{ i: 0 }]);
+});
+
+const FLIP_STARTS = [[1, 2], [1, 2, 3], [4, 7, 1, 9], ['a', 'bb', 'c', 'd', 'e'], [3, 1, 4, 1, 5, 9], [1, 2, 3, 4, 5, 6, 7], ['x', 'y', 'z', 1, 2, 3, 4]];
+const multiset = vals => vals.map(String).sort();
+const flipAll = vals => {
+  const s = SC.chain.create(vals), out = [];
+  for (let k = 0; k < vals.length; k++) { const step = SC.chain.op(s, 'flip').run(s); out.push({ step, s: SC.chain.clone(s) }); }
+  return { s, out };
+};
+
+test('flip: n flips give the same chain as reverse, and each flip keeps a valid chain', () => {
+  for (const vals of FLIP_STARTS) {
+    const { s, out } = flipAll(vals), r = SC.chain.create(vals);
+    SC.chain.op(r, 'reverse').run(r);
+    assert.equal(out.length, vals.length);
+    assert.deepEqual(plain(SC.chain.snapshot(s)), plain(SC.chain.snapshot(r)), vals.join());
+    assert.ok(!s.rest, 'rest is empty after the last flip');
+    out.forEach(({ step, s: after }, k) => {
+      const where = `${vals.join()} flip ${k}`;
+      assert.ok(step.ok, where);
+      assert.equal(SC.chain.valid(after), null, where);
+      assert.deepEqual(multiset([...D.listVals(after.v), ...D.listVals(after.rest || null)]), multiset(vals), where);
+      assert.equal('rest' in plain(SC.chain.snapshot(after)), k < vals.length - 1, `${where}: rest in the snapshot only mid-reversal`);
+      const again = SC.chain.create(SC.chain.snapshot(after));
+      assert.deepEqual(plain(SC.chain.snapshot(again)), plain(SC.chain.snapshot(after)), where);
+      assert.deepEqual(plain(again.v), plain(after.v), where);
+      assert.deepEqual(plain(again.rest ?? null), plain(after.rest ?? null), where);
+    });
+  }
+});
+
+test('flip: result, highlight, changes, pointers and plan for each flip', () => {
+  const vals = [4, 7, 1, 9], { out } = flipAll(vals);
+  out.forEach(({ step }, k) => {
+    assert.equal(step.result, k === 0 ? undefined : vals[k - 1], `flip ${k} result`);
+    assert.deepEqual(plain(step.hi), [{ i: 0 }]);
+    assert.deepEqual(plain(step.changes), [{ kind: 'relink', from: { i: 0 }, to: k === 0 ? null : { i: 1 } }]);
+    assert.deepEqual(plain(step.ptrs), [{ name: k === vals.length - 1 ? 'head' : 'prev', i: 0 }]);
+    assert.ok(step.code.includes('cur.next = prev') && step.say.length >= 10);
+    const p = plan('chain', step);
+    assert.deepEqual(p.enter, [{ sel: { i: 0 }, cls: 'sc-repoint' }]); assert.deepEqual(p.leave, []);
+  });
+});
+
+test('flip: create takes a rest list, counts it in the 7 nodes and checks its values', () => {
+  const s = SC.chain.create({ chain: [2, 1], loose: [8], rest: [3, 4] });
+  assert.deepEqual(plain(SC.chain.snapshot(s)), { chain: [2, 1], loose: [8], rest: [3, 4] });
+  assert.throws(() => SC.chain.create({ chain: [1, 2, 3, 4], loose: [5, 6], rest: [7, 8] }), /rest/);
+  assert.throws(() => SC.chain.create({ chain: [1], rest: [{}] }), /rest/);
+  assert.throws(() => SC.chain.create({ chain: [1], rest: 'x' }), /rest/);
+  const shared = { value: 1, next: null }, cyc = { value: 2, next: null };
+  cyc.next = cyc;
+  assert.equal(typeof SC.chain.valid({ v: shared, rest: shared, loose: [] }), 'string', 'a node in two places');
+  assert.equal(typeof SC.chain.valid({ v: { value: 1, next: null }, rest: cyc, loose: [] }), 'string', 'a cycle in rest');
+  assert.equal(typeof SC.chain.valid({ v: SC.chain.create([1, 2, 3, 4]).v, rest: SC.chain.create([5, 6, 7, 8]).v, loose: [] }), 'string', 'more than 7 nodes');
+});
+
+test('flip: refused on 0 or 1 nodes, and every other chain op is refused mid-reversal with the state untouched', () => {
+  for (const start of [[], [5]]) {
+    const s = SC.chain.create(start), step = SC.chain.op(s, 'flip').run(s);
+    assert.equal(step.ok, false); assert.ok(step.reason.length >= 10); assert.deepEqual(plain(SC.chain.snapshot(s)), { chain: start, loose: [] });
+  }
+  const args = { addFirst: { value: 5 }, addLast: { value: 5 }, removeFirst: {}, find: { value: 1 }, reverse: {}, link: { from: { i: 0 }, to: { l: 0 } } };
+  const reasons = new Set();
+  for (const [name, arg] of Object.entries(args)) {
+    const s = SC.chain.create({ chain: [1, 2, 3], loose: [9] });
+    SC.chain.op(s, 'flip').run(s);
+    const snap = plain(SC.chain.snapshot(s)), step = SC.chain.op(s, name).run(s, arg);
+    assert.equal(step.ok, false, name); assert.match(step.reason, /finish flipping the arrows first/i, name);
+    assert.ok(step.say.includes(step.reason)); assert.deepEqual(plain(step.hi), []); assert.deepEqual(plain(step.changes), []);
+    assert.deepEqual(plain(SC.chain.snapshot(s)), snap, `${name} changed the state`);
+    reasons.add(step.reason);
+  }
+  assert.equal(reasons.size, 1, 'one shared reason');
+});
+
+test('flip: clone mid-reversal is independent, and the unflipped nodes are not selectable', () => {
+  const s = SC.chain.create([1, 2, 3, 4]); SC.chain.op(s, 'flip').run(s);
+  const c = SC.chain.clone(s), snap = plain(SC.chain.snapshot(s));
+  assert.deepEqual(plain(SC.chain.snapshot(c)), snap); assert.notEqual(c.rest, s.rest); assert.notEqual(c.v, s.v);
+  SC.chain.op(c, 'flip').run(c);
+  assert.deepEqual(plain(SC.chain.snapshot(s)), snap);
+  assert.deepEqual(plain(SC.chain.items(s)), [{ i: 0 }, { head: true }]);
+});
+
+test('draw chain: a mid-reversal state draws the unflipped row without hooks, escaped, and lists it in the label', () => {
+  const bad = '<i>x</i>', html = D.draw.chain(SC.chain.create({ chain: [1], rest: [bad, 'y'] }));
+  const [flipped, unflipped] = html.split('<span class="sc-tag">not flipped yet</span>');
+  assert.ok(unflipped, 'the unflipped row has its tag');
+  assert.ok(flipped.includes('>prev<') && flipped.includes('data-head="true"') && flipped.includes('data-i="0"'));
+  assert.ok(!unflipped.includes('sc-item') && !unflipped.includes('data-'), 'unflipped nodes cannot be picked');
+  assert.ok(unflipped.includes('&lt;i&gt;x&lt;/i&gt;') && unflipped.includes('>y<') && !html.includes(bad));
+  const label = html.match(/aria-label="([^"]+)"/)[1];
+  assert.ok(label.includes('&lt;i&gt;x&lt;/i&gt;') && label.includes('y'), label);
+  assert.ok(!D.draw.chain(SC.chain.create([1, 2])).includes('not flipped yet'));
+  assert.ok(label.includes('not flipped yet'));
+  for (const { s } of flipAll([4, 7, 1, 9]).out) assertItemHooks(D.draw.chain(s), 'flip state');
 });

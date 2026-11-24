@@ -250,7 +250,7 @@ function buildStage(m){const vis=m.visual,op=vis.kind==='operate';sess=V.start(v
   vSay(op?(vis.link?'Pick a node in the chain, then a loose node to join onto it. Enter picks, Escape cancels.':'Press a button to run an operation. Try them in different orders.'):'Press Play or Step to walk along. The walk stops to ask you a question.');maybeAsk(false)}
 function vEnd(){const el=$('#vend');if(!el)return;const won=sess.kind==='operate'?V.won(sess):V.passed(sess);
   if(won){if(V.pass1(S,mkey(),sess)){save();$('#stepbar').innerHTML=stepBar()}
-    el.innerHTML=`<div class="msg win"><span class="h">Step 1 done!</span><p>${sess.kind==='operate'?'You built it.':'Every answer was right.'} Step 2 is open now.</p><button class="btn" data-v="go2">Go to step 2 →</button></div>`;vb().classList.add('sc-cheer')}
+    el.innerHTML=`<div class="msg win"><span class="h">Step 1 done!</span><p>${sess.kind==='operate'?'You built it.':sess.missed?'You worked out every answer.':'Every answer was right.'} Step 2 is open now.</p><button class="btn" data-v="go2">Go to step 2 →</button></div>`;vb().classList.add('sc-cheer')}
   else{el.innerHTML='';vb().classList.remove('sc-cheer')}}
 function vShow(r,before,btn,src,after){const g=gen;vBusy=true;vBusyUI();vSay(r.ok===false?(r.reason||r.say):r.say);vInfo();
   draw.play(vb(),sess.vis.scene,before,after||sess.state,r,{reduced:reduced(),interactive:sess.vis.link===true,onDone:()=>{if(g!==gen)return;vBusy=false;vBusyUI();(after?vAfterWrong:vAfter)(btn,src)}})}

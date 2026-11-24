@@ -44,7 +44,7 @@ const sceneSay = m => {
   if (!v) return [];
   if (v.kind === 'predict') return D.visual.start(v, 'x').rec.steps.map(s => s.say).filter(Boolean).map(strip);
   const sc = D.SCENES[v.scene];
-  return v.buttons.map(b => { try { const st = sc.create(v.start); return strip(sc.op(st, b.op).run(st, b.arg).say || ''); } catch { return ''; } }).filter(Boolean);
+  return v.buttons.map(b => { const st = sc.create(v.start); return strip(sc.op(st, b.op).run(st, b.arg).say || ''); }).filter(Boolean);
 };
 const visualText = m => { const v = m.visual; return v ? [v.task, ...(v.pauses || []).map(p => p.ask), ...(v.buttons || []).map(b => b.label)] : []; };
 

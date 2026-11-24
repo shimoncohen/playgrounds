@@ -87,7 +87,7 @@ describe('validate', () => {
     ['size on a line predict', { kind: 'predict', scene: 'line', start: [], task: 't', steps: [{ op: 'enqueue', arg: { value: 1 } }], pauses: [{ step: 0, ask: 'How many?', of: 'size', choices: [0, 1] }] }, v => {}, /pause 0.*size/],
     ['max answer not in choices', MX([7, 3], [{ step: 1, ask: 'Biggest?', of: 'max', choices: [3, 4] }]), v => {}, /right answer is not among/],
     ['size answer not in choices', SZ, v => { v.pauses[0].choices = [0, 1, 3]; }, /right answer is not among/],
-    ['missing ref', OP,v => delete v.ref, /ref/],
+    ['missing ref', OP, v => delete v.ref, /ref/],
     ['empty wrong', OP, v => { v.wrong = []; }, /wrong/],
     ['missing lazy', OP, v => delete v.lazy, /lazy/],
     ['sequence entry that matches no button', OP, v => { v.ref.push(push('purple')); }, /ref has an entry/],
@@ -219,9 +219,6 @@ describe('goal.result on the script-step missions', () => {
   test('0.2 offers an unshift button besides push and pop', () => {
     same(vis('0.2').buttons.map(b => b.op).sort(), ['pop', 'push', 'push', 'unshift']);
   });
-  test('the three ref sequences are among the shortest-ref walks', () => {
-    for (const id of ['0.0', '0.1', '0.2']) assert.equal(vis(id).kind, 'operate', id);
-  });
 });
 
 describe('goal.result on the chapter 1 pile missions', () => {
@@ -258,6 +255,112 @@ describe('goal.result on the chapter 1 pile missions', () => {
   });
 });
 
+describe('goal.result and the walk on the chapter 2 line missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const enq = v => ({ op: 'enqueue', arg: { value: v } }), deq = { op: 'dequeue' }, front = { op: 'front' };
+  test('2.0: the ref wins; the wrong order, the lazy joins and no press do not', () => {
+    assert.equal(won('2.0', vis('2.0').ref), true);
+    assert.equal(won('2.0', [enq('Mo'), enq('Juno'), enq('Clatter'), deq]), false);
+    assert.equal(won('2.0', [enq('Juno'), enq('Mo'), enq('Clatter')]), false);
+    assert.equal(won('2.0', [enq('Juno'), enq('Mo'), enq('Clatter'), front]), false);
+    assert.equal(won('2.0', []), false);
+    assert.equal(won('2.0', vis('2.0').wrong), false);
+    assert.equal(won('2.0', vis('2.0').lazy), false);
+  });
+  test('2.1: enqueue 5, enqueue 8, dequeue wins; the other orders and presses do not', () => {
+    assert.equal(won('2.1', [enq(5), enq(8), deq]), true);
+    assert.equal(won('2.1', [enq(8), enq(5), deq]), false);
+    assert.equal(won('2.1', [enq(5), enq(8), front]), false);
+    assert.equal(won('2.1', [enq(5), enq(8)]), false);
+    assert.equal(won('2.1', []), false);
+    assert.equal(won('2.1', vis('2.1').wrong), false);
+    assert.equal(won('2.1', vis('2.1').lazy), false);
+  });
+  test('2.0 and 2.1 offer different buttons, so one ref wins only its own mission', () => {
+    assert.equal(won('2.1', vis('2.0').ref), false);
+    assert.equal(won('2.0', vis('2.1').ref), false);
+  });
+  test('2.2: the three questions are who leaves, replayed on a plain array', () => {
+    const v = vis('2.2'), line = [...v.start], leavers = [];
+    v.steps.forEach((e, k) => {
+      if (e.op === 'enqueue') line.push(e.arg.value);
+      else { const out = line.shift(); if (v.pauses.some(p => p.step === k)) leavers.push(out); }
+    });
+    same(v.pauses.map(p => p.step), [4, 9, 14]);
+    same(leavers, ['Clatter', 'Juno', 'Pip']);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), leavers);
+    same(line, ['Mo']);
+  });
+});
+
+describe('goal.result and the walk on the chapter 3 chain missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const link = (from, l) => ({ op: 'link', arg: { from, to: { l } } });
+  const head = { head: true };
+  test('3.0: the ref wins; the reversed order, the lazy two links and no press do not', () => {
+    assert.equal(won('3.0', vis('3.0').ref), true);
+    assert.equal(won('3.0', [link(head, 0), link({ i: 0 }, 0), link({ i: 1 }, 0)]), false);
+    assert.equal(won('3.0', [link(head, 1), link({ i: 0 }, 1)]), false);
+    assert.equal(won('3.0', []), false);
+    assert.equal(won('3.0', vis('3.0').wrong), false);
+    assert.equal(won('3.0', vis('3.0').lazy), false);
+  });
+  test('3.0: the ref builds 1 → 2 → 3 and the walk to 3 then finds it at index 2', () => {
+    const v = vis('3.0'), s = V.runSeq(v, v.ref);
+    same(S.chain.snapshot(s.state), { chain: [1, 2, 3], loose: [] });
+    const r = V.apply(s, { op: 'find', arg: { value: 3 } });
+    assert.equal(r.ok, true);
+    assert.equal(r.result, 2);
+  });
+  test('3.0: the walk button is refused on the empty chain, with a reason, and the state stays', () => {
+    const s = V.start(vis('3.0'), '3.0'), before = JSON.stringify(s.state);
+    const r = V.apply(s, { op: 'find', arg: { value: 3 } });
+    assert.equal(r.ok, false);
+    assert.ok(r.reason.length >= 10);
+    assert.equal(JSON.stringify(s.state), before);
+  });
+  test('3.0 is searched with link presses: 1 button and 12 links, every sequence up to depth 2', () => {
+    assert.equal(pressesOf(vis('3.0')).length, 13);
+    const { winners, tried } = shorterWinners(vis('3.0'));
+    same(winners, []);
+    assert.equal(tried, 1 + 13 + 13 ** 2);
+  });
+  test('3.2: addFirst 1, add (end) 9, removeFirst wins; the other orders and presses do not', () => {
+    const op = (o, value) => ({ op: o, arg: { value } });
+    assert.equal(won('3.2', vis('3.2').ref), true);
+    assert.equal(won('3.2', [op('addLast', 1), op('addLast', 9), { op: 'removeFirst' }]), false);
+    assert.equal(won('3.2', [op('addFirst', 1), op('addLast', 9)]), false);
+    assert.equal(won('3.2', []), false);
+    assert.equal(won('3.2', vis('3.2').wrong), false);
+    assert.equal(won('3.2', vis('3.2').lazy), false);
+  });
+  test('3.2: the ref leaves 4 → 7 → 9 and removeFirst gives back 1', () => {
+    const v = vis('3.2'), s = V.runSeq(v, v.ref);
+    same(S.chain.snapshot(s.state), { chain: [4, 7, 9], loose: [] });
+  });
+  test('3.1: each pause answer is the index of the value in [5, 8, 2, 6], or -1', () => {
+    const v = vis('3.1');
+    same(v.steps.map(e => e.arg.value), [8, 6, 9]);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.steps.map(e => v.start.indexOf(e.arg.value)));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [1, 3, -1]);
+  });
+  test('3.3: flip k points back at start[k-1], and find 1 after four flips gives index 3, worked out from start alone', () => {
+    const v = vis('3.3');
+    same(v.start, [1, 2, 3, 4]);
+    same(v.steps.map(e => e.op), ['flip', 'flip', 'flip', 'flip', 'find']);
+    same(v.steps.map(e => e.arg), [undefined, undefined, undefined, undefined, { value: 1 }]);
+    same(v.pauses.map(p => p.step), [1, 2, 3, 4]);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [1, 2, 3, [...v.start].reverse().indexOf(1)]);
+    for (const p of v.pauses.slice(0, 3)) assert.equal(V.answerOf(v, p.step), v.start[p.step - 1]);
+    assert.equal(V.answerOf(v, 4), 3);
+    const st = S.chain.create(v.start);
+    for (const e of v.steps) S.chain.op(st, e.op).run(st, e.arg);
+    same(S.chain.snapshot(st), { chain: [4, 3, 2, 1], loose: [] });
+  });
+});
+
 describe('answer kinds max and size', () => {
   const ask = (vis, of, k, choices) => ({ ...vis, pauses: [{ step: k, ask: 'q', of, choices }] });
   test('max is the biggest number read so far, recomputed from the row', () => {
@@ -288,19 +391,52 @@ describe('answer kinds max and size', () => {
   });
 });
 
+// Every press the learner can make: each button, plus every link between a start point and a loose node on a link mission.
+const pressesOf = vis => {
+  const presses = vis.buttons.map(b => (b.arg === undefined ? { op: b.op } : { op: b.op, arg: b.arg }));
+  if (vis.link === true) for (const from of [{ head: true }, { i: 0 }, { i: 1 }, { i: 2 }]) for (const l of [0, 1, 2]) presses.push({ op: 'link', arg: { from, to: { l } } });
+  return presses;
+};
+// Plays every press sequence shorter than ref and returns the ones that win, with how many it tried.
+const shorterWinners = vis => {
+  const presses = pressesOf(vis), winners = [];
+  let level = [[]], tried = 0;
+  for (let len = 0; len < vis.ref.length; len++) {
+    for (const seq of level) { tried++; if (V.won(V.runSeq(vis, seq))) winners.push(seq); }
+    level = level.flatMap(seq => presses.map(p => [...seq, p]));
+  }
+  return { winners, tried };
+};
+
 describe('shortest ref', () => {
   D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
     const vis = m.visual;
     if (!vis || vis.kind !== 'operate') return;
     test(`${ci}.${mi}: no sequence shorter than ref wins`, () => {
-      const presses = vis.buttons.map(b => (b.arg === undefined ? { op: b.op } : { op: b.op, arg: b.arg }));
-      let level = [[]];
-      for (let len = 0; len < vis.ref.length; len++) {
-        for (const seq of level) assert.equal(V.won(V.runSeq(vis, seq)), false, `${ci}.${mi}: ${JSON.stringify(seq)} wins in ${seq.length} moves, ref has ${vis.ref.length}`);
-        level = level.flatMap(seq => presses.map(p => [...seq, p]));
-      }
+      same(shorterWinners(vis).winners, [], `${ci}.${mi}: a shorter sequence wins, ref has ${vis.ref.length}`);
     });
   }));
+  const link = (from, l) => ({ op: 'link', arg: { from, to: { l } } });
+  const FIND = { label: 'walk to 3', op: 'find', arg: { value: 3 } };
+  const LINK3 = { kind: 'operate', scene: 'chain', link: true, start: { chain: [], loose: [3, 1, 2] }, task: 't', buttons: [FIND],
+    goal: { snapshot: { chain: [1, 2, 3], loose: [] } },
+    ref: [link({ head: true }, 1), link({ i: 0 }, 1), link({ i: 1 }, 0)], wrong: [link({ head: true }, 0)], lazy: [link({ head: true }, 1)] };
+  test('the search tries link presses: it counts every sequence of the press list up to depth ref - 1', () => {
+    same(V.validate(LINK3), []);
+    const presses = 1 + 4 * 3;
+    assert.equal(pressesOf(LINK3).length, presses);
+    const { winners, tried } = shorterWinners(LINK3);
+    same(winners, []);
+    assert.equal(tried, 1 + presses + presses ** 2);
+  });
+  test('the search can fail: a link mission that one link already wins is reported', () => {
+    const quick = { ...LINK3, goal: { snapshot: { chain: [1], loose: [3, 2] } }, ref: [link({ head: true }, 1), { op: 'find', arg: { value: 3 } }] };
+    same(V.validate(quick), []);
+    same(shorterWinners(quick).winners, [[link({ head: true }, 1)]]);
+  });
+  test('the search ignores link presses on a mission with no link flag', () => {
+    assert.equal(pressesOf({ ...LINK3, link: false }).length, 1);
+  });
 });
 
 describe('predict model', () => {
@@ -349,6 +485,19 @@ describe('predict model', () => {
     V.answer(s, 5);
     assert.equal(V.passed(s), true);
     assert.equal(V.advance(s).ok, false);
+  });
+  test('missed starts false, a wrong answer sets it and a right retry keeps it', () => {
+    const s = V.start(PR, 'x');
+    assert.equal(s.missed, false);
+    to(s, 1);
+    V.answer(s, 7);
+    assert.equal(s.missed, false);
+    V.advance(s);
+    V.answer(s, 7);
+    assert.equal(s.missed, true);
+    V.answer(s, 5);
+    assert.equal(s.missed, true);
+    assert.equal(V.passed(s), true);
   });
   test('answering with no open question is refused', () => {
     const r = V.answer(V.start(PR, 'x'), 3);
@@ -475,7 +624,9 @@ describe('missions with visual', () => {
       });
     }
   }));
-  test('all nine chapter 0 and 1 missions are walked', () => {
-    assert.ok(['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3'].every(id => walked.includes(id)), walked.join());
+  test('all sixteen converted missions of chapters 0 to 3 are walked', () => {
+    const ids = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3'];
+    assert.deepEqual(ids.filter(id => !walked.includes(id)), [], walked.join());
+    assert.equal(ids.length, 16);
   });
 });

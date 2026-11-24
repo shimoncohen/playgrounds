@@ -705,7 +705,7 @@ function runnerAvailable(lang){
   try{return !!RUNNERS[lang].available()}catch{return false}
 }
 
-const PENDING=[{mission:'1.2',lang:'py',issue:309},{mission:'1.2',lang:'cpp',issue:310}];
+const PENDING=[{mission:'1.2',lang:'py',issue:309},{mission:'1.2',lang:'cpp',issue:310},{mission:'2.1',lang:'py',issue:309},{mission:'2.1',lang:'cpp',issue:310},{mission:'3.2',lang:'py',issue:309},{mission:'3.2',lang:'cpp',issue:310}];
 function checkPendingRow(row,ids){
   if(!isObj(row))fail('pending row must be an object');
   if(row.mission!=='*'&&!ids.includes(row.mission))fail(`pending row: unknown mission ${JSON.stringify(row.mission)}`);
