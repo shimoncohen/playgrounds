@@ -3684,6 +3684,8 @@ async function dsAnswerAll(page, ch, mi, wrongFirst) {
     await page.click(`#vq [data-c="${p.choices.indexOf(p.right)}"]`);
     await dsIdle(page);
   }
+  // The step ends only when the walk reaches its last step, which can come after the last question.
+  for (let i = 0; i < 10 && !await dsWon(page); i++) { await page.click('[data-v="step"]'); await dsIdle(page); }
   await page.locator('#vend .msg.win').waitFor();
   return pauses;
 }
