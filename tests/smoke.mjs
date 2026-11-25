@@ -2979,9 +2979,10 @@ test('ds-quest mission page: step 1 shows the trail and a centred stage over lef
 });
 
 const DS_SCENES = [{ id: '3.0', ch: 3, mi: 0, cls: 'sc-chain' }, { id: '4.0', ch: 4, mi: 0, cls: 'sc-buckets' },
-  { id: '5.2', ch: 5, mi: 2, cls: 'sc-tree' }, { id: '5.3', ch: 5, mi: 3, cls: 'sc-tree' }];
+  { id: '5.2', ch: 5, mi: 2, cls: 'sc-tree' }, { id: '5.3', ch: 5, mi: 3, cls: 'sc-tree' },
+  { id: '2.0', ch: 2, mi: 0, cls: 'sc-line' }, { id: '2.2', ch: 2, mi: 2, cls: 'sc-line' }, { id: '4.1', ch: 4, mi: 1, cls: 'sc-set' }];
 
-test('ds-quest mission page: the chain, buckets and tree scenes fit at 1280 and 390 px, with step 2 locked', async () => {
+test('ds-quest mission page: the queue line, chain, buckets and tree scenes fit at 1280 and 390 px, with step 2 locked', async () => {
   for (const scene of DS_SCENES) {
     for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
       for (const colorScheme of ['light', 'dark']) {
