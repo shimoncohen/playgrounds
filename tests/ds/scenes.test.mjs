@@ -67,7 +67,7 @@ test('guide examples draw something and field guide covers every chapter with a 
 
 
 // [label, shape, start]: the chain starts with loose nodes so link gets exercised.
-const KINDS = [['row', 'row'], ['pile', 'pile'], ['line', 'line'], ['chain', 'chain', { chain: [4, 7], loose: [1, 2] }], ['map', 'buckets'], ['set', 'buckets', { set: [2, 5] }], ['tree', 'tree']];
+const KINDS = [['row', 'row'], ['pile', 'pile'], ['line', 'line'], ['chain', 'chain', { chain: [4, 7], loose: [1, 2] }], ['map', 'buckets'], ['set', 'buckets', { set: [2, 5] }], ['words', 'buckets', { set: ['hat', 'scarf'] }], ['tree', 'tree']];
 const pickR = a => a[Math.floor(Math.random() * a.length)];
 const GARBAGE = ['x'.repeat(13), '', NaN, Infinity, {}, [], null, true, 1.5];
 const SELS = [{ head: true }, { i: 0 }, { i: 1 }, { i: 3 }, { l: 0 }, { l: 1 }, { i: -1 }, { l: 9 }, { head: false }, { i: '0' }, { x: 1 }, { i: 0, l: 1 }, 'x', null, []];
@@ -75,7 +75,7 @@ function randArg() {
   if (Math.random() < .4) return pickR([undefined, {}]);
   if (Math.random() < .05) return pickR([5, 'x', [1], true]);
   const a = {};
-  for (const k of ['value', 'key']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([1, 5, 9, 'ab', '<b>', -3, 'umbrella', 'hat', 'cape']);
+  for (const k of ['value', 'key', 'target']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([1, 5, 9, 'ab', '<b>', -3, 'umbrella', 'hat', 'cape']);
   for (const k of ['i', 'j']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([0, 1, 2, 5, 9, 11, -1]);
   for (const k of ['from', 'to']) if (Math.random() < .4) a[k] = pickR(SELS);
   return a;
@@ -153,13 +153,13 @@ test('create: defaults, valid starts and invalid starts', () => {
     ['pile', Array(8).fill(1)], ['line', Array(8).fill(1)], ['line', [null]],
     ['chain', Array(8).fill(1)], ['chain', { chain: [1, 2, 3, 4, 5], loose: [1, 2, 3] }], ['chain', [NaN]], ['chain', { chain: 'x' }],
     ['buckets', Array(6).fill(0).map((_, i) => ['k' + i, i])], ['buckets', [[1, 2]]], ['buckets', [['a', 'b']]], ['buckets', [['a', 1], ['a', 2]]],
-    ['buckets', { set: [1, 2, 3, 4, 5, 6, 7] }], ['buckets', { set: ['a'] }], ['buckets', { set: [1, 1] }], ['buckets', 'x'],
+    ['buckets', { set: [1, 2, 3, 4, 5, 6, 7] }], ['buckets', { set: [{}] }], ['buckets', { set: [''] }], ['buckets', { set: ['x'.repeat(13)] }], ['buckets', { set: [NaN] }], ['buckets', { set: ['a', 'a'] }], ['buckets', { set: [1, 1] }], ['buckets', 'x'],
     ['tree', [1, 2, 1]], ['tree', ['a']], ['tree', Array.from({ length: 12 }, (_, i) => i)], ['tree', 5]
   ];
   for (const [shape, st] of bad) assert.throws(() => SC[shape].create(st), `${shape} accepted ${JSON.stringify(st)}`);
 });
 
-test('op finds each op by name, undefined for an unknown name, and the set ops on a Set', () => {
+test('op finds each op by name, undefined for an unknown name, and the set ops on a Set; count is last and has second to last in the map ops', () => {
   for (const [label, shape, start] of KINDS) {
     const sc = SC[shape], s = sc.create(start);
     for (const o of s.v instanceof XSet ?sc.setOps : sc.ops) assert.equal(sc.op(s, o.name), o);
@@ -169,7 +169,12 @@ test('op finds each op by name, undefined for an unknown name, and the set ops o
   assert.equal(SC.buckets.op(m, 'add'), undefined);
   assert.equal(SC.buckets.op(st, 'add').name, 'add');
   assert.equal(SC.buckets.op(st, 'set'), undefined);
-  assert.equal(SC.buckets.op(m, 'has'), SC.buckets.ops.at(-1), 'has is last in the map ops');
+  assert.equal(SC.buckets.op(m, 'count'), SC.buckets.ops.at(-1), 'count is last in the map ops');
+  assert.equal(SC.buckets.op(m, 'has'), SC.buckets.ops.at(-2), 'has is second to last in the map ops');
+  assert.equal(SC.buckets.op(st, 'partner'), SC.buckets.setOps.at(-1), 'partner is last in the set ops');
+  assert.equal(SC.buckets.op(st, 'delete'), SC.buckets.setOps.at(-2));
+  assert.equal(SC.buckets.op(m, 'partner'), undefined);
+  assert.equal(SC.buckets.op(st, 'count'), undefined);
 });
 
 test('clone is independent and keeps the state type', () => {
@@ -194,6 +199,9 @@ const CASES = [
   ['buckets', undefined, 'set', { key: 'hat', value: 4 }], ['buckets', undefined, 'set', { key: 'boot', value: 4 }], ['buckets', undefined, 'get', { key: 'hat' }],
   ['buckets', undefined, 'get', { key: 'cape' }], ['buckets', undefined, 'delete', { key: 'hat' }], ['buckets', undefined, 'has', { key: 'hat' }],
   ['buckets', { set: [2, 5] }, 'add', { value: 3 }], ['buckets', { set: [2, 5] }, 'has', { value: 2 }], ['buckets', { set: [2, 5] }, 'delete', { value: 2 }],
+  ['buckets', [['umbrella', 3]], 'count', { key: 'hat' }], ['buckets', [['umbrella', 3]], 'count', { key: 'umbrella' }],
+  ['buckets', { set: [2, 5] }, 'partner', { value: 3, target: 9 }], ['buckets', { set: [2, 5] }, 'partner', { value: 4, target: 9 }],
+  ['buckets', { set: ['hat'] }, 'add', { value: 'boot' }], ['buckets', { set: ['hat'] }, 'has', { value: 'hat' }], ['buckets', { set: ['hat'] }, 'delete', { value: 'hat' }],
   ['tree', undefined, 'insert', { value: 9 }], ['tree', undefined, 'contains', { value: 3 }], ['tree', undefined, 'contains', { value: 4 }], ['tree', undefined, 'inorder', {}]
 ];
 
@@ -237,7 +245,12 @@ test('refusals: ok:false, a reason, nothing highlighted or changed, state untouc
     ['buckets', [['a', 1]], 'delete', { key: 'zz' }], ['buckets', [['a', 1]], 'set', { key: 'a', value: 'x' }], ['buckets', [['a', 1]], 'set', { key: 5, value: 1 }],
     ['buckets', [['a', 1]], 'get', { key: {} }], ['buckets', [['a', 1]], 'has', { key: NaN }],
     ['buckets', { set: [1, 2, 3, 4, 5, 6] }, 'add', { value: 9 }], ['buckets', { set: [] }, 'delete', {}], ['buckets', { set: [1] }, 'delete', { value: 4 }],
-    ['buckets', { set: [1] }, 'add', { value: 'x' }], ['buckets', { set: [1] }, 'has', { value: {} }],
+    ['buckets', { set: [1] }, 'add', { value: 'x'.repeat(13) }], ['buckets', { set: [1] }, 'add', { value: '' }], ['buckets', { set: [1] }, 'add', { value: {} }],
+    ['buckets', { set: [1] }, 'add', { value: NaN }], ['buckets', { set: [1] }, 'has', { value: {} }], ['buckets', { set: [1] }, 'delete', { value: [] }],
+    ['buckets', { set: ['a'] }, 'delete', { value: 'zz' }], ['buckets', { set: ['a', 'b', 'c', 'd', 'e', 'f'] }, 'add', { value: 'g' }],
+    ['buckets', [['a', 1]], 'count', { key: 5 }], ['buckets', [['a', 1]], 'count', { key: '' }], ['buckets', [['a', 1], ['b', 1], ['c', 1], ['d', 1], ['e', 1]], 'count', { key: 'z' }],
+    ['buckets', { set: [1] }, 'partner', { value: 'x', target: 5 }], ['buckets', { set: [1] }, 'partner', { value: 2, target: '5' }], ['buckets', { set: [1] }, 'partner', { value: NaN, target: 5 }],
+    ['buckets', { set: [1] }, 'partner', { value: 2, target: {} }], ['buckets', { set: [1, 2, 3, 4, 5, 6] }, 'partner', { value: 9, target: 20 }],
     ['tree', [8, 3], 'insert', { value: 3 }], ['tree', eleven, 'insert', { value: 99 }], ['tree', [8], 'insert', { value: 'x' }], ['tree', [8], 'insert', { value: NaN }],
     ['tree', [8], 'contains', { value: '8' }], ['tree', [], 'inorder'], ['tree', [], 'contains', {}], ['tree', [8], 'insert', true]
   ];
@@ -370,7 +383,11 @@ test('guide code: new swap and has lines are at most 39 characters, and no code 
   }
   for (const k of ['umbrella', 'hat', 'scarf', 'boot', 'glove', 'x'.repeat(12)]) {
     const s = SC.buckets.create([[k, 1]]);
-    for (const key of [k, 'x'.repeat(12)]) for (const l of lines(SC.buckets.op(s, 'has').run(s, { key }).code)) assert.ok(l.length <= 39, l);
+    for (const key of [k, 'x'.repeat(12)]) for (const name of ['has', 'count']) for (const l of lines(SC.buckets.op(s, name).run(s, { key }).code)) assert.ok(l.length <= 39, l);
+  }
+  for (const target of [12, -12]) for (const value of [-3, 15, 5, 7]) for (const set of [[], [15], [-3]]) {
+    const s = SC.buckets.create({ set }), r = SC.buckets.op(s, 'partner').run(s, { value, target });
+    assert.ok(r.ok); for (const l of lines(r.code)) assert.ok(l.length <= 39, l);
   }
   for (const d of D.DEMOS) for (let run = 0; run < 30; run++) {
     const s = { v: d.init() };
@@ -386,7 +403,7 @@ test('valid rejects hand-broken states', () => {
   const dup = SC.chain.create({ chain: [1], loose: [2] }); dup.loose.push(dup.loose[0]); broken.push([SC.chain, dup]);
   const big = SC.chain.create({ chain: [1, 2, 3, 4], loose: [5, 6, 7] }); big.loose.push({ value: 8, next: null }); broken.push([SC.chain, big]);
   const linked = SC.chain.create({ chain: [1], loose: [2] }); linked.loose[0].next = linked.v; broken.push([SC.chain, linked]);
-  broken.push([SC.buckets, { v: new XMap(Array.from({ length: 6 }, (_, i) => ['k' + i, i])) }], [SC.buckets, { v: [] }], [SC.buckets, { v: new XMap([['a', 'b']]) }], [SC.buckets, { v: new XSet([1, 2, 3, 4, 5, 6, 7]) }], [SC.buckets, { v: new XSet(['a']) }]);
+  broken.push([SC.buckets, { v: new XMap(Array.from({ length: 6 }, (_, i) => ['k' + i, i])) }], [SC.buckets, { v: [] }], [SC.buckets, { v: new XMap([['a', 'b']]) }], [SC.buckets, { v: new XSet([1, 2, 3, 4, 5, 6, 7]) }], [SC.buckets, { v: new XSet([{}]) }], [SC.buckets, { v: new XSet(['x'.repeat(13)]) }]);
   const unsorted = SC.tree.create([8, 3, 10]); unsorted.v.left.value = 9; broken.push([SC.tree, unsorted]);
   const tc = SC.tree.create([8, 3]); tc.v.left.left = tc.v; broken.push([SC.tree, tc]);
   const str = SC.tree.create([8]); str.v.value = '8'; broken.push([SC.tree, str]);
@@ -675,4 +692,90 @@ test('draw chain: a mid-reversal state draws the unflipped row without hooks, es
   assert.ok(!D.draw.chain(SC.chain.create([1, 2])).includes('not flipped yet'));
   assert.ok(label.includes('not flipped yet'));
   for (const { s } of flipAll([4, 7, 1, 9]).out) assertItemHooks(D.draw.chain(s), 'flip state');
+});
+
+test('flip: one more flip after a finished reversal starts again on the reversed chain', () => {
+  for (const vals of FLIP_STARTS) {
+    const { s } = flipAll(vals), where = vals.join();
+    assert.equal(s.v.value, vals.at(-1), where); assert.ok(!s.rest, where);
+    const step = SC.chain.op(s, 'flip').run(s);
+    assert.ok(step.ok, where);
+    assert.equal(SC.chain.valid(s), null, where);
+    assert.equal(s.v.value, vals.at(-1), `${where}: the head is the same node`);
+    assert.equal(s.v.next, null, `${where}: the head's next is cut`);
+    assert.ok(s.rest, `${where}: rest is set`);
+    assert.equal(s.rest.value, vals.at(-2), where);
+    assert.deepEqual(multiset([...D.listVals(s.v), ...D.listVals(s.rest)]), multiset(vals), where);
+  }
+});
+
+test('text Set: create, valid, ops, escaping, quoted code, drawing and snapshot round trip', () => {
+  const s = SC.buckets.create({ set: ['hat', 'scarf'] });
+  assert.ok(s.v instanceof XSet); assert.equal(SC.buckets.valid(s), null);
+  assert.deepEqual(plain(SC.buckets.snapshot(s)), { set: ['hat', 'scarf'] });
+  assert.deepEqual(plain(SC.buckets.snapshot(SC.buckets.create(SC.buckets.snapshot(s)))), { set: ['hat', 'scarf'] });
+  assert.deepEqual(plain(SC.buckets.items(s)), [{ v: 'hat' }, { v: 'scarf' }]);
+  assert.equal(SC.buckets.create({ set: ['x'.repeat(12), 3] }).v.size, 2);
+  const add = run('buckets', { set: ['hat'] }, 'add', { value: 'boot' });
+  assert.equal(add.step.ok, true); assert.equal(add.step.code, 'seen.add("boot");');
+  assert.ok(add.step.say.includes('"boot"')); assert.deepEqual(plain(add.step.hi), [{ v: 'boot' }]); assert.deepEqual(plain(add.step.changes), [{ kind: 'add', v: 'boot' }]);
+  assert.deepEqual(plain(SC.buckets.snapshot(add.s)), { set: ['hat', 'boot'] });
+  const dup = run('buckets', { set: ['hat'] }, 'add', { value: 'hat' });
+  assert.deepEqual(plain(dup.step.changes), []); assert.equal(dup.s.v.size, 1);
+  const yes = run('buckets', { set: ['hat'] }, 'has', { value: 'hat' }), none = run('buckets', { set: ['hat'] }, 'has', { value: 'cape' });
+  assert.equal(yes.step.result, true); assert.equal(yes.step.code, 'seen.has("hat")  // true'); assert.deepEqual(plain(yes.step.hi), [{ v: 'hat' }]);
+  assert.equal(none.step.result, false); assert.equal(none.step.code, 'seen.has("cape")  // false'); assert.deepEqual(plain(none.step.hi), []);
+  const del = run('buckets', { set: ['hat', 'boot'] }, 'delete', { value: 'hat' });
+  assert.equal(del.step.code, 'seen.delete("hat");'); assert.deepEqual(plain(SC.buckets.snapshot(del.s)), { set: ['boot'] });
+  const evil = run('buckets', { set: [] }, 'add', { value: '<i>' });
+  assert.ok(evil.step.say.includes('&lt;i&gt;') && !evil.step.say.includes('<i>'));
+  const html = D.draw.buckets(add.s);
+  assert.ok(html.includes('data-v="boot"') && html.includes('data-v="hat"'));
+  assert.match(html, /aria-label="Set of 2 values: [^"]*boot/);
+  assertItemHooks(html, 'text set');
+  for (const bad of [{}, '', 'x'.repeat(13), NaN, Infinity, null]) for (const name of ['add', 'has']) {
+    const st = SC.buckets.create({ set: ['hat'] }), r = SC.buckets.op(st, name).run(st, { value: bad });
+    assert.equal(r.ok, false, `${name} took ${String(bad)}`); assert.deepEqual(plain(SC.buckets.snapshot(st)), { set: ['hat'] });
+  }
+  const a = SC.buckets.create({ set: ['a'] }), c = SC.buckets.clone(a); SC.buckets.op(c, 'add').run(c, { value: 'b' });
+  assert.deepEqual(plain(SC.buckets.snapshot(a)), { set: ['a'] });
+});
+
+test('Map count: a new word starts at 1, an old one goes up, a full Map refuses a new word', () => {
+  assert.equal(SC.buckets.op(SC.buckets.create(), 'count').label, 'count word');
+  const old = run('buckets', [['the', 2]], 'count', { key: 'the' });
+  assert.equal(old.step.result, 3); assert.deepEqual(plain(old.step.hi), [{ k: 'the' }]); assert.deepEqual(plain(old.step.changes), [{ kind: 'set', k: 'the' }]);
+  assert.equal(old.step.code, 'let n = counts.get("the");\nn = (n || 0) + 1;\ncounts.set("the", n);  // 3');
+  assert.deepEqual(plain(SC.buckets.snapshot(old.s)), [['the', 3]]);
+  const fresh = run('buckets', [['the', 2]], 'count', { key: 'key' });
+  assert.equal(fresh.step.result, 1); assert.deepEqual(plain(fresh.step.changes), [{ kind: 'add', k: 'key' }]); assert.deepEqual(plain(fresh.step.hi), [{ k: 'key' }]);
+  assert.match(fresh.step.say, /starts at 1/); assert.match(old.step.say, /goes up/);
+  assert.ok(run('buckets', [], 'count', { key: '<i>' }).step.say.includes('&lt;i&gt;'));
+  const dflt = run('buckets', [['the', 2]], 'count').step; assert.equal(dflt.ok, true); assert.ok(dflt.result >= 1);
+  const full = run('buckets', [['a', 1], ['b', 1], ['c', 1], ['d', 1], ['e', 1]], 'count', { key: 'b' });
+  assert.equal(full.step.result, 2); assert.equal(full.s.v.size, 5);
+  const c = SC.buckets.clone(old.s); SC.buckets.op(c, 'count').run(c, { key: 'the' });
+  assert.deepEqual(plain(SC.buckets.snapshot(old.s)), [['the', 3]]);
+});
+
+test('Set partner: a hit finds target - value, a miss remembers the value, a full Set refuses a new value', () => {
+  const hit = run('buckets', { set: [7] }, 'partner', { value: 5, target: 12 });
+  assert.equal(hit.step.result, 7); assert.equal(hit.step.code, 'seen.has(7)  // true');
+  assert.deepEqual(plain(hit.step.hi), [{ v: 7 }]); assert.deepEqual(plain(hit.step.changes), []);
+  assert.deepEqual(plain(SC.buckets.snapshot(hit.s)), { set: [7] });
+  assert.match(hit.step.say, /add up to 12/);
+  const miss = run('buckets', { set: [] }, 'partner', { value: 5, target: 12 });
+  assert.equal(miss.step.result, 7); assert.equal(miss.step.code, 'seen.has(7)  // false\nseen.add(5);');
+  assert.deepEqual(plain(miss.step.hi), [{ v: 5 }]); assert.deepEqual(plain(miss.step.changes), [{ kind: 'add', v: 5 }]);
+  assert.deepEqual(plain(SC.buckets.snapshot(miss.s)), { set: [5] });
+  assert.match(miss.step.say, /numbers remembered so far/); assert.ok(!/Set|Map/.test(miss.step.say.replace(/<[^>]+>/g, '')));
+  const again = run('buckets', { set: [5] }, 'partner', { value: 5, target: 12 });
+  assert.deepEqual(plain(again.step.changes), []); assert.equal(again.s.v.size, 1); assert.deepEqual(plain(again.step.hi), [{ v: 5 }]);
+  const neg = run('buckets', { set: [] }, 'partner', { value: -3, target: 12 });
+  assert.equal(neg.step.result, 15); assert.equal(neg.step.code, 'seen.has(15)  // false\nseen.add(-3);');
+  const dflt = run('buckets', { set: [] }, 'partner').step; assert.equal(dflt.ok, true); assert.equal(dflt.result, Number(dflt.code.match(/has\((-?\d+)\)/)[1]));
+  const full = run('buckets', { set: [1, 2, 3, 4, 5, 6] }, 'partner', { value: 9, target: 20 });
+  assert.equal(full.step.ok, false); assert.equal(full.s.v.size, 6);
+  const hitFull = run('buckets', { set: [1, 2, 3, 4, 5, 6] }, 'partner', { value: 2, target: 8 });
+  assert.equal(hitFull.step.ok, true); assert.equal(hitFull.step.result, 6);
 });

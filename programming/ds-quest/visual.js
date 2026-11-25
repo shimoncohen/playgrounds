@@ -52,7 +52,7 @@ V.validate=vis=>{
   if(!g||typeof g!=='object'||Array.isArray(g)||!('snapshot' in g))add('goal must be {snapshot}');
   else{
    for(const k of Object.keys(g))if(k!=='snapshot'&&k!=='result')add(`goal has an unknown key ${k}`);
-   if('result' in g&&!(Number.isFinite(g.result)||(typeof g.result==='string'&&g.result.length>=1&&g.result.length<=12)))add('goal.result must be a finite number or a text of 1 to 12 characters');
+   if('result' in g&&!(Number.isFinite(g.result)||typeof g.result==='boolean'||(typeof g.result==='string'&&g.result.length>=1&&g.result.length<=12)))add('goal.result must be a finite number, a text of 1 to 12 characters, or true or false');
   }
   if(vis.link===true&&!sc.op(st,'link'))add('link is true but the scene has no link operation');
   for(const k of ['ref','wrong','lazy']){

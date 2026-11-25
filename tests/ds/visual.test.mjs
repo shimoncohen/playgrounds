@@ -64,6 +64,10 @@ describe('validate', () => {
   test('goal.result accepts a number, zero, a negative and a 12-character text', () => {
     for (const r of [0, -3, 2.5, 'x', 'abcdefghijkl']) same(V.validate(mutate(GR, v => { v.goal.result = r; })), [], String(r));
   });
+  test('goal.result accepts true and false, and the message names the three kinds', () => {
+    for (const r of [true, false]) same(V.validate(mutate(GR, v => { v.goal.result = r; })), [], String(r));
+    assert.match(errs(mutate(GR, v => { v.goal.result = {}; })), /number.*text.*true or false/);
+  });
   test('a link mission on a scene with no link operation is rejected', () => {
     assert.match(errs(mutate(OP, v => { v.link = true; })), /link/);
     assert.match(errs(mutate(GR, v => { v.link = true; })), /link/);
@@ -339,6 +343,7 @@ describe('goal.result and the walk on the chapter 3 chain missions', () => {
   test('3.2: the ref leaves 4 → 7 → 9 and removeFirst gives back 1', () => {
     const v = vis('3.2'), s = V.runSeq(v, v.ref);
     same(S.chain.snapshot(s.state), { chain: [4, 7, 9], loose: [] });
+    assert.equal(s.log.at(-1).result, 1);
   });
   test('3.1: each pause answer is the index of the value in [5, 8, 2, 6], or -1', () => {
     const v = vis('3.1');
@@ -391,13 +396,11 @@ describe('answer kinds max and size', () => {
   });
 });
 
-// Every press the learner can make: each button, plus every link between a start point and a loose node on a link mission.
 const pressesOf = vis => {
   const presses = vis.buttons.map(b => (b.arg === undefined ? { op: b.op } : { op: b.op, arg: b.arg }));
   if (vis.link === true) for (const from of [{ head: true }, { i: 0 }, { i: 1 }, { i: 2 }]) for (const l of [0, 1, 2]) presses.push({ op: 'link', arg: { from, to: { l } } });
   return presses;
 };
-// Plays every press sequence shorter than ref and returns the ones that win, with how many it tried.
 const shorterWinners = vis => {
   const presses = pressesOf(vis), winners = [];
   let level = [[]], tried = 0;
@@ -574,6 +577,64 @@ describe('pick (link gesture)', () => {
   });
 });
 
+describe('goal.result and the walk on the chapter 4 map and set missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const set = (key, value) => ({ op: 'set', arg: { key, value } });
+  const get = key => ({ op: 'get', arg: { key } });
+  const add = value => ({ op: 'add', arg: { value } });
+  const has = value => ({ op: 'has', arg: { value } });
+  test('4.0: set umbrella 3, set hat 7, get umbrella wins; a wrong pair, no lookup, the wrong order and no press do not', () => {
+    assert.equal(won('4.0', vis('4.0').ref), true);
+    assert.equal(won('4.0', [set('umbrella', 3), set('scarf', 2), get('umbrella')]), false);
+    assert.equal(won('4.0', [set('umbrella', 3), set('hat', 7)]), false);
+    assert.equal(won('4.0', [set('hat', 7), set('umbrella', 3), get('umbrella')]), false);
+    assert.equal(won('4.0', [set('umbrella', 3), set('hat', 7), get('hat')]), false);
+    assert.equal(won('4.0', []), false);
+    assert.equal(won('4.0', vis('4.0').wrong), false);
+    assert.equal(won('4.0', vis('4.0').lazy), false);
+  });
+  test('4.1: add 5 then has 5 wins; a duplicate add, asking before adding and no press do not', () => {
+    assert.equal(won('4.1', vis('4.1').ref), true);
+    assert.equal(won('4.1', [add(7), has(5)]), false);
+    assert.equal(won('4.1', [add(5), has(4)]), false);
+    assert.equal(won('4.1', [has(5), add(5)]), false);
+    assert.equal(won('4.1', [add(3), add(5)]), false);
+    assert.equal(won('4.1', []), false);
+    assert.equal(won('4.1', vis('4.1').wrong), false);
+    assert.equal(won('4.1', vis('4.1').lazy), false);
+  });
+  test('4.1: the ref is the shortest winner, and the second add of 3 changes nothing', () => {
+    const v = vis('4.1'), s = V.runSeq(v, v.ref);
+    assert.equal(V.moves(s), 2);
+    same(S.buckets.snapshot(s.state), { set: [3, 5] });
+    assert.equal(s.log.at(-1).result, true);
+    const t = V.runSeq(v, [add(3)]);
+    same(S.buckets.snapshot(t.state), { set: [3] });
+  });
+  test('4.2: each pause answer is how often the word has appeared up to and including that step', () => {
+    const v = vis('4.2'), words = v.steps.map(e => e.arg.key);
+    same(words, ['the', 'key', 'the', 'lock', 'the', 'key']);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => words.slice(0, p.step + 1).filter(w => w === words[p.step]).length));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [2, 3, 2]);
+  });
+  test('4.3: each pause answer is whether the word at that step was added by an earlier step', () => {
+    const v = vis('4.3');
+    same(v.steps.map(e => `${e.op} ${e.arg.value}`), ['has hat', 'add hat', 'has scarf', 'add scarf', 'has boot', 'add boot', 'has scarf']);
+    const added = step => v.steps.slice(0, step).some(e => e.op === 'add' && e.arg.value === v.steps[step].arg.value);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => added(p.step)));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [false, false, true]);
+  });
+  test('4.4: each pause answer is the target minus the number, and the last step finds the pair 8 + 4', () => {
+    const v = vis('4.4'), nums = v.steps.map(e => e.arg.value);
+    same(nums, [5, 2, 8, 4]);
+    assert.ok(v.steps.every(e => e.op === 'partner' && e.arg.target === 12));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => 12 - nums[p.step]));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [10, 4, 8]);
+    assert.equal(nums[2] + nums[3], 12);
+  });
+});
+
 describe('missions with visual', () => {
   const walked = [];
   D.CH.forEach((ch, ci) => ch.missions.forEach((m, mi) => {
@@ -624,9 +685,9 @@ describe('missions with visual', () => {
       });
     }
   }));
-  test('all sixteen converted missions of chapters 0 to 3 are walked', () => {
-    const ids = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3'];
+  test('all twenty-one converted missions of chapters 0 to 4 are walked', () => {
+    const ids = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3', '4.0', '4.1', '4.2', '4.3', '4.4'];
     assert.deepEqual(ids.filter(id => !walked.includes(id)), [], walked.join());
-    assert.equal(ids.length, 16);
+    assert.equal(ids.length, 21);
   });
 });

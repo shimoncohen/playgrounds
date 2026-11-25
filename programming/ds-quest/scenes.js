@@ -42,6 +42,8 @@ const build=(sc,list,setList)=>{
 
 const val=(a,k='value')=>{if(a[k]===undefined)return rnd(1,9);if(!isVal(a[k]))no(`<code>${k}</code> must be a number or a short text (1 to 12 characters).`);return a[k]};
 const numArg=(a,k,what)=>{if(a[k]===undefined)return undefined;if(!isNum(a[k]))no(`${what} are numbers, so <code>${k}</code> must be a number.`);return a[k]};
+const setArg=a=>{if(a.value!==undefined&&!isVal(a.value))no('Set values are numbers or short texts, so <code>value</code> must be a number or a text of 1 to 12 characters.');return a.value};
+const q=v=>typeof v==='string'?`"${esc(v)}"`:v;
 const intArg=(a,k)=>{if(a[k]!==undefined&&!isIdx(a[k]))no(`<code>${k}</code> must be a whole number, like 0 or 2.`);return a[k]};
 const keyArg=a=>{if(a.key!==undefined&&!isKey(a.key))no('<code>key</code> must be a short text (1 to 12 characters).');return a.key};
 const mv=(a,b)=>({kind:'move',from:{i:a},to:{i:b}});
@@ -180,7 +182,7 @@ const buckets={shape:'buckets',
    return {v:new Map(st)};
   }
   if(st&&Array.isArray(st.set)){
-   if(st.set.length>6||!st.set.every(isNum)||new Set(st.set).size!==st.set.length)throw new Error('set: start must be at most 6 unique numbers');
+   if(st.set.length>6||!st.set.every(isVal)||new Set(st.set).size!==st.set.length)throw new Error('set: start must be at most 6 unique numbers or short texts');
    return {v:new Set(st.set)};
   }
   throw new Error('buckets: start must be pairs or {set:[...]}');
@@ -190,7 +192,7 @@ const buckets={shape:'buckets',
  items:s=>s.v instanceof Set?[...s.v].map(v=>({v})):[...s.v.keys()].map(k=>({k})),
  pointers:()=>[],
  valid(s){
-  if(s&&s.v instanceof Set)return s.v.size>6?'set holds more than 6 values':[...s.v].every(isNum)?null:'set holds a bad value';
+  if(s&&s.v instanceof Set)return s.v.size>6?'set holds more than 6 values':[...s.v].every(isVal)?null:'set holds a bad value';
   if(!s||!(s.v instanceof Map))return 'buckets state needs a Map or a Set';
   return s.v.size>5?'map holds more than 5 pairs':[...s.v].every(([k,x])=>isKey(k)&&isNum(x))?null:'map holds a bad pair';
  }};
@@ -204,15 +206,21 @@ build(buckets,[
    if(!s.v.has(k))no(`There is no "${esc(k)}" in the Map, so there is nothing to delete.`);s.v.delete(k);
    return {code:`aisle.delete(${fmt(k)});`,say:`<b>delete</b> removed the pair for "${esc(k)}". The others are untouched.`,changes:[{kind:'remove',k}]}}],
  ['has','has',(s,a)=>{const k=keyArg(a)??(s.v.size&&Math.random()<.5?pick([...s.v.keys()]):pick(KEYS));const yes=s.v.has(k);
-   return {code:`aisle.has(${fmt(k)})  // ${yes}`,say:yes?`Yes, "${esc(k)}" is a key in the Map. <code>has</code> answered <code>true</code> without looking through the pairs.`:`No, "${esc(k)}" is not a key here, so <code>has</code> answered <code>false</code>, just as quickly.`,hi:yes?[{k}]:[],result:yes}}]
+   return {code:`aisle.has(${fmt(k)})  // ${yes}`,say:yes?`Yes, "${esc(k)}" is a key in the Map. <code>has</code> answered <code>true</code> without looking through the pairs.`:`No, "${esc(k)}" is not a key here, so <code>has</code> answered <code>false</code>, just as quickly.`,hi:yes?[{k}]:[],result:yes}}],
+ ['count','count word',(s,a)=>{const k=keyArg(a)??(s.v.size&&Math.random()<.5?pick([...s.v.keys()]):pick(KEYS));const had=s.v.has(k);if(!had&&s.v.size>=5)full(5,'pairs');const n=(s.v.get(k)||0)+1;s.v.set(k,n);
+   return {code:`let n = counts.get(${fmt(k)});\nn = (n || 0) + 1;\ncounts.set(${fmt(k)}, n);  // ${n}`,say:had?`"${esc(k)}" was already counted, so its count goes up to ${n}.`:`"${esc(k)}" is a new word, so its count starts at 1.`,hi:[{k}],changes:[{kind:had?'set':'add',k}],result:n}}]
 ],[
- ['add','add',(s,a)=>{const n=numArg(a,'value','Set values')??rnd(1,6);const had=s.v.has(n);if(!had&&s.v.size>=6)full(6,'values');s.v.add(n);
-   return {code:`seen.add(${n});`,say:had?`${n} was already in the Set, so <b>add</b> did nothing. Still ${s.v.size} value${s.v.size===1?'':'s'}.`:`<b>add</b> put ${n} in. The Set now holds ${s.v.size}.`,hi:[{v:n}],changes:had?[]:[{kind:'add',v:n}]}}],
- ['has','has',(s,a)=>{const n=numArg(a,'value','Set values')??rnd(1,6);const yes=s.v.has(n);
-   return {code:`seen.has(${n})  // ${yes}`,say:yes?`Yes, ${n} is in the Set. <b>has</b> answered instantly without checking the values one by one.`:`No, ${n} is not in the Set. <b>has</b> answers false just as quickly.`,hi:yes?[{v:n}]:[],result:yes}}],
- ['delete','delete',(s,a)=>{let n=numArg(a,'value','Set values');if(n===undefined){if(!s.v.size)empty('set');n=pick([...s.v])}
-   if(!s.v.has(n))no(`${n} is not in the Set, so there is nothing to delete.`);s.v.delete(n);
-   return {code:`seen.delete(${n});`,say:`<b>delete</b> removed ${n}.`,changes:[{kind:'remove',v:n}]}}]
+ ['add','add',(s,a)=>{const n=setArg(a)??rnd(1,6);const had=s.v.has(n);if(!had&&s.v.size>=6)full(6,'values');s.v.add(n);
+   return {code:`seen.add(${fmt(n)});`,say:had?`${q(n)} was already in the Set, so <b>add</b> did nothing. Still ${s.v.size} value${s.v.size===1?'':'s'}.`:`<b>add</b> put ${q(n)} in. The Set now holds ${s.v.size}.`,hi:[{v:n}],changes:had?[]:[{kind:'add',v:n}]}}],
+ ['has','has',(s,a)=>{const n=setArg(a)??rnd(1,6);const yes=s.v.has(n);
+   return {code:`seen.has(${fmt(n)})  // ${yes}`,say:yes?`Yes, ${q(n)} is in the Set. <b>has</b> answered instantly without checking the values one by one.`:`No, ${q(n)} is not in the Set. <b>has</b> answers false just as quickly.`,hi:yes?[{v:n}]:[],result:yes}}],
+ ['delete','delete',(s,a)=>{let n=setArg(a);if(n===undefined){if(!s.v.size)empty('set');n=pick([...s.v])}
+   if(!s.v.has(n))no(`${q(n)} is not in the Set, so there is nothing to delete.`);s.v.delete(n);
+   return {code:`seen.delete(${fmt(n)});`,say:`<b>delete</b> removed ${q(n)}.`,changes:[{kind:'remove',v:n}]}}],
+ ['partner','look for partner',(s,a)=>{const n=numArg(a,'value','Set values')??rnd(1,6),t=numArg(a,'target','Set values')??rnd(4,12),p=t-n;
+   if(s.v.has(p))return {code:`seen.has(${p})  // true`,say:`${p} was remembered, and ${n} + ${p} add up to ${t}. The partner is already here.`,hi:[{v:p}],result:p};
+   const had=s.v.has(n);if(!had&&s.v.size>=6)full(6,'values');s.v.add(n);
+   return {code:`seen.has(${p})  // false\nseen.add(${n});`,say:`${p} is not among the numbers remembered so far, so ${n} is remembered for later.`,hi:[{v:n}],changes:had?[]:[{kind:'add',v:n}],result:p}}]
 ]);
 
 const node=value=>({value,left:null,right:null});
