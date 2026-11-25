@@ -2978,6 +2978,37 @@ test('ds-quest mission page: step 1 shows the trail and a centred stage over lef
   }
 });
 
+const DS_SCENES = [{ id: '3.0', ch: 3, mi: 0, cls: 'sc-chain' }, { id: '4.0', ch: 4, mi: 0, cls: 'sc-buckets' },
+  { id: '5.2', ch: 5, mi: 2, cls: 'sc-tree' }, { id: '5.3', ch: 5, mi: 3, cls: 'sc-tree' }];
+
+test('ds-quest mission page: the chain, buckets and tree scenes fit at 1280 and 390 px, with step 2 locked', async () => {
+  for (const scene of DS_SCENES) {
+    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 800 }]) {
+      for (const colorScheme of ['light', 'dark']) {
+        const where = `${scene.id} at ${viewport.width}px, ${colorScheme}`;
+        const { ctx, page, errors } = await dsPage({ viewport, colorScheme }, { ch: scene.ch, mi: scene.mi });
+        await page.locator('#vbox .sc').waitFor();
+        assert.equal(await page.locator(`#vbox .sc.${scene.cls}`).count(), 1, `${where}: draws the ${scene.cls} scene`);
+        assert.equal(await page.evaluate(() => document.querySelector('#mission').firstElementChild.className), 'trail', `${where}: the trail strip comes first`);
+        assert.equal(await page.locator('[data-step="2"][aria-disabled="true"]').count(), 1, `${where}: step 2 is locked`);
+        const g = await page.evaluate(() => {
+          const r = s => document.querySelector(s).getBoundingClientRect(), box = document.querySelector('#vbox');
+          const b = r('#vbox'), sc = r('#vbox .sc'), btn = r('#vbar button'), panel = r('#stage');
+          return { fits: box.scrollWidth <= box.clientWidth, off: Math.abs(b.left + b.width / 2 - (sc.left + sc.width / 2)), scLeft: sc.left - b.left,
+            above: sc.bottom <= btn.top, btnLeft: btn.left - panel.left, align: getComputedStyle(document.querySelector('#vsay')).textAlign };
+        });
+        assert.ok(g.fits ? g.off < 3 : g.scLeft >= -1, `${where}: the stage is centred, or scrolls without losing its left edge (${JSON.stringify(g)})`);
+        assert.ok(g.above, `${where}: the stage sits above the controls`);
+        assert.ok(g.btnLeft < 30, `${where}: the controls start at the left (${g.btnLeft}px)`);
+        assert.ok(['start', 'left'].includes(g.align), `${where}: the sentence is left-aligned`);
+        assert.equal(await overflow(page), false, where);
+        assert.deepEqual(errors, [], where);
+        await ctx.close();
+      }
+    }
+  }
+});
+
 test('ds-quest mission page: finishing step 1 in 1.0 shows refusals, opens the editor, saves seen and runs the practice step', async () => {
   const { ctx, page, errors } = await dsPage({}, { ch: 1, mi: 0 });
   await page.locator('#vbox .sc').waitFor();
@@ -3282,6 +3313,51 @@ test('ds-quest practice page: each language keeps its own text, Python runs, and
   assert.equal(await page.getAttribute('#langBar [data-lang="py"]', 'aria-pressed'), 'true', 'the pick survives a reload');
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+test('ds-quest practice page: Reset code asks twice, then restores the starter of the picked language only', async () => {
+  const { ctx, page, errors } = await dsPage({}, DS_03);
+  await page.locator('#code').waitFor();
+  const jsText = 'function sum(nums){ return 1; }', pyText = 'def sum(nums):\n    return 0';
+  await page.fill('#code', jsText);
+  await page.click('#langBar [data-lang="py"]');
+  await page.fill('#code', pyText);
+  await until(async () => (await dsSaved(page)).codes?.['0.3.py'] === pyText);
+  await page.click('#resetCode');
+  assert.equal(await page.textContent('#resetCode'), 'Click again to reset');
+  assert.ok(await page.locator('#resetCode.armed').count() === 1, 'the first click arms the button');
+  assert.equal(await page.inputValue('#code'), pyText, 'the first click keeps the typed text');
+  await page.waitForTimeout(400);
+  assert.equal((await dsSaved(page)).codes['0.3.py'], pyText, 'nothing is saved over the typed text');
+  await page.click('#resetCode');
+  const starter = await dsLang(page, 3, 'py', 'starter');
+  assert.equal(await page.inputValue('#code'), starter, 'the second click restores the Python starter');
+  assert.equal(await page.textContent('#resetCode'), 'Reset code');
+  await until(async () => (await dsSaved(page)).codes?.['0.3.py'] === starter);
+  const saved = await dsSaved(page);
+  assert.equal(saved.code['0.3'], jsText, 'the JavaScript text is untouched');
+  assert.equal(saved.lang, 'py');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest practice page: Reset code on a script-step mission restores the JavaScript starter and keeps the Python pick', async () => {
+  for (const mi of [0, 1, 2]) {
+    const { ctx, page, errors } = await dsPage({}, { ch: 0, mi, seen: { ['0.' + mi]: true }, lang: 'py' });
+    await page.locator('#code').waitFor();
+    await page.fill('#code', 'typed over the starter');
+    await page.click('#resetCode');
+    await page.click('#resetCode');
+    const starter = await page.evaluate(i => DSQ.CH[0].missions[i].starter, mi);
+    assert.ok(starter.length > 0, `0.${mi} has a starter`);
+    assert.equal(await page.inputValue('#code'), starter, `0.${mi}: Reset code restores the script-step starter`);
+    await until(async () => (await dsSaved(page)).code?.['0.' + mi] === starter);
+    const saved = await dsSaved(page);
+    assert.equal(saved.lang, 'py', `0.${mi}: the saved language pick is unchanged`);
+    assert.deepEqual(saved.codes, {}, `0.${mi}: no per-language text is saved`);
+    assert.deepEqual(errors, [], `0.${mi}`);
+    await ctx.close();
+  }
 });
 
 test('ds-quest practice page: typing after a Python run clears the test list and the Structure view', async () => {
