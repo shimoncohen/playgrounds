@@ -78,6 +78,9 @@ function randArg() {
   for (const k of ['value', 'key', 'target']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([1, 5, 9, 'ab', '<b>', -3, 'umbrella', 'hat', 'cape']);
   for (const k of ['i', 'j']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([0, 1, 2, 5, 9, 11, -1]);
   for (const k of ['from', 'to']) if (Math.random() < .4) a[k] = pickR(SELS);
+  for (const k of ['parent', 'at']) if (Math.random() < .4) a[k] = Math.random() < .25 ? pickR(GARBAGE) : pickR([1, 3, 5, 8, 10, 15, -1]);
+  if (Math.random() < .4) a.n = Math.random() < .25 ? pickR(GARBAGE) : pickR([1, 2, 3, 5, 0, -1, 20]);
+  if (Math.random() < .4) a.side = Math.random() < .3 ? pickR(GARBAGE) : pickR(['left', 'right']);
   return a;
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -202,7 +205,8 @@ const CASES = [
   ['buckets', [['umbrella', 3]], 'count', { key: 'hat' }], ['buckets', [['umbrella', 3]], 'count', { key: 'umbrella' }],
   ['buckets', { set: [2, 5] }, 'partner', { value: 3, target: 9 }], ['buckets', { set: [2, 5] }, 'partner', { value: 4, target: 9 }],
   ['buckets', { set: ['hat'] }, 'add', { value: 'boot' }], ['buckets', { set: ['hat'] }, 'has', { value: 'hat' }], ['buckets', { set: ['hat'] }, 'delete', { value: 'hat' }],
-  ['tree', undefined, 'insert', { value: 9 }], ['tree', undefined, 'contains', { value: 3 }], ['tree', undefined, 'contains', { value: 4 }], ['tree', undefined, 'inorder', {}]
+  ['tree', undefined, 'insert', { value: 9 }], ['tree', undefined, 'contains', { value: 3 }], ['tree', undefined, 'contains', { value: 4 }], ['tree', undefined, 'inorder', {}],
+  ['tree', [8], 'attach', { value: 3, parent: 8, side: 'left' }], ['tree', undefined, 'height', { value: 3 }], ['tree', undefined, 'visit', { n: 2 }], ['tree', undefined, 'turn', { value: 4, at: 8 }]
 ];
 
 test('a full arg means no randomness: same clone, same arg, same step and state', () => {
@@ -252,7 +256,20 @@ test('refusals: ok:false, a reason, nothing highlighted or changed, state untouc
     ['buckets', { set: [1] }, 'partner', { value: 'x', target: 5 }], ['buckets', { set: [1] }, 'partner', { value: 2, target: '5' }], ['buckets', { set: [1] }, 'partner', { value: NaN, target: 5 }],
     ['buckets', { set: [1] }, 'partner', { value: 2, target: {} }], ['buckets', { set: [1, 2, 3, 4, 5, 6] }, 'partner', { value: 9, target: 20 }],
     ['tree', [8, 3], 'insert', { value: 3 }], ['tree', eleven, 'insert', { value: 99 }], ['tree', [8], 'insert', { value: 'x' }], ['tree', [8], 'insert', { value: NaN }],
-    ['tree', [8], 'contains', { value: '8' }], ['tree', [], 'inorder'], ['tree', [], 'contains', {}], ['tree', [8], 'insert', true]
+    ['tree', [8], 'contains', { value: '8' }], ['tree', [], 'inorder'], ['tree', [], 'contains', {}], ['tree', [8], 'insert', true],
+    ['tree', eleven, 'attach', { value: 99, parent: 11, side: 'right' }], ['tree', eleven, 'attach', {}], ['tree', [8, 3], 'attach', { value: 3, parent: 8, side: 'left' }],
+    ['tree', [8], 'attach', { value: 3, parent: 5, side: 'left' }], ['tree', [], 'attach', { value: 3, parent: 8, side: 'left' }],
+    ['tree', [8], 'attach', { value: 3, parent: 8, side: 'up' }], ['tree', [8], 'attach', { value: 3, parent: 8, side: 5 }],
+    ['tree', [8, 3], 'attach', { value: 1, parent: 8, side: 'left' }], ['tree', [8, 10], 'attach', { value: 12, parent: 8, side: 'right' }],
+    ['tree', [8], 'attach', { value: 3, parent: 8, side: 'right' }], ['tree', [8], 'attach', { value: 10, parent: 8, side: 'left' }],
+    ['tree', [8, 3], 'attach', { value: 9, parent: 3, side: 'right' }], ['tree', [8, 3], 'attach', { value: 2, parent: 3 , side: 'right' }],
+    ['tree', [8], 'attach', { value: 'x', parent: 8, side: 'left' }], ['tree', [8], 'attach', { value: NaN }], ['tree', [8], 'attach', { value: 3, parent: '8' }],
+    ['tree', [8], 'attach', { value: 3, parent: NaN, side: 'left' }], ['tree', [8], 'attach', true],
+    ['tree', [], 'height'], ['tree', [8, 3], 'height', { value: 99 }], ['tree', [8], 'height', { value: '8' }], ['tree', [8], 'height', true],
+    ['tree', [], 'visit'], ['tree', [8, 3, 10], 'visit', { n: 0 }], ['tree', [8, 3, 10], 'visit', { n: 4 }], ['tree', [8, 3, 10], 'visit', { n: -1 }],
+    ['tree', [8, 3, 10], 'visit', { n: 1.5 }], ['tree', [8, 3, 10], 'visit', { n: '1' }], ['tree', [8, 3, 10], 'visit', { n: NaN }],
+    ['tree', [], 'turn'], ['tree', [], 'turn', { value: 4, at: 8 }], ['tree', [8, 3], 'turn', { value: 4, at: 99 }], ['tree', [8], 'turn', { value: 'x', at: 8 }],
+    ['tree', [8], 'turn', { value: 4, at: '8' }], ['tree', [8], 'turn', { value: NaN }], ['tree', [8], 'turn', { value: 4, at: NaN }], ['tree', [8], 'turn', true]
   ];
   for (const [shape, start, name, arg] of R) {
     const sc = SC[shape], s = sc.create(start), snap = plain(sc.snapshot(s));
@@ -304,6 +321,91 @@ test('result carries the answer of each operation', () => {
   assert.equal(res(SC.tree, t, 'contains', { value: 4 }), false);
   assert.deepEqual(plain(res(SC.tree, t, 'inorder')), [1, 3, 8, 10]);
   assert.equal(res(SC.chain, SC.chain.create(), 'find', { value: 1 }), 2);
+});
+
+// Test-local search tree, so the expected values do not come from the scene.
+const bst = (vals) => vals.reduce((r, x) => { const put = n => !n ? { v: x, l: null, r: null } : (x < n.v ? { ...n, l: put(n.l) } : { ...n, r: put(n.r) }); return put(r); }, null);
+const hgt = n => n ? 1 + Math.max(hgt(n.l), hgt(n.r)) : 0;
+const subOf = (n, v) => !n ? null : n.v === v ? n : subOf(v < n.v ? n.l : n.r, v);
+const longest = n => !n.l && !n.r ? [n.v] : [n.v, ...longest(hgt(n.l) >= hgt(n.r) ? n.l : n.r)];
+const uniq = (k, hi = 15) => { const s = new Set(); while (s.size < k) s.add(1 + Math.floor(Math.random() * hi)); return [...s]; };
+
+test('tree height, visit and turn results match an independent recomputation', () => {
+  const run = (s, name, a) => SC.tree.op(s, name).run(s, a);
+  for (let t = 0; t < 60; t++) {
+    const start = uniq(1 + Math.floor(Math.random() * 11)), s = SC.tree.create(start), sorted = [...start].sort((a, b) => a - b), root = bst(start);
+    for (const v of start) {
+      const r = run(s, 'height', { value: v }), sub = subOf(root, v);
+      assert.equal(r.ok, true); assert.equal(r.result, hgt(sub), `height of ${v} in ${start}`);
+      assert.deepEqual(plain(r.hi), longest(sub).map(x => ({ v: x })));
+      assert.ok(r.say.length >= 10);
+      for (const at of start) {
+        const q = run(s, 'turn', { value: v, at });
+        assert.equal(q.result, v === at ? 'found' : v < at ? 'left' : 'right', `turn ${v} at ${at}`);
+        const kid = subOf(root, at)[v < at ? 'l' : 'r'];
+        assert.deepEqual(plain(q.hi), v === at ? [{ v: at }] : kid ? [{ v: at }, { v: kid.v }] : [{ v: at }]);
+        assert.equal(q.say.includes('no child'), v !== at && !kid);
+      }
+    }
+    for (let n = 1; n <= start.length; n++) {
+      const r = run(s, 'visit', { n });
+      assert.equal(r.result, sorted[n - 1]); assert.deepEqual(plain(r.hi), [{ v: sorted[n - 1] }]);
+      assert.deepEqual(plain(r.walk), sorted.slice(0, n).map(v => [{ v }]));
+    }
+  }
+});
+
+test('tree height, visit and turn: the lesson values, code lines and sentences', () => {
+  const s = SC.tree.create([8, 3, 10, 1, 6, 14, 4]), run = (n, a) => SC.tree.op(s, n).run(s, a);
+  assert.deepEqual([1, 6, 3, 14, 10, 8].map(value => run('height', { value }).result), [1, 2, 3, 1, 2, 4]);
+  assert.deepEqual(plain(run('height', { value: 8 }).hi), [{ v: 8 }, { v: 3 }, { v: 6 }, { v: 4 }]);
+  const t = SC.tree.create([8, 3, 10, 1, 6, 14]);
+  assert.deepEqual([1, 6, 3, 14, 10, 8].map(value => SC.tree.op(t, 'height').run(t, { value }).result), [1, 1, 2, 1, 2, 3]);
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(n => run('visit', { n }).result), [1, 3, 4, 6, 8, 10, 14]);
+  assert.deepEqual([8, 3, 6, 4].map(at => run('turn', { value: 4, at }).result), ['left', 'right', 'left', 'found']);
+  assert.deepEqual(plain(SC.tree.op(t, 'height').run(t, { value: 8 }).hi), [{ v: 8 }, { v: 3 }, { v: 1 }]);
+  assert.match(run('height', { value: 14 }).say, /leaf/);
+  assert.match(run('height', { value: 3 }).say, /taller|longer|left|right/);
+  assert.match(run('turn', { value: 5, at: 4 }).say, /no child/);
+  assert.match(run('visit', { n: 1 }).say, /starts at the smallest value, 1/);
+  assert.match(run('visit', { n: 3 }).say, /after 3.*4/);
+  assert.match(run('visit', { n: 3 }).say, /left branch, then the node, then the right branch/);
+  for (const [name, a, line] of [['height', { value: 3 }, 'height(tree, 3)  // 3'], ['visit', { n: 3 }, 'visit(tree, 3)  // 4'], ['turn', { value: 4, at: 8 }, 'turn(tree, 4, 8)  // left']]) {
+    const r = run(name, a); assert.equal(r.code, line); assert.ok(r.code.length <= 39);
+  }
+  for (const [name, a] of [['height', { value: 14 }], ['visit', { n: 7 }], ['turn', { value: 4, at: 8 }]]) {
+    const r = run(name, a); assert.deepEqual(plain(SC.tree.snapshot(s)), [8, 3, 1, 6, 4, 10, 14]); assert.ok(!/recursion|subtree/i.test(r.say), name);
+  }
+  assert.deepEqual(SC.tree.op(s, 'visit').label, 'visit next'); assert.equal(SC.tree.op(s, 'attach').label, 'attach');
+});
+
+test('tree attach: defaults, placement and the order rule', () => {
+  const att = (st, a) => { const s = SC.tree.create(st); return [s, SC.tree.op(s, 'attach').run(s, a)]; };
+  let [s, r] = att([], { value: 5 });
+  assert.equal(r.ok, true); assert.deepEqual(plain(SC.tree.snapshot(s)), [5]); assert.equal(r.code, 'root = { value: 5, left: null, right: null };');
+  assert.deepEqual(plain(r.hi), [{ v: 5 }]); assert.deepEqual(plain(r.changes), [{ kind: 'add', v: 5 }]);
+  [s, r] = att([], { value: 5, side: 'left' }); assert.equal(r.ok, true); assert.deepEqual(plain(SC.tree.snapshot(s)), [5]);
+  [s, r] = att([], {}); assert.equal(r.ok, true); assert.equal(SC.tree.snapshot(s).length, 1);
+  [s, r] = att([8, 3, 10], { value: 6 });
+  assert.equal(r.ok, true); assert.equal(s.v.left.right.value, 6); assert.equal(s.v.left.right.left, null);
+  assert.equal(r.code, 'parent.right = { value: 6, left: null, right: null };  // parent is 3');
+  [s, r] = att([8, 3, 10], { value: 6, parent: 3 }); assert.equal(r.ok, true); assert.equal(s.v.left.right.value, 6);
+  [s, r] = att([8, 3, 10], { value: 2 }); assert.equal(s.v.left.left.value, 2);
+  [s, r] = att([8, 3, 10], { value: 3, parent: 8, side: 'left' }); assert.equal(r.ok, false);
+  [s, r] = att([8, 3, 10], { value: 1, parent: 3, side: 'left' }); assert.equal(r.ok, true); assert.equal(s.v.left.left.value, 1);
+  assert.deepEqual(plain(SC.tree.snapshot(SC.tree.create(SC.tree.snapshot(s)))), plain(SC.tree.snapshot(s)));
+  assert.deepEqual(plain(SC.tree.create(SC.tree.snapshot(s)).v), plain(s.v));
+  assert.equal(SC.tree.valid(s), null);
+  [s, r] = att([8], { value: 3, parent: 8, side: 'right' });
+  assert.equal(r.ok, false); assert.match(r.reason, /smaller/); assert.match(r.reason, /bigger/); assert.deepEqual(plain(SC.tree.snapshot(s)), [8]);
+  for (let n = 0; n < 40; n++) {
+    const t = SC.tree.create([8]);
+    for (let k = 1; k < 20; k++) {
+      const size = SC.tree.items(t).length, step = SC.tree.op(t, 'attach').run(t, pickR([undefined, {}]));
+      assert.equal(step.ok, size < 11, `attach with no args, ${size} nodes: ${step.reason}`);
+      assert.equal(SC.tree.valid(t), null);
+    }
+  }
 });
 
 test('chain link: three loose nodes join the chain in order, each step a move plus a relink', () => {

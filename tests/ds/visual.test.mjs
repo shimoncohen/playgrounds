@@ -632,6 +632,71 @@ describe('goal.result and the walk on the chapter 4 map and set missions', () =>
     same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => 12 - nums[p.step]));
     same(v.pauses.map(p => V.answerOf(v, p.step)), [10, 4, 8]);
     assert.equal(nums[2] + nums[3], 12);
+    const sc = S[v.scene], st = sc.create(v.start), last = v.steps.map(e => sc.op(st, e.op).run(st, e.arg)).at(-1);
+    assert.equal(last.result, 8);
+    assert.equal(last.changes.length, 0);
+  });
+});
+
+describe('the chapter 5 tree missions', () => {
+  const vis = id => { const [c, m] = id.split('.'); return D.CH[c].missions[m].visual; };
+  const won = (id, seq) => V.won(V.runSeq(vis(id), seq));
+  const attach = (value, side) => ({ op: 'attach', arg: { value, parent: 8, side } });
+  const insert = value => ({ op: 'insert', arg: { value } });
+  test('5.0: put 3 on the left and 10 on the right wins; the swapped sides are refused and change nothing; the rest do not win', () => {
+    assert.equal(won('5.0', vis('5.0').ref), true);
+    same(vis('5.0').ref, [attach(3, 'left'), attach(10, 'right')]);
+    assert.equal(won('5.0', [attach(10, 'right'), attach(3, 'left')]), true);
+    for (const seq of [vis('5.0').wrong, vis('5.0').lazy, [], [attach(3, 'right'), attach(10, 'right')], [attach(3, 'left'), attach(10, 'left')]]) assert.equal(won('5.0', seq), false);
+    const s = V.start(vis('5.0'), '5.0'), before = JSON.stringify(s.state);
+    for (const e of vis('5.0').wrong) {
+      const r = V.apply(s, e);
+      assert.equal(r.ok, false);
+      assert.match(r.reason, /smaller values go left and bigger values go right/);
+    }
+    assert.equal(JSON.stringify(s.state), before);
+    assert.equal(V.moves(s), 0);
+  });
+  test('5.2: insert 1, 4 and 7 wins; 9 in place of 7, a missing insert and no press do not; the duplicate 3 is refused and changes nothing', () => {
+    assert.equal(won('5.2', vis('5.2').ref), true);
+    same(vis('5.2').ref, [insert(1), insert(4), insert(7)]);
+    assert.equal(won('5.2', [insert(7), insert(4), insert(1)]), true);
+    for (const seq of [vis('5.2').wrong, vis('5.2').lazy, [], [insert(1), insert(4), insert(9)], [insert(1), insert(7)]]) assert.equal(won('5.2', seq), false);
+    const s = V.start(vis('5.2'), '5.2'), before = JSON.stringify(s.state);
+    const r = V.apply(s, insert(3));
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /already in the tree/);
+    assert.equal(JSON.stringify(s.state), before);
+    assert.equal(V.moves(s), 0);
+  });
+  test('5.1: each pause answer is the height of the node at that step, computed from the start values', () => {
+    const v = vis('5.1');
+    // A search tree built from the start values in order: 8 first, then each value goes left or right of the nodes on its way down.
+    const root = { value: v.start[0], left: null, right: null };
+    for (const x of v.start.slice(1)) { let c = root; for (;;) { const side = x < c.value ? 'left' : 'right'; if (!c[side]) { c[side] = { value: x, left: null, right: null }; break; } c = c[side]; } }
+    const height = n => (n ? 1 + Math.max(height(n.left), height(n.right)) : 0);
+    const find = (n, x) => (n.value === x ? n : find(x < n.value ? n.left : n.right, x));
+    same(v.steps.map(e => e.arg.value), [1, 6, 3, 14, 10, 8]);
+    assert.ok(v.steps.every(e => e.op === 'height'));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => height(find(root, v.steps[p.step].arg.value))));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [2, 2, 3]);
+  });
+  test('5.3: each pause answer is the next value of the sorted start values', () => {
+    const v = vis('5.3'), sorted = [...v.start].sort((a, b) => a - b);
+    same(v.steps.map(e => e.arg.n), [1, 2, 3, 4, 5, 6, 7]);
+    assert.ok(v.steps.every(e => e.op === 'visit'));
+    same(sorted, [1, 3, 4, 6, 8, 10, 14]);
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => sorted[p.step]));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), [4, 6, 8]);
+  });
+  test('5.4: each pause answer follows the comparison of the target with the node at that step, and the last step is found', () => {
+    const v = vis('5.4'), target = 4;
+    same(v.steps.map(e => e.arg.at), [8, 3, 6, 4]);
+    assert.ok(v.steps.every(e => e.op === 'turn' && e.arg.value === target));
+    const turn = at => (target === at ? 'found' : target < at ? 'left' : 'right');
+    same(v.pauses.map(p => V.answerOf(v, p.step)), v.pauses.map(p => turn(v.steps[p.step].arg.at)));
+    same(v.pauses.map(p => V.answerOf(v, p.step)), ['right', 'left', 'found']);
+    assert.equal(turn(v.steps.at(-1).arg.at), 'found');
   });
 });
 
@@ -685,9 +750,10 @@ describe('missions with visual', () => {
       });
     }
   }));
-  test('all twenty-one converted missions of chapters 0 to 4 are walked', () => {
-    const ids = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3', '4.0', '4.1', '4.2', '4.3', '4.4'];
-    assert.deepEqual(ids.filter(id => !walked.includes(id)), [], walked.join());
-    assert.equal(ids.length, 21);
+  test('all 26 missions of chapters 0 to 5 are walked', () => {
+    const ids = D.CH.flatMap((ch, ci) => ch.missions.map((_, mi) => `${ci}.${mi}`));
+    same(ids, walked);
+    assert.equal(ids.length, 26);
+    assert.equal(walked.length, 26);
   });
 });

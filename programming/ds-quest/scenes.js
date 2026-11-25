@@ -228,6 +228,9 @@ function insertPath(root,v,path){if(!root){path.push(null);return node(v)}path.p
 const vals=n=>n?[...vals(n.left),n.value,...vals(n.right)]:[];
 const pre=n=>n?[n.value,...pre(n.left),...pre(n.right)]:[];
 const copyT=n=>n?{value:n.value,left:copyT(n.left),right:copyT(n.right)}:null;
+const findT=(n,v)=>n?n.value===v?n:findT(v<n.value?n.left:n.right,v):null;
+const hT=n=>n?1+Math.max(hT(n.left),hT(n.right)):0;
+const longT=n=>n?[n.value,...longT(hT(n.left)>=hT(n.right)?n.left:n.right)]:[];
 const route=(root,t)=>{const path=[];let c=root;while(c){path.push(c.value);if(t===c.value)break;c=t<c.value?c.left:c.right}return path};
 const tree={shape:'tree',
  create(st=[8,3,10]){
@@ -256,7 +259,36 @@ build(tree,[
    const path=route(s.v,t);const found=have.includes(t);
    return {code:`contains(tree, ${t})  // ${found}`,say:found?`Looking for ${t}: it visited ${path.length} node${path.length===1?'':'s'} (${path.join(' → ')}), choosing one side each time, instead of checking all ${have.length}.`:path.length?`${t} is not here. The search followed ${path.join(' → ')} and then ran into an empty spot, which proves it is missing, without looking at the rest.`:`The tree is empty, so ${t} cannot be in it.`,walk:path.map(v=>[{v}]),hi:found?[{v:t}]:[],result:found}}],
  ['inorder','in-order walk',s=>{const have=vals(s.v);if(!have.length)empty('tree');
-   return {code:`inorder(tree)  // [${have.join(', ')}]`,say:`<b>In-order</b> means left branch, then the node, then right branch. On a search tree that visits the values in sorted order: ${have.join(', ')}.`,walk:have.map(v=>[{v}]),result:have}}]
+   return {code:`inorder(tree)  // [${have.join(', ')}]`,say:`<b>In-order</b> means left branch, then the node, then right branch. On a search tree that visits the values in sorted order: ${have.join(', ')}.`,walk:have.map(v=>[{v}]),result:have}}],
+ ['attach','attach',(s,a)=>{let n=numArg(a,'value','Tree values');const p=numArg(a,'parent','Tree values'),have=vals(s.v);
+   if(a.side!==undefined&&a.side!=='left'&&a.side!=='right')no('<code>side</code> must be <code>"left"</code> or <code>"right"</code>.');
+   if(have.length>=11)full(11,'nodes');
+   if(n===undefined)do n=rnd(1,15);while(have.includes(n));else if(have.includes(n))no(`${esc(n)} is already in the tree, and a search tree keeps each value only once.`);
+   if(!s.v){
+    if(p!==undefined)no(`${esc(p)} is not in the tree, because the tree is empty. Leave out <code>parent</code> to make the root.`);
+    s.v=node(n);
+    return {code:`root = { value: ${n}, left: null, right: null };`,say:`<b>attach</b> made ${esc(n)} the root, the first node of the tree.`,hi:[{v:n}],changes:[{kind:'add',v:n}]}}
+   let par;if(p===undefined){par=s.v;for(let c=par;c;c=n<c.value?c.left:c.right)par=c}else par=findT(s.v,p);
+   if(!par)no(`${esc(p)} is not in the tree, so nothing can hang from it.`);
+   const side=a.side??(n<par.value?'left':'right');
+   if(par[side])no(`${esc(par.value)} already has a ${side} child. Pick a free spot.`);
+   const c=copyT(s.v);findT(c,par.value)[side]=node(n);
+   if(tree.valid({v:c}))no(`${esc(n)} cannot go on the ${side} of ${esc(par.value)}: smaller values go left and bigger values go right, so the tree would be out of order.`);
+   par[side]=node(n);
+   return {code:`parent.${side} = { value: ${n}, left: null, right: null };  // parent is ${par.value}`,say:`<b>attach</b> hangs ${esc(n)} as the ${side} child of ${esc(par.value)}. Smaller values go left and bigger values go right, so the tree stays in order.`,hi:[{v:n}],changes:[{kind:'add',v:n}]}}],
+ ['height','height',(s,a)=>{if(!s.v)empty('tree');let v=numArg(a,'value','Tree values');if(v===undefined)v=pick(vals(s.v));
+   const at=findT(s.v,v);if(!at)no(`${esc(v)} is not in the tree, so it has no height.`);
+   const l=hT(at.left),r=hT(at.right),h=1+Math.max(l,r);
+   return {code:`height(tree, ${v})  // ${h}`,say:h===1?`${esc(v)} is a leaf: it has no children, so its height is 1, just itself.`:`Height counts the nodes on the longest path down. From ${esc(v)} the ${l>=r?'left':'right'} branch is ${l===r?'just as tall as the other':'the taller one'} (${h-1} node${h===2?'':'s'}), so the height is ${h}.`,hi:longT(at).map(v=>({v})),result:h}}],
+ ['visit','visit next',(s,a)=>{const have=vals(s.v);if(!have.length)empty('tree');let n=intArg(a,'n');if(n===undefined)n=rnd(1,have.length);
+   if(n<1||n>have.length)no(`<code>n</code> must be from 1 to ${have.length}, the number of nodes in the tree.`);
+   const r=have[n-1];
+   return {code:`visit(tree, ${n})  // ${r}`,say:`The walk goes left branch, then the node, then the right branch. ${n===1?`It starts at the smallest value, ${esc(r)}.`:`The value visited after ${esc(have[n-2])} is ${esc(r)}.`}`,walk:have.slice(0,n).map(v=>[{v}]),hi:[{v:r}],result:r}}],
+ ['turn','turn',(s,a)=>{if(!s.v)empty('tree');let t=numArg(a,'value','Tree values');const at=numArg(a,'at','Tree values')??s.v.value;
+   if(t===undefined)t=rnd(1,15);
+   const nd=findT(s.v,at);if(!nd)no(`${esc(at)} is not in the tree, so the search cannot be there.`);
+   const r=t===at?'found':t<at?'left':'right',kid=r==='found'?null:nd[r];
+   return {code:`turn(tree, ${t}, ${at})  // ${r}`,say:r==='found'?`At ${esc(at)}: ${esc(t)} is the node itself, so it is found.`:`At ${esc(at)}: ${esc(t)} is ${r==='left'?'smaller':'bigger'}, so turn ${r}. ${kid?'Everything on the other side is thrown away.':`There is no child on the ${r}, so ${esc(t)} is missing.`}`,hi:kid?[{v:at},{v:kid.value}]:[{v:at}],result:r}}]
 ]);
 
 D.SCENES={row,pile,line,chain,buckets,tree};
