@@ -229,10 +229,13 @@ function checkBlock(block,where='practice',expanders=EXPANDERS){
   }
 }
 function checkAll(CH,expanders=EXPANDERS){
+  let n=0;
   CH.forEach((ch,ci)=>ch.missions.forEach((m,mi)=>{
     if(!m.practice)return;
     try{checkBlock(m.practice,'practice',expanders)}catch(e){fail(`mission ${ci}.${mi}: ${e.message}`)}
+    n++;
   }));
+  return n;
 }
 
 const camelToSnake=s=>s.replace(/[A-Z]/g,c=>'_'+c.toLowerCase());

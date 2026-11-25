@@ -3719,6 +3719,80 @@ test('ds-quest mission page: 4.4 asks which partner each number looks for with t
   await ctx.close();
 });
 
+test('ds-quest mission page: 5.0 refuses the wrong sides, finishes on 3 left and 10 right, and step 2 offers all four languages', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 5, mi: 0 });
+  await page.locator('#vbox .sc').waitFor();
+  assert.match(await page.textContent('#vmoves'), /Moves 0 · fewest 2/);
+  for (const [b, say] of [[1, /3 cannot go on the right of 8/], [2, /10 cannot go on the left of 8/]]) {
+    await page.click(`#vbar [data-b="${b}"]`);
+    await dsIdle(page);
+    assert.match(await page.textContent('#vsay'), say);
+    assert.match(await page.textContent('#vmoves'), /Moves 0 /, 'a refusal is not a move');
+    assert.equal(await dsWon(page), false);
+  }
+  await dsPlay(page, [0, 3]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.match(await page.textContent('#vend .msg.win'), /Step 1 done!/);
+  assert.match(await page.textContent('#vmoves'), /Moves 2 · fewest 2/);
+  await page.click('[data-v="go2"]');
+  await page.locator('#code').waitFor();
+  assert.match(await page.inputValue('#code'), /function plantTree/);
+  await page.click('#langBar [data-lang="py"]');
+  assert.match(await page.inputValue('#code'), /def plant_tree/);
+  for (const l of ['js', 'py', 'cpp', 'rs']) {
+    assert.ok(await page.locator(`#langBar [data-lang="${l}"]`).isEnabled(), `${l} is enabled`);
+    assert.doesNotMatch(await page.textContent(`#langBar [data-lang="${l}"]`), /not yet/);
+  }
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 5.1 asks three heights (2, 2, 3), keeps the question open after a wrong answer, and ends with "You worked out every answer."', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 5, mi: 1 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 5, 1, true);
+  assert.deepEqual(pauses.map(p => p.right), [2, 2, 3]);
+  assert.match(await page.textContent('#vend .msg.win'), /You worked out every answer\./);
+  assert.doesNotMatch(await page.textContent('#vend .msg.win'), /Every answer was right/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 5.2 refuses insert 3, does not finish on insert 1, 4, 9, and finishes on insert 1, 4, 7', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 5, mi: 2 });
+  await page.locator('#vbox .sc').waitFor();
+  assert.match(await page.textContent('#vmoves'), /Moves 0 · fewest 3/);
+  await dsPlay(page, [4]);
+  assert.match(await page.textContent('#vsay'), /3 is already in the tree/);
+  assert.match(await page.textContent('#vmoves'), /Moves 0 /, 'a refusal is not a move');
+  await dsNotWon(page, [0, 1, 3], 'insert 1, 4, 9');
+  await dsPlay(page, [0, 1, 2]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.match(await page.textContent('#vend .msg.win'), /Step 1 done!/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 5.3 asks which value the in-order walk visits next (4, 6, 8)', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 5, mi: 3 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 5, 3, false);
+  assert.deepEqual(pauses.map(p => p.right), [4, 6, 8]);
+  assert.match(await page.textContent('#vend .msg.win'), /Every answer was right\./);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 5.4 asks which way the search for 4 turns (right, left, found)', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 5, mi: 4 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 5, 4, false);
+  assert.deepEqual(pauses.map(p => p.right), ['right', 'left', 'found']);
+  assert.match(await page.textContent('#vend .msg.win'), /Every answer was right\./);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('ds-quest practice page: an old save keeps its JavaScript text under code, and other languages go under codes', async () => {
   const old = 'function sum(nums){ return 7; }';
   const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 3, seen: { '0.3': true }, done: { '0.3': true }, code: { '0.3': old } });

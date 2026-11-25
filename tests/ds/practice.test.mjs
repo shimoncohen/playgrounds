@@ -181,7 +181,7 @@ test('generators: expansion is checked against the value set', () => {
 
 test('walk: real missions pass (every practice block in the content); fixtures prove it bites', () => {
   const D = load('engine.js', 'content.js', 'practice.js').DSQ;
-  assert.doesNotThrow(() => D.practice.checkAll(D.CH));
+  assert.equal(D.practice.checkAll(D.CH), 23);
   const good = FN([{ args: [[1, 2], 1], want: 2 }]);
   const wrap = (practice) => [{ missions: [{ title: 'a' }, { title: 'b', practice }] }];
   assert.doesNotThrow(() => D.practice.checkAll(wrap(good)));
