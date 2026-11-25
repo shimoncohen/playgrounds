@@ -14,7 +14,7 @@ Each playground is a guided *quest*: a story-flavoured path of bite-sized missio
 | ⚙️ | **C++ Quest** | From Hello, World to pointers, with memory boxes | [`programming/cpp-quest/`](programming/cpp-quest/) |
 | 🐚 | **Shell Quest** | Bash: files, pipes, scripts, `awk`, `sed`, jobs. A pretend computer, so nothing you type can hurt | [`programming/shell-quest/`](programming/shell-quest/) |
 | ⚓ | **Harbor Quest** | Docker, Compose and Kubernetes | [`programming/harbor-quest/`](programming/harbor-quest/) |
-| 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees in JavaScript, drawn as you run them | [`programming/ds-quest/`](programming/ds-quest/) |
+| 🌳 | **Data Structures Quest** | Arrays, stacks, queues, linked lists, maps and trees: watch each one in an animated picture, then practise it in code in JavaScript, Python, C++ or Rust | [`programming/ds-quest/`](programming/ds-quest/) |
 | ⇄ | **Network Quest** | Packets, ARP, IP addressing, routing, NAT and DNS on a pretend network you can poke at, with every packet readable right down to the bytes | [`programming/net-quest/`](programming/net-quest/) |
 | ⌘ | **Agent Quest** | How an AI coding agent works: the read, act, check loop and the context window, then writing prompts and setups for a pretend agent whose runs are graded exactly | [`programming/agent-quest/`](programming/agent-quest/) |
 | 🦀 | **Rust Quest** | Rust from `println!` and `let` onwards, run by a small Rust checker whose error codes are checked against a real `rustc` for the programs the quest supports; anything else is reported as unsupported | [`programming/rust-quest/`](programming/rust-quest/) |
@@ -112,14 +112,14 @@ The Math section vendors four libraries under `math/vendor/`; `tools/vendor-math
 
 ```
 index.html              landing page (a card per section)
-shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, the Settings panel with Theme and Story (settings.js, settings.css), "The trail" strip (trail.js, trail.css), landing.css + cards.js (landing and hub cards), catalog.js (every playground's key and chapter counts), trophies.js (level and achievements), jsrealm.js + scheduler.js + nodeenv.js + nodetest.js + nodetypes.js + terminal.js + tscheck.js (Script Quest's JS realm, virtual event loop, virtual Node with `node:test` and `assert`, typings for Node, the terminal interpreter both quests share, and TypeScript checker)
+shared/                 code every playground reuses: progress saving, tier model, mission "How it works" steps, the Settings panel with Theme and Story (settings.js, settings.css), "The trail" strip (trail.js, trail.css), landing.css + cards.js (landing and hub cards), catalog.js (every playground's key, language and chapter counts), trophies.js (level and achievements), jsrealm.js + scheduler.js + nodeenv.js + nodetest.js + nodetypes.js + terminal.js + tscheck.js (Script Quest's JS realm, virtual event loop, virtual Node with `node:test` and `assert`, typings for Node, the terminal interpreter both quests share, and TypeScript checker)
 programming/            the Programming section: index.html (hub with a card per quest) and one folder per quest
   python-quest/ cpp-quest/
-                        index.html + style.css + app.js each
+                        index.html + style.css + app.js + engine.js each
   script-quest/         like those, plus content/ (chapters, quick-fire, guide) and tiers.js (tier setup); the realm, Node and TS checker live in shared/
   typescript-quest/     the same shape as script-quest/, on the shared engine and tier model; tests in tests/typescript/
   harbor-quest/         like those, plus engine/ (DOM-free Docker, Kubernetes and shell simulator), content/ (tiers, chapters, quick-fire, guide), ui.js
-  ds-quest/             like those, plus engine.js (runner), content.js (course), demos.js (guide explainers)
+  ds-quest/             like those, plus engine.js (runner), content.js (course), scenes.js (DOM-free picture models), draw.js (renderers), visual.js (the picture step), practice.js (practice contract and runners)
   net-quest/            like those, plus engine/ (DOM-free simulator, shell, commands), content/ (mission model, seven chapters, ranks, quick-fire, guide), ui.js + inspector.js
   agent-quest/          like those, plus engine/ (DOM-free agent simulator: files, prompt grammar, context, policy), content/ (mission model, chapters 1 to 23, ranks, quick-fire, guide), ui.js + editor.js + meter.js
   rust-quest/           like those, plus engine/ (DOM-free lexer, parser, checker, interpreter), content/ (mission model, chapters, ranks, quick-fire, guide, the rustc verification record), ui.js + editor.js + memview.js

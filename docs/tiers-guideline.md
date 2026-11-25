@@ -216,6 +216,74 @@ A typed line, a script, a function body and a sourced file all go through the sa
 
 **GNU defaults.** Where tools differ, the practice shell follows GNU: `nl` numbers only non-empty lines (`-b t`; `nl -ba` numbers every line); `find -exec ... \;` exits 0 even when a command fails or is missing, while `-exec ... {} +` exits 1 when its one run fails; `sort`, `uniq -c`, `wc` and `xargs` error texts are GNU's. One deliberate difference: `find` lists each folder sorted by name, where a real `find` uses the order on disk, so content never claims that a real `find` prints in sorted order.
 
+### 3d. Data Structures Quest: the picture step and the practice step
+
+A Data Structures Quest mission has two steps: an animated picture (`visual`), then a practice step in JavaScript, Python, C++ or Rust. All four languages are checked by one language-neutral test set in the mission's `practice` block. The data is plain and DOM-free, and `programming/ds-quest/practice.js` checks its shape.
+
+**Two steps.** Every mission has a `visual` step (see mission 0.2, `content.js:64-69`). Step 2 stays locked until step 1 passes. A mission is done only when both pass.
+
+**The `scriptStep` exception.**
+
+- Missions 0.0, 0.1 and 0.2 carry `scriptStep:true` and no `practice`. They keep the legacy `starter`, `answer` and `check(c)` and teach only JavaScript.
+- Every `scriptStep` mission comes before the mission that teaches `function` (0.3).
+- The picker disables the other languages on them with "taught from mission 0.3".
+
+**The practice block.**
+
+- `fn:{name,sig,tests}` is a function, `cls:{name,methods,tests}` a class, and `nothing` is an optional value (below). A class may also set `ctor`, a list of `[name,type]` pairs.
+- The per-language `starter`, `answer`, `wrong` and `lazy` sit under `practice.langs.<lang>` for `js`, `py`, `cpp` and `rs`. Mission 0.3 is the worked example.
+- A function case is `{args, want}`. A class case is a list of `{m, args, want?}` steps.
+
+**Value types.** `int`, `bool`, `str`, `ints`, `strs`, `list`, `tree` and `void`.
+
+- A `list` holds only whole numbers of 0 or more. A `tree` holds integers of 0 or more, with `-1` for an absent child.
+- `void` is not an argument type. A method takes and returns no `list` or `tree`. A function that takes a `list` or `tree` returns it, not `void`.
+
+**The "nothing" value.** The mission's one stated "nothing" value (for example `-1`) never appears in an `int`, `ints`, `str` or `strs` test input.
+
+**Tree encoding.** Level order, with `-1` for an absent child. Trailing `-1`s are trimmed, an empty tree is `[]`, and the encoding cannot start with `-1`. It is not heap-style: a lopsided tree such as `[8,-1,10,-1,12]` is a valid example.
+
+**Node shapes per language.**
+
+- Field names are `value`/`next` for a list and `value`/`left`/`right` for a tree, in every language.
+- JavaScript uses objects. Python uses dicts with string keys.
+- C++ uses a pool: `Node` structs in `List {nodes, head}` and `Tree {nodes, root}`, with links as indices and `-1` for no link.
+- Rust uses an index arena: `Option<usize>` links in `List {nodes, head}` and `Tree {nodes, root}`.
+- C++ and Rust cannot allocate a node in the learner's code, so a function that changes a list or tree takes it by value and returns it (see the `reverse` starters, `content.js:384,388`).
+
+**Helpers.**
+
+- `fromList`, `toList`, `fromTree` and `toTree` in JavaScript and C++. `from_list`, `to_list`, `from_tree` and `to_tree` in Python and Rust.
+- They ship at the top of each starter under a do-not-edit line. A walk cap makes a cycle fail the case instead of hanging.
+- The text lives in `practice.js` `HELPERS`. A list mission's `starter`, `answer`, `wrong` and `lazy` must contain the list helper text, and a tree mission's the tree helper text: `tests/ds/content.test.mjs` checks this for missions 3.0, 3.1 and 3.3 and for 5.0 to 5.4.
+
+**Class signatures.**
+
+- Class practice runs in JavaScript and Rust only. Python and C++ report "runs functions only, not classes".
+- In JavaScript the starter has a `constructor()` and the learner makes one with `new Stack()` (`content.js:161,175`). In Rust the starter has `fn new() -> Stack`, and the driver builds `Name::new()` and calls snake_case method names (`content.js:179`).
+
+**Names.** Test names are camelCase for a function and PascalCase for a class. They map to snake_case for Python functions and for Rust functions and methods, and the same mapping applies to the helpers.
+
+**Generators.** A case may carry `{gen:'<kind>', part?, ...params}` in place of an `args` entry or the `want`. The expanders are deterministic.
+
+- `ramp` takes `n`, `start` and `step`.
+- `pairs` takes `n` and `q`, with the parts `keys`, `vals`, `queries` and `want`.
+- `words` takes `n`, with the parts `text` and `want`.
+
+**Runners and gaps.**
+
+- Each language has a runner in `RUNNERS`. Python, C++ and Rust run on the engines of their own quests.
+- A mission and language pair that a language with a runner cannot run yet is a `PENDING` row `{mission, lang, issue}`, where `mission` may be `'*'`. The `lang` must be a runner language, and the `issue` that language's gap issue: #309 for Python, #310 for C++, #311 for Rust. The picker shows it disabled as "not yet (#N)".
+- Every mission and language pair must pass its reference answer or be listed in `PENDING`. A row whose pair passes is stale and fails `tests/ds/gaps.test.mjs`.
+- Gaps are tracked in `PENDING` and the three gap issues, not copied into docs.
+
+**Catalog `lang`.** Each entry in `shared/catalog.js` has a `lang`: `js`, `py`, `cpp`, `rs`, `ts` or `null`.
+
+- Today `js` is Script Quest, `py` Python Quest, `cpp` C++ Quest and `rs` Rust Quest. Every other entry is `null`.
+- The set of keys and each `lang` is pinned by `EXPECTED` in `tests/ds/catalog.test.mjs`, so a new playground adds its key there.
+- A non-null `lang` needs a runner in `RUNNERS`. A `PENDING` row cannot stand in for a missing runner, because its `lang` must be a runner language.
+- `lang` is not a subject field.
+
 ## 4. Keeping saved progress compatible
 
 Learners already have saves, exports and linked save files. They must keep loading.
