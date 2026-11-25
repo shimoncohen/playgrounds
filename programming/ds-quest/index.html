@@ -35,6 +35,7 @@
     <article class="mission panel" id="mission" aria-live="polite"></article>
   </aside>
   <div class="codeCol">
+    <div class="langbar" id="langBar" role="group" aria-label="Language" hidden></div>
     <div class="edhead"><span class="file" id="fileName">quest.js</span><span id="edNote">Write your code here</span><span class="sp"></span><button class="linkbtn" id="resetCode">Reset code</button></div>
     <div class="editor" id="editor">
       <div class="gutter" id="gutter" aria-hidden="true"></div>
@@ -44,7 +45,7 @@
       <button data-k="TAB">Tab</button><button data-k="(">(</button><button data-k=")">)</button><button data-k="{">{</button><button data-k="}">}</button><button data-k="[">[</button><button data-k="]">]</button><button data-k="=">=</button><button data-k="&quot;">"</button><button data-k=";">;</button><button data-k=".">.</button><button data-k="&gt;">&gt;</button>
     </div>
     <div class="runbar">
-      <button class="btn runbtn" id="run"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg>Run</button>
+      <button class="btn runbtn" id="run"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 1l9 5-9 5z" fill="currentColor"/></svg><span id="runLabel">Run</span></button>
       <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs</span><span><kbd>Tab</kbd> indents</span><span><kbd>Esc</kbd> then <kbd>Tab</kbd> leaves the editor</span>
     </div>
     <div class="console" id="console" aria-live="polite"></div>
@@ -56,6 +57,7 @@
       <div class="frames" id="map"></div>
     </div>
   </aside>
+  <section id="stage" class="stageCol panel" aria-label="See it" hidden></section>
 </section>
 
 <section id="tab-fire" role="tabpanel" aria-labelledby="t-fire" hidden>
@@ -74,15 +76,32 @@
 </section>
 </main>
 </div>
-<script>window.PROGRESS={key:"ds-quest-v1",name:"Data Structures Quest"}</script>
+<script>window.PROGRESS={key:"ds-quest-v1",name:"Data Structures Quest",defaults:{seen:{},lang:"js"}}</script>
 <script src="../../shared/settings.js"></script>
 <script src="../../shared/trail.js"></script>
 <script src="../../shared/nav.js"></script>
 <script src="../../shared/progress.js"></script>
 <script src="../../shared/how.js"></script>
 <script src="engine.js"></script>
+<script src="../python-quest/engine.js"></script>
+<script src="../cpp-quest/engine.js"></script>
+<script src="../rust-quest/engine/lex.js"></script>
+<script src="../rust-quest/engine/parse.js"></script>
+<script src="../rust-quest/engine/types.js"></script>
+<script src="../rust-quest/engine/exhaust.js"></script>
+<script src="../rust-quest/engine/check.js"></script>
+<script src="../rust-quest/engine/lint.js"></script>
+<script src="../rust-quest/engine/mir.js"></script>
+<script src="../rust-quest/engine/borrow.js"></script>
+<script src="../rust-quest/engine/interp.js"></script>
+<script src="../rust-quest/engine/std.js"></script>
+<script src="../rust-quest/engine/diag.js"></script>
+<script src="../rust-quest/engine/index.js"></script>
 <script src="content.js"></script>
-<script src="demos.js"></script>
+<script src="scenes.js"></script>
+<script src="draw.js"></script>
+<script src="visual.js"></script>
+<script src="practice.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

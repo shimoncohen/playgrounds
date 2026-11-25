@@ -1,10 +1,10 @@
 (()=>{
 'use strict';
-const {CH,RANKS,QF,GUIDE,DEMOS,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
+const {CH,RANKS,QF,GUIDE,DEMOS,SCENES,draw,visual:V,practice:P,qfOpen,run:runCode,makeCtx,tipFor}=DSQ;
 const KEY='ds-quest-v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function fresh(){return {ch:0,mi:0,done:{},xp:0,best:0,badges:{},code:{},free:null,tab:'quest'}}
+function fresh(){return {ch:0,mi:0,done:{},xp:0,best:0,badges:{},code:{},seen:{},lang:'js',codes:{},free:null,tab:'quest'}}
 let S=fresh();
 try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw);if(o&&typeof o==='object')S=Object.assign(fresh(),o)}}catch(e){}
 let saveT=0;function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}},200)}
@@ -24,13 +24,34 @@ function highlight(src){let h='';const re=/(\/\/[^\n]*)|(`(?:\\.|[^`\\])*`?|"(?:
     else h+=esc(m[5])}return h}
 
 /* ---------- editor ---------- */
-let lastRes=null,errLine=null;
+let lastRes=null,errLine=null,tests=null,curLang='js',running=false,runTok=0;
+const LANGS=[['js','JavaScript'],['py','Python'],['cpp','C++'],['rs','Rust']];
+const pr=m=>m&&m.practice&&!m.scriptStep?m.practice:null;
+const noMap=()=>!!pr(curMission())&&curLang!=='js';
+function langStates(m){const b=pr(m);
+  return LANGS.map(([id,name])=>{let why=null;
+    if(m.scriptStep)why=id==='js'?null:'taught from mission 0.3';
+    else{const row=P.PENDING.find(r=>r.lang===id&&(r.mission==='*'||r.mission===S.ch+'.'+S.mi));
+      if(row)why=`not yet (#${row.issue})`;else if(!P.runnerAvailable(id)||!(b.langs&&b.langs[id]&&typeof b.langs[id].starter==='string'))why='unavailable'}
+    return {id,name,why}})}
+function renderLang(){const m=curMission(),pk=m&&(m.scriptStep||m.practice)?m:null,b=pr(m);runTok++;running=false;
+  const st=pk?langStates(pk):[];curLang=pk?(st.find(s=>s.id===S.lang&&!s.why)||st.find(s=>!s.why)||{id:null}).id:'js';
+  const bar=$('#langBar');bar.hidden=!pk;bar.innerHTML=st.map(s=>`<button class="lbtn" data-lang="${s.id}" aria-pressed="${s.id===curLang}"${s.why?' disabled':''}>${esc(s.name)}${s.why?` <small>${esc(s.why)}</small>`:''}</button>`).join('');
+  const L=LANGS.find(x=>x[0]===curLang)||LANGS[0];
+  $('#fileName').textContent=S.free?'sandbox.js':m?`mission_${S.ch+1}_${S.mi+1}.${L[0]}`:'quest.js';
+  $('#edNote').textContent=S.free?'Free play':m?(b&&!curLang?'No language is ready for this mission yet.':b&&curLang!=='js'?'Checked by this quest\'s built-in interpreter':'Write your code here'):'Chapter complete';
+  codeEl.setAttribute('aria-label',curLang||!pk?`${L[1]} code editor`:'Code editor');codeEl.readOnly=!!b&&!curLang;setRunUI()}
+function setRunUI(){$('#run').disabled=running||!curLang;$('#runLabel').textContent=running?'Running…':pr(curMission())?'Run tests':'Run'}
+const slot=()=>!curLang?null:curLang!=='js'?[S.codes,mkey()+'.'+curLang]:[S.code,mkey()];
+const putCode=v=>{const s=slot();if(s)s[0][s[1]]=v};
+const starterOf=m=>pr(m)?(curLang?m.practice.langs[curLang].starter:''):m?m.starter:'';
+function startCode(m){if(S.free)return S.free.code;const s=slot();return s&&s[0][s[1]]!==undefined?s[0][s[1]]:starterOf(m)}
 function lh(){const d=gutEl.firstElementChild;return d?d.getBoundingClientRect().height||22:22}
-function renderEditor(){const v=codeEl.value;hlEl.innerHTML=highlight(v)+'\n ';const n=v.split('\n').length;
+function renderEditor(){const v=codeEl.value;hlEl.innerHTML=(curLang==='js'?highlight(v):esc(v))+'\n ';const n=v.split('\n').length;
   let g='';for(let i=1;i<=n;i++)g+=`<div class="${i===errLine?'bad':''}">${i}</div>`;gutEl.innerHTML=g;placeBand()}
 function placeBand(){if(!errLine){bandEl.hidden=true;return}bandEl.hidden=false;bandEl.classList.add('err');bandEl.style.top=(12+(errLine-1)*lh())+'px';bandEl.style.height=lh()+'px'}
 function scrollToLine(line){const ed=$('#editor');const y=12+(line-1)*lh();if(y<ed.scrollTop+10||y>ed.scrollTop+ed.clientHeight-40)ed.scrollTop=Math.max(0,y-ed.clientHeight/2)}
-function setCode(v){codeEl.value=v;S.code[mkey()]=v;save();clearRun();renderEditor()}
+function setCode(v){codeEl.value=v;putCode(v);save();clearRun();renderEditor()}
 function insertText(t){codeEl.focus();if(!document.execCommand||!document.execCommand('insertText',false,t)){const a=codeEl.selectionStart,b=codeEl.selectionEnd;codeEl.setRangeText(t,a,b,'end');codeEl.dispatchEvent(new Event('input'))}}
 let tabEscape=false;
 codeEl.addEventListener('keydown',e=>{
@@ -46,22 +67,38 @@ codeEl.addEventListener('keydown',e=>{
   if(e.key==='Backspace'&&codeEl.selectionStart===codeEl.selectionEnd){const v=codeEl.value,a=codeEl.selectionStart;const ls=v.lastIndexOf('\n',a-1)+1;const before=v.slice(ls,a);
     if(before.length>=2&&/^ +$/.test(before)){e.preventDefault();const k=before.length%2||2;codeEl.setSelectionRange(a-k,a);insertText('')}}
 });
-codeEl.addEventListener('input',()=>{S.code[mkey()]=codeEl.value;save();if(lastRes)clearRun(true);renderEditor()});
+codeEl.addEventListener('input',()=>{putCode(codeEl.value);save();if(lastRes||tests)clearRun(!!lastRes);renderEditor()});
+$('#langBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled||running)return;S.lang=b.dataset.lang;save();
+  const m=curMission();renderLang();codeEl.value=startCode(m);clearRun();renderEditor();const hp=$('#hintBox pre');if(hp)hp.innerHTML=hintHTML(m);
+  const nb=$(`#langBar [data-lang="${S.lang}"]`);if(nb)nb.focus()});
 $('#keys').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.k;if(k==='TAB')insertText('  ');else insertText(k)});
 let armReset=0;$('#resetCode').addEventListener('click',e=>{const b=e.currentTarget;if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to reset';clearTimeout(armReset);armReset=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset code'},3000);return}
-  b.classList.remove('armed');b.textContent='Reset code';const m=curMission();setCode(S.free?S.free.code:m?m.starter:'');codeEl.focus()});
+  b.classList.remove('armed');b.textContent='Reset code';const m=curMission();setCode(S.free?S.free.code:starterOf(m));codeEl.focus()});
 
 /* ---------- run ---------- */
 let lastCheck=null,pop=false;
-function run(){const src=codeEl.value;const res=runCode(src);
-  lastRes=res;errLine=res.error?res.error.line:null;lastCheck=null;const m=curMission();
+function grade(passed,tip){const c=passed?V.complete(S,S.ch,S.mi):null;
+  if(c&&c.ok){lastCheck={win:true,first:c.first};if(c.badge)lastCheck.badge=true;pop=true;save()}
+  else lastCheck={win:false,tip:c?'Step 1 comes first: finish "See it" above, then your code counts.':tip}}
+function run(){const m=curMission();if(pr(m)){runTests(m);return}
+  const src=codeEl.value;const res=runCode(src);
+  lastRes=res;errLine=res.error?res.error.line:null;lastCheck=null;
   if(m){let r;try{r=m.check(makeCtx(src,res))}catch(e){r=tipFor(e)}
-    if(!res.error&&r===true){lastCheck={win:true,first:!S.done[mkey()]};if(!S.done[mkey()]){S.done[mkey()]=true;S.xp+=10;
-        const ch=CH[S.ch];if(!S.badges[S.ch]&&ch.missions.every((_,i)=>S.done[S.ch+'.'+i])){S.badges[S.ch]=true;S.xp+=25;lastCheck.badge=true}}
-      pop=true;save()}
-    else lastCheck={win:false,tip:typeof r==='string'?r:null}}
+    grade(!res.error&&r===true,typeof r==='string'?r:null)}
   renderConsole();renderMap(res);renderEditor();if(errLine)scrollToLine(errLine);if(lastCheck&&lastCheck.win){renderChapters();renderMission();renderXP()}}
-function clearRun(keepMap){lastRes=null;errLine=null;lastCheck=null;renderConsole();if(keepMap)mapEl.classList.add('stale');else renderMap(null);placeBand()}
+const clip=s=>s.length>120?s.slice(0,117)+'...':s;
+function labelsOf(b){return b.fn?b.fn.tests.map((c,i)=>{try{return clip(`${b.fn.name}(${P.expandCase(c,undefined,b.fn.sig,b.nothing).args.map(a=>JSON.stringify(a)).join(', ')})`)}catch(e){return 'case '+(i+1)}}):b.cls.tests.map((_,i)=>'sequence '+(i+1))}
+function toTests(b,res){const ls=labelsOf(b),same=res.length>1&&!res[0].ok&&res.every(r=>r.msg===res[0].msg);
+  return {whole:same?res[0].msg:null,rows:res.map((r,i)=>{const l=ls[i]||'case '+(i+1);return {ok:r.ok,txt:r.ok||same?l:r.status==='wrong'?r.msg:l+': '+r.msg}})}}
+function runTests(m){if(!curLang||running)return;const lg=curLang,src=codeEl.value,b=m.practice,tok=runTok;
+  const go=()=>{if(tok!==runTok)return;running=false;setRunUI();
+    if(lg==='js'){lastRes=runCode(src);errLine=lastRes.error?lastRes.error.line:null}else{lastRes=null;errLine=null}
+    try{tests=toTests(b,P.RUNNERS[lg].run(src,b))}catch(e){tests={whole:String(e&&e.message||e),rows:[]}}
+    lastCheck=null;grade(tests.rows.length>0&&tests.rows.every(r=>r.ok));
+    renderConsole();renderMap(lastRes);renderEditor();if(errLine)scrollToLine(errLine);if(lastCheck.win){renderChapters();renderMission();renderXP()}};
+  if(lg!=='cpp'&&lg!=='rs'){go();return}
+  running=true;setRunUI();requestAnimationFrame(()=>setTimeout(go,0))}
+function clearRun(keepMap){lastRes=null;errLine=null;lastCheck=null;tests=null;renderConsole();if(keepMap)mapEl.classList.add('stale');else renderMap(null);placeBand()}
 $('#run').addEventListener('click',run);
 
 /* ---------- console ---------- */
@@ -72,17 +109,19 @@ const ERRS={
  RangeError:['A number went out of range. Often a function called itself so many times that it ran out of room.','Recursion needs a base case that stops it. Check what your function does for null or an empty array.'],
  EndlessLoop:['A loop kept going and never finished, or did far too much work.','Make sure something inside the loop changes so its condition becomes false, like moving on to node.next.']};
 function renderConsole(){const r=lastRes;let h='<div class="ttl">Console</div>';
-  if(!r){h+=`<pre class="sys">${S.free?'Free play. Write anything and press Run.':'Press Run to see what your code prints.'}</pre>`;consoleEl.innerHTML=h;return}
-  h+=`<pre>${r.lines.length?esc(r.out):(!r.error?'<span class="sys">(nothing was printed)</span>':'')}</pre>`;
-  if(r.error){const E=ERRS[r.error.type]||['Something went wrong while running.','Read the message and check the marked line.'];const lineTxt=r.error.line?(codeEl.value.split('\n')[r.error.line-1]||'').trim():'';
+  if(!r&&!tests){h+=`<pre class="sys">${S.free?'Free play. Write anything and press Run.':pr(curMission())?'Press Run tests to check your code.':'Press Run to see what your code prints.'}</pre>`;consoleEl.innerHTML=h;return}
+  if(r)h+=`<pre>${r.lines.length?esc(r.out):(!r.error?'<span class="sys">(nothing was printed)</span>':'')}</pre>`;
+  if(r&&r.error){const E=ERRS[r.error.type]||['Something went wrong while running.','Read the message and check the marked line.'];const lineTxt=r.error.line?(codeEl.value.split('\n')[r.error.line-1]||'').trim():'';
     const nice=r.error.type==='EndlessLoop'?'Stopped: too many steps':r.error.line?`${r.error.type} on line ${r.error.line}`:r.error.type;
     h+=`<div class="msg err"><span class="h">${esc(nice)}</span>${lineTxt?`<span class="py">line ${r.error.line}: ${esc(lineTxt)}</span>`:''}${r.error.type==='EndlessLoop'?'':`<span class="py">${esc(r.error.type)}: ${esc(r.error.msg)}</span>`}<p><b>What it means:</b> ${esc(E[0])}</p><p><b>How to fix it:</b> ${esc(E[1])}</p></div>`}
+  if(tests)h+=testHTML(tests);
   if(lastCheck){if(lastCheck.win){const last=S.mi>=CH[S.ch].missions.length-1;
       h+=`<div class="msg win"><span class="h">${lastCheck.first?'Mission complete! +10 XP':'Mission complete'}${lastCheck.badge?' · Badge earned: '+esc(CH[S.ch].badge)+' +25 XP':''}</span><p>${winLine()}</p><button class="btn" data-act="next">${last?'Finish the chapter':'Next mission'} →</button></div>`}
-    else if(lastCheck.tip)h+=`<div class="msg tip"><span class="h">${r.error?'Mission tip':'Not quite yet'}</span><p>${esc(lastCheck.tip)}</p></div>`}
+    else if(lastCheck.tip)h+=`<div class="msg tip"><span class="h">${r&&r.error?'Mission tip':'Not quite yet'}</span><p>${esc(lastCheck.tip)}</p></div>`}
   consoleEl.innerHTML=h;consoleEl.scrollTop=consoleEl.scrollHeight}
 const WINS=['Look at the Structure view: that is the shape your code just built.','That works. Try changing a value and running again to see the picture change.','Clean. Every big program is made of small structures like this one.','Solid. You now know how this structure thinks.'];
-function winLine(){return WINS[(S.ch*7+S.mi)%WINS.length]}
+function winLine(){let i=(S.ch*7+S.mi)%WINS.length;if(!i&&noMap())i=1;return WINS[i]}
+const testHTML=t=>`${t.whole?`<div class="msg err"><span class="h">${esc(t.whole)}</span></div>`:''}${t.rows.length?`<ul class="tests">${t.rows.map(r=>`<li class="${r.ok?'ok':'bad'}"><b>${r.ok?'✓':'✗'}</b> ${esc(r.txt)}</li>`).join('')}</ul>`:''}`;
 consoleEl.addEventListener('click',e=>{const b=e.target.closest('[data-act="next"]');if(b)gotoMission(S.ch,S.mi+1)});
 
 /* ---------- structure view ---------- */
@@ -129,8 +168,8 @@ function varsHTML(res){
   if(fns.length)h+=`<div class="frame fn"><div class="fh"><span>Defined</span></div><div class="defs">${fns.map(n=>`<span class="val t-function"><em>${/^class\b/.test(Function.prototype.toString.call(res.vars[n]))?'class':'fn'}</em>${esc(n)}</span>`).join('')}</div></div>`;
   return h}
 function renderMap(res){mapEl.classList.remove('stale');
-  if(!res){$('#mapSub').textContent='Whatever your code builds is drawn here: rows, chains, maps and trees.';
-    mapEl.innerHTML='<div class="mapEmpty"><p>Press Run and your variables appear here as pictures.</p><div class="demo"><div class="coll t-list"><em>array · 3</em><div class="cells"><div class="cell"><i>0</i><span class="val t-int">7</span></div><div class="cell"><i>1</i><span class="val t-int">8</span></div><div class="cell"><i>2</i><span class="val t-int">9</span></div></div></div></div></div>';return}
+  if(!res){const one=noMap();$('#mapSub').textContent=one?'The Structure view shows JavaScript programs only.':'Whatever your code builds is drawn here: rows, chains, maps and trees.';
+    mapEl.innerHTML=one?'':'<div class="mapEmpty"><p>Press Run and your variables appear here as pictures.</p><div class="demo"><div class="coll t-list"><em>array · 3</em><div class="cells"><div class="cell"><i>0</i><span class="val t-int">7</span></div><div class="cell"><i>1</i><span class="val t-int">8</span></div><div class="cell"><i>2</i><span class="val t-int">9</span></div></div></div></div></div>';return}
   const h=varsHTML(res);
   $('#mapSub').textContent=res.error?'Your code stopped early. These are the names it defines.':h?'What your program left behind when it finished.':'Nothing to draw yet.';
   mapEl.innerHTML=h||'<div class="mapEmpty"><p>No variables to draw. Make one with <code>const</code> and run again.</p></div>'}
@@ -140,6 +179,7 @@ function anatomy(t){if(!t)return '';const L={fn:'function',str:'text',num:'numbe
   return `<div class="anat" aria-label="Parts of the code">${t.map(([s,k,l])=>`<div class="tok k-${k}"><b>${esc(s)}</b><span>${esc(l||L[k]||k)}</span></div>`).join('')}</div>`}
 const totalDone=ci=>CH[ci].missions.filter((_,i)=>S.done[ci+'.'+i]).length;
 function renderChapters(){chaptersEl.innerHTML=CH.map((c,i)=>`<button class="chap${S.badges[i]?' earned':''}" data-ch="${i}" aria-current="${i===S.ch&&!S.free}"><span class="num">${S.badges[i]?'★':i+1}</span><span class="nm">${esc(c.name)}</span><span class="ct">${totalDone(i)}/${c.missions.length}</span></button>`).join('')}
+const hintHTML=m=>{const b=pr(m);if(!b)return highlight(m.answer);if(!curLang)return '';const a=b.langs[curLang].answer;return curLang==='js'?highlight(a):esc(a)};
 function renderMission(){
   if(S.free){missionEl.innerHTML=`<span class="freeTag">Free play</span><h2>Your sandbox</h2><p class="explain">Experiment with anything here. Nothing is checked and nothing can break. The Structure view draws whatever you build.</p>
     <p class="note">Tip: build a small structure, run it, then change one thing and run again. Predict the picture first.</p><div class="actions"><button class="btn" data-act="back">Back to Chapter ${S.ch+1}, mission ${Math.min(S.mi+1,CH[S.ch].missions.length)}</button></div>`;return}
@@ -153,30 +193,116 @@ function renderMission(){
     <div class="learned">${ch.learned.map(x=>`<code>${esc(x)}</code>`).join('')}</div>
     ${last?`<p class="note">Next: play Quick-fire until you can picture the data at a glance, then check the field guide for which structure to pick and what each costs.</p><div class="actions"><button class="btn" data-act="tab-fire">Play Quick-fire</button><button class="btn ghost" data-act="tab-guide">Open the field guide</button></div>`
       :`<div class="actions"><button class="btn" data-act="nextch">Start chapter ${S.ch+2}: ${esc(CH[S.ch+1].name)}</button><button class="btn ghost" data-act="free">Free play</button></div>`}${dots}`}
-  else{const m=ch.missions[S.mi];
-    h=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
+  else{const m=ch.missions[S.mi],g=V.gated(m),how=pr(m)&&Array.isArray(m.how)&&m.how.length;
+    const top=`${Trail.html(ch.story)}<div class="eyebrow">Chapter ${S.ch+1} · Mission ${S.mi+1} of ${n}${S.done[S.ch+'.'+S.mi]?' · done ✓':''}</div>
     ${S.mi===0?`<p class="intro">${ch.intro}</p>`:''}
-    <h2>${esc(m.title)}</h2>
+    <h2>${esc(m.title)}</h2>${g?`<div id="stepbar">${stepBar()}</div>`:''}`;
+    if(g&&step===1)h=`${top}${broken?'<p class="note" role="status">This mission\'s picture is broken, so step 2 stays locked for now.</p>':`<div class="goal"><div class="label">Your goal</div><p>${m.visual.task}</p></div>`}${dots}`;
+    else h=`${top}
     <div class="goal"><div class="label">Your goal</div><p>${m.goal}</p></div>
     ${anatomy(m.anat)}
-    ${HowSteps.html(m.how)}
+    ${pr(m)?'':HowSteps.html(m.how)}
     <p class="explain">${m.explain}</p>
     ${m.note?`<p class="note">${m.note}</p>`:''}
-    <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button><button class="btn ghost" data-act="fill">Type it for me</button>${DEMOS.some(d=>d.ch===S.ch)?'<button class="btn ghost" data-act="watch">Watch it work</button>':''}</div>
-    <div class="hint" id="hintBox" hidden><span>One way to write it:</span><pre>${highlight(m.answer)}</pre></div>${dots}`}
+    <div class="actions"><button class="btn ghost" data-act="hint" aria-expanded="false">Show a hint</button>${how?'<button class="btn ghost" data-act="how" aria-expanded="false">Show how</button>':''}</div>
+    <div class="hint" id="hintBox" hidden><span>One way to write it:</span><pre>${hintHTML(m)}</pre></div>${how?`<div id="howBox" hidden>${HowSteps.html(m.how)}</div>`:''}${dots}`}
   missionEl.innerHTML=h;if(pop){missionEl.classList.remove('pop');void missionEl.offsetWidth;missionEl.classList.add('pop');pop=false}}
 missionEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);return}const a=b.dataset.act;
+  if(b.dataset.mi!==undefined){gotoMission(S.ch,+b.dataset.mi);return}
+  if(b.dataset.step){setStep(+b.dataset.step);return}const a=b.dataset.act;
   if(a==='hint'){const hb=$('#hintBox');hb.hidden=!hb.hidden;b.setAttribute('aria-expanded',String(!hb.hidden));b.textContent=hb.hidden?'Show a hint':'Hide the hint'}
-  else if(a==='fill'){const m=curMission();if(m){setCode(m.answer);codeEl.focus()}}
-  else if(a==='watch')watchDemo(S.ch);
+  else if(a==='how'){const hb=$('#howBox');hb.hidden=!hb.hidden;b.setAttribute('aria-expanded',String(!hb.hidden));b.textContent=hb.hidden?'Show how':'Hide how'}
   else if(a==='nextch')gotoMission(S.ch+1,0);else if(a==='back'){S.free=null;loadMission()}
   else if(a==='free'){goFree('// Free play: try anything!\n')}else if(a&&a.startsWith('tab-'))showTab(a.slice(4))});
 chaptersEl.addEventListener('click',e=>{const b=e.target.closest('.chap');if(!b)return;const ci=+b.dataset.ch;const ch=CH[ci];let mi=ch.missions.findIndex((_,i)=>!S.done[ci+'.'+i]);if(mi<0)mi=0;gotoMission(ci,mi)});
 function gotoMission(ci,mi){S.free=null;S.ch=ci;S.mi=mi;save();loadMission();if(innerWidth<820)missionEl.scrollIntoView({behavior:'smooth',block:'start'})}
-function loadMission(){const m=curMission();const k=mkey();codeEl.value=S.free?S.free.code:S.code[k]!==undefined?S.code[k]:m?m.starter:'';
-  $('#fileName').textContent=S.free?'sandbox.js':m?`mission_${S.ch+1}_${S.mi+1}.js`:'quest.js';$('#edNote').textContent=S.free?'Free play':m?'Write your code here':'Chapter complete';
-  clearRun();renderChapters();renderMission();renderEditor()}
+function loadMission(){const m=curMission();const k=mkey();renderLang();codeEl.value=startCode(m);
+  broken=false;step=2;
+  if(m&&V.gated(m)){let errs;try{errs=V.validate(m.visual)}catch(e){errs=['unreadable']}broken=errs.length>0;step=V.stepOf(S,m,k)}
+  clearRun();renderChapters();renderMission();renderEditor();layout()}
+
+const stageEl=$('#stage');
+let step=2,sess=null,broken=false,gen=0,vBusy=false,playing=false,speed=1,pTimer=0;
+function stepBar(){const open=V.seen(S,mkey());
+  return `<nav class="steps" aria-label="Steps"><button class="stp" data-step="1" aria-current="${step===1?'step':'false'}">1 · See it</button><button class="stp" data-step="2" aria-current="${step===2?'step':'false'}"${open?'':' aria-disabled="true"'}>2 · Write it</button></nav>${open?'':'<p class="note">Finish step 1 first, then step 2 opens.</p>'}`}
+function setStep(n){if(n===step||(n===2&&!V.seen(S,mkey())))return;step=n;renderMission();layout()}
+function layout(){const m=curMission(),s1=!!m&&V.gated(m)&&step===1;
+  stopPlay();gen++;vBusy=false;sess=null;$('#tab-quest').classList.toggle('s1',s1);stageEl.hidden=!s1||broken;stageEl.innerHTML='';
+  if(!stageEl.hidden)buildStage(m)}
+const vb=()=>$('#vbox');
+function stopPlay(){clearTimeout(pTimer);pTimer=0;playing=false;const b=$('#vbar [data-v="play"]');if(b)b.textContent='Play'}
+function vBusyUI(){stageEl.querySelectorAll('button').forEach(b=>{b.disabled=vBusy&&!(playing&&b.dataset.v==='play')})}
+const vSay=h=>{$('#vsay').innerHTML=h};
+const nodeSel=el=>el.dataset.head!==undefined?{head:true}:el.dataset.l!==undefined?{l:+el.dataset.l}:{i:+el.dataset.i};
+/* The box is repainted whole after every step, so the picked node's class and the focus are re-derived from the session. */
+function paintSel(){vb().querySelectorAll('.sc-sel').forEach(x=>x.classList.remove('sc-sel'));
+  if(sess.pending){const e=draw.find(vb(),sess.pending);if(e)e.classList.add('sc-sel')}}
+function settle(btn,src){paintSel();const el=src?draw.find(vb(),src):btn&&btn.isConnected?btn:null;if(el)el.focus()}
+function vPaint(){vb().innerHTML=draw[sess.vis.scene](sess.state,{interactive:sess.vis.link===true});paintSel()}
+function vInfo(){if(sess.kind!=='operate')return;$('#vmoves').textContent=`Moves ${V.moves(sess)} · fewest ${V.fewest(sess)}`;
+  $('#vlog').innerHTML=sess.log.length?sess.log.map(s=>highlight(s.code)).join('\n'):'<span class="sy-cm">// the code of each operation shows here</span>'}
+function buildStage(m){const vis=m.visual,op=vis.kind==='operate';sess=V.start(vis,mkey());
+  stageEl.innerHTML=`<div class="stageBox" id="vbox"></div><p class="vsay" id="vsay" aria-live="polite"></p><div id="vq" class="vq" hidden></div>
+  <div class="demobar" id="vbar" role="group" aria-label="${op?'Operations':'Playback'}">${op?vis.buttons.map((b,i)=>`<button class="vbtn" data-b="${i}">${esc(b.label)}</button>`).join('')+'<button class="linkbtn" data-v="undo">Undo</button><button class="linkbtn" data-v="reset">Reset</button>'
+    :'<button class="vbtn" data-v="back">Back</button><button class="vbtn" data-v="play">Play</button><button class="vbtn" data-v="step">Step</button><button class="vbtn" data-v="speed" aria-pressed="false">1×</button>'}</div>
+  ${op?'<p class="note vmoves" id="vmoves"></p><pre class="democode vlog" id="vlog" aria-live="polite" aria-label="Code that ran"></pre>':''}<div id="vend" aria-live="polite"></div>`;
+  speed=1;vPaint();vInfo();
+  vSay(op?(vis.link?'Pick a node in the chain, then a loose node to join onto it. Enter picks, Escape cancels.':'Press a button to run an operation. Try them in different orders.'):'Press Play or Step to walk along. The walk stops to ask you a question.');maybeAsk(false)}
+function vEnd(){const el=$('#vend');if(!el)return;const won=sess.kind==='operate'?V.won(sess):V.passed(sess);
+  if(won){if(V.pass1(S,mkey(),sess)){save();$('#stepbar').innerHTML=stepBar()}
+    el.innerHTML=`<div class="msg win"><span class="h">Step 1 done!</span><p>${sess.kind==='operate'?'You built it.':sess.missed?'You worked out every answer.':'Every answer was right.'} Step 2 is open now.</p><button class="btn" data-v="go2">Go to step 2 →</button></div>`;vb().classList.add('sc-cheer')}
+  else{el.innerHTML='';vb().classList.remove('sc-cheer')}}
+function vShow(r,before,btn,src,after){const g=gen;vBusy=true;vBusyUI();vSay(r.ok===false?(r.reason||r.say):r.say);vInfo();
+  draw.play(vb(),sess.vis.scene,before,after||sess.state,r,{reduced:reduced(),interactive:sess.vis.link===true,onDone:()=>{if(g!==gen)return;vBusy=false;vBusyUI();(after?vAfterWrong:vAfter)(btn,src)}})}
+function vAfter(btn,src){
+  if(sess.kind==='operate'){settle(btn,src);vEnd();return}
+  if(V.passed(sess)){stopPlay();vEnd();settle(btn);return}
+  if(pOpen()){maybeAsk(true);return}
+  if(playing)pTimer=setTimeout(()=>{pTimer=0;pStep(null)},reduced()?300:900/speed);
+  settle(btn)}
+function vRun(fn,btn,src){const before=SCENES[sess.vis.scene].clone(sess.state);vShow(fn(),before,btn,src)}
+function vPick(sel){const was=sess.pending,before=SCENES[sess.vis.scene].clone(sess.state),r=V.pick(sess,sel);
+  if(r.pending){paintSel();vSay(`Picked ${sel.head?'the head':'node '+(sel.i+1)}. Now pick a loose node to join onto it.`);return}
+  if(r.cancelled){vSay('Pick cancelled.');settle(null,was);return}
+  vShow(r,before,null,was)}
+
+const pOpen=()=>sess.vis.pauses.find(p=>p.step===sess.pos&&!sess.solved.has(p.step));
+function maybeAsk(focus){if(sess.kind!=='predict')return;const p=pOpen(),q=$('#vq');
+  if(!p){q.hidden=true;q.innerHTML='';return}
+  stopPlay();q.hidden=false;
+  q.innerHTML=`<p id="vqask">${esc(p.ask)}</p><div class="demobar" role="group" aria-labelledby="vqask">${p.choices.map((c,i)=>`<button class="vbtn" data-c="${i}">${esc(c)}</button>`).join('')}</div>`;
+  if(focus)q.querySelector('button').focus()}
+function pStep(btn){if(vBusy)return;if(pOpen()){maybeAsk(true);return}
+  const before=SCENES[sess.vis.scene].clone(sess.state),r=V.advance(sess);
+  if(r.ok===false){stopPlay();vSay(r.reason);return}
+  vShow(r,before,btn)}
+function pAnswer(i){if(vBusy)return;const p=pOpen();if(!p)return;const sc=SCENES[sess.vis.scene],before=sc.clone(sess.state),r=V.answer(sess,p.choices[i]);
+  if(r.ok){$('#vq').hidden=true;$('#vq').innerHTML='';vShow(r.step,before,$('#vbar [data-v="step"]'));return}
+  vShow(r.step,before,null,null,sc.clone(sess.rec.states[p.step+1]));vSay(`Not quite. Here is what really happens: ${r.step.say}`)}
+function vAfterWrong(){const g=gen;vBusy=true;vBusyUI();
+  setTimeout(()=>{if(g!==gen)return;vPaint();vBusy=false;vBusyUI();maybeAsk(true)},reduced()?0:900)}
+stageEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||!sess)return;const v=b.dataset.v;
+  if(vBusy&&!(playing&&v==='play'))return;
+  if(b.dataset.b!==undefined){const x=sess.vis.buttons[+b.dataset.b];vRun(()=>V.apply(sess,{op:x.op,arg:x.arg}),b);return}
+  if(b.dataset.c!==undefined){pAnswer(+b.dataset.c);return}
+  if(v==='undo'||v==='reset'){const r=V[v](sess);vPaint();vInfo();vSay(r.ok?'':r.reason);vEnd();return}
+  if(v==='go2'){setStep(2);codeEl.focus();return}
+  if(v==='play'){if(playing){stopPlay();return}playing=true;b.textContent='Pause';pStep(b);return}
+  if(v==='step'){stopPlay();pStep(b);return}
+  if(v==='speed'){speed=speed===1?2:1;b.textContent=speed+'×';b.setAttribute('aria-pressed',String(speed===2));return}
+  if(v==='back'){stopPlay();const r=V.back(sess);if(!r.ok){vSay(r.reason);return}vPaint();vSay('');vEnd();maybeAsk(false)}});
+stageEl.addEventListener('keydown',e=>{if(!sess||sess.vis.link!==true||vBusy)return;
+  if(e.key==='Escape'&&sess.pending){const s=sess.pending;V.cancelPick(sess);vSay('Pick cancelled.');settle(null,s);return}
+  const n=e.key==='Enter'&&e.target.closest('[data-head],[data-i],[data-l]');
+  if(n&&vb().contains(n)){e.preventDefault();vPick(nodeSel(n))}});
+let drag=null;
+stageEl.addEventListener('pointerdown',e=>{if(!sess||sess.vis.link!==true||vBusy)return;const n=e.target.closest('[data-head],[data-i]');
+  if(!n||!vb().contains(n))return;drag={from:nodeSel(n),id:e.pointerId};try{n.setPointerCapture(e.pointerId)}catch(x){}});
+stageEl.addEventListener('pointerup',e=>{if(!drag||drag.id!==e.pointerId)return;const d=drag;drag=null;if(!sess)return;
+  const t=document.elementFromPoint(e.clientX,e.clientY),l=t&&t.closest('[data-l]');
+  V.cancelPick(sess);
+  if(l&&vb().contains(l)){vPick(d.from);vPick(nodeSel(l))}else paintSel()});
+stageEl.addEventListener('pointercancel',()=>{drag=null});
 function goFree(code){S.free={code};S.code.free=code;save();showTab('quest');loadMission();codeEl.focus()}
 
 /* ---------- XP ---------- */
@@ -184,7 +310,7 @@ function renderXP(){let i=0;while(i+1<RANKS.length&&S.xp>=RANKS[i+1][0])i++;cons
   $('#rank').textContent=RANKS[i][1];$('#xpText').textContent=S.xp+' XP';$('#xpFill').style.width=(hi>lo?Math.min(100,(S.xp-lo)/(hi-lo)*100):100)+'%'}
 
 /* ---------- tabs ---------- */
-function showTab(t){S.tab=t;save();document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+function showTab(t){S.tab=t;save();if(t!=='quest')stopPlay();document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
   ['quest','fire','guide'].forEach(x=>$('#tab-'+x).hidden=x!==t);if(t!=='fire')stopFire(true);if(t==='guide'&&!$('#guide').innerHTML)renderGuide();if(t==='fire'&&!fireOn)fireIdle()}
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)showTab(b.dataset.tab)});
 document.querySelector('.tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const bs=[...document.querySelectorAll('.tabs button')];let i=bs.findIndex(b=>b.getAttribute('aria-selected')==='true');i=(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length;showTab(bs[i].dataset.tab);bs[i].focus()});
@@ -241,24 +367,26 @@ function renderGuide(){const groups=CH.map(c=>c.name);
 /* ---------- explainer demos ---------- */
 const DST={},DTIMER={};
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
-const sel=h=>h.i!==undefined?`[data-i="${h.i}"]`:h.v!==undefined?`[data-v="${h.v}"]`:`[data-k="${h.k}"]`;
-function demoBody(d){const st=DST[d.id];return d.render?d.render(st):`<div class="var"><span class="vname">${esc(d.name)}</span><div class="vbox">${view(st.v)}</div></div>`}
-function paintDemo(el,d,hi,cls){const box=el.querySelector('.demoView');box.querySelectorAll('.hi,.walk').forEach(x=>x.classList.remove('hi','walk'));
-  for(const h of hi||[])box.querySelectorAll(sel(h)).forEach(x=>x.classList.add(cls))}
-function renderDemo(d,msg){const el=document.getElementById('demo-'+d.id);if(!el)return;const busy=!!DTIMER[d.id];
-  el.innerHTML=`<h4>${esc(d.title)}</h4><p class="explain">${d.about}</p><div class="demoView">${demoBody(d)}</div>
-  <div class="demobar" role="group" aria-label="Operations">${d.ops.map((o,i)=>`<button class="dbtn" data-demo="${d.id}" data-op="${i}"${busy?' disabled':''}>${esc(o.label)}</button>`).join('')}<button class="linkbtn" data-demo="${d.id}" data-op="reset"${busy?' disabled':''}>Reset</button></div>
-  <pre class="democode" aria-label="Code that ran">${msg&&msg.code?highlight(msg.code):'<span class="sy-cm">// press a button to run an operation</span>'}</pre>
-  <p class="demosay" aria-live="polite">${msg?msg.say:'Pick an operation above. Try them in different orders and watch what happens.'}</p>`}
+const demoBox=el=>el.querySelector('.vbox');
+const setBusy=(el,on)=>el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=on);
+/* The buttons are built once, so a keyboard user keeps focus; only the picture, the code and the sentence change. */
+function renderDemo(d,msg){const el=document.getElementById('demo-'+d.id);if(!el)return;
+  if(!el.querySelector('.demoView'))el.innerHTML=`<h4>${esc(d.title)}</h4><p class="explain">${d.about}</p><div class="demoView"><div class="var"><span class="vname">${esc(d.name)}</span><div class="vbox"></div></div></div>
+  <div class="demobar" role="group" aria-label="Operations">${d.ops.map((o,i)=>`<button class="dbtn" data-demo="${d.id}" data-op="${i}">${esc(o.label)}</button>`).join('')}<button class="linkbtn" data-demo="${d.id}" data-op="reset">Reset</button></div>
+  <pre class="democode" aria-label="Code that ran"></pre><p class="demosay" aria-live="polite"></p>`;
+  demoBox(el).innerHTML=draw[d.shape](DST[d.id]);
+  showDemoText(el,msg)}
+function showDemoText(el,msg){el.querySelector('.democode').innerHTML=msg&&msg.code?highlight(msg.code):'<span class="sy-cm">// press a button to run an operation</span>';
+  el.querySelector('.demosay').innerHTML=msg?msg.say:'Pick an operation above. Try them in different orders and watch what happens.'}
 function runDemo(id,op){const d=DEMOS.find(x=>x.id===id);if(!d||DTIMER[id])return;
   if(op==='reset'||!DST[id]){DST[id]={v:d.init()};renderDemo(d);return}
-  const r=d.ops[+op].run(DST[id]);renderDemo(d,r);const el=document.getElementById('demo-'+id);
-  const fin=()=>{DTIMER[id]=0;paintDemo(el,d,r.hi,'hi');el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=false)};
-  if(r.walk&&r.walk.length&&!reduced()){let k=0;DTIMER[id]=1;el.querySelectorAll('.dbtn,[data-op="reset"]').forEach(b=>b.disabled=true);
-    const step=()=>{if(k>=r.walk.length){fin();return}paintDemo(el,d,r.walk[k++],'walk');DTIMER[id]=setTimeout(step,420)};step()}
-  else paintDemo(el,d,r.hi,'hi')}
+  const el=document.getElementById('demo-'+id),btn=el.contains(document.activeElement)?document.activeElement:null;
+  const before=SCENES[d.shape].clone(DST[id]),r=d.ops[+op].run(DST[id]);
+  const fin=()=>{DTIMER[id]=0;draw.mark(demoBox(el),r.hi,'hi');setBusy(el,false);if(btn)btn.focus()};
+  const walk=()=>{let k=0;const step=()=>{if(k>=r.walk.length){fin();return}draw.mark(demoBox(el),r.walk[k++],'walk');DTIMER[id]=setTimeout(step,420)};step()};
+  DTIMER[id]=1;setBusy(el,true);showDemoText(el,r);
+  draw.play(demoBox(el),d.shape,before,DST[id],r,{reduced:reduced(),onDone:()=>r.walk&&r.walk.length&&!reduced()?walk():fin()})}
 function initDemos(){for(const d of DEMOS){DST[d.id]={v:d.init()};renderDemo(d)}}
-function watchDemo(ch){showTab('guide');const d=DEMOS.find(x=>x.ch===ch);const el=d&&document.getElementById('demo-'+d.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}
 let armProg=0;$('#guide').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.demo){runDemo(b.dataset.demo,b.dataset.op);return}if(b.dataset.code!==undefined){goFree(b.dataset.code);run();return}
   if(b.id==='resetProgress'){if(!b.classList.contains('armed')){b.classList.add('armed');b.textContent='Click again to erase XP, badges and saved code';clearTimeout(armProg);armProg=setTimeout(()=>{b.classList.remove('armed');b.textContent='Reset all progress'},4000);return}
     S=fresh();save();renderXP();showTab('quest');loadMission()}});
