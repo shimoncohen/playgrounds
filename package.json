@@ -21,6 +21,6 @@
     "@commitlint/config-conventional": "^21.2.4",
     "husky": "^9.1.7",
     "playwright": "1.65.0",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
