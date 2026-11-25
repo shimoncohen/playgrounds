@@ -35,16 +35,9 @@ test('lazy answers are caught', () => {
   // printing the expected output without using the structure
   assert.notEqual(check(m(0, 0), 'const staff = [1,2,3];\nprint(3);'), true);
   assert.notEqual(check(m(0, 1), 'print("red");print("gold");'), true);
-  assert.notEqual(check(m(4, 2), 'function countWords(t) { return new Map(t.split(" ").map(w => [w, 1])); }'), true);
   assert.notEqual(check(m(5, 2), 'function insert(r, v) { return { value: v, left: null, right: null }; }'), true);
   assert.notEqual(check(m(5, 4), 'function contains(r, v) { return true; }'), true);
   assert.notEqual(check(m(5, 1), 'function height(n) { return n ? 1 : 0; }'), true);
-});
-
-test('too-slow answers get a hint about speed, not just "wrong"', () => {
-  const slow = 'function twoSum(nums, t) {\n  for (let i = 0; i < nums.length; i++) {\n    for (let j = i + 1; j < nums.length; j++) {\n      if (nums[i] + nums[j] === t) return [i, j];\n    }\n  }\n  return null;\n}';
-  const r = check(D.CH[4].missions[4], slow);
-  assert.match(String(r), /too slow/);
 });
 
 test('endless loops stop with an error', () => {
@@ -98,7 +91,7 @@ const FIRST = {
   peek:        [/\bpeek\b/i, 1, 1],
 };
 
-const CONVERTED = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3'];
+const CONVERTED = ['0.0', '0.1', '0.2', '0.3', '0.4', '1.0', '1.1', '1.2', '1.3', '2.0', '2.1', '2.2', '3.0', '3.1', '3.2', '3.3', '4.0', '4.1', '4.2', '4.3', '4.4'];
 
 const convertedProblems = m => {
   const out = [];
@@ -174,6 +167,7 @@ test('the 1.0 and 1.1 goals name their function, and the 1.2 explain gives the -
   const b = D.CH[1].missions[2];
   assert.equal(b.practice.nothing, -1);
   assert.match(b.explain, /<code>-1<\/code>/);
+  assert.doesNotMatch(b.explain, /give back <code>undefined<\/code>/);
 });
 
 test('the 2.0 goal names serveFirst(names) and the 2.1 explain gives -1, not undefined', () => {
@@ -204,6 +198,66 @@ test('3.0, 3.1 and 3.3: each want is recomputed from the input alone', () => {
   for (const t of D.CH[3].missions[0].practice.fn.tests) assert.deepEqual(t.want, t.args);
   for (const t of D.CH[3].missions[1].practice.fn.tests) assert.equal(t.want, t.args[0].length);
   for (const t of D.CH[3].missions[3].practice.fn.tests) assert.equal(JSON.stringify(t.want), JSON.stringify([...t.args[0]].reverse()));
+});
+
+const P4 = loadEngines({ content: false }).DSQ.practice;
+const plain = v => JSON.parse(JSON.stringify(v));
+const expanded = b => plain(b).fn.tests.map(c => plain(P4.expandCase(c, P4.EXPANDERS, b.fn.sig, b.nothing)));
+
+test('the 4.x goals name their function; 4.0 gives -1 in its goal and explain; 4.3 and 4.4 say neither undefined nor null', () => {
+  for (const mi of [0, 1, 2, 3, 4]) {
+    const m = D.CH[4].missions[mi];
+    assert.ok(m.goal.includes(`<code>${m.practice.fn.name}(`), `4.${mi}: goal names ${m.practice.fn.name}`);
+  }
+  const m = D.CH[4].missions[0];
+  assert.ok(m.goal.includes('<code>lookupAll(keys, vals, queries)</code>'));
+  assert.ok(m.goal.includes('<code>lookupAll([1, 2], [30, 70], [2, 9, 1])</code>'));
+  assert.ok(m.goal.includes('<code>-1</code>'));
+  assert.match(m.explain, /<code>-1<\/code>/);
+  assert.ok(D.CH[4].missions[1].goal.includes('<code>countDistinct([3, 5, 3])</code>'));
+  assert.ok(D.CH[4].missions[2].goal.includes('<code>countWords("the key the lock the key")</code>'));
+  assert.match(D.CH[4].missions[2].explain, /first-seen order/);
+  for (const mi of [3, 4]) assert.doesNotMatch(D.CH[4].missions[mi].goal, /undefined|null/, `4.${mi}`);
+  assert.ok(D.CH[4].missions[3].goal.includes('<code>-1</code>'));
+  assert.ok(D.CH[4].missions[4].goal.includes('<code>[]</code>'));
+});
+
+test('4.0 to 4.4: each want is recomputed from the input alone, generated cases included', () => {
+  const lookupAll = ([keys, vals, queries]) => { const m = new Map(); keys.forEach((k, i) => m.set(k, vals[i])); return queries.map(q => (m.has(q) ? m.get(q) : -1)); };
+  const countWords = ([text]) => {
+    if (text === '') return [];
+    const counts = new Map();
+    for (const w of text.toLowerCase().split(' ')) counts.set(w, (counts.get(w) || 0) + 1);
+    return [...counts].map(([w, c]) => `${w} ${c}`);
+  };
+  const firstRepeat = ([items]) => { const seen = new Set(); for (const x of items) { if (seen.has(x)) return x; seen.add(x); } return -1; };
+  // Brute force, and at most one pair may match, so every want is unambiguous.
+  const twoSum = ([nums, target]) => {
+    const pairs = [];
+    for (let i = 0; i < nums.length; i++) for (let j = i + 1; j < nums.length; j++) if (nums[i] + nums[j] === target) pairs.push([i, j]);
+    assert.ok(pairs.length <= 1, `twoSum: ${pairs.length} pairs for target ${target}`);
+    return pairs[0] || [];
+  };
+  for (const [mi, f] of [[0, lookupAll], [1, ([items]) => new Set(items).size], [2, countWords], [3, firstRepeat], [4, twoSum]]) {
+    const cases = expanded(D.CH[4].missions[mi].practice);
+    assert.ok(cases.length >= 5, `4.${mi}: cases`);
+    for (const c of cases) assert.deepEqual(c.want, f(c.args), `4.${mi}: ${JSON.stringify(c.args).slice(0, 60)}`);
+  }
+});
+
+// A generated size below the floor would let a nested scan fit the step limit.
+test('4.0, 4.1, 4.3 and 4.4 speed proof: the lazy answer passes every literal case and reports limit on the generated one', () => {
+  for (const [mi, floor] of [[0, 500], [1, 700], [3, 700], [4, 700]]) {
+    const id = `4.${mi}`, b = plain(D.CH[4].missions[mi].practice), last = b.fn.tests.at(-1);
+    const gens = [...last.args, last.want].filter(e => e && e.gen);
+    assert.ok(gens.length > 0, `${id}: the last case is generated`);
+    assert.ok(Math.min(...gens.flatMap(e => [e.n, e.q ?? e.n])) >= floor, `${id}: generated size is below ${floor}`);
+    for (const lang of ['js', 'py', 'rs']) {
+      if (P4.PENDING.some(r => r.mission === id && r.lang === lang)) continue;
+      const got = plain(P4.RUNNERS[lang].run(b.langs[lang].lazy, b)).map(r => r.status);
+      assert.deepEqual(got, [...b.fn.tests.slice(0, -1).map(() => 'pass'), 'limit'], `${id} ${lang}`);
+    }
+  }
 });
 
 // The learner's starter carries the page's own helpers, so a drifting copy would make the page's run and the starter disagree.

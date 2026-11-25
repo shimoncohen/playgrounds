@@ -705,7 +705,7 @@ function runnerAvailable(lang){
   try{return !!RUNNERS[lang].available()}catch{return false}
 }
 
-const PENDING=[{mission:'1.2',lang:'py',issue:309},{mission:'1.2',lang:'cpp',issue:310},{mission:'2.1',lang:'py',issue:309},{mission:'2.1',lang:'cpp',issue:310},{mission:'3.2',lang:'py',issue:309},{mission:'3.2',lang:'cpp',issue:310}];
+const PENDING=[{mission:'1.2',lang:'py',issue:309},{mission:'1.2',lang:'cpp',issue:310},{mission:'2.1',lang:'py',issue:309},{mission:'2.1',lang:'cpp',issue:310},{mission:'3.2',lang:'py',issue:309},{mission:'3.2',lang:'cpp',issue:310},{mission:'4.0',lang:'cpp',issue:310},{mission:'4.1',lang:'cpp',issue:310},{mission:'4.2',lang:'cpp',issue:310},{mission:'4.0',lang:'rs',issue:311},{mission:'4.1',lang:'rs',issue:311},{mission:'4.2',lang:'rs',issue:311},{mission:'4.3',lang:'cpp',issue:310},{mission:'4.4',lang:'cpp',issue:310},{mission:'4.3',lang:'rs',issue:311},{mission:'4.4',lang:'rs',issue:311}];
 function checkPendingRow(row,ids){
   if(!isObj(row))fail('pending row must be an object');
   if(row.mission!=='*'&&!ids.includes(row.mission))fail(`pending row: unknown mission ${JSON.stringify(row.mission)}`);

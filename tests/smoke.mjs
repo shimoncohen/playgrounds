@@ -3636,6 +3636,89 @@ test('ds-quest mission page: 3.3 shows the not-flipped-yet row shrink, labels th
   await ctx.close();
 });
 
+test('ds-quest mission page: 4.0 finishes step 1 on set umbrella, set hat, get umbrella, and step 2 offers JavaScript and Python only', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 4, mi: 0 });
+  await page.locator('#vbox .sc').waitFor();
+  await dsNotWon(page, [0, 2, 3], 'set umbrella, set scarf, get umbrella');
+  await dsNotWon(page, [0, 1], 'set umbrella, set hat with no get');
+  await dsPlay(page, [0, 1, 3]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.match(await page.textContent('#vend .msg.win'), /Step 1 done!/);
+  assert.match(await page.textContent('#vmoves'), /Moves 3 · fewest 3/);
+  await page.click('[data-v="go2"]');
+  await page.locator('#code').waitFor();
+  assert.match(await page.inputValue('#code'), /function lookupAll/);
+  await page.click('#langBar [data-lang="py"]');
+  assert.match(await page.inputValue('#code'), /def lookup_all/);
+  assert.match(await page.textContent('#langBar [data-lang="cpp"]'), /not yet \(#310\)/);
+  assert.match(await page.textContent('#langBar [data-lang="rs"]'), /not yet \(#311\)/);
+  assert.ok(await page.locator('#langBar [data-lang="cpp"]').isDisabled() && await page.locator('#langBar [data-lang="rs"]').isDisabled());
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 4.1 finishes step 1 on add 5 then has 5, and not on add 7 then has 5', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 4, mi: 1 });
+  await page.locator('#vbox .sc').waitFor();
+  await dsNotWon(page, [2, 3], 'add 7, has 5');
+  await dsNotWon(page, [1], 'add 5 with no has');
+  await dsPlay(page, [1, 3]);
+  await page.locator('#vend .msg.win').waitFor();
+  assert.match(await page.textContent('#vend .msg.win'), /Step 1 done!/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+async function dsAnswerAll(page, ch, mi, wrongFirst) {
+  const pauses = await page.evaluate(([c, m]) => { const v = DSQ.CH[c].missions[m].visual; return v.pauses.map(p => ({ ask: p.ask, choices: p.choices, right: DSQ.visual.answerOf(v, p.step) })); }, [ch, mi]);
+  for (const [n, p] of pauses.entries()) {
+    for (let i = 0; i < 8 && await page.locator('#vqask').count() === 0; i++) { await page.click('[data-v="step"]'); await dsIdle(page); }
+    await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
+    if (wrongFirst && n === 0) {
+      await page.click(`#vq [data-c="${p.choices.findIndex(c => c !== p.right)}"]`);
+      await page.waitForFunction(() => document.querySelector('#vsay').textContent.includes('Not quite. Here is what really happens:'));
+      await dsIdle(page);
+      await page.waitForFunction(ask => document.querySelector('#vqask')?.textContent === ask, p.ask);
+      assert.equal(await dsWon(page), false, 'a wrong answer does not finish step 1');
+    }
+    await page.click(`#vq [data-c="${p.choices.indexOf(p.right)}"]`);
+    await dsIdle(page);
+  }
+  await page.locator('#vend .msg.win').waitFor();
+  return pauses;
+}
+
+test('ds-quest mission page: 4.2 asks three counts, keeps the question open after a wrong answer, and ends with "You worked out every answer."', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 4, mi: 2 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 4, 2, true);
+  assert.equal(pauses.length, 3);
+  assert.match(await page.textContent('#vend .msg.win'), /You worked out every answer\./);
+  assert.doesNotMatch(await page.textContent('#vend .msg.win'), /Every answer was right/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 4.3 asks three yes or no questions (false, false, true) and ends with every answer right', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 4, mi: 3 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 4, 3, false);
+  assert.deepEqual(pauses.map(p => p.right), [false, false, true]);
+  assert.match(await page.textContent('#vend .msg.win'), /Every answer was right\./);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('ds-quest mission page: 4.4 asks which partner each number looks for with target 12 (10, 4, 8)', async () => {
+  const { ctx, page, errors } = await dsPage({}, { ch: 4, mi: 4 });
+  await page.locator('#vbox .sc').waitFor();
+  const pauses = await dsAnswerAll(page, 4, 4, false);
+  assert.deepEqual(pauses.map(p => p.right), [10, 4, 8]);
+  assert.match(await page.textContent('#vend .msg.win'), /Every answer was right\./);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('ds-quest practice page: an old save keeps its JavaScript text under code, and other languages go under codes', async () => {
   const old = 'function sum(nums){ return 7; }';
   const { ctx, page, errors } = await dsPage({}, { ch: 0, mi: 3, seen: { '0.3': true }, done: { '0.3': true }, code: { '0.3': old } });
